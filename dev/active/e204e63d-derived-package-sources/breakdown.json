@@ -1,0 +1,673 @@
+[
+  {
+    "key": "shipped-policy-region-generator",
+    "title": "Render the shipped area classification into the adopter configuration reference",
+    "description": "The adopter configuration reference and the copyable example configuration obtain the managed, permanent, and issue-scoped area lists from the shipped classification by generation, so neither carries a hand-maintained second copy that can go stale.\n\n## Background\n\nThe shipped development-area classification is declared once in the engine, as the scaffolding constant that repository initialization renders into the configuration table a new repository receives. Two adopter-facing files restate parts of it by hand: the configuration reference carries a fenced block reproducing all three lists verbatim, and the copyable example carries a deliberately reduced illustrative subset that says so in a comment. Nothing binds either to the constant. Both went stale during earlier work and blocked two reviews before they were repaired.\n\nOnly one route to the shipped values respects the boundary between shipped behaviour and this repository's own configuration. Initializing a throwaway repository in a temporary directory produces the table the shipped constant renders; reading the configuration this repository runs under would report its local policy, which merely happens to agree today and is documented as a repository-local choice rather than a binding.\n\nThe example file keeps its hand-authored character everywhere else. Only its area-classification table becomes generated, and its illustrative subset gives way to the table a fresh repository actually receives, so a reader copying the file starts from the shipped classification.\n\nOne property of this route is load-bearing and easy to miss. Initialization runs from the installed binary, so the values the generator obtains are the classification compiled into the binary in use, not the declaration at the current revision. If a contributor edits the declaration and runs the generator without reinstalling, the regions are written from the older compiled copy: they are stale and internally consistent, so rerunning the generator changes nothing and the staleness survives. The repository already knows when an installed binary predates the sources it is judging, but that knowledge cannot help here \u2014 it identifies a repository by resolving a revision in it, and initialization runs in a temporary directory that has no repository at all, so nothing is reported. The generator therefore has to make the check itself, against the repository it is writing into.\n\nSilence is not evidence either way, which is why the check has to be positive rather than an absence of complaint. A binary built without injected provenance reports its build commit as unknown, and an unknown commit, an unresolvable head, or a commit outside the repository's history all resolve to the same not-applicable outcome as a binary that is genuinely current. A binary from an ordinary install is therefore indistinguishable from a fresh one unless currency is established rather than assumed.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository-local generator initializes a throwaway repository in a temporary directory and reads the area-classification table written there, leaving the working tree it runs in otherwise unchanged.\n- [hard] REQ-02: The generator writes that table into a marked region in the adopter configuration reference and into a marked region in the copyable example configuration.\n- [hard] REQ-03: Bytes outside the markers in both targets are preserved exactly, including surrounding prose, authored comments, and every other configuration table.\n- [hard] REQ-04: Neither target retains a hand-maintained restatement of the managed, permanent, or issue-scoped area lists.\n- [hard] REQ-05: A second generator run immediately after the first finds nothing to change.\n- [hard] REQ-06: The generator reads no configuration belonging to this repository, so the values it writes come only from what initialization produces.\n- [hard] REQ-07: The generator writes only once it has positively established, against the repository it writes into rather than against the throwaway directory, that the binary it reads the classification from carries provenance resolvable in that repository and does not predate that repository's sources. Provenance that is absent, unresolvable, or outside that repository's history is a refusal to write, never a pass.\n\n## Notes\n\nThe reference's surrounding prose already explains what the table is and where its authority lives; that prose stays hand-authored and only the values become generated.\n\nOne route to the currency check is available and one is a trap. The available one asks the binary itself: invoked from inside the repository with the marker that puts it in gate-child mode, it reports its own refusal status when it predates that repository, and existing coverage pins that behaviour. Reimplementing the check instead \u2014 reading the binary's reported build provenance, comparing it against the repository head, and re-deriving in shell which paths count as build inputs \u2014 would create a second copy of the very inventory this work exists to bind to one authority.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:policy-projection",
+      "satisfies:REQ-01",
+      "per:@/issue/e204e63d/decision/D-3",
+      "per:@/issue/e204e63d/decision/D-4",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "code-review",
+      "docs-mechanical",
+      "doc-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The two adopter configuration files carry the shipped area classification as a generated region rather than authored prose.",
+      "contract_refs": [
+        "generated-region-splice",
+        "shipped-policy-authority"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "D-3",
+        "D-4",
+        "C6",
+        "C7",
+        "C8",
+        "S3.5",
+        "S4.3",
+        "S4.4",
+        "S7.4"
+      ],
+      "landing_group": "policy-docs",
+      "terminal": {
+        "consumer_family": "the adopter configuration reference pages",
+        "test_boundary": "the generator's own scratch-directory run compared against the committed regions",
+        "worker_sized_reason": "One generator script writes two marked regions that no other work in this container edits.",
+        "footprint": {
+          "creates": [
+            "scripts/docs-render-documentation-policy.sh"
+          ],
+          "touches": [
+            "docs/reference/configuration.md",
+            "docs/reference/example-config.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "shipped-policy-freshness-checker",
+    "title": "A mechanical freshness check for the generated shipped-policy regions",
+    "description": "A deterministic check reports a generated shipped-policy region that no longer matches what repository initialization produces, so the two adopter configuration files cannot drift from the shipped classification unnoticed.\n\n## Background\n\nGenerating the area-classification tables removes the hand-maintained copies, but generation alone does not keep them current: a change to the shipped classification leaves the committed regions correct-looking and wrong until someone reruns the generator. The repository's deterministic documentation checks exist for exactly this class of defect and already carry a member that re-renders configured projections and reports a difference.\n\nThat family has settled conventions. Each member is one committed script that derives both sides of its comparison live from the tree so it encodes no product facts of its own; each reports pass, a genuine finding, or an environment failure through three distinct exit statuses, with an environment failure dominating a finding; each guards its prerequisites up front and names the missing tool. Members split into those taking a caller-supplied footprint and those whose targets are fixed by configuration. A freshness check for two named documents belongs to the second class. A separate self-test harness proves each member in both directions by seeding a defect, asserting a non-zero result, then asserting a clean tree passes; that harness never mutates the real repository.\n\nThe family's own description enumerates its members by name, which makes the description a hand-maintained list that goes stale the moment a member is added.\n\nOne failure mode needs stating because it is neither a prerequisite nor a command failure. The classification the check compares against is produced by the installed binary, so a binary predating the repository under check produces an authoritative-looking but outdated table. Treating that as a difference emits a finding for what is an environment problem; treating it as nothing-to-compare passes vacuously, which is the more dangerous outcome. No refusal status arrives to be translated, because the refusal identifies a repository by resolving a revision in it and the classification is produced in a temporary directory that has none. The check therefore assesses that condition itself, against the repository it is checking, and classifies it as an environment failure.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed check compares the generated regions in both adopter configuration files against freshly produced output and reports a difference as a finding.\n- [hard] REQ-02: The check derives both sides of its comparison live, encoding no copy of the shipped classification.\n- [hard] REQ-03: The check reports pass, finding, and environment failure through the three distinct statuses the family already uses, guards its prerequisites before doing work, and reports any failure to obtain a trustworthy classification \u2014 a binary that predates the repository under check, and equally one whose provenance cannot be resolved against that repository \u2014 as an environment failure, never as a finding and never as a pass.\n- [hard] REQ-04: The check runs against the working tree without leaving it modified.\n- [hard] REQ-05: The check runs as part of the family's fan-out, and its result reaches the aggregate outcome under the family's precedence rules.\n- [hard] REQ-06: The self-test harness proves three cases: a clean tree passes, a seeded stale region is reported as a finding, and an untrustworthy classification is reported as an environment failure.\n- [hard] REQ-07: The family's own description no longer enumerates its members by name, so adding a member cannot make it stale.\n\n## Notes\n\nThe check needs the generator's output, so it either invokes the generator against a scratch copy of the tree or reproduces its inputs; either way it must not depend on a value stated in the check itself.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:policy-projection",
+      "satisfies:REQ-01",
+      "per:@/issue/e204e63d/decision/D-4",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "code-review",
+      "docs-mechanical",
+      "doc-review",
+      "jit-validate"
+    ],
+    "depends_on": [
+      "shipped-policy-region-generator"
+    ],
+    "planning": {
+      "outcome": "A stale generated policy region in either adopter configuration file fails the mechanical documentation checks.",
+      "contract_refs": [
+        "shipped-policy-authority"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "D-4",
+        "C8",
+        "Q6",
+        "S4.4",
+        "S7.2"
+      ],
+      "landing_group": "policy-docs",
+      "terminal": {
+        "consumer_family": "the mechanical documentation-check family",
+        "test_boundary": "the checker self-test harness exercising its three outcomes",
+        "worker_sized_reason": "One checker in the shape of the existing projection check, plus its self-test block.",
+        "footprint": {
+          "creates": [
+            "scripts/docs-check-shipped-policy.sh"
+          ],
+          "touches": [
+            "scripts/docs-mechanical.sh",
+            "scripts/docs-check-selftest.sh",
+            ".jit/gates.toml",
+            "docs/reference/rules-and-gates.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "plan-template-generated-region",
+    "title": "Generate the repository plan-template declaration from the packaged contribution",
+    "description": "The repository's planning-bracket template declaration becomes a generated region rendered from the packaged contribution that is its authority, so the two declarations cannot disagree.\n\n## Background\n\nThe planning-bracket template is declared twice: once inline in the packaged workflow manifest as a semantic contribution, and once in this repository's own template registry. The two match on structure \u2014 roles, types, gates, document paths, labels, internal edges, anchor edges, and transforms are identical after parsing \u2014 and differ in three description strings. Nothing compares them, so that drift has gone unreported.\n\nThe packaged declaration is the shipped artifact and the repository declaration is a local consumer of it, which fixes the direction: the packaged contribution is the authority and the repository copy becomes generated from it. The packaged contribution is already exposed whole through the package's machine-readable inspection output, so no new surface is needed to read it.\n\nTwo properties of the existing registry file constrain the change. Its seven-line header sits outside the template block and survives untouched. Inside the block, a six-line explanation records why the container anchor carries a whole-repository validation gate rather than the per-issue one, citing the criterion and invariant that motivated it; no round trip through a serializer preserves in-block commentary or the file's column alignment, so that rationale has to move outside the generated region to survive.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository plan-template declaration is a marked generated region whose body is rendered from the packaged planning-bracket contribution.\n- [hard] REQ-02: Rendering leaves every byte outside the markers unchanged, including the file header.\n- [hard] REQ-03: The rationale for the container anchor's whole-repository validation gate survives, stated outside the generated region.\n- [hard] REQ-04: A test compares the parsed repository declaration against the parsed packaged declaration and fails when any field differs, description strings included.\n- [hard] REQ-05: The test rests on the two parsed declarations, not on a hand-written expectation of what either contains.\n- [hard] REQ-06: The three description strings that differ today are equal afterwards, with the packaged text taken as authoritative.\n- [hard] REQ-07: The template registry loads the regenerated file, and the plan template still applies to the container type it applies to today.\n\n## Notes\n\nTwo further plan-template declarations exist as adopter-facing illustrations of different rulesets. Both restate this declaration's top-level description string verbatim, and one also restates its planning-node description. They illustrate authoring forms rather than this repository's workflow and stay hand-authored; this work does not touch them.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:template-projection",
+      "satisfies:REQ-02",
+      "per:@/issue/e204e63d/decision/D-1",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "jit-validate"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The repository plan-template block is a generated region whose divergence from the packaged declaration fails the suite.",
+      "contract_refs": [
+        "generated-region-splice"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "D-1",
+        "C4",
+        "C5",
+        "Q4",
+        "S3.2",
+        "S7.4",
+        "S8.6"
+      ],
+      "landing_group": "template-region",
+      "terminal": {
+        "consumer_family": "the repository template registry",
+        "test_boundary": "in-crate tests over the embedded package",
+        "worker_sized_reason": "One renderer beside the existing drift test, and one region inside a forty-eight-line configuration file.",
+        "footprint": {
+          "touches": [
+            ".jit/templates.toml",
+            "crates/jit/src/profile/dogfood.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "provenance-fixture-live-inputs",
+    "title": "Seed the provenance fixture with the repository sources the package draws from",
+    "description": "The isolated repository the build-stability fixture seeds includes the packaged live sources that sit under the tracker data root, so a build inside that fixture can read every source the package is assembled from.\n\n## Background\n\nThe build-stability fixture seeds a throwaway git repository from an inventory of this repository's tracked and untracked inputs, then cold-builds every test target inside it and rebuilds to observe what a metadata-only change invalidates. Its inventory filter bans whole categories outright: the tracker data root, git internals, other agents' worktrees, and generated trees.\n\nOne packaged asset lives under the tracker data root \u2014 the content standards reference the package installs for adopters. While the package carries its own checked-in copy, that ban is harmless. Once the packaged tree is assembled from the repository files it mirrors, a build inside the seeded fixture cannot find that source and the fixture's cold baseline build fails. The failure would surface as an unexplained build error in a suite about relinking, far from its cause.\n\nThe ban exists for a reason: seeding a fixture with a repository's issue data would make every issue mutation an input to a build-stability measurement. The exception has to be narrow enough to keep that property and explicit enough that a later reader does not widen it back to the whole root.\n\n## Success Criteria\n\n- [hard] REQ-01: The seeded fixture repository contains the packaged sources that live under the tracker data root.\n- [hard] REQ-02: The rest of the tracker data root stays out of the fixture, so issue data is still not a build-stability input.\n- [hard] REQ-03: The filter states why the exception is narrow, in terms a later reader can apply rather than reverse.\n- [hard] REQ-04: Git internals, other agents' worktrees, and generated trees stay banned.\n- [hard] REQ-05: The seeded fixture's cold baseline build succeeds with the additional sources present.\n\n## Notes\n\nThe exception is derived from what the package declares rather than named as a single file path where that is practical, so a second packaged source under the same root needs no further edit here.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The provenance fixture repository carries the packaged live sources, so a cold build inside it succeeds.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-03",
+        "Q10",
+        "S5"
+      ],
+      "landing_group": "package-cutover",
+      "terminal": {
+        "consumer_family": "the provenance contract fixture",
+        "test_boundary": "the seeded-repository build stability suite",
+        "worker_sized_reason": "One filter predicate narrows, with the rationale that keeps a later reader from widening it.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/provenance_contract/repository_inventory.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "build-time-package-derivation",
+    "title": "Derive the packaged live-asset tree at build time",
+    "description": "The packaged tree the binary embeds is assembled at build time from the repository files it mirrors, so editing a live consumer cannot leave a stale packaged copy behind.\n\n## Background\n\nThe workflow package is embedded into the binary as a whole directory at compile time, so every asset an adopter receives has to exist inside that directory. This repository consumes the same files at their working paths, which is why sixty-one asset pairs are carried twice in the tree. A test asserts each pair byte-identical, executable mode included, so drift fails the suite rather than shipping \u2014 but both copies are hand-maintained and keeping them equal is a step a contributor has to remember on every edit.\n\nAssembling the packaged tree at build time removes the second copy. The build script writes the package into the build output directory and the embed reads it from there. Two properties of that directory make the assembly more than a copy. It is not reset between builds, so a live consumer that is deleted or renamed leaves its stale copy behind and ships unless the assembly reconciles the subtree it owns. And rewriting it unconditionally moves timestamps on every build-script run, which relinks every test target \u2014 the regression an earlier change removed from this build script by making it read nothing ambient \u2014 so a destination is written only when its bytes differ from its source.\n\nOrdering is guaranteed rather than arranged: the build script runs to completion before the rest of the package compiles, so the embed always reads an assembled tree.\n\nOne packaged file is not drawn from a repository file at all. The managed-region source has no live counterpart, because its counterpart is a marked region inside a repository document rather than a whole file. It stays package-authored and moves out of the derived prefix, so the prefix means exactly one thing and no reconciliation pass can mistake it for a leftover.\n\nAn earlier decision weighed build-time generation of this tree and rejected it as unjustified complexity for one small data tree; a later one made the package the authority and the working paths its rendered consumers. The renderer that decision assumed was never built, so what shipped is a hand-maintained duplicate plus an equality assertion. Both positions are superseded here, and the direction reverses: the repository files become the authority and the packaged tree becomes derived.\n\nThe existing equality assertion carries a second guarantee that must not be lost with it. Alongside comparing bytes, it asserts each declared asset's executable declaration against the actual mode of the repository file it mirrors, in both directions, and it is the only place in the workspace that does so. Byte equality becomes vacuous once the package is assembled by copying, but the executable declaration stays hand-written per asset and the embedding carries no mode metadata at all, so nothing recovers that guarantee implicitly. Rewriting the assertion therefore means keeping its mode half rather than retiring it with its byte half; otherwise a permission change on a live source, or a newly packaged script whose flag is mis-declared, leaves the packaged declaration wrong with nothing reporting it.\n\n## Success Criteria\n\n- [hard] REQ-01: The build script assembles the package under the build output directory from the repository files the manifest declares as live sources, and the embed reads that assembled tree.\n- [hard] REQ-02: No second copy of a live source remains under the package directory in the repository.\n- [hard] REQ-03: The build script re-runs when a file beneath any declared live root changes, and when the manifest changes.\n- [hard] REQ-04: A declared live source absent from the repository fails the build with a message naming the path.\n- [hard] REQ-05: The build script writes a destination only when its bytes differ from the source it is assembled from.\n- [hard] REQ-06: The build script removes a file in the subtree it owns that the manifest no longer declares.\n- [hard] REQ-07: The managed-region source stays package-authored and sits outside the derived prefix.\n- [hard] REQ-08: The assembled tree carries the same set of live-asset sources at the same package-relative paths, one for one with the checked-in tree it replaces, and each of those assets' bytes, executable declaration, and repository target is unchanged. The reported package hash is not that comparison and does change, because the manifest itself changes.\n- [hard] REQ-09: The citation checker's package exclusions still describe what remains of the package directory.\n- [hard] REQ-10: Each declared live asset's executable declaration is asserted against the mode of the repository file it is drawn from, so a permission change alone fails the suite.\n\n## Notes\n\nThe build script reads the manifest for the asset paths it assembles and the roots it watches; it performs no manifest validation, which stays with the runtime package model that already rejects a declared-but-absent source and an undeclared package file.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-03",
+      "per:@/issue/e204e63d/decision/D-2",
+      "enforces:@/invariant/canonical-cutover"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "provenance-fixture-live-inputs",
+      "live-source-root-declaration"
+    ],
+    "planning": {
+      "outcome": "The embedded package reads a tree assembled by the build script from the repository files it mirrors.",
+      "contract_refs": [
+        "live-source-declaration",
+        "derivation-reader-boundary",
+        "derived-tree-reconciliation"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "D-2",
+        "C1",
+        "C3",
+        "C10",
+        "Q1",
+        "Q2",
+        "Q3",
+        "S3.1",
+        "S3.2",
+        "S3.3",
+        "S3.4",
+        "S4.5",
+        "S8.3",
+        "S8.5"
+      ],
+      "landing_group": "package-cutover",
+      "terminal": {
+        "consumer_family": "the embedded profile package",
+        "test_boundary": "the existing in-crate package assertions over the assembled tree",
+        "worker_sized_reason": "One build script, one embed path, and the duplicated copies that script replaces.",
+        "footprint": {
+          "creates": [
+            "profiles/jit-dogfood/assets/regions/agents-jit-guidance.md"
+          ],
+          "touches": [
+            "Cargo.lock",
+            "crates/jit/build.rs",
+            "crates/jit/Cargo.toml",
+            "crates/jit/src/profile/dogfood.rs",
+            "profiles/jit-dogfood/assets/live/",
+            "profiles/jit-dogfood/manifest.toml",
+            "scripts/docs-check-citations.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "derivation-staleness-coverage",
+    "title": "Pin the derived tree's incremental build behaviour",
+    "description": "The two incremental-build properties the assembled package depends on are observed by the suite rather than assumed: a repository file that goes away leaves the package, and an assembly run that changes nothing invalidates nothing.\n\n## Background\n\nAssembling the package into the build output directory introduces two behaviours that no existing test can see. The directory persists across builds, so a live consumer removed from the repository keeps its copy there and ships in the next binary unless the assembly reconciles the subtree it owns; a suite that only ever builds forward never observes this. And the assembly is triggered by timestamps on the directories it watches, so a branch switch reruns it on files whose content did not change; if the run rewrites its destinations regardless, every test target relinks. That is the same class of regression an earlier change removed from this build script, and the repository's build-footprint budget measures target counts and executable bytes rather than invalidation, so it would not report it.\n\nAn existing harness already seeds an isolated repository, cold-builds every test target, mutates the tree, rebuilds, and asserts that nothing was relinked. Both properties are observable through that harness with a different mutation in place of its current one.\n\n## Success Criteria\n\n- [hard] REQ-01: A live consumer removed from the seeded repository is absent from the package the next incremental rebuild embeds, without clearing the build output directory.\n- [hard] REQ-02: A rebuild after a timestamp-only change beneath a watched root leaves the test targets fresh, relinking none of them.\n- [hard] REQ-03: A failure reports which of the two properties broke, rather than surfacing as one opaque mismatch.\n- [hard] REQ-04: Both assertions run in the same isolated seeded repository, so neither depends on the state of the working checkout.\n\n## Notes\n\nThe second property is the load-bearing one for build cost, and it was not measured in this workspace before this work; the assertion is what turns the expected behaviour into an observed one.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-03",
+      "enforces:@/invariant/bounded-rust-build-footprint"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "build-time-package-derivation"
+    ],
+    "planning": {
+      "outcome": "A removed live consumer disappears from the package, while an unchanged rebuild leaves the test targets fresh.",
+      "contract_refs": [
+        "derived-tree-reconciliation"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "Q3",
+        "Q8",
+        "S7.3",
+        "S8.2",
+        "S8.3"
+      ],
+      "landing_group": "derivation-coverage",
+      "terminal": {
+        "consumer_family": "the provenance contract fixture",
+        "test_boundary": "the seeded-repository build stability suite",
+        "worker_sized_reason": "Two assertions land in one existing harness that already cold-builds then rebuilds a seeded repository.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/provenance_contract/build_provenance_metadata_stability_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "package-content-reproducibility",
+    "title": "Two builds report the same package hash",
+    "description": "Two builds from identical sources under identical injected environment report the same package hash and the same provenance, so an assembled package is reproducible rather than incidentally equal.\n\n## Background\n\nAssembling the package at build time makes what the binary embeds a product of a script rather than of checked-in bytes, which raises a question the checked-in tree never posed: does repeating a build produce the same package? Directory iteration order, timestamps, and partially assembled trees are all ways it could not.\n\nAn existing test already builds twice with the same injected provenance values and asserts the two builds report identical provenance documents. It compares reported metadata, not produced bytes. Extending that comparison to the package hash the binary reports is the smallest honest way to observe reproducibility here, and it is deliberately narrower than comparing executable bytes: this workspace has no byte-reproducibility property today for reasons unrelated to this work, so asserting the stronger form would either fail for unrelated causes or have to be weakened until it meant nothing.\n\nThe hash a binary reports is folded over the manifest and every embedded path and its bytes, so it moves whenever what was embedded moves. That makes it the right cross-build comparison and the wrong before-and-after comparison: it is expected to differ once the manifest changes.\n\n## Success Criteria\n\n- [hard] REQ-01: Two builds from identical sources under identical injected provenance report the same package hash.\n- [hard] REQ-02: Those two builds report identical provenance documents.\n- [hard] REQ-03: Changing a live source between the two builds changes the reported package hash, so the comparison is sensitive rather than vacuous.\n- [hard] REQ-04: A build starting from an empty build output directory embeds the complete declared inventory, with no declared asset missing.\n- [hard] REQ-05: The comparison reads values the built binary reports about what it embedded, so it needs no assumption about executable byte layout.\n- [hard] REQ-06: The sensitivity check mutates an isolated seeded copy rather than the working checkout, so a concurrent worker's tree is never touched.\n\n## Notes\n\nThe isolated commit verifier that judges whether a named commit compiles is not extended here: it is not run by any configured check, whereas the two-build comparison already runs as part of the workspace's provenance step.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-04",
+      "per:@/issue/e204e63d/decision/D-5"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "build-time-package-derivation"
+    ],
+    "planning": {
+      "outcome": "Two builds from identical sources under identical injected environment report the same package hash and provenance.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-04",
+        "D-5",
+        "Q3",
+        "Q10",
+        "S4.5",
+        "S8.1"
+      ],
+      "landing_group": "derivation-coverage",
+      "terminal": {
+        "consumer_family": "the provenance contract suite",
+        "test_boundary": "the injected-provenance two-build comparison",
+        "worker_sized_reason": "An existing two-build test gains a hash comparison beside its provenance comparison, reusing the seeding helper already in the suite.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/provenance_contract/version_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "live-source-root-declaration",
+    "title": "Declare the repository roots the packaged live assets are drawn from",
+    "description": "The package manifest states which repository roots its live assets are drawn from, so the set a completeness check has to walk is declared data rather than a fact spread across an inventory.\n\n## Background\n\nThe packaged live assets are drawn from four repository roots today: the agent skill tree, the script directory, the contributed-gate directory, and the tracker's reference directory. Nothing says so. The information exists only implicitly, in the shape of sixty-one declared asset paths, so anything that needs the root set \u2014 a build-time assembly deciding which directories to watch, a check asking whether every live consumer was packaged \u2014 has to infer it or restate it.\n\nThe roots are not usable as bare directories. Fifty-two files under the skill tree, thirty-two under the script directory, and four under the contributed directory are deliberately not packaged: evaluation harnesses, fixtures, transcripts, this repository's own build and check scripts, and review prompts. A literal list of those thirty-six paths would itself be a hand-maintained inventory that goes stale, so exclusions are patterns rather than path literals.\n\nThe manifest's wire shape is public: it is reported by the package's machine-readable inspection output and reaches an agent-facing bridge that asserts against it. Unknown keys are rejected, so the declaration has to be additive \u2014 a manifest without it still parses, and no existing key changes meaning. Keeping the declaration in the manifest rather than in engine code also keeps a repository-local fact inside the package where it belongs.\n\nRoots and patterns are constrained tokens rather than free strings: a malformed entry is rejected where the manifest is parsed, not discovered later by whatever consumes it. Rejecting a malformed pattern at parse time means compiling it there, so the pattern matcher this container needs is introduced here, by the type that owns pattern validity, rather than by whichever consumer happens to match first.\n\n## Success Criteria\n\n- [hard] REQ-01: The manifest declares one entry per repository root the packaged live assets are drawn from, each carrying its own exclusion-pattern list; a list may be empty, since what belongs in it is measured elsewhere.\n- [hard] REQ-02: A root and an exclusion pattern are constrained types rejected at parse time when malformed, rather than strings passed through untouched.\n- [hard] REQ-03: The addition is additive: a manifest carrying no such declaration still parses, and no existing key changes meaning.\n- [hard] REQ-04: The declaration is reported by the package's machine-readable inspection output.\n- [hard] REQ-05: The agent-facing bridge's coverage accounts for the reported shape, so the addition is observed rather than assumed compatible.\n- [hard] REQ-06: The four roots the packaged live assets are drawn from today are declared.\n- [hard] REQ-07: The managed-region source and every install-only asset source fall outside every declared root, so no root claims a package-authored file as a live consumer.\n- [hard] REQ-08: The adopter reference describing what the manifest carries accounts for the declaration.\n\n## Notes\n\nPopulating the exclusion lists is measurement work: only a walk over the roots can tell whether a pattern set is sufficient, so the lists are filled by the work that performs that walk.\n\nOne install-only asset's target path lies inside a declared root, unlike its source. It is absent from this repository, which projects that content elsewhere, so the walk does not meet it here; where it does appear it is unpackaged material like any other and a declared exclusion covers it.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-05",
+      "per:@/issue/e204e63d/decision/D-2",
+      "per:@/issue/e204e63d/decision/D-6",
+      "enforces:@/invariant/semantic-types"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "mcp-ci",
+      "docs-mechanical",
+      "doc-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The package manifest declares each live-source root with the exclusion patterns that bound it.",
+      "contract_refs": [
+        "derivation-reader-boundary",
+        "completeness-walk-rule"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "D-2",
+        "D-6",
+        "C1",
+        "C2",
+        "Q5",
+        "S3.6",
+        "S4.1",
+        "S7.1"
+      ],
+      "produces_contracts": [
+        "live-source-declaration"
+      ],
+      "landing_group": "package-cutover",
+      "terminal": {
+        "consumer_family": "the profile manifest wire model",
+        "test_boundary": "assertions over the package's machine-readable inspection output",
+        "worker_sized_reason": "One additive declaration on an existing wire type, carrying the four roots it describes.",
+        "footprint": {
+          "touches": [
+            "Cargo.lock",
+            "crates/jit/Cargo.toml",
+            "crates/jit/src/profile/manifest.rs",
+            "crates/jit/src/profile/package.rs",
+            "docs/reference/profiles.md",
+            "mcp-server/test-integration.js",
+            "profiles/jit-dogfood/manifest.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "live-source-completeness-guard",
+    "title": "Fail on a repository file under a declared root that no packaged asset claims",
+    "description": "A repository file beneath a declared live-source root that is neither a packaged asset nor matched by a declared exclusion fails the suite, so a new live consumer cannot be left out of adopter installs unnoticed.\n\n## Background\n\nThe existing drift assertion walks one direction only. For each declared asset it reads the repository file it mirrors and compares bytes; nothing enumerates repository files and asks whether each was declared. A new consumer added under a packaged root is therefore absent from every adopter install with nothing reporting it, and the nearest existing guard is a hand-written four-path spot check \u2014 a sample, and itself a hand-maintained list.\n\nThe reverse direction is already closed inside the package: package validation rejects a file present in the package directory that the manifest does not declare. That says nothing about the repository tree, which is the gap here.\n\nTwo properties shape the walk. Exclusions have to be patterns, because the non-packaged material under the declared roots runs to dozens of files \u2014 evaluation harnesses, fixtures, transcripts, this repository's own scripts, review prompts \u2014 and enumerating them as literals reproduces the hand-maintained inventory the check exists to eliminate. And the walk has to consider only files the repository tracks, so a contributor's scratch file under a packaged root is not reported as a packaging defect; a run that cannot obtain that listing has to fail rather than pass on an empty set.\n\n## Success Criteria\n\n- [hard] REQ-01: A test walks each declared live-source root and reports a file that is neither a declared packaged asset nor matched by a declared exclusion.\n- [hard] REQ-02: The report names the offending path, so the reader can decide between packaging it and excluding it.\n- [hard] REQ-03: Exclusion patterns are globs matched against repository-relative paths, so a directory of unpackaged material costs one entry rather than one per file.\n- [hard] REQ-04: The declared exclusions cover the unpackaged material present under those roots today, and the test passes against the current tree.\n- [hard] REQ-05: An unpackaged file added under a declared root that no exclusion matches fails the test.\n- [hard] REQ-06: The walk considers only paths the repository tracks, and a run that cannot obtain that listing fails rather than passing on an empty set.\n- [hard] REQ-07: Every packaged live asset is covered by some declared root, so no packaged file escapes the check.\n\n## Notes\n\nExclusion patterns are chosen to describe categories of material rather than individual files, so that a further evaluation harness or review prompt of the same shape needs no new entry. The script root is the case where this matters most: it already holds this repository's own documentation-generation and check scripts, more of them are being written in parallel with this work, and a pattern covering that category keeps the declaration correct whichever order those land in.\n\nThe workspace's established repository-inventory idiom lists untracked non-ignored paths alongside tracked ones, which is the opposite of the property this walk needs. Copying that flag set would report a contributor's scratch file as a packaging defect; the listing here is the tracked-only one.\n\nThe pattern matcher is already available through the type that validates the declared patterns, so this work adds no dependency of its own.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-05",
+      "per:@/issue/e204e63d/decision/D-6",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "build-time-package-derivation"
+    ],
+    "planning": {
+      "outcome": "An undeclared, unexcluded file under a declared live-source root fails the suite.",
+      "contract_refs": [
+        "live-source-declaration",
+        "completeness-walk-rule"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "D-6",
+        "C2",
+        "Q5",
+        "S7.1"
+      ],
+      "landing_group": "package-cutover",
+      "terminal": {
+        "consumer_family": "the packaged live-asset inventory",
+        "test_boundary": "in-crate repository-walk assertions",
+        "worker_sized_reason": "One walk over four declared roots, plus the exclusion patterns that make it pass today.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/profile/dogfood.rs",
+            "profiles/jit-dogfood/manifest.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "binary-build-input-inventory",
+    "title": "Extend the binary build-input inventory to the packaged live sources",
+    "description": "The inventory that decides whether an installed binary predates the repository it is judging covers the repository files the packaged tree is assembled from, so editing a live consumer alone reports the binary as stale.\n\n## Background\n\nThe staleness report is driven by a positive list of paths that are inputs to the binary. It covers the workspace manifests, the crate sources, the build script, the package directory, and the two hook files the binary embeds. It does not cover the agent skill tree, the tracker's reference directory, the contributed-gate directory, or the four packaged files under the script directory.\n\nWhile the packaged tree is a checked-in copy, that is correct: editing a live consumer does not change the binary. Once the packaged tree is assembled from those repository files, it does \u2014 and the staleness report stays silent, so a contributor keeps running a binary that no longer matches the workflow package it would install.\n\nTwo properties have to hold together. The inventory must not miss a packaged source, or the report is wrong in the direction that matters. And it must not claim a root wholesale where most of that root is not a build input. That hazard is not confined to the script directory: the skill tree is barely half packaged, the contributed directory carries one packaged file in four, and matching is by path prefix, so rolling up any of the three would mark the binary stale on edits that do not change it. Honest coverage is therefore close to one entry per packaged source \u2014 roughly sixty of them \u2014 which is only tolerable because something else checks the list.\n\nThe inventory itself is a pure path predicate in the layer that must stay free of input and output, so it stays a list rather than a lookup \u2014 but a list of sixty paths mirroring the packaged assets is another hand-maintained copy unless something checks it against them.\n\n## Success Criteria\n\n- [hard] REQ-01: Editing a packaged live source and nothing else reports a binary installed before that edit as stale.\n- [hard] REQ-02: A test reconciles the inventory against the packaged live-asset targets and fails when a target is not covered.\n- [hard] REQ-03: Editing a repository file that no packaged asset is drawn from does not report the binary as stale.\n- [hard] REQ-04: The inventory stays a pure path predicate in its present layer, introducing no filesystem access there.\n- [hard] REQ-05: The reconciliation reads the packaged declarations rather than restating them, so a newly packaged source fails the test until the inventory covers it.\n\n## Notes\n\nThe reconciliation lives outside the layer that owns the inventory, so the layer keeps its inbound-only dependency direction while the check still reaches the package.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-06",
+      "enforces:@/invariant/architecture-dependency-direction"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "build-time-package-derivation"
+    ],
+    "planning": {
+      "outcome": "Editing a packaged live source reports a binary installed before that edit as stale.",
+      "contract_refs": [
+        "build-input-inventory-binding"
+      ],
+      "source_refs": [
+        "REQ-06",
+        "C9",
+        "Q5",
+        "S4.4",
+        "S6"
+      ],
+      "landing_group": "package-cutover",
+      "terminal": {
+        "consumer_family": "the stale-binary provenance report",
+        "test_boundary": "in-crate assertions reconciling the inventory against the package",
+        "worker_sized_reason": "One path list grows, and one reconciliation test binds it to the packaged asset targets.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/build_provenance.rs",
+            "crates/jit/src/profile/dogfood.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "policy-projection",
+    "title": "The shipped area classification reaches adopter configuration by generation",
+    "description": "The managed, permanent, and issue-scoped area lists reach the adopter configuration reference and the copyable example configuration by generation from the shipped classification, and a stale region is reported rather than shipped.\n\n## Background\n\nThe shipped development-area classification is declared once in the engine and rendered into the configuration table a new repository receives. Two adopter-facing files restate it by hand \u2014 one reproducing all three lists, one carrying an illustrative subset \u2014 with nothing binding either to its authority. Both went stale during earlier work and blocked two reviews before repair.\n\nThe classification can be obtained without reading this repository's own configuration, by initializing a throwaway repository and reading the table written there. That keeps the shipped values and this repository's local policy distinct, which the boundary between them requires.\n\nGeneration alone does not keep the copies current, so the pair of documents also needs a deterministic check that reports a region no longer matching what initialization produces.\n\n## Success Criteria\n\n- [hard] REQ-01: Both adopter configuration files obtain the three area lists from the shipped classification rather than from an authored copy.\n- [hard] REQ-02: The values reach both documents through what repository initialization writes, never through this repository's own configuration.\n- [hard] REQ-03: Bytes outside the generated regions in both files are preserved, including authored prose and every other configuration table.\n- [hard] REQ-04: A region that no longer matches freshly produced output is reported as a finding by the deterministic documentation checks.\n- [hard] REQ-05: The copyable example carries the classification a fresh repository receives, in place of its present illustrative subset.\n",
+    "type": "story",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:policy-projection",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "code-review",
+      "docs-mechanical",
+      "doc-review"
+    ],
+    "depends_on": [
+      "shipped-policy-freshness-checker"
+    ],
+    "planning": {
+      "outcome": "Both adopter configuration files carry the shipped classification as a generated region, with staleness reported mechanically.",
+      "contract_refs": [
+        "shipped-policy-authority",
+        "generated-region-splice"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "D-3",
+        "D-4",
+        "C6",
+        "C7",
+        "C8",
+        "Q6",
+        "S3.5",
+        "S7.2",
+        "S7.4"
+      ]
+    }
+  },
+  {
+    "key": "template-projection",
+    "title": "The repository plan-template declaration is generated from the package",
+    "description": "The planning-bracket template declared in this repository's template registry is generated from the packaged contribution that is its authority, and a divergence between the two fails the test suite.\n\n## Background\n\nThe planning-bracket template is declared twice, once inline in the packaged workflow manifest and once in this repository's template registry. The two are structurally identical after parsing and differ in three description strings, and nothing compares them, so that drift has gone unreported. The byte-equality contract covering the packaged file assets does not reach this pair, because the packaged declaration is inline manifest data rather than an asset.\n\nThe packaged contribution is the shipped artifact and the repository declaration is a local consumer of it, which fixes the direction of generation. The contribution is already exposed whole through the package's machine-readable inspection output, so reading it needs no new surface.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository plan-template declaration is generated from the packaged contribution rather than authored.\n- [hard] REQ-02: A change to either declaration without the corresponding change to the other fails the test suite.\n- [hard] REQ-03: The guard rests on the two parsed declarations, not on a hand-written expectation of their contents.\n- [hard] REQ-04: Repository knowledge recorded as commentary inside the present declaration survives the change.\n- [hard] REQ-05: The template registry loads the generated file and the template still applies to the container type it applies to today.\n",
+    "type": "story",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:template-projection",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "jit-validate"
+    ],
+    "depends_on": [
+      "plan-template-generated-region"
+    ],
+    "planning": {
+      "outcome": "The repository plan-template declaration is generated from its packaged authority, with divergence failing the suite.",
+      "contract_refs": [
+        "generated-region-splice"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "D-1",
+        "C4",
+        "C5",
+        "Q4",
+        "S3.2",
+        "S7.4",
+        "S8.6"
+      ]
+    }
+  },
+  {
+    "key": "package-derivation",
+    "title": "The packaged asset tree is derived from the repository files it mirrors",
+    "description": "The packaged live-asset tree is assembled at build time from the repository files it mirrors instead of being carried as a second checked-in copy, and the omission, staleness, and reproducibility properties that change entails are each observed.\n\n## Background\n\nSixty-one asset pairs are carried twice in this repository: once at their working path, once inside the package directory the binary embeds. A test asserts each pair byte-identical, but both copies are hand-maintained, and the test walks one direction only \u2014 it checks each declared asset against the repository file it mirrors and never asks whether a repository file belonging in the package was declared, so a new consumer is absent from every adopter install with nothing reporting it.\n\nAssembling the tree at build time removes the duplicate and makes the repository files the authority. It also introduces properties nothing observes today. The build output directory is not reset between builds, so a removed consumer lingers and ships unless the assembly reconciles the subtree it owns. Rewriting that subtree unconditionally relinks every test target on a branch switch. Assembling content from a script rather than from checked-in bytes raises the question whether repeating a build produces the same package. And once those repository files are inputs to the binary, the report that tells a contributor their installed binary is stale has to know about them, or it stays silent while the binary changes.\n\nCompleteness needs data the manifest does not carry: the roots the live assets are drawn from, with pattern exclusions for the dozens of files under those roots that are deliberately not packaged.\n\n## Success Criteria\n\n- [hard] REQ-01: The packaged live-asset tree is assembled from the repository files it mirrors, with no second checked-in copy remaining.\n- [hard] REQ-02: Editing a live consumer alone cannot leave the packaged copy stale, and a removed consumer does not survive in the assembled package.\n- [hard] REQ-03: Two builds from identical sources under identical injected environment embed the same package content, observed as an identical reported package hash, and report identical provenance.\n- [hard] REQ-04: The assembly is ordered so the embed always reads a fully populated tree.\n- [hard] REQ-05: Every root the packaged live assets are drawn from is declared, with exclusions stated as patterns.\n- [hard] REQ-06: A repository file under a declared root that is neither packaged nor excluded fails the test suite.\n- [hard] REQ-07: Editing a live consumer alone reports a binary installed before that edit as stale.\n- [hard] REQ-08: The assembly leaves the workspace's build footprint intact, relinking no test target when its inputs have not changed in content.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "enforces:@/invariant/canonical-cutover",
+      "enforces:@/invariant/bounded-rust-build-footprint"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "mcp-ci",
+      "docs-mechanical",
+      "doc-review"
+    ],
+    "depends_on": [
+      "derivation-staleness-coverage",
+      "package-content-reproducibility",
+      "live-source-completeness-guard",
+      "binary-build-input-inventory"
+    ],
+    "planning": {
+      "outcome": "The packaged tree is assembled at build time from declared roots, reproducibly, with omission and staleness both reported.",
+      "contract_refs": [
+        "live-source-declaration",
+        "derivation-reader-boundary",
+        "derived-tree-reconciliation",
+        "completeness-walk-rule",
+        "build-input-inventory-binding"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-06",
+        "D-2",
+        "D-5",
+        "D-6",
+        "C1",
+        "C2",
+        "C3",
+        "C9",
+        "C10",
+        "Q1",
+        "Q2",
+        "Q3",
+        "Q5",
+        "Q8",
+        "Q10",
+        "S3.1",
+        "S3.2",
+        "S3.3",
+        "S3.4",
+        "S4.1",
+        "S4.4",
+        "S4.5",
+        "S7.1",
+        "S7.3",
+        "S8.1",
+        "S8.2",
+        "S8.3"
+      ]
+    }
+  }
+]
