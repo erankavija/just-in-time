@@ -6303,7 +6303,6 @@ fn run() -> Result<()> {
             }
             jit::cli::ConfigCommands::Validate { json } => {
                 use jit::config::{ConfigLoader, JitConfig};
-                use jit::output::JsonOutput;
                 use serde_json::json;
 
                 #[derive(Default)]
@@ -6353,20 +6352,20 @@ fn run() -> Result<()> {
                 let has_errors = !result.errors.is_empty();
 
                 if json {
-                    let output = json!({
+                    let details = json!({
                         "valid": !has_errors,
                         "errors": result.errors,
                     });
-                    println!(
-                        "{}",
-                        JsonOutput::success(output)
-                            .with_message(if has_errors {
-                                format!("Validation failed: {} error(s)", result.errors.len())
-                            } else {
-                                "Configuration is valid".to_string()
-                            })
-                            .to_json_string()?
-                    );
+                    let message = if has_errors {
+                        format!("Validation failed: {} error(s)", result.errors.len())
+                    } else {
+                        "Configuration is valid".to_string()
+                    };
+                    render_validation_json(
+                        details,
+                        message,
+                        has_errors.then_some(ErrorCode::ValidationFailed),
+                    )?;
                 } else if has_errors {
                     println!("Errors:");
                     for err in &result.errors {
@@ -6376,10 +6375,10 @@ fn run() -> Result<()> {
                     println!("✓ Configuration is valid");
                 }
 
-                // A source that failed to load or carried an invalid value exits 1;
-                // a valid configuration exits 0. There is no warning outcome.
+                // A source that failed to load or carried an invalid value is a
+                // registered validation failure. There is no warning outcome.
                 if has_errors {
-                    std::process::exit(1);
+                    std::process::exit(ErrorCode::ValidationFailed.exit_code().code());
                 }
             }
             jit::cli::ConfigCommands::ShowHierarchy { json } => {
