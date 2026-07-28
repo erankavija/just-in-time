@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "047946794b0d825e67d8d6838f0a7a60035d80eb",
+  "completed_at": "2026-07-28T21:30:45.142177538Z",
+  "duration_ms": 144069,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable registry cutover meets all four hard success criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ced03648-c487-417c-b5e8-a447ec2dc4eb",
+  "message": null,
+  "run_id": "231f2a3e-c656-4121-9638-e71263ac194e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T21:28:21.072240923Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 04794679, cd3574d6 (jit:ced03648)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-07-28T21:19:50Z)\nTruncation recovery: reread failure_probe_coverage_tests.rs in bounded ranges after combined output truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable registry cutover meets all four hard success criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

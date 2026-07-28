@@ -6,12 +6,24 @@
   "dependencies": [],
   "description": "The runtime conformance suite must read only its merged canonical registry from the Rust test tree. Survey fragments under the epic's managed planning directory are historical inputs and must not remain compile-time dependencies.\n\n## Success Criteria\n\n- [hard] REQ-01: `failure_lever_registry.rs` has no compile-time or runtime dependency on `dev/active` or another archivable planning path.\n- [hard] REQ-02: The merged `crates/jit/tests/cli_issue/failure_lever_registry.toml` remains the sole probe input and still covers every reflected machine-readable arm.\n- [hard] REQ-03: Tests preserve schema validation, duplicate-path rejection, invoked/exempt accounting, and the 100-row live census without consulting survey fragments.\n- [hard] REQ-04: A clean checkout continues to compile and run the conformance suite after the epic's managed planning artifacts are archived.\n\n## Notes\n\nThis is the authoritative plan's declared registry landing. The survey fragments remain historical planning evidence until archival; they are not production test inputs.\n",
   "documents": [],
+  "done_at": "2026-07-28T21:31:15.090508795Z",
   "first_ready_at": "2026-07-28T20:49:32.027438478Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T21:28:10.099722095Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T21:30:45.415140197Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ced03648-c487-417c-b5e8-a447ec2dc4eb",
   "labels": [
     "epic:json-error-contract",
@@ -21,7 +33,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Make the failure registry independent of planning artifacts",
-  "updated_at": "2026-07-28T20:51:38.670299177Z"
+  "updated_at": "2026-07-28T21:31:15.090508795Z"
 }
