@@ -4721,7 +4721,7 @@ fn run() -> Result<()> {
                     except,
                     json,
                 } => {
-                    use jit::output::JsonOutput;
+                    use jit::output::{ErrorCode, JsonError, JsonOutput};
 
                     let mut results = Vec::new();
                     let mut errors = Vec::new();
@@ -4746,9 +4746,7 @@ fn run() -> Result<()> {
                     }
 
                     if json {
-                        let msg =
-                            format!("Applied preset '{}' to {} issue(s)", name, results.len());
-                        let output = JsonOutput::success(serde_json::json!({
+                        let payload = serde_json::json!({
                             "preset": name,
                             "success": results.iter().map(|(id, r, _)| {
                                 serde_json::json!({
@@ -4763,9 +4761,24 @@ fn run() -> Result<()> {
                                     "error": e
                                 })
                             }).collect::<Vec<_>>()
-                        }))
-                        .with_message(msg);
-                        println!("{}", output.to_json_string()?);
+                        });
+
+                        if errors.is_empty() {
+                            let msg =
+                                format!("Applied preset '{}' to {} issue(s)", name, results.len());
+                            let output = JsonOutput::success(payload).with_message(msg);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let message = format!(
+                                "Failed to apply preset '{}' to {} issue(s)",
+                                name,
+                                errors.len()
+                            );
+                            let error = JsonError::new(ErrorCode::PresetError, message)
+                                .with_details(payload);
+                            println!("{}", error.to_json_string()?);
+                            std::process::exit(error.exit_code().code());
+                        }
                     } else {
                         if !results.is_empty() {
                             println!("Applied preset '{}' to {} issue(s):", name, results.len());
