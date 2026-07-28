@@ -20,6 +20,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `BLOCKED` | Unfinished dependencies block the operation. | `4` |
 | `GATE_FAILED` | A quality-gate checker did not pass. | `4` |
 | `IO_ERROR` | An input/output or external-system operation failed. | `10` |
+| `PERMISSION_DENIED` | The operation was denied by filesystem or operating-system permissions. | `5` |
 | `PARSE_ERROR` | Input data could not be parsed. | `1` |
 | `CLAIM_REQUIRES_GIT` | The claim or lease operation requires Git. | `10` |
 | `AMBIGUOUS_ID` | The ID prefix matches more than one candidate. | `2` |
