@@ -26,8 +26,8 @@
     {
       "wave_number": 2,
       "issues": [
-        {"id":"6ebd3d03-6cb2-458a-bb61-dad7604340fc","short_id":"6ebd3d03","title":"Register the emitted error codes that carry no exit classification","classification":"implementation","status":"pending"},
-        {"id":"8cfe8699-95f2-4535-8158-35eb05158266","short_id":"8cfe8699","title":"The canonical failure-lever registry the probes read","classification":"implementation","status":"pending"}
+        {"id":"6ebd3d03-6cb2-458a-bb61-dad7604340fc","short_id":"6ebd3d03","title":"Register the emitted error codes that carry no exit classification","classification":"implementation","status":"in_progress"},
+        {"id":"8cfe8699-95f2-4535-8158-35eb05158266","short_id":"8cfe8699","title":"The canonical failure-lever registry the probes read","classification":"implementation","status":"in_progress"}
       ]
     },
     {

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-28T07:04:51.240454868Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
   "dependencies": [
@@ -36,7 +37,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "The canonical failure-lever registry the probes read",
-  "updated_at": "2026-07-28T00:38:08.186603144Z"
+  "updated_at": "2026-07-28T07:04:51.240454868Z"
 }
