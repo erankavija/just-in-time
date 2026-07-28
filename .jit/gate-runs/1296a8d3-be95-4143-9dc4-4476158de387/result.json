@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "20a77ef69fc42c8cf7a50cf664d940958cf12416",
+  "completed_at": "2026-07-28T09:19:46.414701897Z",
+  "duration_ms": 155042,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All seven hard criteria are met by the attributable server-control envelope changes and focused coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "777d00da-22d5-49e7-a005-f2da47d5f4b6",
+  "message": null,
+  "run_id": "1296a8d3-be95-4143-9dc4-4476158de387",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T09:17:11.371773063Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6fc62d4a, 12720987, 78fad7cc, 20a77ef6 (all reachable; `jit:777d00da`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/777d00da/requirement/REQ-01–REQ-07 (issue description; markdown-first); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T09:09:24Z); code-review pending (no run)\nTruncation recovery: re-read per-commit statistics, name-statuses, and patches; narrowed current-code reads to output.rs, main.rs, and the focused test module\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All seven hard criteria are met by the attributable server-control envelope changes and focused coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

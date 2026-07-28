@@ -8,6 +8,7 @@
   ],
   "description": "The server control's start, stop, and status failures print a JSON object of their own shape under the machine-readable flag and exit a literal status, so a consumer that decodes the failure envelope everywhere else cannot decode this one.\n\n## Background\n\nEach of the three failure branches prints a pretty-serialized object carrying a status field and a message string to the payload stream, then exits 1. The payload is machine-readable, but it is not the error envelope: it carries no error code, so nothing identifies the failure class, and the exit status is a literal rather than the class a reported code determines.\n\nThe rest of the surface reports failure as an envelope on the payload stream under a registered code, exiting on the status that code maps to. Bringing these three branches onto that convention is what leaves no arm accepting the flag whose failure an agent consumer can read but not classify.\n\nOnly the failure branches move. The running-status report, the not-running report, and the start confirmation keep the shape and the exit status they have, because their payloads are already the success side of the contract.\n\n## Success Criteria\n\n- [hard] REQ-01: A failing server start reports the error envelope on the payload stream under a registered error code.\n- [hard] REQ-02: A failing server stop reports the error envelope on the payload stream under a registered error code.\n- [hard] REQ-03: A failing server status check reports the error envelope on the payload stream under a registered error code.\n- [hard] REQ-04: Each of those three failures exits on the status its reported code maps to, with no exit-status literal left on the failure path.\n- [hard] REQ-05: The payload stream carries the error envelope alone for these failures, with no second object shape beside it.\n- [hard] REQ-06: The success payloads of the start, stop, and status reports keep their shape and their exit status.\n- [hard] REQ-07: Coverage drives each of the three failure branches and asserts the envelope with its code and the exit status that code determines.\n",
   "documents": [],
+  "done_at": "2026-07-28T09:20:15.932971181Z",
   "first_ready_at": "2026-07-28T08:05:21.984857098Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-07-28T09:15:45.664787083Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:19:46.684902332Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,7 +37,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Report the server control's failures as the error envelope",
-  "updated_at": "2026-07-28T09:15:45.664787083Z"
+  "updated_at": "2026-07-28T09:20:15.932971181Z"
 }
