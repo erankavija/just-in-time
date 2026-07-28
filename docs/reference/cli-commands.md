@@ -3072,9 +3072,11 @@ about the work graph: a membership label the DAG does not back, reported by
 [`jit query divergence`](#membership-divergence-jit-query-divergence) and
 mirrored in this command's advisory `divergence_count`.
 
-Successful whole-repository JSON emits the normal validation report. A failing
-whole-repository invocation emits the canonical error envelope and retains the
-same integrity and rule report under `error.details`:
+Every successful JSON validation mode emits its normal mode-specific report. A
+failing invocation emits the canonical error envelope and retains that same
+report under `error.details`. This applies to whole-repository, per-issue,
+`--explain`, `--scope`, `--branch-drift`, and `--leases` validation. For example,
+a whole-repository rule failure reports:
 
 ```json
 {
@@ -3098,10 +3100,12 @@ same integrity and rule report under `error.details`:
 }
 ```
 
-A rule-only failure keeps the command's established exit `1` through the
-registered `GENERIC_ERROR` mapping. A repository-integrity failure uses
-`VALIDATION_FAILED` and exits `4`. In both cases the code's registered mapping,
-not a separate literal, determines the process status.
+Whole-repository, per-issue, and `--explain` rule failures keep their established
+exit `1` through the registered `GENERIC_ERROR` mapping, as do failed
+`--branch-drift` and `--leases` checks. A repository-integrity failure or failed
+`--scope` gate check uses `VALIDATION_FAILED` and exits `4`. In every case the
+code's registered mapping, not a separate literal, determines the process
+status.
 
 `divergence_count` and `membership_divergences` mirror
 [`jit query divergence`](#membership-divergence-jit-query-divergence). They are
