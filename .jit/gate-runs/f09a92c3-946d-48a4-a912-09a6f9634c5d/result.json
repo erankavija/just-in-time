@@ -1,0 +1,25 @@
+{
+  "branch": "worktree-agent-24929ba4",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b5ebf52bc2ff66c4ce3cec4b8fb548c5ddea4bf1",
+  "completed_at": "2026-07-27T22:30:16.831046637Z",
+  "duration_ms": 204197,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The 15-arm gate failure-lever fragment matches the current visible gate command surface and records setup, expected outcome, exit, and invocation confirmation for each arm.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "24929ba4-32bb-41f8-9458-62776b9fccaa",
+  "message": null,
+  "run_id": "f09a92c3-946d-48a4-a912-09a6f9634c5d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-27T22:26:52.633483447Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b5ebf52b (`jit:24929ba4`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: code-review pending; no recorded exit code\nTruncation recovery: recovered individual tagged patches, focused plan slices, and CLI/dispatch source reads after broad reads truncated\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The 15-arm gate failure-lever fragment matches the current visible gate command surface and records setup, expected outcome, exit, and invocation confirmation for each arm.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

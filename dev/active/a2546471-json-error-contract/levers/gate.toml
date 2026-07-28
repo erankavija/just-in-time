@@ -1,0 +1,124 @@
+schema = "failure-lever-registry/v1"
+namespace = "gate"
+
+[[arms]]
+path = "gate define"
+argv = ["gate", "define", "survey-gate", "--title", "Duplicate Gate", "--description", "Duplicate definition probe", "--json"]
+setup = ["init", "duplicate-gate:survey-gate"]
+expected_failure = "GATE_ERROR: Gate 'survey-gate' already exists"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "gate update"
+argv = ["gate", "update", "no-such-gate", "--title", "Missing gate update", "--json"]
+setup = ["init", "unknown-gate:no-such-gate"]
+expected_failure = "GATE_NOT_FOUND: Gate not found: no-such-gate"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "gate remove"
+argv = ["gate", "remove", "no-such-gate", "--json"]
+setup = ["init", "unknown-gate:no-such-gate"]
+expected_failure = "GATE_NOT_FOUND: Gate not found: no-such-gate"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "gate add"
+argv = ["gate", "add", "00000000-0000-0000-0000-000000000000", "missing-gate", "--json"]
+setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "gate evaluate"
+argv = ["gate", "evaluate", "00000000-0000-0000-0000-000000000000", "missing-gate", "--by", "agent:survey", "--json"]
+setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "gate evaluate-all"
+argv = ["gate", "evaluate-all", "00000000-0000-0000-0000-000000000000", "--by", "agent:survey", "--json"]
+setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "ISSUE_NOT_FOUND: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "gate fail"
+argv = ["gate", "fail", "00000000-0000-0000-0000-000000000000", "missing-gate", "--json"]
+setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "GATE_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "gate list"
+argv = ["gate", "list", "--json"]
+setup = ["init", "malformed-gate-registry"]
+setup_notes = "Replace .jit/gates.toml with the malformed TOML `[[gates]` after initialization."
+expected_failure = "GATE_ERROR: Failed to deserialize gate registry"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "gate show"
+argv = ["gate", "show", "no-such-gate", "--json"]
+setup = ["init", "unknown-gate:no-such-gate"]
+expected_failure = "GATE_NOT_FOUND: Gate not found: no-such-gate"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "gate status"
+argv = ["gate", "status", "00000000-0000-0000-0000-000000000000", "--all", "--json"]
+setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "GATE_CHECK_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "gate status-all"
+argv = ["gate", "status-all", "00000000-0000-0000-0000-000000000000", "--json"]
+setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "gate preset list"
+argv = ["gate", "preset", "list", "--json"]
+setup = ["init", "malformed-preset:survey-preset"]
+setup_notes = "Create .jit/config/gate-presets/survey-preset.json containing only `{` after initialization."
+expected_failure = "PRESET_ERROR: Failed to parse custom gate preset file 'survey-preset.json'"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "gate preset show"
+argv = ["gate", "preset", "show", "no-such-preset", "--json"]
+setup = ["init", "unknown-preset:no-such-preset"]
+expected_failure = "PRESET_ERROR: Preset not found: no-such-preset"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "gate preset apply"
+argv = ["gate", "preset", "apply", "plan-review", "00000000-0000-0000-0000-000000000000", "--json"]
+setup = ["init", "builtin-preset:plan-review", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "Per-target issue lookup error: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 0
+confirmation = "invoked"
+
+[[arms]]
+path = "gate preset create"
+argv = ["gate", "preset", "create", "00000000-0000-0000-0000-000000000000", "survey-preset", "--json"]
+setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]
+expected_failure = "PRESET_ERROR: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_exit = 1
+confirmation = "invoked"
