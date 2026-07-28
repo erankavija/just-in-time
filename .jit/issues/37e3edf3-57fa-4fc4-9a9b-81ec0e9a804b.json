@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:wave6-envelope-contract",
+  "claimed_at": "2026-07-28T15:19:19.494086196Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "The canonical conformance suite for the machine-readable failure envelope",
-  "updated_at": "2026-07-28T14:21:38.576680413Z"
+  "updated_at": "2026-07-28T15:19:22.741784053Z"
 }
