@@ -252,7 +252,8 @@ Error-severity rule findings print with a leading `❌ [<rule>]`, warnings with
 If `--fix` cannot prove ownership, human output includes the complete actionable
 cause chain. With `--json`, the same failure is a standard error object whose
 code is `VALIDATION_FAILED` and whose message retains that chain (for example,
-the target and duplicate delimiter or the mismatched profile provenance).
+the target and duplicate delimiter or the mismatched profile provenance); see
+the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 
 ### Failure modes
 

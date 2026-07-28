@@ -100,7 +100,8 @@ tree. Duplicate, partial, reversed, crossing, or multiply owned regions fail
 before publication. Unresolvable provenance and ambiguous ownership are likewise
 non-repairable and leave every target unchanged. Human output and the standard
 JSON `VALIDATION_FAILED` error envelope retain the underlying target, delimiter,
-or provenance cause so an operator can repair the authority rather than guess.
+or provenance cause so an operator can repair the authority rather than guess;
+see the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 
 ## Publication, rollback, and recovery
 

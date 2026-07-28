@@ -176,10 +176,9 @@ fn test_schema_flag_documents_json_shapes_and_exit_codes() {
 }
 
 // ============================================================================
-// REQ-02 (jit:1a63ef75): `jit --schema`'s `exit_codes` array is the canonical
-// source `docs/reference/cli-commands.md`'s "Exit Codes" table is kept in
-// sync with (`crate::output::ExitCode`, 0 through 6, 10, and 141). Pins the
-// full set so a code added to the enum without a matching schema/doc update
+// REQ-02 (jit:1a63ef75): `jit --schema`'s `exit_codes` array describes the
+// complete (`crate::output::ExitCode`, 0 through 6, 10, and 141) taxonomy.
+// Pins the full set so a code added to the enum without a matching schema update
 // fails this test instead of silently drifting.
 // ============================================================================
 
