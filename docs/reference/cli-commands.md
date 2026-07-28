@@ -22,6 +22,13 @@ issue (fetch the body with `jit issue show`):
 }
 ```
 
+A failing `--json` invocation emits exactly one error envelope on stdout, the
+command's payload stream. Its reported `error.code` is a registered
+[machine-readable error code](error-codes.md), and that code determines the
+process exit status in the [Exit Codes reference](exit-codes.md). Those generated
+references are the canonical vocabulary and status taxonomy; this section is the
+canonical statement of the machine-readable failure contract.
+
 Error responses use a stable top-level `error` object:
 
 ```json
@@ -3831,63 +3838,4 @@ echo "Ready: $READY"
 echo "In Progress: $IN_PROGRESS"
 echo "Blocked: $BLOCKED"
 echo "Recently completed (last 100 events): $RECENT_DONE"
-```
-
-### Exit Codes
-
-JIT uses a standardized exit-code taxonomy for scripting. The full taxonomy, plus
-the per-command mappings and exceptions, is the [Exit Codes reference](exit-codes.md)
-— generated from `jit --schema`'s `exit_codes` array (the taxonomy) and its
-`command_exit_codes` array (the per-command rows). Every emitted row is bound by a
-test to the runtime that produces it: to the shared classifier for codes raised as
-typed errors, and to the command's own exit site for codes a completed run emits
-directly. The `--json` `code` distinctions below refine that taxonomy.
-
-Exit `4` covers several validation failures that share the code but carry a
-distinguishing `code` under `--json`: `CYCLE_DETECTED` (a dependency edge would
-create a cycle), `BLOCKED` (a state transition blocked by unmet
-dependencies), `GATE_FAILED` (a gate-blocked transition), and the generic
-`VALIDATION_FAILED` (e.g. a redundant dependency edge).
-
-Argument-class failures that resolve an id prefix are exit `2`, each with a
-distinguishing `code` under `--json`:
-
-- **Ambiguous prefix** — a prefix matching more than one issue: `code`
-  `AMBIGUOUS_ID`. Human message begins `Ambiguous ID '<prefix>' matches multiple
-  issues:`.
-- **Too-short prefix** — a prefix shorter than the 4-character minimum: `code`
-  `INVALID_ID_PREFIX`. Human message is `Issue ID prefix must be at least 4
-  characters`.
-
-`jit dep rm <from> <target>` validates **both** id arguments identically: a
-too-short or ambiguous prefix in either position is the same argument error
-(exit `2`), rather than a short `<target>` being silently reported as "not
-found".
-
-**Startup failures under `--json`.** A failure that aborts before a command
-handler runs still prints its human line on stderr, and with `--json` also emits
-a structured error object on stdout while keeping its exit code:
-
-- **Repository not found** (exit `3`): `code` `REPOSITORY_NOT_FOUND`.
-- **Repository format too new** (exit `10`): `code` `REPOSITORY_FORMAT_TOO_NEW`
-  (the binary is older than the repository's on-disk format; upgrade `jit`).
-
-**Stale-binary refusal under `--json`:** when a `jit` binary predates the
-repository it is operating on (the full three-part condition, and the two
-places it is checked — the evaluator itself, mid-command, versus a checker's
-own child `jit`, which self-checks at ITS startup — are the canonical
-[`jit gate evaluate`](#jit-gate-evaluate) contract; not restated here). Only
-the evaluator's own refusal reaches `--json` as a distinct top-level error:
-exit `10`, `code` `STALE_BINARY`, no `verdict` field. A checker's own child
-refusing instead surfaces as an ordinary checker failure (exit `4`,
-`GATE_FAILED`, `verdict: "fail"`), with the refusal visible in that gate
-run's `stdout`/`stderr` rather than in the top-level `code`.
-
-```bash
-# Check exit codes
-if jit issue create --title "Test" --orphan --quiet; then
-  echo "Created successfully"
-else
-  echo "Failed with exit code: $?"
-fi
 ```
