@@ -14,7 +14,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T12:34:10.452852110Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-28T12:36:43.679830691Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a193a7cc-a00b-4551-bb30-922a8e015b38",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bind the exit-status projection to the machine-readable invocation form",
-  "updated_at": "2026-07-28T10:13:38.980276619Z"
+  "updated_at": "2026-07-28T12:36:43.679830691Z"
 }

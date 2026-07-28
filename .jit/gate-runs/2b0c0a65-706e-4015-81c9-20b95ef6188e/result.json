@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "dad98a3da859972b3b66728f5d480ef8a5f2e8c7",
+  "completed_at": "2026-07-28T12:36:43.405188219Z",
+  "duration_ms": 152065,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs",
+        "id": "F1",
+        "line": 366,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "serve --fg is not exercised in plain and machine-readable invocation forms."
+      }
+    ],
+    "summary": "The serve --fg projected row lacks dual-form CLI coverage.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a193a7cc-a00b-4551-bb30-922a8e015b38",
+  "message": null,
+  "run_id": "2b0c0a65-706e-4015-81c9-20b95ef6188e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T12:34:11.340178878Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6657 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa8b7-e484-7c82-a1e9-77236fb04107\n--------\nuser\n--- 6644 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d9991154, 2909fe32, 7aa1160e, 561bd861 (tag `jit:a193a7cc`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending (unrun)\nTruncation recovery: recovered the truncated test patch with focused test, schema, runtime-dispatch, and generated-reference reads\n\n1. **[blocking][issue-impact]** `serve --fg` is the one projected row not exercised through either public invocation form. [command_exit_code_projection_tests.rs:366](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:366) tests only `foreground_exit_code`; it never invokes `jit serve --fg` plain or with `--json`, nor compares those statuses. This leaves REQ-01 and REQ-02 unmet for that projected row. References: @/invariant/semantic-test-assertions.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The serve --fg projected row lacks dual-form CLI coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"serve --fg is not exercised in plain and machine-readable invocation forms.\",\"file\":\"crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs\",\"line\":366,\"references\":[\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
