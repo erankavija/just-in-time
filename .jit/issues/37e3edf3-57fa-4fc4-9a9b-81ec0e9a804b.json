@@ -8,6 +8,7 @@
   ],
   "description": "One suite is the canonical contract for the failure envelope: it drives each probed command arm into a failure and asserts the envelope's structure with its classification as semantic properties.\n\n## Background\n\nThe success side of the machine-readable contract has canonical suites — one for the collection wrapper, one for cross-surface field naming. The failure side has none. The nearest file covers five arms, and two of its tests are non-binding: one parses the payload stream and discards the result, leaving only an assertion that the stream is valid JSON, and the other accepts a match on either stream, so it passes whether or not the envelope is emitted. Both pass against the defect this work repairs, so they read as coverage without providing it.\n\nAssertions rest on semantics. The suite asserts that a failure yields an envelope carrying a resolvable code with a non-empty message, that the optional detail and suggestion fields are shaped as declared when present, and that the code identifies the failure class — not that the message equals a particular sentence. The one place a literal field inventory belongs is this suite, as the canonical statement of an intentionally stable external contract.\n\n## Success Criteria\n\n- [hard] REQ-01: A single suite is the canonical statement of the failure envelope's contract, identified as such in its module documentation.\n- [hard] REQ-02: Each probed command arm is driven into a failure and asserted against the envelope contract.\n- [hard] REQ-03: Assertions rest on envelope structure with error classification rather than on copied message text.\n- [hard] REQ-04: The test that discarded its parsed payload asserts the envelope contract instead.\n- [hard] REQ-05: The test that accepted a match on either stream asserts the envelope on the payload stream alone.\n- [hard] REQ-06: A probed failure that emits no envelope fails the suite.\n",
   "documents": [],
+  "done_at": "2026-07-28T16:40:54.121076731Z",
   "first_ready_at": "2026-07-28T14:21:38.576680413Z",
   "gates_required": [
     "cargo-ci",
@@ -16,12 +17,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-28T16:23:58.720372923Z",
+      "updated_at": "2026-07-28T16:36:46.782347023Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-28T16:27:31.333961707Z",
+      "status": "passed",
+      "updated_at": "2026-07-28T16:40:18.373230341Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,7 +37,7 @@
     "enforces:@/invariant/semantic-test-assertions"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "The canonical conformance suite for the machine-readable failure envelope",
-  "updated_at": "2026-07-28T16:27:31.333961707Z"
+  "updated_at": "2026-07-28T16:40:54.121076731Z"
 }
