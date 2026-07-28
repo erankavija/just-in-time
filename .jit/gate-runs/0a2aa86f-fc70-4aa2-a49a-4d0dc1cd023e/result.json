@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "7c6f630d233f74234255c13977d421c867b83597",
+  "completed_at": "2026-07-28T18:18:34.199802029Z",
+  "duration_ms": 112840,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s attributed documentation accurately centralizes the machine-readable failure contract with canonical generated references.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ec029993-2e68-41dd-b2bd-b3018a35d0d5",
+  "message": null,
+  "run_id": "0a2aa86f-fc70-4aa2-a49a-4d0dc1cd023e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T18:16:41.359221292Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf with no resolved children. I inspected each `jit:ec029993` commit individually; the substantive patch updates the canonical [CLI reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:25) and links affected contextual pages back to it. Current source and contract tests confirm that registered `error.code` values determine exit status.\n\nDocumentation decision: the failure envelope, payload stream, code vocabulary, exit-status reference, canonical placement, and concise cross-references meet all issue criteria.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s attributed documentation accurately centralizes the machine-readable failure contract with canonical generated references.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
