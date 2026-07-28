@@ -1,0 +1,36 @@
+schema = "failure-lever-registry/v1"
+namespace = "dep-worktree"
+
+[[arms]]
+path = "dep add"
+argv = ["dep", "add", "missing-from", "missing-to", "--json"]
+setup = ["init", "no-issue:missing-from"]
+expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "dep rm"
+argv = ["dep", "rm", "missing-from", "missing-to", "--json"]
+setup = ["init", "no-issue:missing-from"]
+expected_failure = "DEPENDENCY_ERROR: Issue not found: missing-from"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "worktree info"
+argv = ["worktree", "info", "--json"]
+setup = ["init", "git:repository-with-head", "malformed-worktree-identity"]
+setup_notes = "Create the worktree identity with one successful `worktree info` invocation, then replace .jit/worktree.json with `{ invalid json` before invoking."
+expected_failure = "WORKTREE_INFO_ERROR: Failed to parse worktree.json"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "worktree list"
+argv = ["worktree", "list", "--json"]
+setup = ["init", "git:repository-with-head", "malformed-worktree-identity"]
+setup_notes = "Create the worktree identity with one successful `worktree info` invocation, then replace .jit/worktree.json with `{ invalid json` before invoking."
+expected_failure = "WORKTREE_LIST_ERROR: Failed to load worktree identity from <repository>/.jit"
+expected_exit = 1
+confirmation = "invoked"
