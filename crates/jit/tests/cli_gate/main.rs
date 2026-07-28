@@ -10,6 +10,7 @@ mod gate_evaluate_skip_at_head_test;
 mod gate_findings_test;
 mod gate_key_flag_test;
 mod gate_modification_cli_tests;
+mod gate_preset_apply_json_failure_test;
 mod gate_status_all_lean_response_test;
 mod gate_status_all_strict_test;
 mod gate_status_history_flat_test;
