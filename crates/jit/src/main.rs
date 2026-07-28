@@ -559,21 +559,18 @@ fn dep_add_batch_json_error(
 
 /// Build the JSON error envelope for a failed claim/lease command.
 ///
-/// The git-missing condition ([`jit::errors::ClaimRequiresGitError`]) is mapped
-/// to the `CLAIM_REQUIRES_GIT` code so the `--json` path resolves to exit code
-/// 10, matching the human path and the documented contract. The actionable
-/// message (which names the git requirement) is preserved on both paths. Any
-/// other failure keeps the command-specific `fallback_code`.
-fn claim_json_error(error: &anyhow::Error, fallback_code: &str) -> jit::output::JsonError {
-    use jit::output::{ErrorCode, JsonError};
-    if error
-        .downcast_ref::<jit::errors::ClaimRequiresGitError>()
-        .is_some()
-    {
-        JsonError::new(ErrorCode::ClaimRequiresGit, error.to_string())
+/// A specific typed class always wins over the command fallback. This keeps
+/// permission, external-I/O, no-Git, parsing, and lookup failures aligned with
+/// the human path, which uses [`error_to_exit_code`]. Only a genuinely
+/// unclassified failure retains the command-specific registered code.
+fn claim_json_error(error: &anyhow::Error, fallback_code: ErrorCode) -> jit::output::JsonError {
+    let classified = error_to_error_code(error);
+    let code = if classified == ErrorCode::GenericError {
+        fallback_code
     } else {
-        JsonError::legacy_unregistered(fallback_code, ExitCode::GenericError, error.to_string())
-    }
+        classified
+    };
+    JsonError::new(code, error.to_string())
 }
 
 /// Preserve a `validate --fix` failure's complete cause chain and its exact
@@ -7549,7 +7546,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_ACQUIRE_ERROR");
+                            let json_error = claim_json_error(&e, ErrorCode::ClaimAcquireError);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7594,7 +7591,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_RELEASE_ERROR");
+                            let json_error = claim_json_error(&e, ErrorCode::ClaimReleaseError);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7636,7 +7633,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_RENEW_ERROR");
+                            let json_error = claim_json_error(&e, ErrorCode::ClaimRenewError);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7669,7 +7666,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_HEARTBEAT_ERROR");
+                            let json_error = claim_json_error(&e, ErrorCode::ClaimHeartbeatError);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7757,7 +7754,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_STATUS_ERROR");
+                            let json_error = claim_json_error(&e, ErrorCode::ClaimStatusError);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7830,7 +7827,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_LIST_ERROR");
+                            let json_error = claim_json_error(&e, ErrorCode::ClaimListError);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -7869,7 +7866,7 @@ fn run() -> Result<()> {
                     }
                     Err(e) => {
                         if json {
-                            let json_error = claim_json_error(&e, "CLAIM_FORCE_EVICT_ERROR");
+                            let json_error = claim_json_error(&e, ErrorCode::ClaimForceEvictError);
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
@@ -8071,7 +8068,9 @@ mod exit_code_projection_tests {
     //! projection stops documenting a code the classifier still emits, this test
     //! fails — so the projection cannot silently drift from runtime behavior.
 
-    use super::{error_to_error_code, error_to_exit_code, validate_fix_json_error};
+    use super::{
+        claim_json_error, error_to_error_code, error_to_exit_code, validate_fix_json_error,
+    };
     use jit::declarations::GateStage;
     use jit::domain::{GateRunResult, GateRunStatus};
     use jit::output::ErrorCode;
@@ -8112,6 +8111,15 @@ mod exit_code_projection_tests {
             warnings: Vec::new(),
         }
         .into()
+    }
+
+    #[test]
+    fn test_claim_json_error_keeps_registered_fallback_for_unclassified_failure() {
+        let error = anyhow::anyhow!("claim-specific failure without a typed cause");
+        let json = claim_json_error(&error, ErrorCode::ClaimRenewError);
+
+        assert_eq!(json.error.code, ErrorCode::ClaimRenewError.as_str());
+        assert_eq!(json.exit_code(), ErrorCode::ClaimRenewError.exit_code());
     }
 
     /// Representative typed errors, each paired with the exit code the classifier
