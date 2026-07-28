@@ -11096,3 +11096,7 @@
 {"assignee":"agent:epic-config-validate-rework","id":"da129e41-7980-40b7-a747-08d3689ef1be","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T19:43:03.581513691Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"533c4848-c581-4ae3-8148-ed55c96163f6","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T20:08:42.853354166Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"fc750706-c3f0-4534-af1b-63a62e362b83","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T20:13:03.365220244Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"296aa924-136d-4e2c-bcbe-3da9a927a398","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T20:21:17.772661185Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"663b7fd3-598e-4a6d-97b3-4f4b7701f5f2","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T20:26:03.350584312Z","to":"done","type":"issue_state_changed"}
+{"id":"330214bf-cec6-42a2-bce2-c61a2ecef210","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T20:26:03.350584312Z","type":"issue_completed"}
+{"from":"backlog","id":"cf7a8211-9b7b-4fcc-8331-972745b6013d","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:26:07.881062183Z","to":"ready","type":"issue_state_changed"}

@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "An invalid `config validate` result is a classified post-dispatch failure rather than a success-shaped JSON report, so the arm obeys the authoritative machine-readable failure contract and participates in the canonical conformance census.\n\n## Background\n\n`config validate` catches repository, user, and environment configuration errors into a local result. Under `--json` it currently serializes `{valid:false, errors:[...]}` through the success wrapper and exits on literal status 1. The canonical failure registry therefore exempts the arm instead of probing it. This is a constructible post-dispatch failure, so both the payload shape and the exemption conflict with the epic contract. The registered `VALIDATION_FAILED` class and shared error-envelope detail mechanism already provide the canonical path.\n\n## Success Criteria\n\n- [hard] REQ-01: An invalid `config validate --json` invocation emits exactly one standard error envelope on stdout under registered code `VALIDATION_FAILED`.\n- [hard] REQ-02: The envelope retains every actionable validation error in structured details rather than flattening or dropping the result.\n- [hard] REQ-03: Invalid configuration exits on the status determined by `VALIDATION_FAILED` in both machine-readable and human invocation forms, with no literal failure status on the command path.\n- [hard] REQ-04: A valid configuration keeps its existing successful JSON report, human output, and zero status.\n- [hard] REQ-05: The canonical failure-lever registry replaces the `config validate` exemption with a reproducible invocation, and the definition-derived conformance and census checks assert its envelope, code, and status.\n- [hard] REQ-06: The generated command exit-status projection and its runtime bindings state and verify the new class-correct status in both invocation forms.\n\n## Notes\n\nThe repair is confined to the post-dispatch invalid-result branch and its canonical tests and projections. It does not change which configuration sources are validated or the text of human validation findings.",
   "documents": [],
+  "done_at": "2026-07-28T20:26:03.350584312Z",
   "first_ready_at": "2026-07-28T19:42:36.689719883Z",
   "gates_required": [
     "cargo-ci",
@@ -18,8 +19,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-28T20:13:03.365220244Z",
+      "status": "passed",
+      "updated_at": "2026-07-28T20:21:17.772661185Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,7 +38,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Envelope invalid configuration validation results",
-  "updated_at": "2026-07-28T20:13:03.365220244Z"
+  "updated_at": "2026-07-28T20:26:03.350584312Z"
 }

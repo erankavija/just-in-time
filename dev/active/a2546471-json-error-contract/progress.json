@@ -91,7 +91,7 @@
     {
       "wave_number": 10,
       "issues": [
-        {"id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","short_id":"b2295bbb","title":"Envelope invalid configuration validation results","classification":"implementation","status":"in_progress"}
+        {"id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","short_id":"b2295bbb","title":"Envelope invalid configuration validation results","classification":"implementation","status":"done"}
       ]
     }
   ],
