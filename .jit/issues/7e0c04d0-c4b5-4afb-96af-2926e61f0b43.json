@@ -35,7 +35,7 @@
     "story:code-vocabulary"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "An enumerable error-code vocabulary with class-correct exit status",
-  "updated_at": "2026-07-28T14:04:03.245496474Z"
+  "updated_at": "2026-07-28T14:56:47.951843488Z"
 }

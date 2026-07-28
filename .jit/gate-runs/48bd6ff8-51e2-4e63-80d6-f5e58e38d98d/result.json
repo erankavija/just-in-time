@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "37906bef2c394a3ceec55909ecf314279f3db75a",
+  "completed_at": "2026-07-28T14:56:19.877437997Z",
+  "duration_ms": 136523,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The claim JSON classifier, status projection, fallback preservation, and focused parity coverage satisfy the issue’s hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4359178b-87d7-4e8d-b410-a3f0704ecab4",
+  "message": null,
+  "run_id": "48bd6ff8-51e2-4e63-80d6-f5e58e38d98d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T14:54:03.353845827Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `7750cd2a`, `c399b169`, `25bbf79e`, `a49f900d` (`jit:4359178b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4359178b/requirement/REQ-01–REQ-04 (issue description); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T14:48:07Z)\nTruncation recovery: discarded unrelated historical gate output; re-read all attributable commits, merge-parent diffs, classifier, handlers, mappings, and focused integration tests in bounded calls\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The claim JSON classifier, status projection, fallback preservation, and focused parity coverage satisfy the issue’s hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

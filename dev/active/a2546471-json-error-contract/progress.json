@@ -56,7 +56,7 @@
         {"id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","short_id":"7e0c04d0","title":"An enumerable error-code vocabulary with class-correct exit status","classification":"implementation","status":"pending"},
         {"id":"f4346059-afd1-459d-8028-3227787061dd","short_id":"f4346059","title":"A shared fixture that drives one recorded failure per command arm","classification":"implementation","status":"done"},
         {"id":"cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1","short_id":"cc2fd90d","title":"Envelope failing validation reports","classification":"implementation","status":"done"},
-        {"id":"4359178b-87d7-4e8d-b410-a3f0704ecab4","short_id":"4359178b","title":"Classify underlying claim I/O failures uniformly","classification":"implementation","status":"in_progress"}
+        {"id":"4359178b-87d7-4e8d-b410-a3f0704ecab4","short_id":"4359178b","title":"Classify underlying claim I/O failures uniformly","classification":"implementation","status":"done"}
       ]
     },
     {
