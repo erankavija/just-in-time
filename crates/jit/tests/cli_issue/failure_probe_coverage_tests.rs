@@ -22,6 +22,13 @@ struct Registration<'a> {
 /// from Clap's command tree. Intentionally do not inspect `Command::hidden`:
 /// hidden arms remain executable and therefore remain in the coverage contract.
 fn reflected_json_arm_paths() -> BTreeSet<String> {
+    let schema = jit::schema::CommandSchema::generate();
+    reflected_json_arm_paths_from(&schema.commands)
+}
+
+fn reflected_json_arm_paths_from(
+    commands: &HashMap<String, jit::schema::Command>,
+) -> BTreeSet<String> {
     fn collect(
         prefix: &str,
         commands: &HashMap<String, jit::schema::Command>,
@@ -34,23 +41,26 @@ fn reflected_json_arm_paths() -> BTreeSet<String> {
                 format!("{prefix} {name}")
             };
 
-            match command
+            // Flags in the generated schema belong directly to this command;
+            // inherited/global flags live separately in `global_options`.
+            // Record an executable parent such as bare `query` before walking
+            // its independently executable descendants.
+            if command.flags.iter().any(|flag| flag.name == "json") {
+                paths.insert(path.clone());
+            }
+
+            if let Some(children) = command
                 .subcommands
                 .as_ref()
                 .filter(|children| !children.is_empty())
             {
-                Some(children) => collect(&path, children, paths),
-                None if command.flags.iter().any(|flag| flag.name == "json") => {
-                    paths.insert(path);
-                }
-                None => {}
+                collect(&path, children, paths);
             }
         });
     }
 
-    let schema = jit::schema::CommandSchema::generate();
     let mut paths = BTreeSet::new();
-    collect("", &schema.commands, &mut paths);
+    collect("", commands, &mut paths);
     paths
 }
 
@@ -207,6 +217,42 @@ fn test_coverage_errors_reports_missing_declared_arm() {
     assert_eq!(
         coverage_errors(&declared, &registrations),
         vec!["missing probe or exemption for declared arm `issue future`".to_owned()]
+    );
+}
+
+#[test]
+fn test_reflected_json_arm_paths_preserves_executable_parent_and_child_arms() {
+    fn command(
+        has_json: bool,
+        subcommands: Option<HashMap<String, jit::schema::Command>>,
+    ) -> jit::schema::Command {
+        jit::schema::Command {
+            description: String::new(),
+            hidden: false,
+            aliases: Vec::new(),
+            subcommands,
+            args: Vec::new(),
+            flags: has_json
+                .then(|| jit::schema::Flag {
+                    name: "json".to_owned(),
+                    flag_type: "boolean".to_owned(),
+                    required: false,
+                    description: String::new(),
+                    aliases: Vec::new(),
+                })
+                .into_iter()
+                .collect(),
+            output: None,
+        }
+    }
+
+    let child = command(true, None);
+    let parent = command(true, Some(HashMap::from([("child".to_owned(), child)])));
+    let commands = HashMap::from([("parent".to_owned(), parent)]);
+
+    assert_eq!(
+        reflected_json_arm_paths_from(&commands),
+        BTreeSet::from(["parent".to_owned(), "parent child".to_owned()])
     );
 }
 

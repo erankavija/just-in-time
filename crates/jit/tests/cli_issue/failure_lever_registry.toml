@@ -681,6 +681,16 @@ expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
+path = "query"
+argv = ["query", "--json"]
+setup = ["init", "malformed-index"]
+setup_notes = "Replace the initial .jit/index.json contents with `not-json`; the bare parent dispatches the same all-issues query as `query all`."
+expected_failure = "failed to parse index: expected ident at line 1 column 2"
+expected_code = "PARSE_ERROR"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
 path = "query all"
 argv = ["query", "all", "--json"]
 setup = ["init", "malformed-index"]
