@@ -12,7 +12,7 @@
       "commit": null,
       "doc_type": "research",
       "label": "Failure Lever Registry Fragment",
-      "path": "dev/active/a2546471-json-error-contract/levers/dep-worktree.toml"
+      "path": "dev/archive/a2546471-json-error-contract/dev/active/a2546471-json-error-contract/levers/dep-worktree.toml"
     }
   ],
   "done_at": "2026-07-28T00:29:26.290662645Z",
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "done",
   "title": "Failure-lever survey for the dependency and worktree namespaces",
-  "updated_at": "2026-07-28T00:29:26.290662645Z"
+  "updated_at": "2026-07-28T22:33:03.818214445Z"
 }
