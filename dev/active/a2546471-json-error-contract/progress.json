@@ -89,6 +89,13 @@
       "recorded_at": "2026-07-28T10:46:02+03:00",
       "resolution": "Invoker explicitly authorized the configured code-review gate; 6ebd3d03 code-review passed with zero findings.",
       "resolved_at": "2026-07-28T11:05:58+03:00"
+    },
+    {
+      "category": "rework-exceeded",
+      "issue_id": "dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07",
+      "status": "open",
+      "summary": "After two rework cycles, the third cargo-ci attempt exposed a stale config-get assertion that requires empty stdout for a propagated --json parse failure, conflicting with dbe2f2a8 REQ-01's structural envelope requirement.",
+      "recorded_at": "2026-07-28T14:17:52+03:00"
     }
   ],
   "rework_counts": {

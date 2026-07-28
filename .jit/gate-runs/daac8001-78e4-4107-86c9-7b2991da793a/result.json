@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "717429f47015391f54a3cc433e4cb5171e3aec9b",
+  "completed_at": "2026-07-28T11:17:22.208188407Z",
+  "duration_ms": 352587,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07",
+  "message": null,
+  "run_id": "daac8001-78e4-4107-86c9-7b2991da793a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T11:11:29.620591579Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest config_get_tests::test_get_corrupt_config_toml_json_is_not_invalid_argument ... FAILED\ntest result: FAILED. 315 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 56.23s\n---- config_get_tests::test_get_corrupt_config_toml_json_is_not_invalid_argument stdout ----\n\nthread 'config_get_tests::test_get_corrupt_config_toml_json_is_not_invalid_argument' (4116237) panicked at crates/jit/tests/cli_repo_workflow/config_get_tests.rs:312:5:\nunexpected JSON on stdout for a load failure: {\n  \"error\": {\n    \"code\": \"PARSE_ERROR\",\n    \"message\": \"Failed to parse config.toml\"\n  }\n}\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1361 bytes=26647179)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1317128912/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
