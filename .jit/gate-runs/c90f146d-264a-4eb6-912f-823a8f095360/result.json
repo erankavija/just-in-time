@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b4be440ff5707ef4de936dbf313a58acce57ea36",
+  "completed_at": "2026-07-28T19:14:44.235918935Z",
+  "duration_ms": 72201,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The post-dispatch JSON failure-contract documentation is accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "d780dfc1-9e01-4036-b637-7f6deb17b423",
+  "message": null,
+  "run_id": "c90f146d-264a-4eb6-912f-823a8f095360",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T19:13:32.034291020Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children; inspected three `jit:d780dfc1` commits individually. Their union contains the scoped change at `docs/reference/cli-commands.md:25`; tracker-only changes add no documentation footprint.\n\nThe canonical contract now accurately limits its guarantee to post-parse, post-dispatch failures, preserves the single-envelope/code/exit-status guarantee, and links to generated references. Scoped parser diagnostics remain outside the contract, matching current Clap behavior.\n\n1. No findings identified.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The post-dispatch JSON failure-contract documentation is accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

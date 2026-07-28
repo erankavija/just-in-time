@@ -85,7 +85,7 @@
       "wave_number": 9,
       "issues": [
         {"id":"8f5e5921-6746-4a43-a8d0-92e52e8023bf","short_id":"8f5e5921","title":"Envelope machine-readable parser failures","classification":"implementation","status":"rejected"},
-        {"id":"d780dfc1-9e01-4036-b637-7f6deb17b423","short_id":"d780dfc1","title":"Scope the canonical failure contract to post-dispatch failures","classification":"documentation","status":"in_progress"}
+        {"id":"d780dfc1-9e01-4036-b637-7f6deb17b423","short_id":"d780dfc1","title":"Scope the canonical failure contract to post-dispatch failures","classification":"documentation","status":"done"}
       ]
     }
   ],

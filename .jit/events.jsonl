@@ -11079,3 +11079,8 @@
 {"fields":["dependencies"],"id":"ce92a5bb-9a36-48c5-910d-980a66c7145b","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:07:34.923313213Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"a76a0e7d-5ae3-4144-a2f3-ccbc134d3cf0","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:07:39.539025491Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:epic-doc-scope","id":"a38c11d9-dd57-4459-886b-c2bbf3b0988e","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:07:39.539025491Z","type":"issue_claimed"}
+{"gate_key":"docs-mechanical","id":"665c9e76-806a-49d3-b492-66c8753839b0","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:13:31.427688993Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"91cdc349-cc9c-4135-957d-0a9d5717a543","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:14:44.525625202Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"94044ee7-9421-4bfd-897e-81ed6bb6591d","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:15:12.869676606Z","to":"done","type":"issue_state_changed"}
+{"id":"6c13afad-2d7d-4853-8000-9f1c74527294","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:15:12.869676606Z","type":"issue_completed"}
+{"from":"backlog","id":"563c17fc-a814-4e26-8a49-3ef1fba2d062","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:15:17.370526440Z","to":"ready","type":"issue_state_changed"}
