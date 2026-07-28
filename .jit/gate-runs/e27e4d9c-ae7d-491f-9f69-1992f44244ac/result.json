@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "e83e7d70ae2967e31e313fc3109b59bd7bc70254",
+  "completed_at": "2026-07-28T13:04:10.993077650Z",
+  "duration_ms": 182370,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs",
+        "id": "F1",
+        "line": 857,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/a193a7cc/requirement/REQ-01",
+          "@/issue/a193a7cc/requirement/REQ-02",
+          "@/issue/a193a7cc/requirement/REQ-04",
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "The completeness guard credits seven rows with classifier or harness tests that neither exercise plain and JSON invocations nor derive their expected status from the projection."
+      }
+    ],
+    "summary": "Seven projected rows remain classifier- or harness-only rather than projection-derived dual-form CLI bindings.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a193a7cc-a00b-4551-bb30-922a8e015b38",
+  "message": null,
+  "run_id": "e27e4d9c-ae7d-491f-9f69-1992f44244ac",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T13:01:08.622641637Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5407 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa8d0-9235-7351-9d5e-ae117e186c0d\n--------\nuser\n--- 5394 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 561bd861, 7aa1160e, 2909fe32, d9991154, 7104dd3f, d494532d, 03f0bd08, e83e7d70 (`jit:a193a7cc`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/a193a7cc/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (.jit/issues/a193a7cc-a00b-4551-bb30-922a8e015b38.json); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T13:01:07Z); prior code-review passed (exit 0, run f003f5f5)\nTruncation recovery: partitioned tagged commits and recovered focused test, classifier, parity-suite, registry, and current-line reads\n\n1. **Blocking · issue-impact · high** — The completeness set still treats seven projected rows as covered without a projection-derived, dual-form CLI assertion: `*`/1, 5, and 10; `any command that writes an issue`/4; `gate evaluate, gate evaluate-all`/4 and 10; and `apply`/4. [The guard](file:///home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:857) explicitly delegates the first six to classifier-only cases; those cases hard-code numeric expected statuses and never invoke plain or `--json` CLI forms ([main.rs](file:///home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:8111)). The `apply` row is similarly credited to a command-harness test that only downcasts an error ([template_apply_tests.rs](file:///home/vkaskivuo/Projects/just-in-time/crates/jit/tests/fast_docs_templates/template_apply_tests.rs:1286)). Thus these rows cannot detect an invocation-form divergence and do not read their expected status from the projection, leaving REQ-01, REQ-02, and REQ-04 unmet. The earlier `serve --fg` finding is addressed by its later dual-form test.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Seven projected rows remain classifier- or harness-only rather than projection-derived dual-form CLI bindings.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The completeness guard credits seven rows with classifier or harness tests that neither exercise plain and JSON invocations nor derive their expected status from the projection.\",\"file\":\"crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs\",\"line\":857,\"references\":[\"@/issue/a193a7cc/requirement/REQ-01\",\"@/issue/a193a7cc/requirement/REQ-02\",\"@/issue/a193a7cc/requirement/REQ-04\",\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
