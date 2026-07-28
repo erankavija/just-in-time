@@ -44,7 +44,7 @@
     {
       "wave_number": 4,
       "issues": [
-        {"id":"72835d56-06fa-427c-82fd-a516803723cc","short_id":"72835d56","title":"Verify exit-status parity between the two invocation forms","classification":"implementation","status":"in_progress"},
+        {"id":"72835d56-06fa-427c-82fd-a516803723cc","short_id":"72835d56","title":"Verify exit-status parity between the two invocation forms","classification":"implementation","status":"done"},
         {"id":"a193a7cc-a00b-4551-bb30-922a8e015b38","short_id":"a193a7cc","title":"Bind the exit-status projection to the machine-readable invocation form","classification":"implementation","status":"in_progress"},
         {"id":"dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07","short_id":"dbe2f2a8","title":"Render the structured envelope from the top-level failure printer","classification":"implementation","status":"done"}
       ]

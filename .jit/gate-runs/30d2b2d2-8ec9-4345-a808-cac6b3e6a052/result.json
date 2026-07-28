@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "7c836879b74e41e628a077752d3b7a1cfba401bd",
+  "completed_at": "2026-07-28T11:47:16.453874717Z",
+  "duration_ms": 134034,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are covered by current parity tests; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "72835d56-06fa-427c-82fd-a516803723cc",
+  "message": null,
+  "run_id": "30d2b2d2-8ec9-4345-a808-cac6b3e6a052",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T11:45:02.419739603Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:72835d56 commits 561bd861, 4a0f2a81, 07060167 (merge), 24f9cc22\nPolicy sources: AGENTS.md; .jit/invariants.toml\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: reread output.rs lines 680-755 and 880-940 after a truncated broad search; remaining matches were outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are covered by current parity tests; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
