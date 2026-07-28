@@ -10872,3 +10872,7 @@
 {"assignee":"agent:worker","id":"f875c7de-c3f9-49a9-9ed0-4a5f95fe64c7","issue_id":"a193a7cc-a00b-4551-bb30-922a8e015b38","timestamp":"2026-07-28T10:13:38.980276619Z","type":"issue_claimed"}
 {"from":"ready","id":"d7d35b52-11d5-48ac-9d4a-d39fec6fa55a","issue_id":"dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07","timestamp":"2026-07-28T10:13:43.675395665Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"eea742f4-5d56-40ab-b021-82996440ff5a","issue_id":"dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07","timestamp":"2026-07-28T10:13:43.675395665Z","type":"issue_claimed"}
+{"id":"2d8b889d-02a4-465c-bc15-9532ca3963b6","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","priority":"high","timestamp":"2026-07-28T10:34:31.069263314Z","title":"Enforce semantic types, canonical cutovers, and architecture dependency direction","type":"issue_created"}
+{"fields":["dependencies"],"id":"68d21d42-94e7-4581-99ea-1e12b7d2b2c1","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-28T10:34:42.181188087Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"npm-ci","id":"d92b86b5-6beb-4d30-9af4-ac60354d0f7f","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","timestamp":"2026-07-28T10:35:18.708156690Z","type":"gate_added"}
+{"gate_key":"web-ci","id":"a9241c27-7fa3-497a-81a2-3685ab9a7753","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","timestamp":"2026-07-28T10:35:19.036900149Z","type":"gate_removed"}

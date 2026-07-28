@@ -135,6 +135,9 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **semantic-test-assertions** — Tests assert observable semantic properties or relationships; exact field-name inventories and literal-value assertions are confined to one canonical suite for an intentionally stable external contract.
 - **shared-test-contracts** — Frequently repeated setup and interface behavior use shared fixtures and conformance suites; every implementation of an interface runs the same behavioral contract, while implementation-specific tests cover only implementation-specific behavior.
 - **bounded-rust-build-footprint** — Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets.
+- **semantic-types** — Every identity, constrained token, closed vocabulary, and protocol sentinel has one canonical semantic type; raw strings exist only at parsing and serialization boundaries.
+- **canonical-cutover** — Superseded aliases, fields, and representations are removed after cutover; compatibility code is allowed only in a named, versioned migration boundary with a tracked removal condition.
+- **architecture-dependency-direction** — Dependencies point inward: domain and graph remain pure and I/O-free; storage owns persistence; commands orchestrate domain and storage; CLI, output, and server layers adapt inputs and outputs without pushing their concerns into inner layers.
 <!-- jit:invariants:end -->
 
 ## JIT workflow

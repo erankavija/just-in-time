@@ -84,3 +84,18 @@ id = "bounded-rust-build-footprint"
 statement = "Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets."
 kind = "enforced"
 enforced-by = "@/gate/cargo-ci"
+
+[[invariants]]
+id = "semantic-types"
+statement = "Every identity, constrained token, closed vocabulary, and protocol sentinel has one canonical semantic type; raw strings exist only at parsing and serialization boundaries."
+kind = "advisory"
+
+[[invariants]]
+id = "canonical-cutover"
+statement = "Superseded aliases, fields, and representations are removed after cutover; compatibility code is allowed only in a named, versioned migration boundary with a tracked removal condition."
+kind = "advisory"
+
+[[invariants]]
+id = "architecture-dependency-direction"
+statement = "Dependencies point inward: domain and graph remain pure and I/O-free; storage owns persistence; commands orchestrate domain and storage; CLI, output, and server layers adapt inputs and outputs without pushing their concerns into inner layers."
+kind = "advisory"

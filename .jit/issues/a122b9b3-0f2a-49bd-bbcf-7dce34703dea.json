@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T10:34:31.069263314Z",
+  "dependencies": [],
+  "description": "Convert three advisory project invariants into durable, mechanically checked policy before the v1.0 release. Enforcement must catch regressions without confusing free-form prose with semantic identifiers, legitimate boundary adapters with domain representations, or deliberate migrations with permanent compatibility paths.\n\n## Success Criteria\n\n- [hard] REQ-01: Required automated checks reject new raw-string representations of identities, constrained tokens, closed vocabularies, and protocol sentinels in production code outside explicitly identified parsing and serialization boundaries.\n- [hard] REQ-02: Required automated checks reject superseded aliases, duplicate fields or representations, and compatibility branches outside a named, versioned migration boundary carrying a tracked removal condition; any accepted baseline is explicit, narrow, reviewable, and cannot grow silently.\n- [hard] REQ-03: Required automated checks enforce inward dependency direction across applicable production workspaces: domain and graph remain pure and I/O-free, persistence stays behind storage interfaces, commands orchestrate inner layers, and CLI, output, server, MCP, and web adapters do not push boundary concerns inward.\n- [hard] REQ-04: The enforcement inventory explicitly names every applicable production root; any omitted workspace or path has a local rationale, and no blanket directory or module exemption is accepted.\n- [hard] REQ-05: Positive and negative regression fixtures prove representative compliant cases pass and representative violations of each invariant fail with actionable diagnostics naming the file and violated rule.\n- [hard] REQ-06: The checks run on required repository gate paths used for v1.0 completion, and the current production tree passes after violations are fixed or captured by narrowly justified, non-growing exceptions.\n- [hard] REQ-07: The semantic-types, canonical-cutover, and architecture-dependency-direction registry entries are promoted from advisory to enforced only after their durable checks exist, with each enforced-by reference resolving to the gate or rule that actually performs the check.\n- [hard] REQ-08: Registry projections are regenerated, invariant/link validation is clean, and contributor guidance explains how to diagnose a failure and add an intentional versioned migration boundary without weakening the checks.",
+  "documents": [],
+  "first_ready_at": "2026-07-28T10:34:31.069263314Z",
+  "gates_required": [
+    "cargo-ci",
+    "mcp-ci",
+    "repo-validate",
+    "code-review",
+    "npm-ci"
+  ],
+  "gates_status": {
+    "npm-ci": {
+      "status": "pending",
+      "updated_at": "2026-07-28T10:35:18.708156690Z",
+      "updated_by": null
+    }
+  },
+  "id": "a122b9b3-0f2a-49bd-bbcf-7dce34703dea",
+  "labels": [
+    "milestone:v1.0",
+    "component:core",
+    "enforces:@/invariant/semantic-types",
+    "enforces:@/invariant/canonical-cutover",
+    "enforces:@/invariant/architecture-dependency-direction",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
+  "updated_at": "2026-07-28T10:35:19.036900149Z"
+}
