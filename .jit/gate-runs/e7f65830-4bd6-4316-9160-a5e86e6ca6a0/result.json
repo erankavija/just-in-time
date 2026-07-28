@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "658a09cf140b089db8726fabc8875b5b0bbde28f",
+  "completed_at": "2026-07-28T09:01:22.217407667Z",
+  "duration_ms": 166345,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard requirements are met; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "437ac584-b441-43fb-91bd-a9328f884c12",
+  "message": null,
+  "run_id": "e7f65830-4bd6-4316-9160-a5e86e6ca6a0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T08:58:35.871896554Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6fc62d4, 3311a038, 54aac39b, afc53e49, 658a09cf (`jit:437ac584`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/437ac584/requirement/REQ-01..REQ-05 (issue description); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T08:50:36Z); code-review pending\nTruncation recovery: narrowed reads of each tagged patch, current preset-apply/test code, error-code mapping, and gate/invariant sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard requirements are met; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

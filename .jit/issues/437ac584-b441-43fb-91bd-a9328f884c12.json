@@ -8,6 +8,7 @@
   ],
   "description": "Applying a gate preset under the machine-readable flag nests per-issue failures inside a success payload and exits zero, so an automated caller records a failed application as a success.\n\n## Background\n\nThe human invocation exits non-zero when any target issue fails. The machine-readable invocation has no such exit: it serializes the per-issue failures into an array inside the success payload and returns zero. An agent driving preset application therefore has to inspect the payload's contents to notice a failure the plain path signals in the status alone.\n\nThe repair reports the failure the way the rest of the surface does — an error envelope carrying a registered code, exiting on the status that code maps to — while keeping the per-issue detail readable for a caller that wants it.\n\n## Success Criteria\n\n- [hard] REQ-01: A preset application in which at least one target issue fails exits non-zero under the machine-readable flag.\n- [hard] REQ-02: That failing application reports an error envelope carrying a registered code rather than a success payload.\n- [hard] REQ-03: The per-issue failure detail remains readable from the reported envelope.\n- [hard] REQ-04: The failing application's exit status equals the status its reported code maps to.\n- [hard] REQ-05: A preset application in which no target issue fails is unchanged in payload shape and exit status.\n",
   "documents": [],
+  "done_at": "2026-07-28T09:01:53.819778636Z",
   "first_ready_at": "2026-07-28T08:05:17.563899043Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-07-28T08:57:21.435633412Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:01:22.505577271Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,7 +37,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Report per-issue preset failures as a failing envelope",
-  "updated_at": "2026-07-28T08:57:21.435633412Z"
+  "updated_at": "2026-07-28T09:01:53.819778636Z"
 }
