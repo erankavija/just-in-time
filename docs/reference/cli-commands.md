@@ -22,12 +22,16 @@ issue (fetch the body with `jit issue show`):
 }
 ```
 
-A failing `--json` invocation emits exactly one error envelope on stdout, the
-command's payload stream. Its reported `error.code` is a registered
+For failures reached after successful argument parsing and command dispatch, a
+`--json` invocation emits exactly one error envelope on stdout, the command's
+payload stream. Its reported `error.code` is a registered
 [machine-readable error code](error-codes.md), and that code determines the
 process exit status in the [Exit Codes reference](exit-codes.md). Those generated
 references are the canonical vocabulary and status taxonomy; this section is the
 canonical statement of the machine-readable failure contract.
+
+Clap parser diagnostics raised before dispatch remain outside this envelope
+guarantee.
 
 Error responses use a stable top-level `error` object:
 
