@@ -8064,7 +8064,6 @@ mod exit_code_projection_tests {
     use super::{
         claim_json_error, error_to_error_code, error_to_exit_code, validate_fix_json_error,
     };
-    use anyhow::Context as _;
     use jit::declarations::GateStage;
     use jit::domain::{GateRunResult, GateRunStatus};
     use jit::output::ErrorCode;

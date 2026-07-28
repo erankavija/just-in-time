@@ -65,10 +65,12 @@ fn coverage_errors(declared: &BTreeSet<String>, registrations: &[Registration<'_
     let stale = registered
         .difference(declared)
         .map(|path| format!("stale registry arm `{path}` no longer declares --json"));
-    let empty_exemptions = registrations.iter().filter_map(|registration| {
-        matches!(registration.kind, RegistrationKind::Exemption(reason) if reason.trim().is_empty())
-            .then(|| format!("exemption for `{}` has no stated reason", registration.path))
-    });
+    let empty_exemptions = registrations
+        .iter()
+        .filter(|registration| {
+            matches!(registration.kind, RegistrationKind::Exemption(reason) if reason.trim().is_empty())
+        })
+        .map(|registration| format!("exemption for `{}` has no stated reason", registration.path));
 
     missing.chain(stale).chain(empty_exemptions).collect()
 }
