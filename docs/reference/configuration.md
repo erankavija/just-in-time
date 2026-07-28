@@ -626,8 +626,8 @@ jit config set worktree.enforce_leases warn --global
 jit config validate
 ```
 
-Exit codes are listed in [Exit Codes](exit-codes.md), the generated reference:
-`0` when the configuration is valid and `4` when errors are found.
+See the [command-specific `config validate` mapping in the generated exit-code
+reference](exit-codes.md#command-specific-mappings) for its outcomes.
 
 ## Example Configurations
 

@@ -3625,9 +3625,8 @@ errors and invalid values (both surface when a config source fails to load).
 jit config validate [--json]
 ```
 
-Exit codes follow the [exit-code reference](exit-codes.md#command-specific-mappings):
-`0` when the configuration is valid, `4` when any source fails to load or carries
-an invalid value.
+See the [command-specific `config validate` mapping in the generated exit-code
+reference](exit-codes.md#command-specific-mappings) for its outcomes.
 
 ### `jit config show-hierarchy` / `jit config list-templates`
 
