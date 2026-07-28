@@ -602,7 +602,8 @@ list --kind invariant`.
 
 An unknown key exits `2` (`INVALID_ARGUMENT`): an unknown top-level key
 names the valid sections, an unknown nested key names the missing segment
-and its resolved parent.
+and its resolved parent; see the [machine-readable failure
+contract](cli-commands.md#cli-json-contracts).
 
 ```bash
 jit config get bogus_section
