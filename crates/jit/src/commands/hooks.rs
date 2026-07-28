@@ -75,9 +75,15 @@ pub struct InstallResult {
     pub skipped: Vec<String>,
 }
 
-/// Find .git directory by walking up from current directory
+/// Find .git directory by walking up from current directory.
+///
+/// Honors Git's `GIT_CEILING_DIRECTORIES` boundary so callers can prevent an
+/// unrelated ancestor repository from being selected during discovery.
 fn find_git_dir() -> Result<PathBuf> {
     let current_dir = std::env::current_dir().context("Failed to get current directory")?;
+    let ceilings = std::env::var_os("GIT_CEILING_DIRECTORIES")
+        .map(|value| std::env::split_paths(&value).collect::<Vec<_>>())
+        .unwrap_or_default();
 
     let mut dir = current_dir.as_path();
 
@@ -110,7 +116,11 @@ fn find_git_dir() -> Result<PathBuf> {
             }
         }
 
-        // Move up to parent directory
+        if ceilings.iter().any(|ceiling| ceiling == dir) {
+            anyhow::bail!("Not in a git repository (no .git directory found)");
+        }
+
+        // Move up to parent directory.
         match dir.parent() {
             Some(parent) => dir = parent,
             None => anyhow::bail!("Not in a git repository (no .git directory found)"),
