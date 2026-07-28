@@ -11102,3 +11102,5 @@
 {"from":"backlog","id":"cf7a8211-9b7b-4fcc-8331-972745b6013d","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:26:07.881062183Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"repo-validate","id":"6ad3a83f-7a4e-49e0-b941-1063a54ecb21","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:28:11.523574424Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"a68c4bf9-dbcb-4646-97ef-838c1a4dbd65","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:28:13.181754032Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"39c057d8-b31e-4ce0-9137-10b1d4d42667","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:29:51.711167488Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"c0ac462f-037c-43e4-bc4e-a451d1801b60","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T20:31:42.135378356Z","type":"gate_failed","updated_by":"auto:executor"}
