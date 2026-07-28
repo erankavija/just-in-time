@@ -11,17 +11,50 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/e204e63d-derived-package-sources/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "c84190779f25b5692c29c03e550389c3cbfddfa0682bebd50567eee73f478714",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/e204e63d-derived-package-sources/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3bf1f12a65be3bcf725d2fae7285c70dc4a55dc01f0bfe061600a7fab1676d14",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/e204e63d-derived-package-sources/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/e204e63d-derived-package-sources/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/e204e63d-derived-package-sources/breakdown.json"
     }
   ],
+  "done_at": "2026-07-28T12:16:47.105776898Z",
   "first_ready_at": "2026-07-28T10:06:09.509935886Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-07-28T10:06:09.509935886Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-07-28T12:16:31.008575982Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7eecace8-fae3-49f8-8907-2d6180ae40a3",
@@ -32,7 +65,7 @@
     "type:planning"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Derived profile assets and projected policy documentation",
-  "updated_at": "2026-07-28T10:43:19.392536957Z"
+  "updated_at": "2026-07-28T12:16:47.105776898Z"
 }

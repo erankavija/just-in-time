@@ -1,0 +1,36 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a4dc6b6d6528e7a4d452a71966a985784acce4f7",
+  "completed_at": "2026-07-28T12:05:20.059965009Z",
+  "duration_ms": 188995,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/e204e63d-derived-package-sources/breakdown.json",
+        "id": "F1",
+        "line": 262,
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "package-tree-cutover combines atomic cutover work with region relocation and executable-mode assertion preservation; split the preservable assertion work into a predecessor leaf and retain only an explicitly justified atomic cutover."
+      }
+    ],
+    "summary": "The package cutover leaf remains oversized because it combines cutover, relocation, and assertion-preservation work.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7eecace8-fae3-49f8-8907-2d6180ae40a3",
+  "message": null,
+  "run_id": "6f61a5f9-483b-48f4-bcf1-e3d7a5e8bfc0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T12:02:11.064483004Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7021 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa89a-96f3-7f51-adf2-1eb8d6347912\n--------\nuser\n--- 7008 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high):** `package-tree-cutover` still combines the atomic embed/copy cutover with relocating the package-authored region and preserving/rewriting the executable-mode assertion, so it fails the one-worker no-mixed-deliverables simulation. Extract the mode-contract preservation into a predecessor leaf while the current assertion remains effective; leave only the inseparable re-root/delete transition in this leaf, with a visible, code-specific atomicity override if still required. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/e204e63d-derived-package-sources/breakdown.json:262) [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/e204e63d-derived-package-sources/plan.md:23)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The package cutover leaf remains oversized because it combines cutover, relocation, and assertion-preservation work.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"package-tree-cutover combines atomic cutover work with region relocation and executable-mode assertion preservation; split the preservable assertion work into a predecessor leaf and retain only an explicitly justified atomic cutover.\",\"file\":\"dev/active/e204e63d-derived-package-sources/breakdown.json\",\"line\":262,\"references\":[\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
