@@ -8,12 +8,24 @@
   ],
   "description": "The search command prints a failure envelope and then exits on a literal status its reported code does not map to, so the envelope and the status disagree by construction.\n\n## Background\n\nBoth search failures — the search backend reporting an error, and the external search tool being absent — print an envelope carrying their own code and then exit on a fixed value of 10. Neither code maps to 10, so a caller reading the envelope and a caller reading the exit status reach different conclusions about the same failure.\n\nThe repair derives the status from the reported code, which is the rule the shared emission macro already follows at every other site.\n\n## Success Criteria\n\n- [hard] REQ-01: A failing search invocation under the machine-readable flag exits on the status its reported error code maps to.\n- [hard] REQ-02: No exit-status literal remains on the search failure path.\n- [hard] REQ-03: The absent-search-tool failure reports a status matching its own reported code.\n- [hard] REQ-04: The search-backend failure reports a status matching its own reported code.\n",
   "documents": [],
+  "done_at": "2026-07-28T09:55:57.539246317Z",
   "first_ready_at": "2026-07-28T08:05:35.248010583Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:53:10.480197585Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:55:15.188592741Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e3a11002-7469-438e-b3d0-1b5f6251a1cf",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Align the search command's exit status with its reported error code",
-  "updated_at": "2026-07-28T08:23:54.256328292Z"
+  "updated_at": "2026-07-28T09:55:57.539246317Z"
 }

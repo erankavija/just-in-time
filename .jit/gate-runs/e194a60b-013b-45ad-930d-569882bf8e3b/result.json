@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "f085b9bc9e06176757f12077ea15cd2640da6d8d",
+  "completed_at": "2026-07-28T09:55:14.918911917Z",
+  "duration_ms": 123476,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The search JSON failure path now derives its process status from the registered reported error code, with coverage for both failure classes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e3a11002-7469-438e-b3d0-1b5f6251a1cf",
+  "message": null,
+  "run_id": "e194a60b-013b-45ad-930d-569882bf8e3b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T09:53:11.442544034Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8f61efd6, 82b1bd45, 5f476df4 (`jit:e3a11002`); uncommitted changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-3, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/e3a11002/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T09:47:16Z); code-review pending\nTruncation recovery: narrowed configuration, source-of-truth, mapping, test, and merge-parent reads; unrelated historical gate artifacts were outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The search JSON failure path now derives its process status from the registered reported error code, with coverage for both failure classes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
