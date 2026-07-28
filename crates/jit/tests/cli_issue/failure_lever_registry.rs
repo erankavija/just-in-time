@@ -7,11 +7,17 @@ use std::str::FromStr;
 
 const REGISTRY_TOML: &str = include_str!("failure_lever_registry.toml");
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct FailureLeverRegistry {
     pub(crate) schema: FailureLeverSchema,
     pub(crate) arms: Vec<FailureLever>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawFailureLeverRegistry {
+    schema: FailureLeverSchema,
+    arms: Vec<FailureLever>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -111,6 +117,25 @@ impl<'de> Deserialize<'de> for FailureLever {
     }
 }
 
+impl<'de> Deserialize<'de> for FailureLeverRegistry {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let RawFailureLeverRegistry { schema, arms } =
+            RawFailureLeverRegistry::deserialize(deserializer)?;
+        let mut paths = BTreeSet::new();
+
+        arms.iter().try_for_each(|arm| {
+            paths.insert(arm.path()).then_some(()).ok_or_else(|| {
+                D::Error::custom(format!("duplicate failure-lever path `{}`", arm.path()))
+            })
+        })?;
+
+        Ok(Self { schema, arms })
+    }
+}
+
 impl FailureLever {
     pub(crate) fn path(&self) -> &str {
         match self {
@@ -183,4 +208,30 @@ fn test_failure_lever_registry_rejects_entries_missing_required_fields() {
 
     assert!(toml::from_str::<FailureLeverRegistry>(incomplete_invocation).is_err());
     assert!(toml::from_str::<FailureLeverRegistry>(incomplete_exemption).is_err());
+}
+
+#[test]
+fn test_failure_lever_registry_rejects_duplicate_paths_across_registration_kinds() {
+    let duplicate_path = r#"
+        schema = "failure-lever-registry/v1"
+        [[arms]]
+        path = "status"
+        argv = ["status", "--json"]
+        setup = ["init"]
+        expected_failure = "failure"
+        expected_code = "PARSE_ERROR"
+        expected_exit = 1
+        confirmation = "invoked"
+
+        [[arms]]
+        path = "status"
+        exemption_reason = "duplicate path must be rejected regardless of registration kind"
+        confirmation = "source-only"
+    "#;
+
+    let error = toml::from_str::<FailureLeverRegistry>(duplicate_path)
+        .expect_err("duplicate paths must be rejected by typed registry deserialization");
+    assert!(error
+        .to_string()
+        .contains("duplicate failure-lever path `status`"));
 }
