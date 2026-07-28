@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:32:58.454253185Z",
+  "duration_ms": 189666,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The current registry covers the standalone tool arms and the prior hooks failure mismatch is corrected in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "585d55c3-c3f8-411f-b464-d1f2226cc8ed",
+  "message": null,
+  "run_id": "80263720-176d-4aa5-bbd7-61eeac9527f1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:29:48.787586840Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 203a8f5b, 3a047522 (jit:585d55c3)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-3, D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, shared-test-contracts, semantic-test-assertions (.jit/invariants.toml)\nGate evidence: code-review failed, exit 1 (prior run b37a3788)\nTruncation recovery: narrowed individual commit patches, registry, and affected command handlers\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current registry covers the standalone tool arms and the prior hooks failure mismatch is corrected in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

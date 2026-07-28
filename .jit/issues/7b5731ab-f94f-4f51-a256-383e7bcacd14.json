@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/doc.toml"
     }
   ],
+  "done_at": "2026-07-28T00:13:05.183660387Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:12:41.927731631Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7b5731ab-f94f-4f51-a256-383e7bcacd14",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the doc namespace",
-  "updated_at": "2026-07-27T22:35:59.842863434Z"
+  "updated_at": "2026-07-28T00:13:05.183660387Z"
 }

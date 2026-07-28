@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:32:47.939956414Z",
+  "duration_ms": 170157,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped requirements are met; the prior delete setup finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2b4b5ddb-a769-4b2d-9b9e-04f7b844da41",
+  "message": null,
+  "run_id": "9f61b628-d610-4652-a943-104c47be8c87",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:29:57.782024535Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 26dc711e, 65f54267, 2b2b682a, b945a199 (jit:2b4b5ddb)\nPolicy sources: AGENTS.md\nResolved items: @/issue/2b4b5ddb/requirement/REQ-01–REQ-07 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: code-review failed, exit 1 (prior structured F1); current registry addresses it with `worktree:primary`\nTruncation recovery: narrowed merge patches, dispatch handlers, registry schema/parse, and command definitions\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped requirements are met; the prior delete setup finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

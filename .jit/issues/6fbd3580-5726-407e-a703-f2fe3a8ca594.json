@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/config.toml"
     }
   ],
+  "done_at": "2026-07-28T00:17:21.722176031Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:17:07.805677775Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6fbd3580-5726-407e-a703-f2fe3a8ca594",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the config namespace",
-  "updated_at": "2026-07-27T22:48:25.477658671Z"
+  "updated_at": "2026-07-28T00:17:21.722176031Z"
 }

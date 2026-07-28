@@ -1,26 +1,26 @@
 {
   "epic_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
   "epic_short_id": "a2546471",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id":"24929ba4-32bb-41f8-9458-62776b9fccaa","short_id":"24929ba4","title":"Failure-lever survey for the gate namespace","classification":"research","status":"claimed"},
-        {"id":"2b4b5ddb-a769-4b2d-9b9e-04f7b844da41","short_id":"2b4b5ddb","title":"Failure-lever survey for the issue namespace","classification":"research","status":"claimed"},
-        {"id":"54568bd5-a9cf-40e0-872c-ab7664b8f8dd","short_id":"54568bd5","title":"Failure-lever survey for the profile namespace","classification":"research","status":"claimed"},
-        {"id":"585d55c3-c3f8-411f-b464-d1f2226cc8ed","short_id":"585d55c3","title":"Failure-lever survey for the standalone tool commands","classification":"research","status":"claimed"},
-        {"id":"6fbd3580-5726-407e-a703-f2fe3a8ca594","short_id":"6fbd3580","title":"Failure-lever survey for the config namespace","classification":"research","status":"claimed"},
-        {"id":"7b5731ab-f94f-4f51-a256-383e7bcacd14","short_id":"7b5731ab","title":"Failure-lever survey for the doc namespace","classification":"research","status":"claimed"},
-        {"id":"860dc866-f32d-4d92-b712-fd3222aa0d8a","short_id":"860dc866","title":"Failure-lever survey for the archive namespace","classification":"research","status":"claimed"},
-        {"id":"9dd880d4-4c8e-4ec5-beec-1832eb07773e","short_id":"9dd880d4","title":"Failure-lever survey for the events namespace","classification":"research","status":"claimed"},
-        {"id":"a971ec3a-8d08-49ee-a758-98d32954f2e8","short_id":"a971ec3a","title":"Failure-lever survey for the repository-lifecycle commands","classification":"research","status":"claimed"},
-        {"id":"b3c9db33-7de3-4f16-882e-04f2d0ed6f57","short_id":"b3c9db33","title":"Failure-lever survey for the label namespace","classification":"research","status":"claimed"},
-        {"id":"b6917d8f-0821-4063-afdd-041ddc50c691","short_id":"b6917d8f","title":"Make the error-code vocabulary an enumerable type","classification":"implementation","status":"claimed"},
-        {"id":"c0a64179-e90f-4b99-b24d-aeafc9d3d281","short_id":"c0a64179","title":"Failure-lever survey for the wrapper-classified namespaces","classification":"research","status":"claimed"},
-        {"id":"c4f8a7d2-b684-4060-90f9-bac7b0516d81","short_id":"c4f8a7d2","title":"Failure-lever survey for the dependency and worktree namespaces","classification":"research","status":"claimed"},
-        {"id":"c7ab609d-0b4f-403c-acee-2e8cc8fe34f5","short_id":"c7ab609d","title":"Failure-lever survey for the claim namespace","classification":"research","status":"claimed"},
-        {"id":"cfaff7f0-f16b-412e-bb00-627740f6f9e8","short_id":"cfaff7f0","title":"Failure-lever survey for the query and graph namespaces","classification":"research","status":"claimed"}
+        {"id":"24929ba4-32bb-41f8-9458-62776b9fccaa","short_id":"24929ba4","title":"Failure-lever survey for the gate namespace","classification":"research","status":"done"},
+        {"id":"2b4b5ddb-a769-4b2d-9b9e-04f7b844da41","short_id":"2b4b5ddb","title":"Failure-lever survey for the issue namespace","classification":"research","status":"done"},
+        {"id":"54568bd5-a9cf-40e0-872c-ab7664b8f8dd","short_id":"54568bd5","title":"Failure-lever survey for the profile namespace","classification":"research","status":"done"},
+        {"id":"585d55c3-c3f8-411f-b464-d1f2226cc8ed","short_id":"585d55c3","title":"Failure-lever survey for the standalone tool commands","classification":"research","status":"done"},
+        {"id":"6fbd3580-5726-407e-a703-f2fe3a8ca594","short_id":"6fbd3580","title":"Failure-lever survey for the config namespace","classification":"research","status":"done"},
+        {"id":"7b5731ab-f94f-4f51-a256-383e7bcacd14","short_id":"7b5731ab","title":"Failure-lever survey for the doc namespace","classification":"research","status":"done"},
+        {"id":"860dc866-f32d-4d92-b712-fd3222aa0d8a","short_id":"860dc866","title":"Failure-lever survey for the archive namespace","classification":"research","status":"done"},
+        {"id":"9dd880d4-4c8e-4ec5-beec-1832eb07773e","short_id":"9dd880d4","title":"Failure-lever survey for the events namespace","classification":"research","status":"done"},
+        {"id":"a971ec3a-8d08-49ee-a758-98d32954f2e8","short_id":"a971ec3a","title":"Failure-lever survey for the repository-lifecycle commands","classification":"research","status":"done"},
+        {"id":"b3c9db33-7de3-4f16-882e-04f2d0ed6f57","short_id":"b3c9db33","title":"Failure-lever survey for the label namespace","classification":"research","status":"done"},
+        {"id":"b6917d8f-0821-4063-afdd-041ddc50c691","short_id":"b6917d8f","title":"Make the error-code vocabulary an enumerable type","classification":"implementation","status":"done"},
+        {"id":"c0a64179-e90f-4b99-b24d-aeafc9d3d281","short_id":"c0a64179","title":"Failure-lever survey for the wrapper-classified namespaces","classification":"research","status":"done"},
+        {"id":"c4f8a7d2-b684-4060-90f9-bac7b0516d81","short_id":"c4f8a7d2","title":"Failure-lever survey for the dependency and worktree namespaces","classification":"research","status":"done"},
+        {"id":"c7ab609d-0b4f-403c-acee-2e8cc8fe34f5","short_id":"c7ab609d","title":"Failure-lever survey for the claim namespace","classification":"research","status":"done"},
+        {"id":"cfaff7f0-f16b-412e-bb00-627740f6f9e8","short_id":"cfaff7f0","title":"Failure-lever survey for the query and graph namespaces","classification":"research","status":"done"}
       ]
     },
     {
@@ -81,6 +81,15 @@
   ],
   "created_during_execution": [],
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {
+    "24929ba4": 1,
+    "2b4b5ddb": 1,
+    "54568bd5": 1,
+    "585d55c3": 1,
+    "6fbd3580": 1,
+    "7b5731ab": 1,
+    "b6917d8f": 2,
+    "c0a64179": 1
+  },
   "started_at": "2026-07-28T01:13:41+03:00"
 }

@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/repository-lifecycle.toml"
     }
   ],
+  "done_at": "2026-07-28T00:29:34.132123035Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:27:59.674660862Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a971ec3a-8d08-49ee-a758-98d32954f2e8",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the repository-lifecycle commands",
-  "updated_at": "2026-07-27T22:57:44.596881494Z"
+  "updated_at": "2026-07-28T00:29:34.132123035Z"
 }

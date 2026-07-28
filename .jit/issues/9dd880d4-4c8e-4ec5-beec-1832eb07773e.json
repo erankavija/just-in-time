@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/events.toml"
     }
   ],
+  "done_at": "2026-07-28T00:17:37.266093446Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:15:50.326101905Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9dd880d4-4c8e-4ec5-beec-1832eb07773e",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the events namespace",
-  "updated_at": "2026-07-27T22:46:43.636494815Z"
+  "updated_at": "2026-07-28T00:17:37.266093446Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:15:49.975403571Z",
+  "duration_ms": 137446,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The events failure-lever registry covers both JSON-capable arms with reproducible malformed-log failures.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9dd880d4-4c8e-4ec5-beec-1832eb07773e",
+  "message": null,
+  "run_id": "b9bc6e56-d580-4fbb-9454-f506b9b90c37",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:13:32.528507724Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 89e194de, bbb75d53 (`jit:9dd880d4`)\nPolicy sources: AGENTS.md\nResolved items: none\nGate evidence: none\nTruncation recovery: recovered the merge with path-scoped parent diffs; reread the fragment, CLI declaration, dispatch, storage reader, and parser separately\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The events failure-lever registry covers both JSON-capable arms with reproducible malformed-log failures.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

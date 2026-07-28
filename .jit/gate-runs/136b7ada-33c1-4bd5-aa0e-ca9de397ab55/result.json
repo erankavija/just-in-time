@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:22:02.298346898Z",
+  "duration_ms": 253213,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/a2546471-json-error-contract/levers/item-invariant-project.toml",
+        "id": "F1",
+        "line": 41,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The invariant-check setup omits required invariant fields and has no defined setup-token expansion, so the recorded invocation is not reproducible from this fragment alone."
+      }
+    ],
+    "summary": "The invariant-check probe lacks a self-contained reproducible setup.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c0a64179-e90f-4b99-b24d-aeafc9d3d281",
+  "message": null,
+  "run_id": "136b7ada-33c1-4bd5-aa0e-ca9de397ab55",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:17:49.084385675Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9789 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa615-b920-7692-8cc8-df8f2c7e7279\n--------\nuser\n--- 9776 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 529e53e1, 8b270aa5 (the merge’s other-parent diff was peer-tagged wave integration outside this issue’s impact cone)\nPolicy sources: AGENTS.md; .jit/reference/content-standards.md\nResolved items: @/charter/D-1, D-3, D-4 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, gate-semantics, semantic-test-assertions, shared-test-contracts (.jit/invariants.toml)\nGate evidence: none\nTruncation recovery: re-read parent-specific merge diffs and the fragment’s handlers, configuration grammar, and drift rendering in narrow ranges\n\n1. **[blocking][issue-impact][high]** The `invariant check` setup is not reproducible from the fragment alone. It only says to create an invariant “enforced by” a missing rule, but `.jit/invariants.toml` also requires `statement` and `kind`; no definition of `dangling-invariant-enforcement` supplies them. The recorded probe therefore cannot be reconstructed as required by REQ-02 and REQ-05. [dev/active/a2546471-json-error-contract/levers/item-invariant-project.toml:41](/home/vkaskivuo/Projects/just-in-time/dev/active/a2546471-json-error-contract/levers/item-invariant-project.toml:41)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The invariant-check probe lacks a self-contained reproducible setup.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The invariant-check setup omits required invariant fields and has no defined setup-token expansion, so the recorded invocation is not reproducible from this fragment alone.\",\"file\":\"dev/active/a2546471-json-error-contract/levers/item-invariant-project.toml\",\"line\":41,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

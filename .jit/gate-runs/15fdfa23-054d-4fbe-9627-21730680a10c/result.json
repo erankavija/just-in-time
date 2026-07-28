@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:20:46.592451453Z",
+  "duration_ms": 174367,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three declared archive JSON arms are recorded with reproducible post-dispatch failure levers matching current source behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "860dc866-f32d-4d92-b712-fd3222aa0d8a",
+  "message": null,
+  "run_id": "15fdfa23-054d-4fbe-9627-21730680a10c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:17:52.224764969Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f3550226, a39aaa3f (same fragment merged)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: code-review pending (no exit code)\nTruncation recovery: Re-read scoped CLI, archive, storage, and plan ranges after broad searches truncated; preview invocation stopped at sandbox-denied lock access.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three declared archive JSON arms are recorded with reproducible post-dispatch failure levers matching current source behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

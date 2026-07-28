@@ -39,8 +39,8 @@ confirmation = "invoked"
 path = "invariant check"
 argv = ["invariant", "check", "--json"]
 setup = ["init", "dangling-invariant-enforcement:survey-invariant"]
-setup_notes = "Create .jit/invariants.toml with `survey-invariant` enforced by missing `@/rule/missing-survey-rule` after initialization."
-expected_failure = "Enforcement drift: 1 finding(s) for survey-invariant bound to @/rule/missing-survey-rule"
+setup_notes = "After initialization, create .jit/invariants.toml with one [[invariants]] entry: id = \"survey-invariant\", statement = \"Survey invariant used to reproduce missing enforcement drift.\", kind = \"enforced\", and enforced-by = \"@/rule/missing-survey-rule\"."
+expected_failure = "Exit 4 with message `Enforcement drift: 1 finding(s)` and one finding whose invariant_id is `survey-invariant`, subject is `@/rule/missing-survey-rule`, and unloadable is false."
 expected_exit = 4
 confirmation = "invoked"
 

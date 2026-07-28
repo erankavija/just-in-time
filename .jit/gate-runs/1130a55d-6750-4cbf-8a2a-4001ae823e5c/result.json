@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:12:41.584192088Z",
+  "duration_ms": 245710,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The doc failure-lever registry covers the ten JSON-capable doc arms with reproducible setup, expected failures, exits, and invocation confirmation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7b5731ab-f94f-4f51-a256-383e7bcacd14",
+  "message": null,
+  "run_id": "1130a55d-6750-4cbf-8a2a-4001ae823e5c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:08:35.873740661Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:7b5731ab` commits 31b54b78, 9b939ae8, 03ce180d\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: none\nTruncation recovery: re-read the doc CLI definitions, dispatch/body paths, config parser, and merge patch in bounded ranges; unrelated broad-search and merge-event output was outside the impact cone\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The doc failure-lever registry covers the ten JSON-capable doc arms with reproducible setup, expected failures, exits, and invocation confirmation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

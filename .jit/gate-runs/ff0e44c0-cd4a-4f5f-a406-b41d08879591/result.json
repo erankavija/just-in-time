@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:17:07.452806057Z",
+  "duration_ms": 214289,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The config failure-lever registry covers all six declared JSON arms with supported invocations and valid exemptions.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6fbd3580-5726-407e-a703-f2fe3a8ca594",
+  "message": null,
+  "run_id": "ff0e44c0-cd4a-4f5f-a406-b41d08879591",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:13:33.162891605Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fb97c31b, 7f15c3e4, 6ecf3300 (`jit:6fbd3580`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/6fbd3580/requirement/REQ-01–REQ-07 (issue description); @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: code-review pending (exit code none)\nTruncation recovery: narrowed per-commit merge patches, config CLI dispatch, parser/error paths, tests, and registry-shape reads after broad searches truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The config failure-lever registry covers all six declared JSON arms with supported invocations and valid exemptions.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

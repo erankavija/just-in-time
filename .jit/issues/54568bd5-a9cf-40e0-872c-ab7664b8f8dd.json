@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/profile.toml"
     }
   ],
+  "done_at": "2026-07-28T00:23:45.217203248Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:20:36.283270982Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "54568bd5-a9cf-40e0-872c-ab7664b8f8dd",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the profile namespace",
-  "updated_at": "2026-07-27T22:49:33.326335091Z"
+  "updated_at": "2026-07-28T00:23:45.217203248Z"
 }

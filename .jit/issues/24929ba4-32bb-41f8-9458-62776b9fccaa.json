@@ -15,6 +15,7 @@
       "path": "dev/active/a2546471-json-error-contract/levers/gate.toml"
     }
   ],
+  "done_at": "2026-07-28T00:38:03.294308161Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
@@ -22,7 +23,7 @@
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-07-27T22:30:17.654566482Z",
+      "updated_at": "2026-07-28T00:37:47.645535797Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the gate namespace",
-  "updated_at": "2026-07-27T22:30:17.654566482Z"
+  "updated_at": "2026-07-28T00:38:03.294308161Z"
 }

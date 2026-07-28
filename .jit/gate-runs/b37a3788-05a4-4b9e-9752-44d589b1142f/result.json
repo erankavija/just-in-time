@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:26:17.019142286Z",
+  "duration_ms": 138335,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/a2546471-json-error-contract/levers/standalone-tools.toml",
+        "id": "F1",
+        "line": 32,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The hooks entry records the wrong failure for a Git-absent setup."
+      }
+    ],
+    "summary": "The hooks failure record describes a directory-creation failure that the recorded setup cannot reach.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "585d55c3-c3f8-411f-b464-d1f2226cc8ed",
+  "message": null,
+  "run_id": "b37a3788-05a4-4b9e-9752-44d589b1142f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:23:58.683962730Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8575 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa61b-5cd2-7893-bba7-5e00663d0e04\n--------\nuser\n--- 8562 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 203a8f5b, 3a047522 (jit:585d55c3)\nPolicy sources: AGENTS.md\nResolved items: none\nGate evidence: none\nTruncation recovery: narrowed reads of the fragment, its contract, and affected command handlers\n\n1. **F1 — medium, blocking, issue-impact:** The hooks entry misstates its recorded failure. With `git:absent`, `install_hooks` fails while locating `.git` before it constructs or creates the hooks directory; the actual error is “Not in a git repository.” Update the expected failure so REQ-03 and REQ-05 record the failure the invocation actually produces. [standalone-tools.toml](/home/vkaskivuo/Projects/just-in-time/dev/active/a2546471-json-error-contract/levers/standalone-tools.toml:32), [hooks.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/hooks.rs:30)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The hooks failure record describes a directory-creation failure that the recorded setup cannot reach.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The hooks entry records the wrong failure for a Git-absent setup.\",\"file\":\"dev/active/a2546471-json-error-contract/levers/standalone-tools.toml\",\"line\":32}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

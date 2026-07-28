@@ -15,14 +15,15 @@
       "path": "dev/active/a2546471-json-error-contract/levers/issue.toml"
     }
   ],
+  "done_at": "2026-07-28T00:33:52.240012004Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-27T22:30:00.805623057Z",
+      "status": "passed",
+      "updated_at": "2026-07-28T00:32:48.277920548Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the issue namespace",
-  "updated_at": "2026-07-27T22:30:00.805623057Z"
+  "updated_at": "2026-07-28T00:33:52.240012004Z"
 }

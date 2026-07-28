@@ -29,7 +29,7 @@ confirmation = "invoked"
 path = "hooks install"
 argv = ["hooks", "install", "--json"]
 setup = ["init", "git:absent"]
-expected_failure = "HOOKS_INSTALL_ERROR: the hooks directory cannot be created without a Git repository."
+expected_failure = "HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)"
 expected_exit = 1
 confirmation = "invoked"
 

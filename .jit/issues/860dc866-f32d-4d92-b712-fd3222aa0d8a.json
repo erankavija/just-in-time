@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/archive.toml"
     }
   ],
+  "done_at": "2026-07-28T00:23:37.596671134Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:20:46.942170766Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "860dc866-f32d-4d92-b712-fd3222aa0d8a",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the archive namespace",
-  "updated_at": "2026-07-27T22:50:38.653595394Z"
+  "updated_at": "2026-07-28T00:23:37.596671134Z"
 }

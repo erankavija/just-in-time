@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/standalone-tools.toml"
     }
   ],
+  "done_at": "2026-07-28T00:33:44.596936853Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:32:58.790657476Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "585d55c3-c3f8-411f-b464-d1f2226cc8ed",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the standalone tool commands",
-  "updated_at": "2026-07-27T22:53:57.065236192Z"
+  "updated_at": "2026-07-28T00:33:44.596936853Z"
 }

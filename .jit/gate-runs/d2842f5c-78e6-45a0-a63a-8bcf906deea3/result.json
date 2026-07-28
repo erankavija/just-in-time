@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:16:21.923333205Z",
+  "duration_ms": 170257,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Both machine-readable label arms have reproducible, post-dispatch failure levers recorded in the shared fragment shape.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b3c9db33-7de3-4f16-882e-04f2d0ed6f57",
+  "message": null,
+  "run_id": "d2842f5c-78e6-45a0-a63a-8bcf906deea3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:13:31.665709136Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 34804969, 670a957f (jit:b3c9db33)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: code-review pending; no recorded gate runs in supplied context\nTruncation recovery: narrowed reads of main.rs, config.rs, and storage/json.rs\n\n1. No blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both machine-readable label arms have reproducible, post-dispatch failure levers recorded in the shared fragment shape.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

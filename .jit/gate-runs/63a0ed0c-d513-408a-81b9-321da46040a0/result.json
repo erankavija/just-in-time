@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:32:35.988004810Z",
+  "duration_ms": 153648,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/a2546471-json-error-contract/levers/gate.toml",
+        "id": "F1",
+        "line": 114,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The recorded preset-apply failure text is not produced by current JSON dispatch, so the probe is not reproducible."
+      }
+    ],
+    "summary": "The preset-apply lever records failure text that the current JSON command does not produce.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "24929ba4-32bb-41f8-9458-62776b9fccaa",
+  "message": null,
+  "run_id": "63a0ed0c-d513-408a-81b9-321da46040a0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:30:02.339243809Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7213 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa620-e95c-7fb3-b50c-e9875d0a1ac3\n--------\nuser\n--- 7200 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b5ebf52b (fragment), 1eaaae97 (review evidence), a0bcdbd0 (merge integration)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: code-review passed (exit 0, 2026-07-27T22:30:16Z)\nTruncation recovery: focused CLI, dispatch, command, plan, and exact-line reads after broad-search truncation; unrelated matches were outside the gate-fragment impact cone\n\n1. [blocking][issue-impact] [high] `gate preset apply` records a failure text that current JSON dispatch cannot produce. The dispatcher captures the executor error verbatim as `errors[].error` (`\"Issue not found: …\"`), rather than prefixing it with `\"Per-target issue lookup error: \"`. Thus the recorded invocation does not reproduce its stated expected failure, violating REQ-03 and REQ-05. [dev/active/a2546471-json-error-contract/levers/gate.toml:114](/home/vkaskivuo/Projects/just-in-time/dev/active/a2546471-json-error-contract/levers/gate.toml:114)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The preset-apply lever records failure text that the current JSON command does not produce.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The recorded preset-apply failure text is not produced by current JSON dispatch, so the probe is not reproducible.\",\"file\":\"dev/active/a2546471-json-error-contract/levers/gate.toml\",\"line\":114,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -111,7 +111,7 @@ confirmation = "invoked"
 path = "gate preset apply"
 argv = ["gate", "preset", "apply", "plan-review", "00000000-0000-0000-0000-000000000000", "--json"]
 setup = ["init", "builtin-preset:plan-review", "no-issue:00000000-0000-0000-0000-000000000000"]
-expected_failure = "Per-target issue lookup error: Issue not found: 00000000-0000-0000-0000-000000000000"
+expected_failure = "errors[0].error: Issue not found: 00000000-0000-0000-0000-000000000000"
 expected_exit = 0
 confirmation = "invoked"
 

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:12:25.776332328Z",
+  "duration_ms": 229295,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The fragment covers all 12 declared query/graph JSON arms with source-supported post-dispatch failure records.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cfaff7f0-f16b-412e-bb00-627740f6f9e8",
+  "message": null,
+  "run_id": "fcd15e6d-aede-42ac-b7a2-20d8ea157f86",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:08:36.481092758Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b006cf86, 58443542 (both carry `jit:cfaff7f0`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: none\nTruncation recovery: narrowed per-commit patches, CLI/schema arm enumeration, storage/dispatch reads, and TOML parse verification\n\n1. No findings identified. `query-graph.toml` parses with 12 entries exactly matching the seven query and five graph `--json` arms; each records the malformed-index setup, expected failure/exit, and `invoked` confirmation. Current dispatch and storage paths support the post-dispatch failure lever.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The fragment covers all 12 declared query/graph JSON arms with source-supported post-dispatch failure records.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "203a8f5b4bc9c65082bb32dbf2b1d717734d3acd",
+  "completed_at": "2026-07-28T00:27:59.320617102Z",
+  "duration_ms": 239313,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six repository-lifecycle arms are recorded with valid, source-consistent post-dispatch failure levers.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a971ec3a-8d08-49ee-a758-98d32954f2e8",
+  "message": null,
+  "run_id": "28ba242d-7716-43ec-8db8-4ccb9c7c9e94",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T00:24:00.007120310Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5ffe6c5c, e5f68565 (tagged `jit:a971ec3a`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-6, @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: code-review: pending (exit none)\nTruncation recovery: narrowed reads of individual commit patches, CLI declarations, dispatch paths, failure mechanisms, and registry contract\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six repository-lifecycle arms are recorded with valid, source-consistent post-dispatch failure levers.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

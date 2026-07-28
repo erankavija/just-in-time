@@ -15,11 +15,18 @@
       "path": "dev/active/a2546471-json-error-contract/levers/query-graph.toml"
     }
   ],
+  "done_at": "2026-07-28T00:13:21.026593034Z",
   "first_ready_at": "2026-07-27T21:43:44.885062384Z",
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T00:12:26.125731181Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cfaff7f0-f16b-412e-bb00-627740f6f9e8",
   "labels": [
     "type:task",
@@ -29,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Failure-lever survey for the query and graph namespaces",
-  "updated_at": "2026-07-27T22:34:13.319429603Z"
+  "updated_at": "2026-07-28T00:13:21.026593034Z"
 }
