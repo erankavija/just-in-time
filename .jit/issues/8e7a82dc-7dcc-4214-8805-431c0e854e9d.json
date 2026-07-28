@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T12:17:11.984851016Z",
+  "dependencies": [
+    "380a8e9e-5894-40f6-9c55-a6ac91fbb55b"
+  ],
+  "description": "A rebuild whose watched inputs moved in timestamp but not in content leaves every test target fresh, so watching four repository roots costs nothing on a branch switch.\n\n## Background\n\nThe build script is triggered by timestamps on the directories it watches. A branch switch rewrites untouched files, so the script re-runs on content that did not change. If that run rewrites its destinations regardless, the whole test topology relinks — the same class of regression an earlier change removed from this build script by making it read nothing ambient, measured then at roughly three minutes.\n\nThe workspace's build-footprint budget does not cover this. It counts integration-test targets and sums test-executable bytes; neither reads the build output directory and neither observes invalidation. So the property that makes the watch affordable is, today, an expectation rather than a measurement, and it was never measured in this workspace at all.\n\nThe seeded-repository harness can observe it: cold-build the isolated repository, touch a watched input without changing its content, rebuild, and ask how many test artifacts were not fresh.\n\n## Success Criteria\n\n- [hard] REQ-01: A rebuild after a timestamp-only change beneath a watched root leaves the test targets fresh, relinking none of them.\n- [hard] REQ-02: The assertion runs in an isolated seeded repository, so it never depends on the state of the working checkout.\n- [hard] REQ-03: A failure names the targets that relinked, so the reader sees the cost rather than a bare mismatch.\n- [hard] REQ-04: The assertion distinguishes a relink caused by the watched roots from one caused by an unrelated input, so it reports the property it is named for.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8e7a82dc-7dcc-4214-8805-431c0e854e9d",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation",
+    "satisfies:REQ-03",
+    "enforces:@/invariant/bounded-rust-build-footprint"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Pin the assembly's freshness on a timestamp-only change",
+  "updated_at": "2026-07-28T12:17:11.984851016Z"
+}

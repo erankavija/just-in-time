@@ -1,0 +1,38 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T12:17:11.984851016Z",
+  "dependencies": [
+    "0cf1f351-ee24-4b2f-a38c-f9c318a569f9",
+    "0db28190-29bf-4a52-8c47-804f7842a815",
+    "26f503cc-07a9-4f39-ae86-2453f5a916d6",
+    "4873b32f-8d16-4120-9fb3-987b818361a2",
+    "779ea308-b4b6-462f-a7cb-994f0258ffb9",
+    "8e7a82dc-7dcc-4214-8805-431c0e854e9d",
+    "ce0172c3-59b1-4928-bf95-fcd984dbd7d1"
+  ],
+  "description": "The packaged live-asset tree is assembled at build time from the repository files it mirrors instead of being carried as a second checked-in copy, and the omission, staleness, and reproducibility properties that change entails are each observed.\n\n## Background\n\nSixty-one asset pairs are carried twice in this repository: once at their working path, once inside the package directory the binary embeds. A test asserts each pair byte-identical, but both copies are hand-maintained, and the test walks one direction only — it checks each declared asset against the repository file it mirrors and never asks whether a repository file belonging in the package was declared, so a new consumer is absent from every adopter install with nothing reporting it.\n\nAssembling the tree at build time removes the duplicate and makes the repository files the authority. It also introduces properties nothing observes today. The build output directory is not reset between builds, so a removed consumer lingers and ships unless the assembly reconciles the subtree it owns. Rewriting that subtree unconditionally relinks every test target on a branch switch. Assembling content from a script rather than from checked-in bytes raises the question whether repeating a build produces the same package. And once those repository files are inputs to the binary, the report that tells a contributor their installed binary is stale has to know about them, or it stays silent while the binary changes.\n\nCompleteness needs data the manifest does not carry: the roots the live assets are drawn from, with pattern exclusions for the dozens of files under those roots that are deliberately not packaged.\n\n## Success Criteria\n\n- [hard] REQ-01: The packaged live-asset tree is assembled from the repository files it mirrors, with no second checked-in copy remaining.\n- [hard] REQ-02: Editing a live consumer alone cannot leave the packaged copy stale, and a removed consumer does not survive in the assembled package.\n- [hard] REQ-03: Two builds from identical sources under identical injected environment embed the same package content, observed as an identical reported package hash, and report identical provenance.\n- [hard] REQ-04: The assembly is ordered so the embed always reads a fully populated tree.\n- [hard] REQ-05: Every root the packaged live assets are drawn from is declared, with exclusions stated as patterns.\n- [hard] REQ-06: A repository file under a declared root that is neither packaged nor excluded fails the test suite.\n- [hard] REQ-07: Editing a live consumer alone reports a binary installed before that edit as stale.\n- [hard] REQ-08: The assembly leaves the workspace's build footprint intact, relinking no test target when its inputs have not changed in content.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "cc75b4e6-dca6-4b12-be45-ee25ca6560bd",
+  "labels": [
+    "type:story",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation",
+    "enforces:@/invariant/canonical-cutover",
+    "enforces:@/invariant/bounded-rust-build-footprint"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "The packaged asset tree is derived from the repository files it mirrors",
+  "updated_at": "2026-07-28T12:17:11.984851016Z"
+}

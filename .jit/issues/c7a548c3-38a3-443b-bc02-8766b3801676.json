@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T12:17:11.984851016Z",
+  "dependencies": [
+    "237b15be-df98-4dbb-9fd5-171882314024"
+  ],
+  "description": "The isolated repository the build-stability fixture seeds includes the packaged live sources that sit under the tracker data root, so a build inside that fixture can read every source the package is assembled from.\n\n## Background\n\nThe build-stability fixture seeds a throwaway git repository from an inventory of this repository's tracked and untracked inputs, then cold-builds every test target inside it and rebuilds to observe what a metadata-only change invalidates. Its inventory filter bans whole categories outright: the tracker data root, git internals, other agents' worktrees, and generated trees.\n\nOne packaged asset lives under the tracker data root — the content standards reference the package installs for adopters. While the package carries its own checked-in copy, that ban is harmless. Once the packaged tree is assembled from the repository files it mirrors, a build inside the seeded fixture cannot find that source and the fixture's cold baseline build fails. The failure would surface as an unexplained build error in a suite about relinking, far from its cause.\n\nThe ban exists for a reason: seeding a fixture with a repository's issue data would make every issue mutation an input to a build-stability measurement. The exception has to be narrow enough to keep that property and explicit enough that a later reader does not widen it back to the whole root.\n\n## Success Criteria\n\n- [hard] REQ-01: The seeded fixture repository contains the packaged sources that live under the tracker data root.\n- [hard] REQ-02: The rest of the tracker data root stays out of the fixture, so issue data is still not a build-stability input.\n- [hard] REQ-03: The filter states why the exception is narrow, in terms a later reader can apply rather than reverse.\n- [hard] REQ-04: Git internals, other agents' worktrees, and generated trees stay banned.\n- [hard] REQ-05: The seeded fixture's cold baseline build succeeds with the additional sources present.\n\n## Notes\n\nThe exception is derived from what the package declares rather than named as a single file path where that is practical, so a second packaged source under the same root needs no further edit here.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-28T12:17:11.984851016Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "c7a548c3-38a3-443b-bc02-8766b3801676",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Seed the provenance fixture with the repository sources the package draws from",
+  "updated_at": "2026-07-28T12:18:31.817680873Z"
+}

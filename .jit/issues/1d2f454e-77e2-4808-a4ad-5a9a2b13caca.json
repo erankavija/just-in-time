@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T12:17:11.984851016Z",
+  "dependencies": [
+    "7d038e97-87e8-4d02-9101-6ffef1e8bdc0",
+    "9943c488-9689-4b58-a1a3-e0571db52cf3"
+  ],
+  "description": "The binary embeds the tree the build script produces rather than a checked-in copy, and the duplicated copies leave the repository, so editing a live consumer cannot leave a stale packaged copy behind.\n\n## Background\n\nEverything separable has already happened. The build script produces the tree and its output has been compared against the checked-in one file for file; the package-authored region source has moved out of the way; the executable-mode contract has its own guard. What is left is the one step that cannot be taken in halves: the moment the copies go, the embed must already read the produced tree, and until the copies go the produced tree is unused. Splitting the two leaves a revision that does not build — the embed pointing at nothing, or a package directory holding files no declaration accounts for.\n\nOne consequence rides along because it becomes true in the same instant rather than because it is separate work. The assertion comparing each packaged asset against the repository file it mirrors compares the copy against the source it was produced from once the embed re-roots, which is a comparison of a thing to itself. It is retired here rather than left in place passing on identical inputs, which would read to a later contributor as coverage that exists.\n\nAn earlier decision weighed producing this tree at build time and rejected it as unjustified complexity for one small data tree; a later one made the package the authority and the working paths its rendered consumers. The renderer that decision assumed was never built, so what shipped is a hand-maintained duplicate plus an equality assertion. Both positions are superseded here, and the direction reverses: the repository files become the authority and the packaged tree becomes produced from them.\n\n## Success Criteria\n\n- [hard] REQ-01: The embed reads the tree the build script produces rather than a checked-in one.\n- [hard] REQ-02: No second copy of a live source remains under the package directory in the repository.\n- [hard] REQ-03: The comparison the re-rooting makes self-referential is retired rather than left passing on identical inputs.\n- [hard] REQ-04: The live-asset content the built binary embeds is unchanged by the re-rooting. The reported package hash is not that comparison and does change, because the manifest itself changes.\n- [hard] REQ-05: The repository files the package is produced from are all tracked, so a build from a named commit's sources alone produces the complete package.\n\n## Notes\n\nThe equality of the produced tree and the checked-in one, the region source's position, and the executable-mode contract are all settled before this begins, so this change asserts none of them afresh.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "1d2f454e-77e2-4808-a4ad-5a9a2b13caca",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation",
+    "satisfies:REQ-03",
+    "per:@/issue/e204e63d/decision/D-2",
+    "enforces:@/invariant/canonical-cutover"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Re-root the embed on the assembled tree",
+  "updated_at": "2026-07-28T12:17:11.984851016Z"
+}

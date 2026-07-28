@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T12:17:11.984851016Z",
+  "dependencies": [
+    "1d2f454e-77e2-4808-a4ad-5a9a2b13caca"
+  ],
+  "description": "The inventory that decides whether an installed binary predates the repository it is judging covers the repository files the packaged tree is assembled from, so editing a live consumer alone reports the binary as stale.\n\n## Background\n\nThe staleness report is driven by a positive list of paths that are inputs to the binary. It covers the workspace manifests, the crate sources, the build script, the package directory, and the two hook files the binary embeds. It does not cover the agent skill tree, the tracker's reference directory, the contributed-gate directory, or the four packaged files under the script directory.\n\nWhile the packaged tree is a checked-in copy, that is correct: editing a live consumer does not change the binary. Once the packaged tree is assembled from those repository files, it does — and the staleness report stays silent, so a contributor keeps running a binary that no longer matches the workflow package it would install.\n\nTwo properties have to hold together. The inventory must not miss a packaged source, or the report is wrong in the direction that matters. And it must not claim a root wholesale where most of that root is not a build input. That hazard is not confined to the script directory: the skill tree is barely half packaged, the contributed directory carries one packaged file in four, and matching is by path prefix, so rolling up any of the three would mark the binary stale on edits that do not change it. Honest coverage is therefore close to one entry per packaged source — roughly sixty of them — which is only tolerable because something else checks the list.\n\nThe inventory itself is a pure path predicate in the layer that must stay free of input and output, so it stays a list rather than a lookup — but a list of sixty paths mirroring the packaged assets is another hand-maintained copy unless something checks it against them.\n\n## Success Criteria\n\n- [hard] REQ-01: Editing a packaged live source and nothing else reports a binary installed before that edit as stale.\n- [hard] REQ-02: A test reconciles the inventory against the packaged live-asset targets and fails when a target is not covered.\n- [hard] REQ-03: Editing a repository file that no packaged asset is drawn from does not report the binary as stale.\n- [hard] REQ-04: The inventory stays a pure path predicate in its present layer, introducing no filesystem access there.\n- [hard] REQ-05: The reconciliation reads the packaged declarations rather than restating them, so a newly packaged source fails the test until the inventory covers it.\n\n## Notes\n\nThe reconciliation lives outside the layer that owns the inventory, so the layer keeps its inbound-only dependency direction while the check still reaches the package.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "779ea308-b4b6-462f-a7cb-994f0258ffb9",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation",
+    "satisfies:REQ-06",
+    "enforces:@/invariant/architecture-dependency-direction"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Extend the binary build-input inventory to the packaged live sources",
+  "updated_at": "2026-07-28T12:17:11.984851016Z"
+}

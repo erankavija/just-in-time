@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T12:17:11.984851016Z",
+  "dependencies": [
+    "1d2f454e-77e2-4808-a4ad-5a9a2b13caca"
+  ],
+  "description": "The citation checker's package exclusions describe the package directory as it exists once the derived prefix is gone, so the check neither scans content it should skip nor skips content it should scan.\n\n## Background\n\nThe citation checker scans source paths and qualified item references and reports ones that do not resolve. It carries an exclusion for package content, written when the package directory held both install-only assets and a large tree of copies of repository files. That tree is no longer in the repository, so what the exclusion covers, and what it was protecting against, have both changed.\n\nThe question is small but real: an exclusion that was correct against a directory of sixty-odd copied files may be over-broad or under-broad against what remains, which is the install-only assets, the manifest, and the package-authored region source. Leaving it unexamined means the checker's behaviour over package content is determined by a pattern nobody re-read after the thing it described changed shape.\n\n## Success Criteria\n\n- [hard] REQ-01: The exclusion describes the package directory as it exists after the derived prefix is gone, covering neither more nor less than intended.\n- [hard] REQ-02: The intent the exclusion serves is stated where the pattern lives, so a later reader can judge it against the directory rather than guess.\n- [hard] REQ-03: The mechanical documentation checks pass over the adopter surface with the adjusted exclusion.\n- [hard] REQ-04: A qualified reference inside the remaining package content resolves or is reported, according to the stated intent.\n",
+  "documents": [],
+  "gates_required": [
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "26f503cc-07a9-4f39-ae86-2453f5a916d6",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation",
+    "satisfies:REQ-03"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Adjust the citation checker's package exclusions",
+  "updated_at": "2026-07-28T12:17:11.984851016Z"
+}

@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-28T12:17:11.984851016Z",
+  "dependencies": [
+    "7d038e97-87e8-4d02-9101-6ffef1e8bdc0"
+  ],
+  "description": "A live consumer that goes away from the repository also goes away from the packaged tree the next incremental build produces, observed rather than assumed.\n\n## Background\n\nThe build output directory persists across builds. A live consumer deleted or renamed in the repository keeps its copy there, and the next build produces a tree that still carries it, unless the run reconciles the subtree it owns. A suite that only ever builds forward never sees this: every assertion passes while the file exists, and the failure appears only after someone removes one.\n\nThis is a distinct failure from a stale installed binary, and it has no coverage anywhere in the workspace today. An existing harness already seeds an isolated repository, cold-builds it, mutates the tree, and rebuilds; the mutation this property needs is the removal of a packaged source, and the observation is the produced tree rather than the reported package.\n\n## Success Criteria\n\n- [hard] REQ-01: A live consumer removed from the seeded repository is absent from the packaged tree the next incremental rebuild produces, without clearing the build output directory.\n- [hard] REQ-02: The assertion runs in an isolated seeded repository, so it never depends on the state of the working checkout.\n- [hard] REQ-03: A failure names the file that survived the removal, so the reader sees which reconciliation step did not run.\n- [hard] REQ-04: The assertion observes the produced tree, so it holds whether or not the embed has been re-rooted onto it.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "380a8e9e-5894-40f6-9c55-a6ac91fbb55b",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation",
+    "satisfies:REQ-03"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Pin the assembly's reconciliation of removed sources",
+  "updated_at": "2026-07-28T12:17:11.984851016Z"
+}
