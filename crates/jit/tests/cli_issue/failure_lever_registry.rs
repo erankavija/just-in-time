@@ -6,86 +6,12 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 const REGISTRY_TOML: &str = include_str!("failure_lever_registry.toml");
-const FRAGMENT_TOMLS: &[(&str, &str)] = &[
-    (
-        "archive",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/archive.toml"),
-    ),
-    (
-        "claim",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/claim.toml"),
-    ),
-    (
-        "config",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/config.toml"),
-    ),
-    (
-        "dep-worktree",
-        include_str!(
-            "../../../../dev/active/a2546471-json-error-contract/levers/dep-worktree.toml"
-        ),
-    ),
-    (
-        "doc",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/doc.toml"),
-    ),
-    (
-        "events",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/events.toml"),
-    ),
-    (
-        "gate",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/gate.toml"),
-    ),
-    (
-        "issue",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/issue.toml"),
-    ),
-    (
-        "item-invariant-project",
-        include_str!(
-            "../../../../dev/active/a2546471-json-error-contract/levers/item-invariant-project.toml"
-        ),
-    ),
-    (
-        "label",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/label.toml"),
-    ),
-    (
-        "profile",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/profile.toml"),
-    ),
-    (
-        "query-graph",
-        include_str!("../../../../dev/active/a2546471-json-error-contract/levers/query-graph.toml"),
-    ),
-    (
-        "repository-lifecycle",
-        include_str!(
-            "../../../../dev/active/a2546471-json-error-contract/levers/repository-lifecycle.toml"
-        ),
-    ),
-    (
-        "standalone-tools",
-        include_str!(
-            "../../../../dev/active/a2546471-json-error-contract/levers/standalone-tools.toml"
-        ),
-    ),
-];
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FailureLeverRegistry {
     pub(crate) schema: FailureLeverSchema,
     pub(crate) arms: Vec<FailureLever>,
-}
-
-#[derive(Debug, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-struct FailureLeverFragment {
-    schema: FailureLeverSchema,
-    namespace: String,
-    arms: Vec<FailureLever>,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -223,22 +149,18 @@ fn test_failure_lever_registry_deserializes_typed_committed_input() {
 }
 
 #[test]
-fn test_failure_lever_registry_matches_all_authored_fragments() {
-    let mut namespaces = BTreeSet::new();
-    let mut fragment_arms = Vec::new();
+fn test_failure_lever_registry_test_target_uses_only_its_committed_fixture() {
+    let target_source = include_str!(concat!("failure_lever_", "registry.rs"));
+    let managed_planning_root = ["dev", "active"].join("/");
 
-    FRAGMENT_TOMLS
-        .iter()
-        .for_each(|(expected_namespace, toml)| {
-            let fragment: FailureLeverFragment =
-                toml::from_str(toml).expect("failure-lever survey fragment must be valid");
-            assert_eq!(fragment.schema, FailureLeverSchema::V1);
-            assert_eq!(&fragment.namespace, expected_namespace);
-            assert!(namespaces.insert(fragment.namespace));
-            fragment_arms.extend(fragment.arms);
-        });
-
-    assert_eq!(fragment_arms, failure_lever_registry().arms);
+    assert!(
+        target_source.contains("include_str!(\"failure_lever_registry.toml\")"),
+        "the committed registry fixture remains the test target's input"
+    );
+    assert!(
+        !target_source.contains(&managed_planning_root),
+        "the test target must not compile or run against managed planning artifacts"
+    );
 }
 
 #[test]
