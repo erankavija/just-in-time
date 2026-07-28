@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
   "dependencies": [
+    "4359178b-87d7-4e8d-b410-a3f0704ecab4",
     "72835d56-06fa-427c-82fd-a516803723cc",
     "a193a7cc-a00b-4551-bb30-922a8e015b38"
   ],
@@ -13,7 +14,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T13:58:43.154277084Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-28T14:02:36.647405670Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7e0c04d0-c4b5-4afb-96af-2926e61f0b43",
   "labels": [
     "type:story",
@@ -23,7 +35,7 @@
     "story:code-vocabulary"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "An enumerable error-code vocabulary with class-correct exit status",
-  "updated_at": "2026-07-28T13:35:00.471916689Z"
+  "updated_at": "2026-07-28T14:04:03.245496474Z"
 }

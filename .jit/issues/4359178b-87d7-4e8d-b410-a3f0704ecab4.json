@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:wave5-claim-parity",
+  "claimed_at": "2026-07-28T14:04:12.792405178Z",
+  "context": {},
+  "created_at": "2026-07-28T14:03:48.195261443Z",
+  "dependencies": [],
+  "description": "Classify underlying claim-command I/O failures through the shared typed-error classifier before applying command-specific JSON fallbacks, so claim failures report the same class and exit status in plain and machine-readable forms.\n\n## Background\n\nThe claim JSON helper preserves a special no-Git mapping but otherwise applies a command-specific fallback code. That fallback can hide a reachable permission or external I/O cause that the plain path classifies as a filesystem or external failure, producing different statuses for the same failure. Command-specific claim codes remain appropriate only when no more specific typed class applies.\n\n## Success Criteria\n\n- [hard] REQ-01: A claim JSON failure with a classifiable underlying I/O cause reports the registered shared error code for that cause before any command-specific fallback is considered.\n- [hard] REQ-02: Permission-denied and external-I/O claim failures exit with the status mapped from their reported code, equal to the identical plain invocation.\n- [hard] REQ-03: The explicit no-Git claim mapping and command-specific fallbacks for otherwise unclassified claim failures remain intact.\n- [hard] REQ-04: Integration coverage drives reachable underlying claim I/O failures through plain and JSON forms and asserts equal status, canonical envelope shape, code, and payload-stream purity.",
+  "documents": [],
+  "first_ready_at": "2026-07-28T14:03:48.195261443Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4359178b-87d7-4e8d-b410-a3f0704ecab4",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:code-vocabulary",
+    "satisfies:REQ-03",
+    "satisfies:REQ-04",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Classify underlying claim I/O failures uniformly",
+  "updated_at": "2026-07-28T14:04:16.182143023Z"
+}

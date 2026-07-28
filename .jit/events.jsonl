@@ -10981,3 +10981,10 @@
 {"fields":["dependencies"],"id":"8865a7c5-c8c0-4288-bbe6-5bfb09648458","issue_id":"4087cd55-0c6e-4e16-8c1f-f468b66e8b37","timestamp":"2026-07-28T13:49:26.453049952Z","type":"issue_updated","updated_by":"dependency-add"}
 {"assignee":"agent:wave5-validate-envelope","id":"6374609a-a889-4cfe-a078-6dd8432021c2","issue_id":"cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1","timestamp":"2026-07-28T13:49:40.894024662Z","type":"issue_claimed"}
 {"from":"ready","id":"1b47d1bd-fc9f-4e3c-8414-fd58be7abe0c","issue_id":"cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1","timestamp":"2026-07-28T13:49:44.146624167Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"cf7e8848-42f3-4e8d-b6aa-09152c746910","issue_id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","timestamp":"2026-07-28T13:58:43.154277084Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"314acaeb-8d6f-46f8-ad26-74ed27c69f7e","issue_id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","timestamp":"2026-07-28T14:02:36.647405670Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"1a3352dd-8d28-4406-8ef4-d38383db6fa6","issue_id":"4359178b-87d7-4e8d-b410-a3f0704ecab4","priority":"high","timestamp":"2026-07-28T14:03:48.195261443Z","title":"Classify underlying claim I/O failures uniformly","type":"issue_created"}
+{"from":"ready","id":"2ce282d5-1b9a-4904-a816-587d4e4e3dd3","issue_id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","timestamp":"2026-07-28T14:04:03.245496474Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"39f86c4d-7e15-42c3-a9d1-8b6ae6a25571","issue_id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","timestamp":"2026-07-28T14:04:03.245496474Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:wave5-claim-parity","id":"c5e237b1-198b-434c-934e-bdc623c7bca2","issue_id":"4359178b-87d7-4e8d-b410-a3f0704ecab4","timestamp":"2026-07-28T14:04:12.792405178Z","type":"issue_claimed"}
+{"from":"ready","id":"8b71a603-ce75-49d1-8007-c1886c1d05df","issue_id":"4359178b-87d7-4e8d-b410-a3f0704ecab4","timestamp":"2026-07-28T14:04:16.182143023Z","to":"in_progress","type":"issue_state_changed"}

@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "6d9cecbc177311196d9015814ad7831c7ed443df",
+  "completed_at": "2026-07-28T14:02:35.214815164Z",
+  "duration_ms": 231119,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 575,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Claim JSON fallbacks bypass the shared I/O classifier, so reachable permission/I/O failures exit 3 or 1 under --json but 5 or 10 without it."
+      }
+    ],
+    "summary": "Claim command JSON fallback handling can still disagree with plain invocation exit status for underlying I/O failures.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7e0c04d0-c4b5-4afb-96af-2926e61f0b43",
+  "message": null,
+  "run_id": "1533f72f-14a1-4e7f-b1c5-5b349364f70a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T13:58:44.095783279Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11475 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fa905-4bac-7432-84da-e18508eb457f\n--------\nuser\n--- 11462 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fallback — no reachable commits contain `jit:7e0c04d0`\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-types (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-07-28T13:52:05Z)\nTruncation recovery: recovered relevant source, test, schema, policy, and dependency-commit reads in narrower ranges; abandoned unrelated historical patch remainder\n\n1. **[blocking, issue-impact] F1:** Claim JSON handling still bypasses the shared I/O classifier. `claim_json_error` preserves a command fallback for every non-Git error ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:575)); e.g. `claim acquire --json` emits `CLAIM_ACQUIRE_ERROR` ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:7533)), which maps to exit 3, while the identical plain-path error returns to the shared classifier, where permission and other I/O causes map to exits 5 and 10 ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:211)). An unreadable issue/lease record is reachable in both forms, so REQ-03 remains unmet. Current projection coverage exercises only the no-Git claim case, not these underlying I/O failures.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Claim command JSON fallback handling can still disagree with plain invocation exit status for underlying I/O failures.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Claim JSON fallbacks bypass the shared I/O classifier, so reachable permission/I/O failures exit 3 or 1 under --json but 5 or 10 without it.\",\"file\":\"crates/jit/src/main.rs\",\"line\":575,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
