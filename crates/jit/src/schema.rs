@@ -1023,9 +1023,9 @@ impl CommandSchema {
             ),
             row(
                 "gate preset apply",
-                1,
-                "One or more issues failed to apply the preset (partial batch).",
-                true,
+                3,
+                "A preset target was not found, so the application failed.",
+                false,
             ),
             // `serve` default (daemon), `--stop`, and `--status` follow the
             // standard taxonomy: 0 on success, 1 on a start/stop/status error.

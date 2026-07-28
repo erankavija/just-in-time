@@ -2100,7 +2100,7 @@ Errors (1):
 **Notes:**
 - Gates are automatically added to registry if they don't exist
 - Timeout override applies to all automated gates in the preset
-- On a partial batch (some issues fail to apply) the command exits `1`; see the
+- A missing preset target is a not-found failure (exit `3`); see the
   [exit-code reference](exit-codes.md#command-specific-mappings)
 - Use `--json` for machine-readable output
 
@@ -2235,8 +2235,8 @@ jit gate preset apply rust-ci abc123 --except fmt --except clippy
 
 `jit gate preset apply` follows the [exit-code reference](exit-codes.md); its
 [command-specific mappings](exit-codes.md#command-specific-mappings) record the
-partial-batch case (exit `1` when one or more issues fail to apply). A missing
-preset or issue is a not-found error (`3`) per the global taxonomy.
+missing-target case as the ordinary not-found status (exit `3`). A missing preset
+or issue is likewise a not-found error per the global taxonomy.
 
 ## Dependency Commands
 

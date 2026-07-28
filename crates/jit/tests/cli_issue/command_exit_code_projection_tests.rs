@@ -307,13 +307,13 @@ fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
     });
 }
 
-/// `jit gate preset apply` exits 1 when an issue fails to apply (a partial
-/// batch) — matching `gate preset apply`/1. Applying a builtin preset to a
-/// well-formed but nonexistent id fails that id and exits 1.
+/// `jit gate preset apply` exits 3 when a preset target is missing — matching
+/// `gate preset apply`/3. Applying a builtin preset to a well-formed but
+/// nonexistent id fails that id through the ordinary not-found classifier.
 #[test]
-fn test_command_exit_codes_gate_preset_apply_emits_1() {
+fn test_command_exit_codes_gate_preset_apply_missing_target_emits_3() {
     let temp = setup();
-    assert_projected_exit_status_in_both_forms("gate preset apply", 1, true, |json| {
+    assert_projected_exit_status_in_both_forms("gate preset apply", 3, false, |json| {
         let mut command = Command::new(jit_binary());
         command.current_dir(&temp).args([
             "gate",
@@ -809,7 +809,7 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("config validate", Some(1)),
         ("doc check-links", Some(1)),
         ("doc check-links", Some(2)),
-        ("gate preset apply", Some(1)),
+        ("gate preset apply", Some(3)),
         ("serve, serve --stop, serve --status", Some(1)),
         ("*", Some(141)),
         // Pass-through: asserted against the production site it cites.
