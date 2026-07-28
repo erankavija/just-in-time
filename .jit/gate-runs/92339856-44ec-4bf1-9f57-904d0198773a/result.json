@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b0af714fcc6a67ce8ee1cae5e8c2a9cb0dd676c4",
+  "completed_at": "2026-07-28T18:38:53.668194678Z",
+  "duration_ms": 91519,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The combined machine-readable failure-contract documentation is accurate, canonical, generated where required, and discoverable.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "9eadd135-d27b-471c-b481-46bbf15084d7",
+  "message": null,
+  "run_id": "92339856-44ec-4bf1-9f57-904d0198773a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T18:37:22.148684353Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: container review covered its three `jit:9eadd135` commits plus five commits each for delivered children `85dbcd97` and `ec029993`; all were inspected individually. No attribution fallback was needed.\n\nThe combined contract is accurate and discoverable: the CLI reference states the failure contract once, the generated vocabulary is indexed, and the prior configuration cross-reference defect is resolved at `docs/reference/configuration.md:603`. The generated-reference conformance test passes.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The combined machine-readable failure-contract documentation is accurate, canonical, generated where required, and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

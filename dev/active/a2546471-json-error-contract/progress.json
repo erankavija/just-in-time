@@ -78,7 +78,7 @@
     {
       "wave_number": 8,
       "issues": [
-        {"id":"9eadd135-d27b-471c-b481-46bbf15084d7","short_id":"9eadd135","title":"One canonical adopter home for the machine-readable failure contract","classification":"implementation","status":"in_progress"}
+        {"id":"9eadd135-d27b-471c-b481-46bbf15084d7","short_id":"9eadd135","title":"One canonical adopter home for the machine-readable failure contract","classification":"implementation","status":"done"}
       ]
     }
   ],
