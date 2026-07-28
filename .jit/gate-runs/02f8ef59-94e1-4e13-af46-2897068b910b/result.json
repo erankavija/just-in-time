@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "5545a1b3f6d67ee32f6842cad3fc90f22034f4e3",
+  "completed_at": "2026-07-28T11:01:43.092142936Z",
+  "duration_ms": 252728,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "dbe2f2a8-87c0-47a1-94c6-2bca4b6d3b07",
+  "message": null,
+  "run_id": "02f8ef59-94e1-4e13-af46-2897068b910b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T10:57:30.363604104Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest label_query_json_tests::test_query_label_json_invalid_pattern ... FAILED\ntest label_query_json_tests::test_query_label_with_uppercase_namespace ... FAILED\ntest result: FAILED. 139 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.48s\n---- label_query_json_tests::test_query_label_json_invalid_pattern stdout ----\n\nthread 'label_query_json_tests::test_query_label_json_invalid_pattern' (4021992) panicked at crates/jit/tests/cli_query_graph/label_query_json_tests.rs:167:9:\nassertion `left == right` failed\n  left: String(\"INVALID_ARGUMENT\")\n right: \"INVALID_LABEL_PATTERN\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- label_query_json_tests::test_query_label_with_uppercase_namespace stdout ----\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1362 bytes=26696998)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1316959992/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
