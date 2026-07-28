@@ -6,12 +6,24 @@
   "dependencies": [],
   "description": "Close the final holistic finding by making the canonical failure-lever registry obey its keyed-by-command-path contract.\n\n## Success Criteria\n\n- [hard] REQ-01: The typed registry validation rejects any duplicate `path` across invocation and exemption entries.\n- [hard] REQ-02: The committed registry contains exactly one row per reflected machine-readable command path; the redundant `serve --stop` and `serve --status` registry rows are removed while the dedicated serve failure-envelope test continues to cover start, stop, and status branches.\n- [hard] REQ-03: The generated live census remains definition-derived at 100 unique arms (98 invoked probes and 2 justified exemptions), with invoked/exempt accounting and envelope/status checks unchanged.\n- [hard] REQ-04: Registry tests remain independent of managed planning artifacts and the full Rust and independent code-review gates pass.\n\n## Notes\n\nThe authoritative plan keys registry entries by command path. `serve` is one reflected arm with three separately tested failure branches; only one registry lever is needed for per-arm conformance.",
   "documents": [],
+  "done_at": "2026-07-28T22:25:05.816574816Z",
   "first_ready_at": "2026-07-28T22:06:03.782485284Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T22:21:50.214774209Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T22:24:36.452183189Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ab126109-887b-475b-98b0-229a08930866",
   "labels": [
     "epic:json-error-contract",
@@ -21,7 +33,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Enforce one failure-lever registration per command path",
-  "updated_at": "2026-07-28T22:06:25.212090231Z"
+  "updated_at": "2026-07-28T22:25:05.816574816Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "91cb549fa0b32c239b8fb6536858b30877cf3fb4",
+  "completed_at": "2026-07-28T22:24:36.178798339Z",
+  "duration_ms": 155497,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are supported by the attributable current-tree and recorded-gate evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ab126109-887b-475b-98b0-229a08930866",
+  "message": null,
+  "run_id": "dc27d934-c175-4d6e-b519-1af45c5cae4b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T22:22:00.680960833Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 91cb549f, 7079a11e (`jit:ab126109`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no prior run)\nTruncation recovery: reread bounded registry, coverage, serve-test, item-source, and gate-registry ranges\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are supported by the attributable current-tree and recorded-gate evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
