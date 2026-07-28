@@ -278,6 +278,16 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
         return ErrorCode::AlreadyExists;
     }
 
+    // A malformed query label keeps its established public code rather than
+    // collapsing into the generic invalid-argument member. The dedicated type
+    // makes that distinction structural while retaining the same exit class.
+    if error
+        .downcast_ref::<jit::errors::InvalidLabelPatternError>()
+        .is_some()
+    {
+        return ErrorCode::InvalidLabelPattern;
+    }
+
     // Invalid-argument conditions are typed: the shared InvalidArgumentError, the
     // enum parse errors (gate stage/mode), and a UTF-8 decode failure of
     // subprocess/git output (`String::from_utf8` / `str::from_utf8`, possibly
@@ -1850,6 +1860,13 @@ fn emit_top_level_json_error(error: &anyhow::Error) -> Option<ExitCode> {
 
     let json_error = if let Some(stale) = error.downcast_ref::<jit::errors::StaleBinaryError>() {
         stale_binary_json_error(stale)
+    } else if error
+        .downcast_ref::<jit::errors::InvalidLabelPatternError>()
+        .is_some()
+    {
+        JsonError::new(ErrorCode::InvalidLabelPattern, error.to_string()).with_suggestion(
+            "Use 'namespace:value' for an exact match or 'namespace:*' for a wildcard",
+        )
     } else {
         JsonError::new(error_to_error_code(error), error.to_string())
     };
@@ -8241,6 +8258,19 @@ mod exit_code_projection_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_invalid_label_pattern_keeps_specific_registered_code() {
+        let error = anyhow::Error::new(jit::errors::InvalidLabelPatternError::new(
+            "bad label pattern",
+        ));
+
+        assert_eq!(error_to_error_code(&error), ErrorCode::InvalidLabelPattern);
+        assert_eq!(
+            error_to_exit_code(&error),
+            ErrorCode::InvalidLabelPattern.exit_code()
+        );
     }
 
     /// Every classifier case must land on the exact projected row it documents —

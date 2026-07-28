@@ -277,7 +277,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 /// callers reject malformed patterns identically.
 fn validate_label_pattern(pattern: &str) -> Result<()> {
     if !pattern.contains(':') {
-        return Err(crate::errors::InvalidArgumentError::new(format!(
+        return Err(crate::errors::InvalidLabelPatternError::new(format!(
             "Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'",
             pattern
         ))
@@ -286,7 +286,7 @@ fn validate_label_pattern(pattern: &str) -> Result<()> {
 
     let parts: Vec<&str> = pattern.splitn(2, ':').collect();
     if parts.len() != 2 {
-        return Err(crate::errors::InvalidArgumentError::new(format!(
+        return Err(crate::errors::InvalidLabelPatternError::new(format!(
             "Invalid label pattern '{}': must contain exactly one colon",
             pattern
         ))
@@ -299,7 +299,7 @@ fn validate_label_pattern(pattern: &str) -> Result<()> {
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     {
-        return Err(crate::errors::InvalidArgumentError::new(format!(
+        return Err(crate::errors::InvalidLabelPatternError::new(format!(
             "Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens",
             pattern
         ))

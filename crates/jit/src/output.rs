@@ -696,6 +696,8 @@ pub enum ErrorCode {
     CycleDetected,
     /// An argument or invocation is invalid.
     InvalidArgument,
+    /// A label query filter is not in the accepted namespace/value form.
+    InvalidLabelPattern,
     /// Repository or domain validation failed.
     ValidationFailed,
     /// The requested resource already exists.
@@ -784,11 +786,12 @@ impl ErrorCode {
     ///
     /// A conformance test compares this list with the variants schemars derives
     /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 44] = [
+    pub const ALL: [ErrorCode; 45] = [
         ErrorCode::IssueNotFound,
         ErrorCode::GateNotFound,
         ErrorCode::CycleDetected,
         ErrorCode::InvalidArgument,
+        ErrorCode::InvalidLabelPattern,
         ErrorCode::ValidationFailed,
         ErrorCode::AlreadyExists,
         ErrorCode::InvalidState,
@@ -838,6 +841,7 @@ impl ErrorCode {
             ErrorCode::GateNotFound => "GATE_NOT_FOUND",
             ErrorCode::CycleDetected => "CYCLE_DETECTED",
             ErrorCode::InvalidArgument => "INVALID_ARGUMENT",
+            ErrorCode::InvalidLabelPattern => "INVALID_LABEL_PATTERN",
             ErrorCode::ValidationFailed => "VALIDATION_FAILED",
             ErrorCode::AlreadyExists => "ALREADY_EXISTS",
             ErrorCode::InvalidState => "INVALID_STATE",
@@ -904,6 +908,7 @@ impl ErrorCode {
             | ErrorCode::GateFailed
             | ErrorCode::ProfileConflict => ExitCode::ValidationFailed,
             ErrorCode::InvalidArgument
+            | ErrorCode::InvalidLabelPattern
             | ErrorCode::InvalidState
             | ErrorCode::AmbiguousId
             | ErrorCode::InvalidIdPrefix
@@ -941,6 +946,9 @@ impl ErrorCode {
             ErrorCode::GateNotFound => "The requested gate does not exist.",
             ErrorCode::CycleDetected => "The dependency would create a cycle.",
             ErrorCode::InvalidArgument => "An argument or invocation is invalid.",
+            ErrorCode::InvalidLabelPattern => {
+                "A label query filter is not in the accepted namespace/value form."
+            }
             ErrorCode::ValidationFailed => "Repository or domain validation failed.",
             ErrorCode::AlreadyExists => "The requested resource already exists.",
             ErrorCode::InvalidState => "A lifecycle state or transition is invalid.",
@@ -1072,6 +1080,7 @@ impl std::str::FromStr for ErrorCode {
             "GATE_NOT_FOUND" => Ok(ErrorCode::GateNotFound),
             "CYCLE_DETECTED" => Ok(ErrorCode::CycleDetected),
             "INVALID_ARGUMENT" => Ok(ErrorCode::InvalidArgument),
+            "INVALID_LABEL_PATTERN" => Ok(ErrorCode::InvalidLabelPattern),
             "VALIDATION_FAILED" => Ok(ErrorCode::ValidationFailed),
             "ALREADY_EXISTS" => Ok(ErrorCode::AlreadyExists),
             "INVALID_STATE" => Ok(ErrorCode::InvalidState),
@@ -3346,6 +3355,11 @@ mod tests {
             (
                 ErrorCode::InvalidArgument,
                 "INVALID_ARGUMENT",
+                ExitCode::InvalidArgument,
+            ),
+            (
+                ErrorCode::InvalidLabelPattern,
+                "INVALID_LABEL_PATTERN",
                 ExitCode::InvalidArgument,
             ),
             (

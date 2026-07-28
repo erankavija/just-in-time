@@ -14,6 +14,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `GATE_NOT_FOUND` | The requested gate does not exist. | `3` |
 | `CYCLE_DETECTED` | The dependency would create a cycle. | `4` |
 | `INVALID_ARGUMENT` | An argument or invocation is invalid. | `2` |
+| `INVALID_LABEL_PATTERN` | A label query filter is not in the accepted namespace/value form. | `2` |
 | `VALIDATION_FAILED` | Repository or domain validation failed. | `4` |
 | `ALREADY_EXISTS` | The requested resource already exists. | `6` |
 | `INVALID_STATE` | A lifecycle state or transition is invalid. | `2` |

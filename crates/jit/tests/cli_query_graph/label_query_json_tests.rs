@@ -1,6 +1,8 @@
 //! Integration tests for label query JSON output
 
+use jit::output::ErrorCode;
 use std::process::Command;
+use std::str::FromStr;
 use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
@@ -157,25 +159,24 @@ fn test_query_label_json_invalid_pattern() {
         .unwrap();
 
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Error might be in JSON or plain text depending on where validation happens
-    if !stdout.is_empty() && stdout.starts_with("{") {
-        let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-        // Check error via exit code or error field
-        assert_eq!(json["error"]["code"], "INVALID_LABEL_PATTERN");
-        assert!(json["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("Invalid label pattern"));
-        assert!(json["error"]["suggestions"].is_array());
-        let suggestions_text = json["error"]["suggestions"][0].as_str().unwrap();
-        assert!(suggestions_text.contains("namespace:value"));
-    } else {
-        // Validation error from query_by_label
-        assert!(stderr.contains("Invalid") || stderr.contains("invalid"));
-    }
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("machine-readable failure is one JSON envelope");
+    let code = ErrorCode::from_str(json["error"]["code"].as_str().unwrap())
+        .expect("failure code is registered");
+    assert_eq!(code, ErrorCode::InvalidLabelPattern);
+    assert_eq!(output.status.code(), Some(code.exit_code().code()));
+    assert!(json["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("Invalid label pattern"));
+    assert!(json["error"]["suggestions"][0]
+        .as_str()
+        .is_some_and(|suggestion| suggestion.contains("namespace:value")));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).starts_with("Error: "),
+        "propagated failure retains its human diagnostic"
+    );
 }
 
 #[test]
@@ -225,17 +226,13 @@ fn test_query_label_with_uppercase_namespace() {
         .unwrap();
 
     assert!(!output.status.success());
-    let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Error might be in JSON or plain text
-    if !stdout.is_empty() && stdout.starts_with("{") {
-        let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-        // Check error via exit code or error field
-        assert_eq!(json["error"]["code"], "INVALID_LABEL_PATTERN");
-    } else {
-        assert!(stderr.contains("Invalid") || stderr.contains("invalid"));
-    }
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("machine-readable failure is one JSON envelope");
+    let code = ErrorCode::from_str(json["error"]["code"].as_str().unwrap())
+        .expect("failure code is registered");
+    assert_eq!(code, ErrorCode::InvalidLabelPattern);
+    assert_eq!(output.status.code(), Some(code.exit_code().code()));
 }
 
 #[test]

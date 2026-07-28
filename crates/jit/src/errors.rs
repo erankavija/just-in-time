@@ -139,6 +139,32 @@ impl InvalidArgumentError {
     }
 }
 
+/// A malformed label filter supplied to a query command.
+///
+/// This dedicated type preserves the established `INVALID_LABEL_PATTERN`
+/// machine-readable code while allowing the top-level CLI classifier to select
+/// it structurally. Its display text remains the exact validation message
+/// produced at the query boundary.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct InvalidLabelPatternError {
+    message: String,
+}
+
+impl InvalidLabelPatternError {
+    /// Build an [`InvalidLabelPatternError`] carrying the user-facing message.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+
+    /// The user-facing explanation of the malformed label filter.
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 /// A generic "resource not found" failure carrying its user-facing message.
 ///
 /// This is the shared typed carrier for the long tail of lookup failures that do
