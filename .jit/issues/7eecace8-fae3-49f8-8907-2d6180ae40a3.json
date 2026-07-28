@@ -4,7 +4,15 @@
   "created_at": "2026-07-28T10:06:09.509935886Z",
   "dependencies": [],
   "description": "Planning node for Derived profile assets and projected policy documentation (e204e63d). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/e204e63d-derived-package-sources/plan.md and link it to this node once written.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/e204e63d-derived-package-sources/investigation.md"
+    }
+  ],
   "first_ready_at": "2026-07-28T10:06:09.509935886Z",
   "gates_required": [
     "plan-review"
@@ -26,5 +34,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "planning: Derived profile assets and projected policy documentation",
-  "updated_at": "2026-07-28T10:06:09.509935886Z"
+  "updated_at": "2026-07-28T10:43:19.392536957Z"
 }

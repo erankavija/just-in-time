@@ -10876,3 +10876,5 @@
 {"fields":["dependencies"],"id":"68d21d42-94e7-4581-99ea-1e12b7d2b2c1","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-07-28T10:34:42.181188087Z","type":"issue_updated","updated_by":"dependency-add"}
 {"gate_key":"npm-ci","id":"d92b86b5-6beb-4d30-9af4-ac60354d0f7f","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","timestamp":"2026-07-28T10:35:18.708156690Z","type":"gate_added"}
 {"gate_key":"web-ci","id":"a9241c27-7fa3-497a-81a2-3685ab9a7753","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","timestamp":"2026-07-28T10:35:19.036900149Z","type":"gate_removed"}
+{"fields":["description"],"id":"35e21c36-775f-471c-b85b-a083ece76626","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-28T10:43:07.467393495Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["documents"],"id":"bcd2225b-06b6-40d7-9d53-0d86455711eb","issue_id":"7eecace8-fae3-49f8-8907-2d6180ae40a3","timestamp":"2026-07-28T10:43:19.392536957Z","type":"issue_updated","updated_by":"doc-add"}
