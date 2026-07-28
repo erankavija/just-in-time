@@ -115,7 +115,7 @@
   {
     "key": "plan-template-generated-region",
     "title": "Generate the repository plan-template declaration from the packaged contribution",
-    "description": "The repository's planning-bracket template declaration becomes a generated region rendered from the packaged contribution that is its authority, so the two declarations cannot disagree.\n\n## Background\n\nThe planning-bracket template is declared twice: once inline in the packaged workflow manifest as a semantic contribution, and once in this repository's own template registry. The two match on structure \u2014 roles, types, gates, document paths, labels, internal edges, anchor edges, and transforms are identical after parsing \u2014 and differ in three description strings. Nothing compares them, so that drift has gone unreported.\n\nThe packaged declaration is the shipped artifact and the repository declaration is a local consumer of it, which fixes the direction: the packaged contribution is the authority and the repository copy becomes generated from it. The packaged contribution is already exposed whole through the package's machine-readable inspection output, so no new surface is needed to read it.\n\nTwo properties of the existing registry file constrain the change. Its seven-line header sits outside the template block and survives untouched. Inside the block, a six-line explanation records why the container anchor carries a whole-repository validation gate rather than the per-issue one, citing the criterion and invariant that motivated it; no round trip through a serializer preserves in-block commentary or the file's column alignment, so that rationale has to move outside the generated region to survive.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository plan-template declaration is a marked generated region whose body is rendered from the packaged planning-bracket contribution.\n- [hard] REQ-02: Rendering leaves every byte outside the markers unchanged, including the file header.\n- [hard] REQ-03: The rationale for the container anchor's whole-repository validation gate survives, stated outside the generated region.\n- [hard] REQ-04: A test compares the parsed repository declaration against the parsed packaged declaration and fails when any field differs, description strings included.\n- [hard] REQ-05: The test rests on the two parsed declarations, not on a hand-written expectation of what either contains.\n- [hard] REQ-06: The three description strings that differ today are equal afterwards, with the packaged text taken as authoritative.\n- [hard] REQ-07: The template registry loads the regenerated file, and the plan template still applies to the container type it applies to today.\n\n## Notes\n\nTwo further plan-template declarations exist as adopter-facing illustrations of different rulesets. Both restate this declaration's top-level description string verbatim, and one also restates its planning-node description. They illustrate authoring forms rather than this repository's workflow and stay hand-authored; this work does not touch them.\n",
+    "description": "The planning-bracket template this repository declares becomes a generated region rendered from the packaged contribution that is its authority, so the repository copy is no longer hand-authored.\n\n## Background\n\nThe planning-bracket template is declared twice: once inline in the packaged workflow manifest as a semantic contribution, and once in this repository's own template registry. The two match on structure \u2014 roles, types, gates, document paths, labels, internal edges, anchor edges, and transforms are identical after parsing \u2014 and differ in three description strings.\n\nThe packaged declaration is the shipped artifact and the repository declaration is a local consumer of it, which fixes the direction: the packaged contribution is the authority and the repository copy becomes generated from it. The packaged contribution is already exposed whole through the package's machine-readable inspection output, so no new surface is needed to read it.\n\nTwo properties of the existing registry file constrain the change. Its seven-line header sits outside the template block and survives untouched. Inside the block, a six-line explanation records why the container anchor carries a whole-repository validation gate rather than the per-issue one, citing the criterion and invariant that motivated it; no round trip through a serializer preserves in-block commentary or the file's column alignment, so that rationale has to move outside the generated region to survive.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository plan-template declaration is a marked generated region whose body is rendered from the packaged planning-bracket contribution.\n- [hard] REQ-02: Rendering leaves every byte outside the markers unchanged, including the file header.\n- [hard] REQ-03: The rationale for the container anchor's whole-repository validation gate survives, stated outside the generated region.\n- [hard] REQ-04: The three description strings that differ today are equal afterwards, with the packaged text taken as authoritative.\n- [hard] REQ-05: The template registry loads the regenerated file, and the plan template still applies to the container type it applies to today.\n- [hard] REQ-06: A second rendering run immediately after the first finds nothing to change.\n\n## Notes\n\nTwo further plan-template declarations exist as adopter-facing illustrations of different rulesets. Both restate this declaration's top-level description string verbatim, and one also restates its planning-node description. They illustrate authoring forms rather than this repository's workflow and stay hand-authored; this work does not touch them.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -134,7 +134,7 @@
     ],
     "depends_on": [],
     "planning": {
-      "outcome": "The repository plan-template block is a generated region whose divergence from the packaged declaration fails the suite.",
+      "outcome": "The repository plan-template block is a region rendered from the packaged declaration.",
       "contract_refs": [
         "generated-region-splice"
       ],
@@ -151,11 +151,54 @@
       "landing_group": "template-region",
       "terminal": {
         "consumer_family": "the repository template registry",
-        "test_boundary": "in-crate tests over the embedded package",
-        "worker_sized_reason": "One renderer beside the existing drift test, and one region inside a forty-eight-line configuration file.",
+        "test_boundary": "the template registry's own load of the regenerated file",
+        "worker_sized_reason": "One renderer and one region inside a forty-eight-line configuration file, with the header preserved around it.",
         "footprint": {
           "touches": [
             ".jit/templates.toml",
+            "crates/jit/src/profile/dogfood.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "plan-template-drift-guard",
+    "title": "Fail the suite when the two plan-template declarations disagree",
+    "description": "A change to either plan-template declaration without the corresponding change to the other fails the test suite, compared as two parsed declarations rather than against a written-down expectation.\n\n## Background\n\nGeneration makes the two declarations equal at the moment it runs. It does not keep them equal: a hand edit to the repository copy, or a change to the packaged contribution without a regeneration, puts them back out of step, and nothing today reports that. The pair has drifted before precisely because nothing compared them \u2014 the byte-equality contract that covers the packaged file assets does not reach this one, because the packaged declaration is inline manifest data rather than an asset.\n\nThe comparison has to be between the two parsed values. A test carrying its own expectation of what the template contains would be a third copy of the same declaration, going stale on the next change to either \u2014 the defect this work exists to remove, reintroduced in the guard meant to prevent it. Both sides are already parseable by the crate: the registry loads the repository file, and the packaged contribution is a value inside the embedded package.\n\n## Success Criteria\n\n- [hard] REQ-01: A test parses the repository declaration and the packaged declaration and fails when any field differs, description strings included.\n- [hard] REQ-02: The comparison rests on the two parsed values, holding no expectation of its own about what either contains.\n- [hard] REQ-03: An edit to either declaration alone fails the suite, in whichever of the two it is made.\n- [hard] REQ-04: The failure names the field that differs, so the reader knows which declaration to regenerate.\n\n## Notes\n\nThe guard holds whether or not the region was regenerated, so it reports a hand edit to the generated region as readily as a change to the authority.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:template-projection",
+      "satisfies:REQ-02",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "plan-template-generated-region"
+    ],
+    "planning": {
+      "outcome": "A difference between the parsed repository declaration and the parsed packaged declaration fails the suite.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-02",
+        "D-1",
+        "C4",
+        "C5"
+      ],
+      "landing_group": "template-region",
+      "terminal": {
+        "consumer_family": "the repository template registry",
+        "test_boundary": "an in-crate comparison of the two parsed declarations",
+        "worker_sized_reason": "One comparison between two values the crate can already parse, with no file rewritten by it.",
+        "footprint": {
+          "touches": [
             "crates/jit/src/profile/dogfood.rs"
           ]
         }
@@ -221,7 +264,8 @@
     ],
     "depends_on": [
       "provenance-fixture-live-inputs",
-      "live-source-root-declaration"
+      "live-source-root-declaration",
+      "region-source-relocation"
     ],
     "planning": {
       "outcome": "The build script produces the packaged tree in the output directory, matching the checked-in tree it will replace.",
@@ -259,9 +303,95 @@
     }
   },
   {
+    "key": "region-source-relocation",
+    "title": "Move the package-authored region source out of the derived prefix",
+    "description": "The package-authored managed-region source moves out of the prefix that marks files mirroring a repository counterpart, so that prefix denotes exactly one relationship.\n\n## Background\n\nThe packaged tree uses a source-path prefix to mark the files it carries that also exist at working paths in this repository. Sixty-one assets sit under it and each has a repository counterpart. One file does not: the managed-region source. Its counterpart is a marked region inside a repository document, not a whole file, so nothing in the repository can be copied to produce it \u2014 it is authored inside the package.\n\nWhile the packaged tree is checked in, the mismatch is only untidy. It stops being untidy as soon as anything reads that prefix as a rule. A step that produces the packaged tree by drawing each prefixed file from its repository counterpart finds no counterpart for this one and has nothing to copy; a step that reconciles the prefix against the set of files it should contain sees a file it cannot account for and removes it. Either way the region source is the single element that makes the rule false, so it has to move before any such rule exists rather than after.\n\nMoving it is a relocation inside the package plus the declared source path that names it. Nothing about the region it produces changes: the same repository document, the same marker identity, the same placement.\n\n## Success Criteria\n\n- [hard] REQ-01: The managed-region source sits outside the prefix reserved for package files drawn from a repository counterpart.\n- [hard] REQ-02: The manifest names the relocated source, and the region it declares resolves to the same repository target under the same marker identity with the same placement.\n- [hard] REQ-03: The existing comparison between the packaged region body and the repository region body passes unchanged after the move.\n- [hard] REQ-04: No file remains under the reserved prefix without a repository counterpart, so every path beneath it denotes the same relationship.\n\n## Notes\n\nThe relocation is complete on its own and leaves the packaged content an adopter receives identical; only a source path inside the package changes.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-03",
+      "enforces:@/invariant/canonical-cutover"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The managed-region source sits outside the prefix reserved for files drawn from repository counterparts.",
+      "contract_refs": [
+        "derived-tree-reconciliation"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "C1",
+        "Q1",
+        "S3.2"
+      ],
+      "landing_group": "package-assembly",
+      "terminal": {
+        "consumer_family": "the packaged region declaration",
+        "test_boundary": "in-crate package assertions over the region source",
+        "worker_sized_reason": "One file moves and one declared source path follows it, with the existing region comparison proving the move.",
+        "footprint": {
+          "creates": [
+            "profiles/jit-dogfood/assets/regions/agents-jit-guidance.md"
+          ],
+          "touches": [
+            "profiles/jit-dogfood/assets/live/",
+            "profiles/jit-dogfood/manifest.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "executable-mode-contract-guard",
+    "title": "Give the executable-mode contract a guard of its own",
+    "description": "The executable declaration each packaged asset carries is checked against the actual mode of the repository file it is drawn from by an assertion that stands on its own, so the contract survives the removal of the comparison it currently shares a loop with.\n\n## Background\n\nEach packaged asset declares whether it should be published with the executable bit set; seven of the sixty-one do. One test checks that declaration against the real mode of the repository file the asset mirrors, in both directions, and it is the only place in the workspace that checks it at all. The embedding carries no mode metadata, so nothing else can recover the fact.\n\nThat check lives inside a loop whose other half compares the two copies of each asset byte for byte. The byte half is on its way out: once the packaged tree is produced by copying the repository files, comparing the copy to its source compares a thing to itself. When the byte half goes, an assertion that is merely a clause inside it goes with it, and the mode contract silently stops being checked.\n\nExtracting it first is what prevents that. While the byte comparison is still effective, the mode check becomes an assertion in its own right, reading the declarations and the repository modes directly. From then on the contract is guarded continuously \u2014 there is no revision in which one guard has been retired and its replacement has not yet landed. Doing it in the other order would leave exactly such a gap, and a permission change during that window would go unreported.\n\n## Success Criteria\n\n- [hard] REQ-01: A standalone assertion checks each declared live asset's executable declaration against the mode of the repository file it is drawn from.\n- [hard] REQ-02: The assertion is independent of the byte comparison it currently shares a loop with, so retiring that comparison leaves it intact.\n- [hard] REQ-03: A permission change on a live source alone fails the suite.\n- [hard] REQ-04: A declaration claiming an executable file that is not executable fails, and so does the reverse.\n- [hard] REQ-05: The assertion is effective from the revision it lands in, while the existing comparison is still effective, so the contract is never unguarded between the two.\n\n## Notes\n\nThe assertion is written against the declarations and the repository tree, not against a list of the seven assets that carry the flag today, so a newly declared executable asset is covered without an edit here.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-03"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A standalone assertion checks each declared live asset's executable flag against its repository file's mode.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-03",
+        "C1",
+        "Q1"
+      ],
+      "landing_group": "package-assembly",
+      "terminal": {
+        "consumer_family": "the packaged asset declarations",
+        "test_boundary": "in-crate assertions over declared asset modes",
+        "worker_sized_reason": "One assertion is lifted out of the loop it shares with a byte comparison, leaving both effective at once.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/profile/dogfood.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "package-tree-cutover",
     "title": "Re-root the embed on the assembled tree",
-    "description": "The binary embeds the tree the build script produces rather than a checked-in copy, and the duplicated copies leave the repository, so editing a live consumer cannot leave a stale packaged copy behind.\n\n## Background\n\nWith the produced tree proven equal to the checked-in one, the remaining move is to point the embed at it and retire the duplicates. This cannot be done in halves: the moment the copies go, the embed must already read the produced tree, so the re-rooting and the retirement are one change.\n\nOne packaged file is not drawn from a repository file at all. The managed-region source has no live counterpart, because its counterpart is a marked region inside a repository document rather than a whole file. It stays package-authored and moves out of the derived prefix, so the prefix means exactly one thing and no reconciliation pass can mistake it for a leftover.\n\nThe assertion that compared the two copies is rewritten here, and it carries a second guarantee that must not go with the first. Alongside comparing bytes, it asserts each declared asset's executable declaration against the actual mode of the repository file it mirrors, in both directions, and it is the only place in the workspace that does so. Byte equality becomes vacuous once the package is produced by copying, but the executable declaration stays hand-written per asset and the embedding carries no mode metadata at all, so nothing recovers that guarantee implicitly. It has to survive inside this change, not after it; otherwise a revision exists in which a permission change on a live source, or a newly packaged script whose flag is mis-declared, goes unreported.\n\nAn earlier decision weighed producing this tree at build time and rejected it as unjustified complexity for one small data tree; a later one made the package the authority and the working paths its rendered consumers. The renderer that decision assumed was never built, so what shipped is a hand-maintained duplicate plus an equality assertion. Both positions are superseded here, and the direction reverses: the repository files become the authority and the packaged tree becomes produced from them.\n\n## Success Criteria\n\n- [hard] REQ-01: The embed reads the tree the build script produces rather than a checked-in one.\n- [hard] REQ-02: No second copy of a live source remains under the package directory in the repository.\n- [hard] REQ-03: The managed-region source stays package-authored and sits outside the derived prefix.\n- [hard] REQ-04: Each declared live asset's executable declaration is asserted against the mode of the repository file it is drawn from, so a permission change alone fails the suite.\n- [hard] REQ-05: That assertion is rewritten within this change rather than after it, so no revision exists in which the executable-mode guarantee is absent from the tree.\n- [hard] REQ-06: The live-asset content the built binary embeds is unchanged by the re-rooting. The reported package hash is not that comparison and does change, because the manifest itself changes.\n- [hard] REQ-07: The repository files the package is produced from are all tracked, so a build from a named commit's sources alone still produces the complete package.\n\n## Notes\n\nThe equality between the produced tree and the checked-in one is established before this change begins, so the work here is the re-rooting and the retirement rather than a fresh comparison.\n",
+    "description": "The binary embeds the tree the build script produces rather than a checked-in copy, and the duplicated copies leave the repository, so editing a live consumer cannot leave a stale packaged copy behind.\n\n## Background\n\nEverything separable has already happened. The build script produces the tree and its output has been compared against the checked-in one file for file; the package-authored region source has moved out of the way; the executable-mode contract has its own guard. What is left is the one step that cannot be taken in halves: the moment the copies go, the embed must already read the produced tree, and until the copies go the produced tree is unused. Splitting the two leaves a revision that does not build \u2014 the embed pointing at nothing, or a package directory holding files no declaration accounts for.\n\nOne consequence rides along because it becomes true in the same instant rather than because it is separate work. The assertion comparing each packaged asset against the repository file it mirrors compares the copy against the source it was produced from once the embed re-roots, which is a comparison of a thing to itself. It is retired here rather than left in place passing on identical inputs, which would read to a later contributor as coverage that exists.\n\nAn earlier decision weighed producing this tree at build time and rejected it as unjustified complexity for one small data tree; a later one made the package the authority and the working paths its rendered consumers. The renderer that decision assumed was never built, so what shipped is a hand-maintained duplicate plus an equality assertion. Both positions are superseded here, and the direction reverses: the repository files become the authority and the packaged tree becomes produced from them.\n\n## Success Criteria\n\n- [hard] REQ-01: The embed reads the tree the build script produces rather than a checked-in one.\n- [hard] REQ-02: No second copy of a live source remains under the package directory in the repository.\n- [hard] REQ-03: The comparison the re-rooting makes self-referential is retired rather than left passing on identical inputs.\n- [hard] REQ-04: The live-asset content the built binary embeds is unchanged by the re-rooting. The reported package hash is not that comparison and does change, because the manifest itself changes.\n- [hard] REQ-05: The repository files the package is produced from are all tracked, so a build from a named commit's sources alone produces the complete package.\n\n## Notes\n\nThe equality of the produced tree and the checked-in one, the region source's position, and the executable-mode contract are all settled before this begins, so this change asserts none of them afresh.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -278,7 +408,8 @@
       "code-review"
     ],
     "depends_on": [
-      "package-assembly-mechanism"
+      "package-assembly-mechanism",
+      "executable-mode-contract-guard"
     ],
     "planning": {
       "outcome": "The binary embeds the produced tree, and the duplicated copies are gone from the repository.",
@@ -292,7 +423,6 @@
         "C3",
         "Q1",
         "S3.1",
-        "S3.2",
         "S3.3",
         "S4.5"
       ],
@@ -300,11 +430,8 @@
       "terminal": {
         "consumer_family": "the embedded profile package",
         "test_boundary": "in-crate package assertions over the embedded tree",
-        "worker_sized_reason": "One embed path moves and the copies it supersedes go, in a change that cannot be halved without a broken tree.",
+        "worker_sized_reason": "The embed path and the copies it supersedes are one indivisible transition: either alone leaves a tree that does not build.",
         "footprint": {
-          "creates": [
-            "profiles/jit-dogfood/assets/regions/agents-jit-guidance.md"
-          ],
           "touches": [
             "crates/jit/src/profile/dogfood.rs",
             "profiles/jit-dogfood/assets/live/",
@@ -492,7 +619,7 @@
   {
     "key": "live-source-root-declaration",
     "title": "Declare the repository roots the packaged live assets are drawn from",
-    "description": "The package manifest states which repository roots its live assets are drawn from, so the set a completeness check has to walk is declared data rather than a fact spread across an inventory.\n\n## Background\n\nThe packaged live assets are drawn from four repository roots today: the agent skill tree, the script directory, the contributed-gate directory, and the tracker's reference directory. Nothing says so. The information exists only implicitly, in the shape of sixty-one declared asset paths, so anything that needs the root set \u2014 a build-time assembly deciding which directories to watch, a check asking whether every live consumer was packaged \u2014 has to infer it or restate it.\n\nThe roots are not usable as bare directories. Fifty-two files under the skill tree, thirty-two under the script directory, and four under the contributed directory are deliberately not packaged: evaluation harnesses, fixtures, transcripts, this repository's own build and check scripts, and review prompts. A literal list of those thirty-six paths would itself be a hand-maintained inventory that goes stale, so exclusions are patterns rather than path literals.\n\nThe manifest's wire shape is public: it is reported by the package's machine-readable inspection output and reaches an agent-facing bridge that asserts against it. Unknown keys are rejected, so the declaration has to be additive \u2014 a manifest without it still parses, and no existing key changes meaning. Keeping the declaration in the manifest rather than in engine code also keeps a repository-local fact inside the package where it belongs.\n\nRoots and patterns are constrained tokens rather than free strings: a malformed entry is rejected where the manifest is parsed, not discovered later by whatever consumes it. Rejecting a malformed pattern at parse time means compiling it there, so the pattern matcher this container needs is introduced here, by the type that owns pattern validity, rather than by whichever consumer happens to match first.\n\n## Success Criteria\n\n- [hard] REQ-01: The manifest declares one entry per repository root the packaged live assets are drawn from, each carrying its own exclusion-pattern list; a list may be empty, since what belongs in it is measured elsewhere.\n- [hard] REQ-02: A root and an exclusion pattern are constrained types rejected at parse time when malformed, rather than strings passed through untouched.\n- [hard] REQ-03: The addition is additive: a manifest carrying no such declaration still parses, and no existing key changes meaning.\n- [hard] REQ-04: The declaration is reported by the package's machine-readable inspection output.\n- [hard] REQ-05: The agent-facing bridge's coverage accounts for the reported shape, so the addition is observed rather than assumed compatible.\n- [hard] REQ-06: The four roots the packaged live assets are drawn from today are declared.\n- [hard] REQ-07: The managed-region source and every install-only asset source fall outside every declared root, so no root claims a package-authored file as a live consumer.\n- [hard] REQ-08: The adopter reference describing what the manifest carries accounts for the declaration.\n\n## Notes\n\nPopulating the exclusion lists is measurement work: only a walk over the roots can tell whether a pattern set is sufficient, so the lists are filled by the work that performs that walk.\n\nOne install-only asset's target path lies inside a declared root, unlike its source. It is absent from this repository, which projects that content elsewhere, so the walk does not meet it here; where it does appear it is unpackaged material like any other and a declared exclusion covers it.\n",
+    "description": "The package manifest states which repository roots its live assets are drawn from, so the set anything else has to walk or watch is declared data rather than a fact inferred from an inventory.\n\n## Background\n\nThe packaged live assets are drawn from four repository roots today: the agent skill tree, the script directory, the contributed-gate directory, and the tracker's reference directory. Nothing says so. The information exists only implicitly, in the shape of sixty-one declared asset paths, so anything needing the root set \u2014 a build step deciding which directories to watch, a check asking whether every live consumer was packaged \u2014 has to infer it or restate it.\n\nThe roots are not usable as bare directories. Fifty-two files under the skill tree, thirty-two under the script directory, and three under the contributed-gate directory are deliberately not packaged: evaluation harnesses, fixtures, transcripts, this repository's own build and check scripts, and review prompts. A literal list of those paths would itself be a hand-maintained inventory that goes stale, so exclusions are patterns rather than path literals.\n\nUnknown keys are rejected where the manifest is parsed, so the declaration has to be additive: a manifest without it still parses, and no existing key changes meaning. Keeping the declaration in the manifest rather than in engine code also keeps a repository-local fact inside the package where it belongs.\n\nRoots and patterns are constrained tokens rather than free strings: a malformed entry is rejected at parse time, not discovered later by whatever consumes it. Rejecting a malformed pattern there means compiling it there, so the pattern matcher this work needs is introduced by the type that owns pattern validity rather than by whichever consumer happens to match first.\n\n## Success Criteria\n\n- [hard] REQ-01: The manifest declares one entry per repository root the packaged live assets are drawn from, each carrying its own exclusion-pattern list; a list may be empty, since what belongs in it is measured elsewhere.\n- [hard] REQ-02: A root and an exclusion pattern are constrained types rejected at parse time when malformed, rather than strings passed through untouched.\n- [hard] REQ-03: The addition is additive: a manifest carrying no such declaration still parses, and no existing key changes meaning.\n- [hard] REQ-04: The declaration is carried in the value the package's machine-readable inspection output reports.\n- [hard] REQ-05: The four roots the packaged live assets are drawn from today are declared.\n- [hard] REQ-06: The managed-region source and every install-only asset source fall outside every declared root, so no root claims a package-authored file as a live consumer.\n\n## Notes\n\nPopulating the exclusion lists is measurement work: only a walk over the roots can tell whether a pattern set is sufficient, so the lists are filled by the work that performs that walk.\n\nOne install-only asset's target path lies inside a declared root, unlike its source. It is absent from this repository, which projects that content elsewhere, so the walk does not meet it here; where it does appear it is unpackaged material like any other and a declared exclusion covers it.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -507,10 +634,7 @@
     ],
     "gates": [
       "cargo-ci",
-      "code-review",
-      "mcp-ci",
-      "docs-mechanical",
-      "doc-review"
+      "code-review"
     ],
     "depends_on": [],
     "planning": {
@@ -518,6 +642,9 @@
       "contract_refs": [
         "derivation-reader-boundary",
         "completeness-walk-rule"
+      ],
+      "produces_contracts": [
+        "live-source-declaration"
       ],
       "source_refs": [
         "REQ-05",
@@ -527,16 +654,12 @@
         "C2",
         "Q5",
         "S3.6",
-        "S4.1",
         "S7.1"
       ],
-      "produces_contracts": [
-        "live-source-declaration"
-      ],
-      "landing_group": "package-cutover",
+      "landing_group": "package-assembly",
       "terminal": {
         "consumer_family": "the profile manifest wire model",
-        "test_boundary": "assertions over the package's machine-readable inspection output",
+        "test_boundary": "in-crate manifest parse assertions",
         "worker_sized_reason": "One additive declaration on an existing wire type, carrying the four roots it describes.",
         "footprint": {
           "touches": [
@@ -544,9 +667,95 @@
             "crates/jit/Cargo.toml",
             "crates/jit/src/profile/manifest.rs",
             "crates/jit/src/profile/package.rs",
-            "docs/reference/profiles.md",
-            "mcp-server/test-integration.js",
             "profiles/jit-dogfood/manifest.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "live-source-declaration-bridge-coverage",
+    "title": "Cover the declared roots on the agent-facing bridge",
+    "description": "The bridge that exposes profile inspection to agents is covered for the root declaration, so an additive manifest change is observed on that surface rather than assumed compatible with it.\n\n## Background\n\nThe profile manifest's shape is public twice over: once through the command-line inspection output, and once through the bridge that republishes the same command surface to agent clients. The bridge's own suite drives the profile inspection tool against this package and asserts on the manifest it gets back, which is what makes it a real consumer rather than a pass-through nobody checks.\n\nA recorded constraint from the work that built this package applies directly: changes must preserve the public profile, schema, and bridge journey rather than silently invalidating it. An additive field satisfies that by construction, but \"by construction\" is the claim, not the evidence. The evidence is an assertion on the surface itself, in the suite that already exercises it.\n\nThe assertion belongs to a different workspace from the type it observes, with its own toolchain and its own suite, which is why it stands apart from the declaration it covers.\n\n## Success Criteria\n\n- [hard] REQ-01: The bridge's integration suite asserts that the reported manifest carries the root declaration.\n- [hard] REQ-02: The assertion reads the declaration from the reported value rather than restating what it should contain.\n- [hard] REQ-03: The suite's existing assertions on the reported manifest continue to pass, so the addition is shown not to disturb the surface.\n\n## Notes\n\nNothing else in that workspace refers to the packaged asset paths or the roots, so this is the whole of the bridge-side change.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-05"
+    ],
+    "gates": [
+      "mcp-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "live-source-root-declaration"
+    ],
+    "planning": {
+      "outcome": "The bridge's coverage observes the root declaration in the manifest it reports.",
+      "contract_refs": [
+        "live-source-declaration"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "S3.6",
+        "S4.1"
+      ],
+      "landing_group": "package-assembly",
+      "terminal": {
+        "consumer_family": "the agent-facing profile bridge",
+        "test_boundary": "the bridge's integration suite",
+        "worker_sized_reason": "One assertion in a suite that already drives the profile inspection tool against this package.",
+        "footprint": {
+          "touches": [
+            "mcp-server/test-integration.js"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profiles-reference-manifest-contents",
+    "title": "State the root declaration in the adopter manifest reference",
+    "description": "The adopter reference that describes what the package manifest carries accounts for the declared roots, so its enumeration of the manifest's contents is not silently incomplete.\n\n## Background\n\nThe adopter reference for packaged workflows describes the manifest as the package inventory and lists what it holds: version, contributions, assets, managed regions, hashes, and executable declarations. That sentence is a hand-written enumeration of a structure that has just gained a section, which makes it the kind of copy that is wrong the moment its subject changes.\n\nThe page's own approach is to point a reader at the inspection command for exact contents rather than reproduce them, which is the right shape and should be kept. What needs saying is that the manifest also declares where the packaged live assets are drawn from \u2014 a fact an adopter reading about the package's structure would otherwise not learn exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference's description of the manifest's contents accounts for the root declaration.\n- [hard] REQ-02: The description states what the declaration is for, not merely that a section exists.\n- [hard] REQ-03: The page continues to direct a reader to the inspection output for exact contents rather than reproducing them.\n- [hard] REQ-04: The mechanical documentation checks pass over the adopter surface.\n\n## Notes\n\nThis is the one adopter-facing page that enumerates the manifest's structure; no other page restates it.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:derived-package-sources",
+      "milestone:v1.0",
+      "component:core",
+      "story:package-derivation",
+      "satisfies:REQ-05",
+      "enforces:@/invariant/single-source-prose"
+    ],
+    "gates": [
+      "code-review",
+      "docs-mechanical",
+      "doc-review"
+    ],
+    "depends_on": [
+      "live-source-root-declaration"
+    ],
+    "planning": {
+      "outcome": "The adopter reference describing what the manifest carries accounts for the declared roots.",
+      "contract_refs": [
+        "live-source-declaration"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "S4.1",
+        "S7.2"
+      ],
+      "landing_group": "package-assembly",
+      "terminal": {
+        "consumer_family": "the adopter profile reference",
+        "test_boundary": "the mechanical documentation checks over the adopter surface",
+        "worker_sized_reason": "One prose sentence describing a manifest that has gained a section it does not mention.",
+        "footprint": {
+          "touches": [
+            "docs/reference/profiles.md"
           ]
         }
       }
@@ -708,7 +917,7 @@
       "jit-validate"
     ],
     "depends_on": [
-      "plan-template-generated-region"
+      "plan-template-drift-guard"
     ],
     "planning": {
       "outcome": "The repository plan-template declaration is generated from its packaged authority, with divergence failing the suite.",
@@ -753,7 +962,9 @@
       "build-freshness-coverage",
       "package-content-reproducibility",
       "live-source-completeness-guard",
-      "binary-build-input-inventory"
+      "binary-build-input-inventory",
+      "live-source-declaration-bridge-coverage",
+      "profiles-reference-manifest-contents"
     ],
     "planning": {
       "outcome": "The packaged tree is assembled at build time from declared roots, reproducibly, with omission and staleness both reported.",
