@@ -9,8 +9,10 @@
 //! `CommandExecutor::get_config`) and `EffectiveConfig::full_snapshot` in
 //! `crates/jit/src/config.rs`.
 
+use jit::output::ErrorCode;
 use std::fs;
 use std::process::Command;
+use std::str::FromStr;
 use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
@@ -287,7 +289,7 @@ fn test_get_corrupt_config_toml_is_not_invalid_argument() {
 }
 
 #[test]
-fn test_get_corrupt_config_toml_json_is_not_invalid_argument() {
+fn test_get_corrupt_config_toml_json_emits_registered_parse_error() {
     let temp = TempDir::new().unwrap();
     assert!(jit_init(temp.path()).status.success());
     fs::write(
@@ -298,21 +300,21 @@ fn test_get_corrupt_config_toml_json_is_not_invalid_argument() {
 
     let out = config_get(temp.path(), &["worktree.mode", "--json"]);
     assert!(!out.status.success());
-    assert_ne!(
-        out.status.code(),
-        Some(2),
-        "a malformed config.toml must not be classified as a bad CLI argument: {:?}",
-        out
-    );
-    // Not rendered as a JSON error envelope: `--json` on `config get` only
-    // wraps the SUCCESS path and the unknown-key argument error, not every
-    // failure mode.
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        serde_json::from_str::<serde_json::Value>(&stdout).is_err(),
-        "unexpected JSON on stdout for a load failure: {stdout}"
-    );
+    let envelope: serde_json::Value =
+        serde_json::from_str(&stdout).expect("stdout contains exactly one JSON document");
+    let code = ErrorCode::from_str(
+        envelope["error"]["code"]
+            .as_str()
+            .expect("error envelope carries a code"),
+    )
+    .expect("error envelope code is registered");
+    assert_eq!(code, ErrorCode::ParseError);
+    assert_eq!(out.status.code(), Some(code.exit_code().code()));
+    assert!(envelope["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("Failed to parse config.toml")));
     assert!(stderr.contains("Failed to parse config.toml"));
 }
 
