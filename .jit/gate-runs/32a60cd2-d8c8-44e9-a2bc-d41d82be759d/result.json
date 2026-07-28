@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "712446f4a886829c43bfe6d81f049855586b59bb",
+  "completed_at": "2026-07-28T22:03:12.093021830Z",
+  "duration_ms": 228160,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_issue/failure_lever_registry.rs",
+        "id": "F1",
+        "line": 133,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The registry test does not reject duplicate command paths despite hard REQ-03 requiring duplicate-path rejection; the fixture contains three accepted serve rows with the same path."
+      }
+    ],
+    "summary": "A completed dependency's hard registry-integrity criterion is contradicted by its tests and fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+  "message": null,
+  "run_id": "32a60cd2-d8c8-44e9-a2bc-d41d82be759d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T21:59:23.932355316Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12152 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faabd-5b3c-7c03-be28-79fcb1832e2f\n--------\nuser\n--- 12139 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — High (blocking):** Closed dependency `ced03648` claims duplicate-path rejection, but its registry test only rejects duplicate argv vectors; three `serve` rows share one path. Its hard REQ-03 is therefore unverified and contradicted by the fixture.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A completed dependency's hard registry-integrity criterion is contradicted by its tests and fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The registry test does not reject duplicate command paths despite hard REQ-03 requiring duplicate-path rejection; the fixture contains three accepted serve rows with the same path.\",\"file\":\"crates/jit/tests/cli_issue/failure_lever_registry.rs\",\"line\":133}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
