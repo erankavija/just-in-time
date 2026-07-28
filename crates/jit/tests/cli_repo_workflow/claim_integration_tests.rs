@@ -4,11 +4,13 @@
 //! Verifies actual binary execution, exit codes, and output formats.
 
 use assert_cmd::prelude::*;
+use jit::output::ErrorCode;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output};
+use std::str::FromStr;
 use tempfile::TempDir;
 
 /// Setup a test repository with git and jit initialized
@@ -74,6 +76,120 @@ fn create_issue(repo_path: &Path, title: &str) -> String {
 
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     json["id"].as_str().unwrap().to_string()
+}
+
+fn assert_claim_failure_parity(plain: &Output, json: &Output, expected_code: ErrorCode) {
+    let expected_status = Some(expected_code.exit_code().code());
+    assert_eq!(plain.status.code(), expected_status);
+    assert_eq!(json.status.code(), expected_status);
+    assert_eq!(plain.status.code(), json.status.code());
+
+    assert!(plain.stdout.is_empty(), "plain failure leaked to stdout");
+    assert!(
+        !plain.stderr.is_empty(),
+        "plain failure omitted its diagnostic"
+    );
+    assert!(json.stderr.is_empty(), "JSON failure leaked to stderr");
+
+    let envelope: Value = serde_json::from_slice(&json.stdout)
+        .expect("JSON failure stdout contains exactly one document");
+    assert_eq!(envelope.as_object().map(|object| object.len()), Some(1));
+    let error = envelope["error"]
+        .as_object()
+        .expect("canonical failure envelope contains an error object");
+    assert_eq!(error.len(), 2);
+    let actual_code = ErrorCode::from_str(
+        error["code"]
+            .as_str()
+            .expect("canonical failure carries a registered code"),
+    )
+    .expect("claim failure code belongs to the registered vocabulary");
+    assert_eq!(actual_code, expected_code);
+    assert!(error["message"].is_string());
+}
+
+fn acquire_lease(repo_path: &Path, issue_id: &str, agent_id: &str) -> String {
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(repo_path)
+        .args([
+            "claim",
+            "acquire",
+            issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            agent_id,
+            "--json",
+        ])
+        .output()
+        .expect("acquire fixture lease");
+    assert!(output.status.success(), "claim acquire failed: {output:?}");
+    let json: Value = serde_json::from_slice(&output.stdout).expect("acquire response is JSON");
+    json["lease_id"]
+        .as_str()
+        .expect("acquire response carries lease id")
+        .to_string()
+}
+
+#[cfg(unix)]
+#[test]
+fn test_claim_renew_permission_denied_is_identical_in_plain_and_json_forms() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = setup_repo();
+    let issue_id = create_issue(temp.path(), "Permission-denied claim");
+    let agent = "agent:permission-probe";
+    let lease_id = acquire_lease(temp.path(), &issue_id, agent);
+    let index_path = temp.path().join(".git/jit/claims.index.json");
+    let original_mode = fs::metadata(&index_path).unwrap().permissions().mode();
+    fs::set_permissions(&index_path, fs::Permissions::from_mode(0o0)).unwrap();
+
+    let invoke = |json: bool| {
+        let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+        command
+            .current_dir(temp.path())
+            .env("JIT_AGENT_ID", agent)
+            .args(["claim", "renew", &lease_id, "--extension", "300"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    };
+    let plain = invoke(false);
+    let json = invoke(true);
+
+    fs::set_permissions(&index_path, fs::Permissions::from_mode(original_mode)).unwrap();
+    assert_claim_failure_parity(&plain, &json, ErrorCode::PermissionDenied);
+}
+
+#[test]
+fn test_claim_acquire_external_io_is_identical_in_plain_and_json_forms() {
+    let temp = setup_repo();
+    let issue_id = create_issue(temp.path(), "External-I/O claim");
+    let locks_path = temp.path().join(".git/jit/locks");
+    fs::remove_dir(&locks_path).unwrap();
+    fs::write(&locks_path, "not a directory").unwrap();
+
+    let invoke = |json: bool| {
+        let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+        command.current_dir(temp.path()).args([
+            "claim",
+            "acquire",
+            &issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            "agent:io-probe",
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    };
+    let plain = invoke(false);
+    let json = invoke(true);
+
+    assert_claim_failure_parity(&plain, &json, ErrorCode::IoError);
 }
 
 #[test]
@@ -595,21 +711,21 @@ fn test_claim_renew_json_output() {
 #[test]
 fn test_claim_renew_not_found_error() {
     let temp = setup_repo();
+    let missing_lease = "00000000-0000-0000-0000-000000000000";
 
-    // Try to renew non-existent lease
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .env("JIT_AGENT_ID", "agent:test")
-        .args([
-            "claim",
-            "renew",
-            "01FAKE0000000000000000000",
-            "--extension",
-            "300",
-        ])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not found"));
+    let invoke = |json: bool| {
+        let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+        command
+            .current_dir(temp.path())
+            .env("JIT_AGENT_ID", "agent:test")
+            .args(["claim", "renew", missing_lease, "--extension", "300"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    };
+
+    assert_claim_failure_parity(&invoke(false), &invoke(true), ErrorCode::IssueNotFound);
 }
 
 #[test]
