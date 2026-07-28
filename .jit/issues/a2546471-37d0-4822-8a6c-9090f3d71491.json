@@ -16,7 +16,18 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "status": "failed",
+      "updated_at": "2026-07-28T18:44:20.219862705Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-28T18:41:35.790652355Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a2546471-37d0-4822-8a6c-9090f3d71491",
   "labels": [
     "epic:json-error-contract",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-28T18:39:28.833235410Z"
+  "updated_at": "2026-07-28T18:44:20.219862705Z"
 }
