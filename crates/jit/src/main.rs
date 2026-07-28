@@ -198,11 +198,13 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
         };
     }
 
-    // Configuration parsing is a typed parser failure even when command
-    // orchestration adds anyhow context around it.
-    if error.downcast_ref::<toml::de::Error>().is_some()
-        || error.downcast_ref::<serde_json::Error>().is_some()
-    {
+    // TOML and JSON decoding are typed parser failures even when command
+    // orchestration adds anyhow context around them (configuration, event-log,
+    // migration, and server PID readers all retain their parser source).
+    if error.chain().any(|cause| {
+        cause.downcast_ref::<toml::de::Error>().is_some()
+            || cause.downcast_ref::<serde_json::Error>().is_some()
+    }) {
         return ErrorCode::ParseError;
     }
 
@@ -6654,7 +6656,10 @@ fn run() -> Result<()> {
 
             // Validate dry_run requires fix
             if dry_run && !fix {
-                return Err(anyhow!("--dry-run requires --fix to be specified"));
+                return Err(jit::errors::InvalidArgumentError::new(
+                    "--dry-run requires --fix to be specified",
+                )
+                .into());
             }
 
             // `--scope <C>` is a self-contained gate checker over a container's
@@ -7267,18 +7272,14 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
+                        let code = error_to_error_code(&e);
                         if json {
-                            let json_error = jit::output::JsonError::new(
-                                jit::output::ErrorCode::GenericError,
-                                e.to_string(),
-                            );
+                            let json_error = jit::output::JsonError::new(code, e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
                             eprintln!("Error stopping server: {e}");
-                            std::process::exit(
-                                jit::output::ErrorCode::GenericError.exit_code().code(),
-                            );
+                            std::process::exit(code.exit_code().code());
                         }
                     }
                 }
@@ -7316,18 +7317,14 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
+                        let code = error_to_error_code(&e);
                         if json {
-                            let json_error = jit::output::JsonError::new(
-                                jit::output::ErrorCode::GenericError,
-                                e.to_string(),
-                            );
+                            let json_error = jit::output::JsonError::new(code, e.to_string());
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
                         } else {
                             eprintln!("Error checking server status: {e}");
-                            std::process::exit(
-                                jit::output::ErrorCode::GenericError.exit_code().code(),
-                            );
+                            std::process::exit(code.exit_code().code());
                         }
                     }
                 }
@@ -7493,18 +7490,14 @@ fn run() -> Result<()> {
                             }
                         }
                         Err(e) => {
+                            let code = error_to_error_code(&e);
                             if json {
-                                let json_error = jit::output::JsonError::new(
-                                    jit::output::ErrorCode::GenericError,
-                                    e.to_string(),
-                                );
+                                let json_error = jit::output::JsonError::new(code, e.to_string());
                                 println!("{}", json_error.to_json_string()?);
                                 std::process::exit(json_error.exit_code().code());
                             } else {
                                 eprintln!("Error starting server: {e}");
-                                std::process::exit(
-                                    jit::output::ErrorCode::GenericError.exit_code().code(),
-                                );
+                                std::process::exit(code.exit_code().code());
                             }
                         }
                     }
@@ -8203,6 +8196,15 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (
+                anyhow::Error::new(
+                    serde_json::from_str::<serde_json::Value>("{")
+                        .expect_err("fixture JSON is malformed"),
+                )
+                .context("outer command context"),
+                1,
+                "*",
+            ),
+            (
                 jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
                 10,
                 "*",
@@ -8291,6 +8293,20 @@ mod exit_code_projection_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_error_code_classifier_recognizes_context_wrapped_json_parse_error() {
+        let error = anyhow::Error::new(
+            serde_json::from_str::<serde_json::Value>("{").expect_err("fixture JSON is malformed"),
+        )
+        .context("outer command context");
+
+        assert_eq!(error_to_error_code(&error), ErrorCode::ParseError);
+        assert_eq!(
+            error_to_exit_code(&error),
+            ErrorCode::ParseError.exit_code()
+        );
     }
 
     #[test]

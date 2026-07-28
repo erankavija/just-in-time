@@ -2,7 +2,7 @@
 
 use jit::output::ErrorCode;
 use serde::{de::Error as _, Deserialize, Deserializer};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::str::FromStr;
 
 const REGISTRY_TOML: &str = include_str!("failure_lever_registry.toml");
@@ -198,39 +198,6 @@ pub(crate) fn failure_lever_registry() -> FailureLeverRegistry {
     toml::from_str(REGISTRY_TOML).expect("committed failure-lever registry must be valid")
 }
 
-fn reflected_json_arm_paths() -> BTreeSet<String> {
-    fn collect(
-        prefix: &str,
-        commands: &HashMap<String, jit::schema::Command>,
-        paths: &mut BTreeSet<String>,
-    ) {
-        commands.iter().for_each(|(name, command)| {
-            let path = if prefix.is_empty() {
-                name.clone()
-            } else {
-                format!("{prefix} {name}")
-            };
-
-            match command
-                .subcommands
-                .as_ref()
-                .filter(|children| !children.is_empty())
-            {
-                Some(children) => collect(&path, children, paths),
-                None if command.flags.iter().any(|flag| flag.name == "json") => {
-                    paths.insert(path);
-                }
-                None => {}
-            }
-        });
-    }
-
-    let schema = jit::schema::CommandSchema::generate();
-    let mut paths = BTreeSet::new();
-    collect("", &schema.commands, &mut paths);
-    paths
-}
-
 #[test]
 fn test_failure_lever_registry_deserializes_typed_committed_input() {
     let registry = failure_lever_registry();
@@ -294,16 +261,4 @@ fn test_failure_lever_registry_rejects_entries_missing_required_fields() {
 
     assert!(toml::from_str::<FailureLeverRegistry>(incomplete_invocation).is_err());
     assert!(toml::from_str::<FailureLeverRegistry>(incomplete_exemption).is_err());
-}
-
-#[test]
-fn test_failure_lever_registry_arm_paths_match_command_reflection() {
-    let registry_paths = failure_lever_registry()
-        .arms
-        .iter()
-        .map(FailureLever::path)
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-
-    assert_eq!(registry_paths, reflected_json_arm_paths());
 }

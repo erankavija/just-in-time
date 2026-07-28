@@ -185,12 +185,12 @@ fn assert_projected_exit_status_in_both_forms<F>(
     );
 }
 
-/// A missing template reaches the shared fallback classifier, covering the
-/// universal generic-error row through the public `apply` command.
+/// A missing template is an invalid invocation, covering the universal
+/// invalid-argument row through the public `apply` command.
 #[test]
-fn test_command_exit_codes_generic_apply_failure_emits_1() {
+fn test_command_exit_codes_unknown_apply_template_emits_2() {
     let temp = setup();
-    assert_projected_exit_status_in_both_forms("*", 1, false, |json| {
+    assert_projected_exit_status_in_both_forms("*", 2, false, |json| {
         let mut command = Command::new(jit_binary());
         command.current_dir(&temp).args([
             "apply",
@@ -583,14 +583,15 @@ fn test_command_exit_codes_gate_preset_apply_missing_target_emits_3() {
     });
 }
 
-/// `jit serve --status` (like the daemon start and `--stop`) exits 1 on an
-/// error — here a malformed PID file — matching the `serve, serve --stop, serve
-/// --status`/1 row (standard taxonomy, not an exception).
+/// `jit serve --status` (like the daemon start and `--stop`) classifies a
+/// malformed PID file as `PARSE_ERROR`, whose registered status is 1, matching
+/// the `serve, serve --stop, serve --status`/1 row.
 #[test]
 fn test_command_exit_codes_serve_daemon_error_emits_1() {
     let temp = setup();
     // A malformed PID file makes `server_status` (via `read_pid_file`) error, so
-    // the `--status` arm hits its `exit(1)` site.
+    // the `--status` arm routes the typed parser failure through the shared
+    // classifier.
     fs::write(temp.path().join(".jit/server.pid.json"), "not json").unwrap();
 
     assert_projected_exit_status_in_both_forms(

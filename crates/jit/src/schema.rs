@@ -1027,13 +1027,14 @@ impl CommandSchema {
                 "A preset target was not found, so the application failed.",
                 false,
             ),
-            // `serve` default (daemon), `--stop`, and `--status` follow the
-            // standard taxonomy: 0 on success, 1 on a start/stop/status error.
+            // `serve` default (daemon), `--stop`, and `--status` route failures
+            // through the shared classifier. Malformed PID state is the
+            // representative parser failure bound here; other typed failures
+            // use the applicable universal row above.
             row(
                 "serve, serve --stop, serve --status",
                 1,
-                "The daemon start, stop, or status operation failed (exits 0 on \
-                 success).",
+                "The daemon PID state could not be parsed (exits 0 on success).",
                 false,
             ),
             // Every command reaches this if its stdout write outlives the
