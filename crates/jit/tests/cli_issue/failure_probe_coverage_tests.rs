@@ -65,8 +65,12 @@ fn coverage_errors(declared: &BTreeSet<String>, registrations: &[Registration<'_
     let stale = registered
         .difference(declared)
         .map(|path| format!("stale registry arm `{path}` no longer declares --json"));
+    let empty_exemptions = registrations.iter().filter_map(|registration| {
+        matches!(registration.kind, RegistrationKind::Exemption(reason) if reason.trim().is_empty())
+            .then(|| format!("exemption for `{}` has no stated reason", registration.path))
+    });
 
-    missing.chain(stale).collect()
+    missing.chain(stale).chain(empty_exemptions).collect()
 }
 
 fn probe_contract_errors(
@@ -113,7 +117,10 @@ fn canonical_error_code(stdout: &[u8]) -> (bool, Result<ErrorCode, String>) {
         .as_object()
         .is_some_and(|root| root.len() == 1 && root.contains_key("error"))
         && value["error"].as_object().is_some_and(|error| {
-            error.get("code").is_some_and(serde_json::Value::is_string)
+            error
+                .keys()
+                .all(|key| matches!(key.as_str(), "code" | "message" | "details" | "suggestions"))
+                && error.get("code").is_some_and(serde_json::Value::is_string)
                 && error
                     .get("message")
                     .is_some_and(serde_json::Value::is_string)
@@ -242,4 +249,18 @@ fn test_coverage_errors_accepts_exemption_with_reason() {
         registrations[0].kind,
         RegistrationKind::Exemption(reason) if !reason.is_empty()
     ));
+}
+
+#[test]
+fn test_coverage_errors_rejects_exemption_without_reason() {
+    let declared = BTreeSet::from(["version".to_owned()]);
+    let registrations = [Registration {
+        path: "version",
+        kind: RegistrationKind::Exemption(""),
+    }];
+
+    assert_eq!(
+        coverage_errors(&declared, &registrations),
+        vec!["exemption for `version` has no stated reason".to_owned()]
+    );
 }
