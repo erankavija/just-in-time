@@ -10972,3 +10972,5 @@
 {"from":"in_progress","id":"eb463451-46c3-4bc9-9139-fdb921c888b4","issue_id":"a193a7cc-a00b-4551-bb30-922a8e015b38","timestamp":"2026-07-28T13:34:55.781399060Z","to":"done","type":"issue_state_changed"}
 {"id":"acca73cf-f378-4330-bee1-da5255c2b603","issue_id":"a193a7cc-a00b-4551-bb30-922a8e015b38","timestamp":"2026-07-28T13:34:55.781399060Z","type":"issue_completed"}
 {"from":"backlog","id":"4e6c23c3-a168-4c8e-82e0-2cb62f00dcce","issue_id":"7e0c04d0-c4b5-4afb-96af-2926e61f0b43","timestamp":"2026-07-28T13:35:00.471916689Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:wave5-fixture","id":"daeff902-7900-4fe9-9d7a-b58d83ebd3c0","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T13:36:52.031973355Z","type":"issue_claimed"}
+{"from":"ready","id":"fe8ef65e-eeba-4e96-9262-69f467b7e906","issue_id":"f4346059-afd1-459d-8028-3227787061dd","timestamp":"2026-07-28T13:36:55.254044320Z","to":"in_progress","type":"issue_state_changed"}
