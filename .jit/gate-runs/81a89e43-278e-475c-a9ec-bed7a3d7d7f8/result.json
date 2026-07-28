@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "44b794a704b6e604873f3dcd096e41dc76f0a7b8",
+  "completed_at": "2026-07-28T13:34:17.184551745Z",
+  "duration_ms": 204579,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All projected rows now have projection-derived dual-form bindings; the prior blocking finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a193a7cc-a00b-4551-bb30-922a8e015b38",
+  "message": null,
+  "run_id": "81a89e43-278e-475c-a9ec-bed7a3d7d7f8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T13:30:52.605167591Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 561bd861, 7aa1160e, 2909fe32, d9991154, 7104dd3f, d494532d, 03f0bd08, e83e7d70, 925e3da9, d1228ffb, 53073d4, 44b794a7 (`jit:a193a7cc`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/a193a7cc/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (.jit/issues/a193a7cc-a00b-4551-bb30-922a8e015b38.json); @/invariant/semantic-test-assertions, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T13:25:12Z); prior code-review failed (exit 1, F1 addressed by d1228ffb)\nTruncation recovery: re-read the 7aa1160e test patch in three bounded ranges; inspected direct follow-up patches and current source/test/projection reads; remaining truncated `.jit` metadata was outside the code impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All projected rows now have projection-derived dual-form bindings; the prior blocking finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
