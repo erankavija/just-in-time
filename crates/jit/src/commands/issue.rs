@@ -739,7 +739,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let warnings = self.claim_issue(&id, assignee)?;
             Ok((id, warnings))
         } else {
-            Err(anyhow!("No ready issues available"))
+            Err(crate::errors::NotFoundError::new("No ready issues available").into())
         }
     }
 
@@ -869,6 +869,20 @@ enforce_leases = "off"
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
 
         crate::commands::test_helpers::memory_executor(storage)
+    }
+
+    #[test]
+    fn test_claim_next_without_ready_issue_returns_typed_not_found_error() {
+        let error = setup()
+            .claim_next("agent:test".to_string(), None)
+            .expect_err("an empty ready set must reject claim-next");
+
+        assert!(
+            error
+                .downcast_ref::<crate::errors::NotFoundError>()
+                .is_some(),
+            "claim-next absence must retain a typed classifier, got: {error:?}"
+        );
     }
 
     #[test]

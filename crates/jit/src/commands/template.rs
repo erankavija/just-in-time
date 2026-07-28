@@ -58,7 +58,10 @@ impl TemplateRequest<'_> {
     fn resolve(&self, config: &crate::config::JitConfig) -> Result<GraphTemplate> {
         match self {
             Self::Named(name) => config.templates.get(name).cloned().ok_or_else(|| {
-                anyhow!("no template '{name}' in .jit/templates.toml; declare it or check the name")
+                crate::errors::InvalidArgumentError::new(format!(
+                    "no template '{name}' in .jit/templates.toml; declare it or check the name"
+                ))
+                .into()
             }),
             Self::Explicit(template) => Ok((*template).clone()),
         }
@@ -1474,6 +1477,22 @@ mod tests {
     use super::*;
     use crate::commands::template_expand::test_declarations as declared;
     use crate::domain::artifact_directory::ArtifactDirectoryError;
+
+    #[test]
+    fn test_named_template_resolution_returns_typed_invalid_argument_for_unknown_name() {
+        let config: crate::config::JitConfig =
+            toml::from_str("").expect("empty config uses empty registries");
+        let error = TemplateRequest::Named("missing")
+            .resolve(&config)
+            .expect_err("an undeclared template must be rejected");
+
+        assert!(
+            error
+                .downcast_ref::<crate::errors::InvalidArgumentError>()
+                .is_some(),
+            "unknown template must retain a typed classifier, got: {error:?}"
+        );
+    }
 
     /// The declarations the shared fixtures resolve their document areas
     /// against.
