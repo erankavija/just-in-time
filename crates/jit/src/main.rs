@@ -7063,12 +7063,19 @@ fn run() -> Result<()> {
                 // report (including graph-rule findings) has already been printed
                 // above, so finding #1 is fixed regardless of how we exit.
                 //
-                // A repository-integrity error is propagated as an `Err` so it
-                // keeps its specific exit code (e.g. a broken dependency maps to
-                // `ExitCode::ValidationFailed`) and is surfaced on stderr by the
-                // top-level handler — it is never lost. Otherwise, an
-                // error-severity rule finding (local OR graph) exits non-zero.
+                // A repository-integrity error keeps its specific exit code
+                // (e.g. a broken dependency maps to `ExitCode::ValidationFailed`)
+                // and is surfaced on stderr — it is never lost. In JSON mode the
+                // handler has already rendered the complete validation report, so
+                // terminate here rather than propagating into the general
+                // top-level envelope renderer and appending a second document.
+                // Otherwise, an error-severity rule finding (local OR graph)
+                // exits non-zero.
                 if let Some(err) = integrity_error {
+                    if json {
+                        eprintln!("Error: {}", err);
+                        std::process::exit(error_to_exit_code(&err).code());
+                    }
                     return Err(err);
                 }
                 if rules_failed {

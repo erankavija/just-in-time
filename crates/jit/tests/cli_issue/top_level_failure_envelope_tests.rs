@@ -97,3 +97,51 @@ fn test_command_specific_error_keeps_one_envelope_and_its_details() {
         "handler-owned error stays unchanged"
     );
 }
+
+#[test]
+fn test_handler_owned_validation_report_is_not_followed_by_top_level_envelope() {
+    let repository = setup_repository();
+    let created = Command::new(jit_binary())
+        .current_dir(repository.path())
+        .args(["issue", "create", "--title", "broken graph", "--json"])
+        .output()
+        .expect("create validation fixture");
+    assert!(created.status.success(), "issue create failed: {created:?}");
+    let created_json: serde_json::Value =
+        serde_json::from_slice(&created.stdout).expect("created issue is JSON");
+    let issue_id = created_json["id"].as_str().expect("created issue id");
+    let issue_path = repository
+        .path()
+        .join(".jit/issues")
+        .join(format!("{issue_id}.json"));
+    let mut issue: serde_json::Value =
+        serde_json::from_slice(&fs::read(&issue_path).expect("read created issue record"))
+            .expect("created issue record is JSON");
+    issue["dependencies"] = serde_json::json!(["missing-dependency"]);
+    fs::write(
+        issue_path,
+        serde_json::to_vec_pretty(&issue).expect("serialize broken issue record"),
+    )
+    .expect("write broken issue record");
+
+    let output = Command::new(jit_binary())
+        .current_dir(repository.path())
+        .args(["validate", "--json"])
+        .output()
+        .expect("run handler-owned validation failure fixture");
+
+    assert_eq!(
+        output.status.code(),
+        Some(jit::output::ExitCode::ValidationFailed.code())
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("stdout contains exactly one validation report document");
+    assert_eq!(report["valid"], false);
+    assert!(report["integrity_error"]
+        .as_str()
+        .is_some_and(|message| message.contains("missing-dependency")));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).starts_with("Error: "),
+        "existing human diagnostic remains on stderr"
+    );
+}
