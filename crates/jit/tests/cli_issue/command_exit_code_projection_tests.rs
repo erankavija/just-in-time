@@ -185,12 +185,12 @@ fn assert_projected_exit_status_in_both_forms<F>(
     );
 }
 
-/// A missing template reaches the shared fallback classifier, covering the
-/// universal generic-error row through the public `apply` command.
+/// A missing template is an invalid invocation, covering the universal
+/// invalid-argument row through the public `apply` command.
 #[test]
-fn test_command_exit_codes_generic_apply_failure_emits_1() {
+fn test_command_exit_codes_unknown_apply_template_emits_2() {
     let temp = setup();
-    assert_projected_exit_status_in_both_forms("*", 1, false, |json| {
+    assert_projected_exit_status_in_both_forms("*", 2, false, |json| {
         let mut command = Command::new(jit_binary());
         command.current_dir(&temp).args([
             "apply",

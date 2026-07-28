@@ -25,8 +25,8 @@ path = "validate"
 argv = ["validate", "--dry-run", "--json"]
 setup = ["init"]
 expected_failure = "The validate arm rejects --dry-run without --fix after dispatch."
-expected_code = "GENERIC_ERROR"
-expected_exit = 1
+expected_code = "INVALID_ARGUMENT"
+expected_exit = 2
 confirmation = "invoked"
 
 [[arms]]
@@ -44,7 +44,7 @@ argv = ["migrate", "lifecycle-timestamps", "--json"]
 setup = ["init", "malformed-events-log"]
 setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line after initialization."
 expected_failure = "Lifecycle timestamp migration rejects the malformed event log."
-expected_code = "GENERIC_ERROR"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 

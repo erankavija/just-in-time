@@ -47,7 +47,7 @@ fn test_serve_failures_emit_registered_error_envelope_with_mapped_exit_status() 
 
         assert_eq!(envelope.as_object().map(|object| object.len()), Some(1));
         assert!(envelope["error"]["message"].is_string());
-        assert_eq!(registered, ErrorCode::GenericError);
+        assert_eq!(registered, ErrorCode::ParseError);
         assert_eq!(output.status.code(), Some(registered.exit_code().code()));
     }
 }

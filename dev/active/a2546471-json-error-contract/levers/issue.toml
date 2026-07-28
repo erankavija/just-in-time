@@ -132,8 +132,8 @@ path = "issue claim-next"
 argv = ["issue", "claim-next", "agent:probe", "--json"]
 setup = ["init", "no-ready-issue"]
 expected_failure = "The claim-next arm finds no ready issue to claim."
-expected_code = "GENERIC_ERROR"
-expected_exit = 1
+expected_code = "ISSUE_NOT_FOUND"
+expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
