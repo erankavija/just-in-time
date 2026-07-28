@@ -8,6 +8,7 @@
   ],
   "description": "The recovery command writes its failure envelope to the diagnostic stream, compactly serialized, under a code outside the registered vocabulary. It moves onto the payload stream so a machine consumer finds the envelope where the rest of the surface puts it.\n\n## Background\n\nOther emission sites print the envelope to the payload stream, in the shared pretty serialization, under an upper-case registered code, exiting on the status that code maps to. This one writes to the diagnostic stream — the stream that carries plain diagnostics everywhere else — serializes compactly, uses a lower-case code no consumer can resolve, and exits on a literal.\n\nA machine consumer reading the payload stream for the envelope therefore finds nothing, and one parsing the diagnostic stream finds a JSON document mixed in with prose. Bringing this site onto the convention is what leaves the payload stream carrying the envelope alone across the surface.\n\n## Success Criteria\n\n- [hard] REQ-01: A failing recovery under the machine-readable flag writes its envelope to the payload stream.\n- [hard] REQ-02: The envelope uses the shared serialization rather than a compact one.\n- [hard] REQ-03: The reported code is a registered member of the error-code vocabulary.\n- [hard] REQ-04: The exit status equals the status the reported code maps to, with no literal on the path.\n- [hard] REQ-05: The diagnostic stream carries no JSON document for this failure.\n",
   "documents": [],
+  "done_at": "2026-07-28T09:32:47.162395262Z",
   "first_ready_at": "2026-07-28T08:05:26.408258377Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-07-28T09:28:09.197835867Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T09:32:12.233191760Z",
       "updated_by": "auto:executor"
     }
   },
@@ -30,7 +36,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Move the recovery command's failure envelope onto the payload stream",
-  "updated_at": "2026-07-28T09:28:09.197835867Z"
+  "updated_at": "2026-07-28T09:32:47.162395262Z"
 }

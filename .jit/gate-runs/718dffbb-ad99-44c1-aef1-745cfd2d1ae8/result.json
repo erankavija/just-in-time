@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "19958cf7890fed9c2db120849561d1769b2d83eb",
+  "completed_at": "2026-07-28T09:32:11.960600911Z",
+  "duration_ms": 162049,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Recovery JSON failure handling satisfies all five hard criteria with focused integration coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7c50ef89-0f6d-4b04-b921-84a81d96ecf1",
+  "message": null,
+  "run_id": "718dffbb-ad99-44c1-aef1-745cfd2d1ae8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T09:29:29.911280761Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: be5c2542, 384638f, 6fc62d4, 19958cf (jit:7c50ef89)\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci, @/gate/code-review, @/gate/jit-validate (.jit/gates.toml); @/inv/semantic-test-assertions, @/inv/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: narrowed per-commit patches, registry reads, and current source/test line ranges; item search stopped after its index-lock attempt\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Recovery JSON failure handling satisfies all five hard criteria with focused integration coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
