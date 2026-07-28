@@ -60,7 +60,8 @@ pub use image::{
     PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
     RepositorySeed, RepositorySeedKind, SeedError, TargetClaim,
 };
-pub(crate) use index::{RepositoryIndex, RepositoryIndexError, SUPPORTED_INDEX_SCHEMA_VERSION};
+pub use index::RepositoryIndexError;
+pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
 pub use initialize::{
     render_repo_config, GitattributesClaim, GitattributesStatus, InitializationError,
     InitializationScaffold,
