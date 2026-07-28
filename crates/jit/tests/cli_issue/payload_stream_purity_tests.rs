@@ -53,7 +53,9 @@ fn test_machine_readable_failures_emit_one_json_document_on_payload_stream() {
 
 #[test]
 fn test_payload_stream_purity_rejects_non_json_byte() {
-    assert!(parse_single_json_document(br#"{\"error\":{}}!"#).is_err());
+    let payload = br#"{"error":{}}!"#;
+    assert!(parse_single_json_document(&payload[..payload.len() - 1]).is_ok());
+    assert!(parse_single_json_document(payload).is_err());
 }
 
 #[test]
