@@ -37,7 +37,7 @@
         {"id":"777d00da-22d5-49e7-a005-f2da47d5f4b6","short_id":"777d00da","title":"Report the server control's failures as the error envelope","classification":"implementation","status":"in_progress"},
         {"id":"7c50ef89-0f6d-4b04-b921-84a81d96ecf1","short_id":"7c50ef89","title":"Move the recovery command's failure envelope onto the payload stream","classification":"implementation","status":"in_progress"},
         {"id":"85dbcd97-6808-483f-be3f-ebb2fd77939f","short_id":"85dbcd97","title":"A generated adopter reference for the error-code vocabulary","classification":"implementation","status":"in_progress"},
-        {"id":"e3a11002-7469-438e-b3d0-1b5f6251a1cf","short_id":"e3a11002","title":"Align the search command's exit status with its reported error code","classification":"implementation","status":"pending"},
+        {"id":"e3a11002-7469-438e-b3d0-1b5f6251a1cf","short_id":"e3a11002","title":"Align the search command's exit status with its reported error code","classification":"implementation","status":"in_progress"},
         {"id":"f6c95115-2eca-4046-9372-9f2ef7cf8bf9","short_id":"f6c95115","title":"Expose the stored-record decode failure as a classifiable typed error","classification":"implementation","status":"in_progress"}
       ]
     },
