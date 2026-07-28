@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d494532d0507a6ca1171599d0fdc022154601c25",
+  "completed_at": "2026-07-28T12:52:08.618213256Z",
+  "duration_ms": 152697,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The dual-form projection bindings, including serve --fg, satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a193a7cc-a00b-4551-bb30-922a8e015b38",
+  "message": null,
+  "run_id": "f003f5f5-ff6d-48e3-a1eb-94a75299f51d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T12:49:35.921058867Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d494532d, 7104dd3f, d9991154, 2909fe32, 7aa1160e, 561bd861 (tag `jit:a193a7cc`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/a193a7cc/requirement/REQ-04 (.jit/issues/a193a7cc-a00b-4551-bb30-922a8e015b38.json); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-28T12:43:21Z); code-review failed (exit 1, superseded prior finding)\nTruncation recovery: partitioned AGENTS.md, the Wave 4 patch, merge patch, and current test/runtime reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The dual-form projection bindings, including serve --fg, satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
