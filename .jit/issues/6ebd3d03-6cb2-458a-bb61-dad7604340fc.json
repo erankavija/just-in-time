@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-28T07:28:40.773727889Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6ebd3d03-6cb2-458a-bb61-dad7604340fc",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Register the emitted error codes that carry no exit classification",
-  "updated_at": "2026-07-28T07:04:46.732084103Z"
+  "updated_at": "2026-07-28T07:28:40.773727889Z"
 }

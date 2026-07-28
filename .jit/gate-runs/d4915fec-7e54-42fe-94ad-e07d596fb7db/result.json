@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "e075bda250f9c9cb617b0f067ccec84362dfc13a",
+  "completed_at": "2026-07-28T07:28:40.766268897Z",
+  "duration_ms": 143,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "6ebd3d03-6cb2-458a-bb61-dad7604340fc",
+  "message": null,
+  "run_id": "d4915fec-7e54-42fe-94ad-e07d596fb7db",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T07:28:40.622604086Z",
+  "status": "failed",
+  "stderr": "mktemp: failed to create directory via template ‘/home/vkaskivuo/.cache/jit-cargo-ci-tmp/tmp.XXXXXXXXXX’: Read-only file system\n",
+  "stdout": "",
+  "tree_dirty": false
+}
