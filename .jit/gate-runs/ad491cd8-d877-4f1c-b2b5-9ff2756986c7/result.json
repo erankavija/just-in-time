@@ -1,0 +1,52 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "9847665c926d8d3b5d2515428b196014347dee2d",
+  "completed_at": "2026-07-28T19:19:25.431561Z",
+  "duration_ms": 140819,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 1985,
+        "origin": "issue-impact",
+        "references": [
+          "REQ-02",
+          "REQ-05",
+          "REQ-07"
+        ],
+        "severity": "high",
+        "summary": "Clap parser failures bypass the structured envelope; the parser exits before the renderer, coverage excludes this path, and the documentation narrows the contract despite REQ-02 and REQ-05 requiring every --json arm failure to be structured."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/a2546471-json-error-contract/plan.md",
+        "id": "F2",
+        "line": 276,
+        "origin": "issue-impact",
+        "references": [
+          "REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "The issue and plan claim 99 machine-readable arms, while the current generated failure-probe census records 100; the quantitative narrative is stale."
+      }
+    ],
+    "summary": "Parser failures for --json command arms remain plain-text and are excluded from both coverage and the documented contract, contrary to the epic's unchanged hard criteria.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+  "message": null,
+  "run_id": "ad491cd8-d877-4f1c-b2b5-9ff2756986c7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T19:17:04.611958136Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9091 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faa28-bed1-7763-a1e1-0decaa6c7e44\n--------\nuser\n--- 9078 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. [high, blocking] REQ-02 and REQ-05 are unmet for parser failures. `jit issue show --json` without IDs emits Clap’s plain-text diagnostic, not an error envelope; `Cli::parse()` exits before the top-level renderer ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:1985)). The probe fixture explicitly rejects pre-dispatch failures ([failure_probe_fixture.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/failure_probe_fixture.rs:96)), while the canonical documentation excludes them ([cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:25)). That narrowed contract contradicts the epic’s unchanged requirement that every `--json` arm’s failures be structured.\n2. [medium, advisory] The quantitative scope claim is stale: the epic and plan state 99 JSON arms, but the current derived census records 100. Refresh the planning/issue measurement or cite the generated census as the authoritative count.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Parser failures for --json command arms remain plain-text and are excluded from both coverage and the documented contract, contrary to the epic's unchanged hard criteria.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Clap parser failures bypass the structured envelope; the parser exits before the renderer, coverage excludes this path, and the documentation narrows the contract despite REQ-02 and REQ-05 requiring every --json arm failure to be structured.\",\"file\":\"crates/jit/src/main.rs\",\"line\":1985,\"references\":[\"REQ-02\",\"REQ-05\",\"REQ-07\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The issue and plan claim 99 machine-readable arms, while the current generated failure-probe census records 100; the quantitative narrative is stale.\",\"file\":\"dev/active/a2546471-json-error-contract/plan.md\",\"line\":276,\"references\":[\"REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
