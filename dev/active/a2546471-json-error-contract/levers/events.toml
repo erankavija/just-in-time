@@ -7,6 +7,7 @@ argv = ["events", "query", "--json"]
 setup = ["init", "malformed-events-log"]
 setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line."
 expected_failure = "Failed to deserialize event log"
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -16,5 +17,6 @@ argv = ["events", "tail", "--json"]
 setup = ["init", "malformed-events-log"]
 setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line."
 expected_failure = "Failed to deserialize event log"
+expected_code = "GENERIC_ERROR"
 expected_exit = 1
 confirmation = "invoked"

@@ -7,6 +7,7 @@ argv = ["config", "show", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` after initialization."
 expected_failure = "Failed to parse config.toml"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -15,6 +16,7 @@ path = "config get"
 argv = ["config", "get", "version.unknown", "--json"]
 setup = ["init"]
 expected_failure = "INVALID_ARGUMENT: unknown config key 'version.unknown': no 'unknown' under 'version'"
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -23,6 +25,7 @@ path = "config set"
 argv = ["config", "set", "validation.strictness", "banana", "--json"]
 setup = ["init"]
 expected_failure = "invalid [validation].strictness in .jit/config.toml: 'banana' (expected strict, loose, or permissive)"
+expected_code = "INVALID_ARGUMENT"
 expected_exit = 2
 confirmation = "invoked"
 
@@ -37,6 +40,7 @@ argv = ["config", "show-hierarchy", "--json"]
 setup = ["init", "malformed-config-toml"]
 setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` after initialization."
 expected_failure = "Failed to parse config.toml"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 

@@ -7,6 +7,7 @@ argv = ["archive", "candidates", "--json"]
 setup = ["init", "malformed-index"]
 setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
 expected_failure = "failed to parse index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -16,6 +17,7 @@ argv = ["archive", "document", "docs/missing.md", "--json"]
 setup = ["init", "malformed-index"]
 setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
 expected_failure = "failed to parse index"
+expected_code = "PARSE_ERROR"
 expected_exit = 1
 confirmation = "invoked"
 
@@ -24,5 +26,6 @@ path = "archive container"
 argv = ["archive", "container", "deadbeef", "--json"]
 setup = ["init", "no-issue:deadbeef"]
 expected_failure = "Issue not found: deadbeef"
+expected_code = "ISSUE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"

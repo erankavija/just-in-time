@@ -163,15 +163,14 @@ fn test_invalid_state_error_json() {
         .unwrap();
 
     assert!(!output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    // Should get error message (might be in stderr for clap validation errors)
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("the payload stream must carry the JSON error envelope");
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
     assert!(
-        stdout.contains("INVALID") || stderr.contains("invalid") || stderr.contains("state"),
-        "Expected error about invalid state, got stdout: {}, stderr: {}",
-        stdout,
-        stderr
+        json["error"]["message"]
+            .as_str()
+            .is_some_and(|message| !message.trim().is_empty()),
+        "the JSON error envelope must carry a non-empty message: {json}"
     );
 }
 
@@ -199,9 +198,14 @@ fn test_gate_operation_error_json() {
         .output()
         .unwrap();
 
-    // This should fail or at least handle gracefully
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let _json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-
-    // Verify JSON structure - envelope removed, just check valid JSON
+    assert!(!output.status.success());
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("the payload stream must carry the JSON error envelope");
+    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    assert!(
+        json["error"]["message"]
+            .as_str()
+            .is_some_and(|message| !message.trim().is_empty()),
+        "the JSON error envelope must carry a non-empty message: {json}"
+    );
 }

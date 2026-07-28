@@ -2,6 +2,7 @@
 
 use super::failure_lever_registry::{failure_lever_registry, FailureLever};
 use clap::Parser;
+use jit::output::ErrorCode;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -17,6 +18,7 @@ pub(crate) struct ForcedFailure {
     pub(crate) path: String,
     pub(crate) argv: Vec<String>,
     pub(crate) expected_failure: String,
+    pub(crate) expected_code: ErrorCode,
     pub(crate) expected_exit: i32,
     pub(crate) stdout: Vec<u8>,
     pub(crate) stderr: Vec<u8>,
@@ -82,6 +84,7 @@ pub(crate) fn drive_recorded_failure(
         path: invocation.path.clone(),
         argv: invocation.argv.clone(),
         expected_failure: invocation.expected_failure.clone(),
+        expected_code: invocation.expected_code,
         expected_exit: invocation.expected_exit,
         stdout: output.stdout,
         stderr: output.stderr,
@@ -541,6 +544,7 @@ fn test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class() {
         assert_eq!(result.path, invocation.path);
         assert_eq!(result.argv, invocation.argv);
         assert_eq!(result.expected_failure, invocation.expected_failure);
+        assert_eq!(result.expected_code, invocation.expected_code);
         assert_eq!(result.expected_exit, invocation.expected_exit);
         assert!(
             !result.status.success(),
