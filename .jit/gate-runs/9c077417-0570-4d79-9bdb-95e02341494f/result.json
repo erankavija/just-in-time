@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "da6df7ca5c9af27d4a165804afe53dd38d396ce0",
+  "completed_at": "2026-07-28T18:05:18.601801485Z",
+  "duration_ms": 179020,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found in the integrated per-arm machine-readable failure conformance coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7491da4a-f008-4188-9b1b-251fbe56ec77",
+  "message": null,
+  "run_id": "9c077417-0570-4d79-9bdb-95e02341494f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T18:02:19.581449324Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `32dc2e6204f24f1d7abad617308b63e74aefa2b9` (`jit:7491da4a`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/7491da4a/requirement/REQ-01`–`REQ-08` (issue Markdown); `@/invariant/semantic-test-assertions`, `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/gate/jit-validate` (`.jit/gates.toml`)\nGate evidence: `cargo-ci` passed (exit 0, 2026-07-28T17:54:41.239499824+00:00)\nTruncation recovery: repeated broad discovery as bounded reads of the registry, fixture, guard, canonical suite, payload-purity suite, tagged patch, and generated census\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the integrated per-arm machine-readable failure conformance coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
