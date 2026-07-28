@@ -17,6 +17,7 @@
   ],
   "description": "Every command arm that accepts the machine-readable output flag reports failures reached after successful argument parsing and command dispatch in the structured error envelope, so a machine consumer never has to parse a plain-text command diagnostic.\n\n## Background\n\nPost-dispatch failures previously reached several inconsistent renderers: some arms emitted classified envelopes, some propagated plain text to the top-level printer, and some used an envelope code whose process status diverged from the human form. The command definitions and generated conformance census are the authority for the live arm set. The reviewed plan at `dev/active/a2546471-json-error-contract/plan.md` is authoritative for scope and design.\n\n## Success Criteria\n\n- [hard] REQ-01: A census derived from the command definitions, rather than from sampling, records for every arm accepting the machine-readable output flag whether its post-dispatch failure path renders the structured envelope.\n- [hard] REQ-02: Every arm accepting the flag renders failures reached after successful argument parsing and command dispatch as the structured error envelope carrying a classified error code, with no such failure reaching the top-level plain-text printer.\n- [hard] REQ-03: A post-dispatch failing invocation under the flag emits no plain-text diagnostic on the stream that carries the envelope.\n- [hard] REQ-04: A converted arm's process exit code equals the code its envelope reports, and post-dispatch failures of the same class exit identically across arms.\n- [hard] REQ-05: Regression coverage drives a post-dispatch failing invocation of every converted arm and asserts envelope structure and error classification rather than a copied message string.\n- [hard] REQ-06: A repository check fails when an arm accepting the flag can reach the top-level plain-text printer on a post-dispatch failure, so a newly added arm cannot ship without the envelope.\n- [hard] REQ-07: Adopter documentation states the post-dispatch machine-readable failure contract — envelope shape, error code, exit code — once, in a single canonical home.\n\n## Non-goals\n\n- Changing Clap argument-parser diagnostics, help output, or version exits before command dispatch.\n- Changing the human-readable failure output of a dispatched command.\n- Restructuring the success-side envelope or its collection wrapper.\n- Renaming or removing any error code a command already emits.\n- Adding the flag to command arms that do not accept it today.\n\n## Notes\n\n- Scope is the whole post-dispatch command surface rather than one command namespace.\n- REQ-04 requires the exit code to follow the reported code; existing code names remain stable.\n- REQ-07 is subject to `@/charter/D-13`: one canonical home per adopter-facing fact.\n- REQ-06 makes the definition-derived guard, not a hand-maintained count, authoritative for future arms.\n",
   "documents": [],
+  "done_at": "2026-07-28T22:31:15.544274657Z",
   "first_ready_at": "2026-07-26T05:16:36.327304273Z",
   "gates_required": [
     "repo-validate",
@@ -24,13 +25,13 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "status": "failed",
-      "updated_at": "2026-07-28T22:03:12.360447011Z",
+      "status": "passed",
+      "updated_at": "2026-07-28T22:29:32.354701602Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-07-28T21:59:23.093108886Z",
+      "updated_at": "2026-07-28T22:26:55.826901418Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,7 +43,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-28T22:25:12.007844219Z"
+  "updated_at": "2026-07-28T22:31:15.544274657Z"
 }

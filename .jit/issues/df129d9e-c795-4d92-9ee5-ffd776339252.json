@@ -21,7 +21,7 @@
     "component:cli"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-07-27T20:07:49.793608484Z"
+  "updated_at": "2026-07-28T22:31:21.691263259Z"
 }

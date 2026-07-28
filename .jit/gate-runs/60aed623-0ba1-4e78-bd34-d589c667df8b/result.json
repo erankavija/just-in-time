@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "95c38446187145423bbf0b9fc54f46b50c9be16b",
+  "completed_at": "2026-07-28T22:29:32.076710514Z",
+  "duration_ms": 155404,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are verifiably met by the current implementation, runtime conformance census, tests, and canonical documentation.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+  "message": null,
+  "run_id": "60aed623-0ba1-4e78-bd34-d589c667df8b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T22:26:56.672610209Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met by the current implementation, runtime conformance census, tests, and canonical documentation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
