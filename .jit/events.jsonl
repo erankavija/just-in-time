@@ -11089,3 +11089,8 @@
 {"fields":["description"],"id":"03bad726-cd34-4fd2-8628-02ea19707daf","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:22:07.877597958Z","type":"issue_updated","updated_by":"issue-update"}
 {"gate_key":"repo-validate","id":"7d911e99-35c1-4076-a5eb-87e516444a0b","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:25:02.095059110Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"f04db7f0-d526-4c8d-99e6-a0bed2d67ecb","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:27:11.048404538Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"5e735537-69a9-47ad-857a-0bc8d2f95a16","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","priority":"high","timestamp":"2026-07-28T19:42:36.689719883Z","title":"Envelope invalid configuration validation results","type":"issue_created"}
+{"from":"ready","id":"18b2d042-458b-41c4-bf3a-09204a6dda7f","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:42:59.027751282Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"63665535-df31-4ddc-beb4-f6813d014d52","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:42:59.027751282Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"bead7605-a25f-4c0c-8956-109652ef955a","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T19:43:03.581513691Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:epic-config-validate-rework","id":"da129e41-7980-40b7-a747-08d3689ef1be","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T19:43:03.581513691Z","type":"issue_claimed"}
