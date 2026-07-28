@@ -80,7 +80,15 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "category": "blocker-outside-epic-scope",
+      "issue_id": "6ebd3d03-6cb2-458a-bb61-dad7604340fc",
+      "status": "awaiting-invoker",
+      "summary": "Configured code-review gate requires explicit authorization to send repository code and issue context to its external model service; approval layer rejected the first attempt before execution.",
+      "recorded_at": "2026-07-28T10:46:02+03:00"
+    }
+  ],
   "rework_counts": {
     "24929ba4": 1,
     "2b4b5ddb": 1,
