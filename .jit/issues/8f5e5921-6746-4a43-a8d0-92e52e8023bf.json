@@ -20,10 +20,11 @@
     "story:parser-envelope",
     "satisfies:REQ-02",
     "satisfies:REQ-07",
-    "type:task"
+    "type:task",
+    "resolution:authoritative-plan-excludes-parser-failures"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "rejected",
   "title": "Envelope machine-readable parser failures",
-  "updated_at": "2026-07-28T18:47:03.338145245Z"
+  "updated_at": "2026-07-28T19:06:48.104176196Z"
 }

@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:epic-doc-scope",
+  "claimed_at": "2026-07-28T19:07:39.539025491Z",
+  "context": {},
+  "created_at": "2026-07-28T19:07:22.272333933Z",
+  "dependencies": [],
+  "description": "The adopter-facing machine-readable failure contract states the post-dispatch scope selected by the authoritative plan, so it does not promise an envelope for Clap argument-parser diagnostics that occur before any command arm runs.\n\n## Background\n\nThe reviewed plan defines command-arm failures as failures reachable after successful argument parsing and dispatch. It deliberately leaves malformed invocation handling, help, and version exits under Clap ownership. The canonical CLI reference currently says every failing `--json` invocation emits an envelope, which is broader than that plan and caused the epic review to evaluate an excluded pre-dispatch path as delivered behaviour. The prose must state the planned boundary without weakening any post-dispatch guarantee or copying generated code and exit tables.\n\n## Success Criteria\n\n- [hard] REQ-01: The canonical machine-readable contract limits its envelope guarantee to failures reached after successful argument parsing and command dispatch.\n- [hard] REQ-02: The contract states concisely that Clap parser diagnostics before dispatch remain outside the envelope guarantee.\n- [hard] REQ-03: The post-dispatch contract still guarantees exactly one error envelope on the payload stream, a registered error code, and the process status determined by that code.\n- [hard] REQ-04: The section continues to cite the generated error-code and exit-status references rather than reproducing either table.\n- [hard] REQ-05: Contextual adopter references remain consistent with the canonical scoped statement, and mechanical link, citation, and projection checks pass.\n\n## Notes\n\nThis task changes documentation only. Parser behaviour and the authoritative plan decision remain unchanged.",
+  "documents": [],
+  "first_ready_at": "2026-07-28T19:07:22.272333933Z",
+  "gates_required": [
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "d780dfc1-9e01-4036-b637-7f6deb17b423",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:failure-contract-docs",
+    "satisfies:REQ-07",
+    "per:@/charter/D-13",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Scope the canonical failure contract to post-dispatch failures",
+  "updated_at": "2026-07-28T19:07:39.539025491Z"
+}

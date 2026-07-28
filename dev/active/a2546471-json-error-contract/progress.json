@@ -84,7 +84,8 @@
     {
       "wave_number": 9,
       "issues": [
-        {"id":"8f5e5921-6746-4a43-a8d0-92e52e8023bf","short_id":"8f5e5921","title":"Envelope machine-readable parser failures","classification":"implementation","status":"in_progress"}
+        {"id":"8f5e5921-6746-4a43-a8d0-92e52e8023bf","short_id":"8f5e5921","title":"Envelope machine-readable parser failures","classification":"implementation","status":"rejected"},
+        {"id":"d780dfc1-9e01-4036-b637-7f6deb17b423","short_id":"d780dfc1","title":"Scope the canonical failure contract to post-dispatch failures","classification":"documentation","status":"in_progress"}
       ]
     }
   ],
@@ -107,7 +108,12 @@
     {
       "id": "8f5e5921-6746-4a43-a8d0-92e52e8023bf",
       "short_id": "8f5e5921",
-      "reason": "Epic holistic review found that Clap parser failures bypassed the JSON envelope before dispatch, violating hard REQ-02 and making the canonical REQ-07 documentation overbroad; this leaf closes the parser boundary and adds definition-derived coverage."
+      "reason": "Epic holistic review identified Clap parser failures as outside the envelope; the task was rejected before implementation after the invoker reaffirmed authoritative plan decision D-5, which keeps parser failures outside the post-dispatch contract."
+    },
+    {
+      "id": "d780dfc1-9e01-4036-b637-7f6deb17b423",
+      "short_id": "d780dfc1",
+      "reason": "The canonical adopter prose said every failing --json invocation emits an envelope, which exceeded authoritative plan decision D-5; this leaf restores the planned post-dispatch scope without changing parser behavior."
     }
   ],
   "escalations": [
@@ -129,6 +135,15 @@
       "handoff": "handoff-3.md",
       "resolution": "Invoker selected option 1 and authorized one additional narrow rework cycle for the stale config-get assertion.",
       "resolved_at": "2026-07-28T14:22:07+03:00"
+    },
+    {
+      "category": "scope-authority-clarification",
+      "issue_id": "a2546471-37d0-4822-8a6c-9090f3d71491",
+      "status": "resolved",
+      "summary": "Holistic review treated pre-dispatch Clap parser failures as part of the envelope contract despite explicit plan decision D-5 excluding them; an implementation task was created but stopped before edits.",
+      "recorded_at": "2026-07-28T22:06:00+03:00",
+      "resolution": "The invoker reaffirmed that the reviewed plan is authoritative. Parser behavior remains unchanged; the overbroad canonical adopter sentence is narrowed to the planned post-dispatch contract.",
+      "resolved_at": "2026-07-28T22:07:00+03:00"
     }
   ],
   "rework_counts": {

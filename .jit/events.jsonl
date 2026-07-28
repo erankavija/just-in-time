@@ -11074,3 +11074,8 @@
 {"fields":["dependencies"],"id":"d4e37e96-c2e6-4c57-997d-3ca4f738bf8d","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T18:46:58.573074266Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"8d3e9670-a93c-4c60-b300-ced6577a49af","issue_id":"8f5e5921-6746-4a43-a8d0-92e52e8023bf","timestamp":"2026-07-28T18:47:03.338145245Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:epic-parser-rework","id":"ab0808d4-1080-469d-8129-ea6c148960b3","issue_id":"8f5e5921-6746-4a43-a8d0-92e52e8023bf","timestamp":"2026-07-28T18:47:03.338145245Z","type":"issue_claimed"}
+{"from":"in_progress","id":"e51b7e1e-9c8e-4213-9b09-d431e32f2711","issue_id":"8f5e5921-6746-4a43-a8d0-92e52e8023bf","timestamp":"2026-07-28T19:06:43.568345856Z","to":"rejected","type":"issue_state_changed"}
+{"id":"f4198763-75e7-48ed-b59d-26742a79fd9f","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","priority":"high","timestamp":"2026-07-28T19:07:22.272333933Z","title":"Scope the canonical failure contract to post-dispatch failures","type":"issue_created"}
+{"fields":["dependencies"],"id":"ce92a5bb-9a36-48c5-910d-980a66c7145b","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:07:34.923313213Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"a76a0e7d-5ae3-4144-a2f3-ccbc134d3cf0","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:07:39.539025491Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:epic-doc-scope","id":"a38c11d9-dd57-4459-886b-c2bbf3b0988e","issue_id":"d780dfc1-9e01-4036-b637-7f6deb17b423","timestamp":"2026-07-28T19:07:39.539025491Z","type":"issue_claimed"}
