@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T20:08:42.853354166Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-28T20:13:03.365220244Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8",
   "labels": [
     "epic:json-error-contract",
@@ -28,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Envelope invalid configuration validation results",
-  "updated_at": "2026-07-28T19:43:03.581513691Z"
+  "updated_at": "2026-07-28T20:13:03.365220244Z"
 }

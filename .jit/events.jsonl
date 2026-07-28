@@ -11094,3 +11094,5 @@
 {"fields":["dependencies"],"id":"63665535-df31-4ddc-beb4-f6813d014d52","issue_id":"a2546471-37d0-4822-8a6c-9090f3d71491","timestamp":"2026-07-28T19:42:59.027751282Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"bead7605-a25f-4c0c-8956-109652ef955a","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T19:43:03.581513691Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:epic-config-validate-rework","id":"da129e41-7980-40b7-a747-08d3689ef1be","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T19:43:03.581513691Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"533c4848-c581-4ae3-8148-ed55c96163f6","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T20:08:42.853354166Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"fc750706-c3f0-4534-af1b-63a62e362b83","issue_id":"b2295bbb-d57e-4b75-ad8b-6ae3c25afcd8","timestamp":"2026-07-28T20:13:03.365220244Z","type":"gate_failed","updated_by":"auto:executor"}
