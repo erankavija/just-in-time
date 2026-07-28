@@ -1,0 +1,28 @@
+schema = "failure-lever-registry/v1"
+namespace = "archive"
+
+[[arms]]
+path = "archive candidates"
+argv = ["archive", "candidates", "--json"]
+setup = ["init", "malformed-index"]
+setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
+expected_failure = "failed to parse index"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "archive document"
+argv = ["archive", "document", "docs/missing.md", "--json"]
+setup = ["init", "malformed-index"]
+setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
+expected_failure = "failed to parse index"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "archive container"
+argv = ["archive", "container", "deadbeef", "--json"]
+setup = ["init", "no-issue:deadbeef"]
+expected_failure = "Issue not found: deadbeef"
+expected_exit = 3
+confirmation = "invoked"
