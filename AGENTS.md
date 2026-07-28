@@ -6,7 +6,7 @@ This file provides guidance to AI coding agents working in this repository.
 
 Just-In-Time (JIT) is a CLI-first, repository-local issue tracker designed for AI agent workflows. It features dependency DAGs with cycle detection, quality gates, machine-consumable JSON storage in `.jit/`, event logging, and multi-agent coordination with file locking. All data is plain JSON versioned with git—no external database (`@/charter/D-1`).
 
-**This is a greenfield project. Do not plan for backward compatibility. Breaking changes are not a problem.**
+**This is a greenfield project. Do not plan for backward compatibility (`@/inv/canonical-cutover`). Breaking changes are not a problem.**
 
 ## Validation
 
