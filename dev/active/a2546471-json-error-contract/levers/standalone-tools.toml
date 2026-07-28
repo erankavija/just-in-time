@@ -1,0 +1,74 @@
+schema = "failure-lever-registry/v1"
+namespace = "standalone-tools"
+
+[[arms]]
+path = "apply"
+argv = ["apply", "definitely-missing-template", "00000000-0000-0000-0000-000000000000", "--json"]
+setup = ["init", "no-template:definitely-missing-template"]
+expected_failure = "Template lookup reports that `definitely-missing-template` is not declared."
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "list"
+argv = ["list", "--state", "impossible", "--json"]
+setup = ["init"]
+expected_failure = "State parsing rejects `impossible` after the list arm has dispatched."
+expected_exit = 2
+confirmation = "invoked"
+
+[[arms]]
+path = "rdeps"
+argv = ["rdeps", "deadbeef", "--json"]
+setup = ["init", "no-issue:deadbeef"]
+expected_failure = "Reverse-dependency lookup reports that issue `deadbeef` is not found."
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "hooks install"
+argv = ["hooks", "install", "--json"]
+setup = ["init", "git:absent"]
+expected_failure = "HOOKS_INSTALL_ERROR: the hooks directory cannot be created without a Git repository."
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "search"
+argv = ["search", "[", "--regex", "--json"]
+setup = ["init", "regex:unclosed-character-class"]
+expected_failure = "SEARCH_FAILED: ripgrep rejects the unclosed character class."
+expected_exit = 10
+confirmation = "invoked"
+
+[[arms]]
+path = "serve"
+argv = ["serve", "--json"]
+setup = ["init", "malformed-server-pid-file"]
+setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
+expected_failure = "Server start reports that the PID file is malformed."
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "serve"
+argv = ["serve", "--stop", "--json"]
+setup = ["init", "malformed-server-pid-file"]
+setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
+expected_failure = "Server stop reports that the PID file is malformed."
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "serve"
+argv = ["serve", "--status", "--json"]
+setup = ["init", "malformed-server-pid-file"]
+setup_notes = "Create .jit/server.pid.json containing only `{` after initialization."
+expected_failure = "Server status reports that the PID file is malformed."
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "version"
+exemption_reason = "The pre-dispatch version path only serializes static build information; source inspection finds no repository input or fallible command-body operation that can produce a post-dispatch failure."
+confirmation = "source-only"
