@@ -464,8 +464,6 @@ impl<T: Serialize> JsonOutput<T> {
 #[derive(Debug, Serialize)]
 pub struct JsonError {
     pub error: ErrorDetail,
-    #[serde(skip)]
-    exit_code: ExitCode,
 }
 
 #[allow(dead_code)]
@@ -477,38 +475,11 @@ impl JsonError {
     pub fn new(code: ErrorCode, message: impl Into<String>) -> Self {
         Self {
             error: ErrorDetail {
-                code: code.as_str().to_string(),
-                message: message.into(),
-                details: None,
-                suggestions: Vec::new(),
-            },
-            exit_code: code.exit_code(),
-        }
-    }
-
-    /// Create an envelope from a textual code and an explicit fallback status.
-    ///
-    /// Registered text is resolved through [`ErrorCode`] and therefore uses the
-    /// member's declared status. Unknown text preserves the caller-supplied
-    /// historical status rather than silently acquiring a default class. New
-    /// typed call sites should use [`JsonError::new`].
-    pub fn legacy_unregistered(
-        code: impl Into<String>,
-        exit_code: ExitCode,
-        message: impl Into<String>,
-    ) -> Self {
-        let code = code.into();
-        let exit_code = code
-            .parse::<ErrorCode>()
-            .map_or(exit_code, ErrorCode::exit_code);
-        Self {
-            error: ErrorDetail {
                 code,
                 message: message.into(),
                 details: None,
                 suggestions: Vec::new(),
             },
-            exit_code,
         }
     }
 
@@ -547,9 +518,9 @@ impl JsonError {
         serde_json::to_string_pretty(self)
     }
 
-    /// Return the explicitly selected process exit status.
+    /// Return the process exit status selected by the envelope's error code.
     pub const fn exit_code(&self) -> ExitCode {
-        self.exit_code
+        self.error.code.exit_code()
     }
 }
 
@@ -557,8 +528,8 @@ impl JsonError {
 #[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct ErrorDetail {
-    /// Error code (e.g., "ISSUE_NOT_FOUND", "CYCLE_DETECTED")
-    pub code: String,
+    /// Typed error code serialized using its registered wire spelling.
+    pub code: ErrorCode,
     /// Human-readable error message
     pub message: String,
     /// Optional additional error details
@@ -3218,13 +3189,9 @@ mod tests {
 
     #[test]
     fn test_json_error_basic() {
-        let error = JsonError::legacy_unregistered(
-            "TEST_ERROR",
-            ExitCode::GenericError,
-            "This is a test error",
-        );
+        let error = JsonError::new(ErrorCode::GenericError, "This is a test error");
 
-        assert_eq!(error.error.code, "TEST_ERROR");
+        assert_eq!(error.error.code, ErrorCode::GenericError);
         assert_eq!(error.error.message, "This is a test error");
         assert!(error.error.details.is_none());
         assert!(error.error.suggestions.is_empty());
@@ -3232,22 +3199,17 @@ mod tests {
 
     #[test]
     fn test_json_error_with_details() {
-        let error = JsonError::legacy_unregistered(
-            "NOT_FOUND",
-            ExitCode::GenericError,
-            "Resource not found",
-        )
-        .with_details(json!({"requested_id": "abc123"}));
+        let error = JsonError::new(ErrorCode::IssueNotFound, "Resource not found")
+            .with_details(json!({"requested_id": "abc123"}));
 
         assert_eq!(error.error.details, Some(json!({"requested_id": "abc123"})));
     }
 
     #[test]
     fn test_json_error_with_suggestions() {
-        let error =
-            JsonError::legacy_unregistered("NOT_FOUND", ExitCode::GenericError, "Issue not found")
-                .with_suggestion("Run 'jit issue list' to see available issues")
-                .with_suggestion("Check if the issue ID is correct");
+        let error = JsonError::new(ErrorCode::IssueNotFound, "Issue not found")
+            .with_suggestion("Run 'jit issue list' to see available issues")
+            .with_suggestion("Check if the issue ID is correct");
 
         assert_eq!(error.error.suggestions.len(), 2);
         assert!(error.error.suggestions[0].contains("jit issue list"));
@@ -3255,14 +3217,13 @@ mod tests {
 
     #[test]
     fn test_json_error_serialization() {
-        let error =
-            JsonError::legacy_unregistered("TEST_ERROR", ExitCode::ValidationFailed, "Test")
-                .with_details(json!({"key": "value"}))
-                .with_suggestion("Try something");
+        let error = JsonError::new(ErrorCode::ValidationFailed, "Test")
+            .with_details(json!({"key": "value"}))
+            .with_suggestion("Try something");
 
         let json_str = error.to_json_string().unwrap();
         // Should have error object without envelope
-        assert!(json_str.contains("\"code\": \"TEST_ERROR\""));
+        assert!(json_str.contains("\"code\": \"VALIDATION_FAILED\""));
         assert!(json_str.contains("\"message\": \"Test\""));
         assert!(json_str.contains("\"details\""));
         assert!(json_str.contains("\"suggestions\""));
@@ -3278,18 +3239,6 @@ mod tests {
         let unresolved = JsonError::from_code_text("UNREGISTERED_ERROR", "unregistered failure")
             .expect_err("an unregistered code must remain unresolved");
         assert_eq!(unresolved.as_str(), "UNREGISTERED_ERROR");
-    }
-
-    #[test]
-    fn test_json_error_legacy_constructor_preserves_wire_code_and_explicit_status() {
-        let error = JsonError::legacy_unregistered(
-            "LEGACY_UNREGISTERED",
-            ExitCode::ExternalError,
-            "legacy failure",
-        );
-
-        assert_eq!(error.error.code, "LEGACY_UNREGISTERED");
-        assert_eq!(error.exit_code(), ExitCode::ExternalError);
     }
 
     #[test]
@@ -3565,7 +3514,7 @@ mod tests {
             assert_eq!(code.as_str().parse::<ErrorCode>(), Ok(code));
             let error = JsonError::from_code_text(code.as_str(), "failure")
                 .expect("every registered text code should construct an envelope");
-            assert_eq!(error.error.code, code.as_str());
+            assert_eq!(error.error.code, code);
             assert_eq!(error.exit_code(), code.exit_code());
         }
 
@@ -3673,11 +3622,25 @@ mod tests {
                 .unwrap_or_else(|_| panic!("emitted code {text} must be registered"));
             assert_eq!(code.as_str(), text);
 
-            let error =
-                JsonError::legacy_unregistered(text, ExitCode::Success, "classification probe");
-            assert_eq!(error.error.code, text);
+            let error = JsonError::new(code, "classification probe");
+            assert_eq!(error.error.code, code);
             assert_eq!(error.exit_code(), code.exit_code());
         }
+    }
+
+    /// The process status is a semantic projection of the typed classification.
+    ///
+    /// Assigning an [`ErrorCode`] directly to the envelope makes a textual code
+    /// representation fail at compile time. Changing between classifications
+    /// with different exit classes then proves that no constructor-selected
+    /// status can override the current typed code.
+    #[test]
+    fn test_json_error_exit_status_follows_the_current_typed_code() {
+        let mut envelope = JsonError::new(ErrorCode::GenericError, "failure");
+        assert_eq!(envelope.exit_code(), ExitCode::GenericError);
+
+        envelope.error.code = ErrorCode::ValidationFailed;
+        assert_eq!(envelope.exit_code(), ExitCode::ValidationFailed);
     }
 
     #[test]
