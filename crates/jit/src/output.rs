@@ -3628,19 +3628,117 @@ mod tests {
         }
     }
 
+    /// Pin the envelope's type shape at compile time. Exact destructuring makes
+    /// this test stop compiling if either object gains an independent status
+    /// field, while the explicit type annotation rejects a raw textual code.
     #[test]
-    fn test_production_json_error_construction_has_no_raw_code_status_escape_hatch() {
-        let main_source = include_str!("main.rs");
-        let output_source = include_str!("output.rs")
-            .split_once("#[cfg(test)]\nmod tests")
-            .expect("output tests module marker should remain present")
-            .0;
+    fn test_json_error_shape_has_one_typed_code_and_no_independent_status() {
+        let constructor: fn(ErrorCode, String) -> JsonError = JsonError::new;
+        let envelope = constructor(ErrorCode::GenericError, "failure".to_string());
+        let JsonError { error } = envelope;
+        let ErrorDetail {
+            code,
+            message,
+            details,
+            suggestions,
+        } = error;
+        let typed_code: ErrorCode = code;
 
-        for (path, source) in [("main.rs", main_source), ("output.rs", output_source)] {
-            assert!(
-                !source.contains("legacy_unregistered"),
-                "{path} must construct production envelopes through ErrorCode"
-            );
+        assert_eq!(typed_code, ErrorCode::GenericError);
+        assert_eq!(message, "failure");
+        assert!(details.is_none());
+        assert!(suggestions.is_empty());
+    }
+
+    fn collect_workspace_production_rust_sources(
+        directory: &std::path::Path,
+        sources: &mut Vec<(std::path::PathBuf, String)>,
+    ) {
+        let entries = std::fs::read_dir(directory)
+            .unwrap_or_else(|error| panic!("should read {}: {error}", directory.display()));
+        for entry in entries {
+            let path = entry
+                .expect("source directory entry should be readable")
+                .path();
+            if path.is_dir() {
+                collect_workspace_production_rust_sources(&path, sources);
+            } else if path.extension().and_then(std::ffi::OsStr::to_str) == Some("rs") {
+                let source = std::fs::read_to_string(&path)
+                    .unwrap_or_else(|error| panic!("should read {}: {error}", path.display()));
+                sources.push((path, source));
+            }
+        }
+    }
+
+    /// Keep every workspace production construction path behind the one typed
+    /// constructor in this module. Together with the compile-time shape test,
+    /// this prevents a differently named helper or another production module
+    /// from restoring raw-code construction or storing a caller-selected
+    /// status. This scans every Rust source under every workspace crate rather
+    /// than naming the modules or compatibility function that happened to exist
+    /// at the time of the cutover.
+    #[test]
+    fn test_workspace_json_error_construction_has_one_typed_boundary() {
+        let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .expect("workspace root should resolve");
+        let mut sources = Vec::new();
+        let crate_entries = std::fs::read_dir(workspace_root.join("crates"))
+            .expect("workspace crates directory should be readable");
+        for crate_entry in crate_entries {
+            let source_directory = crate_entry
+                .expect("workspace crate entry should be readable")
+                .path()
+                .join("src");
+            if source_directory.is_dir() {
+                collect_workspace_production_rust_sources(&source_directory, &mut sources);
+            }
+        }
+        assert!(
+            sources.len() > 1,
+            "construction guard must inspect the workspace, not one source file"
+        );
+
+        let output_path = workspace_root.join("crates/jit/src/output.rs");
+        let direct_detail =
+            regex::Regex::new(r"\bErrorDetail\s*\{").expect("direct-detail regex should compile");
+        let inherent_impl = regex::Regex::new(r"\bimpl(?:\s|<[^>{}]*>)+JsonError\s*\{")
+            .expect("inherent-impl regex should compile");
+
+        for (path, source) in &sources {
+            let production_source = if path == &output_path {
+                source
+                    .split_once("#[cfg(test)]\nmod tests")
+                    .expect("output tests module marker should remain present")
+                    .0
+            } else {
+                source
+            };
+
+            let detail_literals = direct_detail.find_iter(production_source).count();
+            let json_error_impls = inherent_impl.find_iter(production_source).count();
+            if path == &output_path {
+                assert_eq!(
+                    detail_literals,
+                    2,
+                    "ErrorDetail must have one definition and one typed construction site: {}",
+                    path.display()
+                );
+                assert_eq!(
+                    json_error_impls,
+                    2,
+                    "all JsonError constructors must remain in the audited output module: {}",
+                    path.display()
+                );
+            } else {
+                assert_eq!(
+                    (detail_literals, json_error_impls),
+                    (0, 0),
+                    "{} introduces a JsonError construction boundary outside output.rs",
+                    path.display()
+                );
+            }
         }
     }
 
