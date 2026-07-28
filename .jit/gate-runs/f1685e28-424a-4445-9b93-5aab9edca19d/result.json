@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a49f900de985da727d6bb95e2a4183e34c6d05d2",
+  "completed_at": "2026-07-28T14:46:01.249070815Z",
+  "duration_ms": 210278,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Failing validate JSON paths now use one registered error envelope with preserved details and code-derived exits; success and plain-mode coverage remains intact.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cc2fd90d-c6bb-4c51-b70b-c7eb929a39c1",
+  "message": null,
+  "run_id": "f1685e28-424a-4445-9b93-5aab9edca19d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T14:42:30.970309118Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a3f8f200, 27b09026, 08d0f617, 7ee57397, f195fb95, cef4caca (`jit:cc2fd90d`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4087cd55/requirement/REQ-06 (.jit/issues/4087cd55-0c6e-4e16-8c1f-f468b66e8b37.json); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover (.jit/invariants.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-07-28T14:35:58.446740241+00:00)\nTruncation recovery: per-commit/path and per-parent merge diffs; narrowed current-source and requirement reads\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Failing validate JSON paths now use one registered error envelope with preserved details and code-derived exits; success and plain-mode coverage remains intact.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

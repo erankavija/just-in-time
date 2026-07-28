@@ -36,7 +36,7 @@
     "story:structural-envelope"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Structural envelope emission for every failing machine-readable invocation",
-  "updated_at": "2026-07-28T13:49:26.453049952Z"
+  "updated_at": "2026-07-28T14:46:37.464007156Z"
 }
