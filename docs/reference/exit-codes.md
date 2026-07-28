@@ -51,7 +51,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `doc check-links` | `1` | One or more documents have broken links. | yes |
 | `doc check-links` | `2` | Documents have only risky-link warnings; here 2 means warnings, not a usage error. | yes |
 | `gate preset apply` | `3` | A preset target was not found, so the application failed. |  |
-| `serve, serve --stop, serve --status` | `1` | The daemon start, stop, or status operation failed (exits 0 on success). |  |
+| `serve, serve --stop, serve --status` | `1` | The daemon PID state could not be parsed (exits 0 on success). |  |
 | `*` | `141` | A downstream reader closed the pipe while jit was still writing. | yes |
 | `serve --fg` | `child` | Foreground mode passes through the inline dev-server child's own exit code (1 when the child produced none). | yes |
 
