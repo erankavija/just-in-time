@@ -380,6 +380,81 @@ fn test_command_exit_codes_serve_foreground_is_passthrough() {
     );
 }
 
+/// Copy the real CLI beside a deterministic fake `jit-server` child.
+///
+/// `find_server_binary` prefers a sibling of the current executable, so this
+/// fixture drives the public foreground dispatch without starting a long-lived
+/// server or relying on PATH. The arbitrary child code is deliberately outside
+/// the documented taxonomy: observing it proves pass-through behavior.
+#[cfg(unix)]
+fn jit_with_exiting_server(temp: &TempDir, exit_code: i32) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+
+    let bin_dir = temp.path().join("serve-fg-bin");
+    fs::create_dir(&bin_dir).unwrap();
+
+    let jit_copy = bin_dir.join("jit");
+    fs::copy(jit_binary(), &jit_copy).unwrap();
+    let mut jit_permissions = fs::metadata(&jit_copy).unwrap().permissions();
+    jit_permissions.set_mode(0o755);
+    fs::set_permissions(&jit_copy, jit_permissions).unwrap();
+
+    let server = bin_dir.join("jit-server");
+    fs::write(&server, format!("#!/bin/sh\nexit {exit_code}\n")).unwrap();
+    let mut server_permissions = fs::metadata(&server).unwrap().permissions();
+    server_permissions.set_mode(0o755);
+    fs::set_permissions(&server, server_permissions).unwrap();
+
+    jit_copy
+}
+
+/// Bind the `serve --fg` pass-through row through both public invocation forms.
+#[cfg(unix)]
+#[test]
+fn test_command_exit_codes_serve_foreground_passthrough_is_dual_form() {
+    const CHILD_EXIT: i32 = 42;
+
+    let temp = setup();
+    let jit = jit_with_exiting_server(&temp, CHILD_EXIT);
+    assert_eq!(documented_exit_code("serve --fg", None, true), None);
+
+    let invoke = |json| {
+        let mut command = Command::new(&jit);
+        command
+            .current_dir(&temp)
+            .args(["serve", "--fg", "--port", "0"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    };
+
+    let plain = invoke(false);
+    let json = invoke(true);
+    assert_eq!(
+        plain.status.code(),
+        Some(CHILD_EXIT),
+        "plain stderr: {}",
+        String::from_utf8_lossy(&plain.stderr)
+    );
+    assert_eq!(
+        json.status.code(),
+        Some(CHILD_EXIT),
+        "JSON stderr: {}",
+        String::from_utf8_lossy(&json.stderr)
+    );
+    assert_eq!(
+        plain.status.code(),
+        json.status.code(),
+        "plain and --json serve --fg statuses must agree"
+    );
+
+    let response: serde_json::Value =
+        serde_json::from_slice(&json.stdout).expect("serve --fg --json result");
+    assert_eq!(response["status"], "exited");
+    assert_eq!(response["exit_code"], CHILD_EXIT);
+}
+
 /// `jit validate --branch-drift` exits 1 when the drift check reports drift or
 /// cannot run, matching the projected `validate --branch-drift` row.
 #[test]
