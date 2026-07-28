@@ -22,12 +22,12 @@
   "gates_status": {
     "holistic-review": {
       "status": "failed",
-      "updated_at": "2026-07-28T19:27:11.048404538Z",
+      "updated_at": "2026-07-28T20:28:13.181754032Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-07-28T19:25:02.095059110Z",
+      "updated_at": "2026-07-28T20:28:11.523574424Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-28T20:26:07.881062183Z"
+  "updated_at": "2026-07-28T20:28:13.181754032Z"
 }
