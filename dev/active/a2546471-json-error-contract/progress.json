@@ -71,7 +71,8 @@
       "wave_number": 7,
       "issues": [
         {"id":"7491da4a-f008-4188-9b1b-251fbe56ec77","short_id":"7491da4a","title":"Per-arm failure conformance and the guard that keeps it","classification":"implementation","status":"pending"},
-        {"id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","short_id":"ec029993","title":"One canonical statement of the machine-readable failure contract","classification":"documentation","status":"in_progress"}
+        {"id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","short_id":"ec029993","title":"One canonical statement of the machine-readable failure contract","classification":"documentation","status":"in_progress"},
+        {"id":"4437d897-465e-470d-99af-6c9683927af0","short_id":"4437d897","title":"Publish the per-arm conformance census","classification":"implementation","status":"in_progress"}
       ]
     },
     {
@@ -91,6 +92,11 @@
       "id": "4359178b-87d7-4e8d-b410-a3f0704ecab4",
       "short_id": "4359178b",
       "reason": "Story 7e0c04d0 review found that claim JSON fallbacks hide classifiable underlying I/O causes and can diverge from plain-mode exit status; this leaf restores typed claim parity without weakening the story contract."
+    },
+    {
+      "id": "4437d897-465e-470d-99af-6c9683927af0",
+      "short_id": "4437d897",
+      "reason": "Story 7491da4a lead review found that the per-arm census existed only in failing assertion diagnostics; this leaf publishes the derived passing census as a build artifact to satisfy hard REQ-06."
     }
   ],
   "escalations": [
@@ -115,6 +121,7 @@
     }
   ],
   "rework_counts": {
+    "7491da4a": 1,
     "37e3edf3": 2,
     "4087cd55": 1,
     "4359178b": 1,

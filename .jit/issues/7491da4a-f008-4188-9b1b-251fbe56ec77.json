@@ -4,6 +4,7 @@
   "created_at": "2026-07-27T21:43:44.885062384Z",
   "dependencies": [
     "37e3edf3-57fa-4fc4-9a9b-81ec0e9a804b",
+    "4437d897-465e-470d-99af-6c9683927af0",
     "60aeaa49-0ee3-4c8d-ac61-f5316bae3932",
     "a1322bee-21c1-4f14-af96-ffa8c7204926"
   ],
@@ -14,7 +15,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-28T17:18:01.074018247Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-28T17:22:29.921838440Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7491da4a-f008-4188-9b1b-251fbe56ec77",
   "labels": [
     "type:story",
@@ -24,7 +36,7 @@
     "story:arm-conformance"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Per-arm failure conformance and the guard that keeps it",
-  "updated_at": "2026-07-28T17:05:48.665775036Z"
+  "updated_at": "2026-07-28T17:24:20.349154003Z"
 }

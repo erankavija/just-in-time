@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "9f36de2717c7bf19527d5fc48daed90a5ddcbdfe",
+  "completed_at": "2026-07-28T17:22:29.646970268Z",
+  "duration_ms": 267596,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found in the registry-backed JSON failure conformance coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7491da4a-f008-4188-9b1b-251fbe56ec77",
+  "message": null,
+  "run_id": "abf20a0b-55b1-40e9-a2aa-7f051b7527f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-28T17:18:02.050789139Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback — no reachable commit tagged `jit:7491da4a`\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/7491da4a/requirement/REQ-01`–`REQ-08` (issue Markdown); `@/invariant/semantic-test-assertions`, `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/gate/jit-validate` (`.jit/gates.toml`)\nGate evidence: `cargo-ci` passed (exit 0, 2026-07-28T17:10:11Z)\nTruncation recovery: reread bounded schema and failure-suite ranges; temporary comparison output was blocked by the read-only sandbox and not used\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the registry-backed JSON failure conformance coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

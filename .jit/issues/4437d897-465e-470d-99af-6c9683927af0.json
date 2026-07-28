@@ -1,0 +1,28 @@
+{
+  "assignee": "agent:wave7-census",
+  "claimed_at": "2026-07-28T17:24:22.185876109Z",
+  "context": {},
+  "created_at": "2026-07-28T17:23:50.805514578Z",
+  "dependencies": [],
+  "description": "Make the standard failure-probe coverage test publish its derived per-arm census on successful runs, so the conformance result is inspectable even when no assertion fails.\n\n## Background\n\nThe coverage guard already derives every machine-readable command arm, executes each registered probe, and builds a diagnostic row naming the observed envelope and code or the declared exemption and reason. Today those rows exist only inside a failing assertion message. A passing standard test therefore leaves no report, despite the parent story requiring the check to report the per-arm result. The report remains test-derived and machine-readable; it must not become another committed arm table.\n\n## Success Criteria\n\n- [hard] REQ-01: A passing standard test invocation writes a machine-readable conformance report under the build output directory.\n- [hard] REQ-02: The report contains exactly one row for every reflected machine-readable command arm and no stale row.\n- [hard] REQ-03: A probed row states whether a canonical envelope rendered, the observed registered error code, and the observed exit status.\n- [hard] REQ-04: An exempt row states the exemption and its non-empty recorded reason.\n- [hard] REQ-05: The report is derived from the reflected command definitions and canonical failure registry at test time rather than maintained as a committed arm table.\n- [hard] REQ-06: Focused tests verify the successful report artifact and retain the existing actionable failure diagnostics.",
+  "documents": [],
+  "first_ready_at": "2026-07-28T17:23:50.805514578Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4437d897-465e-470d-99af-6c9683927af0",
+  "labels": [
+    "epic:json-error-contract",
+    "milestone:v1.0",
+    "component:cli",
+    "story:arm-conformance",
+    "satisfies:REQ-06",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Publish the per-arm conformance census",
+  "updated_at": "2026-07-28T17:24:25.478163447Z"
+}

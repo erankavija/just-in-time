@@ -11037,3 +11037,10 @@
 {"from":"backlog","id":"e007aba4-2748-4dbe-a331-af69a36f9fd8","issue_id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","timestamp":"2026-07-28T17:05:53.371082588Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:wave7-docs","id":"57f6056b-5353-48b4-900f-840b27573785","issue_id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","timestamp":"2026-07-28T17:07:41.821034159Z","type":"issue_claimed"}
 {"from":"ready","id":"daacbd40-70e9-4351-91cc-e63321bbbe72","issue_id":"ec029993-2e68-41dd-b2bd-b3018a35d0d5","timestamp":"2026-07-28T17:07:45.054780763Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"f8e08a04-7f33-4e9e-8807-238ca793bd7f","issue_id":"7491da4a-f008-4188-9b1b-251fbe56ec77","timestamp":"2026-07-28T17:18:01.074018247Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"e22bb8e5-0c9a-4635-bd09-9cd08ff187f7","issue_id":"7491da4a-f008-4188-9b1b-251fbe56ec77","timestamp":"2026-07-28T17:22:29.921838440Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"52d7734c-f894-4101-93d3-86b5283b49b2","issue_id":"4437d897-465e-470d-99af-6c9683927af0","priority":"high","timestamp":"2026-07-28T17:23:50.805514578Z","title":"Publish the per-arm conformance census","type":"issue_created"}
+{"from":"ready","id":"5007753a-cd4b-4904-9f4f-3c312a88f433","issue_id":"7491da4a-f008-4188-9b1b-251fbe56ec77","timestamp":"2026-07-28T17:24:20.349154003Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"58dd1419-5297-49fd-b6c6-d250a4d974d2","issue_id":"7491da4a-f008-4188-9b1b-251fbe56ec77","timestamp":"2026-07-28T17:24:20.349154003Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:wave7-census","id":"78f4db8d-8df8-4ef8-9774-7b24ea85e05e","issue_id":"4437d897-465e-470d-99af-6c9683927af0","timestamp":"2026-07-28T17:24:22.185876109Z","type":"issue_claimed"}
+{"from":"ready","id":"a6d032ac-4a6f-46f0-9e1d-a9552f8d1fe9","issue_id":"4437d897-465e-470d-99af-6c9683927af0","timestamp":"2026-07-28T17:24:25.478163447Z","to":"in_progress","type":"issue_state_changed"}
