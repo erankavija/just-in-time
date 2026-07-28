@@ -1,17 +1,10 @@
 //! REQ-02: bind every `command_exit_codes` row to the runtime behavior it
 //! documents, so no mapping in the generated reference is hand-authored.
 //!
-//! Each row is bound one of two ways:
-//!
-//! - **Subprocess** (this file): run the real command into the documented
-//!   condition and assert the process exit code. This covers the rows emitted by
-//!   direct `std::process::exit` sites (findings signals) and the command families
-//!   whose condition is reachable end-to-end.
-//! - **Classifier** (`main.rs`, `exit_code_projection_tests`): run the typed error
-//!   the condition raises through `error_to_exit_code` — the exact classifier CLI
-//!   dispatch uses — and assert it lands on that row. This covers conditions that
-//!   are impractical to provoke through the binary (a mid-batch write failure) and
-//!   the gate-evaluation verdict rows.
+//! Each projected fixed-code row is bound here by a real subprocess in both
+//! public invocation forms. The classifier tests in `main.rs` remain useful
+//! unit coverage, but cannot substitute for a command-level binding because
+//! they do not exercise parsing, dispatch, or `--json` output selection.
 //!
 //! One row has no fixed projected code: `serve --fg` is a pass-through. Its
 //! public plain and JSON forms are exercised with a deterministic child exit,
@@ -54,6 +47,86 @@ fn create_issue(temp: &TempDir, title: &str, extra: &[&str]) -> String {
     assert!(output.status.success());
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     json["id"].as_str().unwrap().to_string()
+}
+
+fn setup_auto_gate_issue(temp: &TempDir, checker_command: &str) -> String {
+    let definition = Command::new(jit_binary())
+        .current_dir(temp)
+        .args([
+            "gate",
+            "define",
+            "projection-gate",
+            "--title",
+            "Projection gate",
+            "--description",
+            "Projection gate",
+            "--mode",
+            "auto",
+            "--checker-command",
+            checker_command,
+            "--timeout",
+            "10",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        definition.status.success(),
+        "gate definition failed: {}",
+        String::from_utf8_lossy(&definition.stderr)
+    );
+    create_issue(temp, "Gated projection", &["--gate", "projection-gate"])
+}
+
+const CYCLIC_APPLY_CONFIG: &str = r#"
+[type_hierarchy]
+types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
+"#;
+
+const CYCLIC_APPLY_TEMPLATE: &str = r#"
+[[template]]
+name        = "cyclic"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.anchors]]
+  name = "upstream"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  description = "Plan {container.title}."
+  [[template.nodes]]
+  role        = "breakdown"
+  type        = "breakdown"
+  description = "Break down {container.title}."
+  depends_on  = ["planning"]
+  [[template.anchor_edges]]
+  from = "upstream"
+  to   = "breakdown"
+  [[template.transforms]]
+  kind = "move-upstream-to-role"
+  role = "planning"
+"#;
+
+fn setup_prospective_cycle(temp: &TempDir) -> (String, String) {
+    fs::write(temp.path().join(".jit/config.toml"), CYCLIC_APPLY_CONFIG).unwrap();
+    fs::write(
+        temp.path().join(".jit/templates.toml"),
+        CYCLIC_APPLY_TEMPLATE,
+    )
+    .unwrap();
+    let upstream = create_issue(temp, "Upstream", &["--type", "task"]);
+    let container = create_issue(temp, "Container", &["--type", "epic"]);
+    let edge = Command::new(jit_binary())
+        .current_dir(temp)
+        .args(["dep", "add", &container, &upstream])
+        .output()
+        .unwrap();
+    assert!(
+        edge.status.success(),
+        "cycle fixture edge setup failed: {}",
+        String::from_utf8_lossy(&edge.stderr)
+    );
+    (container, upstream)
 }
 
 /// Return the projection's exit status for `command` and assert its documented
@@ -110,6 +183,186 @@ fn assert_projected_exit_status_in_both_forms<F>(
         plain_status, json_status,
         "plain and machine-readable `{command}` statuses must agree"
     );
+}
+
+/// A missing template reaches the shared fallback classifier, covering the
+/// universal generic-error row through the public `apply` command.
+#[test]
+fn test_command_exit_codes_generic_apply_failure_emits_1() {
+    let temp = setup();
+    assert_projected_exit_status_in_both_forms("*", 1, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args([
+            "apply",
+            "definitely-missing-template",
+            "0000000000000000",
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
+}
+
+/// An unreadable index exercises the universal filesystem-permission row through
+/// the top-level query path (rather than a handler-owned mutation response).
+#[test]
+#[cfg(unix)]
+fn test_command_exit_codes_permission_denied_emits_5() {
+    use std::os::unix::fs::PermissionsExt;
+
+    assert_projected_exit_status_in_both_forms("*", 5, false, |json| {
+        let temp = setup();
+        let index = temp.path().join(".jit/index.json");
+        let mut denied = fs::metadata(&index).unwrap().permissions();
+        denied.set_mode(0o000);
+        fs::set_permissions(&index, denied).unwrap();
+
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["query", "all"]);
+        if json {
+            command.arg("--json");
+        }
+        let output = command.output().unwrap();
+
+        let mut restored = fs::metadata(&index).unwrap().permissions();
+        restored.set_mode(0o755);
+        fs::set_permissions(&index, restored).unwrap();
+        output
+    });
+}
+
+/// A repository index newer than the binary's supported format reaches the
+/// universal external-error row before command dispatch.
+#[test]
+fn test_command_exit_codes_too_new_format_emits_10() {
+    assert_projected_exit_status_in_both_forms("*", 10, false, |json| {
+        let temp = setup();
+        let index_path = temp.path().join(".jit/index.json");
+        let mut index: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&index_path).unwrap()).unwrap();
+        index["schema_version"] = serde_json::json!(9999);
+        fs::write(index_path, serde_json::to_string_pretty(&index).unwrap()).unwrap();
+
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args(["query", "all"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
+}
+
+/// An enforcing validation rule rejects an issue create before publication,
+/// exercising the shared write-validation row through a real writer.
+#[test]
+fn test_command_exit_codes_enforcing_write_rule_emits_4() {
+    assert_projected_exit_status_in_both_forms(
+        "any command that writes an issue",
+        4,
+        false,
+        |json| {
+            let temp = setup();
+            let rules_path = temp.path().join(".jit/rules.toml");
+            let mut rules = fs::read_to_string(&rules_path).unwrap();
+            rules.push_str(
+                "\n[[rules]]\nname = \"epic-needs-req\"\nwhen = { type = \"epic\" }\n\
+                 severity = \"error\"\nenforce = true\n\
+                 assert = { require-label = { label = \"req:*\", min = 1 } }\n",
+            );
+            fs::write(rules_path, rules).unwrap();
+
+            let mut command = Command::new(jit_binary());
+            command.current_dir(&temp).args([
+                "issue",
+                "create",
+                "--title",
+                "Unqualified epic",
+                "--type",
+                "epic",
+            ]);
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        },
+    );
+}
+
+/// A checker that ran and failed is the gate-evaluation verdict-failure row.
+#[test]
+fn test_command_exit_codes_gate_evaluate_failure_emits_4() {
+    let temp = setup();
+    let id = setup_auto_gate_issue(&temp, "false");
+    assert_projected_exit_status_in_both_forms(
+        "gate evaluate, gate evaluate-all",
+        4,
+        true,
+        |json| {
+            let mut command = Command::new(jit_binary());
+            command.current_dir(&temp).args([
+                "gate",
+                "evaluate",
+                &id,
+                "projection-gate",
+                "--force",
+            ]);
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        },
+    );
+}
+
+/// A checker that cannot run to a verdict is the gate-evaluation runner-error
+/// row. The unique command is intentionally absent from the test environment.
+#[test]
+fn test_command_exit_codes_gate_evaluate_runner_error_emits_10() {
+    let temp = setup();
+    let id = setup_auto_gate_issue(&temp, "jit-projection-command-does-not-exist");
+    assert_projected_exit_status_in_both_forms(
+        "gate evaluate, gate evaluate-all",
+        10,
+        true,
+        |json| {
+            let mut command = Command::new(jit_binary());
+            command.current_dir(&temp).args([
+                "gate",
+                "evaluate",
+                &id,
+                "projection-gate",
+                "--force",
+            ]);
+            if json {
+                command.arg("--json");
+            }
+            command.output().unwrap()
+        },
+    );
+}
+
+/// The prospective-cycle guard rejects template application before it mutates,
+/// binding the `apply`/4 row to both public invocation forms.
+#[test]
+fn test_command_exit_codes_apply_prospective_cycle_emits_4() {
+    let temp = setup();
+    let (container, upstream) = setup_prospective_cycle(&temp);
+    let upstream_binding = format!("upstream={upstream}");
+    assert_projected_exit_status_in_both_forms("apply", 4, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command.current_dir(&temp).args([
+            "apply",
+            "cyclic",
+            &container,
+            "--anchor",
+            &upstream_binding,
+        ]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
 }
 
 /// `jit validate` exits 4 on repository-integrity findings — matching `validate`/4.
@@ -846,29 +1099,23 @@ fn test_command_exit_codes_broken_pipe_emits_141() {
 }
 
 /// Guard: **every** row in the projection — exception and standard alike — must be
-/// bound to runtime behavior, either by a subprocess test in this file or by the
-/// classifier test in `main.rs` (`exit_code_projection_tests`), which runs the
-/// typed error the row's condition raises through `error_to_exit_code` and asserts
-/// it lands on that exact row. A row added without a binding fails here, so no
-/// mapping in the reference is hand-authored.
+/// bound to both public invocation forms by a subprocess test in this file.
+/// A row added without a binding fails here, so no mapping in the reference is
+/// hand-authored or left with a machine-readable blind spot.
 #[test]
 fn test_command_exit_codes_every_row_is_verified() {
     let verified: std::collections::HashSet<(String, Option<i32>)> = [
-        // Pinned by the `main.rs` classifier test (typed error -> row).
+        // Pinned by the subprocess tests in this file.
         ("*", Some(1)),
         ("*", Some(5)),
         ("*", Some(10)),
         ("any command that writes an issue", Some(4)),
         ("gate evaluate, gate evaluate-all", Some(4)),
         ("gate evaluate, gate evaluate-all", Some(10)),
-        // Pinned by the subprocess tests in this file.
         ("*", Some(0)),
         ("*", Some(2)),
         ("*", Some(3)),
         ("dep add", Some(4)),
-        // Pinned by test_apply_rejects_prospective_cycle_and_creates_nothing
-        // (fast_docs_templates), which asserts the typed CycleDetected the
-        // classifier maps to 4.
         ("apply", Some(4)),
         ("issue update, issue claim, issue claim-next", Some(4)),
         ("gate define", Some(6)),
@@ -888,7 +1135,8 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("gate preset apply", Some(3)),
         ("serve, serve --stop, serve --status", Some(1)),
         ("*", Some(141)),
-        // Pass-through: asserted against the production site it cites.
+        // Pass-through: both public forms use a deterministic child exit;
+        // the sibling helper-level test covers the complete code range.
         ("serve --fg", None),
     ]
     .into_iter()
