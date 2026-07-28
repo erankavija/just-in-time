@@ -46,6 +46,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [CLI Commands](reference/cli-commands.md) - Complete command reference
 - [Repository Profiles](reference/profiles.md) - Preferred embedded workflow setup, package contract, and recovery boundary
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
+- [Machine-readable Error Codes](reference/error-codes.md) - Generated vocabulary of error-envelope codes, meanings, and exit statuses
 - [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
 - [Storage Format](reference/storage-format.md) - On-disk format specification
 - [Storage Record Layout](reference/storage-records.md) - Generated projection of issue identifiers, event-log serialization, and the gate-run record

@@ -997,6 +997,50 @@ impl ErrorCode {
     }
 }
 
+/// Repo-relative path of the committed adopter reference for [`ErrorCode`].
+pub const ERROR_CODE_REFERENCE_PATH: &str = "docs/reference/error-codes.md";
+
+/// Render the complete machine-readable error-code vocabulary as adopter
+/// documentation.
+///
+/// Each row reads its wire spelling, meaning, and numeric exit status from
+/// [`ErrorCode::as_str`], [`ErrorCode::description`], and
+/// [`ErrorCode::exit_code`] respectively. Iterating [`ErrorCode::ALL`] keeps the
+/// page coupled to the same derive-checked member list used by the runtime's
+/// vocabulary conformance tests.
+pub fn render_error_code_reference() -> String {
+    let rows = ErrorCode::ALL
+        .iter()
+        .map(|code| {
+            format!(
+                "| `{}` | {} | `{}` |",
+                code.as_str().replace('|', "\\|"),
+                code.description().replace('|', "\\|"),
+                code.exit_code().code(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        "<!-- Generated from `ErrorCode::ALL`, `as_str`, `description`, and `exit_code` in \
+         `jit::output` — do not edit by hand. Regenerate with: `cargo test -p jit \
+         output::tests::test_regenerate_error_code_reference -- --ignored`. -->\n\
+         \n\
+         # Machine-readable Error Codes\n\
+         \n\
+         > **Diátaxis Type:** Reference\n\
+         \n\
+         These are the values written to `error.code` in a machine-readable failure envelope.\n\
+         Each code determines the process exit status shown in the final column. For the exit\n\
+         status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md).\n\
+         \n\
+         | Error code | Meaning | Exit status |\n\
+         | --- | --- | --- |\n\
+         {rows}\n"
+    )
+}
+
 /// An input string that is not a member of the registered error-code vocabulary.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[error("unknown error code `{code}`")]
@@ -3512,6 +3556,62 @@ mod tests {
                 code.as_str()
             );
         }
+    }
+
+    fn error_code_reference_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(ERROR_CODE_REFERENCE_PATH)
+    }
+
+    /// Every generated row is composed from the vocabulary accessors used by
+    /// runtime envelopes, rather than from a second description or status map.
+    #[test]
+    fn test_error_code_reference_lists_runtime_vocabulary() {
+        let page = render_error_code_reference();
+
+        for code in ErrorCode::ALL {
+            let row = format!(
+                "| `{}` | {} | `{}` |",
+                code.as_str(),
+                code.description(),
+                code.exit_code().code()
+            );
+            assert!(
+                page.contains(&row),
+                "generated reference is missing runtime-derived row {row:?}"
+            );
+        }
+    }
+
+    /// The derive-vs-`ALL` conformance test above rejects an unlisted enum
+    /// member; once listed, that new row changes this projection and fails here
+    /// until the committed page is regenerated.
+    #[test]
+    fn test_committed_error_code_reference_matches_projection() {
+        let committed = std::fs::read_to_string(error_code_reference_path())
+            .expect("committed error-code reference should exist");
+        assert_eq!(
+            committed,
+            render_error_code_reference(),
+            "{ERROR_CODE_REFERENCE_PATH} is stale — regenerate it from `jit::output::ErrorCode` \
+             (run: cargo test -p jit output::tests::test_regenerate_error_code_reference \
+             -- --ignored)"
+        );
+    }
+
+    /// Regenerate the committed error-code reference from [`ErrorCode`].
+    ///
+    /// Run explicitly after changing the vocabulary:
+    /// `cargo test -p jit output::tests::test_regenerate_error_code_reference -- --ignored`.
+    #[test]
+    #[ignore = "writes the committed error-code reference; run explicitly to regenerate"]
+    fn test_regenerate_error_code_reference() {
+        let path = error_code_reference_path();
+        let tmp = path.with_extension("md.tmp");
+        std::fs::write(&tmp, render_error_code_reference())
+            .expect("should write the error-code reference temp file");
+        std::fs::rename(&tmp, &path).expect("should atomically replace the error-code reference");
     }
 
     fn emitted_text_error_codes() -> BTreeSet<&'static str> {
