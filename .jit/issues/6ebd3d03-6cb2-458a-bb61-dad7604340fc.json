@@ -16,7 +16,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-07-28T07:28:40.773727889Z",
+      "updated_at": "2026-07-28T07:37:29.204896635Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Register the emitted error codes that carry no exit classification",
-  "updated_at": "2026-07-28T07:28:40.773727889Z"
+  "updated_at": "2026-07-28T07:37:29.204896635Z"
 }
