@@ -1,0 +1,46 @@
+schema = "failure-lever-registry/v1"
+namespace = "config"
+
+[[arms]]
+path = "config show"
+argv = ["config", "show", "--json"]
+setup = ["init", "malformed-config-toml"]
+setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` after initialization."
+expected_failure = "Failed to parse config.toml"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "config get"
+argv = ["config", "get", "version.unknown", "--json"]
+setup = ["init"]
+expected_failure = "INVALID_ARGUMENT: unknown config key 'version.unknown': no 'unknown' under 'version'"
+expected_exit = 2
+confirmation = "invoked"
+
+[[arms]]
+path = "config set"
+argv = ["config", "set", "validation.strictness", "banana", "--json"]
+setup = ["init"]
+expected_failure = "invalid [validation].strictness in .jit/config.toml: 'banana' (expected strict, loose, or permissive)"
+expected_exit = 2
+confirmation = "invoked"
+
+[[arms]]
+path = "config validate"
+exemption_reason = "A malformed repository config is caught into ValidationResult and emitted as a valid JSON validation report with valid=false and exit 1, rather than propagating a command-body failure."
+confirmation = "source-only"
+
+[[arms]]
+path = "config show-hierarchy"
+argv = ["config", "show-hierarchy", "--json"]
+setup = ["init", "malformed-config-toml"]
+setup_notes = "Replace the [version] table header in .jit/config.toml with the malformed `[version` after initialization."
+expected_failure = "Failed to parse config.toml"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "config list-templates"
+exemption_reason = "The arm only enumerates the built-in HierarchyTemplate::all() collection and serializes it; source inspection finds no repository input or fallible command-body operation that can produce a post-dispatch failure."
+confirmation = "source-only"
