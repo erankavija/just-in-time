@@ -113,8 +113,9 @@ fn test_validate_plain_and_json_report_installed_profile_drift() {
     let structured = jit(repo.path(), &["validate", "--json"]);
     assert!(!structured.status.success(), "{structured:?}");
     let structured = json(&structured);
-    assert_eq!(structured["valid"], false);
-    assert!(structured["integrity_error"]
+    let details = &structured["error"]["details"];
+    assert_eq!(details["valid"], false);
+    assert!(details["integrity_error"]
         .as_str()
         .is_some_and(|message| message.contains("jit-manage/SKILL.md")));
 }

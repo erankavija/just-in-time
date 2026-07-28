@@ -7024,7 +7024,7 @@ fn run() -> Result<()> {
                         "Repository validation passed".to_string()
                     };
                     let divergences_json = serde_json::to_value(&divergence_report.divergences)?;
-                    let output = JsonOutput::success(json!({
+                    let details = json!({
                         "valid": !validation_failed,
                         "integrity_error": integrity_message,
                         "warnings": warnings_json,
@@ -7034,7 +7034,27 @@ fn run() -> Result<()> {
                         "rule_findings": findings_json,
                         "error_count": rule_report.error_count(),
                         "message": message
-                    }));
+                    });
+
+                    if validation_failed {
+                        // Preserve the complete validation report as structured
+                        // detail, but make every failing machine-readable result use
+                        // the canonical error envelope. Repository-integrity failures
+                        // retain their validation-failed class (exit 4); rule-only
+                        // failures retain the historical generic status (exit 1).
+                        // In both cases the registered code is the sole status
+                        // authority, so the payload and process cannot disagree.
+                        let code = if integrity_error.is_some() {
+                            ErrorCode::ValidationFailed
+                        } else {
+                            ErrorCode::GenericError
+                        };
+                        let output = JsonError::new(code, message).with_details(details);
+                        println!("{}", output.to_json_string()?);
+                        std::process::exit(output.exit_code().code());
+                    }
+
+                    let output = JsonOutput::success(details);
                     println!("{}", output.to_json_string()?);
                 } else {
                     if validation_failed {
@@ -7081,18 +7101,12 @@ fn run() -> Result<()> {
                 // above, so finding #1 is fixed regardless of how we exit.
                 //
                 // A repository-integrity error keeps its specific exit code
-                // (e.g. a broken dependency maps to `ExitCode::ValidationFailed`)
-                // and is surfaced on stderr — it is never lost. In JSON mode the
-                // handler has already rendered the complete validation report, so
-                // terminate here rather than propagating into the general
-                // top-level envelope renderer and appending a second document.
-                // Otherwise, an error-severity rule finding (local OR graph)
-                // exits non-zero.
+                // (e.g. a broken dependency maps to `ExitCode::ValidationFailed`).
+                // Machine-readable failures have already terminated after their
+                // single canonical envelope; plain failures continue through the
+                // established human diagnostic path below. Otherwise, an
+                // error-severity rule finding (local OR graph) exits non-zero.
                 if let Some(err) = integrity_error {
-                    if json {
-                        eprintln!("Error: {}", err);
-                        std::process::exit(error_to_exit_code(&err).code());
-                    }
                     return Err(err);
                 }
                 if rules_failed {

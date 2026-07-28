@@ -473,11 +473,12 @@ fn test_validate_whole_repo_json_includes_graph_error_findings_and_exits_nonzero
         .failure();
     let out = assert.get_output().stdout.clone();
     let json: Value = serde_json::from_slice(&out).unwrap();
+    let details = &json["error"]["details"];
     assert_eq!(
-        json["valid"], false,
+        details["valid"], false,
         "whole-repo run must be invalid: {json}"
     );
-    let findings = json["rule_findings"].as_array().unwrap();
+    let findings = details["rule_findings"].as_array().unwrap();
     assert!(
         findings
             .iter()
@@ -512,12 +513,13 @@ fn test_validate_retains_rule_findings_with_integrity_failure_and_exit_four() {
         .stdout
         .clone();
     let json: Value = serde_json::from_slice(&output).unwrap();
-    assert_eq!(json["valid"], false);
-    assert!(json["integrity_error"]
+    let details = &json["error"]["details"];
+    assert_eq!(details["valid"], false);
+    assert!(details["integrity_error"]
         .as_str()
         .is_some_and(|message| message.contains("does not exist")));
-    assert_eq!(json["error_count"], 1);
-    assert!(json["rule_findings"]
+    assert_eq!(details["error_count"], 1);
+    assert!(details["rule_findings"]
         .as_array()
         .unwrap()
         .iter()
