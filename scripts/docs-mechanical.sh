@@ -18,14 +18,20 @@ set -uo pipefail
 #   1. positional args "$@", if any;                      else
 #   2. the DOCS_FOOTPRINT env var (space-separated), if set — the lead's
 #      per-issue scoping knob;                             else
-#   3. a default footprint DERIVED LIVE from configuration (never a hardcoded
-#      path list, depth, or count): the `[documentation].permanent_paths` roots
-#      read from `jit config get documentation` (currently `docs/`). Adopter
-#      documents outside the permanent roots (the root and component READMEs,
-#      INSTALL.md, …) are a curated set the caller supplies explicitly via
-#      positional args or DOCS_FOOTPRINT — the container's full-surface run and
-#      each area audit pass their own footprint — so that scope is caller input,
-#      not a fact embedded in this checker (REQ-01).
+#   3. the default footprint: `docs`, the adopter documentation surface.
+#
+# The default is NOT read from `[documentation]` in `.jit/config.toml`. That
+# table governs archival classification of the development root (`dev/`) —
+# `permanent_paths` are the contributor areas an archive copies rather than
+# relocates — and `docs/` is deliberately absent from it: a linked artifact
+# outside the development root needs no archival destination and is retained
+# where it is (`@/issue/8e071e18/decision/D-14`). So `[documentation]` has no
+# field that names the adopter documentation root; there is nothing live to
+# derive this default from, and `docs` is stated here as the one place this
+# fact is declared for this checker. Contributor documentation under `dev/`
+# is exactly what `[documentation].permanent_paths` denotes; a caller who
+# wants that footprint passes it explicitly via positional args or
+# DOCS_FOOTPRINT, same as any other non-default footprint (REQ-01, REQ-02).
 #
 # Exit codes (child semantics are preserved, exit 2 dominates — F4):
 #   0 — all three checks passed
@@ -37,33 +43,6 @@ set -uo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 
-# Resolve the whole-surface footprint live from configuration. Sets FOOTPRINT.
-resolve_footprint() {
-  command -v jit >/dev/null 2>&1 || {
-    echo "docs-mechanical: 'jit' not found on PATH (needed to derive the footprint)" >&2
-    exit 2
-  }
-  command -v jq >/dev/null 2>&1 || {
-    echo "docs-mechanical: 'jq' not found on PATH (needed to derive the footprint)" >&2
-    exit 2
-  }
-  local doc_json perm
-  doc_json=$(jit config get documentation) || {
-    echo "docs-mechanical: 'jit config get documentation' failed" >&2
-    exit 2
-  }
-  # The derived default is the configured permanent documentation roots
-  # (currently docs/), read live from [documentation].permanent_paths — no path
-  # list, depth, count, or filename assumption, so it cannot rot as the repo
-  # changes. Adopter documents that live outside the permanent roots (the root
-  # and component READMEs, INSTALL.md, …) are a curated set the caller supplies
-  # explicitly via positional arguments or the DOCS_FOOTPRINT environment
-  # variable; that scope is caller input, not a fact embedded in this checker.
-  perm=$(printf '%s' "$doc_json" | jq -r '.permanent_paths[]')
-  FOOTPRINT=()
-  while IFS= read -r p; do [ -n "$p" ] && FOOTPRINT+=("$p"); done <<<"$perm"
-}
-
 if [ "$#" -gt 0 ]; then
   FOOTPRINT=("$@")
 elif [ -n "${DOCS_FOOTPRINT:-}" ]; then
@@ -71,7 +50,8 @@ elif [ -n "${DOCS_FOOTPRINT:-}" ]; then
   # shellcheck disable=SC2206
   FOOTPRINT=($DOCS_FOOTPRINT)
 else
-  resolve_footprint
+  # The adopter documentation surface — see the footprint-resolution note above.
+  FOOTPRINT=("docs")
 fi
 
 env_error=0
