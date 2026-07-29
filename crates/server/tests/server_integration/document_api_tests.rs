@@ -7,6 +7,7 @@ use jit::storage::InMemoryStorage;
 use jit_server::routes::AppState;
 use jit_server::watcher::ChangeTracker;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 fn test_memory_storage() -> InMemoryStorage {
     let storage = InMemoryStorage::new();
@@ -28,6 +29,7 @@ async fn create_test_server() -> TestServer {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
         project_name: "test-project".to_string(),
+        shutdown: CancellationToken::new(),
     };
     let app = jit_server::routes::create_routes(state);
     TestServer::new(app).expect("Failed to create test server")
@@ -57,6 +59,7 @@ async fn create_test_server_with_issue() -> (TestServer, String) {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
         project_name: "test-project".to_string(),
+        shutdown: CancellationToken::new(),
     };
     let app = jit_server::routes::create_routes(state);
     let server = TestServer::new(app).expect("Failed to create test server");
@@ -114,6 +117,7 @@ async fn test_get_document_content_not_yet_implemented() {
         executor: Arc::new(executor),
         tracker: Arc::new(ChangeTracker::new(16)),
         project_name: "test-project".to_string(),
+        shutdown: CancellationToken::new(),
     };
     let app = jit_server::routes::create_routes(state);
     let server = TestServer::new(app).expect("Failed to create test server");

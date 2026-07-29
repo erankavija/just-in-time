@@ -10,6 +10,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 
 use jit::commands::CommandExecutor;
 use jit::declarations::GateDefinition;
@@ -28,6 +29,9 @@ pub struct AppState<S: IssueStore> {
     pub executor: Arc<CommandExecutor<S>>,
     pub tracker: Arc<ChangeTracker>,
     pub project_name: String,
+    /// Cancelled when the process starts shutting down, so live event streams
+    /// end instead of holding their connections through the drain deadline.
+    pub shutdown: CancellationToken,
 }
 
 /// Create API routes
@@ -1038,7 +1042,7 @@ async fn get_changes<S: IssueStore>(State(state): State<AppState<S>>) -> Json<Ch
 
 /// SSE stream of change events
 async fn events_stream<S: IssueStore>(State(state): State<AppState<S>>) -> impl IntoResponse {
-    sse::change_stream(&state.tracker)
+    sse::change_stream(&state.tracker, state.shutdown.clone())
 }
 
 #[cfg(test)]
@@ -1109,6 +1113,7 @@ mod tests {
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let app = create_routes(state);
         TestServer::new(app).unwrap()
@@ -1178,6 +1183,7 @@ mod tests {
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
@@ -1227,6 +1233,7 @@ mod tests {
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
@@ -1271,6 +1278,7 @@ mod tests {
             executor,
             tracker: Arc::new(ChangeTracker::new(16)),
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -1314,6 +1322,7 @@ mod tests {
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -1369,6 +1378,7 @@ mod tests {
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -1405,6 +1415,7 @@ mod tests {
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
@@ -1532,6 +1543,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -1607,6 +1619,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -1721,6 +1734,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         (server, id, doc_rel.to_string())
@@ -1836,6 +1850,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -1885,6 +1900,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         let response = server
@@ -1945,6 +1961,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let app = create_routes(state);
         let server = TestServer::new(app).unwrap();
@@ -2038,6 +2055,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -2076,6 +2094,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -2137,6 +2156,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -2194,6 +2214,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -2255,6 +2276,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -2294,6 +2316,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -2491,6 +2514,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         (server, temp)
@@ -2656,6 +2680,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
 
@@ -2741,6 +2766,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         // Keep tempdir + outside file alive.
@@ -2812,6 +2838,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         Box::leak(Box::new(temp));
@@ -2862,6 +2889,7 @@ pattern = '^v\d+\.\d+$'
             executor,
             tracker,
             project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         Box::leak(Box::new(temp));

@@ -21,8 +21,18 @@ embed-web = ["dep:rust-embed", "dep:mime_guess"]
 [dependencies]
 jit = { path = "../jit" }
 axum = "0.7"
+# Owns listener and connection shutdown behind one `Handle`. `axum::serve`'s
+# `with_graceful_shutdown` waits for open connections indefinitely; this crate's
+# `Handle::graceful_shutdown(Some(duration))` force-closes whatever has not
+# finished by the deadline, which is what bounds process exit
+# (GRACEFUL_DRAIN_TIMEOUT). Default features only — no TLS backend is pulled in.
+axum-server = "0.8"
 tokio = { version = "1.35", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
+# CancellationToken: the one shutdown signal shared by AppState, the router and
+# the SSE streams, so an open event stream reaches EOF instead of being held
+# open by its keepalive while the drain deadline runs down.
+tokio-util = "0.7"
 futures = "0.3"
 notify = "8"
 tower = "0.4"
@@ -49,3 +59,7 @@ mime_guess = { version = "2", optional = true }
 jit = { path = "../jit", features = ["test-support"] }
 axum-test = "14.0"
 tempfile = "3.8"
+# SIGTERM delivery for the real-process shutdown test. Same crate and feature
+# the `jit` crate signals with, so both signalling paths share one guarded
+# `i32::try_from` conversion discipline (`@/inv/pid-safety`).
+nix = { version = "0.31.1", features = ["signal"] }

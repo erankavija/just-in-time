@@ -8,6 +8,7 @@
 #[cfg(feature = "embed-web")]
 pub mod embedded;
 pub mod routes;
+pub mod shutdown;
 pub mod sse;
 pub mod watcher;
 
