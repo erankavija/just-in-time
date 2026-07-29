@@ -469,4 +469,4 @@ git rev-parse --git-common-dir
 - [Tutorial: Parallel Work with Git Worktrees](../tutorials/parallel-work-worktrees.md)
 - [Configuration Reference](../reference/configuration.md)
 - [CLI Commands Reference](../reference/cli-commands.md)
-- Design document: `dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md`
+- Design document: `dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md`

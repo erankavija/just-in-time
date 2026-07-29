@@ -128,7 +128,7 @@ of these keys are explicitly present:
 |--------------|-------------------------|
 | `managed_paths` | Repository-relative component roots whose selected artifacts may relocate |
 | `permanent_paths` | Repository-relative component roots whose source artifacts must remain |
-| `archive_root` | Repository-relative mirror root for proposed destinations |
+| `archive_root` | Repository-relative root for proposed destinations; artifact paths beneath it are relative to `development_root` as specified by [Archive planning and execution](cli-commands.md#archive-planning-and-execution) |
 
 If the table is absent, plans report `unconfigured`. If it exists but any of
 the three keys is absent, previews report `incomplete`. Both statuses make a

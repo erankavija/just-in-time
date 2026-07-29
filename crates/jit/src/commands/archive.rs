@@ -3,7 +3,7 @@
 use super::CommandExecutor;
 use super::{capture_or_retry, with_mutation_session, SessionStep};
 use crate::domain::artifact_classifier::{
-    artifact_destination_root, artifact_mirror_destination, classification_facts_from_evidence,
+    artifact_archive_destination, artifact_destination_root, classification_facts_from_evidence,
     classify_artifacts, preferred_container_destination_root,
     resolve_container_destination as derive_container_destination, ArtifactClassificationInventory,
     ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
@@ -65,8 +65,9 @@ fn effectively_terminal_container_ids(
     ids
 }
 
-fn remap_archived_references(issues: &mut [Issue], destination_root: &str) {
+fn remap_archived_references(issues: &mut [Issue], destination_root: &str, development_root: &str) {
     let prefix = format!("{}/", normalize_artifact_path(destination_root));
+    let development_root = normalize_artifact_path(development_root);
     issues.iter_mut().for_each(|issue| {
         issue
             .documents
@@ -74,8 +75,12 @@ fn remap_archived_references(issues: &mut [Issue], destination_root: &str) {
             .filter(|document| document.commit.is_none())
             .for_each(|document| {
                 let normalized = normalize_artifact_path(&document.path);
-                if let Some(source) = normalized.strip_prefix(&prefix) {
-                    document.path = source.to_string();
+                if let Some(relative) = normalized.strip_prefix(&prefix) {
+                    document.path = if development_root.is_empty() {
+                        relative.to_string()
+                    } else {
+                        normalize_artifact_path(&format!("{development_root}/{relative}"))
+                    };
                 }
             });
     });
@@ -116,11 +121,13 @@ fn apply_recorded_residue_identities(
             _ => None,
         })
         .flatten()
-        .map(|publication| {
-            (
-                publication.destination.clone(),
-                publication.content_identity.clone(),
-            )
+        .filter_map(|publication| {
+            publication.source.as_ref().map(|source| {
+                (
+                    normalize_artifact_path(source),
+                    publication.content_identity.clone(),
+                )
+            })
         })
         .collect::<BTreeMap<_, _>>();
 
@@ -129,12 +136,13 @@ fn apply_recorded_residue_identities(
             (&location.source, &location.destination)
         {
             let differs = source != destination;
-            let mirror = artifact_mirror_destination(destination_root, source_path);
             // Only a prior archive record turns differing source bytes into an
             // edited residue; an unrelated occupied destination still blocks.
+            // Source is the stable publication identity across destination-layout
+            // cutovers, while target and destination root scope the event set.
             if differs
                 && covered
-                    .get(&mirror)
+                    .get(&normalize_artifact_path(source_path))
                     .is_some_and(|identity| identity == destination)
             {
                 location.source = ArtifactLocation::Regular(destination.clone());
@@ -217,7 +225,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Feed inverse-mirror sources to inventory while retaining the real
         // durable issue records for exact apply/observe decisions below.
         let mut inventory_issues = issues.clone();
-        remap_archived_references(&mut inventory_issues, &destination_root);
+        remap_archived_references(
+            &mut inventory_issues,
+            &destination_root,
+            &policy.development_root,
+        );
         let explicit_target = match &target {
             ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
@@ -682,7 +694,11 @@ impl CommandExecutor<JsonFileStorage> {
             legacy.clone()
         };
         let mut inventory_issues = issues.clone();
-        remap_archived_references(&mut inventory_issues, &destination);
+        remap_archived_references(
+            &mut inventory_issues,
+            &destination,
+            &policy.development_root,
+        );
         let explicit = match target {
             ArchiveTarget::Document(path) => ExplicitRootTarget::Document(path),
             ArchiveTarget::Container(_) => ExplicitRootTarget::Container(
@@ -780,10 +796,11 @@ impl CommandExecutor<JsonFileStorage> {
             .iter()
             .filter(|a| !a.version().is_pinned())
             .flat_map(|a| {
-                [
-                    a.source().to_string(),
-                    artifact_mirror_destination(&destination, a.source()),
-                ]
+                std::iter::once(a.source().to_string()).chain(artifact_archive_destination(
+                    &destination,
+                    &policy.development_root,
+                    a.source(),
+                ))
             })
             .collect::<BTreeSet<_>>();
         if matches!(plan_target, PlanTarget::Container { .. }) {
@@ -1417,7 +1434,7 @@ mod tests {
         assert!(result.reference_changes.is_empty());
         assert!(result.planned_deletions.is_empty());
         assert!(repo.path().join("dev/guides/permanent.md").exists());
-        assert!(repo.path().join("archive/dev/guides/permanent.md").exists());
+        assert!(repo.path().join("archive/guides/permanent.md").exists());
         assert_eq!(
             executor
                 .storage
@@ -1447,11 +1464,11 @@ mod tests {
         executor(&repo, storage.clone())
             .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
-        fs::create_dir_all(repo.path().join("archive/dev/guides")).unwrap();
+        fs::create_dir_all(repo.path().join("archive/guides")).unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
         fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
         fs::write(
-            repo.path().join("archive/dev/guides/permanent.md"),
+            repo.path().join("archive/guides/permanent.md"),
             b"permanent",
         )
         .unwrap();
@@ -1464,7 +1481,7 @@ mod tests {
         assert!(first.planned_deletions.is_empty());
         assert!(first.deleted_sources.is_empty());
         assert!(first.publications.iter().any(|publication| {
-            publication.destination == "archive/dev/guides/permanent.md" && publication.adopted
+            publication.destination == "archive/guides/permanent.md" && publication.adopted
         }));
         assert!(repo.path().join("dev/guides/permanent.md").exists());
         let second = executor
@@ -1841,10 +1858,16 @@ epic = "epic"
             .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("scripts")).unwrap();
+        fs::create_dir_all(repo.path().join("workspace/active")).unwrap();
         fs::create_dir_all(repo.path().join("workspace/scratch")).unwrap();
         fs::write(repo.path().join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+        fs::write(repo.path().join("workspace/active/target.md"), "# Target\n").unwrap();
         fs::write(repo.path().join("workspace/scratch/notes.md"), "# Notes\n").unwrap();
-        for path in ["scripts/install.sh", "workspace/scratch/notes.md"] {
+        for path in [
+            "scripts/install.sh",
+            "workspace/active/target.md",
+            "workspace/scratch/notes.md",
+        ] {
             let mut issue =
                 crate::domain::types::fixture_issue(format!("Owner of {path}"), String::new());
             issue.state = State::Done;
@@ -1964,6 +1987,94 @@ epic = "epic"
             .iter()
             .any(|blocker| blocker.code == BlockerCode::UnmanagedSelectedRoot));
         assert!(!inside.eligible());
+    }
+
+    #[test]
+    fn test_execute_document_uses_path_relative_to_a_non_default_development_root_and_relinks() {
+        let (repo, executor) = development_root_repo();
+
+        let result = executor
+            .execute_archive_document("workspace/active/target.md")
+            .unwrap();
+
+        assert!(result.event_appended);
+        assert!(repo
+            .path()
+            .join("workspace/archive/active/target.md")
+            .exists());
+        assert!(!repo.path().join("workspace/active/target.md").exists());
+        assert!(executor.storage.list_issues().unwrap().iter().any(|issue| {
+            issue.documents.iter().any(|document| {
+                document.commit.is_none() && document.path == "workspace/archive/active/target.md"
+            })
+        }));
+    }
+
+    #[test]
+    fn test_execute_document_reconciles_edited_residue_from_pre_cutover_event_destination() {
+        let (repo, executor) = development_root_repo();
+        let source = "workspace/active/target.md";
+        let canonical_destination = "workspace/archive/active/target.md";
+        let historical_destination = "workspace/archive/workspace/active/target.md";
+        fs::create_dir_all(repo.path().join("workspace/archive/active")).unwrap();
+        fs::write(repo.path().join(canonical_destination), b"# Target\n").unwrap();
+        fs::write(repo.path().join(source), b"# Edited residue\n").unwrap();
+
+        let historical_event = Event::draft_artifact_archive_executed(
+            PlanTarget::Document {
+                path: source.into(),
+            },
+            "workspace/archive".into(),
+            vec![crate::domain::artifact_execution::ArchivePublication {
+                source: Some(source.into()),
+                destination: historical_destination.into(),
+                content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                    b"# Target\n",
+                ),
+                adopted: false,
+            }],
+            Vec::new(),
+            Vec::new(),
+            false,
+        );
+        let events_path = repo.path().join(".jit/events.jsonl");
+        let mut event_bytes = fs::read(&events_path).unwrap_or_default();
+        event_bytes.extend(serde_json::to_vec(&historical_event).unwrap());
+        event_bytes.push(b'\n');
+        fs::write(&events_path, event_bytes).unwrap();
+
+        let result = executor.execute_archive_document(source).unwrap();
+
+        assert!(result.event_appended);
+        assert!(result.reconciling);
+        assert!(result.publications.iter().any(|publication| {
+            publication.source.as_deref() == Some(source)
+                && publication.destination == canonical_destination
+                && publication.adopted
+        }));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|warning| warning.code == WarningCode::DeletionFailed));
+        assert_eq!(
+            fs::read(repo.path().join(canonical_destination)).unwrap(),
+            b"# Target\n"
+        );
+        assert_eq!(
+            fs::read(repo.path().join(source)).unwrap(),
+            b"# Edited residue\n"
+        );
+        assert!(executor.storage.list_issues().unwrap().iter().any(|issue| {
+            issue
+                .documents
+                .iter()
+                .any(|document| document.commit.is_none() && document.path == canonical_destination)
+        }));
+        assert_eq!(
+            executor.storage.read_artifact_archive_events().unwrap()[0],
+            historical_event,
+            "the immutable historical event must retain its pre-cutover destination"
+        );
     }
 
     #[test]

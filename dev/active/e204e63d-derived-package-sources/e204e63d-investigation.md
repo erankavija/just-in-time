@@ -587,15 +587,15 @@ The same filter also bans `.agents/worktrees` (harmless) but keeps `.agents/skil
 
 ## 3. Prior-art sweep
 
-Sources: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-{plan,research}.md`,
-`dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md`, `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md`,
-`dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md`, `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-progress.json`,
-`dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-handoff-2.md`, `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md`,
+Sources: `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-{plan,research}.md`,
+`dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md`, `dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-investigation.md`,
+`dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-plan.md`, `dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-progress.json`,
+`dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-handoff-2.md`, `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md`,
 `dev/vision/9db27a3a-charter.md`, `dev/active/c639cfb5-*.md`.
 
 ### Already recorded, supports the work
 
-- **P7** (`dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-progress.json`, `surfaced_pitfalls`) — "no projection binds
+- **P7** (`dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-progress.json`, `surfaced_pitfalls`) — "no projection binds
   the adopter documentation policy lists to SHIPPED_DOCUMENTATION_POLICY […] they went stale
   from wave 1 to wave 3 and blocked two code reviews (E2 on b3fc1a92, F1 on f88a16d9)".
   Disposition: closed session 5, owner decided, **folded into e204e63d REQ-01**.
@@ -608,7 +608,7 @@ Sources: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-{plan,research}.
   reads `.jit/templates.toml`, both `docs/examples/*/templates.toml`, three docs pages and
   `profiles/jit-dogfood/manifest.toml` and asserts each contains none of six stale phrases.
   P15's characterization is accurate.
-- **`dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-handoff-2.md:64`** — "Do NOT hand-copy a shipped constant into
+- **`dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-handoff-2.md:64`** — "Do NOT hand-copy a shipped constant into
   adopter docs without a citation back to it. That is what made the config reference go
   stale from wave 1 to wave 3 and cost two review rounds."
 - **`@/charter/D-13`** — "Give each adopter-facing fact one canonical documentation home",
@@ -642,12 +642,12 @@ Sources: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-{plan,research}.
    assets. Both directions in one manifest is coherent but needs saying out loud, or a
    reviewer reads it as inconsistency.
 3. **Issue 8e071e18's Q1/D-11 chose "edit both trees by hand" deliberately.**
-   `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md:935-943` weighed (a) bring `profiles/…/assets/live/`
+   `dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-investigation.md:935-943` weighed (a) bring `profiles/…/assets/live/`
    into scope and edit both, (b) keep the non-goal, (c) relax the drift test — and
-   recommended (a); `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md:457` formalized it. So the current state is
+   recommended (a); `dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-plan.md:457` formalized it. So the current state is
    a chosen simplification, not an oversight. e204e63d supersedes it.
 4. **jit:5d862134 forbids ambient build inputs.** `crates/jit/build.rs:6-15` and
-   `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md:58-62` record that watching `.git/index`,
+   `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md:58-62` record that watching `.git/index`,
    HEAD, refs, or the clock relinked every test target (~179 s). A directory-level
    `rerun-if-changed` on live roots does not watch git metadata, so it does not violate the
    letter of that decision — but it does make the build script mtime-sensitive to a branch
@@ -956,7 +956,7 @@ name rather than leave silent:
 - **The genuine exposure is invalidation, not size**: a directory-level `rerun-if-changed`
   makes the build script mtime-sensitive to branch switches, and an unconditional OUT_DIR
   rewrite would then relink every test target — the regression jit:5d862134 removed and the
-  invariant's rationale (`dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md:58-62`). The plan
+  invariant's rationale (`dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md:58-62`). The plan
   should require a content-compare-before-write copy and cover it with an extension of
   `build_provenance_metadata_stability_tests.rs`'s existing "zero non-fresh test artifacts"
   assertion.

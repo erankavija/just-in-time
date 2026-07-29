@@ -1,5 +1,5 @@
 //! Tests for the bracket-aware breakdown path (T10, design doc
-//! `dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-design.md`).
+//! `dev/archive/2fbd2a82-planning-bracket/active/planning-bracket-design.md`).
 //!
 //! A breakable container `C` is first scaffolded by the `jit apply plan` engine
 //! into the bracket `C → B → P` (planning node `P` carries the plan-review gate;

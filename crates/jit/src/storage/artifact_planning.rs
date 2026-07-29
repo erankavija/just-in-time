@@ -1,7 +1,7 @@
 //! No-follow filesystem evidence acquisition for pure archive planning.
 
 use crate::domain::artifact_classifier::{
-    artifact_mirror_destination, classification_facts_from_evidence,
+    artifact_archive_destination, classification_facts_from_evidence,
     resolve_container_destination as derive_container_destination, ArtifactClassificationFacts,
     ArtifactClassificationPolicy, CitationScanEvidence, EmbeddedArtifactOwner,
     ResolvedContainerDestination,
@@ -97,15 +97,18 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
             inspect_artifact_evidence(storage, source, ArtifactListingScope::MetadataOnly)?,
         );
         if inspect_destinations {
-            let destination = artifact_mirror_destination(destination_root, source);
-            evidence.insert(
-                destination.clone(),
-                inspect_artifact_evidence(
-                    storage,
-                    &destination,
-                    ArtifactListingScope::MetadataOnly,
-                )?,
-            );
+            if let Some(destination) =
+                artifact_archive_destination(destination_root, &policy.development_root, source)
+            {
+                evidence.insert(
+                    destination.clone(),
+                    inspect_artifact_evidence(
+                        storage,
+                        &destination,
+                        ArtifactListingScope::MetadataOnly,
+                    )?,
+                );
+            }
         }
     }
     if matches!(target, PlanTarget::Container { .. }) && inspect_destinations {

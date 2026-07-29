@@ -31,7 +31,7 @@ set -euo pipefail
 # Budgets — declared once here and cited elsewhere, never re-copied into prose
 # (@/inv/single-source-prose). Their justification and the measured evidence
 # behind them live in the design doc's acceptance budgets, not in this file:
-# dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md ("Artifact budget checker" and
+# dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md ("Artifact budget checker" and
 # "Benchmark protocol").
 readonly MAX_INTEGRATION_TARGETS=12
 readonly MAX_EXECUTABLE_BYTES=$((2 * 1024 * 1024 * 1024)) # 2 GiB
@@ -139,7 +139,7 @@ metadata=$(read_metadata)
 target_count=$(printf '%s' "$metadata" \
   | jq '[.packages[].targets[] | select(.kind[] == "test")] | length')
 if [ "$target_count" -gt "$MAX_INTEGRATION_TARGETS" ]; then
-  errors+=("integration-test targets: observed ${target_count}, limit ${MAX_INTEGRATION_TARGETS}. Corrective area: consolidate top-level crates/jit/tests/*.rs entry points into cohesive suites (dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md, 'Test suite topology').")
+  errors+=("integration-test targets: observed ${target_count}, limit ${MAX_INTEGRATION_TARGETS}. Corrective area: consolidate top-level crates/jit/tests/*.rs entry points into cohesive suites (dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, 'Test suite topology').")
 fi
 
 # REQ-02: unique active test-executable bytes from `cargo test --no-run`.
@@ -162,7 +162,7 @@ for exe in "${executables[@]}"; do
   executable_bytes=$((executable_bytes + size))
 done
 if [ "$executable_bytes" -gt "$MAX_EXECUTABLE_BYTES" ]; then
-  errors+=("active test executables: observed ${executable_bytes} bytes across ${#executables[@]} unique executables, limit ${MAX_EXECUTABLE_BYTES} bytes (2 GiB). Corrective area: shrink per-executable debug payload or consolidate suites (dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md, 'Artifact budget checker').")
+  errors+=("active test executables: observed ${executable_bytes} bytes across ${#executables[@]} unique executables, limit ${MAX_EXECUTABLE_BYTES} bytes (2 GiB). Corrective area: shrink per-executable debug payload or consolidate suites (dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, 'Artifact budget checker').")
 fi
 
 # REQ-03: build/gate policy assertions against the injected policy sources.

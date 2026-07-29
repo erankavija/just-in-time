@@ -7,6 +7,7 @@
 mod harness;
 
 mod ai_review_verdict_tests;
+mod archive_path_layout_tests;
 mod artifact_discovery_tests;
 mod artifact_inventory_tests;
 mod artifact_plan_model_tests;

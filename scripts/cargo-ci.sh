@@ -85,7 +85,7 @@ mkdir -p "$TMPDIR"
 # rebuilds of the same tree. A gate run compiles once and exits, so it has no
 # later rebuild to amortize that cost against; left on, incremental state
 # accumulated without bound across gate runs (baseline measurement:
-# dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md, Baseline table). The
+# dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, Baseline table). The
 # `incremental-state` step below turns "should be disabled" into a checked
 # fact rather than an assumption.
 export CARGO_INCREMENTAL=0

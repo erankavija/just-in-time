@@ -1,4 +1,3 @@
-use jit::domain::artifact_classifier::artifact_mirror_destination;
 use jit::domain::artifact_plan::{ArchiveCandidates, ArtifactPlan};
 use jit::output::{render_archive_candidates, render_archive_plan};
 use serde_json::Value;
@@ -615,7 +614,7 @@ fn test_archive_execute_leaves_an_out_of_root_source_where_it_is_without_schedul
     let plan: Value = serde_json::from_slice(&preview.stdout).unwrap();
     assert_eq!(plan["eligible"], true);
     let destination_root = plan["destination_root"].as_str().unwrap().to_string();
-    let expected_mirror = artifact_mirror_destination(&destination_root, "scripts/install.sh");
+    let expected_mirror = format!("{destination_root}/scripts/install.sh");
     let artifact = plan["artifacts"]
         .as_array()
         .unwrap()

@@ -396,13 +396,18 @@ pub fn classification_facts_from_evidence(
         .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
         .map(|artifact| {
             let source = artifact.source();
-            let destination = artifact_mirror_destination(destination_root, source);
+            let destination =
+                artifact_archive_destination(destination_root, &policy.development_root, source);
             Ok((
                 source.to_string(),
                 ArtifactLocationFacts {
                     source: location_from_evidence(source, evidence)?,
                     destination: if inspect_destinations {
-                        location_from_evidence(&destination, evidence)?
+                        destination
+                            .as_deref()
+                            .map(|destination| location_from_evidence(destination, evidence))
+                            .transpose()?
+                            .unwrap_or(ArtifactLocation::Missing)
                     } else {
                         ArtifactLocation::Missing
                     },
@@ -412,7 +417,13 @@ pub fn classification_facts_from_evidence(
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
     let container_destination = match target {
         PlanTarget::Container { id } if inspect_destinations => {
-            container_destination_from_evidence(destination_root, id, artifacts, evidence)?
+            container_destination_from_evidence(
+                destination_root,
+                &policy.development_root,
+                id,
+                artifacts,
+                evidence,
+            )?
         }
         _ => ContainerDestinationState::Absent,
     };
@@ -442,6 +453,7 @@ fn location_from_evidence(
 
 fn container_destination_from_evidence(
     destination_root: &str,
+    development_root: &str,
     container_id: &str,
     artifacts: &[ArtifactPlanEntry],
     evidence: &ArtifactEvidenceMap,
@@ -483,7 +495,9 @@ fn container_destination_from_evidence(
     let accounted = artifacts
         .iter()
         .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
-        .map(|artifact| artifact_mirror_destination(destination_root, artifact.source()))
+        .filter_map(|artifact| {
+            artifact_archive_destination(destination_root, development_root, artifact.source())
+        })
         .collect::<BTreeSet<_>>();
     Ok(if entries.iter().all(|entry| accounted.contains(entry)) {
         ContainerDestinationState::MarkerlessAccounted
@@ -595,6 +609,20 @@ pub fn classify_artifacts(
         &paths,
         &mut needs_destination,
     );
+    destination_source_conflicts(
+        &needs_destination,
+        &destination_root,
+        &policy.development_root,
+    )
+    .into_values()
+    .filter(|sources| sources.len() > 1)
+    .flatten()
+    .for_each(|source| {
+        plan_blockers.push(PlanBlocker::new(
+            BlockerCode::DestinationConflict,
+            Some(source),
+        ));
+    });
     let edge_source_constraints = edge_source_constraints(
         &inventory.artifacts,
         &facts.locations,
@@ -630,6 +658,29 @@ pub fn classify_artifacts(
         plan_blockers,
         Vec::new(),
     )
+}
+
+/// Group every publishing source by its canonical destination.
+///
+/// The ordered maps make any collision report deterministic. Classification
+/// emits one blocker naming each conflicting source, while ordinary occupied
+/// destination checks name the destination itself.
+fn destination_source_conflicts(
+    sources: &BTreeSet<String>,
+    destination_root: &str,
+    development_root: &str,
+) -> BTreeMap<String, Vec<String>> {
+    sources.iter().fold(BTreeMap::new(), |mut grouped, source| {
+        if let Some(destination) =
+            artifact_archive_destination(destination_root, development_root, source)
+        {
+            grouped
+                .entry(destination)
+                .or_insert_with(Vec::new)
+                .push(source.clone());
+        }
+        grouped
+    })
 }
 
 /// Verify that every supported edge still resolves to an available path after execution.
@@ -816,7 +867,8 @@ fn classify_entry(
         (false, _) => ArtifactAction::Retain,
     };
 
-    let mirror = artifact_mirror_destination(destination_root, &source);
+    let mirror = artifact_archive_destination(destination_root, &policy.development_root, &source)
+        .unwrap_or_else(|| source.clone());
     let mut blockers = entry
         .blockers()
         .iter()
@@ -1043,7 +1095,7 @@ fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = 
 /// whole, rather than sitting inside a longer one.
 ///
 /// A longer path reaches the occurrence through a directory name, whether it
-/// stands above the cited path (`dev/archive/8e071e18/dev/active/plan.md`, the
+/// stands above the cited path (`dev/archive/8e071e18/active/plan.md`, the
 /// destination every relocation publishes) or merely ends with the cited path's
 /// first segment (`mydev/active/plan.md`), and it extends past the occurrence
 /// through a longer name (`dev/active/plan.mdx`). Repository filenames can use
@@ -1499,9 +1551,28 @@ fn container_short_id(id: &str) -> String {
     id.chars().take(SHORT_ID_LENGTH).collect()
 }
 
-/// Mirror one repository-relative source beneath a target destination root.
-pub fn artifact_mirror_destination(destination_root: &str, source: &str) -> String {
-    join_path(destination_root, source)
+/// Place one repository-relative source beneath a target destination root.
+///
+/// Sources inside a configured development root retain only their path relative
+/// to that policy boundary. An empty development root represents the repository
+/// root. Sources outside a non-empty development root return `None` because
+/// classification retains them and must not assign a publication destination.
+pub(crate) fn artifact_archive_destination(
+    destination_root: &str,
+    development_root: &str,
+    source: &str,
+) -> Option<String> {
+    let development_root = normalize_artifact_path(development_root);
+    let source = normalize_artifact_path(source);
+    if development_root.is_empty() {
+        return Some(join_path(destination_root, &source));
+    }
+    if source == development_root {
+        return Some(normalize_artifact_path(destination_root));
+    }
+    source
+        .strip_prefix(&format!("{development_root}/"))
+        .map(|relative| join_path(destination_root, relative))
 }
 
 fn join_path(left: &str, right: &str) -> String {
@@ -1577,6 +1648,65 @@ mod tests {
         assert!(!archived_owner("owner", None, true).is_effectively_terminal());
         assert!(owner("owner", State::Done, true).is_effectively_terminal());
         assert!(!owner("owner", State::InProgress, true).is_effectively_terminal());
+    }
+
+    #[test]
+    fn test_destination_source_conflicts_groups_conflicting_sources_deterministically() {
+        let sources = BTreeSet::from([
+            "./dev/active/plan.md".to_string(),
+            "dev/active/plan.md".to_string(),
+        ]);
+
+        assert_eq!(
+            destination_source_conflicts(&sources, "archive/container", "dev"),
+            BTreeMap::from([(
+                "archive/container/active/plan.md".to_string(),
+                vec![
+                    "./dev/active/plan.md".to_string(),
+                    "dev/active/plan.md".to_string(),
+                ],
+            )]),
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn test_artifact_archive_destination_strips_any_configured_development_root(
+            development_segments in prop::collection::vec("[a-z][a-z0-9-]{0,7}", 1..4),
+            relative_segments in prop::collection::vec("[a-z][a-z0-9.-]{0,9}", 1..6),
+            archive_segments in prop::collection::vec("[a-z][a-z0-9-]{0,7}", 1..4),
+        ) {
+            let development_root = development_segments.join("/");
+            let relative = relative_segments.join("/");
+            let archive_root = archive_segments.join("/");
+            let destination_root = format!("{archive_root}/container");
+            let source = format!("./{development_root}/{relative}");
+
+            prop_assert_eq!(
+                artifact_archive_destination(
+                    &format!("./{destination_root}/"),
+                    &format!("./{development_root}/"),
+                    &source,
+                ),
+                Some(format!("{destination_root}/{relative}")),
+            );
+        }
+
+        #[test]
+        fn test_artifact_archive_destination_is_injective_for_normalized_relative_paths(
+            development_root in "[a-z][a-z0-9-]{0,7}",
+            left in prop::collection::vec("[a-z][a-z0-9.-]{0,9}", 1..6),
+            right in prop::collection::vec("[a-z][a-z0-9.-]{0,9}", 1..6),
+        ) {
+            let left = left.join("/");
+            let right = right.join("/");
+            prop_assume!(left != right);
+
+            prop_assert_ne!(
+                artifact_archive_destination("archives/container", &development_root, &format!("{development_root}/{left}")),
+                artifact_archive_destination("archives/container", &development_root, &format!("{development_root}/{right}")),
+            );
+        }
     }
 
     fn explicit(path: &str, owners: Vec<ArtifactOwner>) -> ArtifactPlanEntry {
@@ -1801,7 +1931,7 @@ mod tests {
             },
             "archive",
             &[artifact],
-            &ArtifactClassificationPolicy::configured("dev", vec![], vec![], "archive"),
+            &ArtifactClassificationPolicy::configured("", vec![], vec![], "archive"),
             Vec::new(),
             &evidence,
         )
@@ -1842,7 +1972,7 @@ mod tests {
                 },
                 "archive",
                 std::slice::from_ref(&artifact),
-                &ArtifactClassificationPolicy::configured("dev", vec![], vec![], "archive"),
+                &ArtifactClassificationPolicy::configured("", vec![], vec![], "archive"),
                 Vec::new(),
                 &evidence,
             )
@@ -1921,7 +2051,7 @@ mod tests {
                 ArtifactAction::Move,
             )
             .with_content_identity(content_identity.clone())
-            .with_destination("dev/archive/abcdef12/dev/active/plan.md")
+            .with_destination("dev/archive/abcdef12/active/plan.md")
             .with_edges(vec![edge(
                 "../../README.md",
                 "README.md",
@@ -2390,7 +2520,7 @@ mod tests {
         assert_eq!(artifact.action(), ArtifactAction::Move);
         assert_eq!(
             artifact.destination(),
-            Some("dev/archive/abcdef12/dev/active/plan.md")
+            Some("dev/archive/abcdef12/active/plan.md")
         );
         assert_eq!(artifact.reference_changes().len(), 1);
         assert_eq!(artifact.pending_deletions().len(), 1);
@@ -2674,7 +2804,9 @@ mod tests {
         );
         let artifact = entry(&plan, "dev/active/shared.md");
         assert_eq!(artifact.action(), ArtifactAction::Copy);
-        let mirror = artifact_mirror_destination(plan.destination_root(), "dev/active/shared.md");
+        let mirror =
+            artifact_archive_destination(plan.destination_root(), "dev", "dev/active/shared.md")
+                .unwrap();
         assert_eq!(
             artifact.reference_changes(),
             &[ReferenceChange {
@@ -2711,7 +2843,7 @@ mod tests {
         assert_eq!(artifact.action(), ArtifactAction::Copy);
         assert_eq!(
             artifact.destination(),
-            Some(artifact_mirror_destination(plan.destination_root(), inside).as_str())
+            artifact_archive_destination(plan.destination_root(), "dev", inside).as_deref()
         );
         assert!(artifact.evidence().contains(&EvidenceCode::PermanentPath));
         assert!(artifact.pending_deletions().is_empty());
@@ -3166,7 +3298,7 @@ mod tests {
         }));
         assert!(artifact.blockers().iter().any(|blocker| {
             blocker.code == BlockerCode::DestinationConflict
-                && blocker.path.as_deref() == Some("dev/archive/abcdef12/dev/active")
+                && blocker.path.as_deref() == Some("dev/archive/abcdef12/active")
         }));
     }
 
@@ -3217,7 +3349,7 @@ mod tests {
     const CITED_SOURCE: &str = "dev/active/plan.md";
 
     /// Scanned file text covering the citation kinds the in-content census in
-    /// `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md`
+    /// `dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-investigation.md`
     /// measured: a production Rust module
     /// doc comment, an adopter-facing inline code span, a shell-script comment
     /// beside an executable default, and one file citing the path twice on a
@@ -3418,13 +3550,7 @@ mod tests {
     fn test_classify_artifacts_reports_no_citation_warning_for_a_citation_repointed_to_the_archived_destination(
     ) {
         let destination = planned_destination(CITED_SOURCE);
-        // The shape that makes this more than a spelling difference: a
-        // destination is the destination root followed by the source path, so
-        // the repointed citation still holds the source path inside it.
-        assert!(
-            destination.contains(CITED_SOURCE),
-            "a destination carries the source path, which is what makes the repointed citation ambiguous"
-        );
+        assert_ne!(destination, CITED_SOURCE);
         let text = format!("Superseded, see `{destination}` for the design.\n");
         let files = [("dev/studies/tooling.md", text.as_str())];
 
@@ -3505,6 +3631,10 @@ mod tests {
 
     #[test]
     fn test_is_whole_path_citation_separates_the_cited_path_from_a_longer_path_around_it() {
+        let canonical_destination =
+            artifact_archive_destination("dev/archive/abcdef12", "dev", CITED_SOURCE).unwrap();
+        assert_eq!(canonical_destination, "dev/archive/abcdef12/active/plan.md");
+        assert!(!canonical_destination.contains(CITED_SOURCE));
         // Text naming the path and nothing more. What sits against it carries
         // no name of its own: the delimiters prose and code write, a shell
         // default's `-`, a sentence period, a relative prefix that adds no
@@ -3521,7 +3651,6 @@ mod tests {
         }
         // Text whose path continues past the occurrence in either direction.
         for line in [
-            format!("Mirrored at `dev/archive/abcdef12/{CITED_SOURCE}`."),
             format!("Vendored at `my{CITED_SOURCE}`."),
             format!("Rendered as `{CITED_SOURCE}x`."),
             format!("Superseded by `{CITED_SOURCE}-old`."),

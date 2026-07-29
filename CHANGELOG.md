@@ -28,12 +28,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **Archive destinations no longer repeat the configured development root.**
+  Artifact paths beneath a document or container destination are now relative
+  to `documentation.development_root`, so `dev/active/plan.md` archives as
+  `<container>/active/plan.md` instead of `<container>/dev/active/plan.md`.
+  Planning, execution, relinking, recovery, and reruns share that canonical
+  derivation, and the repository's existing archive trees and live links have
+  been migrated to it.
+
 - **An archive preview's `moving-path-citation` warnings no longer fire on
   citations that already name the archived destination.** The scan matched a
-  moving artifact's source path as a plain substring, and every destination it
-  plans is the destination root followed by that same source path, so a citation
-  corrected to the destination still contained the source path and still warned
-  — with the column shifted by the length of the inserted destination root.
+  moving artifact's source path as a plain substring. Before the canonical
+  archive-relative layout above, a destination repeated the entire source path
+  after its root, so a citation corrected to that pre-cutover destination still
+  contained the source path and still warned — with the column shifted by the
+  length of the inserted destination root.
   Repointing a citation therefore never emptied the report, and the warning set
   could not be used as a work list. The scan now reports an occurrence only
   where the surrounding text names the moving path whole: text naming a longer
@@ -104,7 +113,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Cargo's undocumented defaults.** Full debug sections dominated a
   representative test executable's size, and incremental state accumulated
   without bound across gate runs (baseline measured in
-  `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md`). The workspace manifest's
+  `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md`). The workspace manifest's
   `[profile.dev]` and `[profile.test]` now set `debug = "line-tables-only"`,
   keeping line-number backtraces without the full debugger payload, and both
   state `incremental = true` explicitly so ordinary interactive builds and
@@ -170,7 +179,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   dependency-feature (no remote JSON Schema resolution, one TLS backend)
   policies against the committed manifests and gate script. The budgets and
   their evidence are defined once in the checker and
-  `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md`. `scripts/cargo-ci.sh` runs it
+  `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md`. `scripts/cargo-ci.sh` runs it
   as a `budget` step after its test step, reusing warm Cargo artifacts (no
   second cold build), and folds a concise footprint summary into the persisted
   gate summary; over-budget or policy-drift runs fail with a diagnostic naming
