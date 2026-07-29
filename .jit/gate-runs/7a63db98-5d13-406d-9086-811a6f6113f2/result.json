@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "91eab00b51087d56d954e6063080e6eafa773023",
+  "completed_at": "2026-07-29T17:14:10.170092880Z",
+  "duration_ms": 219378,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/document/link_validator.rs",
+        "id": "F1",
+        "line": 134,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "A pinned document link to any currently registered document path is accepted without verifying that the target exists at the pinned commit."
+      }
+    ],
+    "summary": "Pinned internal links to targets registered elsewhere bypass pinned-commit existence checking.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
+  "message": null,
+  "run_id": "7a63db98-5d13-406d-9086-811a6f6113f2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T17:10:30.791094808Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8490 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faedb-3b73-7423-9dd7-b75fb742e479\n--------\nuser\n--- 8477 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f08ae5f, f4418c21, 24f71c26 (all `jit:f289ff18`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f289ff18/requirement/REQ-01, @/issue/f289ff18/requirement/REQ-02, @/issue/f289ff18/requirement/REQ-03, @/issue/b80e3c70/requirement/REQ-11, @/charter/D-4, @/gate/jit-validate\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T17:02:49Z)\nTruncation recovery: narrowed per-commit and per-path reads for f08ae5f, f4418c21, and merge 24f71c26\n\n1. **F1 — High, blocking, issue-impact:** A pinned document’s internal link is accepted without checking its pinned commit whenever the target path is registered as any document in the current repository. [`validate_link_at`](crates/jit/src/document/link_validator.rs:134) returns `Valid` from `all_document_paths` before consulting `holds_target`; that set is built from all current references in [`check_document_links`](crates/jit/src/commands/document.rs:1100). Thus a pinned document can link to a registered target introduced after its pin and `check-links` reports it valid, contradicting the delivered “internal links resolve at the pin” behavior. Existing coverage only exercises an unregistered target.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Pinned internal links to targets registered elsewhere bypass pinned-commit existence checking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A pinned document link to any currently registered document path is accepted without verifying that the target exists at the pinned commit.\",\"file\":\"crates/jit/src/document/link_validator.rs\",\"line\":134,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-29T17:10:18.179638792Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-29T17:14:10.446398974Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
   "labels": [
     "milestone:v1.0",
@@ -23,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Honour a document reference's commit pin when checking links",
-  "updated_at": "2026-07-29T14:10:48.273857877Z"
+  "updated_at": "2026-07-29T17:14:10.446398974Z"
 }
