@@ -22,6 +22,11 @@ The `jit doc check-links` command validates documents before archival to ensure:
 - Internal document links resolve correctly
 - Relative paths won't break when documents are moved
 
+Each reference is checked at the version it names: a commit-pinned reference at
+its commit, an unpinned one in the working tree. Archival pins references, so a
+pinned document's file, assets, and links keep resolving once the working tree
+has moved past them.
+
 ### Command Usage
 
 ```bash
@@ -226,8 +231,8 @@ Before archiving a document:
 
 | Type | Meaning | Action |
 |------|---------|--------|
-| `missing_document` | Referenced document doesn't exist | Check path or create document |
-| `missing_asset` | Asset not found in working tree or git | Add asset or fix path |
+| `missing_document` | Reference doesn't resolve at the version it names | Check the path, or the commit it pins |
+| `missing_asset` | Asset not found at the version the reference names | Add asset or fix path |
 | `broken_link` | Internal doc link to nonexistent file | Fix link or create target |
 
 ### Warnings (Exit code 2)

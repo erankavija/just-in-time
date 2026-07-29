@@ -14,13 +14,13 @@ mod scope;
 pub use adapter::{AdapterRegistry, DocFormatAdapter, HtmlAdapter, MarkdownAdapter};
 pub use assets::{Asset, AssetScanner, AssetType};
 pub use link_validator::{InternalLink, LinkType, LinkValidationResult, LinkValidator};
-pub use reference::{
-    resolve_document_reference, DocumentReferenceError, DocumentReferenceRequests,
-    DocumentReferenceResolution, UnresolvedDocumentReference,
-};
 pub use parser::{
     content_parser_for, slugify_heading, ContentParser, ContentParserError, MarkdownContentParser,
     ParsedContent, Section,
+};
+pub use reference::{
+    resolve_document_reference, DocumentReferenceError, DocumentReferenceRequests,
+    DocumentReferenceResolution, UnresolvedDocumentReference,
 };
 pub use scope::{DocumentScope, DocumentScopeParseError};
 

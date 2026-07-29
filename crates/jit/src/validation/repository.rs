@@ -461,8 +461,8 @@ fn validate_integrity(
     // ([`resolve_document_reference`](crate::document::resolve_document_reference)).
     for issue in issues {
         for document in &issue.documents {
-            if let Some(reason) = crate::document::resolve_document_reference(image, document)?
-                .unresolved()
+            if let Some(reason) =
+                crate::document::resolve_document_reference(image, document)?.unresolved()
             {
                 return Err(anyhow!(
                     "Invalid document reference in issue '{}': {reason}",

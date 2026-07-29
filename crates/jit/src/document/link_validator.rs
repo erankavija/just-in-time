@@ -23,18 +23,27 @@ impl LinkValidator {
         }
     }
 
-    /// Scan document for internal links to other documents
+    /// Scan a document in the working tree for internal links to other documents
+    pub fn scan_document_links(&self, doc_path: &Path) -> Result<Vec<InternalLink>> {
+        let content = std::fs::read_to_string(self.repo_root.join(doc_path))?;
+        Ok(Self::scan_links(&content))
+    }
+
+    /// Scan document content for internal links to other documents
     ///
     /// Uses pulldown_cmark parser to properly handle Markdown structure.
     /// Skips links inside code blocks (fenced and indented).
     /// Note: Inline code cannot contain links in Markdown, so we don't need to track it.
-    pub fn scan_document_links(&self, doc_path: &Path) -> Result<Vec<InternalLink>> {
+    ///
+    /// Taking content rather than a path lets a caller scan the version a
+    /// document reference names, such as a commit-pinned document that the
+    /// working tree no longer carries.
+    pub fn scan_links(content: &str) -> Vec<InternalLink> {
         use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 
-        let content = std::fs::read_to_string(self.repo_root.join(doc_path))?;
         let mut links = Vec::new();
 
-        let parser = Parser::new(&content);
+        let parser = Parser::new(content);
 
         // Track whether we're inside a code block
         let mut in_code_block = false;
@@ -94,31 +103,32 @@ impl LinkValidator {
             }
         }
 
-        Ok(links)
+        links
     }
 
-    /// Validate a single link from a document
+    /// Validate a single link from a document against the working tree
     pub fn validate_link(&self, from_doc: &Path, link: &InternalLink) -> LinkValidationResult {
-        let from_dir = from_doc.parent().unwrap_or(Path::new(""));
+        self.validate_link_at(from_doc, link, |target| {
+            let full_path = self.repo_root.join(target);
+            full_path.exists() && full_path.is_file()
+        })
+    }
 
-        // Resolve the target path
-        let target_path = match link.link_type {
-            LinkType::RootRelative => {
-                // Root-relative: starts with /
-                PathBuf::from(link.target.trim_start_matches('/'))
-            }
-            LinkType::Relative => {
-                // Relative to document location
-                from_dir.join(&link.target)
-            }
-            LinkType::Anchor => {
-                // Same-document anchor, always valid
-                return LinkValidationResult::Valid;
-            }
+    /// Validate a single link from a document, asking `holds_target` whether the
+    /// resolved repository-relative path holds a file.
+    ///
+    /// The predicate names the version the link is read at, so a commit-pinned
+    /// document's links resolve at its commit rather than in the working tree.
+    pub fn validate_link_at(
+        &self,
+        from_doc: &Path,
+        link: &InternalLink,
+        holds_target: impl Fn(&Path) -> bool,
+    ) -> LinkValidationResult {
+        // A same-document anchor names no path, and is always valid
+        let Some(normalized) = self.resolve_target(from_doc, link) else {
+            return LinkValidationResult::Valid;
         };
-
-        // Normalize path (resolve .. and .)
-        let normalized = self.normalize_path(&target_path);
 
         // Check if target exists in our document set
         if self.all_document_paths.contains(&normalized) {
@@ -134,9 +144,8 @@ impl LinkValidator {
                 LinkValidationResult::Valid
             }
         } else {
-            // Check if it exists in the filesystem
-            let full_path = self.repo_root.join(&normalized);
-            if full_path.exists() && full_path.is_file() {
+            // Check if the target holds a file at the version being read
+            if holds_target(&normalized) {
                 // Root-relative links to permanent paths (docs/, README.md) are safe
                 if link.link_type == LinkType::RootRelative && self.is_permanent_path(&normalized) {
                     return LinkValidationResult::Valid;
@@ -159,6 +168,25 @@ impl LinkValidator {
                 }
             }
         }
+    }
+
+    /// The normalized repository-relative path a link from `from_doc` names.
+    ///
+    /// Returns `None` for a same-document anchor, which names no path. Callers
+    /// that must know a link's target before reading it — capturing the target's
+    /// evidence at a pinned commit, for instance — resolve it here, so the path
+    /// they read is the one [`validate_link_at`](Self::validate_link_at) asks
+    /// about.
+    pub fn resolve_target(&self, from_doc: &Path, link: &InternalLink) -> Option<PathBuf> {
+        let from_dir = from_doc.parent().unwrap_or(Path::new(""));
+        let target_path = match link.link_type {
+            // Root-relative: starts with /
+            LinkType::RootRelative => PathBuf::from(link.target.trim_start_matches('/')),
+            // Relative to document location
+            LinkType::Relative => from_dir.join(&link.target),
+            LinkType::Anchor => return None,
+        };
+        Some(self.normalize_path(&target_path))
     }
 
     /// Normalize a path by resolving . and ..
@@ -300,6 +328,70 @@ mod tests {
             LinkValidationResult::Broken { .. } => {}
             _ => panic!("Expected broken link"),
         }
+    }
+
+    #[test]
+    fn test_validate_link_at_reads_the_version_its_predicate_names() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let from = PathBuf::from("docs/report.md");
+        let validator = LinkValidator::new(temp_dir.path().to_path_buf(), vec![from.clone()]);
+        let link = InternalLink {
+            target: "appendix.md".to_string(),
+            line_number: 1,
+            link_type: LinkType::Relative,
+        };
+        let target = validator.resolve_target(&from, &link).unwrap();
+
+        // The working tree holds no target at all, so the answer follows the
+        // predicate rather than the filesystem.
+        assert!(matches!(
+            validator.validate_link_at(&from, &link, |path| path == target),
+            LinkValidationResult::Risky { .. }
+        ));
+        assert!(matches!(
+            validator.validate_link_at(&from, &link, |_| false),
+            LinkValidationResult::Broken { .. }
+        ));
+    }
+
+    #[test]
+    fn test_resolve_target_normalizes_relative_targets_and_skips_anchors() {
+        let validator = LinkValidator::new(PathBuf::from("/tmp"), vec![]);
+        let from = PathBuf::from("docs/guide/report.md");
+
+        assert_eq!(
+            validator.resolve_target(
+                &from,
+                &InternalLink {
+                    target: "../assets/diagram.png".to_string(),
+                    line_number: 1,
+                    link_type: LinkType::Relative,
+                }
+            ),
+            Some(PathBuf::from("docs/assets/diagram.png"))
+        );
+        assert_eq!(
+            validator.resolve_target(
+                &from,
+                &InternalLink {
+                    target: "/docs/index.md".to_string(),
+                    line_number: 1,
+                    link_type: LinkType::RootRelative,
+                }
+            ),
+            Some(PathBuf::from("docs/index.md"))
+        );
+        assert_eq!(
+            validator.resolve_target(
+                &from,
+                &InternalLink {
+                    target: "section".to_string(),
+                    line_number: 1,
+                    link_type: LinkType::Anchor,
+                }
+            ),
+            None
+        );
     }
 
     #[test]

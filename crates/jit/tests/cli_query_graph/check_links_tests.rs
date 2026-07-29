@@ -79,12 +79,57 @@ impl TestContext {
             .expect("git command failed");
     }
 
+    /// Prepare a repository that jit manages without Git, so a pinned reference
+    /// has no object database to resolve against.
+    fn init_repo_without_git(&self) {
+        Self::run_jit_static(&self.repo_path, &["init"]);
+    }
+
     fn run_git(&self, args: &[&str]) -> std::process::ExitStatus {
         Command::new("git")
             .current_dir(&self.repo_path)
             .args(args)
             .status()
             .expect("git command failed")
+    }
+
+    fn commit_all(&self, message: &str) {
+        assert!(self.run_git(&["add", "-A"]).success());
+        assert!(self.run_git(&["commit", "-m", message]).success());
+    }
+
+    fn head_commit(&self) -> String {
+        let output = Command::new("git")
+            .current_dir(&self.repo_path)
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .expect("git rev-parse failed");
+        assert!(output.status.success(), "git rev-parse HEAD failed");
+        String::from_utf8(output.stdout)
+            .expect("commit id is UTF-8")
+            .trim()
+            .to_string()
+    }
+
+    /// The JSON link-check report for the whole repository.
+    fn check_links_report(&self) -> serde_json::Value {
+        let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(&self.repo_path)
+            .args(["doc", "check-links", "--scope", "all", "--json"])
+            .output()
+            .expect("check-links failed");
+        serde_json::from_slice(&output.stdout).expect("check-links JSON")
+    }
+
+    /// Whether whole-repository validation accepts this repository.
+    fn validate_accepts(&self) -> bool {
+        Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(&self.repo_path)
+            .args(["validate"])
+            .output()
+            .expect("validate failed")
+            .status
+            .success()
     }
 
     fn run_jit_static(path: &PathBuf, args: &[&str]) {
@@ -473,4 +518,214 @@ fn test_git_versioned_asset_exists() {
     ctx.run_jit(&["doc", "check-links", "--scope", "all"])
         .success()
         .stdout(predicate::str::contains("valid"));
+}
+
+/// Every error a report attributes to one document, whatever its type.
+fn errors_for_document<'a>(
+    report: &'a serde_json::Value,
+    document: &str,
+) -> Vec<&'a serde_json::Value> {
+    report["errors"]
+        .as_array()
+        .expect("errors array")
+        .iter()
+        .filter(|error| error["document"].as_str() == Some(document))
+        .collect()
+}
+
+#[test]
+fn test_check_document_links_resolves_pinned_document_deleted_from_working_tree() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned document", "Description");
+    let doc_path = "docs/pinned.md";
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(ctx.repo_path().join(doc_path), "# Pinned\n\nBody.\n").unwrap();
+    ctx.commit_all("add pinned document");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .success();
+
+    fs::remove_file(ctx.repo_path().join(doc_path)).unwrap();
+    ctx.commit_all("delete pinned document");
+
+    let report = ctx.check_links_report();
+    let errors = errors_for_document(&report, doc_path);
+    assert!(
+        errors.is_empty(),
+        "a reference pinned to a commit holding its file must resolve, got: {errors:?}"
+    );
+    assert_eq!(
+        errors.is_empty(),
+        ctx.validate_accepts(),
+        "link checking and whole-repository validation must classify the pinned reference alike"
+    );
+}
+
+/// A pinned reference's assets and internal links name the same version the
+/// reference does, so a document whose whole neighbourhood left the working tree
+/// still resolves.
+#[test]
+fn test_check_document_links_resolves_pinned_assets_and_links_at_the_pin() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned document with neighbours", "Description");
+    let doc_path = "docs/report.md";
+    let asset_path = "docs/diagram.png";
+    let link_target = "docs/appendix.md";
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(
+        ctx.repo_path().join(doc_path),
+        "# Report\n\n![Diagram](diagram.png)\n\nSee [the appendix](appendix.md).\n",
+    )
+    .unwrap();
+    fs::write(ctx.repo_path().join(asset_path), b"png-bytes").unwrap();
+    fs::write(ctx.repo_path().join(link_target), "# Appendix\n").unwrap();
+    ctx.commit_all("add report with asset and appendix");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .success();
+
+    fs::remove_file(ctx.repo_path().join(doc_path)).unwrap();
+    fs::remove_file(ctx.repo_path().join(asset_path)).unwrap();
+    fs::remove_file(ctx.repo_path().join(link_target)).unwrap();
+    ctx.commit_all("delete the report and its neighbours");
+
+    let report = ctx.check_links_report();
+    let errors = errors_for_document(&report, doc_path);
+    assert!(
+        errors.is_empty(),
+        "a pinned document's assets and links resolve at its pin, got: {errors:?}"
+    );
+    assert_eq!(
+        errors.is_empty(),
+        ctx.validate_accepts(),
+        "link checking and whole-repository validation must classify the pinned reference alike"
+    );
+}
+
+#[test]
+fn test_check_document_links_rejects_pinned_document_absent_at_its_commit() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    fs::write(ctx.repo_path().join("README.md"), "# Repo\n").unwrap();
+    ctx.commit_all("initial commit");
+    let pin = ctx.head_commit();
+
+    let issue_id = ctx.create_issue("Reference pinned before its file", "Description");
+    let doc_path = "docs/later.md";
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(ctx.repo_path().join(doc_path), "# Later\n").unwrap();
+    ctx.commit_all("add the document after the pinned commit");
+
+    // The file is in the working tree, but not at the commit the reference names.
+    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .success();
+
+    let report = ctx.check_links_report();
+    let errors = errors_for_document(&report, doc_path);
+    assert!(
+        !errors.is_empty(),
+        "a reference pinned to a commit without its file must not resolve"
+    );
+    assert_eq!(
+        errors.is_empty(),
+        ctx.validate_accepts(),
+        "link checking and whole-repository validation must classify the pinned reference alike"
+    );
+}
+
+/// Without Git a pin has no object database to resolve against, so the reference
+/// is reported unresolved — the same answer whole-repository validation gives.
+#[test]
+fn test_check_document_links_reports_pinned_document_without_git() {
+    let ctx = TestContext::new();
+    ctx.init_repo_without_git();
+
+    let issue_id = ctx.create_issue("Pinned without git", "Description");
+    let doc_path = "docs/pinned.md";
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(ctx.repo_path().join(doc_path), "# Pinned\n").unwrap();
+
+    ctx.run_jit(&[
+        "doc",
+        "add",
+        &issue_id,
+        doc_path,
+        "--commit",
+        "0123456789abcdef0123456789abcdef01234567",
+    ])
+    .success();
+
+    let report = ctx.check_links_report();
+    let errors = errors_for_document(&report, doc_path);
+    assert!(
+        !errors.is_empty(),
+        "an unresolvable pin must be reported even though the file is in the working tree"
+    );
+    assert_eq!(
+        errors.is_empty(),
+        ctx.validate_accepts(),
+        "link checking and whole-repository validation must classify the pinned reference alike"
+    );
+}
+
+/// A link target that names no repository path is read as absent, rather than
+/// failing the check that would have reported it.
+#[test]
+fn test_check_document_links_reports_pinned_link_target_outside_the_repository() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned document linking outward", "Description");
+    let doc_path = "notes.md";
+    fs::write(
+        ctx.repo_path().join(doc_path),
+        "# Notes\n\nSee [the parent](../) for context.\n",
+    )
+    .unwrap();
+    ctx.commit_all("add notes");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--commit", &pin])
+        .success();
+
+    let report = ctx.check_links_report();
+    assert!(
+        report["errors"].is_array(),
+        "the check completes and reports, rather than failing"
+    );
+    assert!(
+        errors_for_document(&report, doc_path)
+            .iter()
+            .any(|error| error["type"] == "broken_link"),
+        "a target outside the repository is reported broken"
+    );
+}
+
+/// An unpinned reference keeps resolving from the working tree when Git is
+/// absent, so link checking stays usable without Git.
+#[test]
+fn test_check_document_links_resolves_unpinned_document_without_git() {
+    let ctx = TestContext::new();
+    ctx.init_repo_without_git();
+
+    let issue_id = ctx.create_issue("Unpinned without git", "Description");
+    let doc_path = "docs/current.md";
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(ctx.repo_path().join(doc_path), "# Current\n").unwrap();
+
+    ctx.run_jit(&["doc", "add", &issue_id, doc_path]).success();
+
+    let report = ctx.check_links_report();
+    let errors = errors_for_document(&report, doc_path);
+    assert!(
+        errors.is_empty(),
+        "an unpinned reference resolves from the working tree, got: {errors:?}"
+    );
 }

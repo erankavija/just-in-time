@@ -52,9 +52,7 @@ impl DocumentReferenceRequests {
     /// A pinned reference needs its `(commit, path)` evidence alone. An unpinned
     /// reference needs its working-tree entry and its `HEAD` evidence, because
     /// either one carries the current version.
-    pub fn for_reference(
-        document: &DocumentReference,
-    ) -> Result<Self, DocumentReferenceError> {
+    pub fn for_reference(document: &DocumentReference) -> Result<Self, DocumentReferenceError> {
         Ok(match document.commit.as_deref() {
             Some(commit) => Self {
                 worktree: None,
@@ -165,7 +163,10 @@ pub fn resolve_document_reference(
                 UnresolvedDocumentReference::PinUnavailable {
                     path: path.to_string(),
                     commit: revision.to_string(),
-                    reason: evidence.unavailable_reason().unwrap_or("not found").to_string(),
+                    reason: evidence
+                        .unavailable_reason()
+                        .unwrap_or("not found")
+                        .to_string(),
                 },
             ),
             None => DocumentReferenceResolution::Unresolved(
@@ -286,8 +287,15 @@ mod tests {
             spec.discover_pinned(revision, path).unwrap();
             pinned.insert((revision.to_string(), path.to_string()), evidence);
         }
-        RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), pinned, BTreeMap::new())
-            .unwrap()
+        RepositoryImage::close(
+            layout(),
+            spec,
+            entries,
+            BTreeMap::new(),
+            pinned,
+            BTreeMap::new(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -326,7 +334,11 @@ mod tests {
         let absent = image(
             &document,
             true,
-            Some(absent_evidence(&commit, "docs/design.md", "path not in tree")),
+            Some(absent_evidence(
+                &commit,
+                "docs/design.md",
+                "path not in tree",
+            )),
         );
         assert!(matches!(
             resolve_document_reference(&absent, &document)
@@ -354,7 +366,15 @@ mod tests {
         let document = reference("docs/design.md", None);
 
         assert!(resolve_document_reference(
-            &image(&document, true, Some(absent_evidence(UNPINNED_REVISION, "docs/design.md", "deleted"))),
+            &image(
+                &document,
+                true,
+                Some(absent_evidence(
+                    UNPINNED_REVISION,
+                    "docs/design.md",
+                    "deleted"
+                ))
+            ),
             &document
         )
         .unwrap()
@@ -374,7 +394,11 @@ mod tests {
                 &image(
                     &document,
                     false,
-                    Some(absent_evidence(UNPINNED_REVISION, "docs/design.md", "deleted"))
+                    Some(absent_evidence(
+                        UNPINNED_REVISION,
+                        "docs/design.md",
+                        "deleted"
+                    ))
                 ),
                 &document
             )

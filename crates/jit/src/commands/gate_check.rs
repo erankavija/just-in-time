@@ -858,8 +858,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         )?;
         if matches!(checker, GateChecker::Exec { .. }) {
             for document in &issue.documents {
-                let requests =
-                    crate::document::DocumentReferenceRequests::for_reference(document)?;
+                let requests = crate::document::DocumentReferenceRequests::for_reference(document)?;
                 if let Some(worktree) = requests.worktree() {
                     spec.discover_paths([worktree.clone()])?;
                 }

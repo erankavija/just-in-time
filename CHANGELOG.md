@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **`jit doc check-links` honours a document reference's commit pin.** It read
+  the working tree for every reference, so a reference pinned to a commit whose
+  file had since been deleted was reported `missing_document` — permanently, for
+  every historical reference the archival workflow pins by design — while `jit
+  validate` resolved the same reference at its pin and passed. Both commands now
+  apply one rule (`crate::document::resolve_document_reference` over
+  boundary-captured evidence): a pinned reference resolves at its commit and an
+  unpinned one in the working tree with a `HEAD` fallback. A pinned reference is
+  read at its commit throughout — file, assets, and internal links — so its
+  neighbourhood resolves as it stood at the pin. A pin is a claim about Git
+  history, so without Git a pinned reference is reported unresolved carrying the
+  boundary's reason, the answer `jit validate` already gave; unpinned references
+  still resolve from the working tree, keeping link checking usable without Git.
+
 - **Graph-template application no longer leaves a node `ready` while a
   dependency it just wired blocks it.** `jit apply` added the edge, then read
   the dependent's dependency set back from the already-mutated map. When the new
