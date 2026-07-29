@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "0904cc2970591f56d932597d65732ad4f3657d93",
+  "completed_at": "2026-07-29T15:48:56.278783328Z",
+  "duration_ms": 146768,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "web/package-lock.json",
+        "id": "F1",
+        "line": 1,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-11"
+        ],
+        "severity": "high",
+        "summary": "The exact required npm audit command exits 1 due to registry DNS resolution, leaving the advisory-free production dependency criterion unverified."
+      }
+    ],
+    "summary": "REQ-01 remains unverified because the required npm audit command currently exits non-zero before producing advisory results.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
+  "message": null,
+  "run_id": "f21ec714-6328-4bc2-889f-55343a58532b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T15:46:29.510037949Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6925 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fae8e-4ee6-72b0-b8ae-6ae7a48b7f3b\n--------\nuser\n--- 6912 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0ee5c22a, 45bd85c5, bbbd98b1 (all reachable from HEAD)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2 — dev/vision/9db27a3a-charter.md; @/charter/D-11 — dev/vision/9db27a3a-charter.md; @/gate/jit-validate — .jit/gates.toml\nGate evidence: npm-ci passed (exit 0, 2026-07-29T15:46:13Z); jit-validate pending (no run)\nTruncation recovery: package-lock patch read in three ranges; Mermaid patch, gate registry, current consumers, and item sources read separately\n\n1. **[blocking, issue-impact]** REQ-01 is not presently verified: the exact `npm audit --omit=dev --audit-level=info` command exits 1 before returning advisory results because the registry hostname cannot resolve. The committed lock resolves the remediated production packages, but no successful audit projection exists to establish the required advisory-free result. [`web/package-lock.json:1`] (@/charter/D-11)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-01 remains unverified because the required npm audit command currently exits non-zero before producing advisory results.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The exact required npm audit command exits 1 due to registry DNS resolution, leaving the advisory-free production dependency criterion unverified.\",\"file\":\"web/package-lock.json\",\"line\":1,\"references\":[\"@/charter/D-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

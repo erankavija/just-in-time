@@ -12,7 +12,18 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-29T15:52:32.950068272Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-29T15:46:28.714056678Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
   "labels": [
     "type:bug",
@@ -22,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remediate web production dependency advisories",
-  "updated_at": "2026-07-29T14:10:33.622495818Z"
+  "updated_at": "2026-07-29T15:52:32.950068272Z"
 }
