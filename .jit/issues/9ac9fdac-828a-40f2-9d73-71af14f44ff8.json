@@ -30,6 +30,13 @@
       "format": "markdown",
       "label": "Dogfood evidence",
       "path": "dev/archive/9ac9fdac-graph-templates/features/25064508/dogfood-9ac9fdac.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "Showcase alternate theme",
+      "path": "dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-graph-templates-showcase/themes/gruvbox.css"
     }
   ],
   "done_at": "2026-06-24T05:30:05.247973747Z",
@@ -45,5 +52,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Graph templates: configurable parameterized subgraphs applied to the work DAG",
-  "updated_at": "2026-07-29T09:19:15.600178018Z"
+  "updated_at": "2026-07-29T09:48:51.078493156Z"
 }

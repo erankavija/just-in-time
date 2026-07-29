@@ -25,6 +25,12 @@
       "format": "markdown",
       "label": "Smell-Hunt Report",
       "path": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-smell-hunt-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "progress",
+      "label": "Progress record",
+      "path": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-progress.json"
     }
   ],
   "done_at": "2026-06-26T17:55:29.421106564Z",
@@ -40,5 +46,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Code-smell cleanup: eliminate cross-boundary leaks and stringly-typed code",
-  "updated_at": "2026-07-27T09:58:33.205158232Z"
+  "updated_at": "2026-07-29T09:50:04.191436088Z"
 }

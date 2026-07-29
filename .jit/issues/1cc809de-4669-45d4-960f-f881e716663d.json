@@ -22,6 +22,13 @@
       "format": "markdown",
       "label": "Completion report",
       "path": "dev/archive/1cc809de-repository-state-quality/1cc809de-completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "Showcase alternate theme",
+      "path": "dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/themes/gruvbox.css"
     }
   ],
   "done_at": "2026-07-25T06:32:35.869622377Z",
@@ -51,5 +58,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Repository-state quality hardening",
-  "updated_at": "2026-07-29T09:19:03.278576989Z"
+  "updated_at": "2026-07-29T09:48:43.200958178Z"
 }

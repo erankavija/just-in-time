@@ -19,6 +19,13 @@
       "doc_type": "design",
       "label": "Design Document",
       "path": "dev/archive/93f3e4df-rejection-state/dev/active/rejection-state-design.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/93f3e4df-rejection-state/dev/active/93f3e4df-990c-4993-b8dc-66a8827acba7-plan.md"
     }
   ],
   "done_at": "2026-01-02T18:20:50.378306173Z",
@@ -42,5 +49,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Issue Lifecycle - Rejection State",
-  "updated_at": "2026-07-27T10:05:26.251208817Z"
+  "updated_at": "2026-07-29T09:50:09.089047670Z"
 }

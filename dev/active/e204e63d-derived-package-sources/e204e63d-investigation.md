@@ -587,7 +587,7 @@ The same filter also bans `.agents/worktrees` (harmless) but keeps `.agents/skil
 Sources: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-{plan,research}.md`,
 `dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md`, `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md`,
 `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md`, `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-progress.json`,
-`dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-handoff-2.md`, `dev/active/73482aa1-rust-build-efficiency.md`,
+`dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-handoff-2.md`, `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md`,
 `dev/vision/9db27a3a-charter.md`, `dev/active/c639cfb5-*.md`.
 
 ### Already recorded, supports the work
@@ -644,7 +644,7 @@ Sources: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-{plan,research}.
    recommended (a); `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md:457` formalized it. So the current state is
    a chosen simplification, not an oversight. e204e63d supersedes it.
 4. **jit:5d862134 forbids ambient build inputs.** `crates/jit/build.rs:6-15` and
-   `dev/active/73482aa1-rust-build-efficiency.md:58-62` record that watching `.git/index`,
+   `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md:58-62` record that watching `.git/index`,
    HEAD, refs, or the clock relinked every test target (~179 s). A directory-level
    `rerun-if-changed` on live roots does not watch git metadata, so it does not violate the
    letter of that decision — but it does make the build script mtime-sensitive to a branch
@@ -943,7 +943,7 @@ name rather than leave silent:
 - **The genuine exposure is invalidation, not size**: a directory-level `rerun-if-changed`
   makes the build script mtime-sensitive to branch switches, and an unconditional OUT_DIR
   rewrite would then relink every test target — the regression jit:5d862134 removed and the
-  invariant's rationale (`dev/active/73482aa1-rust-build-efficiency.md:58-62`). The plan
+  invariant's rationale (`dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md:58-62`). The plan
   should require a content-compare-before-write copy and cover it with an extension of
   `build_provenance_metadata_stability_tests.rs`'s existing "zero non-fresh test artifacts"
   assertion.

@@ -266,7 +266,7 @@ flowchart LR
 ## Investigation sources
 
 - [Investigation](investigation.md) —
-  `dev/active/e204e63d-derived-package-sources/investigation.md`. The exhaustive
+  `dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md`. The exhaustive
   consumer inventories, the per-root undeclared file counts, the manifest and
   template diffs, and the primitive-verification table all remain there.
 

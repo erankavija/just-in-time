@@ -28,6 +28,55 @@
       "format": "markdown",
       "label": "Completion Report",
       "path": "dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "Showcase alternate theme",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/themes/gruvbox.css"
+    },
+    {
+      "commit": null,
+      "doc_type": "session",
+      "format": "markdown",
+      "label": "Session handoff",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-2.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "session",
+      "format": "markdown",
+      "label": "Session handoff",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-3.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "session",
+      "format": "markdown",
+      "label": "Session handoff",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-4.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "session",
+      "format": "markdown",
+      "label": "Session handoff",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-5.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "session",
+      "format": "markdown",
+      "label": "Session handoff",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "planning",
+      "format": "markdown",
+      "label": "Planning brief",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md"
     }
   ],
   "done_at": "2026-07-16T20:56:51.974957142Z",
@@ -75,5 +124,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Versioned repository profiles and portable JIT dogfood setup",
-  "updated_at": "2026-07-29T09:19:10.673847240Z"
+  "updated_at": "2026-07-29T09:50:14.893069541Z"
 }

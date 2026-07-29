@@ -14,6 +14,13 @@
       "doc_type": "design",
       "label": "Design Document",
       "path": "dev/archive/d7bfd4a4-observability/dev/active/observability-design.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/d7bfd4a4-observability/dev/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md"
     }
   ],
   "gates_required": [
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Epic: Production Observability",
-  "updated_at": "2026-07-27T10:03:41.737751631Z"
+  "updated_at": "2026-07-29T09:50:27.676290323Z"
 }

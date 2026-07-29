@@ -56,7 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Cargo's undocumented defaults.** Full debug sections dominated a
   representative test executable's size, and incremental state accumulated
   without bound across gate runs (baseline measured in
-  `dev/active/73482aa1-rust-build-efficiency.md`). The workspace manifest's
+  `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md`). The workspace manifest's
   `[profile.dev]` and `[profile.test]` now set `debug = "line-tables-only"`,
   keeping line-number backtraces without the full debugger payload, and both
   state `incremental = true` explicitly so ordinary interactive builds and
@@ -98,7 +98,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   dependency-feature (no remote JSON Schema resolution, one TLS backend)
   policies against the committed manifests and gate script. The budgets and
   their evidence are defined once in the checker and
-  `dev/active/73482aa1-rust-build-efficiency.md`. `scripts/cargo-ci.sh` runs it
+  `dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md`. `scripts/cargo-ci.sh` runs it
   as a `budget` step after its test step, reusing warm Cargo artifacts (no
   second cold build), and folds a concise footprint summary into the persisted
   gate summary; over-budget or policy-drift runs fail with a diagnostic naming

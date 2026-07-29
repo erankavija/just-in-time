@@ -14,6 +14,13 @@
       "doc_type": "design",
       "label": "Phase 2 Design",
       "path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/documentation-lifecycle-phase2-design.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/94f873c8-docs-lifecycle-p2/dev/active/94f873c8-8508-44b0-b036-ff61c2a9716d-plan.md"
     }
   ],
   "first_ready_at": "2026-04-24T14:16:45.138521622Z",
@@ -31,5 +38,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Epic: Documentation Lifecycle Phase 2 - Ergonomics & Automation",
-  "updated_at": "2026-07-27T09:59:24.160974647Z"
+  "updated_at": "2026-07-29T09:50:11.650004391Z"
 }

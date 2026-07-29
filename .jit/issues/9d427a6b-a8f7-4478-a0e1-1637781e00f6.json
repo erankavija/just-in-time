@@ -32,6 +32,13 @@
       "format": "markdown",
       "label": "Agent UX Observations",
       "path": "dev/archive/9d427a6b-production-polish/dev/studies/agent-ux-observations.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/9d427a6b-production-polish/dev/active/9d427a6b-a8f7-4478-a0e1-1637781e00f6-plan.md"
     }
   ],
   "done_at": "2026-03-14T19:37:51.524399732Z",
@@ -55,5 +62,5 @@
   "priority": "normal",
   "state": "archived",
   "title": "Epic: Production Polish",
-  "updated_at": "2026-07-27T10:04:33.396388636Z"
+  "updated_at": "2026-07-29T09:50:17.438912368Z"
 }

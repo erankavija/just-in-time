@@ -24,6 +24,13 @@
       "doc_type": "design",
       "label": "Design Document",
       "path": "dev/archive/5fe00921-production-stability/dev/active/production-stability-design.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/5fe00921-production-stability/dev/active/5fe00921-6548-4263-b428-f1e839f68c74-plan.md"
     }
   ],
   "done_at": "2026-06-01T23:00:20.819367502Z",
@@ -39,5 +46,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Epic: Production Stability",
-  "updated_at": "2026-07-27T10:04:51.021439431Z"
+  "updated_at": "2026-07-29T09:49:58.841432588Z"
 }

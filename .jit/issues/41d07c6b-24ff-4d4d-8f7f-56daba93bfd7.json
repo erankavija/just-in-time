@@ -8,7 +8,15 @@
     "6d0128ae-38cf-48a6-9dbb-5fd962aef470"
   ],
   "description": "Usability improvements across the CLI and Web UI to enhance the developer and agent experience before v1.0 release.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/41d07c6b-usability/dev/active/41d07c6b-24ff-4d4d-8f7f-56daba93bfd7-plan.md"
+    }
+  ],
   "done_at": "2026-06-01T23:01:04.686842963Z",
   "first_ready_at": "2026-06-01T21:44:10.201785779Z",
   "gates_required": [],
@@ -22,5 +30,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Epic: Usability Improvements",
-  "updated_at": "2026-07-27T13:41:34.514717129Z"
+  "updated_at": "2026-07-29T09:49:54.067241155Z"
 }

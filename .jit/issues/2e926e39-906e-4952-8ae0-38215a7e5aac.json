@@ -28,6 +28,13 @@
       "doc_type": "notes",
       "label": "Showcase Deck (reveal.js)",
       "path": "dev/archive/2e926e39-agent-seamlessness/dev/presentations/2e926e39/talk.html"
+    },
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "Showcase alternate theme",
+      "path": "dev/archive/2e926e39-agent-seamlessness/dev/presentations/2e926e39/themes/gruvbox.css"
     }
   ],
   "done_at": "2026-06-28T05:48:08.360783593Z",
@@ -43,5 +50,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Agent-seamlessness residuals: first-guess CLI, gate-output readability, and validate scoping",
-  "updated_at": "2026-07-27T09:58:01.124908805Z"
+  "updated_at": "2026-07-29T09:48:45.899812512Z"
 }

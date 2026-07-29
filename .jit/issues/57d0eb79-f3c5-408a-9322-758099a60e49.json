@@ -1,13 +1,15 @@
 {
-  "id": "57d0eb79-f3c5-408a-9322-758099a60e49",
-  "title": "Bound debug information and gate incremental state",
-  "description": "Configure development and test profiles so failures retain useful line-number backtraces without embedding full debugger payloads in every test executable. Keep interactive incremental compilation explicit while ensuring broad gate builds do not accumulate incremental state.\n\n## Background\n\nA representative 246.7 MiB test executable contains 193.7 MiB of debug sections, and accumulated incremental state accounts for roughly 19 GiB. The repository currently has no manifest-level development or test profile policy.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace manifest sets both development and test debug information to `line-tables-only`, and a representative failing test with `RUST_BACKTRACE=1` reports a source file and line number from repository code.\n- [hard] REQ-02: The workspace manifest explicitly enables the intended incremental behavior for ordinary interactive development and tests rather than relying on an undocumented Cargo default.\n- [hard] REQ-03: `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every Rust compilation step while preserving the manifest's interactive policy outside the gate.\n- [hard] REQ-04: Every cargo-ci gate run deterministically verifies, as a failing gate step, that no non-empty Cargo incremental compilation state exists under the target directory that run actually used (an explicitly set CARGO_TARGET_DIR, else Cargo's resolved default), while still running formatting, zero-warning workspace all-target clippy, and the complete workspace test suite. Routine gate runs are not required to create isolated target directories; fresh isolated-CARGO_TARGET_DIR runs are the benchmark protocol's territory (dev/active/73482aa1-rust-build-efficiency.md) and must pass the same incremental-state step when exercised. [amended 2026-07-15, invoker-approved: codifies the plan's split between routine gate runs and isolated measurement samples]\n- [hard] REQ-05: A regression test or deterministic policy assertion fails if either profile returns to full debug information or if the gate stops disabling incremental compilation.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-15T07:07:44.032702341Z",
+  "context": {},
+  "created_at": "2026-07-14T13:02:07.397960625Z",
   "dependencies": [
     "4e22a20d-9a29-41b2-9266-f51ef9ee3b7a"
   ],
+  "description": "Configure development and test profiles so failures retain useful line-number backtraces without embedding full debugger payloads in every test executable. Keep interactive incremental compilation explicit while ensuring broad gate builds do not accumulate incremental state.\n\n## Background\n\nA representative 246.7 MiB test executable contains 193.7 MiB of debug sections, and accumulated incremental state accounts for roughly 19 GiB. The repository currently has no manifest-level development or test profile policy.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace manifest sets both development and test debug information to `line-tables-only`, and a representative failing test with `RUST_BACKTRACE=1` reports a source file and line number from repository code.\n- [hard] REQ-02: The workspace manifest explicitly enables the intended incremental behavior for ordinary interactive development and tests rather than relying on an undocumented Cargo default.\n- [hard] REQ-03: `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every Rust compilation step while preserving the manifest's interactive policy outside the gate.\n- [hard] REQ-04: Every cargo-ci gate run deterministically verifies, as a failing gate step, that no non-empty Cargo incremental compilation state exists under the target directory that run actually used (an explicitly set CARGO_TARGET_DIR, else Cargo's resolved default), while still running formatting, zero-warning workspace all-target clippy, and the complete workspace test suite. Routine gate runs are not required to create isolated target directories; fresh isolated-CARGO_TARGET_DIR runs are the benchmark protocol's territory (dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md) and must pass the same incremental-state step when exercised. [amended 2026-07-15, invoker-approved: codifies the plan's split between routine gate runs and isolated measurement samples]\n- [hard] REQ-05: A regression test or deterministic policy assertion fails if either profile returns to full debug information or if the gate stops disabling incremental compilation.",
+  "documents": [],
+  "done_at": "2026-07-15T08:44:42.019252992Z",
+  "first_ready_at": "2026-07-14T13:02:07.397966395Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -15,24 +17,22 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T08:13:37.525288296Z"
+      "updated_at": "2026-07-15T08:13:37.525288296Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-15T08:38:29.005509405Z"
+      "updated_at": "2026-07-15T08:38:29.005509405Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "57d0eb79-f3c5-408a-9322-758099a60e49",
   "labels": [
     "story:rust-build-efficiency",
     "type:enhancement"
   ],
-  "created_at": "2026-07-14T13:02:07.397960625Z",
-  "updated_at": "2026-07-15T08:44:42.019253632Z",
-  "first_ready_at": "2026-07-14T13:02:07.397966395Z",
-  "claimed_at": "2026-07-15T07:07:44.032702341Z",
-  "done_at": "2026-07-15T08:44:42.019252992Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Bound debug information and gate incremental state",
+  "updated_at": "2026-07-29T10:17:46.670737004Z"
 }

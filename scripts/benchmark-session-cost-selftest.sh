@@ -86,7 +86,7 @@ artifact="$out/session-cost-deadbeef.json"
   exit 1
 }
 
-template="$repo_root/dev/studies/perf/session-cost-27ffbd2d.json"
+template="$repo_root/dev/archive/1cc809de-repository-state-quality/dev/studies/perf/session-cost-27ffbd2d.json"
 jq -e --slurpfile template "$template" '
   (keys == ($template[0] | keys)) and
   ((.jit | keys) == ($template[0].jit | keys)) and

@@ -1,47 +1,46 @@
 {
-  "id": "33f76b11-0c12-4150-bebb-2f0fdb5dbc83",
-  "title": "planning: Complete profile lifecycle, composition, and upgrades",
-  "description": "Planning node for Complete profile lifecycle, composition, and upgrades (c639cfb5). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/c639cfb5-plan.md and link it to this node once written.",
-  "state": "ready",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-18T09:28:56.124408965Z",
   "dependencies": [
     "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f"
   ],
+  "description": "Planning node for Complete profile lifecycle, composition, and upgrades (c639cfb5). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md and link it to this node once written.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Current-system investigation",
+      "path": "dev/active/c639cfb5-jit-profiles-complete/c639cfb5-investigation.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md"
+    }
+  ],
+  "first_ready_at": "2026-07-18T09:28:56.124409415Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "pending",
-      "updated_by": null,
-      "updated_at": "2026-07-18T09:28:56.133684642Z"
+      "updated_at": "2026-07-18T09:28:56.133684642Z",
+      "updated_by": null
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/active/c639cfb5-investigation.md",
-      "commit": null,
-      "label": "Current-system investigation",
-      "doc_type": "research",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/active/c639cfb5-research.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "research",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/active/c639cfb5-plan.md",
-      "commit": null,
-      "label": "Implementation plan",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "33f76b11-0c12-4150-bebb-2f0fdb5dbc83",
   "labels": [
     "epic:jit-profiles-complete",
     "milestone:v1.1",
@@ -50,7 +49,8 @@
     "component:storage",
     "type:planning"
   ],
-  "created_at": "2026-07-18T09:28:56.124408965Z",
-  "updated_at": "2026-07-18T09:58:25.950776761Z",
-  "first_ready_at": "2026-07-18T09:28:56.124409415Z"
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Complete profile lifecycle, composition, and upgrades",
+  "updated_at": "2026-07-29T10:17:42.088033989Z"
 }

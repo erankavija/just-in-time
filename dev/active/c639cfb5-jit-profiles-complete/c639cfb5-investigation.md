@@ -74,7 +74,7 @@ delivered fact.
   canonical repository image, materializer, strict managed-document engine, exact
   delta/storage capability, mutation session, and recoverable publisher, plus removal of
   profile projection/final-byte/snapshot/marker planners and command-local profile/init
-  transaction builders (`dev/active/c639cfb5-plan.md:31-34`,
+  transaction builders (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`,
   `dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md:63-88`). V1.1 implementation waits until `cdc840ad` is Done,
   re-investigates the actual delivered tree and capability names, rebases its surviving
   deletion inventory, and only then asserts the cdc-owned predecessors are absent.
@@ -105,11 +105,11 @@ delivered fact.
   migration, ownership/upgrade planner, runtime/init routing, CLI/schema/MCP/current event,
   current docs, and exact contract tests land only together. No decoder/model foundation
   may land separately as dead or alternate code; only evidence expansion follows the
-  cutover (`dev/active/c639cfb5-plan.md:26-35`,
-  `dev/active/c639cfb5-plan.md:40-61`).
+  cutover (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26-35`,
+  `dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:40-61`).
 - General removal remains correctly excluded. The old brief already distinguished
   upgrade-time removal of unchanged solely-owned content from a general removal
-  command (`dev/active/9b7b5f9c-jit-profiles-planning-brief.md:67-71`), and the current
+  command (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:67-71`), and the current
   container makes the same decision. No v1.1 surface should be named or modeled as a
   general uninstall operation.
 
@@ -146,16 +146,16 @@ input/interpolation/audit machinery rather than implementing a redacted subset.
 |---|---|---|
 | 1. The v1.0 MVP capabilities are done and excluded from reimplementation scope. | **already-done** | Completion evidence covers the embedded package, planner, transaction, provenance/audit, public CLI/schema/MCP, docs, and acceptance journey (`dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md:11-67`, `dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md:138-171`). Current code and the exact public-schema test agree (`crates/jit/src/commands/profile.rs:68-133`, `crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:517-639`). Preserve capability and data compatibility through the canonical v1.1 replacement; do not preserve competing implementation paths. |
 | 2. The current CLI accepts one embedded profile and has no local/multiple selection, dependencies, incompatibilities, variables, validate/diff/upgrade, or removal. | **valid-and-open** | `init` has one `Option<String>` and `profile apply` one positional ID (`crates/jit/src/cli.rs:41-50`, `crates/jit/src/cli.rs:2841-2853`). The profile family contains only list/show/apply (`crates/jit/src/cli.rs:2821-2854`); MCP tests explicitly reject deferred lifecycle tools (`mcp-server/test-integration.js:198-243`). The manifest's closed field set also excludes all lifecycle vocabulary (`crates/jit/src/profile/manifest.rs:12-30`). |
-| 3. The delivered v1 package semantics provide validated merging and path safety. | **already-done semantic input; cdc-owned removals are expected future prerequisites** | Closed wire types and contribution variants are established (`crates/jit/src/profile/manifest.rs:12-82`). Preserve equality/conflict semantics, but `ProfileApplicationPlan`, `PlannedTarget*`, `plan_profile_application_against`, snapshot, projection, and final-byte removal belongs to the Backlog `cdc840ad` plan, not current fact or v1.1 credit (`dev/active/c639cfb5-plan.md:31-34`). |
+| 3. The delivered v1 package semantics provide validated merging and path safety. | **already-done semantic input; cdc-owned removals are expected future prerequisites** | Closed wire types and contribution variants are established (`crates/jit/src/profile/manifest.rs:12-82`). Preserve equality/conflict semantics, but `ProfileApplicationPlan`, `PlannedTarget*`, `plan_profile_application_against`, snapshot, projection, and final-byte removal belongs to the Backlog `cdc840ad` plan, not current fact or v1.1 credit (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`). |
 | 4. Applied records are currently package-granular and audit is a single profile-applied contract. | **already-done current-state fact; lifecycle extension is open** | The record has exactly ID/version/embedded origin/package hash/target hashes (`crates/jit/src/profile/application.rs:7-21`), and acceptance freezes that shape (`crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:583-595`). The event stores the same package-level identity (`crates/jit/src/domain/types.rs:1468-1490`) and its closed event catalog/parser are direct consumers (`crates/jit/src/domain/event_catalog.rs:111-169`, `crates/jit/src/domain/event_log.rs:35-89`). A canonical versioned record plus an isolated, transactional, one-way v1 migrator are necessary; an ordinary reader that accepts both shapes is forbidden. |
 | 5. V1.1 must wait for and consume `cdc840ad`'s planned repository image/materializer/session/publisher, while owning none of its predecessor deletions. | **valid-and-open prerequisite; currently Backlog** | `cdc840ad` plans canonical image/marker/delta/storage and direct mutation cutovers, including removal of profile snapshot/projection/drift/final-byte planning and command-local publishers (`dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md:63-88`). After it is Done, v1.1 must inspect the actual tree, rebase against what really landed, consume the actual capabilities, and assert rather than claim cdc-owned removals. |
 | 6. Manifest, record, result, event, and CLI contract changes have a repository-wide consumer blast radius. | **valid-and-open** | Direct consumers span runtime modules, generated schema, exact-surface tests, fixtures, package-derived gate presets, MCP curation/tests, CI, and canonical/adopter docs. The complete sweep is enumerated below. |
 | 7. Earlier profile studies and session artifacts contain useful facts but may contain stale assumptions. | **valid-and-open** | The pre-MVP investigation says no product profile surface existed (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:16-26`), which is now historical only. Its architecture and deferred-scope cautions remain useful (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:499-548`). The core handoff records the later projection-manifest integration (`dev/archive/6eb585bc-core-maintenance/6eb585bc-handoff-5.md:17-21`). Current code and the completion report outrank pre-implementation descriptions. |
 | 8. Registry SSOT, domain-agnostic pure logic, Git optionality, and public JSON/schema contracts constrain the design. | **valid-and-open** | Layer boundaries require pure domain logic, storage-owned persistence, command orchestration, and CLI/output-only presentation (`AGENTS.md:135-146`). JSON and list-envelope conventions are mandatory (`AGENTS.md:155-163`). The dogfood preset compatibility surface already derives from package data rather than owning another inventory (`crates/jit/src/profile/preset.rs:41-74`, `crates/jit/src/gate_presets/builtin.rs:17-52`). |
-| 9. REQ-12/D-07 require one canonical lifecycle design, same-change removal of predecessors that survive the eventual cdc landing, and durable v1 migration with no compatibility branches. | **valid-and-open; architecture-defining** | The provisional v1.1 inventory is the embedded-only package/resolver, ordinary v1 record loader/matcher, source-specific one-ID init/profile command and dispatch, current `profile_applied` constructor/appender, surviving v1 result/provenance family, and current public/docs consumers. The final inventory is rebased only after `cdc840ad` is Done; cdc-owned paths are then absence assertions, never v1.1 re-deletion credit (`dev/active/c639cfb5-plan.md:31-35`). |
+| 9. REQ-12/D-07 require one canonical lifecycle design, same-change removal of predecessors that survive the eventual cdc landing, and durable v1 migration with no compatibility branches. | **valid-and-open; architecture-defining** | The provisional v1.1 inventory is the embedded-only package/resolver, ordinary v1 record loader/matcher, source-specific one-ID init/profile command and dispatch, current `profile_applied` constructor/appender, surviving v1 result/provenance family, and current public/docs consumers. The final inventory is rebased only after `cdc840ad` is Done; cdc-owned paths are then absence assertions, never v1.1 re-deletion credit (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-35`). |
 | 10. REQ-04/REQ-06/REQ-11 and D-06 define variables as explicitly non-secret and persistable, with no secret channel. | **valid-and-open; supersedes the earlier sensitive-value finding** | V1 has no variable vocabulary and rejects the reserved reference namespace (`crates/jit/src/profile/manifest.rs:12-30`, `crates/jit/src/profile/planner.rs:278-309`). V2 must persist every resolved variable value for deterministic reconfiguration, expose precedence and reference rendering, audit names/source kinds without values, and test that no secret declaration, input, interpolation, resupply, or special redaction surface exists (`.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json:4`). |
 | 11. Manifest v1 bytes and hashes remain stable while v2 decodes into the canonical model. | **valid-and-open; compatibility-defining** | The dogfood manifest is explicitly v1 (`profiles/jit-dogfood/manifest.toml:1-5`), package identity hashes canonical manifest serialization plus exact declared source bytes, and tests already pin a v1 fixture hash (`crates/jit/src/profile/package.rs:453-526`, `crates/jit/src/profile/package.rs:657-669`). Introduce version-specific wire decoding followed immediately by one normalized package; do not rewrite the dogfood tree or run v1/v2 planners. |
-| 12. Canonical applied records require full closure, and decoder/model/runtime/public/docs work is one vertical cutover after `cdc840ad` reaches Done. | **valid-and-open; breakdown constraint** | The v1 record is closed but minimal (`crates/jit/src/profile/application.rs:7-21`). After re-investigating the actual cdc landing, the final decoder/model/resolver/records are introduced and used only in the same task that switches runtime/init, schema/MCP/event/docs, exact tests, and truly surviving-path deletion; no separately green foundation exists (`dev/active/c639cfb5-plan.md:26-35`, `dev/active/c639cfb5-plan.md:48-62`). |
+| 12. Canonical applied records require full closure, and decoder/model/runtime/public/docs work is one vertical cutover after `cdc840ad` reaches Done. | **valid-and-open; breakdown constraint** | The v1 record is closed but minimal (`crates/jit/src/profile/application.rs:7-21`). After re-investigating the actual cdc landing, the final decoder/model/resolver/records are introduced and used only in the same task that switches runtime/init, schema/MCP/event/docs, exact tests, and truly surviving-path deletion; no separately green foundation exists (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26-35`, `dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:48-62`). |
 | 13. Template, canonical-record, and current-event wire details are fixed. | **chosen planning decisions; not current code facts** | Manifest v2 asset/region `template` is boolean/default false; placeholders follow the sole bounded semantic-string rules; canonical records are schema v2; and `profile_lifecycle_changed` uses the exact operation/action/migration/no-event rules recorded below. These shapes land only in the vertical cutover and must not be cited as released v1 behavior. |
 
 ## Current system by contract
@@ -220,7 +220,7 @@ The public source grammar is now frozen: every selecting command accepts one rep
 `ProfileSelector` collection carries the interleaved occurrence stream through CLI,
 generated schema, MCP, command requests, results, and tests. Separate ID/path vectors,
 untagged values, index reconstruction, implicit search, and remote discovery are rejected
-(`dev/active/c639cfb5-plan.md:26-27`, `dev/active/c639cfb5-plan.md:103-105`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26-27`, `dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:103-105`).
 
 ### Semantic merge and multi-profile gap
 
@@ -271,8 +271,8 @@ unknown fields and duplicate names fail, and `name`/`env` use
 `[variables]` string map, plus repeatable `--set NAME=VALUE`; `--set` splits at the first
 `=`, empty strings are values, undeclared names and duplicate values within one tier fail,
 and the source-kind enum is `default|values_file|environment|set`
-(`dev/active/c639cfb5-research.md:391-428`,
-`dev/active/c639cfb5-plan.md:26-29`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md:391-428`,
+`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26-29`).
 
 `{{jit:var:NAME}}` is the only template form. It is a single non-recursive pass over string
 semantic leaves and UTF-8 asset/region bodies whose declarations explicitly opt into
@@ -282,7 +282,7 @@ cannot contain references; loops, conditionals, indirection, nested languages, m
 or unknown references, and non-string values fail closed. Package identity covers the
 unresolved package bytes; plan and ownership-claim identities cover the sorted resolved
 value map and exact final semantic/materialized bytes
-(`dev/active/c639cfb5-plan.md:27-29`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:27-29`).
 
 This is not a partial secret feature. There is no secret flag in the manifest, `--secret`
 or hidden prompt/input channel, secret reference form, ephemeral wrapper, redaction/resupply
@@ -321,7 +321,7 @@ implement them, and cdc's Backlog status does not change their public meaning:
   with no resolved values or rendered bytes.
 
 These decisions refine the broader strict-template, record-migration, and one-current-event
-choices in the reviewed plan (`dev/active/c639cfb5-plan.md:26-35`). Decoder/model, record,
+choices in the reviewed plan (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26-35`). Decoder/model, record,
 event, output/schema/MCP, exact tests, and canonical docs must expose them in the same
 vertical cutover.
 
@@ -370,8 +370,8 @@ This embedded-only evidence restriction is deliberate. The still-shipped pinned 
 is the only historical base that can be authenticated without adding a second inventory.
 If it is unavailable or any hash/current unit differs, migration fails closed and names the
 required ID, version, package hash, and target hashes
-(`dev/active/c639cfb5-research.md:123-219`,
-`dev/active/c639cfb5-plan.md:29-31`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md:123-219`,
+`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:29-31`).
 
 Package target hashes describe authored contribution frames, not the repository's
 post-merge per-key base state (`crates/jit/src/profile/package.rs:453-521`). They cannot by
@@ -391,13 +391,13 @@ exactly once at its ownership granularity, and shared owner sets agree wherever 
 No optional legacy fields, central duplicate ownership index, orphan sidecar, event replay,
 or partially migrated row may be needed to reconstruct the canonical evidence. Canonical
 per-profile claims and cross-record validation must prove the closure invariant
-(`dev/active/c639cfb5-plan.md:29-31`, `dev/active/c639cfb5-plan.md:106-110`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:29-31`, `dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:106-110`).
 
 Every operation evaluates selected candidates alongside every surviving unselected owner,
 dependency, dependent, and incompatibility from that canonical closure. Equal resolved
 fingerprints retain all owners; differing selected or surviving bases conflict. Upgrade
 must not invalidate an unselected dependent's version range or introduce an incompatibility
-with a survivor (`dev/active/c639cfb5-plan.md:29-30`).
+with a survivor (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:29-30`).
 
 Three-way upgrade decisions can then compare recorded base fingerprint, current semantic
 value, and candidate value. Only `current == base` is untouched; `current != base` plus a
@@ -409,7 +409,7 @@ Old `ProfileApplied` events remain readable append-only history; event decoding 
 competing mutation path. V1.1 current mutations emit only `profile_lifecycle_changed`;
 ordinary `profile_applied` construction/appending is deleted while the historical tag,
 parser, and torn-tail handling remain decodable for audit continuity
-(`dev/active/c639cfb5-plan.md:34-35`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:34-35`).
 
 ### Audit and public results
 
@@ -436,7 +436,7 @@ Current result types expose package-level list/show/apply/plan shapes
 directly in `main.rs` (`crates/jit/src/main.rs:2073-2185`). The vertical cutover removes
 that one-ID result family in favor of count-wrapped deterministic collection results over
 repeated ordered `id:ID|path:DIR`; dry-run and mutation may remain an honest operation union,
-not a single-versus-multiple compatibility union (`dev/active/c639cfb5-research.md:519-549`).
+not a single-versus-multiple compatibility union (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md:519-549`).
 
 ## Primitive verification
 
@@ -446,18 +446,18 @@ not a single-versus-multiple compatibility union (`dev/active/c639cfb5-research.
 | Adding v2 fields directly to the v1 manifest type preserves v1 identity. | **contradicted** | V1 rejects unknown fields, validates one exact manifest version, and hashes canonical serialization of that wire object (`crates/jit/src/profile/manifest.rs:12-44`, `crates/jit/src/profile/package.rs:233-242`, `crates/jit/src/profile/package.rs:507-516`). Version-specific strict wire types must normalize into one model, while v1 hashing remains frozen. |
 | Package path validation rejects lexical escapes. | **confirmed** | Empty, absolute, traversal, backslash, drive/colon, control-character, and noncanonical paths fail (`crates/jit/src/profile/package.rs:391-417`). |
 | Package validation alone makes local directory loading symlink-safe. | **contradicted** | Manifest paths are checked lexically; the existing embedded loader does no live directory walk (`crates/jit/src/profile/package.rs:191-214`). Local loading needs capability-confined, no-follow capture before pure validation. |
-| The released one-package planner established useful overlay semantics. | **confirmed historical input; removal is assigned to Backlog cdc** | The v1 planner uses an immutable view and exact target validation (`crates/jit/src/profile/planner.rs:132-150`, `crates/jit/src/profile/planner.rs:227-275`). The cdc plan expects `ProfileApplicationPlan`, `PlannedTarget*`, and `plan_profile_application_against` to be absent. V1.1 waits for Done, verifies actual absence, and receives no deletion credit for paths cdc really removed (`dev/active/c639cfb5-plan.md:31-34`). |
+| The released one-package planner established useful overlay semantics. | **confirmed historical input; removal is assigned to Backlog cdc** | The v1 planner uses an immutable view and exact target validation (`crates/jit/src/profile/planner.rs:132-150`, `crates/jit/src/profile/planner.rs:227-275`). The cdc plan expects `ProfileApplicationPlan`, `PlannedTarget*`, and `plan_profile_application_against` to be absent. V1.1 waits for Done, verifies actual absence, and receives no deletion credit for paths cdc really removed (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`). |
 | Re-running the old one-package planner implements multi-profile composition. | **contradicted and structurally forbidden** | It accepts one package and record path (`crates/jit/src/profile/planner.rs:132-150`). The cdc plan is expected to remove that route; after cdc Done, v1.1 rechecks the tree and must neither recreate nor wrap it. |
 | Current semantic merge is idempotent and rejects differing same-key definitions. | **confirmed** | Equal map/keyed/projection values no-op, existing set strings no-op, and differing definitions return `ContributionConflict` (`crates/jit/src/profile/planner.rs:501-683`). |
-| Released profile application proves coupled record/event publication. | **confirmed current guarantee; replacement is assigned to Backlog cdc** | V1 holds repository/event locks and puts targets, record, and event in one file transaction (`crates/jit/src/commands/profile.rs:137-220`). The cdc plan is expected to replace command-local builders with one mutation session. V1.1 waits for that actual capability, then feeds it rather than reproducing or claiming cdc's deletion (`dev/active/c639cfb5-plan.md:31-34`). |
+| Released profile application proves coupled record/event publication. | **confirmed current guarantee; replacement is assigned to Backlog cdc** | V1 holds repository/event locks and puts targets, record, and event in one file transaction (`crates/jit/src/commands/profile.rs:137-220`). The cdc plan is expected to replace command-local builders with one mutation session. V1.1 waits for that actual capability, then feeds it rather than reproducing or claiming cdc's deletion (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`). |
 | The transaction kernel provides instantaneous multi-file filesystem atomicity. | **contradicted** | It publishes identity-checked actions sequentially after a durable prepared journal; failures roll back or retain recovery state (`crates/jit/src/storage/file_transaction.rs:107-176`, `crates/jit/src/storage/file_transaction.rs:492-593`). The public contract correctly calls this recoverable publication (`docs/reference/profiles.md:95-111`). |
 | The transaction kernel supports a complete multi-profile file delta without a new journal protocol. | **confirmed** | `FileTransactionPlan` already accepts a deterministic action vector (`crates/jit/src/storage/file_transaction.rs:34-41`), normalizes paths/directories and rejects duplicate targets (`crates/jit/src/storage/file_transaction.rs:856-920`). v1.1 should feed it one aggregate materialization delta. |
 | Recovery is available even when repository caches are invalid. | **confirmed** | The coordinator reads only transaction protocol state, not config/rules/schema (`crates/jit/src/storage/recovery_coordinator.rs:1-41`), and its tests exercise invalid caches (`crates/jit/src/storage/recovery_coordinator.rs:251-264`). |
 | Existing record hashes are enough for three-way per-key upgrade. | **contradicted** | The record has only package/target hashes (`crates/jit/src/profile/application.rs:7-21`); target hashes frame authored operations by whole target (`crates/jit/src/profile/package.rs:453-521`). Per-key/file base fingerprints and migration proof are open. |
 | Independent per-profile ownership rows are sufficient without a closure check. | **contradicted** | Shared ownership spans profiles, while the current record has no ownership vocabulary at all (`crates/jit/src/profile/application.rs:7-21`). Canonical validation must reject missing profile records, orphan owner references, absent contribution rows, duplicate ownership identities, inconsistent shared owner sets, and partial migrations before publication. |
 | A serde union/default-based reader for old and new records counts as canonical migration. | **contradicted** | The current applied record is an exact unknown-field-denying five-field type (`crates/jit/src/profile/application.rs:7-21`), while older repository indexes are accepted through defaults (`crates/jit/src/storage/json.rs:123-140`). REQ-12 requires an isolated one-way decoder that durably rewrites canonical versioned records, not that index-style fallback in normal lifecycle reads. |
-| The current profile projection drift helper is a lifecycle ownership engine. | **contradicted; planned cdc removal** | It compares a dedicated projection tree rather than semantic ownership (`crates/jit/src/profile/drift.rs:42-51`). The cdc plan assigns removal of `profile::drift` and duplicate projection vocabulary. After cdc Done, v1.1 verifies what is absent and implements drift over canonical claims without restoring it (`dev/active/c639cfb5-plan.md:31-34`). |
-| Managed-target composition/publication is v1.1 work. | **contradicted; expected `cdc840ad` prerequisite** | Backlog cdc plans one strict managed-document engine, canonical image/materializer, exact delta/storage capability, and publisher. V1.1 cannot start its implementation until those postconditions are delivered and inspected (`dev/active/c639cfb5-plan.md:31-36`). |
+| The current profile projection drift helper is a lifecycle ownership engine. | **contradicted; planned cdc removal** | It compares a dedicated projection tree rather than semantic ownership (`crates/jit/src/profile/drift.rs:42-51`). The cdc plan assigns removal of `profile::drift` and duplicate projection vocabulary. After cdc Done, v1.1 verifies what is absent and implements drift over canonical claims without restoring it (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`). |
+| Managed-target composition/publication is v1.1 work. | **contradicted; expected `cdc840ad` prerequisite** | Backlog cdc plans one strict managed-document engine, canonical image/materializer, exact delta/storage capability, and publisher. V1.1 cannot start its implementation until those postconditions are delivered and inspected (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-36`). |
 | Current profile operations are Git-independent. | **confirmed** | Fresh and existing application are tested outside Git (`crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:232-299`), and worktree identity is optional after repository publication (`crates/jit/src/commands/mod.rs:1032-1070`). Keep local package and upgrade paths inside the same boundary. |
 
 ## Planned post-cdc prerequisite and provisional v1.1 cutover inventories
@@ -475,18 +475,18 @@ postconditions, not present facts: `cdc840ad` is Backlog. V1.1 implementation mu
 Done, re-investigate the actual delivered tree and capability contracts, subtract paths
 cdc truly removed from its own inventory, assert those names/routes remain absent, and
 reject recreation; none of cdc's actual removals becomes v1.1 deletion credit
-(`dev/active/c639cfb5-plan.md:31-34`, `dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md:63-88`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`, `dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md:63-88`).
 
 ### Provisional surviving predecessors: rebase after cdc Done, then delete vertically
 
 | Surviving predecessor | Canonical replacement and same-change proof |
 |---|---|
-| Public `EmbeddedProfilePackage`, its re-export, and the embedded-only package lookup/resolver | One strict v1/v2 decoder immediately returns the source-neutral package model, and one resolver accepts ordered `id:ID|path:DIR` selectors. Remove the embedded-only type/export/lookup rather than wrapping it (`dev/active/c639cfb5-plan.md:26-34`). |
-| Embedded-only list/show/plan/apply/validate methods plus `validate_profile_id` | One aggregate lifecycle service backs every verb. Remove source-specific methods and direct callers in `commands/profile.rs`, profiled init, `main.rs`, server/direct callers, and tests in the same cutover (`dev/active/c639cfb5-plan.md:33-34`). |
-| Single-ID init/profile request, dispatch, output, schema, and MCP shape | One repeated ordered `--profile id:ID|path:DIR` occurrence and collection result contract travels unchanged through CLI, schema, MCP, requests, results, tests, and current docs. Separate ID/path channels and single-versus-many result unions do not survive (`dev/active/c639cfb5-plan.md:26`, `dev/active/c639cfb5-research.md:490-551`). |
-| Five-field `AppliedProfileRecord` as the ordinary current type, its loader/matcher/constructor, and the surviving v1 provenance/result family | Ordinary reads accept only the closed canonical records. Keep the five-field shape solely as the private embedded-pinned migration input; delete `ProfileApplicationStatus`, `ProfileApplicationWarning`, `ProfileApplyResult`, `ProfileListResult`, `ProfileShowResult`, `ProfileTargetAction`, `ProfileTargetChange`, `ProfilePlanStatus`, and `ProfilePlanResult` as surviving public predecessors (`dev/active/c639cfb5-plan.md:31-34`). |
-| Current `Event::new_profile_applied` constructor and profile event-image appender/emitter | Current mutations emit only `profile_lifecycle_changed` through the cdc audit-seed/materialization path, with sorted variable name/source-kind pairs and no values. Remove current construction/emission; retain only historical `ProfileApplied` tag/parser and torn-tail decoding (`dev/active/c639cfb5-plan.md:34-35`). |
-| Current embedded-only/apply-only/minimal-record CLI, JSON, schema, MCP, exact-test, and adopter-doc contracts | Runtime/init, outputs, generated surfaces, current event, exact tests, navigation, and canonical docs switch in the same green task. Preserve archive/presentation history; no later public/docs cleanup owns contract changes (`dev/active/c639cfb5-plan.md:33-35`, `dev/active/c639cfb5-plan.md:48-62`). |
+| Public `EmbeddedProfilePackage`, its re-export, and the embedded-only package lookup/resolver | One strict v1/v2 decoder immediately returns the source-neutral package model, and one resolver accepts ordered `id:ID|path:DIR` selectors. Remove the embedded-only type/export/lookup rather than wrapping it (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26-34`). |
+| Embedded-only list/show/plan/apply/validate methods plus `validate_profile_id` | One aggregate lifecycle service backs every verb. Remove source-specific methods and direct callers in `commands/profile.rs`, profiled init, `main.rs`, server/direct callers, and tests in the same cutover (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:33-34`). |
+| Single-ID init/profile request, dispatch, output, schema, and MCP shape | One repeated ordered `--profile id:ID|path:DIR` occurrence and collection result contract travels unchanged through CLI, schema, MCP, requests, results, tests, and current docs. Separate ID/path channels and single-versus-many result unions do not survive (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26`, `dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md:490-551`). |
+| Five-field `AppliedProfileRecord` as the ordinary current type, its loader/matcher/constructor, and the surviving v1 provenance/result family | Ordinary reads accept only the closed canonical records. Keep the five-field shape solely as the private embedded-pinned migration input; delete `ProfileApplicationStatus`, `ProfileApplicationWarning`, `ProfileApplyResult`, `ProfileListResult`, `ProfileShowResult`, `ProfileTargetAction`, `ProfileTargetChange`, `ProfilePlanStatus`, and `ProfilePlanResult` as surviving public predecessors (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`). |
+| Current `Event::new_profile_applied` constructor and profile event-image appender/emitter | Current mutations emit only `profile_lifecycle_changed` through the cdc audit-seed/materialization path, with sorted variable name/source-kind pairs and no values. Remove current construction/emission; retain only historical `ProfileApplied` tag/parser and torn-tail decoding (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:34-35`). |
+| Current embedded-only/apply-only/minimal-record CLI, JSON, schema, MCP, exact-test, and adopter-doc contracts | Runtime/init, outputs, generated surfaces, current event, exact tests, navigation, and canonical docs switch in the same green task. Preserve archive/presentation history; no later public/docs cleanup owns contract changes (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:33-35`, `dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:48-62`). |
 
 The unchanged `profiles/jit-dogfood` v1 package and package-derived workflow inventory are
 preserved, not deleted or copied. Strict v1 package decoding is a permanent wire contract;
@@ -579,7 +579,7 @@ v1.1 migrates a surviving consumer or merely asserts a cdc-owned predecessor sta
   assert rather than migrate/delete:
   `profile/planner.rs` public final-byte plan vocabulary, `profile/render.rs`,
   `profile/snapshot.rs`, `profile/drift.rs`, duplicate preset projection inventory, and
-  their exports/callers (`dev/active/c639cfb5-plan.md:31-34`).
+  their exports/callers (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-34`).
 - Command orchestration and exports: `crates/jit/src/commands/profile.rs:1-347`,
   `crates/jit/src/commands/init.rs:1-32`,
   `crates/jit/src/commands/init.rs:337-430`,
@@ -675,8 +675,8 @@ v1.1 migrates a surviving consumer or merely asserts a cdc-owned predecessor sta
 ### Historical/planning consumers that must not be rewritten as current API docs
 
 - Original complete-lifecycle contract:
-  `dev/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38` and
-  `dev/active/9b7b5f9c-jit-profiles-planning-brief.md:57-102`.
+  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38` and
+  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:57-102`.
 - MVP scope decision: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-mvp-scope-brief.md:7-30`.
 - Pre-MVP investigation and implementation plan:
   `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:1-22`,
@@ -702,8 +702,8 @@ v1.1 migrates a surviving consumer or merely asserts a cdc-owned predecessor sta
 The original complete-lifecycle brief already contains the essential product decisions:
 separate embedded ID and explicit local paths, dependency/variable resolution, semantic
 composition without order winners, per-profile ownership, three-way upgrade, and removal
-deferral (`dev/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38`,
-`dev/active/9b7b5f9c-jit-profiles-planning-brief.md:47-83`). It is valuable input, but its
+deferral (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38`,
+`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:47-83`). It is valuable input, but its
 23-criterion scope predates the bounded MVP and must not be treated as the current public
 shape.
 
@@ -711,7 +711,7 @@ Its secret/redaction language is now specifically stale. REQ-04, REQ-06, REQ-11,
 D-06 replace it with explicitly non-secret, persistable values and an absence test for any
 secret channel. Synthesis should retain precedence and reference-rendering ideas from the
 brief, but must discard sensitive wrappers, redaction paths, resupply flows, and secret
-audit concepts (`dev/active/9b7b5f9c-jit-profiles-planning-brief.md:20-38`,
+audit concepts (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:20-38`,
 `.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json:4`).
 
 The MVP brief and charter explicitly moved this breadth intact to post-1.0
@@ -743,8 +743,8 @@ projection/snapshot/final-byte/command-transaction predecessors. These are expec
 postconditions until cdc reaches Done. The current `c639cfb5` plan and research freeze the
 remaining selector, variable, migration, event, and vertical-cutover choices; they outrank
 this report's earlier open alternatives
-(`dev/active/c639cfb5-plan.md:24-36`,
-`dev/active/c639cfb5-research.md:652-672`).
+(`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:24-36`,
+`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md:652-672`).
 
 No dedicated `dev/sessions/` document records a later profile-lifecycle decision. Current
 issue decisions, the reviewed current plan/research, cdc's planned postconditions plus its
@@ -766,7 +766,7 @@ profile completion report, and the canonical profile reference outrank older pro
   before canonical service loading, and—only after cdc reaches Done—canonical record
   persistence through the verified cdc repository image/mutation session. Storage must not
   restore a profile-specific snapshot or transaction builder that the actual cdc landing
-  removed (`dev/active/c639cfb5-plan.md:31-36`).
+  removed (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-36`).
 - **Command layer:** explicit package source resolution, environment/values/`--set` input
   collection, aggregate plan orchestration, locked rebuild, migration policy, audit-event
   construction, and typed result/error mapping. After cdc Done and re-investigation, it
@@ -896,4 +896,4 @@ the embedded source registry only.
   `[variables]` values file; repeatable `--set NAME=VALUE`; sole
   `{{jit:var:NAME}}`; asset/region `template` boolean default false; record v2; and the
   exact `profile_lifecycle_changed` operation/action/migration/no-event rules above, with
-  historical `ProfileApplied` decode-only (`dev/active/c639cfb5-plan.md:26-35`).
+  historical `ProfileApplied` decode-only (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:26-35`).

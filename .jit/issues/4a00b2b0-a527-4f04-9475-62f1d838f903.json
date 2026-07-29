@@ -29,6 +29,13 @@
       "format": "markdown",
       "label": "AI Tool Worktree Compatibility Study",
       "path": "dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation plan",
+      "path": "dev/archive/4a00b2b0-agent-validation/dev/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md"
     }
   ],
   "done_at": "2026-06-01T22:34:01.166883980Z",
@@ -44,5 +51,5 @@
   "priority": "critical",
   "state": "archived",
   "title": "Epic: AI Agent Validation",
-  "updated_at": "2026-07-27T09:58:17.237924976Z"
+  "updated_at": "2026-07-29T09:49:56.407963142Z"
 }

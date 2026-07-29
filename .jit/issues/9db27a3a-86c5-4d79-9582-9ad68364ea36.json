@@ -44,16 +44,16 @@
   "documents": [
     {
       "commit": null,
-      "doc_type": "notes",
-      "label": "Steward progress",
-      "path": "dev/active/9db27a3a-progress.json"
-    },
-    {
-      "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Project charter",
       "path": "dev/vision/9db27a3a-charter.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "label": "Steward progress",
+      "path": "dev/active/9db27a3a-v1-0/9db27a3a-progress.json"
     }
   ],
   "gates_required": [
@@ -68,5 +68,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Version 1.0 Production Release",
-  "updated_at": "2026-07-28T10:34:42.181188087Z"
+  "updated_at": "2026-07-29T09:52:01.948502307Z"
 }
