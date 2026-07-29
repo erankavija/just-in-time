@@ -43,14 +43,17 @@ function jsonSchemaToZod(property, isRequired) {
       schema = z.any();
   }
   
-  // Add default value if present
-  if (property.default !== undefined) {
-    schema = schema.default(property.default);
-  }
-  
-  // Make optional if not required
+  // Make optional if not required. In Zod 4 this must be the inner wrapper:
+  // an outer optional() returns undefined before an inner default() can
+  // resolve it.
   if (!isRequired) {
     schema = schema.optional();
+  }
+
+  // Add default value after optionality so omitted optional and required
+  // properties both resolve the advertised JSON Schema default.
+  if (property.default !== undefined) {
+    schema = schema.default(property.default);
   }
   
   return schema;
