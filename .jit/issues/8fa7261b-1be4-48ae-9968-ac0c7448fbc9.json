@@ -5,7 +5,15 @@
   "created_at": "2026-07-15T09:12:53.169206436Z",
   "dependencies": [],
   "description": "The committed web production dependency graph is advisory-free while preserving the built UI.\n\n## Success Criteria\n\n- [hard] REQ-01: npm audit --omit=dev --audit-level=info exits zero in web/ against the committed package-lock.json with no audit exception.\n- [hard] REQ-02: Web lint, unit tests, TypeScript build, and production bundle succeed after the dependency changes.\n- [hard] REQ-03: Any dependency API or rendering migration updates every affected UI consumer and regression test in the same change.\n\n## Notes\n\nBlast radius: `web/package.json`, `web/package-lock.json`, and affected `web/src/` code/tests; no Rust or MCP contract changes.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": "Production dependency audit evidence",
+      "path": "dev/active/8fa7261b/production-audit-evidence.md"
+    }
+  ],
   "first_ready_at": "2026-07-15T09:12:53.169206806Z",
   "gates_required": [
     "npm-ci",
@@ -33,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remediate web production dependency advisories",
-  "updated_at": "2026-07-29T15:52:32.950068272Z"
+  "updated_at": "2026-07-29T16:01:26.272608060Z"
 }
