@@ -1,4 +1,6 @@
-# Both the job-level and the step-level escape are findings.
+# The job-level escape, the step-level escape, and an escape hidden behind an
+# expression whose run-time value a static check cannot know are all findings.
 exit: 1
 job 'validate' sets 'continue-on-error'
 job 'audit' step 1 (Audit) sets 'continue-on-error'
+job 'smoke' sets 'continue-on-error'

@@ -15,3 +15,8 @@ jobs:
       - name: Audit
         continue-on-error: true
         run: ./audit.sh
+  smoke:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name == 'push' }}
+    steps:
+      - run: ./smoke.sh

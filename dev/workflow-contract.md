@@ -11,6 +11,10 @@ Two checkers run over the same tree:
 | `actionlint`, pinned and checksum-verified | workflow schema, expression syntax, context and `needs` reference validity, shell quoting inside `run:` |
 | [`scripts/workflow-contract.py`](../scripts/workflow-contract.py) | this repository's structural declarations — triggers, `workflow_call` interfaces, `needs` edges, permissions, failure escapes, `uses:` pinning |
 
+The linter runs with its shellcheck and pyflakes integrations off, so a run
+depends on the pinned binary alone rather than on which tools the host happens
+to have installed.
+
 `.github/` is repository policy. It is not part of the shipped jit surface, and
 nothing here describes adopter-facing behaviour.
 
@@ -32,8 +36,10 @@ Exit codes are `0` clean, `1` findings, `2` environment or contract error. An
 environment error is never reported as a pass.
 
 The same two commands run in the `workflow-contract` job of
-[`ci.yml`](../.github/workflows/ci.yml) on every push and pull request, so a
-workflow edit that violates a declared assertion fails that pull request.
+[`ci.yml`](../.github/workflows/ci.yml), whose triggers cover every push and
+pull request that touches anything but documentation. No edit to a workflow, to
+the contract, or to the harness itself reaches `main` without them: a change
+that violates a declared assertion fails its pull request.
 
 ## Declaring assertions
 

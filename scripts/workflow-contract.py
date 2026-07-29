@@ -134,6 +134,18 @@ def is_truthy(value) -> bool:
     return str(value).strip().lower() in {"true", "yes", "on", "1"}
 
 
+def is_explicitly_false(value) -> bool:
+    """True only for a literal negative.
+
+    An escape key set from an expression (`continue-on-error: ${{ … }}`) is not
+    literally false, so it stays a finding: what it evaluates to at run time is
+    exactly what a static check cannot know.
+    """
+    if isinstance(value, bool):
+        return not value
+    return str(value).strip().lower() in {"false", "no", "off", "0"}
+
+
 # --------------------------------------------------------------------------
 # Shared shape helpers
 # --------------------------------------------------------------------------
@@ -359,7 +371,7 @@ def check_steps_for_escapes(relative: Path, subject: str, steps) -> list[Finding
     for index, raw_step in enumerate(steps or [], start=1):
         step = as_mapping(raw_step)
         label = f"{subject} {step_label(index, step)}"
-        if "continue-on-error" in step and is_truthy(step["continue-on-error"]):
+        if "continue-on-error" in step and not is_explicitly_false(step["continue-on-error"]):
             findings.append(
                 finding(relative, f"{label} sets 'continue-on-error', which suppresses failure")
             )
@@ -377,7 +389,7 @@ def check_failure_escapes(relative: Path, doc) -> list[Finding]:
     findings = []
     for name, job in workflow_jobs(doc).items():
         subject = f"job {name!r}"
-        if "continue-on-error" in job and is_truthy(job["continue-on-error"]):
+        if "continue-on-error" in job and not is_explicitly_false(job["continue-on-error"]):
             findings.append(
                 finding(relative, f"{subject} sets 'continue-on-error', which suppresses failure")
             )
@@ -660,6 +672,10 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
         if path.is_file() and path.suffix in WORKFLOW_SUFFIXES
     )
     committed = {path.name for path in workflows}
+    # Seeded with every workflow so recursion through a local
+    # `./.github/workflows/…` call never re-checks a file the main loop covers,
+    # and a composite reached from two workflows is reported once.
+    visited = {path.resolve() for path in workflows}
 
     findings = [
         finding(
@@ -682,7 +698,7 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
 
         findings.extend(check_job_graph(relative, doc))
         if require_sha_pinned_uses:
-            findings.extend(check_uses(root, path, False, doc, {path}))
+            findings.extend(check_uses(root, path, False, doc, visited))
         if forbid_failure_escapes:
             findings.extend(check_failure_escapes(relative, doc))
         findings.extend(check_triggers(relative, doc, declaration.get("triggers")))
