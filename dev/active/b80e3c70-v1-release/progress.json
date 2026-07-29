@@ -359,7 +359,7 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {
-    "7edd2fe8": 1,
+    "7edd2fe8": 2,
     "8fa7261b": 1
   },
   "surfaced_pitfalls": [
