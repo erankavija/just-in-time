@@ -1,16 +1,16 @@
 {
-  "id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
-  "title": "Enforce reusable blocking dependency audits",
-  "description": "One reusable security workflow blocks pull requests and release callers on audit installation, data-source, or advisory failure.\n\n## Success Criteria\n\n- [hard] REQ-01: The security workflow runs on pull requests and workflow_call, installs a pinned cargo-audit with --locked, and executes cargo audit -D warnings plus both npm audit --omit=dev --audit-level=info commands against committed locks.\n- [hard] REQ-02: Installation, registry/database, and finding failures propagate as job failures; the workflow contains no continue-on-error, shell fallback, blanket ignore, or advisory allowlist.\n- [hard] REQ-03: The shared workflow-verification harness proves each of the three audit boundaries prevents caller success and all downstream release jobs remain unstarted.\n\n## Notes\n\nBlast radius: `.github/workflows/security-audit.yml` plus declarations consumed by the shared workflow-verification harness; gate-preset examples remain configuration examples, not hosted-release substitutes.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.170390577Z",
   "dependencies": [
     "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
     "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
     "bb302dbd-bd03-42ed-ae71-b0f035453f56",
     "f04f7888-a828-4677-aea8-f640a6702375"
   ],
+  "description": "One reusable security workflow blocks pull requests and the release workflow on audit installation, data-source, or advisory failure.\n\n## Success Criteria\n\n- [hard] REQ-01: The security workflow runs on pull requests and through `workflow_call`, installs a pinned `cargo-audit` with `--locked`, and executes `cargo audit -D warnings` plus both `npm audit --omit=dev --audit-level=info` commands against the committed locks.\n- [hard] REQ-02: Installation, registry, database, and finding failures each propagate as a job failure; the workflow contains no `continue-on-error`, shell fallback, blanket ignore, or advisory allowlist.\n- [hard] REQ-03: The shared workflow-contract checks assert that each of the three audit boundaries is a `needs` predecessor of every artifact-producing job in the release workflow, and that no path reaches publication while one of them fails.\n\n## Notes\n\nBlast radius: `.github/workflows/security-audit.yml` plus the assertions it declares to the shared workflow-contract harness. Gate-preset examples in `.jit/` remain repository-local configuration examples, not a substitute for the hosted check.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.170390817Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
@@ -20,15 +20,14 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
   "labels": [
     "type:task",
-    "epic:production-readiness",
-    "satisfies:REQ-02",
-    "satisfies:REQ-03"
+    "epic:v1-release",
+    "milestone:v1.0"
   ],
-  "created_at": "2026-07-15T09:12:53.170390577Z",
-  "updated_at": "2026-07-15T09:12:53.267035147Z",
-  "first_ready_at": "2026-07-15T09:12:53.170390817Z"
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Enforce reusable blocking dependency audits",
+  "updated_at": "2026-07-29T13:52:38.653854147Z"
 }

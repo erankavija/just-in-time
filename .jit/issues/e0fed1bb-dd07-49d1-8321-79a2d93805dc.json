@@ -1,13 +1,13 @@
 {
-  "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
-  "title": "Make the normal validation suites reusable",
-  "description": "Pull requests, branch builds, and the release workflow execute one maintained definition of the full normal validation suite on their own commit.\n\n## Success Criteria\n\n- [hard] REQ-01: The normal CI workflow accepts workflow_call while retaining its pull-request and branch behavior without duplicating Rust, web, MCP, repository-validation, or MSRV job definitions.\n- [hard] REQ-02: The shared workflow-verification harness proves a caller receives failure when any required Rust, web, MCP, repository-validation, or exact-MSRV job fails on the called SHA.\n- [hard] REQ-03: Existing CI workflow checks and representative local suite commands remain green after the trigger/refactor change.\n\n## Notes\n\nBlast radius: `.github/workflows/ci.yml` and workflow-contract tests only; security and publication stay in their dedicated workflows.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.171353117Z",
   "dependencies": [
     "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0"
   ],
+  "description": "Pull requests, branch builds, and the release workflow execute one maintained definition of the full normal validation suite on their own commit.\n\n## Success Criteria\n\n- [hard] REQ-01: The normal CI workflow accepts `workflow_call` while retaining its pull-request and branch behavior, without duplicating the Rust, web, MCP, repository-validation, or MSRV job definitions.\n- [hard] REQ-02: The shared workflow-contract checks assert that a caller declares each required Rust, web, MCP, repository-validation, and exact-MSRV job as a `needs` predecessor, so no caller can reach success while one of them fails on the called commit.\n- [hard] REQ-03: Existing CI workflow checks and representative local suite commands remain green after the trigger and refactor change.\n\n## Notes\n\nBlast radius: `.github/workflows/ci.yml` and workflow-contract assertions only; security and publication stay in their dedicated workflows.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.171353367Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
@@ -17,15 +17,15 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
   "labels": [
     "type:task",
-    "epic:production-readiness",
-    "satisfies:REQ-03",
-    "satisfies:REQ-04"
+    "epic:v1-release",
+    "milestone:v1.0",
+    "satisfies:REQ-09"
   ],
-  "created_at": "2026-07-15T09:12:53.171353117Z",
-  "updated_at": "2026-07-15T09:12:53.334471276Z",
-  "first_ready_at": "2026-07-15T09:12:53.171353367Z"
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Make the normal validation suites reusable",
+  "updated_at": "2026-07-29T13:52:43.551919779Z"
 }

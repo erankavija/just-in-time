@@ -1,30 +1,29 @@
 {
-  "id": "847237ef-95b2-4b61-9b3d-8a470554c863",
-  "title": "Implement the fixed-ref tag authority primitive",
-  "description": "A repository-owned primitive exposes the only code path for creating the two protected annotated tag namespaces.\n\n## Success Criteria\n\n- [hard] REQ-01: One versioned interface accepts only candidate-tag or final-tag plus exact prepared/handoff identity, freeze SHA/root, compact payload, expected actor, environment, and repository; it constructs only the constant protected refs.\n- [hard] REQ-02: The primitive mints one repository-only App token, creates the annotated ref without force, exact-readbacks the tag object and peeled SHA, returns structured completion fields, and always revokes without persisting credentials.\n- [hard] REQ-03: Unit and negative fixtures reject arbitrary or movable refs, update/delete/force, GITHUB_TOKEN or PAT use, wrong identity/evidence, malformed payload, over-broad installation, persisted credentials, and cross-namespace use.\n- [hard] REQ-04: The primitive owns no workflow trigger, job graph, transition schema, concurrency policy, hosted cross-workflow fixture, account setting, tag, release, or candidate byte.\n\n## Notes\n\nBlast radius: the fixed-ref interface, implementation, and unit/negative fixtures only.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
-  "dependencies": [
-    "e0fed1bb-dd07-49d1-8321-79a2d93805dc"
-  ],
+  "context": {},
+  "created_at": "2026-07-15T11:19:56.071658839Z",
+  "dependencies": [],
+  "description": "A repository-owned primitive exposes the only code path for creating the two protected annotated tag namespaces.\n\n## Success Criteria\n\n- [hard] REQ-01: One versioned interface accepts only candidate-tag or final-tag plus exact prepared/handoff identity, freeze SHA/root, compact payload, expected actor, environment, and repository; it constructs only the constant protected refs.\n- [hard] REQ-02: The primitive mints one repository-only App token, creates the annotated ref without force, exact-readbacks the tag object and peeled SHA, returns structured completion fields, and always revokes without persisting credentials.\n- [hard] REQ-03: Unit and negative fixtures reject arbitrary or movable refs, update/delete/force, GITHUB_TOKEN or PAT use, wrong identity/evidence, malformed payload, over-broad installation, persisted credentials, and cross-namespace use.\n- [hard] REQ-04: The primitive owns no workflow trigger, job graph, transition schema, concurrency policy, hosted cross-workflow fixture, account setting, tag, release, or candidate byte.\n\n## Notes\n\nBlast radius: the fixed-ref interface, implementation, and unit/negative fixtures only.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:19:56.071659189Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "847237ef-95b2-4b61-9b3d-8a470554c863",
   "labels": [
     "type:task",
     "epic:production-readiness",
     "story:release-authority-foundation",
     "satisfies:REQ-03",
     "satisfies:REQ-04",
-    "satisfies:REQ-05"
+    "satisfies:REQ-05",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:19:56.071658839Z",
-  "updated_at": "2026-07-15T11:20:19.370523031Z",
-  "first_ready_at": "2026-07-15T11:19:56.071659189Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement the fixed-ref tag authority primitive",
+  "updated_at": "2026-07-29T13:50:04.390202177Z"
 }

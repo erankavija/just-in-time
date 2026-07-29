@@ -15,10 +15,12 @@
   "labels": [
     "milestone:v1.0",
     "component:tooling",
-    "type:bug"
+    "type:bug",
+    "epic:v1-release",
+    "satisfies:REQ-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Mechanical documentation checker defaults to the archival permanent paths",
-  "updated_at": "2026-07-26T19:30:08.501698654Z"
+  "updated_at": "2026-07-29T13:56:16.995290229Z"
 }

@@ -1,22 +1,20 @@
 {
-  "id": "570a0cab-5d63-4df2-ba79-c104b441766b",
-  "title": "Implement final-tag authorization and recovery workflows",
-  "description": "Fresh live-state and MSRV authorization creates the immutable final tag through the fixed-ref primitive and supports exact-tag recovery without stale preparation.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the constant publication mutex, protected preflight authenticates rehearsal and escrow, proves final channels absent, runs live MSRV recency last, uploads a one-use prepared record, and calls the authority primitive for annotated v1.0.0 creation.\n- [hard] REQ-02: Exact tag object, peeled SHA, manifest, and authority output readback precede completion; an absent tag supersedes stale preparation and repeats full preflight, while an exact existing tag may recovery-complete.\n- [hard] REQ-03: Fixtures reject conflicting tags/channels, stale or foreign preparation, unsafe retry, mutation outside the mutex, and recovery without exact escrow/tag/live-state agreement.\n\n## Notes\n\nBlast radius: final-tag authorization/recovery workflow YAML and hosted transition fixtures only.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T11:19:56.075220421Z",
   "dependencies": [
-    "82bab119-cf80-4531-8a5e-0b435169c010",
-    "cdee58b3-1428-4874-9814-dacefc517605"
+    "82bab119-cf80-4531-8a5e-0b435169c010"
   ],
+  "description": "Fresh live-state and MSRV authorization creates the immutable final tag through the fixed-ref primitive and supports exact-tag recovery without stale preparation.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the constant publication mutex, protected preflight authenticates rehearsal and escrow, proves final channels absent, runs live MSRV recency last, uploads a one-use prepared record, and calls the authority primitive for annotated v1.0.0 creation.\n- [hard] REQ-02: Exact tag object, peeled SHA, manifest, and authority output readback precede completion; an absent tag supersedes stale preparation and repeats full preflight, while an exact existing tag may recovery-complete.\n- [hard] REQ-03: Fixtures reject conflicting tags/channels, stale or foreign preparation, unsafe retry, mutation outside the mutex, and recovery without exact escrow/tag/live-state agreement.\n\n## Notes\n\nBlast radius: final-tag authorization/recovery workflow YAML and hosted transition fixtures only.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:19:56.075220701Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "570a0cab-5d63-4df2-ba79-c104b441766b",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -26,9 +24,11 @@
     "satisfies:REQ-05",
     "satisfies:REQ-09",
     "satisfies:REQ-10",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:19:56.075220421Z",
-  "updated_at": "2026-07-15T11:20:19.628896989Z",
-  "first_ready_at": "2026-07-15T11:19:56.075220701Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement final-tag authorization and recovery workflows",
+  "updated_at": "2026-07-29T13:49:49.802117310Z"
 }

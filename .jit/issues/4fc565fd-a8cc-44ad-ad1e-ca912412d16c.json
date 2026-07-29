@@ -1,21 +1,20 @@
 {
-  "id": "4fc565fd-a8cc-44ad-ad1e-ca912412d16c",
-  "title": "Authorize and create the immutable v1.0.0 tag",
-  "description": "A reviewer-approved serialized run authenticates rehearsal, verifies absent public channels, runs fresh live MSRV, and creates one transition-guarded annotated final tag before publication.\n\n## Success Criteria\n\n- [hard] REQ-01: The entire workflow declares `concurrency: {group: jit-v1.0.0-publication, cancel-in-progress: false}` before any live read. Initial authorization accepts only rehearsal_completed_artifact_id, verifies embedded escrow release/asset/root identities and non-expired/unabandoned status through day 60, enters final-release, and holds the group through tag completion/recovery upload. Listings cannot select another chain.\n- [hard] REQ-02: Before live MSRV/token/tag mutation, it verifies immutable releases enabled; exact candidate escrow present, immutable, attested and byte-complete; and public npm 1.0.0, v1.0.0/final GitHub Release, and GHCR :1.0.0 absent. Unknown/conflicting state fails before mutation.\n- [hard] REQ-03: It runs live MSRV as final validation and uploads attested final-tag-prepared with rehearsal ID, candidate escrow release/asset IDs+digests/URL/attestation, root digest, candidate SHA, versions/policy digest, absent-final-channel snapshot, actor/run/expiry. Only that ID permits App-token mint.\n- [hard] REQ-04: The App creates annotated v1.0.0 non-force at freeze SHA. Its tag message embeds prepared ID/digest plus a complete compact authorization manifest: escrow release ID/URL and every asset ID/digest, root digest, candidate tag/SHA, rehearsal identity, versions/policy digest and expected npm/GHCR/final-GitHub identities. Exact object/annotation/peeled-SHA/App readback writes final-tag-completed, then revokes token. Recovery accepting the old prepared ID may write recovery-completed only for the exact existing tag. If absent, it records supersession without mutation; a new grouped run must accept rehearsal ID, repeat full live preflight/MSRV, and issue a new prepared ID.\n- [hard] REQ-05: Tag creation itself is irreversible. No npm/GHCR/GitHub mutation starts before completed/recovery evidence. Fixtures reject stale absent-tag reuse, listing authority, substituted parents, wrong/moved tag, unsafe retry, changed MSRV, untrusted actor, duplicate publisher, or post-creation abandonment/replacement.\n- [hard] REQ-06: A replaced pending authorization/recovery run has executed no step and is explicitly redispatched with the same exact parent ID. Fixtures prove the running holder is never cancelled, no mutating subjob escapes the constant group, and the group is retained through final completion/recovery upload.\n\n## Notes\n\nBlast radius: constant-group exact-ID fresh preflight, tag transition/App operation, and exact-existing-tag recovery only; durable candidate escrow already exists and no package/final-channel publication occurs here.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.181935405Z",
   "dependencies": [
     "81cd978e-f089-445f-a059-ca88e3e1a2de"
   ],
+  "description": "A reviewer-approved serialized run authenticates rehearsal, verifies absent public channels, runs fresh live MSRV, and creates one transition-guarded annotated final tag before publication.\n\n## Success Criteria\n\n- [hard] REQ-01: The entire workflow declares `concurrency: {group: jit-v1.0.0-publication, cancel-in-progress: false}` before any live read. Initial authorization accepts only rehearsal_completed_artifact_id, verifies embedded escrow release/asset/root identities and non-expired/unabandoned status through day 60, enters final-release, and holds the group through tag completion/recovery upload. Listings cannot select another chain.\n- [hard] REQ-02: Before live MSRV/token/tag mutation, it verifies immutable releases enabled; exact candidate escrow present, immutable, attested and byte-complete; and public npm 1.0.0, v1.0.0/final GitHub Release, and GHCR :1.0.0 absent. Unknown/conflicting state fails before mutation.\n- [hard] REQ-03: It runs live MSRV as final validation and uploads attested final-tag-prepared with rehearsal ID, candidate escrow release/asset IDs+digests/URL/attestation, root digest, candidate SHA, versions/policy digest, absent-final-channel snapshot, actor/run/expiry. Only that ID permits App-token mint.\n- [hard] REQ-04: The App creates annotated v1.0.0 non-force at freeze SHA. Its tag message embeds prepared ID/digest plus a complete compact authorization manifest: escrow release ID/URL and every asset ID/digest, root digest, candidate tag/SHA, rehearsal identity, versions/policy digest and expected npm/GHCR/final-GitHub identities. Exact object/annotation/peeled-SHA/App readback writes final-tag-completed, then revokes token. Recovery accepting the old prepared ID may write recovery-completed only for the exact existing tag. If absent, it records supersession without mutation; a new grouped run must accept rehearsal ID, repeat full live preflight/MSRV, and issue a new prepared ID.\n- [hard] REQ-05: Tag creation itself is irreversible. No npm/GHCR/GitHub mutation starts before completed/recovery evidence. Fixtures reject stale absent-tag reuse, listing authority, substituted parents, wrong/moved tag, unsafe retry, changed MSRV, untrusted actor, duplicate publisher, or post-creation abandonment/replacement.\n- [hard] REQ-06: A replaced pending authorization/recovery run has executed no step and is explicitly redispatched with the same exact parent ID. Fixtures prove the running holder is never cancelled, no mutating subjob escapes the constant group, and the group is retained through final completion/recovery upload.\n\n## Notes\n\nBlast radius: constant-group exact-ID fresh preflight, tag transition/App operation, and exact-existing-tag recovery only; durable candidate escrow already exists and no package/final-channel publication occurs here.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.181935665Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "4fc565fd-a8cc-44ad-ad1e-ca912412d16c",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -24,9 +23,11 @@
     "satisfies:REQ-07",
     "satisfies:REQ-09",
     "satisfies:REQ-10",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T09:12:53.181935405Z",
-  "updated_at": "2026-07-15T09:12:54.428663402Z",
-  "first_ready_at": "2026-07-15T09:12:53.181935665Z"
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Authorize and create the immutable v1.0.0 tag",
+  "updated_at": "2026-07-29T13:41:49.559193994Z"
 }

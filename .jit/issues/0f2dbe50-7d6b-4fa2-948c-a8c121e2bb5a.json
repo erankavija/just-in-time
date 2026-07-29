@@ -1,16 +1,15 @@
 {
-  "id": "0f2dbe50-7d6b-4fa2-948c-a8c121e2bb5a",
-  "title": "Freeze the exact integrated v1.0 source",
-  "description": "One clean protected-branch commit contains every accepted product, dependency, workflow/tooling, Docker, documentation, core, and profile change; its trusted freeze workflow uploads and attests the exact immutable handoff before any candidate identity or product artifact exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The protected release-branch tip contains the accepted core-maintenance and portable-profile commits, the profile quickstart, resolved integration conflicts, and the final Rust-remediation/core changes in Cargo.lock and manifests.\n- [hard] REQ-02: A fresh fetch/checkout proves HEAD equals the protected remote tip, git status --porcelain=v2 --untracked-files=all is empty, no submodule/worktree input is unresolved, the tree is reproducible from the commit, all product manifests declare 1.0.0, every critical external Action is full-SHA pinned, GitHub immutable releases are enabled, and canonical docs/tooling are present.\n- [hard] REQ-03: Normal suites, blocking audits, repository validation, exact MSRV, workflow-contract tests, Docker PR/runtime fixtures, documentation checks, and external core/profile public-contract checks pass on this commit without modifying it.\n- [hard] REQ-04: The workflow attests then uploads exactly one overwrite-forbidden `freeze-root-v1.0.0-<SHA>-run<R>-attempt<A>` manifest at 90-day retention, recording SHA/tree, protected branch/ref, accepted upstream commit IDs, workflow/tool-policy digests, suite run IDs, immutable-release setting, timestamp, repository/actor/event/run identity, and absence of candidate/final tags, public npm 1.0.0, GHCR :1.0.0, and GitHub v1 release. Its exact artifact ID/digest/expiry and attestation verification are retained in the run summary for reviewer selection.\n- [hard] REQ-05: This work creates no tag and no native, source, MCP, or OCI candidate. Failed or ambiguous upload, retention below 90 days, any later source commit, dirty input, changed workflow definition, or accepted-upstream amendment invalidates the artifact and requires a new freeze; candidate bytes are never patched in place.\n\n## Notes\n\nBlast radius: read-only integration verification plus one immutable attested freeze artifact; no source, tag, or product artifact is created.\n",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.177775002Z",
   "dependencies": [
     "cdc840ad-9332-4936-9381-772318967f0f",
     "6eb585bc-998d-4778-906d-415fcdc1916e",
-    "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f",
-    "080e54c6-8b70-40c5-9bbe-6a9f720a09ce"
+    "9b7b5f9c-6357-4e99-a1df-bef80d6bca1f"
   ],
+  "description": "One clean protected-branch commit contains every accepted product, dependency, workflow/tooling, Docker, documentation, core, and profile change; its trusted freeze workflow uploads and attests the exact immutable handoff before any candidate identity or product artifact exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The protected release-branch tip contains the accepted core-maintenance and portable-profile commits, the profile quickstart, resolved integration conflicts, and the final Rust-remediation/core changes in Cargo.lock and manifests.\n- [hard] REQ-02: A fresh fetch/checkout proves HEAD equals the protected remote tip, git status --porcelain=v2 --untracked-files=all is empty, no submodule/worktree input is unresolved, the tree is reproducible from the commit, all product manifests declare 1.0.0, every critical external Action is full-SHA pinned, GitHub immutable releases are enabled, and canonical docs/tooling are present.\n- [hard] REQ-03: Normal suites, blocking audits, repository validation, exact MSRV, workflow-contract tests, Docker PR/runtime fixtures, documentation checks, and external core/profile public-contract checks pass on this commit without modifying it.\n- [hard] REQ-04: The workflow attests then uploads exactly one overwrite-forbidden `freeze-root-v1.0.0-<SHA>-run<R>-attempt<A>` manifest at 90-day retention, recording SHA/tree, protected branch/ref, accepted upstream commit IDs, workflow/tool-policy digests, suite run IDs, immutable-release setting, timestamp, repository/actor/event/run identity, and absence of candidate/final tags, public npm 1.0.0, GHCR :1.0.0, and GitHub v1 release. Its exact artifact ID/digest/expiry and attestation verification are retained in the run summary for reviewer selection.\n- [hard] REQ-05: This work creates no tag and no native, source, MCP, or OCI candidate. Failed or ambiguous upload, retention below 90 days, any later source commit, dirty input, changed workflow definition, or accepted-upstream amendment invalidates the artifact and requires a new freeze; candidate bytes are never patched in place.\n\n## Notes\n\nBlast radius: read-only integration verification plus one immutable attested freeze artifact; no source, tag, or product artifact is created.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.177775272Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
@@ -20,8 +19,7 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "0f2dbe50-7d6b-4fa2-948c-a8c121e2bb5a",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -32,9 +30,11 @@
     "satisfies:REQ-08",
     "satisfies:REQ-09",
     "satisfies:REQ-10",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T09:12:53.177775002Z",
-  "updated_at": "2026-07-18T09:29:13.417074620Z",
-  "first_ready_at": "2026-07-15T09:12:53.177775272Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Freeze the exact integrated v1.0 source",
+  "updated_at": "2026-07-29T13:49:35.220288673Z"
 }

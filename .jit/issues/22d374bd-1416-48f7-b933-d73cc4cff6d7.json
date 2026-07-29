@@ -1,28 +1,28 @@
 {
-  "id": "22d374bd-1416-48f7-b933-d73cc4cff6d7",
-  "title": "Add the dual-license and compatibility release record",
-  "description": "The repository and release inputs carry complete legal text plus a canonical changelog and v1.0 compatibility/upgrade record.\n\n## Success Criteria\n\n- [hard] REQ-01: LICENSE-MIT and LICENSE-APACHE contain the complete texts matching the MIT OR Apache-2.0 manifest expression and are included by artifact manifests.\n- [hard] REQ-02: CHANGELOG and the v1.0 release-note source state supported capabilities, compatibility boundaries, upgrade expectations, and intentional packaging removals without repeating installation commands.\n- [hard] REQ-03: A release metadata check fails when either license text, the v1.0 changelog entry, or the compatibility/upgrade record is absent from the release inputs.\n\n## Notes\n\nBlast radius: repository-root license/changelog files, the canonical release-note source, and release metadata validation; install/deployment commands remain in canonical user guides.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.172773078Z",
   "dependencies": [
     "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2"
   ],
+  "description": "The repository and the release inputs carry complete legal text plus a canonical changelog and a v1.0 compatibility and upgrade record.\n\n## Success Criteria\n\n- [hard] REQ-01: `LICENSE-MIT` and `LICENSE-APACHE` contain the complete texts matching the `MIT OR Apache-2.0` manifest expression, and both are included in the published native archive.\n- [hard] REQ-02: The changelog and the v1.0 release-note source state the supported capabilities, compatibility boundaries, upgrade expectations, and intentional packaging removals, without repeating installation commands.\n- [hard] REQ-03: A release metadata check fails when either license text, the v1.0 changelog entry, or the compatibility and upgrade record is missing or names a version other than the declared product version.\n\n## Notes\n\nBlast radius: repository-root license and changelog files, the canonical release-note source, and release metadata validation; installation and deployment commands remain in the canonical user guides.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.172773318Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "22d374bd-1416-48f7-b933-d73cc4cff6d7",
   "labels": [
     "type:task",
-    "epic:production-readiness",
-    "satisfies:REQ-04",
-    "satisfies:REQ-05"
+    "epic:v1-release",
+    "milestone:v1.0",
+    "satisfies:REQ-09"
   ],
-  "created_at": "2026-07-15T09:12:53.172773078Z",
-  "updated_at": "2026-07-15T09:12:53.514111717Z",
-  "first_ready_at": "2026-07-15T09:12:53.172773318Z"
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Add the dual-license and compatibility release record",
+  "updated_at": "2026-07-29T13:52:53.372043893Z"
 }

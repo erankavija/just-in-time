@@ -1,13 +1,13 @@
 {
-  "id": "81cd978e-f089-445f-a059-ca88e3e1a2de",
-  "title": "Run the pre-publication clean-room v1.0 rehearsal",
-  "description": "A pristine reviewer-authorized run authenticates the immutable candidate prerelease and rehearses all exact escrowed native, source, MCP, OCI, evidence, and frozen-document bytes while every final v1 channel remains absent.\n\n## Success Criteria\n\n- [hard] REQ-01: workflow_dispatch accepts only candidate_escrow_release_id plus expected root digest and no ref/name/latest selector. Read-only verification fetches that numeric release, candidate tag/peeled SHA, release attestation and exact numeric asset IDs/digests from its recovery bundle, rejects any missing/mutable/mismatched identity, and downloads every tested byte directly from release assets—not Actions artifacts.\n- [hard] REQ-02: Extracted native candidates install cleanly and verify jit version/init, accepted profile quickstart, human and --json commands, jit --schema, jit-server, real embedded web/SPA fallback, and /api/health.\n- [hard] REQ-03: In a separate pristine environment, the exact source archive checksum/provenance/inventory are verified and extracted without Git metadata; frozen source instructions and cargo install --path crates/jit --locked pass without changing the archive.\n- [hard] REQ-04: The exact retained MCP tarball is integrity/provenance-verified, clean-installed, and completes initialize/tools-list with candidate jit; public npm 1.0.0 remains absent, with no publish/repack command.\n- [hard] REQ-05: OCI tar SHA-256/D_index match escrow evidence; Skopeo copies D_run digest-preservingly into rootless Podman, and exact runtime bytes pass default/host-UID lifecycle, API/web/document/search/persistence/ownership smoke. With a ten-second stop timeout, multiple SSE and a deliberately non-completing ordinary connection remain active at SIGTERM; SSE reaches EOF, the handle force-closes the stall at five seconds, and PID 1 exits 0 before ten seconds without SIGKILL/137 or archive mutation.\n- [hard] REQ-06: Frozen binary/source install, deployment, upgrade, checksum/provenance, compatibility, profile quickstart, and package-candidate instructions execute with commands, versions, checksums, package integrity, image digest, and results retained.\n- [hard] REQ-07: Before/after rehearsal, the exact immutable candidate prerelease remains present while public npm 1.0.0, v1.0.0 tag/final GitHub Release, and GHCR :1.0.0 remain absent; rehearsal has no tag/registry/release/source-write permission.\n- [hard] REQ-08: Acceptance inventories CLI, server/API, web UI, MCP server, escrowed native/source/MCP candidates, and OCI image; it verifies core/profiles Done contracts and quickstart.\n- [hard] REQ-09: Success uploads/attests one 90-day rehearsal-completed artifact containing candidate release numeric ID/URL, every asset ID/digest, root digest, release attestation, commands/results, core/profile acceptance, and final-channel snapshot. Final authorization accepts only this ID and reauthenticates escrow; failure/day-60/expiry/abandonment prevents final tag.\n\n## Notes\n\nBlast radius: read-only clean-room acceptance from public immutable candidate escrow plus one attested rehearsal artifact; defects return to their source owner before final-v1 identity.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.181456005Z",
   "dependencies": [
     "3d4342f9-e24e-40f2-b83d-52e4de487344"
   ],
+  "description": "A pristine reviewer-authorized run authenticates the immutable candidate prerelease and rehearses all exact escrowed native, source, MCP, OCI, evidence, and frozen-document bytes while every final v1 channel remains absent.\n\n## Success Criteria\n\n- [hard] REQ-01: workflow_dispatch accepts only candidate_escrow_release_id plus expected root digest and no ref/name/latest selector. Read-only verification fetches that numeric release, candidate tag/peeled SHA, release attestation and exact numeric asset IDs/digests from its recovery bundle, rejects any missing/mutable/mismatched identity, and downloads every tested byte directly from release assets—not Actions artifacts.\n- [hard] REQ-02: Extracted native candidates install cleanly and verify jit version/init, accepted profile quickstart, human and --json commands, jit --schema, jit-server, real embedded web/SPA fallback, and /api/health.\n- [hard] REQ-03: In a separate pristine environment, the exact source archive checksum/provenance/inventory are verified and extracted without Git metadata; frozen source instructions and cargo install --path crates/jit --locked pass without changing the archive.\n- [hard] REQ-04: The exact retained MCP tarball is integrity/provenance-verified, clean-installed, and completes initialize/tools-list with candidate jit; public npm 1.0.0 remains absent, with no publish/repack command.\n- [hard] REQ-05: OCI tar SHA-256/D_index match escrow evidence; Skopeo copies D_run digest-preservingly into rootless Podman, and exact runtime bytes pass default/host-UID lifecycle, API/web/document/search/persistence/ownership smoke. With a ten-second stop timeout, multiple SSE and a deliberately non-completing ordinary connection remain active at SIGTERM; SSE reaches EOF, the handle force-closes the stall at five seconds, and PID 1 exits 0 before ten seconds without SIGKILL/137 or archive mutation.\n- [hard] REQ-06: Frozen binary/source install, deployment, upgrade, checksum/provenance, compatibility, profile quickstart, and package-candidate instructions execute with commands, versions, checksums, package integrity, image digest, and results retained.\n- [hard] REQ-07: Before/after rehearsal, the exact immutable candidate prerelease remains present while public npm 1.0.0, v1.0.0 tag/final GitHub Release, and GHCR :1.0.0 remain absent; rehearsal has no tag/registry/release/source-write permission.\n- [hard] REQ-08: Acceptance inventories CLI, server/API, web UI, MCP server, escrowed native/source/MCP candidates, and OCI image; it verifies core/profiles Done contracts and quickstart.\n- [hard] REQ-09: Success uploads/attests one 90-day rehearsal-completed artifact containing candidate release numeric ID/URL, every asset ID/digest, root digest, release attestation, commands/results, core/profile acceptance, and final-channel snapshot. Final authorization accepts only this ID and reauthenticates escrow; failure/day-60/expiry/abandonment prevents final tag.\n\n## Notes\n\nBlast radius: read-only clean-room acceptance from public immutable candidate escrow plus one attested rehearsal artifact; defects return to their source owner before final-v1 identity.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.181456215Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
@@ -17,8 +17,7 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "81cd978e-f089-445f-a059-ca88e3e1a2de",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -30,9 +29,11 @@
     "satisfies:REQ-08",
     "satisfies:REQ-09",
     "satisfies:REQ-10",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T09:12:53.181456005Z",
-  "updated_at": "2026-07-15T09:12:54.407036116Z",
-  "first_ready_at": "2026-07-15T09:12:53.181456215Z"
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Run the pre-publication clean-room v1.0 rehearsal",
+  "updated_at": "2026-07-29T13:41:58.908676610Z"
 }

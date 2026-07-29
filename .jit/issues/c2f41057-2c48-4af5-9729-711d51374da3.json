@@ -1,13 +1,13 @@
 {
-  "id": "c2f41057-2c48-4af5-9729-711d51374da3",
-  "title": "Publish and verify the v1.0 release channels",
-  "description": "A serialized continuation/resume authenticates final tag, npm state and candidate escrow, publishes the escrowed OCI and final GitHub assets under transitions, and verifies the complete release without rebuilding or depending on unexpired Actions evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: Every GHCR/final-GitHub publish or recovery entry point declares `jit-v1.0.0-publication` with `cancel-in-progress:false` before live read and holds it through its last completion/recovery upload. It accepts exact final-tag/npm IDs when available; on Actions 410 it authenticates the compact tag manifest, immutable candidate release/asset IDs/digests and exact live npm state. Untrusted pushes, mismatched escrow/tag, or unknown state fail before mutation.\n- [hard] REQ-02: GHCR prepared upload precedes pinned Skopeo --all --preserve-digests from the exact escrowed OCI tar; D_index readback precedes completed upload. Recovery accepts exact D_index or retries only from confirmed absence; Actions 410 uses tag+escrow identity and writes new recovery-completed. No npm operation occurs here.\n- [hard] REQ-03: An isolated final-GitHub protected job creates/resumes only the authorized matching draft, copies/downloads the exact candidate-escrow assets without regeneration, and wraps draft creation, each asset-set upload, and final publish in prepared/completed records when available. Exact readback precedes the next operation; endpoint allowlists forbid candidate-release mutation and recovery never deletes/replaces mismatched final assets.\n- [hard] REQ-04: Post-publication verification proves npm integrity/OIDC provenance, GHCR D_index/D_run/descriptors/subjects and pull runtime, final GitHub asset IDs/checksums/attestations/public URLs, final tag manifest, core/profile acceptance, and immutable state all equal candidate escrow. Candidate and final releases remain immutable; final assets are byte copies of escrow.\n- [hard] REQ-05: Transition records are overwrite-forbidden and agree with live state, but Actions are convenient ledger rather than sole recovery. After final tag, artifact 410/deletion triggers tag+escrow+live-state recovery and a new recovery-completed artifact; escrow mismatch/loss is a critical exact-version incident and never authorizes rebuild/replacement.\n- [hard] REQ-06: Parsed-YAML/hosted fixtures prove the same constant group/policy across every final entry point, cross-workflow serialization, no running cancellation, safe pending replacement/explicit same-parent redispatch, read-only Actions permissions, and crash recovery at every boundary from escrow without rebuild or mutable aliases.\n\n## Notes\n\nBlast radius: constant-group exact-byte GHCR/final-GitHub publication from immutable candidate escrow, resumable evidence, isolated publishing permissions, and public verification only.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.182853996Z",
   "dependencies": [
     "b7439e3b-8f07-45dc-8558-fda070437ac7"
   ],
+  "description": "A serialized continuation/resume authenticates final tag, npm state and candidate escrow, publishes the escrowed OCI and final GitHub assets under transitions, and verifies the complete release without rebuilding or depending on unexpired Actions evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: Every GHCR/final-GitHub publish or recovery entry point declares `jit-v1.0.0-publication` with `cancel-in-progress:false` before live read and holds it through its last completion/recovery upload. It accepts exact final-tag/npm IDs when available; on Actions 410 it authenticates the compact tag manifest, immutable candidate release/asset IDs/digests and exact live npm state. Untrusted pushes, mismatched escrow/tag, or unknown state fail before mutation.\n- [hard] REQ-02: GHCR prepared upload precedes pinned Skopeo --all --preserve-digests from the exact escrowed OCI tar; D_index readback precedes completed upload. Recovery accepts exact D_index or retries only from confirmed absence; Actions 410 uses tag+escrow identity and writes new recovery-completed. No npm operation occurs here.\n- [hard] REQ-03: An isolated final-GitHub protected job creates/resumes only the authorized matching draft, copies/downloads the exact candidate-escrow assets without regeneration, and wraps draft creation, each asset-set upload, and final publish in prepared/completed records when available. Exact readback precedes the next operation; endpoint allowlists forbid candidate-release mutation and recovery never deletes/replaces mismatched final assets.\n- [hard] REQ-04: Post-publication verification proves npm integrity/OIDC provenance, GHCR D_index/D_run/descriptors/subjects and pull runtime, final GitHub asset IDs/checksums/attestations/public URLs, final tag manifest, core/profile acceptance, and immutable state all equal candidate escrow. Candidate and final releases remain immutable; final assets are byte copies of escrow.\n- [hard] REQ-05: Transition records are overwrite-forbidden and agree with live state, but Actions are convenient ledger rather than sole recovery. After final tag, artifact 410/deletion triggers tag+escrow+live-state recovery and a new recovery-completed artifact; escrow mismatch/loss is a critical exact-version incident and never authorizes rebuild/replacement.\n- [hard] REQ-06: Parsed-YAML/hosted fixtures prove the same constant group/policy across every final entry point, cross-workflow serialization, no running cancellation, safe pending replacement/explicit same-parent redispatch, read-only Actions permissions, and crash recovery at every boundary from escrow without rebuild or mutable aliases.\n\n## Notes\n\nBlast radius: constant-group exact-byte GHCR/final-GitHub publication from immutable candidate escrow, resumable evidence, isolated publishing permissions, and public verification only.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.182854226Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
@@ -17,8 +17,7 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "c2f41057-2c48-4af5-9729-711d51374da3",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -26,9 +25,11 @@
     "satisfies:REQ-05",
     "satisfies:REQ-07",
     "satisfies:REQ-10",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T09:12:53.182853996Z",
-  "updated_at": "2026-07-15T09:12:54.471573333Z",
-  "first_ready_at": "2026-07-15T09:12:53.182854226Z"
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Publish and verify the v1.0 release channels",
+  "updated_at": "2026-07-29T13:42:36.354410642Z"
 }

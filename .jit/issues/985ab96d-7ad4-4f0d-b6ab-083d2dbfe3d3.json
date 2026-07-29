@@ -15,10 +15,12 @@
   "labels": [
     "milestone:v1.0",
     "component:core",
-    "type:task"
+    "type:task",
+    "epic:v1-release",
+    "satisfies:REQ-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Unreferenced plan-doc location resolver",
-  "updated_at": "2026-07-26T19:29:56.941091209Z"
+  "updated_at": "2026-07-29T13:56:02.297626185Z"
 }

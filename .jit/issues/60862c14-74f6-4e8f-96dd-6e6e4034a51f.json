@@ -1,25 +1,23 @@
 {
-  "id": "60862c14-74f6-4e8f-96dd-6e6e4034a51f",
-  "title": "Implement immutable candidate escrow workflows",
-  "description": "A complete candidate draft is verified and published once as durable immutable prerelease escrow before rehearsal.\n\n## Success Criteria\n\n- [hard] REQ-01: The protected escrow workflow authenticates the candidate root, creates or safely resumes only its matching draft, uploads every exact candidate/evidence/recovery asset, and verifies numeric asset IDs, digests, attestations, tag, and source identities.\n- [hard] REQ-02: Draft creation, each upload set, and publication use schema-valid prepared/completed records; mismatch never deletes, replaces, or edits an existing asset, and the published candidate prerelease is immutable.\n- [hard] REQ-03: Endpoint and crash fixtures prove retry safety, least privilege, exact-root selection, and durable recovery without using Actions artifacts as the sole byte store.\n\n## Notes\n\nBlast radius: candidate-escrow workflow YAML, exact asset verification, and escrow fixtures only.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T11:19:56.074066380Z",
   "dependencies": [
     "03b89b77-fdb9-443c-a491-441ae9447286",
     "68c1f2f3-6620-4770-b6f3-395cc38219b7",
     "82bab119-cf80-4531-8a5e-0b435169c010",
-    "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe",
-    "f7f80d53-508e-4b03-b045-5209061c8d0a"
+    "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe"
   ],
+  "description": "A complete candidate draft is verified and published once as durable immutable prerelease escrow before rehearsal.\n\n## Success Criteria\n\n- [hard] REQ-01: The protected escrow workflow authenticates the candidate root, creates or safely resumes only its matching draft, uploads every exact candidate/evidence/recovery asset, and verifies numeric asset IDs, digests, attestations, tag, and source identities.\n- [hard] REQ-02: Draft creation, each upload set, and publication use schema-valid prepared/completed records; mismatch never deletes, replaces, or edits an existing asset, and the published candidate prerelease is immutable.\n- [hard] REQ-03: Endpoint and crash fixtures prove retry safety, least privilege, exact-root selection, and durable recovery without using Actions artifacts as the sole byte store.\n\n## Notes\n\nBlast radius: candidate-escrow workflow YAML, exact asset verification, and escrow fixtures only.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:19:56.074066650Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "60862c14-74f6-4e8f-96dd-6e6e4034a51f",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -28,9 +26,11 @@
     "satisfies:REQ-04",
     "satisfies:REQ-05",
     "satisfies:REQ-07",
-    "satisfies:REQ-10"
+    "satisfies:REQ-10",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:19:56.074066380Z",
-  "updated_at": "2026-07-15T11:20:19.525520964Z",
-  "first_ready_at": "2026-07-15T11:19:56.074066650Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement immutable candidate escrow workflows",
+  "updated_at": "2026-07-29T13:49:54.670113304Z"
 }

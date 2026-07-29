@@ -1,0 +1,41 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-29T13:46:37.535084130Z",
+  "dependencies": [
+    "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
+    "985ab96d-7ad4-4f0d-b6ab-083d2dbfe3d3",
+    "a122b9b3-0f2a-49bd-bbcf-7dce34703dea",
+    "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
+    "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
+    "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
+    "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
+    "f9e42a43-e382-4e1b-9e15-91984def9977"
+  ],
+  "description": "The maintainer creates the annotated `v1.0.0` tag on a verified commit and confirms that the resulting GitHub release is complete and installable.\n\n## Background\n\nThis is the release act itself. Everything it depends on has already landed: the audits are blocking and green, the workflows are pinned, the manifests declare `1.0.0`, the image is consolidated, the documentation has one canonical home per fact, and the remaining milestone defects are closed.\n\nThe tag is created by a person, not by automation. The workflow reacts to it. Verification afterwards is performed from the published release as an adopter would see it, not from the build that produced it.\n\n## Success Criteria\n\n- [hard] REQ-01: Before the tag is created, a fresh clone of the release commit has a clean working tree, all four product manifests declare `1.0.0`, repository validation reports no drift, and the normal suites and blocking audits pass on that commit.\n- [hard] REQ-02: The declared MSRV is compared against current stable immediately before tagging and refreshed if it would be more than one stable release behind.\n- [hard] REQ-03: An annotated `v1.0.0` tag is created at that commit and pushed, and the release workflow completes without a manual step, a re-run with modified inputs, or an edit to the tagged tree.\n- [hard] REQ-04: The published release carries the Linux x86_64 musl archive, the MCP tarball, the SHA-256 checksum file, both license texts, and release notes; every asset's recorded checksum matches its downloaded bytes.\n- [hard] REQ-05: Downloading the published archive on a clean machine and following the documented installation instructions verbatim produces a working `jit` and `jit-server`: `jit init`, the profile quickstart, `jit --schema`, a server start serving `/api/health` and a real web UI, and the MCP tarball completing an `initialize` and `tools/list` exchange against the installed CLI.\n- [hard] REQ-06: Following the documented container instructions builds the image and runs it against a mounted repository, serving the API and web UI and exiting cleanly on termination.\n- [hard] REQ-07: No npm registry version, container registry tag, or additional release channel exists for `1.0.0`, matching what the documentation claims.\n\n## Notes\n\nIf any verification step fails, the tag and the release are deleted, the defect is fixed under its owning issue, and a corrected tag is pushed. There is no partial-publication state to reconcile: the release is one atomic GitHub object and no other channel is touched.",
+  "documents": [],
+  "first_ready_at": "2026-07-29T13:46:37.535084130Z",
+  "gates_required": [
+    "repo-validate",
+    "docs-mechanical",
+    "jit-validate"
+  ],
+  "gates_status": {},
+  "id": "bb03df0a-65c7-496a-bb09-2620eb253fd5",
+  "labels": [
+    "type:task",
+    "epic:v1-release",
+    "milestone:v1.0",
+    "component:release",
+    "satisfies:REQ-01",
+    "satisfies:REQ-02",
+    "satisfies:REQ-07",
+    "satisfies:REQ-09",
+    "satisfies:REQ-10",
+    "satisfies:REQ-11"
+  ],
+  "priority": "critical",
+  "state": "backlog",
+  "title": "Cut the v1.0.0 tag and verify the published release",
+  "updated_at": "2026-07-29T13:48:07.701575297Z"
+}

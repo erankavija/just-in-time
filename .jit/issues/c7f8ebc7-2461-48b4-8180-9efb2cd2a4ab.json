@@ -15,10 +15,12 @@
   "labels": [
     "milestone:v1.0",
     "component:core",
-    "type:bug"
+    "type:bug",
+    "epic:v1-release",
+    "satisfies:REQ-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Archival citation warnings fire on citations that already name the destination",
-  "updated_at": "2026-07-26T19:30:00.790799615Z"
+  "updated_at": "2026-07-29T13:56:12.115837796Z"
 }

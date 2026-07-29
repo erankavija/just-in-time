@@ -1,21 +1,20 @@
 {
-  "id": "ec073132-740a-4f51-b71c-13944c11357a",
-  "title": "Implement gated candidate, rehearsal, tag, and publication orchestration",
-  "description": "Disjoint workflow and verification children implement the authenticated candidate-to-publication protocol by composing accepted authority and producer interfaces.\n\n## Success Criteria\n\n- [hard] REQ-01: Versioned transition, root, escrow, rehearsal, and compact tag-manifest schemas define every exact identity and crash/recovery boundary before workflow implementations consume them.\n- [hard] REQ-02: Candidate handoff/validation/producer/root, immutable escrow, clean-room rehearsal, final-tag, npm, GHCR, and final-GitHub workflows are independently owned and use least privilege, exact-ID authentication, overwrite-forbidden evidence, and no source rebuild or mutable discovery.\n- [hard] REQ-03: Every final mutator and recovery path shares literal `jit-v1.0.0-publication` with `cancel-in-progress:false`; prepared/live-readback/completed ordering and Actions-410 recovery reconcile immutable escrow, tag manifest, and exact live state.\n- [hard] REQ-04: Cross-workflow acceptance proves serialization, pending replacement behavior, no running cancellation, fresh absent-tag authorization, exact-existing-tag recovery, endpoint isolation, and denial of mismatch, unsafe retry, or precondition bypass.\n- [hard] REQ-05: The story's children exclusively own release-execution workflow YAML, protocol schemas, and hosted cross-workflow fixtures; they do not duplicate account-side configuration or producer primitive implementation.\n\n## Notes\n\nBlast radius: the `story:release-orchestration` child set; source freeze and all public release operations remain downstream execution work.\n",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.174577020Z",
   "dependencies": [
     "466d4af6-8b19-4ab7-ba0b-7abc9b0fc602"
   ],
+  "description": "Disjoint workflow and verification children implement the authenticated candidate-to-publication protocol by composing accepted authority and producer interfaces.\n\n## Success Criteria\n\n- [hard] REQ-01: Versioned transition, root, escrow, rehearsal, and compact tag-manifest schemas define every exact identity and crash/recovery boundary before workflow implementations consume them.\n- [hard] REQ-02: Candidate handoff/validation/producer/root, immutable escrow, clean-room rehearsal, final-tag, npm, GHCR, and final-GitHub workflows are independently owned and use least privilege, exact-ID authentication, overwrite-forbidden evidence, and no source rebuild or mutable discovery.\n- [hard] REQ-03: Every final mutator and recovery path shares literal `jit-v1.0.0-publication` with `cancel-in-progress:false`; prepared/live-readback/completed ordering and Actions-410 recovery reconcile immutable escrow, tag manifest, and exact live state.\n- [hard] REQ-04: Cross-workflow acceptance proves serialization, pending replacement behavior, no running cancellation, fresh absent-tag authorization, exact-existing-tag recovery, endpoint isolation, and denial of mismatch, unsafe retry, or precondition bypass.\n- [hard] REQ-05: The story's children exclusively own release-execution workflow YAML, protocol schemas, and hosted cross-workflow fixtures; they do not duplicate account-side configuration or producer primitive implementation.\n\n## Notes\n\nBlast radius: the `story:release-orchestration` child set; source freeze and all public release operations remain downstream execution work.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.174577260Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "ec073132-740a-4f51-b71c-13944c11357a",
   "labels": [
     "epic:production-readiness",
     "satisfies:REQ-03",
@@ -24,9 +23,11 @@
     "satisfies:REQ-07",
     "satisfies:REQ-10",
     "story:release-orchestration",
-    "type:story"
+    "type:story",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T09:12:53.174577020Z",
-  "updated_at": "2026-07-15T11:20:53.838014485Z",
-  "first_ready_at": "2026-07-15T09:12:53.174577260Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement gated candidate, rehearsal, tag, and publication orchestration",
+  "updated_at": "2026-07-29T13:37:29.497333760Z"
 }

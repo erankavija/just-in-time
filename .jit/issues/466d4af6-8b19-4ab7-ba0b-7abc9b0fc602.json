@@ -1,10 +1,7 @@
 {
-  "id": "466d4af6-8b19-4ab7-ba0b-7abc9b0fc602",
-  "title": "Verify cross-workflow serialization and Actions-410 recovery",
-  "description": "The complete release workflow set is accepted as one serialized, least-privilege protocol with durable exact-state recovery.\n\n## Success Criteria\n\n- [hard] REQ-01: Parsed workflow checks prove every final mutator and recovery entry point declares literal jit-v1.0.0-publication with cancel-in-progress:false before live read, keeps it through completion, grants actions:read but never actions:write post-tag, and leaves no mutating subjob outside the group.\n- [hard] REQ-02: Hosted fixtures prove cross-workflow serialization, no running cancellation, explicit same-parent redispatch after pending replacement, push-owned candidate propagation, fresh absent-tag authorization, exact-existing-tag recovery, and crash recovery at every channel boundary.\n- [hard] REQ-03: Actions-410 fixtures reconstruct from immutable escrow, compact tag manifest, and exact live state; mismatch or escrow loss blocks as an incident and never authorizes rebuild, replacement, mutable discovery, or unsafe retry.\n- [hard] REQ-04: Acceptance verifies file ownership remains disjoint from account configuration and producer primitives and that no final channel can mutate before its authenticated predecessor completes.\n\n## Notes\n\nBlast radius: cross-workflow contract and hosted recovery fixtures plus acceptance evidence only.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T11:19:56.077595303Z",
   "dependencies": [
     "570a0cab-5d63-4df2-ba79-c104b441766b",
     "7ee2efb5-ad81-4cef-8e36-bf2cc9d87e7e",
@@ -14,14 +11,16 @@
     "60862c14-74f6-4e8f-96dd-6e6e4034a51f",
     "d7930fa7-36c1-4268-8ccc-3fa7e5999ddf"
   ],
+  "description": "The complete release workflow set is accepted as one serialized, least-privilege protocol with durable exact-state recovery.\n\n## Success Criteria\n\n- [hard] REQ-01: Parsed workflow checks prove every final mutator and recovery entry point declares literal jit-v1.0.0-publication with cancel-in-progress:false before live read, keeps it through completion, grants actions:read but never actions:write post-tag, and leaves no mutating subjob outside the group.\n- [hard] REQ-02: Hosted fixtures prove cross-workflow serialization, no running cancellation, explicit same-parent redispatch after pending replacement, push-owned candidate propagation, fresh absent-tag authorization, exact-existing-tag recovery, and crash recovery at every channel boundary.\n- [hard] REQ-03: Actions-410 fixtures reconstruct from immutable escrow, compact tag manifest, and exact live state; mismatch or escrow loss blocks as an incident and never authorizes rebuild, replacement, mutable discovery, or unsafe retry.\n- [hard] REQ-04: Acceptance verifies file ownership remains disjoint from account configuration and producer primitives and that no final channel can mutate before its authenticated predecessor completes.\n\n## Notes\n\nBlast radius: cross-workflow contract and hosted recovery fixtures plus acceptance evidence only.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:19:56.077595563Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "466d4af6-8b19-4ab7-ba0b-7abc9b0fc602",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -30,9 +29,11 @@
     "satisfies:REQ-04",
     "satisfies:REQ-05",
     "satisfies:REQ-07",
-    "satisfies:REQ-10"
+    "satisfies:REQ-10",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:19:56.077595303Z",
-  "updated_at": "2026-07-15T11:37:10.483163738Z",
-  "first_ready_at": "2026-07-15T11:19:56.077595563Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Verify cross-workflow serialization and Actions-410 recovery",
+  "updated_at": "2026-07-29T13:41:40.158257165Z"
 }

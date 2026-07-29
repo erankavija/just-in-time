@@ -16,10 +16,12 @@
   "labels": [
     "milestone:v1.0",
     "component:core",
-    "type:task"
+    "type:task",
+    "epic:v1-release",
+    "satisfies:REQ-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Archive execution reports no citation warnings",
-  "updated_at": "2026-07-26T19:30:04.651689838Z"
+  "updated_at": "2026-07-29T13:56:21.869081112Z"
 }

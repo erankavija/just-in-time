@@ -1,31 +1,30 @@
 {
-  "id": "09f75a4f-77d0-414d-b830-d3fdcaf93e53",
-  "title": "Implement frozen validation workflows",
-  "description": "Authenticated candidate-event identity gates the complete reusable validation suite on the immutable source before any producer is invoked.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow consumes the exact candidate-event completion and freeze identities and invokes the reusable normal CI, blocking security audit, workflow-contract, repository-validation, exact-MSRV, and live recency checks with least privilege.\n- [hard] REQ-02: Caller, workflow, checkout, repository, event, source, or evidence mismatch fails closed; any validation failure prevents producer invocation and public-channel mutation.\n- [hard] REQ-03: One overwrite-forbidden 90-day validation-completed record carries exact run, workflow, source, policy, suite, and parent identities for authenticated producer dispatch.\n\n## Notes\n\nBlast radius: candidate validation-caller workflow YAML and identity/failure fixtures only; producer invocation, artifact creation, root assembly, tags, and public channels are outside scope.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T11:36:54.470981584Z",
   "dependencies": [
-    "f7f80d53-508e-4b03-b045-5209061c8d0a",
-    "cdee58b3-1428-4874-9814-dacefc517605",
     "0f2e1b12-227a-4816-919c-de4158ded338"
   ],
+  "description": "Authenticated candidate-event identity gates the complete reusable validation suite on the immutable source before any producer is invoked.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow consumes the exact candidate-event completion and freeze identities and invokes the reusable normal CI, blocking security audit, workflow-contract, repository-validation, exact-MSRV, and live recency checks with least privilege.\n- [hard] REQ-02: Caller, workflow, checkout, repository, event, source, or evidence mismatch fails closed; any validation failure prevents producer invocation and public-channel mutation.\n- [hard] REQ-03: One overwrite-forbidden 90-day validation-completed record carries exact run, workflow, source, policy, suite, and parent identities for authenticated producer dispatch.\n\n## Notes\n\nBlast radius: candidate validation-caller workflow YAML and identity/failure fixtures only; producer invocation, artifact creation, root assembly, tags, and public channels are outside scope.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:36:54.470981984Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "09f75a4f-77d0-414d-b830-d3fdcaf93e53",
   "labels": [
     "type:task",
     "epic:production-readiness",
     "story:release-orchestration",
     "satisfies:REQ-03",
-    "satisfies:REQ-04"
+    "satisfies:REQ-04",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:36:54.470981584Z",
-  "updated_at": "2026-07-15T11:37:10.327677665Z",
-  "first_ready_at": "2026-07-15T11:36:54.470981984Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement frozen validation workflows",
+  "updated_at": "2026-07-29T13:49:25.503495985Z"
 }

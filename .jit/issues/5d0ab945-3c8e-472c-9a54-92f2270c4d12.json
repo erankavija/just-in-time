@@ -1,24 +1,23 @@
 {
-  "id": "5d0ab945-3c8e-472c-9a54-92f2270c4d12",
-  "title": "Implement candidate producer-dispatch workflows",
-  "description": "Validated immutable identity invokes the native/source, MCP, and OCI producer interfaces and preserves each exact output for root assembly.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow authenticates the validation-completed record and invokes each reusable producer interface with the same candidate-event, freeze SHA/root, repository, workflow, and policy identities.\n- [hard] REQ-02: Native/source, MCP, and OCI jobs expose exact artifact IDs, ZIP and subject digests, retention/expiry, attestations, and producer run identities through typed outputs; no producer can run before validation succeeds.\n- [hard] REQ-03: Fixtures reject missing, foreign, expired, rebuilt, mismatched, or duplicate producer results, identity drift between jobs, source modification, and any tag, escrow, registry, or release mutation.\n\n## Notes\n\nBlast radius: producer-caller workflow YAML, typed output plumbing, and dispatch fixtures only; producer implementations and candidate-root assembly are outside scope.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T11:36:54.471512465Z",
   "dependencies": [
     "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe",
     "03b89b77-fdb9-443c-a491-441ae9447286",
     "68c1f2f3-6620-4770-b6f3-395cc38219b7",
     "09f75a4f-77d0-414d-b830-d3fdcaf93e53"
   ],
+  "description": "Validated immutable identity invokes the native/source, MCP, and OCI producer interfaces and preserves each exact output for root assembly.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow authenticates the validation-completed record and invokes each reusable producer interface with the same candidate-event, freeze SHA/root, repository, workflow, and policy identities.\n- [hard] REQ-02: Native/source, MCP, and OCI jobs expose exact artifact IDs, ZIP and subject digests, retention/expiry, attestations, and producer run identities through typed outputs; no producer can run before validation succeeds.\n- [hard] REQ-03: Fixtures reject missing, foreign, expired, rebuilt, mismatched, or duplicate producer results, identity drift between jobs, source modification, and any tag, escrow, registry, or release mutation.\n\n## Notes\n\nBlast radius: producer-caller workflow YAML, typed output plumbing, and dispatch fixtures only; producer implementations and candidate-root assembly are outside scope.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:36:54.471512675Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "5d0ab945-3c8e-472c-9a54-92f2270c4d12",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -26,9 +25,11 @@
     "satisfies:REQ-03",
     "satisfies:REQ-04",
     "satisfies:REQ-05",
-    "satisfies:REQ-07"
+    "satisfies:REQ-07",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:36:54.471512465Z",
-  "updated_at": "2026-07-15T11:37:10.381117904Z",
-  "first_ready_at": "2026-07-15T11:36:54.471512675Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement candidate producer-dispatch workflows",
+  "updated_at": "2026-07-29T13:39:11.396310349Z"
 }

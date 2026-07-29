@@ -15,10 +15,12 @@
   "labels": [
     "milestone:v1.0",
     "component:core",
-    "type:bug"
+    "type:bug",
+    "epic:v1-release",
+    "satisfies:REQ-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Honour a document reference's commit pin when checking links",
-  "updated_at": "2026-07-27T10:44:26.375581722Z"
+  "updated_at": "2026-07-29T13:56:26.762618237Z"
 }

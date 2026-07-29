@@ -1,28 +1,25 @@
 {
-  "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
-  "title": "Remediate web production dependency advisories",
-  "description": "The committed web production dependency graph is advisory-free while preserving the built UI.\n\n## Success Criteria\n\n- [hard] REQ-01: npm audit --omit=dev --audit-level=info exits zero in web/ against the committed package-lock.json with no audit exception.\n- [hard] REQ-02: Web lint, unit tests, TypeScript build, and production bundle succeed after the dependency changes.\n- [hard] REQ-03: Any dependency API or rendering migration updates every affected UI consumer and regression test in the same change.\n\n## Notes\n\nBlast radius: `web/package.json`, `web/package-lock.json`, and affected `web/src/` code/tests; no Rust or MCP contract changes.",
-  "state": "ready",
-  "priority": "normal",
   "assignee": null,
-  "dependencies": [
-    "207364b1-cc06-4bf5-ae61-34908acc898c"
-  ],
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.169206436Z",
+  "dependencies": [],
+  "description": "The committed web production dependency graph is advisory-free while preserving the built UI.\n\n## Success Criteria\n\n- [hard] REQ-01: npm audit --omit=dev --audit-level=info exits zero in web/ against the committed package-lock.json with no audit exception.\n- [hard] REQ-02: Web lint, unit tests, TypeScript build, and production bundle succeed after the dependency changes.\n- [hard] REQ-03: Any dependency API or rendering migration updates every affected UI consumer and regression test in the same change.\n\n## Notes\n\nBlast radius: `web/package.json`, `web/package-lock.json`, and affected `web/src/` code/tests; no Rust or MCP contract changes.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.169206806Z",
   "gates_required": [
     "npm-ci",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
   "labels": [
     "type:bug",
-    "epic:production-readiness",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02"
+    "epic:v1-release",
+    "milestone:v1.0"
   ],
-  "created_at": "2026-07-15T09:12:53.169206436Z",
-  "updated_at": "2026-07-15T11:48:52.054736164Z",
-  "first_ready_at": "2026-07-15T09:12:53.169206806Z"
+  "priority": "normal",
+  "state": "ready",
+  "title": "Remediate web production dependency advisories",
+  "updated_at": "2026-07-29T13:47:14.406406968Z"
 }

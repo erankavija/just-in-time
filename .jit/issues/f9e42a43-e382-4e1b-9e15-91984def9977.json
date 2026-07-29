@@ -15,10 +15,12 @@
   "labels": [
     "milestone:v1.0",
     "component:core",
-    "type:bug"
+    "type:bug",
+    "epic:v1-release",
+    "satisfies:REQ-11"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Treat a directory link target consistently across discovery, link checking and validation",
-  "updated_at": "2026-07-27T10:44:23.643747816Z"
+  "updated_at": "2026-07-29T13:56:31.641834390Z"
 }

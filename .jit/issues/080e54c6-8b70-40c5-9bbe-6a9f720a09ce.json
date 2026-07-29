@@ -1,27 +1,27 @@
 {
-  "id": "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
-  "title": "Prune repeated entry-point and component documentation",
-  "description": "README, MCP component documentation, CLI reference examples, and contributor entry points remain discoverable but no longer duplicate canonical release and deployment facts.\n\n## Success Criteria\n\n- [hard] REQ-01: README.md presents the product and preferred quickstart, mcp-server/README.md describes component architecture and links to installation, and AGENTS.md/contrib/README.md remain contributor entry points without copying adopter workflows.\n- [hard] REQ-02: Active-tree checks find one owner for installation commands, Docker/Compose commands, MCP package startup, artifact/support matrices, version/MSRV policy, and compatibility guarantees across README.md, INSTALL.md, docs/, mcp-server/README.md, AGENTS.md, and contrib/README.md.\n- [hard] REQ-03: Every removed walkthrough leaves a valid, context-bearing link from its former audience entry point, and mechanical plus adversarial documentation review confirms no supported path became undiscoverable.\n- [hard] REQ-04: Archived studies/session evidence and unrelated configurable cargo-audit gate examples remain unchanged.\n\n## Notes\n\nBlast radius: active entry-point and component documentation only; archived evidence, unrelated factual corrections, and configurable audit examples remain unchanged, and all merged documentation becomes source-freeze input.\n",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.177321862Z",
   "dependencies": [
     "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2"
   ],
+  "description": "README, MCP component documentation, CLI reference examples, and contributor entry points remain discoverable but no longer duplicate canonical release and deployment facts.\n\n## Success Criteria\n\n- [hard] REQ-01: README.md presents the product and preferred quickstart, mcp-server/README.md describes component architecture and links to installation, and AGENTS.md/contrib/README.md remain contributor entry points without copying adopter workflows.\n- [hard] REQ-02: Active-tree checks find one owner for installation commands, Docker/Compose commands, MCP package startup, artifact/support matrices, version/MSRV policy, and compatibility guarantees across README.md, INSTALL.md, docs/, mcp-server/README.md, AGENTS.md, and contrib/README.md.\n- [hard] REQ-03: Every removed walkthrough leaves a valid, context-bearing link from its former audience entry point, and mechanical plus adversarial documentation review confirms no supported path became undiscoverable.\n- [hard] REQ-04: Archived studies/session evidence and unrelated configurable cargo-audit gate examples remain unchanged.\n\n## Notes\n\nBlast radius: active entry-point and component documentation only; archived evidence, unrelated factual corrections, and configurable audit examples remain unchanged, and all merged documentation becomes source-freeze input.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.177322082Z",
   "gates_required": [
     "docs-mechanical",
     "doc-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
   "labels": [
     "type:task",
-    "epic:production-readiness",
-    "satisfies:REQ-08"
+    "epic:v1-release",
+    "milestone:v1.0"
   ],
-  "created_at": "2026-07-15T09:12:53.177321862Z",
-  "updated_at": "2026-07-15T11:41:25.314369785Z",
-  "first_ready_at": "2026-07-15T09:12:53.177322082Z"
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Prune repeated entry-point and component documentation",
+  "updated_at": "2026-07-29T13:45:20.901287541Z"
 }

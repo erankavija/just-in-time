@@ -27,10 +27,12 @@
     "enforces:@/invariant/semantic-types",
     "enforces:@/invariant/canonical-cutover",
     "enforces:@/invariant/architecture-dependency-direction",
-    "type:task"
+    "type:task",
+    "epic:v1-release",
+    "satisfies:REQ-11"
   ],
   "priority": "high",
   "state": "ready",
   "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
-  "updated_at": "2026-07-28T10:35:19.036900149Z"
+  "updated_at": "2026-07-29T13:56:07.212395905Z"
 }

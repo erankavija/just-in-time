@@ -1,31 +1,32 @@
 {
-  "id": "7ee2efb5-ad81-4cef-8e36-bf2cc9d87e7e",
-  "title": "Implement npm publication and recovery workflows",
-  "description": "The exact escrowed MCP tarball is published once through protected tokenless OIDC after final-tag completion.\n\n## Success Criteria\n\n- [hard] REQ-01: The npm workflow authenticates final-tag completion and escrow identity, enters the constant publication mutex before live read, writes prepared evidence, and invokes the pure direct-publish interface on the exact retained tarball with id-token permission and no npm token.\n- [hard] REQ-02: Exact registry integrity and provenance readback precede completion; recovery reconciles matching live state from tag and escrow after Actions-410 without repack or source-directory publication.\n- [hard] REQ-03: Fixtures reject pre-tag publish, wrong environment/package/tarball/integrity, token use, concurrent mutation, stale evidence, and conflicting registry state.\n\n## Notes\n\nBlast radius: npm publication/recovery workflow YAML and cross-workflow fixtures only.",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T11:19:56.075799822Z",
   "dependencies": [
     "82bab119-cf80-4531-8a5e-0b435169c010",
     "0c3fcf3a-7d9d-4c3e-a40b-4db8d42b6bbe"
   ],
+  "description": "The exact escrowed MCP tarball is published once through protected tokenless OIDC after final-tag completion.\n\n## Success Criteria\n\n- [hard] REQ-01: The npm workflow authenticates final-tag completion and escrow identity, enters the constant publication mutex before live read, writes prepared evidence, and invokes the pure direct-publish interface on the exact retained tarball with id-token permission and no npm token.\n- [hard] REQ-02: Exact registry integrity and provenance readback precede completion; recovery reconciles matching live state from tag and escrow after Actions-410 without repack or source-directory publication.\n- [hard] REQ-03: Fixtures reject pre-tag publish, wrong environment/package/tarball/integrity, token use, concurrent mutation, stale evidence, and conflicting registry state.\n\n## Notes\n\nBlast radius: npm publication/recovery workflow YAML and cross-workflow fixtures only.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:19:56.075800082Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "7ee2efb5-ad81-4cef-8e36-bf2cc9d87e7e",
   "labels": [
     "type:task",
     "epic:production-readiness",
     "story:release-orchestration",
     "satisfies:REQ-04",
     "satisfies:REQ-05",
-    "satisfies:REQ-10"
+    "satisfies:REQ-10",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:19:56.075799822Z",
-  "updated_at": "2026-07-15T11:20:19.674521252Z",
-  "first_ready_at": "2026-07-15T11:19:56.075800082Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement npm publication and recovery workflows",
+  "updated_at": "2026-07-29T13:39:58.227654475Z"
 }

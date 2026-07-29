@@ -1,22 +1,21 @@
 {
-  "id": "0f2e1b12-227a-4816-919c-de4158ded338",
-  "title": "Implement candidate handoff and event-completion workflows",
-  "description": "An authenticated numeric source-freeze identity is converted into one protected candidate tag whose push records the sole candidate-event completion identity.\n\n## Success Criteria\n\n- [hard] REQ-01: Reviewer-authorized dispatch accepts only a numeric freeze artifact ID, verifies its exact non-expired digest, schema, attestation, trusted run, protected remote SHA/tree, repository, actor, and workflow identities, and uploads one overwrite-forbidden 90-day handoff/prepared record before ref mutation.\n- [hard] REQ-02: The fixed-ref authority creates the annotated candidate tag with the exact handoff and freeze-root identities; creator readback verifies the tag object and peeled SHA without acting as the push run's authority.\n- [hard] REQ-03: The App-authored push workflow verifies event, tag, SHA, actor, repository, workflow, and embedded handoff/root identities, then uploads one candidate-event-completed or exact recovery-completed record and exposes its ID through typed outputs.\n- [hard] REQ-04: Fixtures reject missing, foreign, expired, listed-by-name, mismatched, movable, human-created, or conflicting identity, unsafe retry, source modification, and any validation, candidate-byte, escrow, registry, or release operation.\n\n## Notes\n\nBlast radius: freeze-ID dispatch, candidate handoff and protected tag workflow YAML, push-owned completion plumbing, and identity/crash fixtures only.\n",
-  "state": "backlog",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T11:19:56.073479670Z",
   "dependencies": [
     "5cb1a9a6-8dfb-431d-b018-58cdb364b6ca",
     "82bab119-cf80-4531-8a5e-0b435169c010"
   ],
+  "description": "An authenticated numeric source-freeze identity is converted into one protected candidate tag whose push records the sole candidate-event completion identity.\n\n## Success Criteria\n\n- [hard] REQ-01: Reviewer-authorized dispatch accepts only a numeric freeze artifact ID, verifies its exact non-expired digest, schema, attestation, trusted run, protected remote SHA/tree, repository, actor, and workflow identities, and uploads one overwrite-forbidden 90-day handoff/prepared record before ref mutation.\n- [hard] REQ-02: The fixed-ref authority creates the annotated candidate tag with the exact handoff and freeze-root identities; creator readback verifies the tag object and peeled SHA without acting as the push run's authority.\n- [hard] REQ-03: The App-authored push workflow verifies event, tag, SHA, actor, repository, workflow, and embedded handoff/root identities, then uploads one candidate-event-completed or exact recovery-completed record and exposes its ID through typed outputs.\n- [hard] REQ-04: Fixtures reject missing, foreign, expired, listed-by-name, mismatched, movable, human-created, or conflicting identity, unsafe retry, source modification, and any validation, candidate-byte, escrow, registry, or release operation.\n\n## Notes\n\nBlast radius: freeze-ID dispatch, candidate handoff and protected tag workflow YAML, push-owned completion plumbing, and identity/crash fixtures only.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T11:19:56.073479960Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "0f2e1b12-227a-4816-919c-de4158ded338",
   "labels": [
     "type:task",
     "epic:production-readiness",
@@ -24,9 +23,11 @@
     "satisfies:REQ-03",
     "satisfies:REQ-04",
     "satisfies:REQ-05",
-    "satisfies:REQ-07"
+    "satisfies:REQ-07",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T11:19:56.073479670Z",
-  "updated_at": "2026-07-15T11:37:10.280139520Z",
-  "first_ready_at": "2026-07-15T11:19:56.073479960Z"
+  "priority": "high",
+  "state": "rejected",
+  "title": "Implement candidate handoff and event-completion workflows",
+  "updated_at": "2026-07-29T13:38:52.719023661Z"
 }

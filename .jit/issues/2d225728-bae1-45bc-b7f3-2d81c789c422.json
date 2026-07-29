@@ -1,13 +1,13 @@
 {
-  "id": "2d225728-bae1-45bc-b7f3-2d81c789c422",
-  "title": "Execute frozen-source validation and security gates",
-  "description": "The candidate-tag caller executes the already-landed normal, security, workflow, and MSRV definitions on the freeze SHA before any candidate producer starts.\n\n## Success Criteria\n\n- [hard] REQ-01: Local reusable normal CI and blocking security workflows run with identity preflight and pass Rust/web/MCP suites, repository validation, cargo audit -D warnings, both npm production audits, and exact-MSRV build/test at github.sha equal to the freeze SHA.\n- [hard] REQ-02: The tested recency command records declared/stable versions and policy digest for the freeze SHA; failure, workflow/checkout mismatch, or any attempted source modification prevents all producer jobs.\n- [hard] REQ-03: Evidence contains run IDs/workflow SHAs, while no archive, release tag, npm publish, or public identity is created by this workflow.\n\n## Notes\n\nBlast radius: execution evidence from reusable validation/security/MSRV workflows only; definitions remain unchanged.\n",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.178683633Z",
   "dependencies": [
     "b2d7d4b3-c1c9-4f6d-b4ae-78a091d65a6b"
   ],
+  "description": "The candidate-tag caller executes the already-landed normal, security, workflow, and MSRV definitions on the freeze SHA before any candidate producer starts.\n\n## Success Criteria\n\n- [hard] REQ-01: Local reusable normal CI and blocking security workflows run with identity preflight and pass Rust/web/MCP suites, repository validation, cargo audit -D warnings, both npm production audits, and exact-MSRV build/test at github.sha equal to the freeze SHA.\n- [hard] REQ-02: The tested recency command records declared/stable versions and policy digest for the freeze SHA; failure, workflow/checkout mismatch, or any attempted source modification prevents all producer jobs.\n- [hard] REQ-03: Evidence contains run IDs/workflow SHAs, while no archive, release tag, npm publish, or public identity is created by this workflow.\n\n## Notes\n\nBlast radius: execution evidence from reusable validation/security/MSRV workflows only; definitions remain unchanged.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.178683883Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
@@ -17,17 +17,18 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "2d225728-bae1-45bc-b7f3-2d81c789c422",
   "labels": [
     "type:task",
     "epic:production-readiness",
     "satisfies:REQ-02",
     "satisfies:REQ-03",
     "satisfies:REQ-04",
-    "satisfies:REQ-09"
+    "satisfies:REQ-09",
+    "resolution:over-engineered"
   ],
-  "created_at": "2026-07-15T09:12:53.178683633Z",
-  "updated_at": "2026-07-15T11:35:44.124445820Z",
-  "first_ready_at": "2026-07-15T09:12:53.178683883Z"
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Execute frozen-source validation and security gates",
+  "updated_at": "2026-07-29T13:41:02.567116938Z"
 }

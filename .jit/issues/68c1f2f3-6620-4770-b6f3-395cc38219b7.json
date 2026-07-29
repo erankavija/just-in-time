@@ -1,14 +1,13 @@
 {
-  "id": "68c1f2f3-6620-4770-b6f3-395cc38219b7",
-  "title": "Implement OCI candidate producer tooling",
-  "description": "Pull requests prove the consolidated runtime and the OCI/archive/attestation/copy machinery is fixture-tested before freeze, but no v1 OCI candidate or release tag is created.\n\n## Success Criteria\n\n- [hard] REQ-01: Pull requests build without pushing and runtime-smoke default 10001:10001 plus host-owner UID:GID mapping, PID 1 signal shutdown, / and /api/health routing, WORKDIR /repo, an initialized /repo mount, seeded issue and linked-document /api/search results, host-visible persistence, and clear failure on an incompatible owner/mode.\n- [hard] REQ-02: Main pushes publish only :main and :sha-<commit>; no pull request or release-candidate job assigns :latest, major, minor, full-version, split-component, or CLI image tags.\n- [hard] REQ-03: The local candidate producer requires the immutable envelope before Buildx. A release-tool manifest pins Buildx, BuildKit, Skopeo, Podman, and the OCI Distribution registry by version/digest and defines one Linux/amd64 type=oci tar with source/revision/version labels, provenance=max, SBOM=true, and no load/repack.\n- [hard] REQ-04: Fixtures parse a representative archive into tar SHA-256, D_index, D_run and descriptor inventory; require runnable/max-provenance/SPDX subjects; copy D_run to rootless Podman with preserved digest; and round-trip the full index to a disposable registry with --all --preserve-digests.\n- [hard] REQ-05: The shared harness rejects push permission on pull requests, v1 tag mutation, missing identity preflight, digest/descriptor/subject changes, and runtime failure. Completion verifies GHCR :1.0.0 and any v1 OCI candidate remain absent; only workflow/tooling/fixtures land.\n\n## Notes\n\nBlast radius: Docker workflow definitions, pinned Buildx/BuildKit/Skopeo/Podman setup, OCI structure/copy/runtime fixtures, and harness declarations; exact v1 OCI execution occurs after source freeze.",
-  "state": "backlog",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.176417991Z",
   "dependencies": [
-    "5cb1a9a6-8dfb-431d-b018-58cdb364b6ca",
-    "3a3b5704-b385-4358-98e3-23e095b2ee97"
+    "5cb1a9a6-8dfb-431d-b018-58cdb364b6ca"
   ],
+  "description": "Pull requests prove the consolidated runtime and the OCI/archive/attestation/copy machinery is fixture-tested before freeze, but no v1 OCI candidate or release tag is created.\n\n## Success Criteria\n\n- [hard] REQ-01: Pull requests build without pushing and runtime-smoke default 10001:10001 plus host-owner UID:GID mapping, PID 1 signal shutdown, / and /api/health routing, WORKDIR /repo, an initialized /repo mount, seeded issue and linked-document /api/search results, host-visible persistence, and clear failure on an incompatible owner/mode.\n- [hard] REQ-02: Main pushes publish only :main and :sha-<commit>; no pull request or release-candidate job assigns :latest, major, minor, full-version, split-component, or CLI image tags.\n- [hard] REQ-03: The local candidate producer requires the immutable envelope before Buildx. A release-tool manifest pins Buildx, BuildKit, Skopeo, Podman, and the OCI Distribution registry by version/digest and defines one Linux/amd64 type=oci tar with source/revision/version labels, provenance=max, SBOM=true, and no load/repack.\n- [hard] REQ-04: Fixtures parse a representative archive into tar SHA-256, D_index, D_run and descriptor inventory; require runnable/max-provenance/SPDX subjects; copy D_run to rootless Podman with preserved digest; and round-trip the full index to a disposable registry with --all --preserve-digests.\n- [hard] REQ-05: The shared harness rejects push permission on pull requests, v1 tag mutation, missing identity preflight, digest/descriptor/subject changes, and runtime failure. Completion verifies GHCR :1.0.0 and any v1 OCI candidate remain absent; only workflow/tooling/fixtures land.\n\n## Notes\n\nBlast radius: Docker workflow definitions, pinned Buildx/BuildKit/Skopeo/Podman setup, OCI structure/copy/runtime fixtures, and harness declarations; exact v1 OCI execution occurs after source freeze.",
+  "documents": [],
+  "first_ready_at": "2026-07-15T09:12:53.176418241Z",
   "gates_required": [
     "cargo-ci",
     "npm-ci",
@@ -18,16 +17,17 @@
     "jit-validate"
   ],
   "gates_status": {},
-  "context": {},
-  "documents": [],
+  "id": "68c1f2f3-6620-4770-b6f3-395cc38219b7",
   "labels": [
     "type:enhancement",
     "epic:production-readiness",
     "satisfies:REQ-01",
     "satisfies:REQ-06",
-    "satisfies:REQ-07"
+    "satisfies:REQ-07",
+    "resolution:folded-into-release-workflow"
   ],
-  "created_at": "2026-07-15T09:12:53.176417991Z",
-  "updated_at": "2026-07-15T09:12:53.900747258Z",
-  "first_ready_at": "2026-07-15T09:12:53.176418241Z"
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Implement OCI candidate producer tooling",
+  "updated_at": "2026-07-29T13:49:59.516152083Z"
 }
