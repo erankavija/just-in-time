@@ -1632,7 +1632,16 @@ struct ArchivedCitation {
 /// it is not itself an artifact of the plan: it stays put, and the only thing
 /// execution could do to it is rewrite the now-stale path in its text.
 fn archived_citation() -> ArchivedCitation {
+    archived_citation_with_scan_directories(0)
+}
+
+/// Add empty scan directories to exercise the transaction's complete-listing
+/// closure without changing the one citation the fixture reports.
+fn archived_citation_with_scan_directories(directory_count: usize) -> ArchivedCitation {
     let repo = citation_scan_repo(false, "See fixtures/root.md for the source of truth.\n");
+    (0..directory_count).for_each(|index| {
+        fs::create_dir_all(repo.path().join(format!("notes/fanout-{index:03}"))).unwrap();
+    });
     fs::write(repo.path().join("fixtures/appendix.md"), "appendix body\n").unwrap();
 
     let created = jit(
@@ -1785,6 +1794,21 @@ fn test_archive_container_execution_reports_the_preview_warning_set() {
         archive_warning_set(&run.execution),
         archive_warning_set(&run.preview),
         "execution must report the warning set preview computed for the same archive target"
+    );
+}
+
+/// REQ-03 (`jit:ef118aea`): a declared scan root may contain more directories
+/// than the ordinary validation closure lists; execution still captures and
+/// revalidates that complete configured universe rather than imposing a
+/// smaller repository-size cap than its path budget.
+#[test]
+fn test_archive_container_execution_reports_citations_with_more_than_256_scan_directories() {
+    let run = archived_citation_with_scan_directories(261);
+
+    assert_eq!(
+        archive_warning_set(&run.execution),
+        archive_warning_set(&run.preview),
+        "a large declared scan root must preserve preview/execution warning parity"
     );
 }
 

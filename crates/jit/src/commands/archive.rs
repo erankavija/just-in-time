@@ -330,6 +330,28 @@ fn capture_more(
     }
 }
 
+fn capture_advisory_more(
+    session: &mut dyn RepositoryMutationSession,
+    image: &mut crate::repository_state::RepositoryImage,
+    paths: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
+    listings: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
+) -> Result<bool> {
+    let paths = paths.into_iter().collect::<BTreeSet<_>>();
+    let listings = listings.into_iter().collect::<BTreeSet<_>>();
+    let mut spec = image.capture_spec().clone();
+    spec.discover_advisory_paths(paths)?;
+    for listing in listings {
+        spec.discover_listing(listing)?;
+    }
+    match capture_or_retry(session.capture(spec))? {
+        Some(next) if next.has_stable_overlap(image) => {
+            *image = next;
+            Ok(true)
+        }
+        Some(_) | None => Ok(false),
+    }
+}
+
 fn capture_pinned_more(
     session: &mut dyn RepositoryMutationSession,
     image: &mut crate::repository_state::RepositoryImage,
@@ -482,11 +504,16 @@ fn capture_directory_tree(
     session: &mut dyn RepositoryMutationSession,
     mut image: crate::repository_state::RepositoryImage,
     root: &str,
+    advisory: bool,
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
     use crate::repository_state::RepositoryEntry;
     let root_path = image_path(image.layout(), root)?;
     if !image.entries().contains_key(&root_path)
-        && !capture_more(session, &mut image, [root_path.clone()], [])?
+        && !(if advisory {
+            capture_advisory_more(session, &mut image, [root_path.clone()], [])?
+        } else {
+            capture_more(session, &mut image, [root_path.clone()], [])?
+        })
     {
         return Ok(None);
     }
@@ -498,7 +525,11 @@ fn capture_directory_tree(
         RepositoryEntry::Directory { .. } => {}
     }
     if !image.listing_fingerprints().contains_key(&root_path)
-        && !capture_more(session, &mut image, [], [root_path.clone()])?
+        && !(if advisory {
+            capture_advisory_more(session, &mut image, [], [root_path.clone()])?
+        } else {
+            capture_more(session, &mut image, [], [root_path.clone()])?
+        })
     {
         return Ok(None);
     }
@@ -522,7 +553,11 @@ fn capture_directory_tree(
             }
         }
         if !paths.is_empty() {
-            if !capture_more(session, &mut image, paths, [])? {
+            if !(if advisory {
+                capture_advisory_more(session, &mut image, paths, [])?
+            } else {
+                capture_more(session, &mut image, paths, [])?
+            }) {
                 return Ok(None);
             }
             continue;
@@ -543,7 +578,11 @@ fn capture_directory_tree(
         if listings.is_empty() {
             return Ok(Some(image));
         }
-        if !capture_more(session, &mut image, [], listings)? {
+        if !(if advisory {
+            capture_advisory_more(session, &mut image, [], listings)?
+        } else {
+            capture_more(session, &mut image, [], listings)?
+        }) {
             return Ok(None);
         }
     }
@@ -564,13 +603,15 @@ fn capture_citation_scan_evidence(
         .filter(|root| validate_repo_relative_path(root).is_ok())
         .collect::<BTreeSet<_>>();
     for root in &roots {
-        let Some(next) = capture_directory_tree(session, image.clone(), root)? else {
-            return Ok(None);
-        };
-        *image = next;
+        match capture_directory_tree(session, image.clone(), root, true) {
+            Ok(Some(next)) => *image = next,
+            Ok(None) => return Ok(None),
+            Err(error) => return Err(error),
+        }
     }
 
-    Ok(Some(
+    Ok(Some(crate::storage::citation_scan_evidence_from_files(
+        roots.iter().cloned().collect::<Vec<_>>().as_slice(),
         image
             .entries()
             .iter()
@@ -583,23 +624,15 @@ fn capture_citation_scan_evidence(
                     .ok()?
                     .to_string_lossy()
                     .replace('\\', "/");
-                let inside_scan_root = roots.iter().any(|root| {
-                    relative == *root
-                        || relative
-                            .strip_prefix(root)
-                            .is_some_and(|suffix| suffix.starts_with('/'))
-                });
-                match (inside_scan_root, entry) {
-                    (true, crate::repository_state::RepositoryEntry::File { bytes, .. }) => {
-                        String::from_utf8(bytes.clone())
-                            .ok()
-                            .map(|text| (relative, text))
+                match entry {
+                    crate::repository_state::RepositoryEntry::File { bytes, .. } => {
+                        Some((relative, bytes.clone()))
                     }
                     _ => None,
                 }
             })
-            .collect(),
-    ))
+            .collect::<Vec<_>>(),
+    )))
 }
 
 impl CommandExecutor<JsonFileStorage> {
@@ -879,7 +912,7 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(ArtifactEvidence::Directory { .. })
             )
         {
-            let Some(next) = capture_directory_tree(session, image, &destination)? else {
+            let Some(next) = capture_directory_tree(session, image, &destination, false)? else {
                 return Ok(None);
             };
             image = next;

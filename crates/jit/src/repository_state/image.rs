@@ -498,6 +498,7 @@ pub struct CaptureBudget {
 pub struct CaptureSpec {
     fixed: BTreeSet<VirtualPath>,
     discovered: BTreeSet<VirtualPath>,
+    advisory: BTreeSet<VirtualPath>,
     listings: BTreeSet<VirtualPath>,
     pinned: BTreeSet<(String, String)>,
     linked_worktree: BTreeSet<VirtualPath>,
@@ -513,6 +514,7 @@ impl CaptureSpec {
         let spec = Self {
             fixed: fixed.into_iter().collect(),
             discovered: BTreeSet::new(),
+            advisory: BTreeSet::new(),
             listings: BTreeSet::new(),
             pinned: BTreeSet::new(),
             linked_worktree: BTreeSet::new(),
@@ -536,6 +538,28 @@ impl CaptureSpec {
         candidate.validate()?;
         *self = candidate;
         Ok(())
+    }
+
+    /// Add paths whose unreadable file bytes are advisory rather than fatal.
+    pub fn discover_advisory_paths(
+        &mut self,
+        paths: impl IntoIterator<Item = VirtualPath>,
+    ) -> Result<(), CaptureError> {
+        let mut candidate = self.clone();
+        for path in paths {
+            if !candidate.fixed.contains(&path) {
+                candidate.discovered.insert(path.clone());
+            }
+            candidate.advisory.insert(path);
+        }
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Whether an unreadable entry is advisory for this capture.
+    pub fn is_advisory(&self, path: &VirtualPath) -> bool {
+        self.advisory.contains(path)
     }
 
     /// Require a complete non-recursive listing.
@@ -607,6 +631,9 @@ impl CaptureSpec {
         }
         if self.discovered.iter().any(|path| self.fixed.contains(path)) {
             return Err(CaptureError::DuplicateCapturePath);
+        }
+        if self.advisory.iter().any(|path| !self.contains_path(path)) {
+            return Err(CaptureError::AdvisoryPathNotCaptured);
         }
         let path_count = self.fixed.len()
             + self.discovered.len()
@@ -1520,6 +1547,8 @@ pub enum CaptureError {
     DepthBudgetExceeded(VirtualPath),
     #[error("capture spec contains the same path in fixed and discovered sets")]
     DuplicateCapturePath,
+    #[error("advisory capture path was not included in the capture read set")]
+    AdvisoryPathNotCaptured,
     #[error("phase-one fixed capture requires a Data path, got {0:?}")]
     PhaseOneRequiresDataPath(VirtualPath),
     #[error("capture did not provide requested path {0:?}")]

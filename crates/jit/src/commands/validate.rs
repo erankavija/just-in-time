@@ -199,7 +199,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&str>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        self.capture_proposed_base_inner(session, overrides, extra_paths, precheck_target, true)
+        self.capture_proposed_base_inner(
+            session,
+            overrides,
+            extra_paths,
+            precheck_target,
+            true,
+            false,
+        )
     }
 
     pub(crate) fn capture_proposed_base_without_documents(
@@ -212,6 +219,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             &[],
             None,
             false,
+            true,
         )
     }
 
@@ -225,14 +233,20 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&str>,
         capture_documents: bool,
+        archive_scan: bool,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
         };
 
+        // An archive citation scan may enumerate every directory below its
+        // declared roots. A complete listing consumes one distinct captured
+        // path, so archive capture binds that ceiling to the existing exact-path
+        // closure limit rather than imposing a smaller repository-size cap.
+        let max_paths = 1 << 16;
         let budget = CaptureBudget {
-            max_paths: 1 << 16,
-            max_listings: 256,
+            max_paths,
+            max_listings: if archive_scan { max_paths } else { 256 },
             max_bytes: 512 * 1024 * 1024,
             max_depth: 32,
         };

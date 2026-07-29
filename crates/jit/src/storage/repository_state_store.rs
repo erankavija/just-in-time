@@ -787,7 +787,16 @@ fn capture_capability_image(
 ) -> Result<RepositoryImage, RepositoryStateStoreError> {
     let entries = spec
         .paths()
-        .map(|path| Ok((path.clone(), inspect_capability_entry(layout, roots, path)?)))
+        .map(|path| {
+            let entry = match inspect_capability_entry(layout, roots, path) {
+                Ok(entry) => entry,
+                Err(RepositoryStateStoreError::Io(_)) if spec.is_advisory(path) => {
+                    advisory_unreadable_entry(path)?
+                }
+                Err(error) => return Err(error),
+            };
+            Ok((path.clone(), entry))
+        })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     let listings = spec
         .listings()
@@ -795,7 +804,7 @@ fn capture_capability_image(
         .map(|path| {
             Ok((
                 path.clone(),
-                inspect_capability_listing(layout, roots, path)?,
+                inspect_capability_listing(layout, roots, path, spec.is_advisory(path))?,
             ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
@@ -1098,10 +1107,24 @@ fn inspect_capability_entry(
     inspect_capability_leaf(&parent, &leaf)
 }
 
+fn advisory_unreadable_entry(
+    path: &VirtualPath,
+) -> Result<RepositoryEntry, RepositoryStateStoreError> {
+    Ok(RepositoryEntry::Unsupported {
+        identity: EntryIdentity::for_bytes(
+            format!("advisory-unreadable:{}", path.relative().as_str()),
+            b"",
+        )?,
+        reason: "advisory citation scan could not read this entry".into(),
+        mode: FileMode::Regular,
+    })
+}
+
 fn inspect_capability_listing(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
     path: &VirtualPath,
+    advisory: bool,
 ) -> Result<ListingFingerprint, RepositoryStateStoreError> {
     let entry = inspect_capability_entry(layout, roots, path)?;
     let RepositoryEntry::Directory { identity, .. } = entry else {
@@ -1125,7 +1148,12 @@ fn inspect_capability_listing(
             .into_string()
             .map_err(|_| RepositoryStateStoreError::UnsafeTarget("non-UTF-8 entry".into()))?;
         let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
-        let identity = inspect_capability_entry(layout, roots, &child)?
+        let child_entry = match inspect_capability_entry(layout, roots, &child) {
+            Ok(entry) => entry,
+            Err(RepositoryStateStoreError::Io(_)) if advisory => advisory_unreadable_entry(&child)?,
+            Err(error) => return Err(error),
+        };
+        let identity = child_entry
             .identity()
             .cloned()
             .ok_or_else(|| RepositoryStateStoreError::RetryableConflict { path: name.clone() })?;

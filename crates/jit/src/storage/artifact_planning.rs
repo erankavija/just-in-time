@@ -1,7 +1,7 @@
 //! No-follow filesystem evidence acquisition for pure archive planning.
 
 use crate::domain::artifact_classifier::{
-    artifact_archive_destination, classification_facts_from_evidence,
+    artifact_archive_destination, classification_facts_from_evidence, contains_path,
     resolve_container_destination as derive_container_destination, ArtifactClassificationFacts,
     ArtifactClassificationPolicy, CitationScanEvidence, EmbeddedArtifactOwner,
     ResolvedContainerDestination,
@@ -156,7 +156,7 @@ pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
     storage: &S,
     roots: &[String],
 ) -> CitationScanEvidence {
-    roots
+    let files = roots
         .iter()
         .map(|root| normalize_artifact_path(root))
         .filter(|root| !root.is_empty())
@@ -170,6 +170,30 @@ pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
                 _ => Vec::new(),
             }
         })
+        .collect::<Vec<_>>();
+    citation_scan_evidence_from_files(roots, files)
+}
+
+/// Derive advisory citation text from regular files reached by declared roots.
+///
+/// Both the ordinary preview boundary and the transactional archive boundary
+/// use this pure rule, keeping root normalization, containment, and UTF-8
+/// handling identical while their respective capture mechanisms establish the
+/// file-byte evidence.
+pub(crate) fn citation_scan_evidence_from_files(
+    roots: &[String],
+    files: impl IntoIterator<Item = (String, Vec<u8>)>,
+) -> CitationScanEvidence {
+    let roots = roots
+        .iter()
+        .map(|root| normalize_artifact_path(root))
+        .filter(|root| !root.is_empty())
+        .filter(|root| validate_repo_relative_path(root).is_ok())
+        .collect::<Vec<_>>();
+    files
+        .into_iter()
+        .map(|(path, bytes)| (normalize_artifact_path(&path), bytes))
+        .filter(|(path, _)| roots.iter().any(|root| contains_path(root, path)))
         .filter_map(|(path, bytes)| String::from_utf8(bytes).ok().map(|text| (path, text)))
         .collect()
 }
