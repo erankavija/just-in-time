@@ -14,12 +14,12 @@
   "gates_status": {
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-29T18:07:24.310875123Z",
+      "updated_at": "2026-07-29T18:22:57.165186257Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-29T18:03:49.703183370Z",
+      "updated_at": "2026-07-29T18:21:31.276706425Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Mechanical documentation checker defaults to the archival permanent paths",
-  "updated_at": "2026-07-29T18:07:24.310875123Z"
+  "updated_at": "2026-07-29T18:22:57.165186257Z"
 }

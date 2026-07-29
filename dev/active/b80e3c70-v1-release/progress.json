@@ -115,7 +115,7 @@
           "short_id": "eeee8a1a",
           "title": "Mechanical documentation checker defaults to the archival permanent paths",
           "classification": "implementation",
-          "status": "rework",
+          "status": "review_retry",
           "gates": [
             "code-review",
             "docs-mechanical"

@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ccce76f344b2ab44eb0ea331dfcaa2e892475fdb",
+  "completed_at": "2026-07-29T18:22:56.884212365Z",
+  "duration_ms": 345,
+  "exit_code": 1,
+  "gate_key": "code-review",
+  "issue_id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
+  "message": null,
+  "run_id": "47c81767-c1a6-4304-81f5-69bf060a6533",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T18:22:56.538986069Z",
+  "status": "failed",
+  "stderr": "---\nERROR: Agent produced no output.\n",
+  "stdout": "",
+  "tree_dirty": true
+}
