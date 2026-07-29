@@ -504,7 +504,13 @@ def check_workflow_call(relative: Path, doc, declaration) -> list[Finding]:
         return []
     call = normalize_triggers(doc).get("workflow_call")
     if call is None:
-        return [finding(relative, "contract declares a workflow_call interface, but the workflow has no 'workflow_call' trigger")]
+        return [
+            finding(
+                relative,
+                "contract declares a workflow_call interface, but the workflow "
+                "declares no 'workflow_call' trigger",
+            )
+        ]
     call = as_mapping(call)
     findings = []
 
