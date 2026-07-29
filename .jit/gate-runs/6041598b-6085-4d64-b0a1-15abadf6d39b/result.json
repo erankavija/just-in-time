@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "jit validate \"$JIT_ISSUE_ID\"",
+  "commit": "d7425437c839ba325191e032d4a53fa42c4fb3d4",
+  "completed_at": "2026-07-29T21:15:44.428577291Z",
+  "duration_ms": 2243,
+  "exit_code": 0,
+  "gate_key": "jit-validate",
+  "issue_id": "f04f7888-a828-4677-aea8-f640a6702375",
+  "message": null,
+  "run_id": "6041598b-6085-4d64-b0a1-15abadf6d39b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T21:15:42.184958420Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "✓ Issue validation passed\n",
+  "tree_dirty": true
+}

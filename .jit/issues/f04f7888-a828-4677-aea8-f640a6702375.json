@@ -14,6 +14,7 @@
       "path": "dev/active/f04f7888/req-05-verification.md"
     }
   ],
+  "done_at": "2026-07-29T21:16:00.107193823Z",
   "first_ready_at": "2026-07-15T09:12:53.175035200Z",
   "gates_required": [
     "cargo-ci",
@@ -23,12 +24,17 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-29T20:52:27.340636675Z",
+      "updated_at": "2026-07-29T21:12:58.740324805Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-29T20:56:12.372460644Z",
+      "status": "passed",
+      "updated_at": "2026-07-29T21:15:32.256554852Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-29T21:15:44.442079592Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +45,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Implement graceful jit-server process shutdown",
-  "updated_at": "2026-07-29T20:56:12.372460644Z"
+  "updated_at": "2026-07-29T21:16:00.107193823Z"
 }

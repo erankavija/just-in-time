@@ -24,7 +24,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Build the single server and web production image",
-  "updated_at": "2026-07-29T13:44:51.300307054Z"
+  "updated_at": "2026-07-29T21:16:05.287455189Z"
 }

@@ -2,6 +2,7 @@
   "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
   "epic_short_id": "b80e3c70",
   "current_wave": 1,
+  "current_sub_wave": "1b",
   "wave_note": "Wave 1 is dispatched in four sub-waves (1a, 1b, 1c, 1d). The execution-discovered archive-layout defect is ordered after c7f8ebc7 and before ef118aea so later archival reporting validates the canonical relative path. 1b is serialized behind 1a; 1c behind 1b; 1d behind all other wave-1 work.",
   "waves": [
     {
@@ -66,7 +67,7 @@
           "short_id": "f04f7888",
           "title": "Implement graceful jit-server process shutdown",
           "classification": "implementation",
-          "status": "final_docs_rework_authorized",
+          "status": "done",
           "gates": [
             "cargo-ci",
             "code-review",
@@ -81,7 +82,11 @@
           "exceptional_rework_attempts": 1,
           "criterion_amendment": "REQ-02 was updated before the exceptional merge to replace the obsolete axum-server-owned graceful_shutdown(Some(timeout)) mechanism with the user-approved single application-owned boundary: graceful_shutdown(None), boundary-time sampling, then shutdown() only for survivors.",
           "traceability_note": "The first exceptional code-review found no behavior defect but rejected the worker's spaced `jit: f04f7888` tag because reviewer attribution requires literal `jit:f04f7888`. The just-created unpushed merge message was amended to `jit:f04f7888`; old and new merge commits have identical tree 35fe99260ea81ebd6ca6f5bd2a3e71e8ab1e1e16, and amended commit f7ca2d03 passed exact-commit verification.",
-          "gate_note": "At current main cea1815c, cargo-ci passes with 4,089 tests. Code-review accepts attribution and the shutdown behavior but fails because CHANGELOG.md still describes the superseded axum-server-owned timeout. jit-validate remains pending. Further repair exceeds the normal two reworks plus the explicitly approved exceptional third round."
+          "gate_note": "Final main d7425437 passes cargo-ci with 4,089 tests, code-review with zero findings, and jit-validate. The final docs-only repair corrected the stale axum-server-owned timeout prose without changing implementation.",
+          "final_docs_branch_head": "5d400cc2",
+          "final_merge_commit": "d7425437",
+          "final_docs_rework_attempts": 1,
+          "completed_at": "2026-07-29T21:16:00.107193823Z"
         },
         {
           "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
@@ -521,7 +526,7 @@
     }
   ],
   "build_budget_watch": {
-    "current": "integration-targets=11/12, active-executables=15, bytes=1344087296/2147483648",
+    "current": "integration-targets=11/12, active-executables=15, bytes=1348004920/2147483648",
     "note": "f04f7888 deliberately folded its real-process test into a new server_integration suite rather than adding a 12th target, which would have left zero headroom. Any later issue adding an integration target must re-check @/inv/bounded-rust-build-footprint first."
   }
 }

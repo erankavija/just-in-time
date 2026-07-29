@@ -27,7 +27,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Enforce reusable blocking dependency audits",
-  "updated_at": "2026-07-29T13:52:38.653854147Z"
+  "updated_at": "2026-07-29T21:16:15.406088143Z"
 }

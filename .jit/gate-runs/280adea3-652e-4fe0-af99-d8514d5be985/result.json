@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d7425437c839ba325191e032d4a53fa42c4fb3d4",
+  "completed_at": "2026-07-29T21:15:31.930471347Z",
+  "duration_ms": 144419,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable graceful-shutdown implementation and corrected documentation satisfy the issue’s hard criteria; the prior changelog finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f04f7888-a828-4677-aea8-f640a6702375",
+  "message": null,
+  "run_id": "280adea3-652e-4fe0-af99-d8514d5be985",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T21:13:07.511066990Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 18 reachable `jit:f04f7888` commits (ecbc1b7d through d7425437); uncommitted `.jit` changes excluded  \nPolicy sources: AGENTS.md  \nResolved items: REQ-01–REQ-05 (.jit issue description); @/charter/D-11, D-12, D-13 (dev/vision/9db27a3a-charter.md); @/invariant/pid-safety, semantic-test-assertions, shared-test-contracts, bounded-rust-build-footprint, single-source-prose (.jit/invariants.toml); @/gate/cargo-ci, jit-validate (.jit/gates.toml)  \nGate evidence: cargo-ci passed (exit 0, 2026-07-29T21:05:53Z); jit-validate pending; prior code-review failed on stale CHANGELOG prose, now resolved  \nTruncation recovery: re-read all relevant patches by commit/path, current shutdown/SSE/test sources, lockfile, evidence, and final documentation in bounded reads  \n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable graceful-shutdown implementation and corrected documentation satisfy the issue’s hard criteria; the prior changelog finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
