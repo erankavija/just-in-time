@@ -232,10 +232,10 @@ a blocker caused by lifecycle state (`non-terminal-target`,
 `document-non-terminal-owner`) additionally carries a `guidance` string naming
 the permitted next action.
 
-A preview also reports the in-content citations a relocation would break as
-`moving-path-citation` warnings, read from the declared `citation_scan_roots`
-universe — the repository-relative directories and files whose text the scan
-reads, which need not lie under the development root ([Citation scan
+A preview and an execution both report the in-content citations a relocation
+would break as `moving-path-citation` warnings, read from the declared
+`citation_scan_roots` universe — the repository-relative directories and files
+whose text the scan reads, which need not lie under the development root ([Citation scan
 roots](configuration.md#citation-scan-roots)). Only a relocating artifact earns
 them, and every citation is its own warning whose `path` names the citing file
 with the citation's 1-based line and column, spelled
@@ -247,8 +247,9 @@ carry no action and no blocker, so eligibility, `--execute`, and issue
 transitions all behave as they would with no citation present. Execution
 relocates bytes and relinks document records while rewriting no document
 content, so a citing file survives byte for byte and keeps a stale citation
-until an adopter edits it. An execution plan is built without citation evidence,
-so a preview is where these warnings are read.
+until an adopter edits it. Its JSON `warnings` array and human `warning:` lines
+include the same warning set that a preview computed immediately before the
+unchanged run, so either command reports the stale citations the run leaves.
 
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those

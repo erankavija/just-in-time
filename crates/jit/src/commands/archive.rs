@@ -6,7 +6,7 @@ use crate::domain::artifact_classifier::{
     artifact_archive_destination, artifact_destination_root, classification_facts_from_evidence,
     classify_artifacts, preferred_container_destination_root,
     resolve_container_destination as derive_container_destination, ArtifactClassificationInventory,
-    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
+    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts, CitationScanEvidence,
 };
 use crate::domain::artifact_discovery::{
     discover_archive_artifacts as derive_archive_artifacts, expand_artifact_closure,
@@ -549,6 +549,59 @@ fn capture_directory_tree(
     }
 }
 
+/// Capture and derive the advisory citation evidence for the configured scan
+/// roots. The execution plan consumes this same evidence as preview, so a run
+/// reports every stale moving-path citation it leaves for an adopter to edit.
+fn capture_citation_scan_evidence(
+    session: &mut dyn RepositoryMutationSession,
+    image: &mut crate::repository_state::RepositoryImage,
+    roots: &[String],
+) -> Result<Option<CitationScanEvidence>> {
+    let roots = roots
+        .iter()
+        .map(|root| normalize_artifact_path(root))
+        .filter(|root| !root.is_empty())
+        .filter(|root| validate_repo_relative_path(root).is_ok())
+        .collect::<BTreeSet<_>>();
+    for root in &roots {
+        let Some(next) = capture_directory_tree(session, image.clone(), root)? else {
+            return Ok(None);
+        };
+        *image = next;
+    }
+
+    Ok(Some(
+        image
+            .entries()
+            .iter()
+            .filter_map(|(path, entry)| {
+                let relative = image
+                    .layout()
+                    .resolve(path)
+                    .ok()?
+                    .strip_prefix(image.layout().worktree_root())
+                    .ok()?
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                let inside_scan_root = roots.iter().any(|root| {
+                    relative == *root
+                        || relative
+                            .strip_prefix(root)
+                            .is_some_and(|suffix| suffix.starts_with('/'))
+                });
+                match (inside_scan_root, entry) {
+                    (true, crate::repository_state::RepositoryEntry::File { bytes, .. }) => {
+                        String::from_utf8(bytes.clone())
+                            .ok()
+                            .map(|text| (relative, text))
+                    }
+                    _ => None,
+                }
+            })
+            .collect(),
+    ))
+}
+
 impl CommandExecutor<JsonFileStorage> {
     fn capture_archive_plan(
         &self,
@@ -843,6 +896,12 @@ impl CommandExecutor<JsonFileStorage> {
             embedded,
             &evidence,
         )?;
+        let Some(citations) =
+            capture_citation_scan_evidence(session, &mut image, &policy.citation_scan_roots)?
+        else {
+            return Ok(None);
+        };
+        facts.citations = citations;
         apply_recorded_residue_identities(
             &mut facts.locations,
             &plan_target,

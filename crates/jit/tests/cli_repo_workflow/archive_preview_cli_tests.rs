@@ -1179,6 +1179,30 @@ fn citation_warning_paths(plan: &Value, source: &str) -> Vec<String> {
         .collect()
 }
 
+/// The complete warning set from either an archive plan or an execution result.
+/// Plans partition warnings between target and artifact records; executions
+/// flatten that same semantic set into their result envelope.
+fn archive_warning_set(report: &Value) -> BTreeSet<(String, Option<String>)> {
+    report["warnings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .chain(
+            report["artifacts"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .flat_map(|artifact| artifact["warnings"].as_array().into_iter().flatten()),
+        )
+        .map(|warning| {
+            (
+                warning["code"].as_str().unwrap().to_string(),
+                warning["path"].as_str().map(str::to_string),
+            )
+        })
+        .collect()
+}
+
 /// Blank out every warnings collection in `plan`, in place, leaving actions,
 /// blockers, and eligibility as the only remaining variables.
 fn clear_warnings(plan: &mut Value) {
@@ -1747,6 +1771,20 @@ fn test_archive_container_execution_leaves_a_citing_scanned_file_byte_identical(
             .unwrap()
             .contains(CITED_ARTIFACT),
         "the surviving text must still carry the stale citation verbatim"
+    );
+}
+
+/// REQ-03 (`jit:ef118aea`): execution derives the same advisory warnings as a
+/// preview of the unchanged target, including citations it intentionally leaves
+/// for the adopter to repair after relocation.
+#[test]
+fn test_archive_container_execution_reports_the_preview_warning_set() {
+    let run = archived_citation();
+
+    assert_eq!(
+        archive_warning_set(&run.execution),
+        archive_warning_set(&run.preview),
+        "execution must report the warning set preview computed for the same archive target"
     );
 }
 
