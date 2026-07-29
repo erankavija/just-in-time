@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "55beb5b7b8f14c73edd5cf32d810d7e175088a9f",
+  "completed_at": "2026-07-29T19:30:52.581310177Z",
+  "duration_ms": 287721,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/artifact_classifier.rs",
+        "id": "F1",
+        "line": 1068,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Any prefix ending in :- is accepted as a citation start, so a longer path such as notes:-dev/active/design.md still emits a warning."
+      }
+    ],
+    "summary": "The unconditional shell-default prefix rule still misclassifies longer paths ending in :- as citations, violating REQ-04.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
+  "message": null,
+  "run_id": "2212c53d-bc4d-4927-b547-7f44415a5ebf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T19:26:04.860072241Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10373 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faf57-598b-7741-aa6e-c62f4ed9780b\n--------\nuser\n--- 10360 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c8750579, 977c3894, a85b7866, 867cf72, d9217303, e15a5577, 55beb5b7\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/b80e3c70/requirement/REQ-11 (.jit/issues/b80e3c70-cf7d-4f72-b53d-6e556363be58.json)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T19:17:04Z); prior code-review failed (exit 1; prior `.bak` finding addressed)\nTruncation recovery: per-path first- and second-parent merge diffs, bounded individual patches, and narrowed current implementation/test reads; unrelated merge-side changes excluded from the impact cone\n\n1. [blocking][issue-impact][high] `is_citation_start` accepts any prefix ending in `:-`. Thus `notes:-dev/active/design.md` is treated as a standalone citation and warns, although it is a longer unrelated path containing the source. This violates REQ-04. The tests cover `${PLAN_OUT:-…}` but not a path prefix preceding `:-`. [`crates/jit/src/domain/artifact_classifier.rs:1068`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/artifact_classifier.rs:1068)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The unconditional shell-default prefix rule still misclassifies longer paths ending in :- as citations, violating REQ-04.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Any prefix ending in :- is accepted as a citation start, so a longer path such as notes:-dev/active/design.md still emits a warning.\",\"file\":\"crates/jit/src/domain/artifact_classifier.rs\",\"line\":1068,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

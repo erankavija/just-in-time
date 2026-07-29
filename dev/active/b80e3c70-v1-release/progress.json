@@ -99,7 +99,7 @@
           "short_id": "c7f8ebc7",
           "title": "Archival citation warnings fire on citations that already name the destination",
           "classification": "implementation",
-          "status": "rework",
+          "status": "escalated",
           "gates": [
             "cargo-ci",
             "code-review"
@@ -363,6 +363,12 @@
       "reason": "Code review found a distinct notification-to-deadline timing gap after the configured two rework rounds were exhausted.",
       "finding": "The drain observer can report forced closure before axum-server starts its own drain deadline, so the count and log can be false.",
       "decision_needed": "Authorize one exceptional third rework round, accept the known logging defect, or defer/remove the issue from the v1.0 epic."
+    },
+    {
+      "issue": "c7f8ebc7",
+      "reason": "Code review found a distinct shell-default-prefix ambiguity after the configured two rework rounds were exhausted.",
+      "finding": "The citation matcher accepts any prefix ending in ':-', so a longer path such as 'notes:-dev/active/design.md' still warns.",
+      "decision_needed": "Authorize one exceptional third rework round, accept the known false-positive edge case, or defer/remove the issue from the v1.0 epic."
     }
   ],
   "rework_counts": {
