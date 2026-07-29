@@ -2,7 +2,7 @@
   "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
   "epic_short_id": "b80e3c70",
   "current_wave": 1,
-  "wave_note": "Wave 1 is dispatched in three sub-waves (1a, 1b, 1c) because eleven issues have no sibling dependency but three file-footprint collisions exist. 1b is serialized behind 1a; 1c is serialized behind 1b.",
+  "wave_note": "Wave 1 is dispatched in four sub-waves (1a, 1b, 1c, 1d). The execution-discovered archive-layout defect is ordered after c7f8ebc7 and before ef118aea so later archival reporting validates the canonical relative path. 1b is serialized behind 1a; 1c behind 1b; 1d behind all other wave-1 work.",
   "waves": [
     {
       "wave_number": 1,
@@ -66,7 +66,7 @@
           "short_id": "f04f7888",
           "title": "Implement graceful jit-server process shutdown",
           "classification": "implementation",
-          "status": "escalated",
+          "status": "exceptional_rework_authorized",
           "gates": [
             "cargo-ci",
             "code-review",
@@ -99,7 +99,7 @@
           "short_id": "c7f8ebc7",
           "title": "Archival citation warnings fire on citations that already name the destination",
           "classification": "implementation",
-          "status": "escalated",
+          "status": "exceptional_rework_authorized",
           "gates": [
             "cargo-ci",
             "code-review"
@@ -154,6 +154,22 @@
       "footprint_rationale": "f9e42a43 edits commands/document.rs and check_links_tests.rs, which 1a's f289ff18 owns. ef118aea edits the archival citation planner, which 1a's c7f8ebc7 owns.",
       "issues": [
         {
+          "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
+          "short_id": "625cc07f",
+          "title": "Strip the development root from container archive destinations",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "c7f8ebc7"
+          ],
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "docs-mechanical"
+          ],
+          "footprint_note": "Expected to own archive destination derivation, its tests, and canonical archive-layout documentation. Run after c7f8ebc7 so citation parsing is stable and before ef118aea so execution/reporting tests exercise the corrected layout."
+        },
+        {
           "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
           "short_id": "f9e42a43",
           "title": "Treat a directory link target consistently across discovery, link checking and validation",
@@ -163,7 +179,14 @@
             "cargo-ci",
             "code-review"
           ]
-        },
+        }
+      ]
+    },
+    {
+      "wave_number": 1,
+      "sub_wave": "1c",
+      "footprint_rationale": "ef118aea depends on the execution-discovered archive-layout correction and is intentionally delayed until that canonical path has landed.",
+      "issues": [
         {
           "id": "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
           "short_id": "ef118aea",
@@ -175,13 +198,16 @@
             "code-review",
             "doc-review"
           ],
-          "merge_note": "c7f8ebc7 reflowed the whole moving-path-citation paragraph in docs/reference/cli-commands.md, which contains the two sentences about an execution plan being built without citation evidence. Expect a textual conflict there if ef118aea rewrites that paragraph. Dispatch ef118aea only after c7f8ebc7 is merged."
+          "depends_on": [
+            "625cc07f"
+          ],
+          "merge_note": "c7f8ebc7 reflowed the moving-path-citation paragraph in docs/reference/cli-commands.md. Dispatch only after 625cc07f lands, then verify both citation-boundary and canonical archive-layout wording survive."
         }
       ]
     },
     {
       "wave_number": 1,
-      "sub_wave": "1c",
+      "sub_wave": "1d",
       "footprint_rationale": "a122b9b3 adds whole-tree invariant enforcement across crates/, mcp-server/, and web/, and must fix every violation the enforced tree then reports. It collides with every other wave-1 issue and runs alone, last, so it sees all landed code.",
       "issues": [
         {
@@ -356,19 +382,30 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
+      "short_id": "625cc07f",
+      "title": "Strip the development root from container archive destinations",
+      "reason": "Production archive destination derivation repeats the configured development-root segment, yielding paths such as dev/archive/<container>/dev/active/plan.md.",
+      "wiring": "Depends on c7f8ebc7; ef118aea depends on this issue; bb03df0a therefore retains release-gate coverage transitively.",
+      "content_standards_review": "Passed after removing tracker-context and sibling references from the draft description before commit."
+    }
+  ],
   "escalations": [
     {
       "issue": "f04f7888",
       "reason": "Code review found a distinct notification-to-deadline timing gap after the configured two rework rounds were exhausted.",
       "finding": "The drain observer can report forced closure before axum-server starts its own drain deadline, so the count and log can be false.",
-      "decision_needed": "Authorize one exceptional third rework round, accept the known logging defect, or defer/remove the issue from the v1.0 epic."
+      "decision_needed": "Authorize one exceptional third rework round, accept the known logging defect, or defer/remove the issue from the v1.0 epic.",
+      "resolution": "User authorized one exceptional third rework round."
     },
     {
       "issue": "c7f8ebc7",
       "reason": "Code review found a distinct shell-default-prefix ambiguity after the configured two rework rounds were exhausted.",
       "finding": "The citation matcher accepts any prefix ending in ':-', so a longer path such as 'notes:-dev/active/design.md' still warns.",
-      "decision_needed": "Authorize one exceptional third rework round, accept the known false-positive edge case, or defer/remove the issue from the v1.0 epic."
+      "decision_needed": "Authorize one exceptional third rework round, accept the known false-positive edge case, or defer/remove the issue from the v1.0 epic.",
+      "resolution": "User authorized one exceptional third rework round."
     }
   ],
   "rework_counts": {
@@ -402,12 +439,24 @@
     {
       "subject": "archive destinations duplicate the full development-root path",
       "detail": "Confirmed production behavior: artifact_mirror_destination(destination_root, source) appends the entire repository-relative source, yielding paths such as dev/archive/<container>/dev/active/plan.md. This is a user-identified design smell, not merely a defensive c7 example. Prefer stripping the configured development_root before mirroring, subject to collision and migration design.",
-      "routed_to": null,
-      "criterion_check": "not owned by c7f8ebc7; requires an explicit archive-layout decision before changing persisted paths"
+      "routed_to": "625cc07f",
+      "criterion_check": "filed as an explicit canonical-cutover defect and ordered before ef118aea"
     }
   ],
   "started_at": "2026-07-29T14:20:00+00:00",
   "lead_decisions": [
+    {
+      "issue": "f04f7888",
+      "decision": "Authorize one exceptional third rework round beyond the normal two-round limit.",
+      "reasoning": "The final review found a concrete deadline-origin race that can produce a false forced-close count; accepting it would violate the shutdown result contract.",
+      "rejected_alternative": "Accept the known logging defect or defer the issue from v1.0."
+    },
+    {
+      "issue": "c7f8ebc7",
+      "decision": "Authorize one exceptional third rework round beyond the normal two-round limit.",
+      "reasoning": "The final review found a concrete false-positive citation boundary for longer paths ending in ':-'; accepting it would violate the exact-token criterion.",
+      "rejected_alternative": "Accept the known false positive or defer the issue from v1.0."
+    },
     {
       "issue": "bb302dbd",
       "decision": "Accept the zod 3 -> 4 major bump.",

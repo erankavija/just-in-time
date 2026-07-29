@@ -25,9 +25,9 @@
 - Main is clean. All four rework worktrees were verified clean and fully merged, then removed; their branches remain available.
 - The only other registered worktrees are the pre-existing `lead-install-clean` and `steward-v1-readiness` worktrees.
 
-## Decisions required from the invoker
+## Exceptional rework approved
 
-The execution-lead policy permits two rework rounds. Both issues below reached that limit with distinct, substantive findings. Do not dispatch more rework without explicit approval.
+The execution-lead policy permits two normal rework rounds. Both issues below reached that limit with distinct, substantive findings. On 2026-07-29 the invoker explicitly authorized one exceptional third round for each issue.
 
 ### `f04f7888`
 
@@ -35,7 +35,7 @@ The execution-lead policy permits two rework rounds. Both issues below reached t
 - Final `code-review`: failed.
 - Remaining finding: the observer starts its deadline before `axum-server` starts the handle's own drain timer. If the serving task observes the notification late, the observer can report `ForcedClosed` and log a forced-close count while the connection is still inside the handle's legitimate drain window.
 - Prepared resolution: remove the second deadline domain. Call `handle.graceful_shutdown(None)` to stop acceptance and begin indefinite graceful draining, own the one configured timeout in JIT, sample `connection_count` at that exact boundary, and call public `handle.shutdown()` only when survivors remain. This makes the sampled count and force-close action share one boundary.
-- Recommended decision: authorize one exceptional third rework round. Use a frontier model at high reasoning because the fix must align two asynchronous deadline domains and add deterministic timing coverage.
+- Approved execution: one exceptional third rework round using a frontier model at high reasoning because the fix must align two asynchronous deadline domains and add deterministic timing coverage.
 - Alternatives: explicitly accept the inaccurate log/count, or defer/remove the issue from the v1.0 epic. Accepting the known defect is not recommended.
 
 ### `c7f8ebc7`
@@ -44,7 +44,7 @@ The execution-lead policy permits two rework rounds. Both issues below reached t
 - Final `code-review`: failed.
 - Remaining finding: `is_citation_start` treats every prefix ending in `:-` as shell-default syntax, so a longer unrelated path such as `notes:-dev/active/design.md` still produces a moving-source warning, violating REQ-04.
 - Prepared resolution: recognize shell defaults only in proven parameter-expansion context such as `${NAME:-...}`, with explicit counterexamples for raw `notes:-...`, concatenated longer paths, malformed/unclosed expansions, and valid variable-name forms.
-- Recommended decision: authorize one exceptional third rework round. Require shell-default recognition to prove actual parameter-expansion context rather than accepting the raw two-character suffix. A focused high-reasoning implementation model is sufficient.
+- Approved execution: one exceptional third rework round using a focused high-reasoning implementation model. Shell-default recognition must prove actual parameter-expansion context rather than accepting the raw two-character suffix.
 - Alternatives: explicitly accept the false-positive edge case, or defer/remove the issue from v1.0. Accepting a known REQ-04 violation is not recommended.
 
 ## User-directed archive-layout finding
@@ -56,7 +56,7 @@ The concern about duplicated directory depth is confirmed production behavior, n
 - Tests and documentation intentionally describe this as an on-disk mirror.
 - Searches for “archive destination”, “mirror source path”, and “duplicated development root” found no open issue that owns correcting the shape.
 
-This is recorded under `surfaced_pitfalls` in `progress.json`. The likely design direction is to strip the configured development root before mirroring, yielding a shape such as `dev/archive/<container>/active/plan.md`, but collision behavior and any migration boundary must be designed explicitly before changing persisted paths. Do not let c7's matching logic normalize or endorse the current shape.
+This is recorded under `surfaced_pitfalls` in `progress.json` and now owned by issue `625cc07f`, **Strip the development root from container archive destinations**. Its description was reviewed against `.jit/reference/content-standards.md` before commit. The graph orders `c7f8ebc7 → 625cc07f → ef118aea`, so citation parsing stabilizes first and the later execution/reporting work validates the corrected canonical layout. Do not let c7's matching logic normalize or endorse the current shape.
 
 ## Validation and evidence notes
 
@@ -67,14 +67,14 @@ This is recorded under `surfaced_pitfalls` in `progress.json`. The likely design
 - `eeee8a1a` had two no-output reviewer-service failures. After the service recovered, its mechanical gate and code review both passed and the issue completed.
 - External code-review egress was explicitly approved by the user.
 
-## Next steps after approval
+## Next steps
 
-1. Record the invoker's decisions in `progress.json`.
-2. If exceptional rework is approved, create fresh worktrees from current main and dispatch `f04f7888` and `c7f8ebc7` with the complete cumulative finding history. Increment or separately record the exceptional attempt; do not erase the existing count of two.
+1. Commit the recorded approvals, issue `625cc07f`, its DAG wiring, and progress/handoff updates as isolated lead state.
+2. Create fresh worktrees from current main and dispatch exceptional-round `f04f7888` and `c7f8ebc7` workers with the complete cumulative finding history. Preserve the normal rework counts of two and record this attempt separately.
 3. Merge each result separately, verify the exact commit, reinstall through `scripts/install-jit.sh`, and rerun required gates sequentially.
 4. Complete both issues only after all criteria, linked artifacts, stale-behavior sweeps, and deferred-marker audits pass.
-5. Run `jit validate`, commit JIT state separately, and then dispatch wave 1b (`f9e42a43`, `ef118aea`). Re-read `f9e42a43`'s predecessor note in `progress.json`; `f289ff18` moved its error construction into `crates/jit/src/document/reference.rs`.
-6. Keep the confirmed archive-layout smell visible. Create a dedicated design/implementation issue only with an explicit hierarchy and dependency choice; it is not owned by c7.
+5. Run `jit validate`, commit JIT state separately, and then dispatch wave 1b (`f9e42a43`, `625cc07f`). Re-read `f9e42a43`'s predecessor note in `progress.json`; `f289ff18` moved its error construction into `crates/jit/src/document/reference.rs`.
+6. Dispatch `ef118aea` only after `625cc07f` completes, then run whole-tree issue `a122b9b3` alone.
 
 ## Operational traps retained from session 1
 
