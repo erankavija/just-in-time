@@ -1046,9 +1046,10 @@ fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = 
 /// stands above the cited path (`dev/archive/8e071e18/dev/active/plan.md`, the
 /// destination every relocation publishes) or merely ends with the cited path's
 /// first segment (`mydev/active/plan.md`), and it extends past the occurrence
-/// through a longer name (`dev/active/plan.mdx`). So the path characters
-/// against the occurrence on either side must name nothing of their own for it
-/// to be a citation.
+/// through a longer name (`dev/active/plan.mdx`). Repository filenames can use
+/// nearly every non-NUL, non-slash character, so a small allow-list of filename
+/// characters cannot reliably find that boundary. Instead, an occurrence is a
+/// citation only when prose or code syntax delimits it.
 ///
 /// Punctuation carrying no name leaves the citation whole, which is how the
 /// citations prose and code actually write are kept: a quote or bracket around
@@ -1056,24 +1057,61 @@ fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = 
 /// sentence period after it, and a relative `./` or `../` before it, which adds
 /// no directory and marks a citation the same relocation breaks.
 fn is_whole_path_citation(line: &str, offset: usize, source: &str) -> bool {
-    let before = line[..offset]
-        .chars()
-        .rev()
-        .take_while(|character| is_path_character(*character));
-    let after = line[offset + source.len()..]
-        .chars()
-        .take_while(|character| is_path_character(*character));
-    !before.chain(after).any(is_name_character)
+    is_citation_start(&line[..offset]) && is_citation_end(&line[offset + source.len()..])
 }
 
-/// Whether `character` can belong to a repository path as text spells one.
-fn is_path_character(character: char) -> bool {
-    is_name_character(character) || matches!(character, '/' | '.' | '-')
+/// Whether text before a path finishes with syntax that introduces a citation.
+///
+/// Relative `./` and `../` prefixes still name the same repository-relative
+/// artifact, and `:-` is the shell-default form used by the scanned scripts.
+fn is_citation_start(prefix: &str) -> bool {
+    prefix.is_empty()
+        || prefix.ends_with(":-")
+        || relative_prefix_start(prefix)
+        || prefix.chars().last().is_some_and(is_citation_delimiter)
 }
 
-/// Whether `character` names a path segment rather than punctuating one.
-fn is_name_character(character: char) -> bool {
-    character.is_alphanumeric() || character == '_'
+/// Whether text after a path starts with syntax that closes a citation.
+fn is_citation_end(suffix: &str) -> bool {
+    suffix.is_empty() || suffix.chars().next().is_some_and(is_citation_delimiter)
+}
+
+/// Whether `prefix` ends in one or more repository-relative path introducers.
+fn relative_prefix_start(prefix: &str) -> bool {
+    ["../", "./"].into_iter().any(|relative| {
+        prefix.strip_suffix(relative).is_some_and(|before| {
+            before.is_empty()
+                || relative_prefix_start(before)
+                || (!before.ends_with('.') && is_citation_start(before))
+        })
+    })
+}
+
+/// Whether `character` delimits a path citation in prose or code.
+///
+/// This intentionally lists syntax rather than filename characters. A character
+/// not listed here is allowed in a repository filename and therefore keeps an
+/// adjacent source occurrence inside a longer path.
+fn is_citation_delimiter(character: char) -> bool {
+    character.is_whitespace()
+        || matches!(
+            character,
+            '\'' | '"'
+                | '`'
+                | '('
+                | ')'
+                | '['
+                | ']'
+                | '{'
+                | '}'
+                | '<'
+                | '>'
+                | '.'
+                | ','
+                | ';'
+                | '!'
+                | '?'
+        )
 }
 
 fn selected_destination_roots(
@@ -1433,6 +1471,7 @@ fn merge<T: Clone>(existing: &[T], additional: impl IntoIterator<Item = T>) -> V
 mod tests {
     use super::*;
     use crate::domain::type_taxonomy::HierarchyConfig;
+    use proptest::prelude::*;
     use std::collections::HashMap;
 
     const CONTAINER: &str = "abcdef12-3456-7890-abcd-ef1234567890";
@@ -3419,8 +3458,55 @@ mod tests {
             format!("Vendored at `my{CITED_SOURCE}`."),
             format!("Rendered as `{CITED_SOURCE}x`."),
             format!("Superseded by `{CITED_SOURCE}-old`."),
+            format!("Stored at `.../{CITED_SOURCE}`."),
         ] {
             assert!(!cites(&line), "{line} names a longer path");
+        }
+    }
+
+    #[test]
+    fn test_is_whole_path_citation_rejects_a_source_inside_a_path_with_non_alphanumeric_names() {
+        let line = "See `other+dev/active/design.md` for the alternate design.";
+        let source = "dev/active/design.md";
+        let offset = line
+            .find(source)
+            .expect("the longer path must contain the source path");
+
+        assert!(
+            !is_whole_path_citation(line, offset, source),
+            "a plus belongs to the preceding filename, not citation syntax"
+        );
+    }
+
+    proptest! {
+        #[test]
+        fn test_is_whole_path_citation_rejects_path_safe_characters_adjacent_to_the_source(
+            before in any::<u8>().prop_map(char::from).prop_filter(
+                "a non-delimiter filename character",
+                |character| *character != '\0' && *character != '/' && !is_citation_delimiter(*character),
+            ),
+            after in any::<u8>().prop_map(char::from).prop_filter(
+                "a non-delimiter filename character",
+                |character| *character != '\0' && *character != '/' && !is_citation_delimiter(*character),
+            ),
+        ) {
+            let prefixed = format!("`{before}{CITED_SOURCE}`");
+            let suffixed = format!("`{CITED_SOURCE}{after}`");
+
+            prop_assert!(!cites(&prefixed), "{before:?} extends the path before its source");
+            prop_assert!(!cites(&suffixed), "{after:?} extends the path after its source");
+        }
+
+        #[test]
+        fn test_is_whole_path_citation_accepts_syntax_delimiters(
+            delimiter in any::<u8>().prop_map(char::from).prop_filter(
+                "a citation delimiter",
+                |character| is_citation_delimiter(*character),
+            ),
+        ) {
+            let line = format!("{delimiter}{CITED_SOURCE}{delimiter}");
+
+            prop_assert!(cites(&line), "{delimiter:?} delimits a standalone citation");
         }
     }
 
