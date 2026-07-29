@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>A place for everything — issue-based artifact layout and serviceable archival in JIT</title>
+
+<!-- Every asset below is vendored under this deck folder. The deck opens from
+     a file:// URL with no network: reveal.js 5.1.0 in vendor/reveal.js/, the
+     three font families in vendor/fonts/. No CDN, no Google Fonts, no math
+     library. -->
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="vendor/reveal.js/reset.css">
+<link rel="stylesheet" href="vendor/reveal.js/reveal.css">
+
+<!-- Theme system: structure is theme-agnostic; swap the #theme link to retheme -->
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- ── TITLE ───────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>A place for everything</h1>
+  <p class="tagline">Issue-based artifact layout and serviceable archival in JIT</p>
+  <p>Epic <code>8e071e18</code> &nbsp;·&nbsp; just-in-time &nbsp;·&nbsp; 2026-07-27</p>
+  <p class="caption">Every command output on these slides was captured from a real run of
+     <code>jit 0.2.1 (commit 758a44d3)</code>. Product behaviour is shown on a freshly
+     initialized repository, so no claim depends on this project's own configuration.</p>
+</section>
+
+<!-- ── WHAT SHIPPED ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Feature introduction</span>
+  <h2>What shipped</h2>
+  <div class="def">
+    An issue owns one directory per configured area, a command resolves it, and the
+    archival mechanism can service every artifact that lands there.
+  </div>
+  <ul>
+    <li>Configuration declares which development areas organize artifacts <em>per issue</em>.</li>
+    <li>The directory name is derived from the issue's identity — never from its title.</li>
+    <li>Archival classifies every configured area, so no artifact class is unreachable.</li>
+    <li>Planning warns about the prose citations a relocation would break, and rewrites none of them.</li>
+  </ul>
+  <div class="note">The through-line: a path is <strong>resolved by the tool</strong> rather than
+     spelled out by whoever is writing the file.</div>
+</section>
+
+<!-- ── MOTIVATION ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Motivation</span>
+  <h2>Two defects, found by an epic's own review</h2>
+  <p><strong>The mechanism could not service a whole artifact class.</strong>
+     <code>jit archive</code> refused any selected root that was neither managed, permanent, nor
+     already archived. The shipped default named three managed areas;
+     <code>dev/presentations</code> was not among them, so archiving a slide deck had to be
+     hand-rolled with <code>git mv</code>.</p>
+  <p>That bypass skipped the planner's reference remapping. A document reference dangled and
+     <code>jit validate</code> hard-failed until it was repaired by hand.</p>
+  <div class="warning">A workaround that skips the mechanism also skips everything the mechanism
+     guarantees. The failure surfaced two steps later, in an unrelated command.</div>
+</section>
+
+<!-- ── MOTIVATION 2 ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Motivation</span>
+  <h2>The flat layout did not scale</h2>
+  <p>172 artifacts sat at area root as <code>&lt;short-id&gt;-&lt;artifact&gt;.md</code>. Most were
+     owned by issues that had been terminal for months.</p>
+  <p>The one place that already derived a directory name from an issue fell back to the issue
+     <em>title</em>, which produced names truncated mid-word. The archive contained its own
+     counter-example:</p>
+  <pre><code class="language-text">dev/archive/a9b5dd08-use-strategic-label-slugs-in-archive-directory-n/</code></pre>
+  <p class="small">The directory whose issue was titled <em>“Use strategic label slugs in archive
+     directory names”</em> — cut off two characters into the last word.</p>
+</section>
+
+<!-- ── THE CONVENTION ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Design</span>
+  <h2>The convention</h2>
+  <div class="def">
+    An issue's artifact directory is <code>&lt;area&gt;/&lt;short-id&gt;-&lt;slug&gt;</code> when the
+    issue resolves a single membership value, and <code>&lt;area&gt;/&lt;short-id&gt;</code>
+    otherwise. Filenames inside it carry no short-id prefix.
+  </div>
+  <ul>
+    <li>The slug comes from a membership label — the issue's <code>type:</code> label, that type's
+        membership namespace, and a single value of it.</li>
+    <li>Titles are excluded by construction, so renaming an issue never moves its directory.</li>
+    <li>The directory names the issue, so each file names its own artifact: <code>plan.md</code>.</li>
+  </ul>
+  <div class="note">Pre-existing flat files are tolerated rather than restructured in place.</div>
+</section>
+
+<!-- ── DOC DIR ─────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The resolver</span>
+  <h2><code>jit doc dir</code> — with a membership label</h2>
+  <pre><code class="language-bash">$ jit doc dir c8d742fa dev/active
+dev/active/c8d742fa-payment-reconciliation
+
+$ jit doc dir c8d742fa dev/presentations
+dev/presentations/c8d742fa-payment-reconciliation</code></pre>
+  <p>The issue is titled <em>“Payment reconciliation”</em> and carries
+     <code>type:epic</code> with <code>epic:payment-reconciliation</code>. The slug is the
+     <strong>label value</strong>; the title coincidentally matches and contributes nothing.</p>
+  <p class="small">The caller names the area. Everything after it is derived.</p>
+</section>
+
+<!-- ── DOC DIR 2 ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The resolver</span>
+  <h2><code>jit doc dir</code> — without one, and when wrong</h2>
+  <pre><code class="language-bash">$ jit doc dir b4d6e478 dev/active
+dev/active/b4d6e478
+
+$ jit doc dir c8d742fa dev/notes ; echo "exit=$?"
+Error: 'dev/notes' is not a declared issue-scoped area
+       (declared: dev/active, dev/studies, dev/plans, dev/presentations)
+exit=2</code></pre>
+  <p>Issue <code>b4d6e478</code> is titled <em>“Ledger import”</em> and carries no membership
+     label, so it takes the bare short id. No trace of the title appears, and an undeclared area is
+     rejected rather than resolved.</p>
+</section>
+
+<!-- ── COMPOSE VS RESOLVE ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The resolver</span>
+  <h2>Obtain the path; do not compose it</h2>
+  <pre><code class="language-bash">$ jit doc dir c8d742fa dev/active --json
+{
+  "area": "dev/active",
+  "directory": "dev/active/c8d742fa-payment-reconciliation",
+  "issue_id": "c8d742fa-13fb-4b26-9b2c-bdd14b6e5a44",
+  "short_id": "c8d742fa"
+}</code></pre>
+  <p>The answer is a <strong>name, not a reading of the tree</strong>: it resolves the same before
+     anything is written there, and the command creates nothing.</p>
+  <pre><code class="language-bash">mkdir -p "$(jit doc dir &lt;id&gt; &lt;area&gt;)"</code></pre>
+</section>
+
+<!-- ── CONFORMANCE ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The advisory report</span>
+  <h2><code>jit doc conformance</code></h2>
+  <pre><code class="language-bash">$ jit doc conformance ; echo "exit=$?"
+Scanned areas: dev/active, dev/studies, dev/plans, dev/presentations
+Artifacts (2):
+  dev/active/b4d6e478-stray-plan.md
+    nonconforming -> dev/active/b4d6e478 (issue b4d6e478-…)
+  dev/active/c8d742fa-payment-reconciliation/review-notes.md
+    nonconforming -> dev/active/b4d6e478 (issue b4d6e478-…)
+exit=0</code></pre>
+  <p class="small">Two artifacts, two different reasons — and one file that is <em>absent</em> from
+     the report is the most interesting of the three.</p>
+</section>
+
+<!-- ── CONFORMANCE: TWO RULES ──────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The advisory report</span>
+  <h2>Two ways to resolve an owner</h2>
+  <table>
+    <thead><tr><th>artifact</th><th>owner resolved from</th></tr></thead>
+    <tbody>
+      <tr><td><code>b4d6e478-stray-plan.md</code></td><td>the short id the <strong>name</strong> opens with</td></tr>
+      <tr><td><code>…-payment-reconciliation/review-notes.md</code></td><td>the <strong>document reference</strong> naming it</td></tr>
+      <tr><td><code>…-payment-reconciliation/plan.md</code></td><td>reference — and it <em>conforms</em>, so it is not listed</td></tr>
+    </tbody>
+  </table>
+  <p>The second row is a file sitting inside the epic's directory while a different issue's
+     reference claims it. The third is the same shape, correctly placed.</p>
+  <div class="note">A prefix-less name no issue references is passed over: nothing states who owns
+     it.</div>
+</section>
+
+<!-- ── WHY THE SECOND RULE ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The advisory report</span>
+  <h2>Why the second rule exists</h2>
+  <p>The convention drops the short-id prefix from filenames inside an issue directory. So
+     <strong>every artifact created under the convention is prefix-less by construction</strong>.</p>
+  <p>A report that attributed owners only from filename prefixes would reach legacy flat artifacts
+     and progressively fail to reach conforming ones — going blind exactly as the convention it
+     advises on is adopted.</p>
+  <div class="warning">This was missed at design time. The epic's own independent review caught it
+     against the epic's criteria, and it was fixed before the epic closed.</div>
+</section>
+
+<!-- ── ADVISORY BY DESIGN ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The advisory report</span>
+  <h2>Advice, not enforcement</h2>
+  <ul>
+    <li>The command writes nothing and blocks no state transition.</li>
+    <li>It exits <code>0</code> whatever it finds — note <code>exit=0</code> on the previous slide.</li>
+    <li>A listed artifact is left exactly where it is; acting on the report is the adopter's call.</li>
+  </ul>
+  <p>A blocking validation rule was rejected deliberately: legacy flat artifacts are tolerated on
+     purpose, so a cutover predicate would be a false-positive source rather than a signal.</p>
+  <div class="note">The topmost offending path component is the one named, so a misplaced directory
+     is one entry rather than one per file beneath it.</div>
+</section>
+
+<!-- ── CLASSIFICATION ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Archival</span>
+  <h2>Every area is classified, out of the box</h2>
+  <pre><code class="language-bash">$ git init &amp;&amp; jit init &amp;&amp; jit config get documentation
+  "development_root": "dev",   "archive_root": "dev/archive",
+
+  "managed_paths":      dev/active  dev/studies  dev/sessions  dev/plans
+                        dev/presentations  dev/design  dev/benchmarks
+                        dev/experiments
+  "permanent_paths":    dev/architecture  dev/eval  dev/vision
+                        dev/index.md  dev/TESTING.md  dev/authoring-conventions.md
+  "issue_scoped_areas": dev/active  dev/studies  dev/plans  dev/presentations</code></pre>
+  <p class="small">Scaffolded by <code>jit init</code> with no hand editing; array formatting
+     condensed for the slide. <code>dev/presentations</code> is managed,
+     <code>dev/architecture</code> permanent.</p>
+</section>
+
+<!-- ── MANAGED VS PERMANENT ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Archival</span>
+  <h2>Managed and permanent are different questions</h2>
+  <div class="two-col">
+    <div>
+      <h3>Managed</h3>
+      <p>Move on archive. The area's contents are revision-specific work products of the issues
+         that produced them.</p>
+    </div>
+    <div>
+      <h3>Permanent</h3>
+      <p>Archive by copy; the source stays. Living contributor documentation that readers still
+         navigate to.</p>
+    </div>
+  </div>
+  <p>Classifying each area explicitly — rather than applying a blanket rule to the development
+     root — is what keeps a living-documentation area from being swept into move-on-archive the
+     first time a container that links it is archived.</p>
+  <p class="small">A bare <code>dev/</code> permanent entry was rejected: classification matches by
+     path prefix, so it would silently make every managed area permanent.</p>
+</section>
+
+<!-- ── DESTINATION NAMING ──────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Archival</span>
+  <h2>The destination is named the same way</h2>
+  <pre><code class="language-bash">$ jit archive container c8d742fa --json     # epic:payment-reconciliation
+  "destination_root": "dev/archive/c8d742fa-payment-reconciliation"
+
+$ jit archive container b4d6e478 --json     # "Ledger import", no label
+  "destination_root": "dev/archive/b4d6e478"</code></pre>
+  <p>One derivation serves both the issue's artifact directory and its archive destination — the
+     same normalizer, so the two can never disagree.</p>
+  <div class="note">Execution writes a <code>.jit-container</code> marker holding the resolved full
+     container id. The short id and the marker stay authoritative; the suffix is a human-readable
+     aid.</div>
+</section>
+
+<!-- ── RETENTION ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Archival</span>
+  <h2>What lies outside the development root is retained</h2>
+  <pre><code class="language-bash">$ jit archive container c8d742fa --json
+  "eligible": true,  "blockers": [],
+  "action_counts": { "move": 1, "copy": 0, "retain": 3, "block": 0 }
+
+  retain  README.md          evidence: outside-development-root
+  retain  scripts/regen.sh   evidence: outside-development-root
+  retain  src/ledger.rs      evidence: outside-development-root
+  move    dev/active/c8d742fa-payment-reconciliation/plan.md</code></pre>
+  <p>All four are linked to the same container. Source files, scripts and repository-root documents
+     keep their single copy, and discovery stops at them rather than walking through.</p>
+</section>
+
+<!-- ── WHY RETENTION ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Archival</span>
+  <h2>Retention was chosen on measurement</h2>
+  <p>Classifying out-of-root artifacts as <em>permanent</em> was implemented first, then rejected:
+     permanence sets keep-the-source while leaving wants-a-destination true, so <strong>copying fell
+     out as an inherited consequence rather than a chosen behaviour</strong>.</p>
+  <p>Because discovery walks an unbounded transitive link closure through densely cross-linked
+     documentation, that implementation scheduled, for this repository's 24 terminal containers,
+     <strong>684 copy operations over 139 distinct files</strong> — 16.6&nbsp;MB of duplicated
+     content, including seven frozen mirrors of the whole adopter documentation tree.</p>
+  <div class="warning">Which the project's own single-source invariant names as a staleness defect.
+     The alternative was not argued; it was measured.</div>
+</section>
+
+<!-- ── DIRECTORY TARGETS ───────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Archival</span>
+  <h2>A directory link is navigation</h2>
+  <p>The plan document above contains an ordinary markdown link to a directory:</p>
+  <pre><code class="language-markdown">Background in [the studies area](../../studies).</code></pre>
+  <p>The plan is <code>eligible</code> with zero blockers. The directory target contributes no
+     artifact entry, no edge, and no warning.</p>
+  <div class="note">Rewriting the repository's own directory links was rejected as the fix: they are
+     legitimate markdown, and the defect would have stayed shipped for every adopter.</div>
+</section>
+
+<!-- ── CITATION WARNINGS ───────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Citations</span>
+  <h2>Relocation breaks prose that validation cannot see</h2>
+  <p>A path spelled out in a shell comment or a README is not a document reference. Nothing
+     validates it, and moving the file silently invalidates it.</p>
+  <pre><code class="language-bash">$ jit archive container c8d742fa --json
+  moving-path-citation  README.md:3:20
+  moving-path-citation  scripts/regen.sh:2:15</code></pre>
+  <p>Every occurrence is its own warning, naming the citing file with a 1-based line and column.
+     Only a <em>relocating</em> artifact earns them.</p>
+  <div class="note">Matching only markdown link targets would have reached 2 of 26 measured
+     citations, missing every shell-script line and both adopter-facing mentions — all inline code
+     spans.</div>
+</section>
+
+<!-- ── SCAN UNIVERSE ───────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Citations</span>
+  <h2>The scan universe is declared</h2>
+  <p>The same container, before and after declaring where to look:</p>
+  <pre><code class="language-bash"># default universe: the development root together with the permanent paths
+  warnings: 0
+
+# citation_scan_roots = ["dev", "scripts", "README.md"]
+  moving-path-citation  README.md:3:20
+  moving-path-citation  scripts/regen.sh:2:15</code></pre>
+  <p class="small">The default reaches the permanent paths; configuration widens it to executable
+     and adopter-facing files outside the development root. Execution rewrites no document content:
+     a citation inside a dated historical record must survive verbatim.</p>
+</section>
+
+<!-- ── GIT OPTIONAL ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Citations</span>
+  <h2>Identical without version control</h2>
+  <p>The same repository with <code>.git</code> removed:</p>
+  <pre><code class="language-bash">$ ls -d .git    ->  absent
+  eligible: True   destination_root: dev/archive/c8d742fa-payment-reconciliation
+  moving-path-citation  README.md:3:20
+  moving-path-citation  scripts/regen.sh:2:15</code></pre>
+  <p>Identical to the tracked run. Deriving the universe from version-control tracking was rejected
+     for this reason: archival is a core command.</p>
+  <div class="note">A tracking-derived warning set would silently empty without version control —
+     reporting success by finding nothing.</div>
+</section>
+
+<!-- ── EXECUTION ───────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Execution</span>
+  <h2>Preview, then execute</h2>
+  <pre><code class="language-bash">$ jit archive container c8d742fa --execute
+Archive execution complete: 2 publication(s), 1 reference change(s),
+                            1 source deletion(s)
+
+$ find dev/archive -type f | sort
+dev/archive/c8d742fa-payment-reconciliation/.jit-container
+dev/archive/c8d742fa-payment-reconciliation/active/…/plan.md</code></pre>
+  <p class="small">Beneath the destination root each artifact keeps its repository-relative source
+     path, so a document archived out of an area is found again under the same area name. The
+     marker holds the resolved full container id.</p>
+</section>
+
+<!-- ── EXECUTION 2 ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Execution</span>
+  <h2>References follow; retained sources do not move</h2>
+  <pre><code class="language-bash">$ jit doc list c8d742fa
+  - dev/archive/c8d742fa-payment-reconciliation/active/…/plan.md
+  - src/ledger.rs
+  - scripts/regen.sh
+  - README.md</code></pre>
+  <p>The relocated document's reference is relinked to its new path. The three retained artifacts
+     keep both their location and their reference — <code>src/ledger.rs</code>,
+     <code>scripts/regen.sh</code> and <code>README.md</code> are all still where they were.</p>
+  <div class="note">A rerun of an already-archived container reconciles to a no-op.</div>
+</section>
+
+<!-- ── AT SCALE ────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Dogfooding</span>
+  <h2>The cleanup ran through the mechanism</h2>
+  <p>The repository's own development root was cleaned by running <code>--execute</code> once per
+     terminal container — deliberately, so the repaired reference remapping was exercised on real
+     artifacts and the run is itself the acceptance evidence.</p>
+  <table>
+    <thead><tr><th>measure</th><th>value</th></tr></thead>
+    <tbody>
+      <tr><td>container executions</td><td>24</td></tr>
+      <tr><td>artifacts relocated / mirrored / retained</td><td>176 / 19 / 83</td></tr>
+      <tr><td>blockers</td><td>0</td></tr>
+      <tr><td>files hash-compared against the plan that moved them</td><td>214</td></tr>
+      <tr><td>in-content citation warnings reported</td><td>641</td></tr>
+    </tbody>
+  </table>
+  <p class="small">A rehearsal of all 24 executions in a throwaway worktree is what exposed the
+     defect fixed by <code>ca832358</code>, before any of it touched the real repository.</p>
+</section>
+
+<!-- ── WHAT THE GATE CAUGHT ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Verification</span>
+  <h2>The epic's own gate failed it twice</h2>
+  <p>An independent adversarial review runs against the epic's criteria before it may close. Both
+     failures were real, and neither was found by the lead.</p>
+  <ul>
+    <li><strong>One artifact was never archived.</strong> Its container's whole content was a single
+        commit-pinned reference, which the planner retains by design. The criterion stated no
+        commit-pin exception — so the pin was removed and the container archived, rather than the
+        criterion amended.</li>
+    <li><strong>The conformance report could not see prefix-less artifacts</strong> — the gap two
+        slides back. The lead had recorded this and argued it was <em>not</em> a violation.</li>
+  </ul>
+  <div class="warning">Recording a finding and dispositioning it does not make it out of scope. The
+     reviewer's job is to disagree.</div>
+</section>
+
+<!-- ── VERIFICATION METHOD ─────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Verification</span>
+  <h2>How the claims on these slides were checked</h2>
+  <ul>
+    <li>Product behaviour is shown on a <strong>freshly initialized</strong> repository, so no claim
+        depends on this project's dogfood configuration.</li>
+    <li>Warning codes and blocker names were read from the emitting Rust source, not from prose
+        about them.</li>
+    <li>The conformance change was measured by diffing the report before and after: 10 artifacts
+        added, <strong>none removed and none changed</strong>.</li>
+    <li>Relocation was verified by git blob identity between the pre-run source and the archived
+        destination.</li>
+  </ul>
+  <div class="note">Eligibility, exit status and action counts are all blind to a broken repository.
+     A rehearsal ends in whole-repository validation, not in exit codes.</div>
+</section>
+
+<!-- ── OPEN ────────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Honest limits</span>
+  <h2>What is still open</h2>
+  <ul>
+    <li>An eligible plan can still refuse at execution in the general case. The instance that
+        triggered it was fixed; the design question is open.</li>
+    <li>A directory link target is navigation to archival discovery and a <em>missing asset</em> to
+        the link checker. The subsystems disagree.</li>
+    <li>Archival leaves empty source directories — invisible under version control, persistent
+        without it.</li>
+    <li>The conformance report consults a document reference only to <em>supply</em> a missing
+        owner, never to contradict a filename prefix.</li>
+  </ul>
+  <div class="note">Each is recorded against the criterion it was tested against, with the reason it
+     is a follow-up rather than a violation.</div>
+</section>
+
+<!-- ── CLOSING ─────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>A place for everything</h1>
+  <p class="tagline">Resolve the path; let the mechanism move it</p>
+  <p class="caption">Epic <code>8e071e18</code> — 89 children, 14 waves, 15 hard criteria.
+     Deck sources and vendored assets:
+     <code>dev/presentations/8e071e18-dev-artifact-layout/</code>, which is the directory
+     <code>jit doc dir 8e071e18 dev/presentations</code> resolves.</p>
+</section>
+
+</div></div>
+
+<script src="vendor/reveal.js/reveal.js"></script>
+<script src="vendor/reveal.js/plugin/highlight/highlight.js"></script>
+<script>
+  window.__deckReady = false;
+
+  function initDeck() {
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>

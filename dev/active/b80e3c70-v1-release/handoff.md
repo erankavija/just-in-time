@@ -56,7 +56,7 @@ The execution-lead policy permits two normal rework rounds. Both issues below re
 The concern about duplicated directory depth is confirmed production behavior, not merely a defensive c7 example:
 
 - `artifact_mirror_destination(destination_root, source)` appends the entire repository-relative source path.
-- With this repository's `development_root = "dev"` and `archive_root = "dev/archive"`, outputs include `dev/archive/<container>/dev/active/plan.md`.
+- With this repository's `development_root = "dev"` and `archive_root = "dev/archive"`, outputs include `dev/archive/<container>/active/plan.md`.
 - Tests and documentation intentionally describe this as an on-disk mirror.
 - Searches for “archive destination”, “mirror source path”, and “duplicated development root” found no open issue that owns correcting the shape.
 

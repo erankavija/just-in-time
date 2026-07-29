@@ -10,7 +10,7 @@
 //! - Claims index provides derived view of active leases
 //! - Monotonic time semantics for expiration (immune to NTP)
 //!
-//! See design doc: `dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md` - "Claim Acquisition Algorithm"
+//! See design doc: `dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md` - "Claim Acquisition Algorithm"
 
 use crate::storage::clock::{Clock, SystemClock};
 use crate::storage::StorageWarning;

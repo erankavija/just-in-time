@@ -109,7 +109,7 @@ delivered fact.
   `dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:40-61`).
 - General removal remains correctly excluded. The old brief already distinguished
   upgrade-time removal of unchanged solely-owned content from a general removal
-  command (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:67-71`), and the current
+  command (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-jit-profiles-planning-brief.md:67-71`), and the current
   container makes the same decision. No v1.1 surface should be named or modeled as a
   general uninstall operation.
 
@@ -150,7 +150,7 @@ input/interpolation/audit machinery rather than implementing a redacted subset.
 | 4. Applied records are currently package-granular and audit is a single profile-applied contract. | **already-done current-state fact; lifecycle extension is open** | The record has exactly ID/version/embedded origin/package hash/target hashes (`crates/jit/src/profile/application.rs:7-21`), and acceptance freezes that shape (`crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:583-595`). The event stores the same package-level identity (`crates/jit/src/domain/types.rs:1468-1490`) and its closed event catalog/parser are direct consumers (`crates/jit/src/domain/event_catalog.rs:111-169`, `crates/jit/src/domain/event_log.rs:35-89`). A canonical versioned record plus an isolated, transactional, one-way v1 migrator are necessary; an ordinary reader that accepts both shapes is forbidden. |
 | 5. V1.1 must wait for and consume `cdc840ad`'s planned repository image/materializer/session/publisher, while owning none of its predecessor deletions. | **valid-and-open prerequisite; currently Backlog** | `cdc840ad` plans canonical image/marker/delta/storage and direct mutation cutovers, including removal of profile snapshot/projection/drift/final-byte planning and command-local publishers (`dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md:63-88`). After it is Done, v1.1 must inspect the actual tree, rebase against what really landed, consume the actual capabilities, and assert rather than claim cdc-owned removals. |
 | 6. Manifest, record, result, event, and CLI contract changes have a repository-wide consumer blast radius. | **valid-and-open** | Direct consumers span runtime modules, generated schema, exact-surface tests, fixtures, package-derived gate presets, MCP curation/tests, CI, and canonical/adopter docs. The complete sweep is enumerated below. |
-| 7. Earlier profile studies and session artifacts contain useful facts but may contain stale assumptions. | **valid-and-open** | The pre-MVP investigation says no product profile surface existed (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:16-26`), which is now historical only. Its architecture and deferred-scope cautions remain useful (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:499-548`). The core handoff records the later projection-manifest integration (`dev/archive/6eb585bc-core-maintenance/6eb585bc-handoff-5.md:17-21`). Current code and the completion report outrank pre-implementation descriptions. |
+| 7. Earlier profile studies and session artifacts contain useful facts but may contain stale assumptions. | **valid-and-open** | The pre-MVP investigation says no product profile surface existed (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-investigation.md:16-26`), which is now historical only. Its architecture and deferred-scope cautions remain useful (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-investigation.md:499-548`). The core handoff records the later projection-manifest integration (`dev/archive/6eb585bc-core-maintenance/6eb585bc-handoff-5.md:17-21`). Current code and the completion report outrank pre-implementation descriptions. |
 | 8. Registry SSOT, domain-agnostic pure logic, Git optionality, and public JSON/schema contracts constrain the design. | **valid-and-open** | Layer boundaries require pure domain logic, storage-owned persistence, command orchestration, and CLI/output-only presentation (`AGENTS.md:135-146`). JSON and list-envelope conventions are mandatory (`AGENTS.md:155-163`). The dogfood preset compatibility surface already derives from package data rather than owning another inventory (`crates/jit/src/profile/preset.rs:41-74`, `crates/jit/src/gate_presets/builtin.rs:17-52`). |
 | 9. REQ-12/D-07 require one canonical lifecycle design, same-change removal of predecessors that survive the eventual cdc landing, and durable v1 migration with no compatibility branches. | **valid-and-open; architecture-defining** | The provisional v1.1 inventory is the embedded-only package/resolver, ordinary v1 record loader/matcher, source-specific one-ID init/profile command and dispatch, current `profile_applied` constructor/appender, surviving v1 result/provenance family, and current public/docs consumers. The final inventory is rebased only after `cdc840ad` is Done; cdc-owned paths are then absence assertions, never v1.1 re-deletion credit (`dev/active/c639cfb5-jit-profiles-complete/c639cfb5-plan.md:31-35`). |
 | 10. REQ-04/REQ-06/REQ-11 and D-06 define variables as explicitly non-secret and persistable, with no secret channel. | **valid-and-open; supersedes the earlier sensitive-value finding** | V1 has no variable vocabulary and rejects the reserved reference namespace (`crates/jit/src/profile/manifest.rs:12-30`, `crates/jit/src/profile/planner.rs:278-309`). V2 must persist every resolved variable value for deterministic reconfiguration, expose precedence and reference rendering, audit names/source kinds without values, and test that no secret declaration, input, interpolation, resupply, or special redaction surface exists (`.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json:4`). |
@@ -675,16 +675,16 @@ v1.1 migrates a surviving consumer or merely asserts a cdc-owned predecessor sta
 ### Historical/planning consumers that must not be rewritten as current API docs
 
 - Original complete-lifecycle contract:
-  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38` and
-  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:57-102`.
-- MVP scope decision: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-mvp-scope-brief.md:7-30`.
+  `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38` and
+  `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-jit-profiles-planning-brief.md:57-102`.
+- MVP scope decision: `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-mvp-scope-brief.md:7-30`.
 - Pre-MVP investigation and implementation plan:
-  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:1-22`,
-  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md:22-40`, and
-  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md:181-199`.
+  `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-investigation.md:1-22`,
+  `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-plan.md:22-40`, and
+  `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-plan.md:181-199`.
 - Publication/embedding research:
-  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-research.md:1-15` and
-  `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-research.md:183-218`.
+  `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-research.md:1-15` and
+  `dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-research.md:183-218`.
 - Delivered-state authority:
   `dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md:11-67` and
   `dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md:138-171`.
@@ -692,9 +692,9 @@ v1.1 migrates a surviving consumer or merely asserts a cdc-owned predecessor sta
   `dev/archive/6eb585bc-core-maintenance/6eb585bc-handoff-5.md:17-21` and
   `dev/archive/6eb585bc-core-maintenance/6eb585bc-handoff-5.md:65-70`.
 - The profile presentation is a historical consumer of v1 exact output and storage
-  (`dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/talk.html:55-91`,
-  `dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/talk.html:161-169`,
-  `dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/talk.html:236-267`). Preserve it as v1 evidence; do not
+  (`dev/archive/9b7b5f9c-jit-profiles/presentations/9b7b5f9c/talk.html:55-91`,
+  `dev/archive/9b7b5f9c-jit-profiles/presentations/9b7b5f9c/talk.html:161-169`,
+  `dev/archive/9b7b5f9c-jit-profiles/presentations/9b7b5f9c/talk.html:236-267`). Preserve it as v1 evidence; do not
   silently update its claims to v1.1.
 
 ## Prior-art sweep and stale assumptions
@@ -702,8 +702,8 @@ v1.1 migrates a surviving consumer or merely asserts a cdc-owned predecessor sta
 The original complete-lifecycle brief already contains the essential product decisions:
 separate embedded ID and explicit local paths, dependency/variable resolution, semantic
 composition without order winners, per-profile ownership, three-way upgrade, and removal
-deferral (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38`,
-`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:47-83`). It is valuable input, but its
+deferral (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-jit-profiles-planning-brief.md:16-38`,
+`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-jit-profiles-planning-brief.md:47-83`). It is valuable input, but its
 23-criterion scope predates the bounded MVP and must not be treated as the current public
 shape.
 
@@ -711,20 +711,20 @@ Its secret/redaction language is now specifically stale. REQ-04, REQ-06, REQ-11,
 D-06 replace it with explicitly non-secret, persistable values and an absence test for any
 secret channel. Synthesis should retain precedence and reference-rendering ideas from the
 brief, but must discard sensitive wrappers, redaction paths, resupply flows, and secret
-audit concepts (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md:20-38`,
+audit concepts (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-jit-profiles-planning-brief.md:20-38`,
 `.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json:4`).
 
 The MVP brief and charter explicitly moved this breadth intact to post-1.0
-(`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-mvp-scope-brief.md:7-30`,
+(`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-mvp-scope-brief.md:7-30`,
 `dev/vision/9db27a3a-charter.md:138-150`). The MVP plan additionally forbade placeholder
 lifecycle fields in v1 and chose minimal provenance only
-(`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md:181-195`). That choice explains why migration is real work;
+(`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-plan.md:181-195`). That choice explains why migration is real work;
 it is not evidence that ownership was accidentally omitted.
 
 The old investigation's statements that no profile CLI or transaction kernel exists are
-now stale (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:16-36`). Its architectural boundaries and
-consumer-sweep warning remain current (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md:499-548`).
-The research note is intentionally MVP-only and says so (`dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-research.md:1-9`);
+now stale (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-investigation.md:16-36`). Its architectural boundaries and
+consumer-sweep warning remain current (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-investigation.md:499-548`).
+The research note is intentionally MVP-only and says so (`dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-research.md:1-9`);
 its choice of recoverable journal and compile-time embedding applies to the v1 embedded
 source, not to local-package discovery.
 

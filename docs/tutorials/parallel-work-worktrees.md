@@ -254,4 +254,4 @@ jit graph deps <issue-id> --depth 0
 ## See Also
 
 - [CLI Commands Reference](../reference/cli-commands.md) — Full command documentation
-- Design document: `dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md`
+- Design document: `dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md`
