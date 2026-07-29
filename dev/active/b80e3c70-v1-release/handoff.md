@@ -34,6 +34,7 @@ The execution-lead policy permits two rework rounds. Both issues below reached t
 - `cargo-ci`: passed at merge `c61439c7`.
 - Final `code-review`: failed.
 - Remaining finding: the observer starts its deadline before `axum-server` starts the handle's own drain timer. If the serving task observes the notification late, the observer can report `ForcedClosed` and log a forced-close count while the connection is still inside the handle's legitimate drain window.
+- Prepared resolution: remove the second deadline domain. Call `handle.graceful_shutdown(None)` to stop acceptance and begin indefinite graceful draining, own the one configured timeout in JIT, sample `connection_count` at that exact boundary, and call public `handle.shutdown()` only when survivors remain. This makes the sampled count and force-close action share one boundary.
 - Recommended decision: authorize one exceptional third rework round. Use a frontier model at high reasoning because the fix must align two asynchronous deadline domains and add deterministic timing coverage.
 - Alternatives: explicitly accept the inaccurate log/count, or defer/remove the issue from the v1.0 epic. Accepting the known defect is not recommended.
 
@@ -42,6 +43,7 @@ The execution-lead policy permits two rework rounds. Both issues below reached t
 - `cargo-ci`: passed at merge `55beb5b7`.
 - Final `code-review`: failed.
 - Remaining finding: `is_citation_start` treats every prefix ending in `:-` as shell-default syntax, so a longer unrelated path such as `notes:-dev/active/design.md` still produces a moving-source warning, violating REQ-04.
+- Prepared resolution: recognize shell defaults only in proven parameter-expansion context such as `${NAME:-...}`, with explicit counterexamples for raw `notes:-...`, concatenated longer paths, malformed/unclosed expansions, and valid variable-name forms.
 - Recommended decision: authorize one exceptional third rework round. Require shell-default recognition to prove actual parameter-expansion context rather than accepting the raw two-character suffix. A focused high-reasoning implementation model is sufficient.
 - Alternatives: explicitly accept the false-positive edge case, or defer/remove the issue from v1.0. Accepting a known REQ-04 violation is not recommended.
 
