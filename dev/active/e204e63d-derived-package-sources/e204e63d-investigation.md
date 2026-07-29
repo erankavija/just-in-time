@@ -410,7 +410,7 @@ the most complex and is not warranted by the current data.
 
 **Fan-out.** `scripts/docs-mechanical.sh` is the gate entrypoint. It is deliberately not
 `set -e` (`docs-mechanical.sh:2-4`) so every checker runs. It runs three children through the
-`run` helper (`docs-mechanical.sh:80-92`) at `docs-mechanical.sh:94-96`:
+`run` helper (`docs-mechanical.sh:60-72`) at `docs-mechanical.sh:74-76`:
 
 ```
 run "M2 links & anchors" "$here/docs-check-links.sh" "${FOOTPRINT[@]}"
@@ -428,7 +428,7 @@ run "M5 projections"     "$here/docs-check-projections.sh"
    (`docs-check-links.sh:42-45`, `docs-check-citations.sh:50-55`,
    `docs-check-projections.sh:26-29`). The orchestrator maps `1 → finding`, anything else
    nonzero `→ env_error`, and **exit 2 dominates exit 1**
-   (`docs-mechanical.sh:86-90`, `:98-102`).
+   (`docs-mechanical.sh:66-70`, `:78-82`).
 3. **Footprint argument handling.** Two shapes exist and a new checker must pick one
    explicitly. Footprint-taking checkers require at least one positional path and exit 2 on
    none (`docs-check-links.sh:47-50`, `docs-check-citations.sh:58-60`); they encode no
@@ -444,7 +444,10 @@ run "M5 projections"     "$here/docs-check-projections.sh"
    `.projections[].target`, never a hardcoded path.
 5. **Prerequisite guards up front**, each exiting 2 with a named tool
    (`docs-check-projections.sh:31-38` guards `jq` and "inside a git work tree";
-   `docs-mechanical.sh:42-49` guards `jit` and `jq`).
+   `docs-check-citations.sh:64-71` guards `jit` and `jq`, needed to resolve `@/` items).
+   `docs-mechanical.sh` itself guards nothing (`jit:eeee8a1a` removed its only guard, on
+   `jit`/`jq`, along with the `resolve_footprint` call that needed them — the default
+   footprint is now a literal, not a config lookup).
 6. **Self-test registration.** `scripts/docs-check-selftest.sh` is a separate harness (not
    run by the gate) that proves, per checker, both directions: seed the defect → assert
    nonzero; clean → assert zero (`docs-check-selftest.sh:8-10`). A new checker adds a block
@@ -458,7 +461,7 @@ run "M5 projections"     "$here/docs-check-projections.sh"
    `[gates.checker] type = "exec"`, `command = "./scripts/docs-mechanical.sh"`,
    `timeout_seconds = 300`, `pass_context = false`, and
    `[gates.checker.env] DOCS_FOOTPRINT = "docs/"`. Adding a checker means editing
-   `docs-mechanical.sh:94-96` and the gate `description` at `.jit/gates.toml:171` (which
+   `docs-mechanical.sh:74-76` and the gate `description` at `.jit/gates.toml:171` (which
    enumerates the three checkers by name — itself a hand-maintained enumeration that will go
    stale, worth noting under `@/invariant/single-source-prose`).
 
@@ -764,8 +767,18 @@ This report owns the inventory; the plan cites it. Paths are repository-relative
 
 **Derived (already correct)**
 - `crates/jit/src/hierarchy_templates.rs:22` (`render_policy_paths`), `:63` (`generate_config_toml`), `:288-297` (template), `:329-336` (substitutions).
-- `scripts/docs-mechanical.sh:41-65` — derives its default footprint live from `jit config get documentation`'s `.permanent_paths`.
 - `.agents/skills/jit-project-lead/scripts/standards-scan.sh:39,65-82,406` — parses `[documentation]` out of `.jit/config.toml` at runtime.
+
+`scripts/docs-mechanical.sh` no longer belongs in this catalog (`jit:eeee8a1a`). It used to
+derive its default footprint live from `jit config get documentation`'s `.permanent_paths` —
+a genuine restatement-avoider, correctly bucketed above — but that value denoted the wrong
+surface: `.permanent_paths` names the dev/ contributor areas an archive copies, not the
+adopter documentation root, and the two diverged once every development area carried an
+explicit archival classification. The fix (`docs-mechanical.sh:16-34,53-54`) hardcodes the
+default to the literal `docs` instead, because `[documentation]` has no field that names the
+adopter documentation root — `docs/` sits deliberately outside that table, needing no
+archival destination (`@/issue/8e071e18/decision/D-14`) — so there is nothing left in the
+documentation-policy lists for this script to read or restate.
 
 **Consumers of the accessors (not restatements)**
 - `crates/jit/src/domain/artifact_classifier.rs:47-172`, `artifact_directory.rs:79-376`, `artifact_conformance.rs:116,295-299`, `artifact_plan.rs:77-90`.
