@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "c61439c7d77f5e1b7a9e97d3cc13a95a1f3e69f2",
+  "completed_at": "2026-07-29T17:33:44.679333064Z",
+  "duration_ms": 267297,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/shutdown.rs",
+        "id": "F1",
+        "line": 143,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Drain observation can report a forced close before axum-server's actual deadline starts, producing a false forced-close count and log."
+      }
+    ],
+    "summary": "Drain observation can still falsely report forced closes because its timer begins before axum-server's actual drain timer.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f04f7888-a828-4677-aea8-f640a6702375",
+  "message": null,
+  "run_id": "d19f8630-3fd9-473f-9e22-5d867787807a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T17:29:17.382160647Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14879 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faeec-6c57-76a2-bbbf-d19dc6f7061d\n--------\nuser\n--- 14866 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: ecbc1b7d, dbb0316a, 0fb22552, cb64d918, 06c05d0b, 1b740d3a, b0ce7d8b, 684cbc78, d262c7da, 91eab00b, 442c856b, c61439c7 (`jit:f04f7888`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/pid-safety, @/invariant/bounded-rust-build-footprint, @/invariant/atomic-writes, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/charter/D-11, @/charter/D-12 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, current commit c61439c7); code-review previously failed (exit 1; its pre-expiry sampling finding was reworked); jit-validate pending\nTruncation recovery: re-read implementation, test, dependency, documentation, evidence, and merge-parent patches by path; classified merge-parent workflow/MCP changes outside the shutdown impact cone\n\n1. **F1 — blocking, issue-impact (medium):** The rework starts `expiry` before notifying the `axum-server` handle, but that handle begins its own drain timer only after its serving task observes the notification. If that task is delayed, `observe_drain` can return `ForcedClosed` at its earlier boundary while the connection is still legitimately within the handle’s later drain window and can finish voluntarily. The forced-close log and “count at expiry” are therefore still unreliable; the new test does not control or cover this notification-to-timer gap. `crates/server/src/shutdown.rs:143`\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Drain observation can still falsely report forced closes because its timer begins before axum-server's actual drain timer.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Drain observation can report a forced close before axum-server's actual deadline starts, producing a false forced-close count and log.\",\"file\":\"crates/server/src/shutdown.rs\",\"line\":143,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
