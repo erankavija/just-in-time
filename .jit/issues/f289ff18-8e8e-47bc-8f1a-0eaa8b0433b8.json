@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Link checking honours a document reference's commit pin instead of demanding the file in the working tree.\n\n## Background\n\nA document reference may pin a commit, which records the version the reference names. `jit validate` resolves such a reference against its pin and passes.\n\n`jit doc check-links` does not. It reads the working tree and reports `missing_document` for a pinned reference whose file has since been deleted, so a repository whose references all resolve is reported as having errors.\n\nMeasured on this repository: issue `41aa1b75` carries three references pinned to commit `6b799832`, whose files were deleted from the working tree in a later commit. All three resolve at the pin — `git cat-file -e 6b799832:<path>` succeeds for each — and `jit validate` reports zero errors. `jit doc check-links` reports all three as `missing_document` errors and exits 1.\n\nA pin exists precisely so a reference keeps naming a version the working tree has moved past. A checker that ignores it turns every pinned historical reference into a permanent error, and the archival workflow creates pinned references by design.\n\n## Success Criteria\n\n- [hard] REQ-01: A document reference pinned to a commit where its file exists is reported as valid, whether or not the file is in the working tree.\n- [hard] REQ-02: A pinned reference whose file is absent at its pinned commit is still reported as an error.\n- [hard] REQ-03: The two commands agree: whole-repository validation and link checking classify a pinned reference the same way.\n\n## Notes\n\nSurfaced by the archival-layout epic `8e071e18` while reconciling that epic's requirement that every document reference resolves. Three references do not resolve by link checking's reckoning and all three resolve by the validator's; the validator is right. Outside the epic's criteria — its gate is whole-repository validation, which passes.",
   "documents": [],
+  "done_at": "2026-07-29T18:01:03.942575518Z",
   "first_ready_at": "2026-07-27T10:44:26.375581722Z",
   "gates_required": [
     "cargo-ci",
@@ -13,13 +14,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-29T17:40:03.919113043Z",
+      "status": "passed",
+      "updated_at": "2026-07-29T17:57:37.374183963Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-29T17:14:10.446398974Z",
+      "status": "passed",
+      "updated_at": "2026-07-29T18:00:30.582493971Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,7 +33,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Honour a document reference's commit pin when checking links",
-  "updated_at": "2026-07-29T17:40:03.919113043Z"
+  "updated_at": "2026-07-29T18:01:03.942575518Z"
 }

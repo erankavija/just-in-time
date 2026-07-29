@@ -83,7 +83,7 @@
           "short_id": "f289ff18",
           "title": "Honour a document reference's commit pin when checking links",
           "classification": "implementation",
-          "status": "rework",
+          "status": "done",
           "gates": [
             "cargo-ci",
             "code-review"
