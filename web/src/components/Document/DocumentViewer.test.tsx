@@ -8,8 +8,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { DocumentContent } from '../../types/models';
 
-// Mock MermaidDiagram before importing DocumentViewer so the module graph
-// uses our stub, avoiding mermaid init in jsdom.
+// Mock MermaidDiagram before importing DocumentViewer so the module graph uses
+// our stub. These cases assert that a mermaid fence reaches the component with
+// the right source; MermaidDiagram.test.tsx covers the rendering itself.
 vi.mock('../MermaidDiagram', () => ({
   MermaidDiagram: ({ code }: { code: string }) => (
     <div data-testid="mermaid-diagram" data-code={code} />

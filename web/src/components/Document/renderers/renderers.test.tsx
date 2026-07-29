@@ -16,7 +16,8 @@ function makeRef(path: string): DocumentReference {
   return { path };
 }
 
-// Mock MermaidDiagram to avoid mermaid init in jsdom
+// Stub MermaidDiagram so these cases assert renderer dispatch only;
+// MermaidDiagram.test.tsx covers the rendering itself.
 vi.mock('../../MermaidDiagram', () => ({
   MermaidDiagram: ({ code }: { code: string }) => (
     <div data-testid="mermaid-diagram" data-code={code} />
