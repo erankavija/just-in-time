@@ -1,0 +1,116 @@
+# Workflow contract — what every committed GitHub workflow has to be.
+#
+# `scripts/workflow-contract.sh` runs a pinned actionlint over the workflows and
+# then checks them against the declarations below. A workflow declares its
+# static assertions here; it never carries a verifier of its own. The grammar
+# and the pin-update procedure are documented in dev/workflow-contract.md.
+#
+# This is repository policy, not a shipped jit default: nothing under .github/
+# is part of the product surface.
+
+version: 1
+
+# Rules that hold for every workflow, declared or not.
+global:
+  # No workflow file may exist outside this contract, so a new one cannot enter
+  # the repository unverified.
+  require_declaration: true
+  # Every workflow states the token it runs with rather than inheriting the
+  # repository default.
+  require_workflow_permissions: true
+  # No continue-on-error, no condition that survives a failed predecessor, no
+  # shell-level suppression of a non-zero exit.
+  forbid_failure_escapes: true
+  # Every external action and reusable workflow is pinned to a commit SHA and
+  # carries the upstream version that SHA was resolved from.
+  require_sha_pinned_uses: true
+
+workflows:
+  ci.yml:
+    triggers:
+      required:
+        push:
+          branches: [main]
+        pull_request:
+          branches: [main]
+      # A fork pull request must not run with repository write credentials.
+      forbidden: [pull_request_target]
+    permissions:
+      contents: read
+    jobs:
+      # The contract check itself: deleting or renaming this job is a finding,
+      # so the harness cannot be removed from pull requests silently.
+      workflow-contract: {}
+      # Badge deployment pushes to the badges branch and is the one job that
+      # holds write credentials.
+      coverage:
+        permissions:
+          contents: write
+
+  security-audit.yml:
+    triggers:
+      required:
+        schedule: {}
+        workflow_dispatch: {}
+        push:
+          branches: [main]
+      forbidden: [pull_request_target]
+    permissions:
+      contents: read
+    jobs:
+      security-audit: {}
+
+  docker.yml:
+    triggers:
+      required:
+        push:
+          branches: [main]
+          tags: ['v*']
+      forbidden: [pull_request_target]
+    permissions:
+      contents: read
+    jobs:
+      # Registry publication is the only reason a job here holds a write scope,
+      # and it holds no more than that.
+      build-and-push:
+        permissions:
+          contents: read
+          packages: write
+      build-all-in-one:
+        permissions:
+          contents: read
+          packages: write
+
+  docs.yml:
+    triggers:
+      required:
+        push:
+          branches: [main]
+        workflow_dispatch: {}
+      forbidden: [pull_request_target]
+    # Pages deployment needs the id-token scope for its OIDC exchange.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    jobs:
+      build-and-deploy: {}
+
+  release.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+      # A tag push is the only thing that may reach publication: no manual
+      # dispatch, no branch push, no upstream workflow run.
+      allowed: [push]
+      forbidden: [pull_request_target]
+    permissions:
+      contents: read
+    jobs:
+      # Publication holds the only write scope and cannot start until every
+      # artifact job has succeeded.
+      create-release:
+        permissions:
+          contents: write
+        needs: [build-binaries, package-mcp-server, build-web-ui]
