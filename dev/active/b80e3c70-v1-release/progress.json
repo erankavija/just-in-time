@@ -229,7 +229,7 @@
           "short_id": "ef118aea",
           "title": "Archive execution reports no citation warnings",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "gates": [
             "cargo-ci",
             "code-review",
@@ -238,7 +238,10 @@
           "depends_on": [
             "625cc07f"
           ],
-          "merge_note": "c7f8ebc7 reflowed the moving-path-citation paragraph in docs/reference/cli-commands.md. Dispatch only after 625cc07f lands, then verify both citation-boundary and canonical archive-layout wording survive."
+          "merge_note": "c7f8ebc7 reflowed the moving-path-citation paragraph in docs/reference/cli-commands.md. Dispatch only after 625cc07f lands, then verify both citation-boundary and canonical archive-layout wording survive.",
+          "dispatch_order": 1,
+          "planned_model": "gpt-5.6-terra/high",
+          "branch": "worktree-agent-ef118aea"
         }
       ]
     },
