@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "2c41fc4c683f4025093d0e2ab72eda7659aeff00",
+  "completed_at": "2026-07-29T16:54:48.969416143Z",
+  "duration_ms": 260854,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/shutdown.rs",
+        "id": "F1",
+        "line": 156,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The drain outcome logs a connection count sampled up to 100 ms before expiry as the count at expiry, so it can falsely report forced closes after a connection voluntarily finishes."
+      }
+    ],
+    "summary": "Drain-expiry logging can falsely report a forced close using a pre-expiry connection count.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f04f7888-a828-4677-aea8-f640a6702375",
+  "message": null,
+  "run_id": "33c751b8-a162-418e-a58d-a5891d31c6db",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T16:50:28.114464923Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5142 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faec8-e180-78c3-82d4-cbc1b68d7640\n--------\nuser\n--- 5129 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: ecbc1b7d, 0fb22552, dbb0316a, cb64d918, 06c05d0b, 1b740d3a, b0ce7d8b, 684cbc78, d262c7da (`jit:f04f7888`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-11, @/charter/D-12 (dev/vision/9db27a3a-charter.md); @/invariant/pid-safety, @/invariant/bounded-rust-build-footprint, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T16:26:27Z); jit-validate pending; prior code-review failure’s REQ-05 evidence is now linked and records audit/MSRV results\nTruncation recovery: re-read each implementation, test, dependency, documentation, and merge patch by path; narrowed the truncated workflow search to CI lines 110–162\n\n1. **F1 — blocking, issue-impact (medium):** `observe_drain` samples `connection_count` up to 100 ms before its deadline, then sleeps and reports that stale value as the count “at expiry.” A connection can finish voluntarily during that window (and the handle’s deadline starts slightly earlier than this separately measured timer), producing a false forced-close log and count. The real-process test keeps its stalled connection alive, so it does not cover this race. This does not meet REQ-02’s deadline/forced-close logging requirement. `crates/server/src/shutdown.rs:156`\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Drain-expiry logging can falsely report a forced close using a pre-expiry connection count.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The drain outcome logs a connection count sampled up to 100 ms before expiry as the count at expiry, so it can falsely report forced closes after a connection voluntarily finishes.\",\"file\":\"crates/server/src/shutdown.rs\",\"line\":156,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

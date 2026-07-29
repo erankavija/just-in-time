@@ -11559,3 +11559,4 @@
 {"gate_key":"jit-validate","id":"3d59b483-7c73-4fdf-8383-ceaf19e583ad","issue_id":"bb302dbd-bd03-42ed-ae71-b0f035453f56","timestamp":"2026-07-29T16:48:42.256151243Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"b6ff95fe-e428-4681-87d4-02492e949a0a","issue_id":"bb302dbd-bd03-42ed-ae71-b0f035453f56","timestamp":"2026-07-29T16:49:12.544382396Z","to":"done","type":"issue_state_changed"}
 {"id":"fba90cf0-857f-4193-859c-9db277e82f7d","issue_id":"bb302dbd-bd03-42ed-ae71-b0f035453f56","timestamp":"2026-07-29T16:49:12.544382396Z","type":"issue_completed"}
+{"gate_key":"code-review","id":"c27e4839-3f37-4d60-897c-09da7bff9f67","issue_id":"f04f7888-a828-4677-aea8-f640a6702375","timestamp":"2026-07-29T16:54:49.283752149Z","type":"gate_failed","updated_by":"auto:executor"}

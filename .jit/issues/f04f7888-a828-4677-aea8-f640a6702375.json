@@ -28,7 +28,7 @@
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-29T16:37:33.120067497Z",
+      "updated_at": "2026-07-29T16:54:49.283752149Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Implement graceful jit-server process shutdown",
-  "updated_at": "2026-07-29T16:45:01.875404519Z"
+  "updated_at": "2026-07-29T16:54:49.283752149Z"
 }
