@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`jit-server` shuts down gracefully instead of dying mid-connection.** The
+  server awaited `axum::serve` bare, with no signal handling at all, so a
+  `SIGTERM` from `jit serve --stop` (or Ctrl+C under `jit serve --fg`) killed
+  the process wherever it happened to be: in-flight responses were truncated
+  and the exit was a signal death rather than an exit status. On a registered
+  Ctrl+C or `SIGTERM` the server now cancels one process-wide
+  `CancellationToken` — cloned into the application state and from there into
+  every live SSE stream, so `/api/events/stream` subscribers reach EOF instead
+  of being held open behind their 15-second keepalive — and then hands a
+  five-second deadline to an `axum-server` handle that owns the listener and
+  the connections. Acceptance stops and the port is released at once, ordinary
+  connections get the full deadline to finish, and whatever is still open when
+  it expires is force-closed. The process exits `0`, and its log records the
+  signal, the deadline, the connection count at the signal and at expiry, the
+  forced-close path, and clean completion.
+
 ### Fixed
 
 - **Graph-template application no longer leaves a node `ready` while a
