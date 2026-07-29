@@ -1,0 +1,18 @@
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  ci.yml:
+    triggers:
+      required:
+        pull_request:
+          branches: [main]
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read

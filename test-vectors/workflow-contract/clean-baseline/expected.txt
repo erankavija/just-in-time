@@ -1,0 +1,2 @@
+# A conforming tree reports no findings.
+exit: 0

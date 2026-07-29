@@ -1,0 +1,4 @@
+# Both the job-level and the step-level escape are findings.
+exit: 1
+job 'validate' sets 'continue-on-error'
+job 'audit' step 1 (Audit) sets 'continue-on-error'

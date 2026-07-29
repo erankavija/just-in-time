@@ -1,0 +1,23 @@
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  ci.yml:
+    permissions:
+      contents: read
+    workflow_call:
+      inputs:
+        required:
+          target:
+            type: string
+            required: true
+        allowed: [target]
+      outputs:
+        required: [digest]
+      secrets:
+        allowed: []

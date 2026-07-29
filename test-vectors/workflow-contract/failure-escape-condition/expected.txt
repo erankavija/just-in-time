@@ -1,0 +1,5 @@
+# 'always()' and a failure-tolerant disjunction both run a job whose
+# predecessor failed, which is how a red validation reaches publication.
+exit: 1
+job 'publish' condition uses 'always()'
+job 'notify' condition tolerates a failed predecessor

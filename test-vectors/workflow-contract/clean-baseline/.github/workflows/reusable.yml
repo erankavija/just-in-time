@@ -1,0 +1,23 @@
+name: Reusable Build
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: Target triple to build.
+        type: string
+        required: true
+    outputs:
+      digest:
+        description: Digest of the built artifact.
+        value: ${{ jobs.build.outputs.digest }}
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.hash.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: hash
+        run: echo "digest=$(sha256sum dist/app | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"

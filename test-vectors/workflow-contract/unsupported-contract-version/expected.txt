@@ -1,0 +1,3 @@
+# An unreadable contract is an environment error, never a silent pass.
+exit: 2
+unsupported contract version

@@ -1,0 +1,4 @@
+# Both an absent event and an absent filter value on a present event are findings.
+exit: 1
+required trigger 'push' is not declared
+trigger 'pull_request' declares no branches value 'main'

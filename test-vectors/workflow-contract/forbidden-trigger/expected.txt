@@ -1,0 +1,4 @@
+# A forbidden event and an event outside the allowed set are both findings.
+exit: 1
+forbidden trigger 'pull_request_target' is declared
+trigger 'schedule' is outside the declared allowed set

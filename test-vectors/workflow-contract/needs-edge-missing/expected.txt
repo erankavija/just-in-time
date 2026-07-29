@@ -1,0 +1,4 @@
+# 'publish' reaches 'validate' transitively through 'build' and stays clean;
+# dropping the audit edge leaves publication reachable while an audit fails.
+exit: 1
+job 'publish' does not reach required predecessor 'audit'

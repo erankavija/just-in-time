@@ -1,0 +1,3 @@
+# A silently widened job token is the failure this assertion exists for.
+exit: 1
+job 'publish' permissions do not match the contract

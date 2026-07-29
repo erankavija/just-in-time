@@ -1,0 +1,12 @@
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  ci.yml:
+    permissions:
+      contents: read

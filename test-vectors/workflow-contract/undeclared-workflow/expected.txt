@@ -1,0 +1,4 @@
+# A new workflow cannot enter the repository outside the harness.
+exit: 1
+nightly.yml
+is not declared in the contract
