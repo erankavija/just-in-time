@@ -11,7 +11,18 @@
     "code-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-29T17:45:36.568036873Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-29T17:42:16.695340513Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
   "labels": [
     "milestone:v1.0",
@@ -23,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Mechanical documentation checker defaults to the archival permanent paths",
-  "updated_at": "2026-07-29T14:10:58.051450262Z"
+  "updated_at": "2026-07-29T17:45:36.568036873Z"
 }
