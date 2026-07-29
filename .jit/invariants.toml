@@ -99,3 +99,8 @@ kind = "advisory"
 id = "architecture-dependency-direction"
 statement = "Dependencies point inward: domain and graph remain pure and I/O-free; storage owns persistence; commands orchestrate domain and storage; CLI, output, and server layers adapt inputs and outputs without pushing their concerns into inner layers."
 kind = "advisory"
+
+[[invariants]]
+id = "convention-convergence"
+statement = "A shared convention or abstraction has one form: work that finds it harmful or ill-fitting changes it at its source, or reports the mismatch as a blocking concern before proceeding. A local parallel variant, a private helper duplicating a shared mechanism, or a bypass around an abstraction is a defect unless it is a named, cited exception with a tracked convergence condition."
+kind = "advisory"

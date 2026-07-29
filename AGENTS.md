@@ -139,6 +139,7 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **semantic-types** — Every identity, constrained token, closed vocabulary, and protocol sentinel has one canonical semantic type; raw strings exist only at parsing and serialization boundaries.
 - **canonical-cutover** — Superseded aliases, fields, and representations are removed after cutover; compatibility code is allowed only in a named, versioned migration boundary with a tracked removal condition.
 - **architecture-dependency-direction** — Dependencies point inward: domain and graph remain pure and I/O-free; storage owns persistence; commands orchestrate domain and storage; CLI, output, and server layers adapt inputs and outputs without pushing their concerns into inner layers.
+- **convention-convergence** — A shared convention or abstraction has one form: work that finds it harmful or ill-fitting changes it at its source, or reports the mismatch as a blocking concern before proceeding. A local parallel variant, a private helper duplicating a shared mechanism, or a bypass around an abstraction is a defect unless it is a named, cited exception with a tracked convergence condition.
 <!-- jit:invariants:end -->
 
 ## JIT workflow
