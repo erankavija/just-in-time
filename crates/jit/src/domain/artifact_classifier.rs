@@ -1055,7 +1055,8 @@ fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = 
 /// citations prose and code actually write are kept: a quote or bracket around
 /// the path, the `-` of a shell default (`${OUT:-dev/active/plan.md}`), a
 /// sentence period after it, and a relative `./` or `../` before it, which adds
-/// no directory and marks a citation the same relocation breaks.
+/// no directory and marks a citation the same relocation breaks. A period is
+/// only sentence punctuation when what follows cannot continue a filename.
 fn is_whole_path_citation(line: &str, offset: usize, source: &str) -> bool {
     is_citation_start(&line[..offset]) && is_citation_end(&line[offset + source.len()..])
 }
@@ -1073,7 +1074,25 @@ fn is_citation_start(prefix: &str) -> bool {
 
 /// Whether text after a path starts with syntax that closes a citation.
 fn is_citation_end(suffix: &str) -> bool {
-    suffix.is_empty() || suffix.chars().next().is_some_and(is_citation_delimiter)
+    suffix.is_empty()
+        || suffix.chars().next().is_some_and(is_citation_delimiter)
+        || is_sentence_period(suffix)
+}
+
+/// Whether `suffix` begins with a sentence period rather than a filename extension.
+fn is_sentence_period(suffix: &str) -> bool {
+    suffix.strip_prefix('.').is_some_and(|after_period| {
+        after_period.is_empty()
+            || after_period
+                .chars()
+                .next()
+                .is_some_and(is_sentence_period_follower)
+    })
+}
+
+/// Whether `character` can follow sentence-ending punctuation without extending a path.
+fn is_sentence_period_follower(character: char) -> bool {
+    character.is_whitespace() || matches!(character, '\'' | '"' | '`' | ')' | ']' | '}' | '>')
 }
 
 /// Whether `prefix` ends in one or more repository-relative path introducers.
@@ -1106,7 +1125,6 @@ fn is_citation_delimiter(character: char) -> bool {
                 | '}'
                 | '<'
                 | '>'
-                | '.'
                 | ','
                 | ';'
                 | '!'
@@ -3449,6 +3467,7 @@ mod tests {
             format!("OUT=\"${{PLAN_OUT:-{CITED_SOURCE}}}\""),
             format!("The design lives in {CITED_SOURCE}."),
             format!("See ./{CITED_SOURCE} from the repository root."),
+            format!("See ../{CITED_SOURCE} from a nested directory."),
         ] {
             assert!(cites(&line), "{line} cites the path");
         }
@@ -3458,6 +3477,8 @@ mod tests {
             format!("Vendored at `my{CITED_SOURCE}`."),
             format!("Rendered as `{CITED_SOURCE}x`."),
             format!("Superseded by `{CITED_SOURCE}-old`."),
+            format!("Stored at `{CITED_SOURCE}.bak`."),
+            format!("Stored at `other.{CITED_SOURCE}`."),
             format!("Stored at `.../{CITED_SOURCE}`."),
         ] {
             assert!(!cites(&line), "{line} names a longer path");
@@ -3491,7 +3512,7 @@ mod tests {
             ),
         ) {
             let prefixed = format!("`{before}{CITED_SOURCE}`");
-            let suffixed = format!("`{CITED_SOURCE}{after}`");
+            let suffixed = format!("`{CITED_SOURCE}{after}continued`");
 
             prop_assert!(!cites(&prefixed), "{before:?} extends the path before its source");
             prop_assert!(!cites(&suffixed), "{after:?} extends the path after its source");
@@ -3507,6 +3528,18 @@ mod tests {
             let line = format!("{delimiter}{CITED_SOURCE}{delimiter}");
 
             prop_assert!(cites(&line), "{delimiter:?} delimits a standalone citation");
+        }
+
+        #[test]
+        fn test_is_whole_path_citation_accepts_a_period_only_before_sentence_context(
+            follower in any::<u8>().prop_map(char::from).prop_filter(
+                "a sentence-period follower",
+                |character| is_sentence_period_follower(*character),
+            ),
+        ) {
+            let line = format!("{CITED_SOURCE}.{follower}");
+
+            prop_assert!(cites(&line), "a period before {follower:?} ends the citation");
         }
     }
 
@@ -3527,6 +3560,8 @@ mod tests {
                 format!("Mirrored at `äänet/{CITED_SOURCE}`.\n"),
             ),
             (CITED_SOURCE, format!("Vendored at `my{CITED_SOURCE}`.\n")),
+            (CITED_SOURCE, format!("Stored at `{CITED_SOURCE}.bak`.\n")),
+            (CITED_SOURCE, format!("Stored at `other.{CITED_SOURCE}`.\n")),
             (CITED_SOURCE, format!("Rendered as `{CITED_SOURCE}x`.\n")),
             (
                 "dev/active/dev",
