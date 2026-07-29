@@ -66,7 +66,7 @@
           "short_id": "f04f7888",
           "title": "Implement graceful jit-server process shutdown",
           "classification": "implementation",
-          "status": "escalated",
+          "status": "final_docs_rework_authorized",
           "gates": [
             "cargo-ci",
             "code-review",
@@ -421,7 +421,7 @@
       "reason": "The explicitly approved exceptional third round resolved the shutdown race, but post-merge review found a stale changelog sentence after the attribution-only correction.",
       "finding": "CHANGELOG.md says the five-second deadline is handed to axum-server, while shipping code owns the sole boundary in JIT, calls graceful_shutdown(None), samples survivors, then calls shutdown().",
       "decision_needed": "Authorize one final docs-only repair and full gate rerun, provide alternate guidance/take over, or reject/defer f04f7888 from the v1.0 epic.",
-      "resolution": null
+      "resolution": "User authorized the recommended final documentation-only repair and full gate rerun on 2026-07-30."
     }
   ],
   "rework_counts": {
@@ -461,6 +461,12 @@
   ],
   "started_at": "2026-07-29T14:20:00+00:00",
   "lead_decisions": [
+    {
+      "issue": "f04f7888",
+      "decision": "Authorize one final documentation-only repair after the exceptional implementation round.",
+      "reasoning": "The implementation, deterministic shutdown tests, attribution, and cargo-ci already pass; the only remaining blocker is one stale changelog sentence that contradicts the accepted single application-owned deadline.",
+      "rejected_alternative": "Reject or defer the fully working shutdown implementation from v1.0."
+    },
     {
       "issue": "f04f7888",
       "decision": "Authorize one exceptional third rework round beyond the normal two-round limit.",
