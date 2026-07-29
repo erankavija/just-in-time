@@ -23,9 +23,9 @@ jit = { path = "../jit" }
 axum = "0.7"
 # Owns listener and connection shutdown behind one `Handle`. `axum::serve`'s
 # `with_graceful_shutdown` waits for open connections indefinitely; this crate's
-# `Handle::graceful_shutdown(Some(duration))` force-closes whatever has not
-# finished by the deadline, which is what bounds process exit
-# (GRACEFUL_DRAIN_TIMEOUT). Default features only — no TLS backend is pulled in.
+# shutdown sequence starts `Handle::graceful_shutdown(None)`, then owns the sole
+# timeout boundary and calls `Handle::shutdown()` if connections survive it.
+# Default features only — no TLS backend is pulled in.
 axum-server = "0.8"
 tokio = { version = "1.35", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
