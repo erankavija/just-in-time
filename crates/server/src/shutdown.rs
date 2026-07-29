@@ -45,19 +45,13 @@ pub enum ShutdownSignal {
     Terminate,
 }
 
-impl ShutdownSignal {
-    /// The platform name the signal is logged under.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Interrupt => "SIGINT",
-            Self::Terminate => "SIGTERM",
-        }
-    }
-}
-
+/// Renders the platform name the signal is logged under.
 impl std::fmt::Display for ShutdownSignal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(self.as_str())
+        formatter.write_str(match self {
+            Self::Interrupt => "SIGINT",
+            Self::Terminate => "SIGTERM",
+        })
     }
 }
 

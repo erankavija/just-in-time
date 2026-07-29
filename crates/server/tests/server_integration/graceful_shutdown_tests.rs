@@ -186,6 +186,31 @@ fn wait_for_listening_port(server: &mut RunningServer) -> u16 {
     }
 }
 
+/// The log message that reports a delivered signal.
+const SIGNAL_RECEIVED: &str = "Shutdown signal received";
+
+/// The log message that reports the deadline closing what did not finish.
+const FORCE_CLOSING: &str = "force-closing";
+
+/// The value of `field` on the log line carrying `message`.
+///
+/// `tracing`'s compact format renders event fields as `name=value` after the
+/// message, so reading one field back is how the fixture asserts on a specific
+/// reported number rather than on the shape of a whole line.
+fn log_field(log: &str, message: &str, field: &str) -> String {
+    let line = log
+        .lines()
+        .find(|line| line.contains(message))
+        .unwrap_or_else(|| panic!("no log line reports {message:?}; log:\n{log}"));
+    line.split(&format!("{field}="))
+        .nth(1)
+        .unwrap_or_else(|| panic!("the {message:?} line carries no {field} field: {line}"))
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_string()
+}
+
 /// Drops CSI escape sequences (`ESC [ … final-byte`) from captured output.
 fn strip_ansi(text: &str) -> String {
     let mut plain = String::with_capacity(text.len());
@@ -447,24 +472,20 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     );
 
     let log = server.log();
-    assert!(
-        log.contains("signal=SIGTERM"),
-        "the shutdown log does not name the signal:\n{log}"
+    assert_eq!(log_field(&log, SIGNAL_RECEIVED, "signal"), "SIGTERM");
+    assert_eq!(
+        log_field(&log, SIGNAL_RECEIVED, "drain_deadline_secs"),
+        GRACEFUL_DRAIN_TIMEOUT.as_secs().to_string()
     );
-    assert!(
-        log.contains(&format!(
-            "drain_deadline_secs={}",
-            GRACEFUL_DRAIN_TIMEOUT.as_secs()
-        )),
-        "the shutdown log does not state the drain deadline:\n{log}"
+    assert_eq!(
+        log_field(&log, SIGNAL_RECEIVED, "open_connections"),
+        "4",
+        "the log must account for both event streams and both ordinary connections"
     );
-    assert!(
-        log.contains("open_connections=4"),
-        "the shutdown log does not report the connections open at the signal:\n{log}"
-    );
-    assert!(
-        log.contains("open_connections=1") && log.to_lowercase().contains("force-clos"),
-        "the shutdown log does not report the forced close at the deadline:\n{log}"
+    assert_eq!(
+        log_field(&log, FORCE_CLOSING, "open_connections"),
+        "1",
+        "the log must report the connection the deadline force-closed"
     );
     assert!(
         log.contains("Shutdown complete"),
