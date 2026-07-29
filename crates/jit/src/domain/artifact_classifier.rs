@@ -1058,18 +1058,66 @@ fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = 
 /// no directory and marks a citation the same relocation breaks. A period is
 /// only sentence punctuation when what follows cannot continue a filename.
 fn is_whole_path_citation(line: &str, offset: usize, source: &str) -> bool {
-    is_citation_start(&line[..offset]) && is_citation_end(&line[offset + source.len()..])
+    let prefix = &line[..offset];
+    let suffix = &line[offset + source.len()..];
+    citation_start(prefix).is_some_and(|start| match start {
+        CitationStart::Delimited => is_citation_end(suffix),
+        CitationStart::ShellDefault => is_shell_default_end(suffix),
+    })
+}
+
+/// The syntax that introduces a standalone path citation.
+#[derive(Clone, Copy)]
+enum CitationStart {
+    Delimited,
+    ShellDefault,
 }
 
 /// Whether text before a path finishes with syntax that introduces a citation.
 ///
 /// Relative `./` and `../` prefixes still name the same repository-relative
-/// artifact, and `:-` is the shell-default form used by the scanned scripts.
-fn is_citation_start(prefix: &str) -> bool {
-    prefix.is_empty()
-        || prefix.ends_with(":-")
-        || relative_prefix_start(prefix)
-        || prefix.chars().last().is_some_and(is_citation_delimiter)
+/// artifact. A shell default is a citation only when its valid parameter name,
+/// opening `${`, and closing `}` prove the source occupies the whole default.
+fn citation_start(prefix: &str) -> Option<CitationStart> {
+    shell_default_start(prefix)
+        .then_some(CitationStart::ShellDefault)
+        .or_else(|| relative_prefix_start(prefix))
+        .or_else(|| {
+            (prefix.is_empty() || prefix.chars().last().is_some_and(is_citation_delimiter))
+                .then_some(CitationStart::Delimited)
+        })
+}
+
+/// Whether `prefix` ends with a standalone `${NAME:-` shell-default introducer.
+fn shell_default_start(prefix: &str) -> bool {
+    prefix.strip_suffix(":-").is_some_and(|before_default| {
+        before_default
+            .rsplit_once("${")
+            .is_some_and(|(before_open, name)| {
+                is_shell_variable_name(name)
+                    && (before_open.is_empty()
+                        || before_open
+                            .chars()
+                            .last()
+                            .is_some_and(is_citation_delimiter))
+            })
+    })
+}
+
+/// Whether `name` is a portable shell variable name.
+fn is_shell_variable_name(name: &str) -> bool {
+    let mut characters = name.chars();
+    characters
+        .next()
+        .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+        && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+}
+
+/// Whether `suffix` closes a shell default without extending its value.
+fn is_shell_default_end(suffix: &str) -> bool {
+    suffix.strip_prefix('}').is_some_and(|after_default| {
+        !after_default.starts_with('}') && is_citation_end(after_default)
+    })
 }
 
 /// Whether text after a path starts with syntax that closes a citation.
@@ -1096,12 +1144,12 @@ fn is_sentence_period_follower(character: char) -> bool {
 }
 
 /// Whether `prefix` ends in one or more repository-relative path introducers.
-fn relative_prefix_start(prefix: &str) -> bool {
-    ["../", "./"].into_iter().any(|relative| {
-        prefix.strip_suffix(relative).is_some_and(|before| {
-            before.is_empty()
-                || relative_prefix_start(before)
-                || (!before.ends_with('.') && is_citation_start(before))
+fn relative_prefix_start(prefix: &str) -> Option<CitationStart> {
+    ["../", "./"].into_iter().find_map(|relative| {
+        prefix.strip_suffix(relative).and_then(|before| {
+            (!before.ends_with('.'))
+                .then_some(())
+                .and_then(|()| citation_start(before))
         })
     })
 }
@@ -3483,6 +3531,52 @@ mod tests {
         ] {
             assert!(!cites(&line), "{line} names a longer path");
         }
+    }
+
+    #[test]
+    fn test_is_whole_path_citation_recognizes_only_closed_standalone_shell_defaults() {
+        for line in [
+            format!("OUT=\"${{PLAN_OUT:-{CITED_SOURCE}}}\""),
+            format!("${{_PLAN_OUT9:-{CITED_SOURCE}}}"),
+            format!("OUT=\"${{PLAN_OUT:-./{CITED_SOURCE}}}\""),
+        ] {
+            assert!(cites(&line), "{line} is a shell default naming the path");
+        }
+
+        for line in [
+            format!("notes:-{CITED_SOURCE}"),
+            format!("notes:-./{CITED_SOURCE}"),
+            format!("${{9PLAN_OUT:-{CITED_SOURCE}}}"),
+            format!("${{PLAN-OUT:-{CITED_SOURCE}}}"),
+            format!("${{PLAN_OUT:-{CITED_SOURCE}"),
+            format!("prefix${{PLAN_OUT:-{CITED_SOURCE}}}"),
+            format!("${{PLAN_OUT:-{CITED_SOURCE}}}suffix"),
+            format!("${{PLAN_OUT:-notes:-{CITED_SOURCE}}}"),
+        ] {
+            assert!(
+                !cites(&line),
+                "{line} is not a standalone shell default citation"
+            );
+        }
+    }
+
+    #[test]
+    fn test_classify_artifacts_ignores_shell_default_lookalikes_that_do_not_name_the_source() {
+        let text = [
+            format!("notes:-{CITED_SOURCE}"),
+            format!("${{9PLAN_OUT:-{CITED_SOURCE}}}"),
+            format!("${{PLAN_OUT:-{CITED_SOURCE}"),
+            format!("prefix${{PLAN_OUT:-{CITED_SOURCE}}}"),
+            format!("${{PLAN_OUT:-{CITED_SOURCE}}}suffix"),
+        ]
+        .join("\n");
+        let files = [("scripts/archive.sh", text.as_str())];
+        let plan = scanned_plan_for(default_policy(), CITED_SOURCE, &files);
+
+        assert!(
+            cited_locations(entry(&plan, CITED_SOURCE)).is_empty(),
+            "raw, malformed, and concatenated shell-default lookalikes do not cite the source"
+        );
     }
 
     #[test]
