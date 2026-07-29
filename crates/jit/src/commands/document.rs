@@ -32,6 +32,52 @@ enum DocumentScanSource {
     Pinned { revision: String, path: String },
 }
 
+/// Capture bounds for one link check: every reference, plus the assets and link
+/// targets a pinned reference names at its commit.
+const LINK_CHECK_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+    crate::repository_state::CaptureBudget {
+        max_paths: 1 << 16,
+        max_listings: 0,
+        max_bytes: 512 * 1024 * 1024,
+        max_depth: 32,
+    };
+
+/// One document reference as the link checker read it at the version it names.
+enum CheckedDocument {
+    /// The reference's file does not exist at that version.
+    Unresolved(crate::document::UnresolvedDocumentReference),
+    /// An unpinned reference, whose neighbourhood the working tree answers for.
+    WorkingTree,
+    /// A commit-pinned reference, read at its commit.
+    Pinned(PinnedDocumentReading),
+}
+
+/// A pinned document's content and neighbourhood, read at its commit.
+struct PinnedDocumentReading {
+    links: Vec<crate::document::InternalLink>,
+    present: std::collections::BTreeSet<std::path::PathBuf>,
+    scan_error: Option<String>,
+}
+
+impl PinnedDocumentReading {
+    /// Whether `path` holds a file at the pinned commit.
+    ///
+    /// Answers only for the assets and link targets the capture requested; any
+    /// other path is reported absent rather than read from the working tree.
+    fn holds(&self, path: &std::path::Path) -> bool {
+        self.present.contains(path)
+    }
+
+    /// The internal links the pinned content names, or why it could not be
+    /// scanned.
+    fn links(&self) -> std::result::Result<Vec<crate::document::InternalLink>, String> {
+        match &self.scan_error {
+            Some(message) => Err(message.clone()),
+            None => Ok(self.links.clone()),
+        }
+    }
+}
+
 impl DocumentScanWarning {
     fn message(&self) -> &str {
         match self {
@@ -1016,10 +1062,25 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     /// Check document links and assets for validity
+    ///
+    /// Every reference is checked at the version it names: a commit-pinned
+    /// reference at its commit — its file, its assets, and its internal links
+    /// alike — and an unpinned reference in the working tree. Reference
+    /// resolution shares the rule whole-repository validation applies
+    /// ([`resolve_document_reference`](crate::document::resolve_document_reference)),
+    /// so the two commands classify a reference the same way.
+    ///
+    /// A pin is a claim about Git history. Where Git cannot resolve it the
+    /// reference is reported unresolved, carrying the capture boundary's reason;
+    /// unpinned references still resolve from the working tree, so link checking
+    /// stays usable in a repository without Git (`@/charter/D-4`).
     pub fn check_document_links(
         &self,
         scope: &crate::document::DocumentScope,
-    ) -> Result<crate::commands::LinkCheckResult> {
+    ) -> Result<crate::commands::LinkCheckResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
         use crate::document::{AssetType, DocumentScope, LinkValidationResult, LinkValidator};
         use std::path::PathBuf;
 
@@ -1068,39 +1129,45 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Try to open git repository for checking versioned assets
         let git_repo = git2::Repository::discover(repo_root).ok();
 
+        // Read every reference at the version it names, before any classification.
+        let readings =
+            self.read_documents_at_named_versions(&layout, &all_documents, &link_validator)?;
+
         // Validate each document
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
 
-        for (issue_id, doc) in &all_documents {
-            let doc_path = repo_root.join(&doc.path);
-
-            // Check if document file exists
-            if !doc_path.exists() {
-                errors.push(serde_json::json!({
-                    "issue_id": issue_id,
-                    "document": doc.path,
-                    "type": "missing_document",
-                    "message": format!("Document file not found: {}", doc.path),
-                }));
-                continue;
-            }
+        for ((issue_id, doc), reading) in all_documents.iter().zip(&readings) {
+            // A pinned reference answers every question about itself from its
+            // commit; an unpinned one answers from the working tree.
+            let pinned = match reading {
+                CheckedDocument::Unresolved(reason) => {
+                    errors.push(serde_json::json!({
+                        "issue_id": issue_id,
+                        "document": doc.path,
+                        "type": "missing_document",
+                        "message": reason.to_string(),
+                    }));
+                    continue;
+                }
+                CheckedDocument::Pinned(pinned) => Some(pinned),
+                CheckedDocument::WorkingTree => None,
+            };
 
             // Check assets
             for asset in &doc.assets {
                 match asset.asset_type {
                     AssetType::Local => {
                         if let Some(ref resolved) = asset.resolved_path {
-                            let asset_path = repo_root.join(resolved);
-                            let exists_in_working_tree = asset_path.exists();
-                            let exists_in_git = if !exists_in_working_tree {
-                                // Check if asset exists in git
-                                check_asset_in_git(&git_repo, resolved)
-                            } else {
-                                false
+                            let present = match pinned {
+                                Some(pinned) => pinned.holds(resolved),
+                                None => {
+                                    repo_root.join(resolved).exists()
+                                        || check_asset_in_git(&git_repo, resolved)
+                                }
                             };
 
-                            if !exists_in_working_tree && !exists_in_git {
+                            if !present {
                                 errors.push(serde_json::json!({
                                     "issue_id": issue_id,
                                     "document": doc.path,
@@ -1172,10 +1239,24 @@ impl<S: IssueStore> CommandExecutor<S> {
 
             // Check internal document links
             let doc_path_rel = PathBuf::from(&doc.path);
-            match link_validator.scan_document_links(&doc_path_rel) {
+            let scanned = match pinned {
+                Some(pinned) => pinned.links(),
+                None => link_validator
+                    .scan_document_links(&doc_path_rel)
+                    .map_err(|error| format!("Failed to scan document for links: {error}")),
+            };
+            match scanned {
                 Ok(links) => {
                     for link in links {
-                        match link_validator.validate_link(&doc_path_rel, &link) {
+                        let result = match pinned {
+                            Some(pinned) => {
+                                link_validator.validate_link_at(&doc_path_rel, &link, |target| {
+                                    pinned.holds(target)
+                                })
+                            }
+                            None => link_validator.validate_link(&doc_path_rel, &link),
+                        };
+                        match result {
                             LinkValidationResult::Broken { reason } => {
                                 errors.push(serde_json::json!({
                                     "issue_id": issue_id,
@@ -1200,12 +1281,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }
                     }
                 }
-                Err(e) => {
+                Err(message) => {
                     warnings.push(serde_json::json!({
                         "issue_id": issue_id,
                         "document": doc.path,
                         "type": "scan_error",
-                        "message": format!("Failed to scan document for links: {}", e),
+                        "message": message,
                     }));
                 }
             }
@@ -1245,6 +1326,53 @@ impl<S: IssueStore> CommandExecutor<S> {
             },
         })
     }
+
+    /// Read every document reference at the version it names, from one closed
+    /// image.
+    ///
+    /// A pinned reference's link targets are only known once its pinned content
+    /// has been scanned, so the capture expands once — the same discover-then-
+    /// re-capture shape document scanning uses — and a re-scan that reveals a
+    /// target the expanded capture does not hold restarts the session.
+    fn read_documents_at_named_versions(
+        &self,
+        layout: &crate::repository_state::RepositoryLayout,
+        documents: &[(String, &crate::domain::DocumentReference)],
+        link_validator: &crate::document::LinkValidator,
+    ) -> Result<Vec<CheckedDocument>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use std::collections::BTreeSet;
+
+        with_mutation_session(&self.storage, layout, "document link check", |session| {
+            let spec = link_check_capture_spec(documents, &BTreeSet::new())?;
+            let Some(image) = capture_or_retry(session.capture(spec))? else {
+                return Ok(SessionStep::Retry);
+            };
+            let targets = pinned_link_targets(&image, documents, link_validator);
+            if targets.is_empty() {
+                return Ok(SessionStep::Done(read_documents(
+                    &image,
+                    documents,
+                    link_validator,
+                )?));
+            }
+            let Some(image) =
+                capture_or_retry(session.capture(link_check_capture_spec(documents, &targets)?))?
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            if !pinned_link_targets(&image, documents, link_validator).is_subset(&targets) {
+                return Ok(SessionStep::Retry);
+            }
+            Ok(SessionStep::Done(read_documents(
+                &image,
+                documents,
+                link_validator,
+            )?))
+        })
+    }
 }
 
 impl CapturedDocumentScan {
@@ -1256,6 +1384,172 @@ impl CapturedDocumentScan {
             warning: None,
         }
     }
+}
+
+/// Repository-relative paths of the local assets `document` records.
+fn local_asset_paths(
+    document: &crate::domain::DocumentReference,
+) -> impl Iterator<Item = &std::path::Path> {
+    document
+        .assets
+        .iter()
+        .filter(|asset| matches!(asset.asset_type, crate::document::AssetType::Local))
+        .filter_map(|asset| asset.resolved_path.as_deref())
+}
+
+/// Declare the evidence a link check reads: each reference at the version it
+/// names, a pinned reference's local assets at its commit, and `link_targets`
+/// discovered by scanning pinned content.
+fn link_check_capture_spec(
+    documents: &[(String, &crate::domain::DocumentReference)],
+    link_targets: &std::collections::BTreeSet<(String, String)>,
+) -> Result<crate::repository_state::CaptureSpec> {
+    use crate::document::DocumentReferenceRequests;
+    use crate::repository_state::CaptureSpec;
+    use std::collections::BTreeSet;
+
+    let mut spec = CaptureSpec::phase_one(Vec::new(), LINK_CHECK_CAPTURE_BUDGET)?;
+    let mut worktree = BTreeSet::new();
+    for (_, document) in documents {
+        let requests = DocumentReferenceRequests::for_reference(document)?;
+        worktree.extend(requests.worktree().cloned());
+        let (revision, path) = requests.pinned();
+        spec.discover_pinned(revision, path)?;
+        if document.commit.is_some() {
+            for asset in local_asset_paths(document) {
+                discover_derived_pinned(&mut spec, revision, &asset.to_string_lossy())?;
+            }
+        }
+    }
+    spec.discover_paths(worktree)?;
+    for (revision, path) in link_targets {
+        discover_derived_pinned(&mut spec, revision, path)?;
+    }
+    Ok(spec)
+}
+
+/// Request pinned evidence for a path derived from a document's content.
+///
+/// A derived path the pinned-request contract rejects — a link target that
+/// climbs past the repository root, say — names no repository file, so it is
+/// dropped from the request set and read as absent rather than failing the whole
+/// check. A budget or layout failure still propagates.
+fn discover_derived_pinned(
+    spec: &mut crate::repository_state::CaptureSpec,
+    revision: &str,
+    path: &str,
+) -> Result<()> {
+    use crate::repository_state::CaptureError;
+
+    match spec.discover_pinned(revision, path) {
+        Ok(()) | Err(CaptureError::InvalidPinnedRequest(..)) | Err(CaptureError::Layout(_)) => {
+            Ok(())
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// The pinned bytes captured for `(revision, path)`, as text.
+fn pinned_text(
+    image: &crate::repository_state::RepositoryImage,
+    revision: &str,
+    path: &str,
+) -> std::result::Result<String, String> {
+    let bytes = image
+        .pinned_evidence()
+        .get(&(revision.to_string(), path.to_string()))
+        .and_then(crate::repository_state::PinnedDocumentEvidence::bytes)
+        .ok_or_else(|| format!("no captured content for '{path}' at '{revision}'"))?;
+    std::str::from_utf8(bytes)
+        .map(str::to_owned)
+        .map_err(|error| error.to_string())
+}
+
+/// Whether the pinned evidence captured for `(revision, path)` holds a file.
+fn pinned_holds(
+    image: &crate::repository_state::RepositoryImage,
+    revision: &str,
+    path: &std::path::Path,
+) -> bool {
+    image
+        .pinned_evidence()
+        .get(&(revision.to_string(), path.to_string_lossy().into_owned()))
+        .is_some_and(crate::repository_state::PinnedDocumentEvidence::exists)
+}
+
+/// The link targets every pinned document's captured content names, as pinned
+/// requests at that document's own commit.
+fn pinned_link_targets(
+    image: &crate::repository_state::RepositoryImage,
+    documents: &[(String, &crate::domain::DocumentReference)],
+    link_validator: &crate::document::LinkValidator,
+) -> std::collections::BTreeSet<(String, String)> {
+    documents
+        .iter()
+        .filter_map(|(_, document)| {
+            let commit = document.commit.as_deref()?;
+            let content = pinned_text(image, commit, &document.path).ok()?;
+            let from = std::path::Path::new(&document.path);
+            Some(
+                crate::document::LinkValidator::scan_links(&content)
+                    .into_iter()
+                    .filter_map(|link| link_validator.resolve_target(from, &link))
+                    .map(move |target| (commit.to_string(), target.to_string_lossy().into_owned())),
+            )
+        })
+        .flatten()
+        .collect()
+}
+
+/// Derive each reference's reading from one closed image.
+fn read_documents(
+    image: &crate::repository_state::RepositoryImage,
+    documents: &[(String, &crate::domain::DocumentReference)],
+    link_validator: &crate::document::LinkValidator,
+) -> Result<Vec<CheckedDocument>> {
+    documents
+        .iter()
+        .map(|(_, document)| read_document(image, document, link_validator))
+        .collect()
+}
+
+fn read_document(
+    image: &crate::repository_state::RepositoryImage,
+    document: &crate::domain::DocumentReference,
+    link_validator: &crate::document::LinkValidator,
+) -> Result<CheckedDocument> {
+    use crate::document::LinkValidator;
+
+    if let Some(reason) = crate::document::resolve_document_reference(image, document)?.unresolved()
+    {
+        return Ok(CheckedDocument::Unresolved(reason.clone()));
+    }
+    let Some(commit) = document.commit.as_deref() else {
+        return Ok(CheckedDocument::WorkingTree);
+    };
+
+    let from = std::path::Path::new(&document.path);
+    let (links, scan_error) = match pinned_text(image, commit, &document.path) {
+        Ok(content) => (LinkValidator::scan_links(&content), None),
+        Err(error) => (
+            Vec::new(),
+            Some(format!("Failed to scan document for links: {error}")),
+        ),
+    };
+    let present = local_asset_paths(document)
+        .map(std::path::Path::to_path_buf)
+        .chain(
+            links
+                .iter()
+                .filter_map(|link| link_validator.resolve_target(from, link)),
+        )
+        .filter(|path| pinned_holds(image, commit, path))
+        .collect();
+    Ok(CheckedDocument::Pinned(PinnedDocumentReading {
+        links,
+        present,
+        scan_error,
+    }))
 }
 
 fn document_capture_spec(

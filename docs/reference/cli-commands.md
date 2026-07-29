@@ -2666,6 +2666,15 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 document is valid, otherwise `1` (broken links) or `2` (only warnings). JSON
 reports `valid`, `errors`, `warnings`, and a `summary`.
 
+Each reference is checked at the version it names, the same version `jit
+validate` resolves it against. A reference pinned to a commit is read at that
+commit — its file, its assets, and its internal links alike — so it stays valid
+after the working tree moves past it, and stays invalid when its file is absent
+at that commit even while the working tree carries the path. An unpinned
+reference is read in the working tree, with `HEAD` covering a file that has left
+it. Resolving a pin needs Git: without Git a pinned reference is reported
+unresolved, carrying the reason, while unpinned references resolve as usual.
+
 ### `jit doc dir`
 
 Print the repository-relative directory an issue owns in a declared
