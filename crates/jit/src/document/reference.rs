@@ -286,6 +286,7 @@ mod tests {
             revision,
             path,
             PinnedSourceClass::GitObject,
+            DocumentTargetKind::File,
             Some("a".repeat(40)),
             Some("b".repeat(40)),
             Some(EntryIdentity::for_bytes("git-blob:b", &bytes).unwrap()),
@@ -300,6 +301,7 @@ mod tests {
             revision,
             path,
             PinnedSourceClass::GitUnavailable,
+            DocumentTargetKind::Missing,
             None,
             None,
             None,
@@ -310,7 +312,7 @@ mod tests {
     }
 
     fn directory_evidence(revision: &str, path: &str) -> PinnedDocumentEvidence {
-        PinnedDocumentEvidence::new_with_target_kind(
+        PinnedDocumentEvidence::new(
             revision,
             path,
             PinnedSourceClass::GitObject,

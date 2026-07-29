@@ -816,7 +816,7 @@ fn capture_capability_image(
                             EntryIdentity::for_bytes(format!("git-blob:{oid}"), bytes)
                         })
                         .transpose()?;
-                    PinnedDocumentEvidence::new_with_target_kind(
+                    PinnedDocumentEvidence::new(
                         revision.clone(),
                         path.clone(),
                         PinnedSourceClass::GitObject,
@@ -832,6 +832,7 @@ fn capture_capability_image(
                     revision.clone(),
                     path.clone(),
                     PinnedSourceClass::GitUnavailable,
+                    crate::repository_state::RepositoryTargetKind::Missing,
                     None,
                     None,
                     None,
@@ -884,6 +885,7 @@ fn capture_memory_image(
                     revision.clone(),
                     path.clone(),
                     PinnedSourceClass::GitUnavailable,
+                    crate::repository_state::RepositoryTargetKind::Missing,
                     None,
                     None,
                     None,

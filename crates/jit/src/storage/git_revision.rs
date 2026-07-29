@@ -204,35 +204,39 @@ impl GitRevisionResolver {
     ) -> Result<PinnedTargetRead, GitRevisionError> {
         validate_repo_relative_path(path)?;
         let version = self.resolve_commit(revision)?;
-        let object = format!("{}:{path}", version.as_str());
-        let oid_output = self.run(["rev-parse", "--verify", object.as_str()])?;
-        if !oid_output.status.success() {
+        let entry_output =
+            self.run(["ls-tree", "-z", "--full-tree", version.as_str(), "--", path])?;
+        if !entry_output.status.success() {
+            return Err(GitRevisionError::PinnedReadFailed {
+                revision: revision.to_string(),
+                path: path.to_string(),
+                stderr: stderr(&entry_output),
+            });
+        }
+        let Some((mode, object_type, object_oid)) =
+            parse_pinned_tree_entry(&entry_output.stdout, path).map_err(|reason| {
+                GitRevisionError::PinnedReadFailed {
+                    revision: revision.to_string(),
+                    path: path.to_string(),
+                    stderr: reason,
+                }
+            })?
+        else {
             return Ok(PinnedTargetRead {
                 version,
                 target_kind: RepositoryTargetKind::Missing,
                 object_oid: None,
                 bytes: None,
-                unavailable_reason: Some(stderr(&oid_output)),
+                unavailable_reason: Some("not found in commit tree".into()),
             });
-        }
-        let object_oid = String::from_utf8_lossy(&oid_output.stdout)
-            .trim()
-            .to_string();
-        let kind_output = self.run(["cat-file", "-t", object.as_str()])?;
-        if !kind_output.status.success() {
-            return Err(GitRevisionError::PinnedReadFailed {
-                revision: revision.to_string(),
-                path: path.to_string(),
-                stderr: stderr(&kind_output),
-            });
-        }
-        let target_kind = match String::from_utf8_lossy(&kind_output.stdout).trim() {
-            "blob" => RepositoryTargetKind::File,
-            "tree" => RepositoryTargetKind::Directory,
+        };
+        let target_kind = match (mode.as_str(), object_type.as_str()) {
+            ("100644" | "100755", "blob") => RepositoryTargetKind::File,
+            ("040000", "tree") => RepositoryTargetKind::Directory,
             _ => RepositoryTargetKind::Unsupported,
         };
         let bytes = if target_kind.is_file() {
-            let output = self.run(["cat-file", "blob", object.as_str()])?;
+            let output = self.run(["cat-file", "blob", object_oid.as_str()])?;
             if !output.status.success() {
                 return Err(GitRevisionError::PinnedReadFailed {
                     revision: revision.to_string(),
@@ -303,6 +307,43 @@ impl GitRevisionResolver {
                 source,
             })
     }
+}
+
+/// Parse the one exact NUL-delimited `git ls-tree` entry requested for a
+/// pinned path. Git emits `mode SP type SP oid TAB path NUL`; parse bytes so a
+/// path containing whitespace never changes the field boundary.
+fn parse_pinned_tree_entry(
+    output: &[u8],
+    expected_path: &str,
+) -> Result<Option<(String, String, String)>, String> {
+    let entries = output
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+        .collect::<Vec<_>>();
+    let [] = entries.as_slice() else {
+        let [entry] = entries.as_slice() else {
+            return Err("git ls-tree returned multiple entries for one path".into());
+        };
+        let Some(tab_index) = entry.iter().position(|byte| *byte == b'\t') else {
+            return Err("git ls-tree entry lacks a path separator".into());
+        };
+        let (header, path_with_separator) = entry.split_at(tab_index);
+        let path = &path_with_separator[1..];
+        if path != expected_path.as_bytes() {
+            return Err("git ls-tree returned a different path than requested".into());
+        }
+        let fields = header.split(|byte| *byte == b' ').collect::<Vec<_>>();
+        let [mode, object_type, oid] = fields.as_slice() else {
+            return Err("git ls-tree entry has an invalid header".into());
+        };
+        let decode = |field: &[u8]| {
+            std::str::from_utf8(field)
+                .map(str::to_owned)
+                .map_err(|_| "git ls-tree entry is not UTF-8".to_string())
+        };
+        return Ok(Some((decode(mode)?, decode(object_type)?, decode(oid)?)));
+    };
+    Ok(None)
 }
 
 fn parse_changed_paths(output: Output, operation: String) -> Result<Vec<String>, GitRevisionError> {

@@ -309,36 +309,6 @@ impl PinnedDocumentEvidence {
         requested_revision: impl Into<String>,
         requested_path: impl Into<String>,
         source: PinnedSourceClass,
-        commit_oid: Option<String>,
-        object_oid: Option<String>,
-        identity: Option<EntryIdentity>,
-        bytes: Option<Vec<u8>>,
-        unavailable_reason: Option<String>,
-    ) -> Result<Self, CaptureError> {
-        let target_kind = if bytes.is_some() {
-            RepositoryTargetKind::File
-        } else {
-            RepositoryTargetKind::Missing
-        };
-        Self::new_with_target_kind(
-            requested_revision,
-            requested_path,
-            source,
-            target_kind,
-            commit_oid,
-            object_oid,
-            identity,
-            bytes,
-            unavailable_reason,
-        )
-    }
-
-    /// Construct and validate boundary evidence with an explicit target kind.
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_with_target_kind(
-        requested_revision: impl Into<String>,
-        requested_path: impl Into<String>,
-        source: PinnedSourceClass,
         target_kind: RepositoryTargetKind,
         commit_oid: Option<String>,
         object_oid: Option<String>,
@@ -1717,6 +1687,7 @@ mod tests {
                 &request.0,
                 &request.1,
                 PinnedSourceClass::GitUnavailable,
+                RepositoryTargetKind::Missing,
                 None,
                 None,
                 None,
@@ -1748,6 +1719,7 @@ mod tests {
                 &request.0,
                 &request.1,
                 PinnedSourceClass::GitUnavailable,
+                RepositoryTargetKind::Missing,
                 None,
                 None,
                 None,
@@ -1820,6 +1792,7 @@ mod tests {
             &pinned_request.0,
             &pinned_request.1,
             PinnedSourceClass::GitUnavailable,
+            RepositoryTargetKind::Missing,
             None,
             None,
             None,
@@ -2306,6 +2279,7 @@ mod tests {
                 "HEAD",
                 "README.md",
                 PinnedSourceClass::GitObject,
+                RepositoryTargetKind::File,
                 Some("commit".into()),
                 Some("blob".into()),
                 Some(EntryIdentity::for_bytes("blob", b"bytes").unwrap()),

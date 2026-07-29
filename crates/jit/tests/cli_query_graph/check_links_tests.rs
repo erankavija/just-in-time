@@ -605,6 +605,56 @@ fn test_pinned_directory_reference_is_unsupported_at_its_commit() {
         .stderr(predicate::str::contains("not found").not());
 }
 
+#[cfg(unix)]
+#[test]
+fn test_pinned_symlink_target_is_unsupported_at_its_commit() {
+    use std::os::unix::fs::symlink;
+
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned symlink target", "Description");
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(ctx.repo_path().join("docs/target.md"), "Pinned target\n").unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/report.md"),
+        "See [the linked target](linked.md).\n",
+    )
+    .unwrap();
+    symlink("target.md", ctx.repo_path().join("docs/linked.md")).unwrap();
+    ctx.commit_all("add pinned symlink target");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
+        .success();
+
+    fs::remove_file(ctx.repo_path().join("docs/linked.md")).unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/linked.md"),
+        "This ordinary working-tree file must not be used.\n",
+    )
+    .unwrap();
+    ctx.commit_all("replace symlink with regular file");
+
+    let report = ctx.check_links_report();
+    let errors = errors_for_document(&report, "docs/report.md");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error["type"] == "unsupported_asset"),
+        "the pinned symlink must be diagnosed as unsupported: {report}"
+    );
+    assert!(
+        errors.iter().any(|error| {
+            error["type"] == "broken_link"
+                && error["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("unsupported artifact type"))
+        }),
+        "the pinned symlink must not resolve through the current regular file: {report}"
+    );
+}
+
 #[test]
 fn test_git_versioned_asset_exists() {
     let ctx = TestContext::new();
