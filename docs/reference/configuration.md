@@ -192,9 +192,9 @@ citation scan reads: it matches a moving artifact's path wherever a scanned
 file's text names that path whole — a shell-script line, a doc comment, an
 inline code span, or a markdown link target alike — and passes over text naming
 a longer path that ends with it, such as the archived destination a repointed
-citation names. Each entry is a directory, reaching every file
-beneath it, or an individual file, reaching exactly that path, matched the
-same way as `managed_paths` and `permanent_paths` above. The key is optional;
+citation names. Each entry is a directory, reaching every file beneath it, or
+an individual file, reaching exactly that path, matched the same way as
+`managed_paths` and `permanent_paths` above. The key is optional;
 `jit init` does not scaffold it, so a fresh repository's `[documentation]`
 table omits it, and an absent key resolves to the development root together
 with `permanent_paths` (both shown above). An authored list replaces that
