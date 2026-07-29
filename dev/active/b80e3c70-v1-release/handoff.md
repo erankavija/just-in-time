@@ -39,6 +39,7 @@ The execution-lead policy permits two normal rework rounds. Both issues below re
 - Approved execution: one exceptional third rework round using a frontier model at high reasoning because the fix must align two asynchronous deadline domains and add deterministic timing coverage.
 - Alternatives: explicitly accept the inaccurate log/count, or defer/remove the issue from the v1.0 epic. Accepting the known defect is not recommended.
 - Contract alignment: stored REQ-02 was amended before merge to state the approved single application-owned deadline outcome rather than the superseded `graceful_shutdown(Some(...))` mechanism. The amended description also now follows the repository content-standard structure.
+- Traceability correction: the first post-merge review found no behavior defect but rejected the worker's spaced `jit: f04f7888` tag. The unpushed merge message was amended to literal `jit:f04f7888`; old `32757166` and amended `f7ca2d03` have the identical tree, and the amended commit passed the exact-commit build verifier.
 
 ### `c7f8ebc7`
 

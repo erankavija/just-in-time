@@ -77,7 +77,8 @@
           "uncommitted": 0,
           "reported": "yes",
           "branch": "worktree-agent-f04f7888",
-          "criterion_amendment": "REQ-02 was updated before the exceptional merge to replace the obsolete axum-server-owned graceful_shutdown(Some(timeout)) mechanism with the user-approved single application-owned boundary: graceful_shutdown(None), boundary-time sampling, then shutdown() only for survivors."
+          "criterion_amendment": "REQ-02 was updated before the exceptional merge to replace the obsolete axum-server-owned graceful_shutdown(Some(timeout)) mechanism with the user-approved single application-owned boundary: graceful_shutdown(None), boundary-time sampling, then shutdown() only for survivors.",
+          "traceability_note": "The first exceptional code-review found no behavior defect but rejected the worker's spaced `jit: f04f7888` tag because reviewer attribution requires literal `jit:f04f7888`. The just-created unpushed merge message was amended to `jit:f04f7888`; old and new merge commits have identical tree 35fe99260ea81ebd6ca6f5bd2a3e71e8ab1e1e16, and amended commit f7ca2d03 passed exact-commit verification."
         },
         {
           "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",

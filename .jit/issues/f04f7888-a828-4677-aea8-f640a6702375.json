@@ -23,12 +23,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-29T17:29:07.651704227Z",
+      "updated_at": "2026-07-29T20:29:18.110877756Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-29T17:33:44.990230385Z",
+      "updated_at": "2026-07-29T20:33:07.143248363Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Implement graceful jit-server process shutdown",
-  "updated_at": "2026-07-29T20:19:48.569740700Z"
+  "updated_at": "2026-07-29T20:33:07.143248363Z"
 }

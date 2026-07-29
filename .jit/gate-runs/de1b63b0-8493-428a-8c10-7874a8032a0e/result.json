@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "327571668037da874204567427683c29f4ce710c",
+  "completed_at": "2026-07-29T20:33:06.838167112Z",
+  "duration_ms": 219176,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/shutdown.rs",
+        "id": "F1",
+        "line": 169,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Commit abc54594 introduces the corrective shutdown behavior but uses `jit: f04f7888`, not the required literal `jit:f04f7888`, so required commit attribution excludes the shipping fix."
+      }
+    ],
+    "summary": "The corrective shutdown implementation is excluded from the required issue-tagged attribution footprint.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f04f7888-a828-4677-aea8-f640a6702375",
+  "message": null,
+  "run_id": "de1b63b0-8493-428a-8c10-7874a8032a0e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T20:29:27.661519496Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9512 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faf91-6034-75e1-b565-89115d43f8fd\n--------\nuser\n--- 9499 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c61439c7, 442c856b, 91eab00b, d262c7da, 684cbc78, b0ce7d8b, 1b740d3a, 06c05d0b, cb64d918, 0fb22552, dbb0316a, ecbc1b7d (`jit:f04f7888`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-11 and @/charter/D-12 (dev/vision/9db27a3a-charter.md); @/invariant/pid-safety, @/invariant/bounded-rust-build-footprint, and @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T20:21:56Z); jit-validate pending\nTruncation recovery: re-read tagged implementation/test patches by path, merge-parent diffs, current shutdown/SSE/test sources, dependency lock entries, and the corrective post-tag patch\n\n1. **F1 — blocking, issue-impact (medium):** The corrective single-deadline implementation at `crates/server/src/shutdown.rs:169` was introduced by commit `abc54594`, whose message contains `jit: f04f7888` rather than the required literal `jit:f04f7888`. The mandatory attribution query therefore excludes the change that resolves the prior drain-boundary finding, making this issue’s shipping implementation untraceable through its required tagged footprint and violating the repository commit convention.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The corrective shutdown implementation is excluded from the required issue-tagged attribution footprint.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Commit abc54594 introduces the corrective shutdown behavior but uses `jit: f04f7888`, not the required literal `jit:f04f7888`, so required commit attribution excludes the shipping fix.\",\"file\":\"crates/server/src/shutdown.rs\",\"line\":169}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
