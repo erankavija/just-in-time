@@ -7,10 +7,12 @@
 //!    an idle SSE subscriber reaches EOF immediately instead of holding its
 //!    connection open behind a 15-second keepalive.
 //! 2. One [`axum_server::Handle`], which owns the listener and the connections.
-//!    [`Handle::graceful_shutdown`] with a deadline stops acceptance, gives
-//!    everything still running at most [`GRACEFUL_DRAIN_TIMEOUT`] to finish, and
-//!    force-closes whatever is left when the deadline expires — the bound that
-//!    makes process exit predictable even for a connection that never completes.
+//!    [`axum_server::Handle::graceful_shutdown`] stops acceptance without
+//!    starting a second timer. JIT owns the sole [`GRACEFUL_DRAIN_TIMEOUT`]
+//!    boundary, samples the live count there, and calls
+//!    [`axum_server::Handle::shutdown`] when survivors remain. That makes
+//!    process exit predictable even when axum-server's serving task observes
+//!    the graceful notification late.
 //!
 //! [`run_shutdown_sequence`] performs both, in that order, and reports what the
 //! drain deadline saw.
@@ -20,7 +22,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use tokio::time::{sleep, Instant};
+use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -99,9 +101,10 @@ pub async fn await_shutdown_signal() -> io::Result<ShutdownSignal> {
 /// Waits for `signal`, then shuts the server down within `drain_deadline`.
 ///
 /// Cancels `shutdown` first so live event streams end and stop counting against
-/// the drain, then hands the deadline to `handle`, which stops accepting
-/// connections, lets the rest finish, and force-closes whatever survives to the
-/// deadline. The serve future returns `Ok` on both paths.
+/// the drain, then asks `handle` to stop accepting and drain indefinitely. JIT
+/// owns the only deadline: at that boundary it samples the remaining count and
+/// invokes the handle's immediate shutdown if any connections survive. The
+/// serve future returns `Ok` on both paths.
 ///
 /// # Errors
 /// Returns `signal`'s error when the process could not register its signal
@@ -122,7 +125,7 @@ where
         Err(error) => {
             warn!(%error, "Shutdown signal handling failed; stopping the server");
             shutdown.cancel();
-            handle.graceful_shutdown(Some(drain_deadline));
+            handle.shutdown();
             return Err(error);
         }
     };
@@ -134,16 +137,11 @@ where
         "Shutdown signal received; draining connections"
     );
 
-    // Order matters: event streams end first, so the drain below is only ever
-    // waiting on connections that have real work left.
-    shutdown.cancel();
-    // Start this observation boundary before notifying the handle. The handle
-    // begins its own duration once its serving task receives that notification,
-    // so this observer cannot trail the force-close deadline it reports on.
-    let expiry = Instant::now() + drain_deadline;
-    handle.graceful_shutdown(Some(drain_deadline));
-
-    let outcome = observe_drain(&handle, expiry).await;
+    // Create JIT's sole boundary before notification. axum-server drains
+    // indefinitely; it cannot start a second deadline when its serving task
+    // eventually observes the graceful notification.
+    let boundary = sleep(drain_deadline);
+    let outcome = drain_connections(&handle, &shutdown, boundary).await;
     match outcome {
         DrainOutcome::Drained => info!("All connections finished before the drain deadline"),
         DrainOutcome::ForcedClosed { connections } => warn!(
@@ -155,25 +153,54 @@ where
     Ok(outcome)
 }
 
-/// Watches the live connection count until `expiry`.
+/// Cancels application streams, initiates an unbounded graceful drain in
+/// axum-server, and enforces JIT's single configured boundary.
+async fn drain_connections<F>(
+    handle: &ServerHandle,
+    shutdown: &CancellationToken,
+    boundary: F,
+) -> DrainOutcome
+where
+    F: Future<Output = ()>,
+{
+    // Order matters: event streams end first, so the drain below is only ever
+    // waiting on connections that have real work left.
+    shutdown.cancel();
+    handle.graceful_shutdown(None);
+    observe_drain(handle, boundary).await
+}
+
+/// Watches the live connection count until `boundary` resolves.
 ///
 /// Every count is sampled after its preceding wait. In particular, the final
-/// count is taken at the observation boundary rather than before the final
-/// polling interval, so a connection that drains in that interval is not
-/// reported as forced closed.
-async fn observe_drain(handle: &ServerHandle, expiry: Instant) -> DrainOutcome {
+/// count and the force-close action happen together at the boundary, so the
+/// reported count is exactly the set whose survival caused JIT to invoke the
+/// handle's immediate shutdown.
+async fn observe_drain<F>(handle: &ServerHandle, boundary: F) -> DrainOutcome
+where
+    F: Future<Output = ()>,
+{
+    tokio::pin!(boundary);
+
     loop {
         let connections = handle.connection_count();
         if connections == 0 {
             return DrainOutcome::Drained;
         }
 
-        let remaining = expiry.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
-            return DrainOutcome::ForcedClosed { connections };
-        }
+        tokio::select! {
+            biased;
+            () = &mut boundary => {
+                let connections = handle.connection_count();
+                if connections == 0 {
+                    return DrainOutcome::Drained;
+                }
 
-        sleep(remaining.min(DRAIN_SAMPLE_INTERVAL)).await;
+                handle.shutdown();
+                return DrainOutcome::ForcedClosed { connections };
+            }
+            () = sleep(DRAIN_SAMPLE_INTERVAL) => {}
+        }
     }
 }
 
@@ -186,7 +213,7 @@ mod tests {
     use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
-    use tokio::sync::oneshot;
+    use tokio::sync::{mpsc, oneshot};
     use tokio::task::JoinHandle;
     use tokio::time::timeout;
     use tokio_util::sync::CancellationToken;
@@ -212,6 +239,40 @@ mod tests {
         (addr, serving)
     }
 
+    /// Serves requests that report handler entry and then remain in flight.
+    async fn serve_stalling_on_loopback(
+        handle: &ServerHandle,
+    ) -> (
+        SocketAddr,
+        JoinHandle<io::Result<()>>,
+        mpsc::UnboundedReceiver<()>,
+    ) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        listener
+            .set_nonblocking(true)
+            .expect("non-blocking listener");
+        let (started, started_requests) = mpsc::unbounded_channel();
+        let app = Router::new().route(
+            "/stall",
+            get(move || {
+                let started = started.clone();
+                async move {
+                    started.send(()).expect("the test observes handler entry");
+                    std::future::pending::<&'static str>().await
+                }
+            }),
+        );
+        let server = axum_server::from_tcp(listener)
+            .expect("adopt the bound listener")
+            .handle(handle.clone());
+        let serving = tokio::spawn(server.serve(app.into_make_service()));
+        let addr = timeout(TEST_BUDGET, handle.listening())
+            .await
+            .expect("the server binds within the test budget")
+            .expect("the server reports its bound address");
+        (addr, serving, started_requests)
+    }
+
     /// Opens a connection whose request never completes: the request line and a
     /// header are sent, the terminating blank line never is. Hyper stays mid
     /// message, so a graceful shutdown cannot retire the connection and only
@@ -223,6 +284,17 @@ mod tests {
             .await
             .expect("send a partial request");
         stream.flush().await.expect("flush the partial request");
+        stream
+    }
+
+    /// Opens a complete request whose handler remains in flight.
+    async fn open_stalling_request(addr: SocketAddr) -> TcpStream {
+        let mut stream = TcpStream::connect(addr).await.expect("connect");
+        stream
+            .write_all(b"GET /stall HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .expect("send a request to the stalling handler");
+        stream.flush().await.expect("flush the stalling request");
         stream
     }
 
@@ -299,6 +371,71 @@ mod tests {
             .expect("the stalled connection is closed within the test budget")
             .expect("read the closed connection");
         assert_eq!(read, 0, "the stalled connection must be force-closed");
+    }
+
+    #[tokio::test]
+    async fn test_drain_connections_force_closes_exact_survivors_when_graceful_notice_is_observed_late(
+    ) {
+        let handle = ServerHandle::new();
+        let (addr, serving, mut started_requests) = serve_stalling_on_loopback(&handle).await;
+        let mut first_stalled = open_stalling_request(addr).await;
+        let mut second_stalled = open_stalling_request(addr).await;
+        for _ in 0..2 {
+            timeout(TEST_BUDGET, started_requests.recv())
+                .await
+                .expect("each stalling handler starts within the test budget")
+                .expect("the handler-entry channel remains open");
+        }
+        wait_for_connection_count(&handle, 2).await;
+
+        // Leave the accepted connection tasks alive while preventing the main
+        // serving task from observing the graceful notification and beginning
+        // axum-server's post-accept-loop drain. This deterministically models
+        // the notification-to-deadline race: only JIT's boundary can force the
+        // two connection tasks to stop.
+        serving.abort();
+        assert!(
+            serving
+                .await
+                .expect_err("the serving task was aborted")
+                .is_cancelled(),
+            "the serving task must stop observing handle notifications"
+        );
+        let (expire, boundary) = oneshot::channel();
+        let shutdown = CancellationToken::new();
+        let observer = tokio::spawn({
+            let handle = handle.clone();
+            let shutdown = shutdown.clone();
+            async move {
+                drain_connections(&handle, &shutdown, async {
+                    boundary
+                        .await
+                        .expect("the test triggers the drain boundary")
+                })
+                .await
+            }
+        });
+
+        timeout(TEST_BUDGET, shutdown.cancelled())
+            .await
+            .expect("the drain starts within the test budget");
+        expire
+            .send(())
+            .expect("the drain observer is waiting on the boundary");
+        let outcome = timeout(TEST_BUDGET, observer)
+            .await
+            .expect("the drain observer finishes within the test budget")
+            .expect("the drain observer does not panic");
+
+        assert_eq!(outcome, DrainOutcome::ForcedClosed { connections: 2 });
+        for stalled in [&mut first_stalled, &mut second_stalled] {
+            let mut byte = [0u8; 1];
+            let read = timeout(TEST_BUDGET, stalled.read(&mut byte))
+                .await
+                .expect("the configured boundary closes the stalled connection")
+                .expect("read the closed connection");
+            assert_eq!(read, 0, "every sampled survivor must be force-closed");
+        }
     }
 
     #[tokio::test]
