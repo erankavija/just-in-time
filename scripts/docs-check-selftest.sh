@@ -2,12 +2,14 @@
 # NB: NOT `set -e` — this harness inspects child exit codes on purpose.
 set -uo pipefail
 
-# docs-check-selftest — durable, re-runnable REQ-02 evidence for the three
-# documentation mechanical checkers (epic 2d109173, issue 99f4a2b4).
+# docs-check-selftest — durable, re-runnable regression evidence for the
+# documentation mechanical checkers and their orchestrator.
 #
 # For EACH checker it proves both required behaviours:
 #   (1) seed the checker's defect class → assert the checker exits NONZERO;
 #   (2) revert the seed → assert the checker exits ZERO on a clean footprint.
+# It also uses an isolated fixture to prove the orchestrator's bare default is
+# the adopter docs surface and that DOCS_FOOTPRINT overrides that default.
 #
 # The self-test NEVER mutates the real repository index or working tree: the
 # link/citation seeds are scratch files in a mktemp dir, and the projection
@@ -33,6 +35,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 links="$here/docs-check-links.sh"
 citations="$here/docs-check-citations.sh"
 projections="$here/docs-check-projections.sh"
+mechanical="$here/docs-mechanical.sh"
 
 fail=0
 assert_rc() {
@@ -45,12 +48,58 @@ assert_rc() {
   fi
 }
 
+assert_logged_footprint() {
+  local checker="$1" want="$2" log="$3" msg="$4"
+  if grep -qxF "$checker:$want" "$log"; then
+    echo "PASS: $msg"
+  else
+    echo "FAIL: $msg (missing $checker:$want)"
+    fail=1
+  fi
+}
+
 scratch=$(mktemp -d)
 # The only cleanup needed: remove the scratch dir. Nothing in the real repo is
 # ever mutated, so there is no repository state to restore.
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below
 cleanup() { rm -rf "$scratch"; }
 trap cleanup EXIT
+
+echo "== docs-mechanical.sh footprint resolution =="
+# The orchestrator discovers its children beside itself, so a copied entrypoint
+# plus recording child stubs exercises its real resolution logic without
+# coupling this assertion to the repository's live documentation or gate env.
+fixture="$scratch/orchestrator"
+fixture_scripts="$fixture/scripts"
+fixture_log="$scratch/orchestrator.log"
+mkdir -p "$fixture_scripts"
+cp "$mechanical" "$fixture_scripts/docs-mechanical.sh"
+for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh; do
+  # shellcheck disable=SC2016  # $0/$* and the log variable expand in the stub.
+  printf '#!/usr/bin/env bash\nprintf "%%s:%%s\\n" "$(basename "$0")" "$*" >>"$DOCS_MECHANICAL_LOG"\n' >"$fixture_scripts/$checker"
+  chmod +x "$fixture_scripts/$checker"
+done
+
+# No caller override: the entrypoint must select docs, not the archival dev/
+# permanent paths it used before this regression fix.
+(
+  cd "$fixture" || exit 3
+  DOCS_MECHANICAL_LOG="$fixture_log" "$fixture_scripts/docs-mechanical.sh" >/dev/null 2>&1
+)
+assert_rc 0 $? "orchestrator: bare invocation succeeds in isolated fixture"
+assert_logged_footprint "docs-check-links.sh" "docs" "$fixture_log" "orchestrator: bare invocation selects adopter docs, not archival paths"
+assert_logged_footprint "docs-check-citations.sh" "docs" "$fixture_log" "orchestrator: bare invocation passes adopter docs to both footprint checkers"
+
+# An explicit environment footprint remains higher precedence than the default.
+: >"$fixture_log"
+(
+  cd "$fixture" || exit 3
+  DOCS_MECHANICAL_LOG="$fixture_log" DOCS_FOOTPRINT="fixture-explicit" "$fixture_scripts/docs-mechanical.sh" >/dev/null 2>&1
+)
+assert_rc 0 $? "orchestrator: explicit DOCS_FOOTPRINT invocation succeeds"
+assert_logged_footprint "docs-check-links.sh" "fixture-explicit" "$fixture_log" "orchestrator: DOCS_FOOTPRINT overrides the bare default"
+assert_logged_footprint "docs-check-citations.sh" "fixture-explicit" "$fixture_log" "orchestrator: explicit footprint reaches both footprint checkers"
+echo
 
 echo "== M2 docs-check-links.sh =="
 # Defect: an intra-repo link whose target does not exist.
@@ -70,6 +119,7 @@ echo "== M3 docs-check-citations.sh =="
 # Construct the deliberately absent path separately so this self-test source is
 # not itself reported as a dangling citation when the scripts tree is scanned.
 missing_path='crates/jit/does_not_exist_zzz'
+# shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
 printf 'See `%s` for details.\n' "$missing_path" >"$scratch/cite_bad.md"
 "$citations" "$scratch/cite_bad.md" >/dev/null 2>&1
 assert_rc 1 $? "citations: dangling repo-rooted path is MISSING"
@@ -128,6 +178,10 @@ if git clone --local --no-hardlinks --quiet . "$clone" 2>/dev/null; then
   # Run both projection assertions in a subshell rooted at the clone.
   (
     cd "$clone" || exit 3
+    # This untouched clone is the end-to-end regression for the entrypoint's
+    # bare default, including all three real child checkers.
+    "$mechanical" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_mechanical_bare"
     # All projection targets, deduplicated; the drift is injected into the first.
     mapfile -t targets < <(jit project render --json | jq -r '.projections[].target' | sort -u)
     it="${targets[0]}"
@@ -144,6 +198,7 @@ if git clone --local --no-hardlinks --quiet . "$clone" 2>/dev/null; then
     "$projections" >/dev/null 2>&1
     echo "$?" >"$scratch/rc_drift"
   )
+  assert_rc 0 "$(cat "$scratch/rc_mechanical_bare")" "orchestrator: bare invocation succeeds over an unmodified repository"
   assert_rc 0 "$(cat "$scratch/rc_fresh")" "projections: fresh (rendered==staged) tree is clean"
   assert_rc 1 "$(cat "$scratch/rc_drift")" "projections: drifted target region is a finding"
 else
