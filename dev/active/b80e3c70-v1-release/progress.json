@@ -131,7 +131,7 @@
           "short_id": "985ab96d",
           "title": "Unreferenced plan-doc location resolver",
           "classification": "implementation",
-          "status": "merged_pending_review",
+          "status": "done",
           "gates": [
             "cargo-ci",
             "code-review"

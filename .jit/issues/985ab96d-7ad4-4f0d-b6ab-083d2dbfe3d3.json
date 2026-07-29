@@ -14,12 +14,24 @@
       "path": "dev/active/985ab96d/985ab96d-decision.md"
     }
   ],
+  "done_at": "2026-07-29T18:53:49.916275672Z",
   "first_ready_at": "2026-07-26T19:29:56.941091209Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-29T18:49:57.188636718Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-29T18:53:26.275427056Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "985ab96d-7ad4-4f0d-b6ab-083d2dbfe3d3",
   "labels": [
     "milestone:v1.0",
@@ -29,7 +41,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Unreferenced plan-doc location resolver",
-  "updated_at": "2026-07-29T15:38:27.627836255Z"
+  "updated_at": "2026-07-29T18:53:49.916275672Z"
 }
