@@ -14,7 +14,7 @@
           "short_id": "7edd2fe8",
           "title": "Establish deterministic workflow contract verification",
           "classification": "implementation",
-          "status": "rework",
+          "status": "done",
           "gates": [
             "repo-validate",
             "code-review",

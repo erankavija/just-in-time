@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Every committed GitHub workflow is checked through one maintained static harness rather than bespoke or hypothetical failure fixtures.\n\n## Success Criteria\n\n- [hard] REQ-01: A pinned `actionlint` binary validates all committed workflow YAML, and a repository-owned parser performs deterministic structural assertions over parsed triggers, `workflow_call` inputs and outputs, `needs` edges, permissions, and forbidden failure escapes. It recursively scans workflow and local-composite `uses:` entries and rejects every non-local action or reusable-workflow reference that is not an exact 40-character hexadecimal commit SHA.\n- [hard] REQ-02: One documented harness interface lets the normal CI, security, container, and release workflows declare their required static assertions without copying a verifier into each workflow.\n- [hard] REQ-03: The checks run locally and on every pull request, and a workflow edit that violates a declared assertion fails that pull request.\n- [hard] REQ-04: Every external `uses:` reference on the CI, security, container, and release paths carries a reviewed full 40-character SHA plus a human-readable upstream-version comment. A pin-update pull request identifies the upstream release, its tag-to-SHA resolution, and its changelog and permission deltas, and passes the static checks under maintainer review; automation may propose an update but never merges one.\n\n## Notes\n\nBlast radius: one focused workflow-contract script and test directory, its pinned `actionlint` setup, the external `uses:` pins across committed workflows and local composites, and the pin-update policy. No product behavior changes.\n\nVerification is static by design. Proving caller-failure propagation dynamically would require disposable repositories and hosted runs whose maintenance cost exceeds the failure it detects.\n",
   "documents": [],
+  "done_at": "2026-07-29T16:12:21.852433429Z",
   "first_ready_at": "2026-07-15T09:12:53.165642283Z",
   "gates_required": [
     "repo-validate",
@@ -14,13 +15,18 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-29T15:59:15.504722682Z",
+      "status": "passed",
+      "updated_at": "2026-07-29T16:11:52.548693Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-29T16:11:55.656795472Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-07-29T15:55:52.721647299Z",
+      "updated_at": "2026-07-29T16:08:28.510651487Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,7 +38,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Establish deterministic workflow contract verification",
-  "updated_at": "2026-07-29T15:59:15.504722682Z"
+  "updated_at": "2026-07-29T16:12:21.852433429Z"
 }
