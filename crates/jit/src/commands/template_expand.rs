@@ -634,9 +634,8 @@ fn extract_hard_criteria(description: &str) -> String {
 }
 
 /// The declarations shared by the tests of every derivation that resolves a
-/// template document declaration: the apply engine here, the capture-path and
-/// refresh derivations in [`super::template`], and the plan-doc location
-/// resolver in [`super::plan_doc`].
+/// template document declaration: the apply engine here, and the capture-path
+/// and refresh derivations in [`super::template`].
 ///
 /// One area registry, one taxonomy, one container, and one bracket template for
 /// all of them, so a test comparing two derivations compares their answers to

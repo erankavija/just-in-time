@@ -2295,17 +2295,28 @@ pub(crate) fn find_planning_node<'a>(
         })
 }
 
+/// The document-reference label that marks a planning node's plan document.
+///
+/// A planning node records WHERE its container's plan lives as a
+/// [`DocumentReference`](crate::domain::DocumentReference) carrying this label.
+/// That reference is the validation-time source of truth for the plan-doc
+/// location: `jit validate` reads the plan from this reference's `path`, so a
+/// plan that is moved/archived and re-linked keeps validating from its new
+/// location. The graph template's
+/// [`plan_doc_location`](crate::templates::GraphTemplate::plan_doc_location)
+/// resolves into the planning node's description as an instruction naming where
+/// to author the plan; applying a template attaches no document reference, and
+/// this one is created when the plan is authored and linked.
+const PLAN_DOC_LABEL: &str = "plan";
+
 /// The repo-root-relative path of `planning`'s recorded plan document, if it has
 /// one.
 ///
-/// Reads the planning node's
-/// [`PLAN_DOC_LABEL`](crate::commands::plan_doc::PLAN_DOC_LABEL)-labeled
+/// Reads the planning node's [`PLAN_DOC_LABEL`]-labeled
 /// [`DocumentReference`](crate::domain::DocumentReference) — the validation-time
 /// source of truth for the plan-doc location. Returns `None` when the node
 /// records no such reference (the plan is inline, in the container's body).
 pub(crate) fn planning_node_plan_path(planning: &Issue) -> Option<String> {
-    use crate::commands::plan_doc::PLAN_DOC_LABEL;
-
     planning
         .documents
         .iter()
