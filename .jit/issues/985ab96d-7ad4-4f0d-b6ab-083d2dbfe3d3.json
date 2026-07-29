@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-29T14:11:02.954873053Z",
   "context": {},
   "created_at": "2026-07-26T19:29:56.941091209Z",
   "dependencies": [],
@@ -20,7 +21,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Unreferenced plan-doc location resolver",
-  "updated_at": "2026-07-29T13:56:02.297626185Z"
+  "updated_at": "2026-07-29T14:11:02.954873053Z"
 }

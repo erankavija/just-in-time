@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-29T14:10:58.051450262Z",
   "context": {},
   "created_at": "2026-07-26T19:30:08.501698654Z",
   "dependencies": [],
@@ -20,7 +21,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Mechanical documentation checker defaults to the archival permanent paths",
-  "updated_at": "2026-07-29T13:56:16.995290229Z"
+  "updated_at": "2026-07-29T14:10:58.051450262Z"
 }

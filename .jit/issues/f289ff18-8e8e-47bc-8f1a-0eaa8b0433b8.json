@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-29T14:10:48.273857877Z",
   "context": {},
   "created_at": "2026-07-27T10:44:26.375581722Z",
   "dependencies": [],
@@ -20,7 +21,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Honour a document reference's commit pin when checking links",
-  "updated_at": "2026-07-29T13:56:26.762618237Z"
+  "updated_at": "2026-07-29T14:10:48.273857877Z"
 }
