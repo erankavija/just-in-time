@@ -48,7 +48,7 @@
           "short_id": "bb302dbd",
           "title": "Remediate MCP production dependency advisories",
           "classification": "implementation",
-          "status": "reported-pending-question",
+          "status": "reported",
           "gates": [
             "mcp-ci",
             "code-review",
@@ -374,7 +374,7 @@
       "decision": "Accept the zod 3 -> 4 major bump.",
       "reasoning": "Declared ^3.24.1 floors below SDK 1.30's peer range ^3.25 || ^4.0, so the range had to move regardless of the audit; zod 3.x stopped shipping while 4.x is current, so under @/charter/D-11 a later zod-3 advisory would have no in-range fix. REQ-03 contemplates a validation-API migration.",
       "rejected_alternative": "Pin zod ^3.25.76, audit-clean today, reverting two test changes.",
-      "open_verification": "Enumerate every advertised inputSchema default across all 112 tools; a non-empty default on an optional property would change the CLI argv under zod 4."
+      "open_verification": "CLOSED. Exactly one advertised default across all 112 tools (jit_item_search.query = \"\", optional); differential sweep shows 0 tools whose (accepted, argv) differ. tool-generator.js propagates defaults for positional args only, so a flag default cannot reach validateArguments."
     }
   ],
   "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
