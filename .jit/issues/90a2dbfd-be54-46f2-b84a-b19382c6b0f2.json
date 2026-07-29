@@ -23,7 +23,7 @@
       "doc_type": "analysis",
       "format": "markdown",
       "label": "Completion Report",
-      "path": "dev/archive/features/90a2dbfd-completion-report.md"
+      "path": "dev/archive/90a2dbfd-item-sources/features/90a2dbfd-completion-report.md"
     }
   ],
   "done_at": "2026-06-27T01:17:15.720700845Z",
@@ -52,5 +52,5 @@
   "priority": "normal",
   "state": "archived",
   "title": "Generalize addressable items to declarative kinds over markdown/toml sources",
-  "updated_at": "2026-07-27T10:03:25.127017689Z"
+  "updated_at": "2026-07-29T09:19:14.777801705Z"
 }

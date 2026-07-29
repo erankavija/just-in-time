@@ -1,13 +1,49 @@
 {
-  "id": "562e977c-98d1-457b-a59c-4a4e7323e762",
-  "title": "Project authoritative storage-layout specifics",
-  "description": "Issue-ID shape, event-file serialization, and gate-run result layout have no maintained storage projection, so adopter documentation must cite implementation directly.\n\nSource: `crates/jit/src/domain/types.rs:16-17,547-579`; `crates/jit/src/storage/json.rs:24-39,82-89,152-179,634-670,735-775,778-812`; `dev/archive/2d109173-plan.md:31,384-403`.\n\n## Success Criteria\n\n- [hard] REQ-01: A generated storage reference specifies UUID issue IDs and the eight-character human short-ID convention only where source supports it.\n- [hard] REQ-02: It specifies JSON Lines events in `.jit/events.jsonl` and links to the authoritative event contract rather than copying a second tag catalog.\n- [hard] REQ-03: It projects `.jit/gate-runs/<run-id>/result.json` and source-backed structured result fields.\n- [hard] REQ-04: Freshness or conformance coverage prevents drift from storage code.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-12T12:07:29.919258543Z",
+  "context": {},
+  "created_at": "2026-07-11T13:35:35.553516821Z",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
+  "description": "Issue-ID shape, event-file serialization, and gate-run result layout have no maintained storage projection, so adopter documentation must cite implementation directly.\n\nSource: `crates/jit/src/domain/types.rs:16-17,547-579`; `crates/jit/src/storage/json.rs:24-39,82-89,152-179,634-670,735-775,778-812`; `dev/archive/2d109173-docs-exhaustive-audit/2d109173-plan.md:31,384-403`.\n\n## Success Criteria\n\n- [hard] REQ-01: A generated storage reference specifies UUID issue IDs and the eight-character human short-ID convention only where source supports it.\n- [hard] REQ-02: It specifies JSON Lines events in `.jit/events.jsonl` and links to the authoritative event contract rather than copying a second tag catalog.\n- [hard] REQ-03: It projects `.jit/gate-runs/<run-id>/result.json` and source-backed structured result fields.\n- [hard] REQ-04: Freshness or conformance coverage prevents drift from storage code.",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "1af635aa0c245f1d2745ab7ec082bb3bd2e8f2e4c52ff93b2e661b9184756b28",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7416a79de55d2946bd6d84d63c50fac001b2de2fc3f39216ddb4bd6ab2ff6247",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bbbbd1e4ceb8385486c929554d0ff0b23558470419d86124ef5310b1fc294cf1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "events.md",
+          "resolved_path": "docs/reference/events.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Storage Record Layout",
+      "path": "docs/reference/storage-records.md"
+    }
+  ],
+  "done_at": "2026-07-12T12:57:29.156080446Z",
+  "first_ready_at": "2026-07-11T13:35:35.553517081Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -15,72 +51,36 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:57:22.022383669Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:51:35.056431773Z"
+      "updated_at": "2026-07-12T12:51:35.056431773Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:49:41.933016133Z"
+      "updated_at": "2026-07-12T12:49:41.933016133Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:55:24.063364762Z"
+      "updated_at": "2026-07-12T12:55:24.063364762Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-12T12:57:22.022383669Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "docs/reference/storage-records.md",
-      "commit": null,
-      "label": "Storage Record Layout",
-      "doc_type": null,
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "exit-codes.md",
-          "resolved_path": "docs/reference/exit-codes.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "1af635aa0c245f1d2745ab7ec082bb3bd2e8f2e4c52ff93b2e661b9184756b28",
-          "is_shared": false
-        },
-        {
-          "original_path": "storage-format.md",
-          "resolved_path": "docs/reference/storage-format.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "7416a79de55d2946bd6d84d63c50fac001b2de2fc3f39216ddb4bd6ab2ff6247",
-          "is_shared": false
-        },
-        {
-          "original_path": "events.md",
-          "resolved_path": "docs/reference/events.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "bbbbd1e4ceb8385486c929554d0ff0b23558470419d86124ef5310b1fc294cf1",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "562e977c-98d1-457b-a59c-4a4e7323e762",
   "labels": [
     "type:task",
     "milestone:v1.0",
     "component:storage",
     "epic:documentation-contract-followups"
   ],
-  "created_at": "2026-07-11T13:35:35.553516821Z",
-  "updated_at": "2026-07-12T12:57:29.156081166Z",
-  "first_ready_at": "2026-07-11T13:35:35.553517081Z",
-  "claimed_at": "2026-07-12T12:07:29.919258543Z",
-  "done_at": "2026-07-12T12:57:29.156080446Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Project authoritative storage-layout specifics",
+  "updated_at": "2026-07-29T09:19:59.958753665Z"
 }

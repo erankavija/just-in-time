@@ -21,16 +21,17 @@
     },
     {
       "commit": null,
-      "doc_type": "notes",
-      "label": "Completion report",
-      "path": "dev/archive/f2532a2d-completion-report.md"
-    },
-    {
-      "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Bracket plan (D1-D9)",
       "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/f2532a2d-jit-project-lead/f2532a2d-completion-report.md"
     }
   ],
   "done_at": "2026-07-03T07:53:15.803424209Z",
@@ -60,5 +61,5 @@
   "priority": "high",
   "state": "archived",
   "title": "jit-project-lead skill: milestone-level vision steward above the epic lead",
-  "updated_at": "2026-07-27T10:05:09.242464464Z"
+  "updated_at": "2026-07-29T09:19:11.218102426Z"
 }

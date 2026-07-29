@@ -17,17 +17,17 @@
     },
     {
       "commit": null,
-      "doc_type": null,
-      "format": "markdown",
-      "label": "Completion Report",
-      "path": "dev/archive/9b7b5f9c-completion-report.md"
-    },
-    {
-      "commit": null,
       "doc_type": "notes",
       "format": "html",
       "label": "Showcase Deck (reveal.js)",
       "path": "dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/talk.html"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Completion Report",
+      "path": "dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md"
     }
   ],
   "done_at": "2026-07-16T20:56:51.974957142Z",
@@ -75,5 +75,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Versioned repository profiles and portable JIT dogfood setup",
-  "updated_at": "2026-07-27T10:05:43.241915760Z"
+  "updated_at": "2026-07-29T09:19:10.673847240Z"
 }

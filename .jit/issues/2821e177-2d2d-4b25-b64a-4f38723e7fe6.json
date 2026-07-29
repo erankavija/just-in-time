@@ -20,29 +20,20 @@
     },
     {
       "commit": null,
+      "doc_type": "study",
+      "format": "markdown",
+      "label": "Addressable items: use cases and the SSOT adoption push",
+      "path": "dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-item-use-cases.md"
+    },
+    {
+      "commit": null,
       "doc_type": "analysis",
       "format": "markdown",
       "label": "Epic completion report",
-      "path": "dev/archive/features/2821e177/completion-report.md"
+      "path": "dev/archive/2821e177-addressing-v2/features/2821e177/completion-report.md"
     },
     {
       "assets": [
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://fonts.gstatic.com",
-          "resolved_path": null
-        },
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
-          "resolved_path": null
-        },
         {
           "asset_type": "external",
           "content_hash": null,
@@ -56,7 +47,7 @@
           "content_hash": null,
           "is_shared": false,
           "mime_type": null,
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
           "resolved_path": null
         },
         {
@@ -65,7 +56,15 @@
           "is_shared": false,
           "mime_type": null,
           "original_path": "themes/rust.css",
-          "resolved_path": "dev/archive/features/2821e177/showcase/themes/rust.css"
+          "resolved_path": "dev/archive/2821e177-addressing-v2/features/2821e177/showcase/themes/rust.css"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
+          "resolved_path": null
         },
         {
           "asset_type": "local",
@@ -73,7 +72,15 @@
           "is_shared": false,
           "mime_type": null,
           "original_path": "base.css",
-          "resolved_path": "dev/archive/features/2821e177/showcase/base.css"
+          "resolved_path": "dev/archive/2821e177-addressing-v2/features/2821e177/showcase/base.css"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
+          "resolved_path": null
         },
         {
           "asset_type": "external",
@@ -88,7 +95,7 @@
           "content_hash": null,
           "is_shared": false,
           "mime_type": null,
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
+          "original_path": "https://fonts.gstatic.com",
           "resolved_path": null
         },
         {
@@ -104,7 +111,15 @@
           "content_hash": null,
           "is_shared": false,
           "mime_type": null,
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
           "resolved_path": null
         },
         {
@@ -114,28 +129,13 @@
           "mime_type": null,
           "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
           "resolved_path": null
-        },
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
-          "resolved_path": null
         }
       ],
       "commit": null,
       "doc_type": "reference",
       "format": "html",
       "label": "Addressing v2 showcase deck (16 slides)",
-      "path": "dev/archive/features/2821e177/showcase/talk.html"
-    },
-    {
-      "commit": null,
-      "doc_type": "study",
-      "format": "markdown",
-      "label": "Addressable items: use cases and the SSOT adoption push",
-      "path": "dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-item-use-cases.md"
+      "path": "dev/archive/2821e177-addressing-v2/features/2821e177/showcase/talk.html"
     }
   ],
   "done_at": "2026-07-03T23:04:34.850621637Z",
@@ -171,5 +171,5 @@
   "priority": "normal",
   "state": "archived",
   "title": "Addressing v2: uniform path-based addresses; rule/gate as addressable items",
-  "updated_at": "2026-07-27T09:57:28.408866984Z"
+  "updated_at": "2026-07-29T09:19:17.259759539Z"
 }

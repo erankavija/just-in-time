@@ -1,11 +1,20 @@
 {
-  "id": "4ae60108-d2b0-4fbc-829a-7df6203b1850",
-  "title": "Improve state transition feedback when gates block completion",
-  "description": "When 'jit issue update --state done' is blocked by unpassed gates, the system silently transitions to 'gated' and returns exit 0. This violates principle of least surprise for both humans and AI agents. The command should return non-zero exit code and clear feedback about why the requested transition was modified. See attached design document.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-session-1",
+  "claimed_at": "2025-12-20T12:56:39.417502191Z",
+  "context": {},
+  "created_at": "2025-12-20T13:04:21.247867264Z",
   "dependencies": [],
+  "description": "When 'jit issue update --state done' is blocked by unpassed gates, the system silently transitions to 'gated' and returns exit 0. This violates principle of least surprise for both humans and AI agents. The command should return non-zero exit code and clear feedback about why the requested transition was modified. See attached design document.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Design Document",
+      "path": "dev/archive/14303b30-phase5-2/bug-fixes/state-transition-feedback-design.md"
+    }
+  ],
+  "done_at": "2025-12-20T13:04:25.329264282Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,41 +23,33 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "clippy": {
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T13:04:21.239880235Z"
+      "updated_at": "2025-12-20T13:04:21.245785581Z",
+      "updated_by": "ci:clippy"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "human:reviewer",
-      "updated_at": "2025-12-20T13:04:21.249592976Z"
+      "updated_at": "2025-12-20T13:04:21.249592976Z",
+      "updated_by": "human:reviewer"
     },
     "fmt": {
       "status": "passed",
-      "updated_by": "ci:fmt",
-      "updated_at": "2025-12-20T13:04:21.247769414Z"
+      "updated_at": "2025-12-20T13:04:21.247769414Z",
+      "updated_by": "ci:fmt"
     },
-    "clippy": {
+    "tdd-reminder": {
       "status": "passed",
-      "updated_by": "ci:clippy",
-      "updated_at": "2025-12-20T13:04:21.245785581Z"
+      "updated_at": "2025-12-20T13:04:21.239880235Z",
+      "updated_by": "agent:copilot"
     },
     "tests": {
       "status": "passed",
-      "updated_by": "agent:test",
-      "updated_at": "2025-12-20T13:15:38.080289983Z"
+      "updated_at": "2025-12-20T13:15:38.080289983Z",
+      "updated_by": "agent:test"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/bug-fixes/state-transition-feedback-design.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": null
-    }
-  ],
+  "id": "4ae60108-d2b0-4fbc-829a-7df6203b1850",
   "labels": [
     "type:task",
     "component:cli",
@@ -56,8 +57,8 @@
     "milestone:v1.0",
     "epic:ai-agent-validation"
   ],
-  "created_at": "2025-12-20T13:04:21.247867264Z",
-  "updated_at": "2026-07-05T19:51:12.961443937Z",
-  "claimed_at": "2025-12-20T12:56:39.417502191Z",
-  "done_at": "2025-12-20T13:04:25.329264282Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Improve state transition feedback when gates block completion",
+  "updated_at": "2026-07-29T09:19:13.954133129Z"
 }

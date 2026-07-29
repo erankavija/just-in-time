@@ -1,11 +1,19 @@
 {
-  "id": "3342dc7c-5ef2-44c3-a65e-d3c5c81277e9",
-  "title": "Implement gate preview command",
-  "description": "DECISION: Won't implement - unnecessary complexity for marginal value. Current workflow already solves the problem: jit issue claim fails fast with clear error messages. Agents can attempt to claim and handle error - no preview needed. Proposed caching layer introduces complexity without addressing real user pain. See attached analysis document.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2025-12-20T19:23:20.090849700Z",
   "dependencies": [],
+  "description": "DECISION: Won't implement - unnecessary complexity for marginal value. Current workflow already solves the problem: jit issue claim fails fast with clear error messages. Agents can attempt to claim and handle error - no preview needed. Proposed caching layer introduces complexity without addressing real user pain. See attached analysis document.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Closure Analysis",
+      "path": "dev/archive/14303b30-phase5-2/bug-fixes/gate-preview-analysis.md"
+    }
+  ],
+  "done_at": "2025-12-20T19:23:26.351814994Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,41 +22,33 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:23:10.397046505Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T19:22:13.569442816Z"
-    },
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:23:19.582851306Z"
+      "updated_at": "2025-12-20T19:23:19.582851306Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T19:23:26.348798081Z"
+      "updated_at": "2025-12-20T19:23:26.348798081Z",
+      "updated_by": "agent:copilot"
     },
     "fmt": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:23:19.787979316Z"
+      "updated_at": "2025-12-20T19:23:19.787979316Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "status": "passed",
+      "updated_at": "2025-12-20T19:22:13.569442816Z",
+      "updated_by": "agent:copilot"
+    },
+    "tests": {
+      "status": "passed",
+      "updated_at": "2025-12-20T19:23:10.397046505Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/bug-fixes/gate-preview-analysis.md",
-      "commit": null,
-      "label": "Closure Analysis",
-      "doc_type": null
-    }
-  ],
+  "id": "3342dc7c-5ef2-44c3-a65e-d3c5c81277e9",
   "labels": [
     "type:task",
     "epic:phase5.2",
@@ -56,7 +56,8 @@
     "component:cli",
     "resolution:wont-fix"
   ],
-  "created_at": "2025-12-20T19:23:20.090849700Z",
-  "updated_at": "2026-07-05T19:51:12.941479403Z",
-  "done_at": "2025-12-20T19:23:26.351814994Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement gate preview command",
+  "updated_at": "2026-07-29T09:19:13.682739542Z"
 }

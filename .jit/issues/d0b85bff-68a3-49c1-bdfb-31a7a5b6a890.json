@@ -1,11 +1,20 @@
 {
-  "id": "d0b85bff-68a3-49c1-bdfb-31a7a5b6a890",
-  "title": "Add JSON output support to doc archive command",
-  "description": "## Problem\n\nThe `jit doc archive` command lacks `--json` flag, making it inconsistent with other commands and preventing proper structured warning output.\n\n## Current State\n\n- All other doc commands (add, list, history, etc.) support `--json`\n- Archive command prints directly via `println!` \n- Warnings from `archive_document()` method are currently ignored in main.rs because there's no way to format them properly\n\n## Acceptance Criteria\n\n- [ ] Add `json: bool` parameter to `DocCommands::Archive`\n- [ ] Update main.rs to use `OutputContext` for archive warnings\n- [ ] Ensure archive success/failure output respects `--json` flag\n- [ ] All existing tests pass",
-  "state": "done",
-  "priority": "low",
   "assignee": "agent:copilot-session",
+  "claimed_at": "2026-02-17T19:35:29.498716155Z",
+  "context": {},
+  "created_at": "2026-02-17T19:20:27.369210588Z",
   "dependencies": [],
+  "description": "## Problem\n\nThe `jit doc archive` command lacks `--json` flag, making it inconsistent with other commands and preventing proper structured warning output.\n\n## Current State\n\n- All other doc commands (add, list, history, etc.) support `--json`\n- Archive command prints directly via `println!` \n- Warnings from `archive_document()` method are currently ignored in main.rs because there's no way to format them properly\n\n## Acceptance Criteria\n\n- [ ] Add `json: bool` parameter to `DocCommands::Archive`\n- [ ] Update main.rs to use `OutputContext` for archive warnings\n- [ ] Ensure archive success/failure output respects `--json` flag\n- [ ] All existing tests pass",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Implementation Plan",
+      "path": "dev/archive/9d427a6b-production-polish/features/d0b85bff-archive-json-plan.md"
+    }
+  ],
+  "done_at": "2026-02-17T19:58:21.541694122Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,47 +25,38 @@
   "gates_status": {
     "clippy": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-17T19:54:13.082712998Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-17T19:54:16.888425806Z"
+      "updated_at": "2026-02-17T19:54:13.082712998Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-17T19:58:21.538664019Z"
+      "updated_at": "2026-02-17T19:58:21.538664019Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "fmt": {
+      "status": "passed",
+      "updated_at": "2026-02-17T19:54:16.888425806Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-17T19:45:43.491469326Z"
+      "updated_at": "2026-02-17T19:45:43.491469326Z",
+      "updated_by": "agent:copilot-session"
     },
     "tests": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-17T19:53:50.564381703Z"
+      "updated_at": "2026-02-17T19:53:50.564381703Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/features/d0b85bff-archive-json-plan.md",
-      "commit": null,
-      "label": "Implementation Plan",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "d0b85bff-68a3-49c1-bdfb-31a7a5b6a890",
   "labels": [
     "type:task",
     "component:core",
     "epic:production-polish"
   ],
-  "created_at": "2026-02-17T19:20:27.369210588Z",
-  "updated_at": "2026-07-10T11:07:32.494036994Z",
-  "claimed_at": "2026-02-17T19:35:29.498716155Z",
-  "done_at": "2026-02-17T19:58:21.541694122Z"
+  "priority": "low",
+  "state": "done",
+  "title": "Add JSON output support to doc archive command",
+  "updated_at": "2026-07-29T09:19:15.051779276Z"
 }

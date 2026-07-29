@@ -20,17 +20,17 @@
     },
     {
       "commit": null,
-      "doc_type": "analysis",
-      "format": "markdown",
-      "label": "Epic completion report",
-      "path": "dev/archive/features/53e3fa36-completion-report.md"
-    },
-    {
-      "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Decomposition plan (P node, plan-review approved)",
       "path": "dev/archive/53e3fa36-agent-ergonomics/dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "analysis",
+      "format": "markdown",
+      "label": "Epic completion report",
+      "path": "dev/archive/53e3fa36-agent-ergonomics/features/53e3fa36-completion-report.md"
     }
   ],
   "done_at": "2026-06-24T16:02:05.798728550Z",
@@ -46,5 +46,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Agent-facing CLI ergonomics: gate verdicts, --json contract, and workflow primitives",
-  "updated_at": "2026-07-27T09:57:44.852522967Z"
+  "updated_at": "2026-07-29T09:19:14.503352613Z"
 }

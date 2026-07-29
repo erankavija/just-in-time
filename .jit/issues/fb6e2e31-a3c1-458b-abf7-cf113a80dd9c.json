@@ -17,8 +17,9 @@
     {
       "commit": null,
       "doc_type": "notes",
+      "format": "markdown",
       "label": "Authoring Conventions Draft",
-      "path": "dev/archive/studies/authoring-conventions-draft.md"
+      "path": "dev/archive/71373e37-docs-lifecycle/studies/authoring-conventions-draft.md"
     }
   ],
   "done_at": "2025-12-24T19:28:59.521092963Z",
@@ -67,5 +68,5 @@
   "priority": "high",
   "state": "done",
   "title": "Implement jit doc check-links",
-  "updated_at": "2026-07-27T09:59:07.323303440Z"
+  "updated_at": "2026-07-29T09:19:12.588046111Z"
 }

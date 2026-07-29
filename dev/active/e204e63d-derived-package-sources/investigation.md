@@ -585,7 +585,7 @@ The same filter also bans `.agents/worktrees` (harmless) but keeps `.agents/skil
 ## 3. Prior-art sweep
 
 Sources: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-{plan,research}.md`,
-`dev/archive/9b7b5f9c-completion-report.md`, `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md`,
+`dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md`, `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md`,
 `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md`, `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-progress.json`,
 `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-handoff-2.md`, `dev/active/73482aa1-rust-build-efficiency.md`,
 `dev/vision/9db27a3a-charter.md`, `dev/active/c639cfb5-*.md`.
@@ -653,7 +653,7 @@ Sources: `dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-{plan,research}.
    single embedded offline profile with no new lifecycle surface. D-4's choice of a
    repository-local generator over a new `jit` command is consistent with it, and the
    charter is the reason to cite for that rejection.
-6. **`dev/archive/9b7b5f9c-completion-report.md:101-104`** — "Future projection changes must
+6. **`dev/archive/9b7b5f9c-jit-profiles/9b7b5f9c-completion-report.md:101-104`** — "Future projection changes must
    therefore preserve the public profile/schema/MCP and installed-checker journey rather than
    silently invalidating it", with `9b7b5f9c-plan.md:155` "No criterion removes or renames a
    public surface". **Constraint:** D-2's declared root+exclusion list must be an *additive*

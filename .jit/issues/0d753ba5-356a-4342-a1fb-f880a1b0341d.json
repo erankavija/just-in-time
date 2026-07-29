@@ -1,38 +1,38 @@
 {
-  "id": "0d753ba5-356a-4342-a1fb-f880a1b0341d",
-  "title": "planning: Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
-  "description": "Planning node for Structured project knowledge in jit: addressable items, qualified ids, and projected invariants (25064508). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: dev/archive/features/25064508/plan.md.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-23T21:38:17.502529208Z",
   "dependencies": [],
+  "description": "Planning node for Structured project knowledge in jit: addressable items, qualified ids, and projected invariants (25064508). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Plan document: dev/archive/25064508-structured-knowledge/features/25064508/plan.md.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "plan",
+      "path": "dev/archive/25064508-structured-knowledge/features/25064508/plan.md"
+    }
+  ],
+  "done_at": "2026-06-24T21:47:25.971261078Z",
+  "first_ready_at": "2026-06-24T20:44:34.634468240Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-24T21:42:12.486375549Z"
+      "updated_at": "2026-06-24T21:42:12.486375549Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/features/25064508/plan.md",
-      "commit": null,
-      "label": "plan",
-      "doc_type": null,
-      "format": "markdown"
-    }
-  ],
+  "id": "0d753ba5-356a-4342-a1fb-f880a1b0341d",
   "labels": [
     "milestone:v1.0",
     "epic:structured-knowledge",
     "type:planning"
   ],
-  "created_at": "2026-06-23T21:38:17.502529208Z",
-  "updated_at": "2026-07-05T19:51:12.908768459Z",
-  "first_ready_at": "2026-06-24T20:44:34.634468240Z",
-  "done_at": "2026-06-24T21:47:25.971261078Z"
+  "priority": "high",
+  "state": "done",
+  "title": "planning: Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
+  "updated_at": "2026-07-29T09:20:13.363652528Z"
 }

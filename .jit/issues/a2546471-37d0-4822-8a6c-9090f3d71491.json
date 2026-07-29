@@ -56,7 +56,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": "Completion report",
-      "path": "dev/archive/dev/active/a2546471-json-error-contract/completion-report.md"
+      "path": "dev/archive/a2546471-json-error-contract/dev/active/a2546471-json-error-contract/completion-report.md"
     }
   ],
   "done_at": "2026-07-28T22:31:15.544274657Z",
@@ -87,5 +87,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Structured failure reporting across the machine-readable CLI surface",
-  "updated_at": "2026-07-28T22:34:13.398656682Z"
+  "updated_at": "2026-07-29T09:19:11.490809125Z"
 }

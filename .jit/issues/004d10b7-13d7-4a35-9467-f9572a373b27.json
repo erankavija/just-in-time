@@ -23,7 +23,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": "Completion Report",
-      "path": "dev/archive/sessions/004d10b7-completion-report.md"
+      "path": "dev/archive/004d10b7-documentation-contract-followups/sessions/004d10b7-completion-report.md"
     }
   ],
   "done_at": "2026-07-12T13:00:56.749316963Z",
@@ -59,5 +59,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Documentation contract follow-ups",
-  "updated_at": "2026-07-27T19:00:33.633370520Z"
+  "updated_at": "2026-07-29T09:19:12.037932995Z"
 }

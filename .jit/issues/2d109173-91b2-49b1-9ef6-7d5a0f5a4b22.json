@@ -17,16 +17,17 @@
   "documents": [
     {
       "commit": null,
-      "doc_type": "analysis",
+      "doc_type": null,
       "format": "markdown",
-      "label": "Planning brief",
-      "path": "dev/archive/bug-fixes/2d109173-planning-brief.md"
+      "label": "Completion Report",
+      "path": "dev/archive/2d109173-docs-exhaustive-audit/2d109173-completion-report.md"
     },
     {
       "commit": null,
-      "doc_type": null,
-      "label": "Completion Report",
-      "path": "dev/archive/2d109173-completion-report.md"
+      "doc_type": "analysis",
+      "format": "markdown",
+      "label": "Planning brief",
+      "path": "dev/archive/2d109173-docs-exhaustive-audit/bug-fixes/2d109173-planning-brief.md"
     }
   ],
   "done_at": "2026-07-11T19:12:08.828600839Z",
@@ -63,5 +64,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Exhaustive documentation audit and drift removal",
-  "updated_at": "2026-07-29T09:09:36.197880543Z"
+  "updated_at": "2026-07-29T09:19:13.127861459Z"
 }

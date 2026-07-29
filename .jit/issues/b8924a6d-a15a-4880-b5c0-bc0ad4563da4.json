@@ -11,17 +11,17 @@
   "documents": [
     {
       "commit": null,
-      "doc_type": "design",
-      "format": "markdown",
-      "label": null,
-      "path": "dev/archive/2d109173-plan.md"
-    },
-    {
-      "commit": null,
       "doc_type": "documentation",
       "format": "markdown",
       "label": "Audit notes",
       "path": "dev/archive/2d109173-docs-exhaustive-audit/dev/active/b8924a6d-audit-notes.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2d109173-docs-exhaustive-audit/2d109173-plan.md"
     }
   ],
   "done_at": "2026-07-11T08:54:06.994931705Z",
@@ -63,5 +63,5 @@
   "priority": "normal",
   "state": "done",
   "title": "How-to guides audit",
-  "updated_at": "2026-07-27T10:00:14.441101654Z"
+  "updated_at": "2026-07-29T09:19:08.470335464Z"
 }

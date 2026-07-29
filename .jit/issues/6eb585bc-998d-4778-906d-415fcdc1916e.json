@@ -71,21 +71,21 @@
       "doc_type": "report",
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/6eb585bc-completion-report.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/6eb585bc-batch-report-2026-07-05.md"
     },
     {
       "commit": null,
       "doc_type": "report",
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/6eb585bc-batch-report-2026-07-05.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/6eb585bc-completion-report.md"
     },
     {
       "commit": null,
       "doc_type": "report",
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/6eb585bc-usability-audit-2026-07-05.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/6eb585bc-usability-audit-2026-07-05.md"
     }
   ],
   "done_at": "2026-07-17T13:33:40.339134398Z",
@@ -133,5 +133,5 @@
   "priority": "normal",
   "state": "archived",
   "title": "Core maintenance",
-  "updated_at": "2026-07-27T09:58:50.049489070Z"
+  "updated_at": "2026-07-29T09:19:10.122969203Z"
 }

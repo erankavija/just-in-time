@@ -1,46 +1,46 @@
 {
-  "id": "3c4cab67-ca5e-4c8c-bacf-8e2a9dff2e94",
-  "title": "planning: Exhaustive documentation audit and drift removal",
-  "description": "Planning node for Exhaustive documentation audit and drift removal (2d109173). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/archive/2d109173-plan.md and link it to this node once written.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-10T19:06:12.821478531Z",
   "dependencies": [],
+  "description": "Planning node for Exhaustive documentation audit and drift removal (2d109173). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/archive/2d109173-docs-exhaustive-audit/2d109173-plan.md and link it to this node once written.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "study",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2d109173-docs-exhaustive-audit/2d109173-investigation.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/2d109173-docs-exhaustive-audit/2d109173-plan.md"
+    }
+  ],
+  "done_at": "2026-07-10T20:07:45.191671585Z",
+  "first_ready_at": "2026-07-10T19:06:12.821478971Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T20:06:24.702177245Z"
+      "updated_at": "2026-07-10T20:06:24.702177245Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/2d109173-investigation.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "study",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/archive/2d109173-plan.md",
-      "commit": null,
-      "label": null,
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "3c4cab67-ca5e-4c8c-bacf-8e2a9dff2e94",
   "labels": [
     "milestone:v1.0",
     "epic:docs-exhaustive-audit",
     "component:docs",
     "type:planning"
   ],
-  "created_at": "2026-07-10T19:06:12.821478531Z",
-  "updated_at": "2026-07-10T20:07:45.191672345Z",
-  "first_ready_at": "2026-07-10T19:06:12.821478971Z",
-  "done_at": "2026-07-10T20:07:45.191671585Z"
+  "priority": "high",
+  "state": "done",
+  "title": "planning: Exhaustive documentation audit and drift removal",
+  "updated_at": "2026-07-29T09:19:55.477763894Z"
 }

@@ -21,7 +21,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": "Execution completion report",
-      "path": "dev/archive/b4e55aa2-completion-report.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/b4e55aa2-completion-report.md"
     }
   ],
   "done_at": "2026-07-12T21:30:52.812218551Z",
@@ -75,5 +75,5 @@
   "priority": "high",
   "state": "done",
   "title": "Ground code review in AGENTS.md and addressable policy",
-  "updated_at": "2026-07-27T09:58:50.049489070Z"
+  "updated_at": "2026-07-29T09:19:10.946539179Z"
 }

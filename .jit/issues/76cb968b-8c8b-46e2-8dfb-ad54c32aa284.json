@@ -35,7 +35,7 @@
       "doc_type": "report",
       "format": "markdown",
       "label": "Completion Report",
-      "path": "dev/archive/76cb968b-completion-report.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/76cb968b-completion-report.md"
     }
   ],
   "done_at": "2026-07-06T12:17:01.875794436Z",
@@ -70,5 +70,5 @@
   "priority": "normal",
   "state": "done",
   "title": "SSOT adoption sweep: skills, README, and docs cite @-addresses instead of copying item text",
-  "updated_at": "2026-07-27T09:58:50.049489070Z"
+  "updated_at": "2026-07-29T09:19:10.398780117Z"
 }

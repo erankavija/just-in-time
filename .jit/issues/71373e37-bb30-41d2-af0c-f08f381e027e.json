@@ -30,8 +30,9 @@
     {
       "commit": null,
       "doc_type": "design",
+      "format": "markdown",
       "label": "Authoring Conventions (Draft)",
-      "path": "dev/archive/studies/authoring-conventions-draft.md"
+      "path": "dev/archive/71373e37-docs-lifecycle/studies/authoring-conventions-draft.md"
     }
   ],
   "done_at": "2025-12-28T01:16:20.027436271Z",
@@ -56,5 +57,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Epic: Documentation Lifecycle and Reorganization",
-  "updated_at": "2026-07-27T09:59:07.323303440Z"
+  "updated_at": "2026-07-29T09:19:12.315180831Z"
 }

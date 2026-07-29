@@ -26,7 +26,7 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Documentation Audit Plan",
-      "path": "dev/archive/studies/docs-audit-plan.md"
+      "path": "dev/archive/cfb3ba94-docs/studies/docs-audit-plan.md"
     }
   ],
   "done_at": "2026-02-04T12:05:13.124989066Z",
@@ -50,5 +50,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Epic: User Documentation (Product Docs Phase 2)",
-  "updated_at": "2026-07-27T09:59:40.598569630Z"
+  "updated_at": "2026-07-29T09:19:12.856830103Z"
 }

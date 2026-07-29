@@ -21,13 +21,6 @@
     },
     {
       "commit": null,
-      "doc_type": "completion-report",
-      "format": "markdown",
-      "label": "Completion Report",
-      "path": "dev/archive/features/2fbd2a82-completion-report.md"
-    },
-    {
-      "commit": null,
       "doc_type": "slides",
       "format": "html",
       "label": "Showcase slides",
@@ -39,6 +32,13 @@
       "format": "markdown",
       "label": "Showcase alternate theme",
       "path": "dev/archive/2fbd2a82-planning-bracket/dev/active/planning-bracket-showcase/themes/gruvbox.css"
+    },
+    {
+      "commit": null,
+      "doc_type": "completion-report",
+      "format": "markdown",
+      "label": "Completion Report",
+      "path": "dev/archive/2fbd2a82-planning-bracket/features/2fbd2a82-completion-report.md"
     }
   ],
   "done_at": "2026-06-18T20:10:25.277031526Z",
@@ -53,5 +53,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Plan-before-fan-out bracket: gated planning node before breakdown",
-  "updated_at": "2026-07-27T12:06:10.613539794Z"
+  "updated_at": "2026-07-29T09:19:14.230029013Z"
 }
