@@ -183,14 +183,23 @@
           "footprint_note": "Owns archive destination derivation, its tests, the repository archive migration, and canonical archive-layout documentation. Dispatched alongside f9e42a43 rework after its first submission proved CHANGELOG-disjoint; must land before ef118aea so execution/reporting tests exercise the corrected layout.",
           "dispatch_order": 2,
           "planned_model": "gpt-5.6-sol/high",
-          "branch": "worktree-agent-625cc07f"
+          "branch": "worktree-agent-625cc07f",
+          "branch_head": "0d899de0",
+          "merge_commit": "483ade2a",
+          "commits": 2,
+          "uncommitted": 0,
+          "reported": "yes",
+          "rework_attempts": 1,
+          "review_note": "The independent review found four blockers in historical-event reconciliation, moved links and live JIT references, a superseded test representation, and current-vs-historical prose. One cumulative rework closed all four; re-review passed and a physical layout sweep found no remaining container/dev or container/archive nesting.",
+          "gate_note": "The exact merged commit passed the build verifier. The lead migrated 265 live document paths, 3 asset resolved paths, and 7 co-resident current descriptions while preserving 6 description-only histories and the immutable event log. cargo-ci, code-review, and docs-mechanical then passed sequentially; cargo-ci's new incremental preflight ran first.",
+          "completed_at": "2026-07-29T22:58:44.272607435Z"
         },
         {
           "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
           "short_id": "f9e42a43",
           "title": "Treat a directory link target consistently across discovery, link checking and validation",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "gates": [
             "cargo-ci",
             "code-review"

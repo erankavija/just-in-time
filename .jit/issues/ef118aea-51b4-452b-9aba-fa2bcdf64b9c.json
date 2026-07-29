@@ -23,7 +23,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Archive execution reports no citation warnings",
-  "updated_at": "2026-07-29T19:42:20.490399515Z"
+  "updated_at": "2026-07-29T22:58:49.476703420Z"
 }

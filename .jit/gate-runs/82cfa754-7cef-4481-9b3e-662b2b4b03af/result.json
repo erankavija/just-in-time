@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8cf5bd3be6ea3c1ef30afd8e074c164197b037b6",
+  "completed_at": "2026-07-29T22:58:05.728686365Z",
+  "duration_ms": 249617,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The canonical relative archive layout, collision handling, reconciliation, documentation, tests, and repository migration satisfy the issue-scoped criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
+  "message": null,
+  "run_id": "82cfa754-7cef-4481-9b3e-662b2b4b03af",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T22:53:56.111297680Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 56e69507, 2bab0592, 0d899de0, 483ade2a, 8cf5bd3b (`jit:625cc07f`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T22:44:28Z); docs-mechanical pending (no run)\nTruncation recovery: narrowed reads by commit, code path, test, archive rename set, issue-path migration, and current-tree legacy-path scan\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The canonical relative archive layout, collision handling, reconciliation, documentation, tests, and repository migration satisfy the issue-scoped criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
