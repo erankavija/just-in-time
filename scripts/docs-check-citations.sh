@@ -47,7 +47,7 @@ set -euo pipefail
 #   docs-check-citations.sh PATH [PATH ...]
 # The footprint is a REQUIRED space-separated list of files/dirs — the checker
 # encodes no default path list (that would be a product fact, REQ-01). The gate
-# entrypoint (docs-mechanical.sh) derives the whole-surface footprint live and
+# entrypoint (docs-mechanical.sh) resolves the whole-surface footprint and
 # passes it in; area audits pass their own.
 #
 # Exit codes:
