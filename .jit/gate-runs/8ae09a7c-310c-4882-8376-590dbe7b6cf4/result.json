@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "2e193bae03273eb2faa9414242dc781028083939",
+  "completed_at": "2026-07-29T17:40:03.901959886Z",
+  "duration_ms": 227879,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
+  "message": null,
+  "run_id": "8ae09a7c-310c-4882-8376-590dbe7b6cf4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T17:36:16.022262624Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest document::link_validator::tests::test_validate_link_exists ... FAILED\ntest result: FAILED. 2192 passed; 1 failed; 5 ignored; 0 measured; 0 filtered out; finished in 62.50s\n---- document::link_validator::tests::test_validate_link_exists stdout ----\n\nthread 'document::link_validator::tests::test_validate_link_exists' (932760) panicked at crates/jit/src/document/link_validator.rs:306:18:\nExpected valid link\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1457 bytes=27046468)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1346892464/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

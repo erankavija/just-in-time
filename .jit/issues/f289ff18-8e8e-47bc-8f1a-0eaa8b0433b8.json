@@ -13,8 +13,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-07-29T17:10:18.179638792Z",
+      "status": "failed",
+      "updated_at": "2026-07-29T17:40:03.919113043Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Honour a document reference's commit pin when checking links",
-  "updated_at": "2026-07-29T17:14:10.446398974Z"
+  "updated_at": "2026-07-29T17:40:03.919113043Z"
 }
