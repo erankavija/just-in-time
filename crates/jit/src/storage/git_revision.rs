@@ -6,6 +6,7 @@
 //! hash-algorithm-agnostic OID to the domain layer.
 
 use crate::domain::artifact_plan::ArtifactVersion;
+use crate::repository_state::RepositoryTargetKind;
 use crate::storage::validate_repo_relative_path;
 use std::path::PathBuf;
 use std::process::{Command, Output};
@@ -49,6 +50,43 @@ pub struct PinnedArtifactRead {
     version: ArtifactVersion,
     blob_oid: String,
     bytes: Vec<u8>,
+}
+
+/// No-follow classification of one target at a resolved historical commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinnedTargetRead {
+    version: ArtifactVersion,
+    target_kind: RepositoryTargetKind,
+    object_oid: Option<String>,
+    bytes: Option<Vec<u8>>,
+    unavailable_reason: Option<String>,
+}
+
+impl PinnedTargetRead {
+    /// Canonical historical commit used for this classification.
+    pub fn version(&self) -> &ArtifactVersion {
+        &self.version
+    }
+
+    /// Captured filesystem kind at the named commit.
+    pub fn target_kind(&self) -> RepositoryTargetKind {
+        self.target_kind
+    }
+
+    /// Git object id for a present target.
+    pub fn object_oid(&self) -> Option<&str> {
+        self.object_oid.as_deref()
+    }
+
+    /// Exact bytes for an ordinary file target.
+    pub fn bytes(&self) -> Option<&[u8]> {
+        self.bytes.as_deref()
+    }
+
+    /// Stable reason when the target is missing at a resolved commit.
+    pub fn unavailable_reason(&self) -> Option<&str> {
+        self.unavailable_reason.as_deref()
+    }
 }
 
 impl PinnedArtifactRead {
@@ -149,6 +187,69 @@ impl GitRevisionResolver {
             version,
             blob_oid,
             bytes: output.stdout,
+        })
+    }
+
+    /// Resolve and classify `path` at `revision` without consulting the
+    /// working tree.
+    ///
+    /// Unlike [`read_pinned_path`](Self::read_pinned_path), directories and
+    /// unsupported Git tree entries are successful, typed results. A path
+    /// absent from an otherwise resolved commit is likewise represented as
+    /// [`RepositoryTargetKind::Missing`] with its boundary diagnostic.
+    pub fn inspect_pinned_target(
+        &self,
+        revision: &str,
+        path: &str,
+    ) -> Result<PinnedTargetRead, GitRevisionError> {
+        validate_repo_relative_path(path)?;
+        let version = self.resolve_commit(revision)?;
+        let object = format!("{}:{path}", version.as_str());
+        let oid_output = self.run(["rev-parse", "--verify", object.as_str()])?;
+        if !oid_output.status.success() {
+            return Ok(PinnedTargetRead {
+                version,
+                target_kind: RepositoryTargetKind::Missing,
+                object_oid: None,
+                bytes: None,
+                unavailable_reason: Some(stderr(&oid_output)),
+            });
+        }
+        let object_oid = String::from_utf8_lossy(&oid_output.stdout)
+            .trim()
+            .to_string();
+        let kind_output = self.run(["cat-file", "-t", object.as_str()])?;
+        if !kind_output.status.success() {
+            return Err(GitRevisionError::PinnedReadFailed {
+                revision: revision.to_string(),
+                path: path.to_string(),
+                stderr: stderr(&kind_output),
+            });
+        }
+        let target_kind = match String::from_utf8_lossy(&kind_output.stdout).trim() {
+            "blob" => RepositoryTargetKind::File,
+            "tree" => RepositoryTargetKind::Directory,
+            _ => RepositoryTargetKind::Unsupported,
+        };
+        let bytes = if target_kind.is_file() {
+            let output = self.run(["cat-file", "blob", object.as_str()])?;
+            if !output.status.success() {
+                return Err(GitRevisionError::PinnedReadFailed {
+                    revision: revision.to_string(),
+                    path: path.to_string(),
+                    stderr: stderr(&output),
+                });
+            }
+            Some(output.stdout)
+        } else {
+            None
+        };
+        Ok(PinnedTargetRead {
+            version,
+            target_kind,
+            object_oid: Some(object_oid),
+            bytes,
+            unavailable_reason: None,
         })
     }
 

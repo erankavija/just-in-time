@@ -535,6 +535,77 @@ fn test_validate_reports_direct_directory_reference_as_unsupported_artifact_type
 }
 
 #[test]
+fn test_pinned_directory_link_target_is_navigation_at_its_commit() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned directory link", "Description");
+    fs::create_dir_all(ctx.repo_path().join("docs/studies")).unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/studies/.keep"),
+        "tracked directory\n",
+    )
+    .unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/report.md"),
+        "See [the studies area](studies).\n",
+    )
+    .unwrap();
+    ctx.commit_all("add pinned directory navigation");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
+        .success();
+
+    fs::remove_dir_all(ctx.repo_path().join("docs/studies")).unwrap();
+    fs::write(ctx.repo_path().join("docs/studies"), "now a file\n").unwrap();
+    ctx.commit_all("replace navigation directory");
+
+    let report = ctx.check_links_report();
+    assert!(
+        errors_for_document(&report, "docs/report.md").is_empty(),
+        "the pinned directory target must remain navigation: {report}"
+    );
+    assert!(
+        report["warnings"]
+            .as_array()
+            .expect("warnings array")
+            .iter()
+            .all(|warning| warning["type"] != "scan_error"),
+        "the pinned directory target must not produce a scan error: {report}"
+    );
+}
+
+#[test]
+fn test_pinned_directory_reference_is_unsupported_at_its_commit() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned directory reference", "Description");
+    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+    fs::write(
+        ctx.repo_path().join("dev/studies/.keep"),
+        "tracked directory\n",
+    )
+    .unwrap();
+    ctx.commit_all("add pinned directory reference");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "dev/studies", "--commit", &pin])
+        .success();
+
+    fs::remove_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+    fs::write(ctx.repo_path().join("dev/studies"), "now a file\n").unwrap();
+    ctx.commit_all("replace pinned directory reference");
+
+    ctx.run_jit(&["validate"])
+        .failure()
+        .stderr(predicate::str::contains("unsupported artifact type"))
+        .stderr(predicate::str::contains("dev/studies"))
+        .stderr(predicate::str::contains("not found").not());
+}
+
+#[test]
 fn test_git_versioned_asset_exists() {
     let ctx = TestContext::new();
     ctx.init_repo();

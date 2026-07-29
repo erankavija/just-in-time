@@ -139,6 +139,40 @@ impl RepositoryEntry {
     }
 }
 
+/// Semantic kind of a repository target captured at a working-tree or pinned
+/// revision boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RepositoryTargetKind {
+    /// An ordinary file with readable bytes.
+    File,
+    /// A directory navigation target.
+    Directory,
+    /// No target exists at the named version.
+    Missing,
+    /// A present target which is not an ordinary file or directory.
+    Unsupported,
+}
+
+impl RepositoryTargetKind {
+    /// Classify a captured working-tree entry without filesystem I/O.
+    pub fn from_entry(entry: &RepositoryEntry) -> Self {
+        match entry {
+            RepositoryEntry::File { .. } => Self::File,
+            RepositoryEntry::Directory { .. } => Self::Directory,
+            RepositoryEntry::Absent => Self::Missing,
+            RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
+                Self::Unsupported
+            }
+        }
+    }
+
+    /// Whether the target is an ordinary file.
+    pub fn is_file(self) -> bool {
+        matches!(self, Self::File)
+    }
+}
+
 /// Fingerprint of one complete non-recursive directory listing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ListingFingerprint {
@@ -254,10 +288,12 @@ pub struct PinnedDocumentEvidence {
     requested_path: String,
     /// Evidence source class.
     source: PinnedSourceClass,
+    /// Semantic kind of the target at the requested revision.
+    target_kind: RepositoryTargetKind,
     /// Canonical commit OID when available.
     commit_oid: Option<String>,
-    /// Blob OID when present.
-    blob_oid: Option<String>,
+    /// Git object OID when the target is present.
+    object_oid: Option<String>,
     /// Exact object/content identity, including SHA-256 and byte size.
     identity: Option<EntryIdentity>,
     /// Exact bytes when present.
@@ -274,7 +310,38 @@ impl PinnedDocumentEvidence {
         requested_path: impl Into<String>,
         source: PinnedSourceClass,
         commit_oid: Option<String>,
-        blob_oid: Option<String>,
+        object_oid: Option<String>,
+        identity: Option<EntryIdentity>,
+        bytes: Option<Vec<u8>>,
+        unavailable_reason: Option<String>,
+    ) -> Result<Self, CaptureError> {
+        let target_kind = if bytes.is_some() {
+            RepositoryTargetKind::File
+        } else {
+            RepositoryTargetKind::Missing
+        };
+        Self::new_with_target_kind(
+            requested_revision,
+            requested_path,
+            source,
+            target_kind,
+            commit_oid,
+            object_oid,
+            identity,
+            bytes,
+            unavailable_reason,
+        )
+    }
+
+    /// Construct and validate boundary evidence with an explicit target kind.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_target_kind(
+        requested_revision: impl Into<String>,
+        requested_path: impl Into<String>,
+        source: PinnedSourceClass,
+        target_kind: RepositoryTargetKind,
+        commit_oid: Option<String>,
+        object_oid: Option<String>,
         identity: Option<EntryIdentity>,
         bytes: Option<Vec<u8>>,
         unavailable_reason: Option<String>,
@@ -283,8 +350,9 @@ impl PinnedDocumentEvidence {
             requested_revision: requested_revision.into(),
             requested_path: requested_path.into(),
             source,
+            target_kind,
             commit_oid,
-            blob_oid,
+            object_oid,
             identity,
             bytes,
             unavailable_reason,
@@ -296,12 +364,18 @@ impl PinnedDocumentEvidence {
         Ok(evidence)
     }
 
-    /// Whether the requested path exists at the requested revision (exact bytes
-    /// were captured). `false` covers both an unresolvable revision and a path
-    /// absent from the resolved tree — [`unavailable_reason`](Self::unavailable_reason)
-    /// carries the boundary diagnostic distinguishing them.
+    /// Whether the requested target is an ordinary file at its named revision.
+    ///
+    /// Directory and unsupported targets are present but intentionally return
+    /// `false`; inspect [`target_kind`](Self::target_kind) when that distinction
+    /// matters.
     pub fn exists(&self) -> bool {
-        self.bytes.is_some()
+        self.target_kind.is_file()
+    }
+
+    /// Semantic kind captured for the named target at its requested revision.
+    pub fn target_kind(&self) -> RepositoryTargetKind {
+        self.target_kind
     }
 
     /// The exact captured bytes at the requested revision, when present.
@@ -314,8 +388,8 @@ impl PinnedDocumentEvidence {
         self.commit_oid.as_deref()
     }
 
-    /// The stable Git-unavailable/not-found/read-failed reason, when the path had
-    /// no captured bytes at the requested revision.
+    /// The stable Git-unavailable/not-found/read-failed reason, when the target
+    /// could not be captured as a present typed object.
     pub fn unavailable_reason(&self) -> Option<&str> {
         self.unavailable_reason.as_deref()
     }
@@ -325,25 +399,41 @@ impl PinnedDocumentEvidence {
             return Err(CaptureError::PinnedEvidenceRequestMismatch(request.clone()));
         }
         validate_pinned_request(&self.requested_revision, &self.requested_path)?;
-        for oid in [&self.commit_oid, &self.blob_oid].into_iter().flatten() {
+        for oid in [&self.commit_oid, &self.object_oid].into_iter().flatten() {
             if oid.is_empty() || oid.chars().any(char::is_control) {
                 return Err(CaptureError::InvalidPinnedEvidence(
                     "object identifiers must be non-empty and control-free".into(),
                 ));
             }
         }
-        match (&self.identity, &self.bytes, &self.unavailable_reason) {
-            (Some(identity), Some(bytes), None) => identity.validate_bytes(bytes)?,
-            (None, None, Some(reason))
+        match (
+            self.target_kind,
+            &self.identity,
+            &self.bytes,
+            &self.unavailable_reason,
+        ) {
+            (RepositoryTargetKind::File, Some(identity), Some(bytes), None) => {
+                identity.validate_bytes(bytes)?
+            }
+            (
+                RepositoryTargetKind::Directory | RepositoryTargetKind::Unsupported,
+                None,
+                None,
+                None,
+            ) => {}
+            (RepositoryTargetKind::Missing, None, None, Some(reason))
                 if !reason.is_empty() && !reason.chars().any(char::is_control) => {}
             _ => {
                 return Err(CaptureError::InvalidPinnedEvidence(
-                    "evidence must contain either matching identity/bytes or one stable unavailable reason".into(),
+                    "pinned target kind and evidence payload disagree".into(),
                 ));
             }
         }
         if self.source == PinnedSourceClass::GitUnavailable
-            && (self.commit_oid.is_some() || self.blob_oid.is_some() || self.bytes.is_some())
+            && (self.commit_oid.is_some()
+                || self.object_oid.is_some()
+                || self.bytes.is_some()
+                || self.target_kind != RepositoryTargetKind::Missing)
         {
             return Err(CaptureError::InvalidPinnedEvidence(
                 "git-unavailable evidence cannot contain Git object data".into(),

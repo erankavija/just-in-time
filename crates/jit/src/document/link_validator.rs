@@ -112,7 +112,7 @@ impl LinkValidator {
             if self.all_document_paths.contains(target) {
                 crate::document::DocumentTargetKind::File
             } else {
-                crate::document::DocumentTargetKind::from_filesystem(&self.repo_root.join(target))
+                crate::document::classify_filesystem_target(&self.repo_root.join(target))
             }
         })
     }

@@ -14,60 +14,23 @@
 //! unaffected, because the working tree answers it.
 
 use crate::domain::DocumentReference;
-use crate::repository_state::{
-    CaptureError, RepositoryEntry, RepositoryImage, RepositoryLayoutError, VirtualPath,
-};
+use crate::repository_state::{CaptureError, RepositoryImage, RepositoryLayoutError, VirtualPath};
 use thiserror::Error;
 
-/// Semantic type of a repository target named by a document operation.
+/// Semantic classification shared by working-tree and pinned target evidence.
+pub use crate::repository_state::RepositoryTargetKind as DocumentTargetKind;
+
+/// Classify a working-tree path with no-follow metadata.
 ///
-/// This classification deliberately separates an absent path from a present
-/// directory.  The latter is navigation when reached by a Markdown link, but
-/// is not a supported issue-document artifact.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DocumentTargetKind {
-    /// An ordinary file whose bytes can be read as a document or asset.
-    File,
-    /// A directory, which can be a Markdown navigation target.
-    Directory,
-    /// No occupant exists at the named path.
-    Missing,
-    /// A present occupant that document operations cannot read as a file.
-    Unsupported,
-}
-
-impl DocumentTargetKind {
-    /// Classify a captured repository entry without doing filesystem I/O.
-    pub fn from_entry(entry: &RepositoryEntry) -> Self {
-        match entry {
-            RepositoryEntry::File { .. } => Self::File,
-            RepositoryEntry::Directory { .. } => Self::Directory,
-            RepositoryEntry::Absent => Self::Missing,
-            RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
-                Self::Unsupported
-            }
-        }
-    }
-
-    /// Classify a filesystem path for working-tree-only link checks.
-    ///
-    /// This deliberately uses no-follow metadata, matching captured
-    /// [`RepositoryEntry`] classification. An unreadable target is unsupported
-    /// rather than missing: it may exist, but cannot safely be treated as a
-    /// document file.
-    pub fn from_filesystem(path: &std::path::Path) -> Self {
-        match std::fs::symlink_metadata(path) {
-            Ok(metadata) if metadata.file_type().is_file() => Self::File,
-            Ok(metadata) if metadata.file_type().is_dir() => Self::Directory,
-            Ok(_) => Self::Unsupported,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Self::Missing,
-            Err(_) => Self::Unsupported,
-        }
-    }
-
-    /// Whether this target names an ordinary file.
-    pub fn is_file(self) -> bool {
-        matches!(self, Self::File)
+/// An unreadable target is unsupported rather than missing: it may exist, but
+/// cannot safely be treated as a document file.
+pub fn classify_filesystem_target(path: &std::path::Path) -> DocumentTargetKind {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_file() => DocumentTargetKind::File,
+        Ok(metadata) if metadata.file_type().is_dir() => DocumentTargetKind::Directory,
+        Ok(_) => DocumentTargetKind::Unsupported,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => DocumentTargetKind::Missing,
+        Err(_) => DocumentTargetKind::Unsupported,
     }
 }
 
@@ -218,7 +181,25 @@ pub fn resolve_document_reference(
 
     let Some(worktree) = requests.worktree() else {
         return Ok(match evidence {
-            Some(evidence) if evidence.exists() => DocumentReferenceResolution::Resolved,
+            Some(evidence) if evidence.target_kind().is_file() => {
+                DocumentReferenceResolution::Resolved
+            }
+            Some(evidence) if matches!(evidence.target_kind(), DocumentTargetKind::Directory) => {
+                DocumentReferenceResolution::Unresolved(
+                    UnresolvedDocumentReference::UnsupportedArtifactType {
+                        path: path.to_string(),
+                        kind: "directory",
+                    },
+                )
+            }
+            Some(evidence) if matches!(evidence.target_kind(), DocumentTargetKind::Unsupported) => {
+                DocumentReferenceResolution::Unresolved(
+                    UnresolvedDocumentReference::UnsupportedArtifactType {
+                        path: path.to_string(),
+                        kind: "unsupported",
+                    },
+                )
+            }
             Some(evidence) => DocumentReferenceResolution::Unresolved(
                 UnresolvedDocumentReference::PinUnavailable {
                     path: path.to_string(),
@@ -269,7 +250,7 @@ mod tests {
     use super::*;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, EntryIdentity, FileMode, PinnedDocumentEvidence,
-        PinnedSourceClass, RepositoryLayout, RepositoryRootEvidence,
+        PinnedSourceClass, RepositoryEntry, RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -324,6 +305,21 @@ mod tests {
             None,
             None,
             Some(reason.to_string()),
+        )
+        .unwrap()
+    }
+
+    fn directory_evidence(revision: &str, path: &str) -> PinnedDocumentEvidence {
+        PinnedDocumentEvidence::new_with_target_kind(
+            revision,
+            path,
+            PinnedSourceClass::GitObject,
+            DocumentTargetKind::Directory,
+            Some("a".repeat(40)),
+            Some("b".repeat(40)),
+            None,
+            None,
+            None,
         )
         .unwrap()
     }
@@ -419,6 +415,25 @@ mod tests {
                 .unresolved(),
             Some(UnresolvedDocumentReference::PinUnavailable { reason, .. })
                 if reason.contains("path not in tree")
+        ));
+    }
+
+    #[test]
+    fn test_resolve_document_reference_reports_pinned_directory_as_unsupported() {
+        let commit = "f".repeat(40);
+        let document = reference("docs/studies", Some(&commit));
+        let image = image(
+            &document,
+            true,
+            Some(directory_evidence(&commit, "docs/studies")),
+        );
+
+        assert!(matches!(
+            resolve_document_reference(&image, &document)
+                .unwrap()
+                .unresolved(),
+            Some(UnresolvedDocumentReference::UnsupportedArtifactType { path, kind })
+                if path == "docs/studies" && *kind == "directory"
         ));
     }
 

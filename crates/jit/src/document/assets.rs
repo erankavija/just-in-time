@@ -239,7 +239,7 @@ impl AssetScanner {
         // Check if file exists
         let full_path = self.repo_root.join(&resolved);
         let (asset_type, mime_type, content_hash) =
-            match crate::document::DocumentTargetKind::from_filesystem(&full_path) {
+            match crate::document::classify_filesystem_target(&full_path) {
                 crate::document::DocumentTargetKind::File => {
                     let mime = Self::detect_mime_type(&resolved);
                     let hash = compute_file_hash(&full_path).ok();
