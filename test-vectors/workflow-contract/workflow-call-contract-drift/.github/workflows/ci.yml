@@ -1,0 +1,21 @@
+name: Reusable
+on:
+  workflow_call:
+    inputs:
+      target:
+        description: Target triple.
+        type: boolean
+        required: false
+      extra:
+        description: Undeclared knob.
+        type: string
+    secrets:
+      registry-token:
+        required: true
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build.sh

@@ -1,0 +1,4 @@
+# Deleting a required job must fail rather than quietly satisfy the contract.
+exit: 1
+declares job 'smoke'
+which the workflow does not define

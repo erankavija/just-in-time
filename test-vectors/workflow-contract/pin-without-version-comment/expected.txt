@@ -1,0 +1,3 @@
+# A bare SHA is unreviewable without the upstream version it resolves from.
+exit: 1
+carries no upstream-version comment

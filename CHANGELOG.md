@@ -88,6 +88,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **One static harness verifies every committed GitHub workflow.**
+  `scripts/workflow-contract.sh` runs a pinned, checksum-verified `actionlint`
+  and this repository's own structural verifier over the workflow tree, and the
+  `workflow-contract` job in `ci.yml` runs both on every pull request. Each
+  workflow declares what it guarantees in `.github/workflow-contract.yml` —
+  required and forbidden triggers, `workflow_call` inputs and outputs,
+  transitive `needs` edges, workflow- and job-level permissions, required jobs
+  — instead of carrying a verifier of its own. Repository-wide rules reject any
+  `continue-on-error`, any condition that survives a failed predecessor, any
+  shell-level suppression of a non-zero exit, and any external `uses:` that is
+  not an exact 40-character commit SHA with an upstream-version comment; the
+  `uses:` scan follows local `./…` references into composite actions
+  recursively. Twenty case vectors under `test-vectors/workflow-contract/` seed
+  one defect class each, and `scripts/workflow-contract-selftest.sh` replays
+  them plus an actionlint-only defect. `dev/workflow-contract.md` documents the
+  declaration grammar and what a pin-update pull request has to establish
+  before a maintainer merges it.
+
+  Every external action in the CI, security, container, documentation, and
+  release workflows moved to a resolved commit SHA in the same change, every
+  workflow gained an explicit least-privilege token, and the `profile-adoption`
+  test command was quoted — its `:: ` test-path filter made `ci.yml`
+  unparseable to a strict YAML parser.
+
 - **Automatic Rust build-footprint budget enforcement in the `cargo-ci` gate.**
   A committed checker, `scripts/rust-build-budget.sh`, derives the logical test
   topology and active-executable footprint from Cargo output rather than

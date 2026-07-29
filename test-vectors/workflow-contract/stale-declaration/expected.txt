@@ -1,0 +1,5 @@
+# A declaration for a deleted workflow is stale evidence of a check that no
+# longer runs anywhere.
+exit: 1
+deleted.yml
+is not a committed workflow file

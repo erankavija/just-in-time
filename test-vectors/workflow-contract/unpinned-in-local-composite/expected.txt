@@ -1,0 +1,5 @@
+# The scan follows local composites, so a nested reference cannot hide.
+exit: 1
+.github/actions/build/action.yml
+actions/setup-node@v4
+is not pinned to a 40-character commit SHA

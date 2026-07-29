@@ -1,0 +1,3 @@
+# A dependency on a job that does not exist is a broken graph.
+exit: 1
+job 'publish' needs unknown job 'ghost'

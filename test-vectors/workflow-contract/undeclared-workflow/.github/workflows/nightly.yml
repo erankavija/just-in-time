@@ -1,0 +1,11 @@
+name: Nightly
+on:
+  schedule:
+    - cron: '0 3 * * *'
+permissions:
+  contents: read
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./sweep.sh

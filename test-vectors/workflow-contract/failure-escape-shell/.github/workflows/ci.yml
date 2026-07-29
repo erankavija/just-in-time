@@ -1,0 +1,15 @@
+name: CI
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit
+        run: cargo audit -D warnings || true
+      - name: Test
+        run: |
+          set +e
+          cargo test --workspace

@@ -1,0 +1,22 @@
+name: CI
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - run: ./check.sh
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit
+        continue-on-error: true
+        run: ./audit.sh
+  smoke:
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ github.event_name == 'push' }}
+    steps:
+      - run: ./smoke.sh

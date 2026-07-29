@@ -1,0 +1,42 @@
+# Case vector: a tree that satisfies every declared assertion.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  ci.yml:
+    triggers:
+      required:
+        pull_request:
+          branches: [main]
+      forbidden: [pull_request_target]
+    permissions:
+      contents: read
+    jobs:
+      validate: {}
+      publish:
+        permissions:
+          contents: write
+        needs: [validate]
+
+  reusable.yml:
+    triggers:
+      required:
+        workflow_call: {}
+      allowed: [workflow_call]
+    permissions:
+      contents: read
+    workflow_call:
+      inputs:
+        required:
+          target:
+            type: string
+            required: true
+        allowed: [target]
+      outputs:
+        required: [digest]
+        allowed: [digest]

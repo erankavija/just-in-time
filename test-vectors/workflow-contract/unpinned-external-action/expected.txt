@@ -1,0 +1,4 @@
+# A movable tag is not a commit pin.
+exit: 1
+actions/checkout@v4
+is not pinned to a 40-character commit SHA

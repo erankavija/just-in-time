@@ -1,0 +1,4 @@
+# A local reference the tree does not contain is a broken contract, not a pin exemption.
+exit: 1
+./.github/actions/absent
+does not resolve

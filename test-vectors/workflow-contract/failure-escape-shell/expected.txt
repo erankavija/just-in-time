@@ -1,0 +1,4 @@
+# A shell-level escape hides a red command behind a green step.
+exit: 1
+step 1 (Audit) run script suppresses failure with '|| true'
+step 2 (Test) run script suppresses failure with 'set +e'
