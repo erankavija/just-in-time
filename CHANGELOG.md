@@ -16,11 +16,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Ctrl+C or `SIGTERM` the server now cancels one process-wide
   `CancellationToken` — cloned into the application state and from there into
   every live SSE stream, so `/api/events/stream` subscribers reach EOF instead
-  of being held open behind their 15-second keepalive — and then hands a
-  five-second deadline to an `axum-server` handle that owns the listener and
-  the connections. Acceptance stops and the port is released at once, ordinary
-  connections get the full deadline to finish, and whatever is still open when
-  it expires is force-closed. The process exits `0`, and its log records the
+  of being held open behind their 15-second keepalive — and then establishes
+  its sole five-second drain boundary. It calls `graceful_shutdown(None)` on
+  the `axum-server` handle that owns the listener and connections to stop
+  acceptance and allow an indefinite cooperative drain, so the port is
+  released at once and ordinary connections get the full boundary to finish.
+  At that boundary JIT samples the connection count and calls `shutdown()` to
+  force-close only survivors. The process exits `0`, and its log records the
   signal, the deadline, the connection count at the signal and at expiry, the
   forced-close path, and clean completion.
 
