@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "83c441f4cd570da44a7fa95164a21de45390238b",
+  "completed_at": "2026-07-29T15:43:45.343740463Z",
+  "duration_ms": 183074,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".github/workflows/ci.yml",
+        "id": "F1",
+        "line": 11,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7edd2fe8/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "Documentation-only pull requests skip the workflow-contract checks, despite REQ-03 requiring every pull request."
+      }
+    ],
+    "summary": "The workflow-contract checks are not scheduled on documentation-only pull requests, violating REQ-03.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
+  "message": null,
+  "run_id": "b4449726-5ee7-426d-b25f-afac34f7520e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T15:40:42.269114087Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8042 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fae89-0285-7a00-85d6-7ccf947ae09a\n--------\nuser\n--- 8029 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7e09c606, d32739e7, 0c6baa2d, f94893fe, bc0ca679, 18bedc2e (tag `jit:7edd2fe8`; merge has no first-parent patch)\nPolicy sources: AGENTS.md; .jit/issues/7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0.json; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/7edd2fe8/requirement/REQ-01, @/issue/7edd2fe8/requirement/REQ-02, @/issue/7edd2fe8/requirement/REQ-03, @/issue/7edd2fe8/requirement/REQ-04, @/gate/jit-validate, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts\nGate evidence: repo-validate passed (exit 0, 2026-07-29T15:39:45Z); jit-validate pending (not run)\nTruncation recovery: recovered harness slices, zero-context workflow patches, all vector groups, and documentation/follow-up patches after broad-output truncation\n\n1. **[blocking][issue-impact]** `.github/workflows/ci.yml:11` excludes documentation-only pull requests via `paths-ignore` (lines 13–17), so the `workflow-contract` job does not run on every pull request. This contradicts hard REQ-03; the accompanying documentation explicitly narrows coverage to non-documentation changes. References: `@/issue/7edd2fe8/requirement/REQ-03`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The workflow-contract checks are not scheduled on documentation-only pull requests, violating REQ-03.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Documentation-only pull requests skip the workflow-contract checks, despite REQ-03 requiring every pull request.\",\"file\":\".github/workflows/ci.yml\",\"line\":11,\"references\":[\"@/issue/7edd2fe8/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

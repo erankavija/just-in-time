@@ -12,7 +12,18 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-29T15:43:45.610821433Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-29T15:39:47.963202561Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
   "labels": [
     "type:task",
@@ -23,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Establish deterministic workflow contract verification",
-  "updated_at": "2026-07-29T14:10:28.714364259Z"
+  "updated_at": "2026-07-29T15:43:45.610821433Z"
 }
