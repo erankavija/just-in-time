@@ -1555,9 +1555,8 @@ fn container_short_id(id: &str) -> String {
 ///
 /// Sources inside a configured development root retain only their path relative
 /// to that policy boundary. An empty development root represents the repository
-/// root. Sources outside a non-empty development root return their unchanged
-/// source path: classification retains them and therefore never interprets that
-/// bookkeeping value as a publication destination.
+/// root. Sources outside a non-empty development root return `None` because
+/// classification retains them and must not assign a publication destination.
 pub(crate) fn artifact_archive_destination(
     destination_root: &str,
     development_root: &str,
@@ -3632,6 +3631,10 @@ mod tests {
 
     #[test]
     fn test_is_whole_path_citation_separates_the_cited_path_from_a_longer_path_around_it() {
+        let canonical_destination =
+            artifact_archive_destination("dev/archive/abcdef12", "dev", CITED_SOURCE).unwrap();
+        assert_eq!(canonical_destination, "dev/archive/abcdef12/active/plan.md");
+        assert!(!canonical_destination.contains(CITED_SOURCE));
         // Text naming the path and nothing more. What sits against it carries
         // no name of its own: the delimiters prose and code write, a shell
         // default's `-`, a sentence period, a relative prefix that adds no
@@ -3648,7 +3651,6 @@ mod tests {
         }
         // Text whose path continues past the occurrence in either direction.
         for line in [
-            format!("Mirrored at `dev/archive/abcdef12/{CITED_SOURCE}`."),
             format!("Vendored at `my{CITED_SOURCE}`."),
             format!("Rendered as `{CITED_SOURCE}x`."),
             format!("Superseded by `{CITED_SOURCE}-old`."),

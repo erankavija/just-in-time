@@ -38,10 +38,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **An archive preview's `moving-path-citation` warnings no longer fire on
   citations that already name the archived destination.** The scan matched a
-  moving artifact's source path as a plain substring, and every destination it
-  plans is the destination root followed by that same source path, so a citation
-  corrected to the destination still contained the source path and still warned
-  — with the column shifted by the length of the inserted destination root.
+  moving artifact's source path as a plain substring. Before the canonical
+  archive-relative layout above, a destination repeated the entire source path
+  after its root, so a citation corrected to that pre-cutover destination still
+  contained the source path and still warned — with the column shifted by the
+  length of the inserted destination root.
   Repointing a citation therefore never emptied the report, and the warning set
   could not be used as a work list. The scan now reports an occurrence only
   where the surrounding text names the moving path whole: text naming a longer

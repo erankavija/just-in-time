@@ -408,7 +408,7 @@
       "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
       "short_id": "625cc07f",
       "title": "Strip the development root from container archive destinations",
-      "reason": "Production archive destination derivation repeats the configured development-root segment, yielding paths such as dev/archive/<container>/active/plan.md.",
+      "reason": "Pre-cutover production archive destination derivation repeated the configured development-root segment, yielding paths such as dev/archive/<container>/dev/active/plan.md.",
       "wiring": "Depends on c7f8ebc7; ef118aea depends on this issue; bb03df0a therefore retains release-gate coverage transitively.",
       "content_standards_review": "Passed after removing tracker-context and sibling references from the draft description before commit.",
       "scope_audit": "A 2026-07-29 scan found 297 repository-owned archive files under a duplicated */dev/* segment and 20 live non-history files referencing that shape. REQ-06 prevents a helper-only fix that leaves those materializations behind; immutable event payloads remain audit history."
@@ -467,7 +467,7 @@
     },
     {
       "subject": "archive destinations duplicate the full development-root path",
-      "detail": "Confirmed production behavior: artifact_mirror_destination(destination_root, source) appends the entire repository-relative source, yielding paths such as dev/archive/<container>/active/plan.md. This is a user-identified design smell, not merely a defensive c7 example. Prefer stripping the configured development_root before mirroring, subject to collision and migration design.",
+      "detail": "Confirmed pre-cutover production behavior: artifact_mirror_destination(destination_root, source) appended the entire repository-relative source, yielding paths such as dev/archive/<container>/dev/active/plan.md. This was a user-identified design smell, not merely a defensive c7 example. The accepted cutover strips the configured development_root before mirroring.",
       "routed_to": "625cc07f",
       "criterion_check": "filed as an explicit canonical-cutover defect and ordered before ef118aea"
     }

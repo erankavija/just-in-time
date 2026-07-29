@@ -55,9 +55,9 @@ The execution-lead policy permits two normal rework rounds. Both issues below re
 
 The concern about duplicated directory depth is confirmed production behavior, not merely a defensive c7 example:
 
-- `artifact_mirror_destination(destination_root, source)` appends the entire repository-relative source path.
-- With this repository's `development_root = "dev"` and `archive_root = "dev/archive"`, outputs include `dev/archive/<container>/active/plan.md`.
-- Tests and documentation intentionally describe this as an on-disk mirror.
+- Before the canonical cutover, `artifact_mirror_destination(destination_root, source)` appended the entire repository-relative source path.
+- With this repository's `development_root = "dev"` and `archive_root = "dev/archive"`, those pre-cutover outputs included `dev/archive/<container>/dev/active/plan.md`.
+- Pre-cutover tests and documentation intentionally described that layout as an on-disk mirror.
 - Searches for “archive destination”, “mirror source path”, and “duplicated development root” found no open issue that owns correcting the shape.
 
 This is recorded under `surfaced_pitfalls` in `progress.json` and now owned by issue `625cc07f`, **Strip the development root from container archive destinations**. Its description was reviewed against `.jit/reference/content-standards.md` before commit. The graph orders `c7f8ebc7 → 625cc07f → ef118aea`, so citation parsing stabilizes first and the later execution/reporting work validates the corrected canonical layout. Do not let c7's matching logic normalize or endorse the current shape.

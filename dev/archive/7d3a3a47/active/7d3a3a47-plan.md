@@ -88,8 +88,8 @@ plan-side narrowing.
   destination (which the mirror mapping locates), never from the possibly-edited source.
 
 - **Destination layout (D-12, amended by owner 2026-07-13: short hashes on every
-  user-visible surface).** The destination root is `<archive_root>/` plus, for container
-  targets, `<container.short_id>/` — consistent with document filenames
+  user-visible surface; pre-cutover and superseded by `625cc07f`).** The destination root
+  is `<archive_root>/` plus, for container targets, `<container.short_id>/` — consistent with document filenames
   (`<short>-plan.md`) and CLI output. The segment derives from the container's own id
   prefix, never from the current id population, so it is deterministic. Directory
   ownership is exact via a marker: when execution first creates the directory it writes
@@ -98,8 +98,8 @@ plan-side narrowing.
   directory whose marker names a different container as a target-level
   `destination-conflict`, so short-id prefix collisions are always caught, and a
   markerless directory (legacy or hand-made) blocks when it holds entries the plan does
-  not account for. Every moved or copied artifact lands at that root plus its
-  repository-relative source path.
+  not account for. Under this pre-cutover design, every moved or copied artifact landed at
+  that root plus its repository-relative source path.
   Archival takes no category input (D-21): the mirror rule alone determines every
   destination. Mirroring under one common prefix keeps every relative offset between bundle
   members invariant, keeps identical filenames from different directories distinct, and
@@ -658,7 +658,8 @@ review; none is REOPEN.
   policy status, artifact counts, blockers, and summaries; individual artifacts are
   details inside a candidate**. Rejected: individual artifacts as independent archival
   candidates.
-- **D-12 — Destination layout mirrors repository-relative paths:** chosen **destination
+- **D-12 — Destination layout mirrors repository-relative paths (pre-cutover; superseded by
+  `625cc07f`):** chosen **destination
   root `<archive_root>/` (+ `<container.short_id>/` for container targets — amended by
   owner 2026-07-13: user-visible surfaces use short hashes), each
   artifact at root + repository-relative source path, no category segment (D-21)**. The

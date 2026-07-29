@@ -37,8 +37,8 @@ with it; no run selected it.
 | mirrored location | the file is at each location and retained at its source path | reading source and every destination |
 | retained | the file stays at its current path | reading that path |
 
-Every archived and mirrored location below is the source path reproduced under the container's
-directory beneath the archive root; the mechanism preserves the path.
+Every archived and mirrored location below preserves the part of the source path relative to the
+configured development root beneath the container's directory in the archive.
 
 ## Arithmetic
 

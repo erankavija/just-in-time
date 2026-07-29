@@ -107,7 +107,6 @@ fn apply_recorded_residue_identities(
     locations: &mut BTreeMap<String, ArtifactLocationFacts>,
     target: &PlanTarget,
     destination_root: &str,
-    development_root: &str,
     events: &[Event],
 ) {
     let covered = events
@@ -122,11 +121,13 @@ fn apply_recorded_residue_identities(
             _ => None,
         })
         .flatten()
-        .map(|publication| {
-            (
-                publication.destination.clone(),
-                publication.content_identity.clone(),
-            )
+        .filter_map(|publication| {
+            publication.source.as_ref().map(|source| {
+                (
+                    normalize_artifact_path(source),
+                    publication.content_identity.clone(),
+                )
+            })
         })
         .collect::<BTreeMap<_, _>>();
 
@@ -135,16 +136,13 @@ fn apply_recorded_residue_identities(
             (&location.source, &location.destination)
         {
             let differs = source != destination;
-            let Some(mirror) =
-                artifact_archive_destination(destination_root, development_root, source_path)
-            else {
-                return;
-            };
             // Only a prior archive record turns differing source bytes into an
             // edited residue; an unrelated occupied destination still blocks.
+            // Source is the stable publication identity across destination-layout
+            // cutovers, while target and destination root scope the event set.
             if differs
                 && covered
-                    .get(&mirror)
+                    .get(&normalize_artifact_path(source_path))
                     .is_some_and(|identity| identity == destination)
             {
                 location.source = ArtifactLocation::Regular(destination.clone());
@@ -287,7 +285,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             &mut facts.locations,
             &plan_target,
             &destination_root,
-            &policy.development_root,
             &archive_events,
         );
         classify_artifacts(
@@ -850,7 +847,6 @@ impl CommandExecutor<JsonFileStorage> {
             &mut facts.locations,
             &plan_target,
             &destination,
-            &policy.development_root,
             &crate::repository_state::captured_archive_events(&image)?,
         );
         let plan = classify_artifacts(
@@ -2012,6 +2008,73 @@ epic = "epic"
                 document.commit.is_none() && document.path == "workspace/archive/active/target.md"
             })
         }));
+    }
+
+    #[test]
+    fn test_execute_document_reconciles_edited_residue_from_pre_cutover_event_destination() {
+        let (repo, executor) = development_root_repo();
+        let source = "workspace/active/target.md";
+        let canonical_destination = "workspace/archive/active/target.md";
+        let historical_destination = "workspace/archive/workspace/active/target.md";
+        fs::create_dir_all(repo.path().join("workspace/archive/active")).unwrap();
+        fs::write(repo.path().join(canonical_destination), b"# Target\n").unwrap();
+        fs::write(repo.path().join(source), b"# Edited residue\n").unwrap();
+
+        let historical_event = Event::draft_artifact_archive_executed(
+            PlanTarget::Document {
+                path: source.into(),
+            },
+            "workspace/archive".into(),
+            vec![crate::domain::artifact_execution::ArchivePublication {
+                source: Some(source.into()),
+                destination: historical_destination.into(),
+                content_identity: crate::domain::artifact_plan::ContentIdentity::from_bytes(
+                    b"# Target\n",
+                ),
+                adopted: false,
+            }],
+            Vec::new(),
+            Vec::new(),
+            false,
+        );
+        let events_path = repo.path().join(".jit/events.jsonl");
+        let mut event_bytes = fs::read(&events_path).unwrap_or_default();
+        event_bytes.extend(serde_json::to_vec(&historical_event).unwrap());
+        event_bytes.push(b'\n');
+        fs::write(&events_path, event_bytes).unwrap();
+
+        let result = executor.execute_archive_document(source).unwrap();
+
+        assert!(result.event_appended);
+        assert!(result.reconciling);
+        assert!(result.publications.iter().any(|publication| {
+            publication.source.as_deref() == Some(source)
+                && publication.destination == canonical_destination
+                && publication.adopted
+        }));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|warning| warning.code == WarningCode::DeletionFailed));
+        assert_eq!(
+            fs::read(repo.path().join(canonical_destination)).unwrap(),
+            b"# Target\n"
+        );
+        assert_eq!(
+            fs::read(repo.path().join(source)).unwrap(),
+            b"# Edited residue\n"
+        );
+        assert!(executor.storage.list_issues().unwrap().iter().any(|issue| {
+            issue
+                .documents
+                .iter()
+                .any(|document| document.commit.is_none() && document.path == canonical_destination)
+        }));
+        assert_eq!(
+            executor.storage.read_artifact_archive_events().unwrap()[0],
+            historical_event,
+            "the immutable historical event must retain its pre-cutover destination"
+        );
     }
 
     #[test]

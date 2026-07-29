@@ -28,9 +28,9 @@ dominating the record's owner relocated it. `dev/sessions/` is absent from the w
 | mirrored location | the file is at each location and retained at its source path | reading source and every destination |
 | retained | the file stays at its current path | reading that path |
 
-Every archived location below is the source path reproduced under the container's directory beneath
-the archive root; the mechanism preserves the path, so the two columns share a basename by
-construction.
+Every archived location below preserves the part of the source path relative to the configured
+development root beneath the container's directory in the archive, so the two columns share a
+basename by construction.
 
 ## Arithmetic
 

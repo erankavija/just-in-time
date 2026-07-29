@@ -1259,7 +1259,7 @@ holds exactly as D-13 states it.
 
 | Decision | Premise | Verdict |
 |---|---|---|
-| **D-3** adoption independent of archival classification | that a managed area can stay flat and still archive | **holds** — nothing in the classifier consults naming; `contains_path` matches paths only, and destination is the mirrored source path |
+| **D-3** adoption independent of archival classification | that a managed area can stay flat and still archive | **holds** — nothing in the classifier consults naming; `contains_path` matches paths only, and the destination preserves the source path relative to the configured development root |
 | **D-13** areas classified as listed | that all 12 areas + 3 root files are covered | **holds** — the 8 previously unclassified areas of claim 3 are exactly the 8 D-13 assigns |
 | **D-13** bare `dev/` rejected because matching is by prefix | prefix matching | **holds** — R4 |
 | **D-13** `dev/vision` permanent because the charter is a configured item-kind source | that `.jit/config.toml` names it | **holds** — `.jit/config.toml:202` `source = "dev/vision/9db27a3a-charter.md"`; also cited at `CLAUDE.md:100` and `AGENTS.md:100`. Additionally its owner 9db27a3a is `backlog` (live), so it would not be selected anyway |

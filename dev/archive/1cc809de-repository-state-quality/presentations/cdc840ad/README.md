@@ -10,4 +10,4 @@ The corrected successor deck is
 in it traces to a repository artifact.
 
 The retired deck's files are archived unchanged at
-[`dev/archive/features/cdc840ad/showcase/`](../../archive/features/cdc840ad/showcase/talk.html).
+[`dev/archive/features/cdc840ad/showcase/`](../../../features/cdc840ad/showcase/talk.html).

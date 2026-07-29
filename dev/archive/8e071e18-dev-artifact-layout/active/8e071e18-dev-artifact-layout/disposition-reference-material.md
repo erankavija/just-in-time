@@ -20,8 +20,8 @@ are complete and committed.
 | mirrored location | the file is at each location and retained at its source path | reading source and every destination |
 | assigned owning issue | the file is linked to that issue and stays where it is | reading the issue's document references, and the path on disk |
 
-Every archived location below is the source path reproduced under the container's directory beneath
-the archive root; the mechanism preserves the path.
+Every archived location below preserves the part of the source path relative to the configured
+development root beneath the container's directory in the archive.
 
 ## Arithmetic
 

@@ -256,7 +256,7 @@ A third budget — at most 10 GiB for the complete fresh validation target direc
 acceptance threshold the benchmark protocol below validates against once per build-topology
 change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
 defeat the point of the interactive incremental-build policy described next. See
-[dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md](archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md)
+[dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md](archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md)
 ("Benchmark protocol") for the full acceptance criteria and
 [dev/benchmarks/rust-build-efficiency/report.md](benchmarks/rust-build-efficiency/report.md)
 for the measured comparison.
