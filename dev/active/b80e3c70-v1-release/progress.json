@@ -389,7 +389,8 @@
       "title": "Strip the development root from container archive destinations",
       "reason": "Production archive destination derivation repeats the configured development-root segment, yielding paths such as dev/archive/<container>/dev/active/plan.md.",
       "wiring": "Depends on c7f8ebc7; ef118aea depends on this issue; bb03df0a therefore retains release-gate coverage transitively.",
-      "content_standards_review": "Passed after removing tracker-context and sibling references from the draft description before commit."
+      "content_standards_review": "Passed after removing tracker-context and sibling references from the draft description before commit.",
+      "scope_audit": "A 2026-07-29 scan found 297 repository-owned archive files under a duplicated */dev/* segment and 20 live non-history files referencing that shape. REQ-06 prevents a helper-only fix that leaves those materializations behind; immutable event payloads remain audit history."
     }
   ],
   "escalations": [

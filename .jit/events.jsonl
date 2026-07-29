@@ -11600,3 +11600,4 @@
 {"from":"ready","id":"0fc8fde5-d976-4624-b520-e85252595b02","issue_id":"ef118aea-51b4-452b-9aba-fa2bcdf64b9c","timestamp":"2026-07-29T19:42:20.490399515Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"79e9a92a-0111-495b-9676-c97324610474","issue_id":"ef118aea-51b4-452b-9aba-fa2bcdf64b9c","timestamp":"2026-07-29T19:42:20.490399515Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"c729d0b3-3961-4434-bd53-38a43419ebc9","issue_id":"bb03df0a-65c7-496a-bb09-2620eb253fd5","new_count":7,"old_count":8,"removed_deps":["c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab"],"timestamp":"2026-07-29T19:42:20.490399515Z","type":"dependency_reduced"}
+{"fields":["description"],"id":"454c6989-a67e-4f9e-a07b-a1923f2bf054","issue_id":"625cc07f-0174-4644-a41e-bd1a77d00b8b","timestamp":"2026-07-29T19:46:29.701614046Z","type":"issue_updated","updated_by":"issue-update"}

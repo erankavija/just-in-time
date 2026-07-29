@@ -58,6 +58,8 @@ The concern about duplicated directory depth is confirmed production behavior, n
 
 This is recorded under `surfaced_pitfalls` in `progress.json` and now owned by issue `625cc07f`, **Strip the development root from container archive destinations**. Its description was reviewed against `.jit/reference/content-standards.md` before commit. The graph orders `c7f8ebc7 → 625cc07f → ef118aea`, so citation parsing stabilizes first and the later execution/reporting work validates the corrected canonical layout. Do not let c7's matching logic normalize or endorse the current shape.
 
+A scope scan found 297 repository-owned archive files in the duplicated `*/dev/*` shape and 20 live non-history files that reference it. `625cc07f` REQ-06 therefore requires migration of current stored artifacts and live references, not merely a helper/test change. Historical event payloads remain immutable audit evidence and do not count as current destinations.
+
 ## Validation and evidence notes
 
 - Every implementation/rework merge was followed by `scripts/verify-commit-builds.sh` using the workspace-backed verifier cache.
