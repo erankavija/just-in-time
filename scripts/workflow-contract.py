@@ -473,13 +473,22 @@ def check_triggers(relative: Path, doc, declaration) -> list[Finding]:
         if event not in actual:
             findings.append(finding(relative, f"required trigger {event!r} is not declared"))
             continue
-        for key, values in as_mapping(filters).items():
+        required_filters = as_mapping(filters)
+        for key, values in required_filters.items():
+            if key == "forbidden_filters":
+                continue
             present = trigger_filter_values(event, actual[event], key)
             findings.extend(
                 finding(relative, f"trigger {event!r} declares no {key} value {value!r}")
                 for value in as_list(values)
                 if value not in present
             )
+        actual_filters = as_mapping(actual[event])
+        findings.extend(
+            finding(relative, f"trigger {event!r} declares forbidden filter {key!r}")
+            for key in as_list(required_filters.get("forbidden_filters"))
+            if key in actual_filters
+        )
 
     forbidden = [event for event in as_list(declared.get("forbidden")) if event in actual]
     findings.extend(

@@ -10,11 +10,6 @@ on:
       - '.gitignore'
   pull_request:
     branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.gitignore'
 
 permissions:
   contents: read
@@ -28,8 +23,9 @@ jobs:
   # over every committed workflow, plus this repository's structural assertions
   # from .github/workflow-contract.yml. It runs first and needs no toolchain, so
   # a pull request that edits a workflow learns within a minute that it broke a
-  # declared assertion. `scripts/workflow-contract-selftest.sh` re-proves that
-  # the harness still rejects each defect class it claims to reject.
+  # declared assertion, including on documentation-only pull requests.
+  # `scripts/workflow-contract-selftest.sh` re-proves that the harness still
+  # rejects each defect class it claims to reject.
   workflow-contract:
     name: Workflow Contract
     runs-on: ubuntu-latest
