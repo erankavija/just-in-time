@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ca5877bddb524829e953abe77a64707523c044b9",
+  "completed_at": "2026-07-29T19:13:49.816979249Z",
+  "duration_ms": 201469,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The default now selects docs, preserves positional and DOCS_FOOTPRINT precedence, documents the adopter surface, and has focused regression coverage; current affected paths match the attributed HEAD.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
+  "message": null,
+  "run_id": "7727686d-61b3-474d-b325-789eb21a665d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T19:10:28.347438360Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0f04e470, ac46b11d, 295a0a6c, 83c441f4, b5073514, 97fd72ea, fc2e4291, ccce76f3\nPolicy sources: AGENTS.md\nResolved items: @/issue/b80e3c70/requirement/REQ-11 (.jit/issues/b80e3c70-cf7d-4f72-b53d-6e556363be58.json); @/issue/8e071e18/decision/D-14 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: docs-mechanical passed (exit 0, 2026-07-29T19:10:08Z); prior code-review failed (exit 1) with no structured findings or stdout\nTruncation recovery: narrower reads of the affected scripts, gate/configuration, linked investigation, and item sources completed after combined output truncation\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The default now selects docs, preserves positional and DOCS_FOOTPRINT precedence, documents the adopter surface, and has focused regression coverage; current affected paths match the attributed HEAD.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
