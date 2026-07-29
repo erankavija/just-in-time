@@ -85,6 +85,7 @@ planned destinations are named from the container.
 ### Reference
 - [TESTING.md](TESTING.md) — testing strategy and focused test commands
 - [authoring-conventions.md](authoring-conventions.md) — asset and link patterns that survive archival
+- [workflow-contract.md](workflow-contract.md) — how the committed GitHub workflows are verified and how their action pins are updated
 - [architecture-pitfalls.md](studies/architecture-pitfalls.md) — common pitfalls
 - [clippy-suppressions.md](studies/clippy-suppressions.md) — documented suppressions
 
