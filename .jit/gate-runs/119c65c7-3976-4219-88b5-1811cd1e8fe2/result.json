@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d92173035ee510c43f7a7e6d0cca207ce8cc10f2",
+  "completed_at": "2026-07-29T19:08:27.264264928Z",
+  "duration_ms": 175356,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/artifact_classifier.rs",
+        "id": "F1",
+        "line": 1109,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c7f8ebc7/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "A dot after the source path is always treated as a citation delimiter, so longer paths such as dev/active/design.md.bak still warn."
+      }
+    ],
+    "summary": "Whole-path detection still warns for longer paths whose next character is a dot, violating REQ-04.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
+  "message": null,
+  "run_id": "119c65c7-3976-4219-88b5-1811cd1e8fe2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T19:05:31.907627412Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4954 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faf44-8b38-7b03-9709-db52bf7f47f8\n--------\nuser\n--- 4941 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d9217303, 867cf72e, a85b7866, 977c3894, c8750579\nPolicy sources: AGENTS.md\nResolved items: @/issue/c7f8ebc7/requirement/REQ-04 (issue description, markdown-first); @/issue/8b05a612/requirement/REQ-11 (v1 production-readiness scope brief, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T18:56:40Z); code-review failed (exit 1, prior structured finding)\nTruncation recovery: bounded per-commit stats, file lists, patches, current source/test line reads; unrelated merge-parent output excluded after file-list inspection\n\n1. **F1 — high — blocking — issue-impact:** `is_citation_delimiter` treats `.` as an unconditional boundary, so `dev/active/design.md.bak` is recognized as a citation of `dev/active/design.md` and emits a warning. That is a longer unrelated path and violates REQ-04. The delimiter property test also asserts this incorrect behavior. [crates/jit/src/domain/artifact_classifier.rs:1109](crates/jit/src/domain/artifact_classifier.rs:1109) References: @/issue/c7f8ebc7/requirement/REQ-04\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Whole-path detection still warns for longer paths whose next character is a dot, violating REQ-04.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A dot after the source path is always treated as a citation delimiter, so longer paths such as dev/active/design.md.bak still warn.\",\"file\":\"crates/jit/src/domain/artifact_classifier.rs\",\"line\":1109,\"references\":[\"@/issue/c7f8ebc7/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

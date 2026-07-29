@@ -14,12 +14,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-29T18:16:20.199994832Z",
+      "updated_at": "2026-07-29T19:05:19.805595506Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-29T18:19:00.676251070Z",
+      "updated_at": "2026-07-29T19:08:27.555750277Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Archival citation warnings fire on citations that already name the destination",
-  "updated_at": "2026-07-29T18:19:00.676251070Z"
+  "updated_at": "2026-07-29T19:08:27.555750277Z"
 }
