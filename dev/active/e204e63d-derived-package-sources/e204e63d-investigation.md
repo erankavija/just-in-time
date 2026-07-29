@@ -449,13 +449,13 @@ run "M5 projections"     "$here/docs-check-projections.sh"
    `jit`/`jq`, along with the `resolve_footprint` call that needed them — the default
    footprint is now a literal, not a config lookup).
 6. **Self-test registration.** `scripts/docs-check-selftest.sh` is a separate harness (not
-   run by the gate) that proves, per checker, both directions: seed the defect → assert
+   run by the gate) that proves, per child checker, both directions: seed the defect → assert
    nonzero; clean → assert zero (`docs-check-selftest.sh:8-10`). A new checker adds a block
-   in the same shape as `docs-check-selftest.sh:55-64` (links), `:66-81` (citations), or
-   `:121-152` (projections). Two constraints it enforces: the harness must never mutate the
-   real repository (`docs-check-selftest.sh:12-17`) — the projection block clones the repo
-   into a scratch dir (`:126-127`) precisely because rendering writes to tracked targets —
-   and its own exit codes are `0`/`1`/`2` (`:19-22`).
+   in the same shape as `docs-check-selftest.sh:104-113` (links), `:115-131` (citations), or
+   `:171-208` (projections). Two constraints it enforces: the harness must never mutate the
+   real repository (`docs-check-selftest.sh:14-19`) — the projection block clones the repo
+   into a scratch dir (`:171-177`) precisely because rendering writes to tracked targets —
+   and its own exit codes are `0`/`1`/`2` (`:21-24`).
 7. **Gate wiring.** `.jit/gates.toml:167-191` declares the `docs-mechanical` gate:
    `stage = "postcheck"`, `mode = "auto"`, `priority = 100`, `auto = true`,
    `[gates.checker] type = "exec"`, `command = "./scripts/docs-mechanical.sh"`,
