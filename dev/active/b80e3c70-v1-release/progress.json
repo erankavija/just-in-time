@@ -164,7 +164,7 @@
     {
       "wave_number": 1,
       "sub_wave": "1b",
-      "footprint_rationale": "f9e42a43 edits commands/document.rs and check_links_tests.rs, which 1a's f289ff18 owns. ef118aea edits the archival citation planner, which 1a's c7f8ebc7 owns.",
+      "footprint_rationale": "Both issues are implementation-disjoint in core code, but both are likely to add a Fixed entry at the same existing CHANGELOG.md insertion point. Serialize f9e42a43 before 625cc07f to avoid a predictable same-file conflict; 625cc07f then supplies the canonical archive layout required by wave 1c ef118aea.",
       "issues": [
         {
           "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
@@ -180,18 +180,22 @@
             "code-review",
             "docs-mechanical"
           ],
-          "footprint_note": "Expected to own archive destination derivation, its tests, and canonical archive-layout documentation. Run after c7f8ebc7 so citation parsing is stable and before ef118aea so execution/reporting tests exercise the corrected layout."
+          "footprint_note": "Expected to own archive destination derivation, its tests, the repository archive migration, and canonical archive-layout documentation. Run after f9e42a43 to avoid a changelog insertion conflict, and before ef118aea so execution/reporting tests exercise the corrected layout.",
+          "dispatch_order": 2,
+          "planned_model": "gpt-5.6-sol/high"
         },
         {
           "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
           "short_id": "f9e42a43",
           "title": "Treat a directory link target consistently across discovery, link checking and validation",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "gates": [
             "cargo-ci",
             "code-review"
-          ]
+          ],
+          "dispatch_order": 1,
+          "planned_model": "gpt-5.6-terra/high"
         }
       ]
     },
