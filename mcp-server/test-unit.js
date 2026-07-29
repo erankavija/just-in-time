@@ -648,31 +648,33 @@ await runTest('validates array type with string items', () => {
   assert.ok(!bad.success);
 });
 
-await runTest('default values on optional fields do not apply (known Zod ordering issue)', () => {
-  // validator.js chains .default() before .optional(), so Zod's optional()
-  // swallows undefined before the default can kick in. This test documents
-  // the current behavior. Defaults only work on required fields.
+await runTest('a schema default applies to an omitted argument whether or not it is required', () => {
+  // tools/list advertises each argument's `default` in the tool inputSchema, so
+  // a client that omits the argument must get exactly that value back.
+  for (const required of [[], ['mode']]) {
+    const schema = {
+      properties: {
+        mode: { type: 'string', default: 'manual' },
+      },
+      required,
+    };
+    const result = validateArguments({}, schema);
+    assert.ok(result.success);
+    assert.strictEqual(result.data.mode, 'manual',
+      `default should apply with required=${JSON.stringify(required)}`);
+  }
+});
+
+await runTest('an explicit value overrides a schema default', () => {
   const schema = {
     properties: {
       mode: { type: 'string', default: 'manual' },
     },
     required: [],
   };
-  const result = validateArguments({}, schema);
+  const result = validateArguments({ mode: 'auto' }, schema);
   assert.ok(result.success);
-  assert.strictEqual(result.data.mode, undefined);
-});
-
-await runTest('default values on required fields do apply', () => {
-  const schema = {
-    properties: {
-      mode: { type: 'string', default: 'manual' },
-    },
-    required: ['mode'],
-  };
-  const result = validateArguments({}, schema);
-  assert.ok(result.success);
-  assert.strictEqual(result.data.mode, 'manual');
+  assert.strictEqual(result.data.mode, 'auto');
 });
 
 await runTest('createValidator produces reusable validator', () => {
@@ -792,6 +794,18 @@ await runTest('skips undefined and empty string values', () => {
   const result = buildCliArgs(['issue', 'show'], { id: 'abc', title: undefined }, cmdDef);
   assert.ok(!result.includes('--title'), 'should skip undefined flag');
   assert.ok(!result.includes('undefined'), 'should not have literal undefined');
+});
+
+await runTest('a positional argument defaulted to the empty string stays off the command line', () => {
+  // `item search` declares an empty-string default for its query, which
+  // validation materialises. An empty positional would shift every argument
+  // after it, so it must be dropped here.
+  const cmdDef = {
+    args: [{ name: 'query', type: 'string' }],
+    flags: [{ name: 'json', type: 'boolean' }],
+  };
+  const result = buildCliArgs(['item', 'search'], { query: '' }, cmdDef);
+  assert.deepStrictEqual(result, ['item', 'search', '--json']);
 });
 
 await runTest('command path forms the start of args', () => {
