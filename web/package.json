@@ -14,10 +14,10 @@
   "dependencies": {
     "@types/dagre": "^0.7.53",
     "@types/react-syntax-highlighter": "^15.5.13",
-    "axios": "^1.13.2",
+    "axios": "^1.18.1",
     "dagre": "^0.8.5",
     "katex": "^0.16.25",
-    "mermaid": "^11.12.2",
+    "mermaid": "^11.16.0",
     "papaparse": "^5.5.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
