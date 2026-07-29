@@ -12,7 +12,18 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-29T16:33:22.139188688Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-29T16:37:33.120067497Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f04f7888-a828-4677-aea8-f640a6702375",
   "labels": [
     "type:enhancement",
@@ -22,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Implement graceful jit-server process shutdown",
-  "updated_at": "2026-07-29T14:10:43.400860075Z"
+  "updated_at": "2026-07-29T16:37:33.120067497Z"
 }

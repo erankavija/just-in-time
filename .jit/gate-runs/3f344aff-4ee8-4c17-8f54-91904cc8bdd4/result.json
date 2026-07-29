@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "0b3d333b8bd3f1de73c4f05337791bee19db3b6b",
+  "completed_at": "2026-07-29T16:37:32.841017818Z",
+  "duration_ms": 239954,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci.sh",
+        "id": "F1",
+        "line": 237,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-11",
+          "@/charter/D-12"
+        ],
+        "severity": "high",
+        "summary": "REQ-05 is materially unverified: cargo-ci does not run cargo audit or the declared-MSRV build for the newly added dependencies."
+      }
+    ],
+    "summary": "REQ-05 lacks audit and declared-MSRV validation evidence for the new dependency graph.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f04f7888-a828-4677-aea8-f640a6702375",
+  "message": null,
+  "run_id": "3f344aff-4ee8-4c17-8f54-91904cc8bdd4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T16:33:32.886610524Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7211 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faeb9-63e3-7941-ab57-bda5de2b7b7d\n--------\nuser\n--- 7198 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 06c05d0b, cb64d918, 0fb22552, dbb0316a, ecbc1b7d (`jit:f04f7888`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/pid-safety (.jit/invariants.toml); @/charter/D-11, @/charter/D-12 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T16:26:27Z); jit-validate pending (not run)\nTruncation recovery: bounded reads of shutdown.rs, sse.rs, integration fixture, cargo-ci script, and individual commit patches\n\n1. **F1 — blocking, issue-impact (high):** REQ-05 remains materially unverified. The recorded `cargo-ci` run validates formatting, clippy, tests, provenance, build budget, and incremental state, but its command sequence does not run `cargo audit` or build with the declared MSRV. No current audit/MSRV result accompanies the new `axum-server` and `tokio-util` dependency graph. `@/charter/D-11`, `@/charter/D-12`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-05 lacks audit and declared-MSRV validation evidence for the new dependency graph.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-05 is materially unverified: cargo-ci does not run cargo audit or the declared-MSRV build for the newly added dependencies.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":237,\"references\":[\"@/charter/D-11\",\"@/charter/D-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
