@@ -357,15 +357,6 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
         };
     }
 
-    // A missing/unreadable plan document is a not-found condition (3); a missing
-    // content-parser cargo feature is a generic failure.
-    if let Some(plan_error) = error.downcast_ref::<jit::commands::plan_doc::PlanDocError>() {
-        return match plan_error {
-            jit::commands::plan_doc::PlanDocError::Read { .. } => ErrorCode::RepositoryNotFound,
-            jit::commands::plan_doc::PlanDocError::ContentParser(_) => ErrorCode::GenericError,
-        };
-    }
-
     // A template whose internal depends_on edges form a cycle is a validation
     // failure (4); other template-config errors are generic.
     if let Some(template_error) = error.downcast_ref::<jit::templates::TemplateConfigError>() {

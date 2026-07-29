@@ -365,9 +365,10 @@ impl ChildLink {
 /// `plan_content` is the injected plan-document content map (issue-id → resolved
 /// criteria-source string). It keeps the engine PURE while still honoring a
 /// container whose criteria live in an EXTERNAL plan file: the boundary (the
-/// validate / gate-checker context) resolves each external plan via the
-/// [`plan_doc`](crate::commands::plan_doc) resolver and hands the loaded strings
-/// in here. When a `label-coverage` (or `criteria-*`) rule reads a source issue's
+/// validate / gate-checker context) locates each external plan from its planning
+/// node's recorded plan-document reference, reads it out of the captured
+/// repository image, and hands the loaded strings in here. When a
+/// `label-coverage` (or `criteria-*`) rule reads a source issue's
 /// criteria, the engine parses the injected content for that id if present, else
 /// falls back to the issue's own [`description`](crate::domain::Issue). An EMPTY
 /// map therefore reproduces the description-only behavior exactly, so callers with

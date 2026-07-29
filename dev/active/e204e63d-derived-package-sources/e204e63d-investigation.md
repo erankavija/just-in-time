@@ -722,7 +722,7 @@ This report owns the inventory; the plan cites it. Paths are repository-relative
 - `crates/jit/src/repository_state/materialize.rs:198,224,748`.
 - `crates/jit/src/repository_state/mod.rs:489,494` — config-load wiring.
 - `crates/jit/src/config.rs:64-70,1609-1644` — `JitConfig.templates`.
-- `crates/jit/src/commands/template.rs`, `template_expand.rs`, `breakdown.rs`, `graph.rs:420-424`, `plan_doc.rs:5`, `validate.rs:762-782`.
+- `crates/jit/src/commands/template.rs`, `template_expand.rs`, `breakdown.rs`, `graph.rs:420-424`, `validate.rs:762-782`.
 - `crates/jit/src/gate_presets.rs:8,21,170`, `gate_presets/builtin.rs`, `gate_presets/planning.rs:25`, `gate_presets/reference.rs`.
 - `crates/jit/src/commands/gate.rs:1333,1453,1892` — `apply_gate_preset`.
 - `crates/jit/src/cli.rs:99-116`, `main.rs:676`, `output.rs:1385`, `schema.rs:633,1780`.
@@ -769,7 +769,7 @@ This report owns the inventory; the plan cites it. Paths are repository-relative
 
 **Consumers of the accessors (not restatements)**
 - `crates/jit/src/domain/artifact_classifier.rs:47-172`, `artifact_directory.rs:79-376`, `artifact_conformance.rs:116,295-299`, `artifact_plan.rs:77-90`.
-- `crates/jit/src/commands/{document.rs:126,171; plan_doc.rs:438; template_expand.rs:662,981; config.rs:409-534; archive.rs (~32 test-fixture sites)}`.
+- `crates/jit/src/commands/{document.rs:126,171; template_expand.rs:662,981; config.rs:409-534; archive.rs (~32 test-fixture sites)}`.
 
 **Tests asserting the shipped values**
 - `crates/jit/src/config.rs:2399-2646` — unit tests comparing fallbacks to `SHIPPED_DOCUMENTATION_POLICY` field by field.
