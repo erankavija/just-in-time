@@ -66,19 +66,22 @@
           "short_id": "f04f7888",
           "title": "Implement graceful jit-server process shutdown",
           "classification": "implementation",
-          "status": "exceptional_rework_authorized",
+          "status": "escalated",
           "gates": [
             "cargo-ci",
             "code-review",
             "jit-validate"
           ],
-          "branch_head": "cb64d918",
-          "commits": 4,
+          "branch_head": "abc54594",
+          "merge_commit": "f7ca2d03",
+          "commits": 1,
           "uncommitted": 0,
           "reported": "yes",
-          "branch": "worktree-agent-f04f7888",
+          "branch": "worktree-agent-f04f7888-r3",
+          "exceptional_rework_attempts": 1,
           "criterion_amendment": "REQ-02 was updated before the exceptional merge to replace the obsolete axum-server-owned graceful_shutdown(Some(timeout)) mechanism with the user-approved single application-owned boundary: graceful_shutdown(None), boundary-time sampling, then shutdown() only for survivors.",
-          "traceability_note": "The first exceptional code-review found no behavior defect but rejected the worker's spaced `jit: f04f7888` tag because reviewer attribution requires literal `jit:f04f7888`. The just-created unpushed merge message was amended to `jit:f04f7888`; old and new merge commits have identical tree 35fe99260ea81ebd6ca6f5bd2a3e71e8ab1e1e16, and amended commit f7ca2d03 passed exact-commit verification."
+          "traceability_note": "The first exceptional code-review found no behavior defect but rejected the worker's spaced `jit: f04f7888` tag because reviewer attribution requires literal `jit:f04f7888`. The just-created unpushed merge message was amended to `jit:f04f7888`; old and new merge commits have identical tree 35fe99260ea81ebd6ca6f5bd2a3e71e8ab1e1e16, and amended commit f7ca2d03 passed exact-commit verification.",
+          "gate_note": "At current main cea1815c, cargo-ci passes with 4,089 tests. Code-review accepts attribution and the shutdown behavior but fails because CHANGELOG.md still describes the superseded axum-server-owned timeout. jit-validate remains pending. Further repair exceeds the normal two reworks plus the explicitly approved exceptional third round."
         },
         {
           "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
@@ -412,6 +415,13 @@
       "finding": "The citation matcher accepts any prefix ending in ':-', so a longer path such as 'notes:-dev/active/design.md' still warns.",
       "decision_needed": "Authorize one exceptional third rework round, accept the known false-positive edge case, or defer/remove the issue from the v1.0 epic.",
       "resolution": "User authorized one exceptional third rework round."
+    },
+    {
+      "issue": "f04f7888",
+      "reason": "The explicitly approved exceptional third round resolved the shutdown race, but post-merge review found a stale changelog sentence after the attribution-only correction.",
+      "finding": "CHANGELOG.md says the five-second deadline is handed to axum-server, while shipping code owns the sole boundary in JIT, calls graceful_shutdown(None), samples survivors, then calls shutdown().",
+      "decision_needed": "Authorize one final docs-only repair and full gate rerun, provide alternate guidance/take over, or reject/defer f04f7888 from the v1.0 epic.",
+      "resolution": null
     }
   ],
   "rework_counts": {
@@ -474,7 +484,8 @@
   "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
   "base_commit": "a8182e6f20476d547e3a0f969ef0ed4c636e4b56",
   "handoffs": [
-    "dev/active/b80e3c70-v1-release/handoff.md"
+    "dev/active/b80e3c70-v1-release/handoff.md",
+    "dev/active/b80e3c70-v1-release/handoff-3.md"
   ],
   "merge_conflicts_expected": [
     {

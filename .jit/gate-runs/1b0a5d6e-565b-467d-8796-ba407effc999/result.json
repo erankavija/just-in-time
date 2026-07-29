@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "cea1815c644afaba460e52e516f5206d4559f3c3",
+  "completed_at": "2026-07-29T20:56:12.058570689Z",
+  "duration_ms": 214351,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "CHANGELOG.md",
+        "id": "F1",
+        "line": 19,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-13",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "CHANGELOG.md says axum-server owns the five-second deadline, but the shipping code owns that boundary in the application and uses graceful_shutdown(None) followed by shutdown() only for survivors."
+      }
+    ],
+    "summary": "The changelog documents the superseded handle-owned deadline rather than the shipping application-owned shutdown boundary.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f04f7888-a828-4677-aea8-f640a6702375",
+  "message": null,
+  "run_id": "1b0a5d6e-565b-467d-8796-ba407effc999",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T20:52:37.707050848Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8677 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fafa6-95f4-74a2-a7ad-9a59dfc01c24\n--------\nuser\n--- 8664 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 14 reachable `jit:f04f7888` commits: bfe3d07f, f7ca2d03, c61439c7, 442c856b, 91eab00b, d262c7da, 684cbc78, b0ce7d8b, 1b740d3a, 06c05d0b, cb64d918, 0fb22552, dbb0316a, ecbc1b7d\nPolicy sources: AGENTS.md\nResolved items: @/invariant/pid-safety, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose (.jit/invariants.toml); @/charter/D-11, @/charter/D-12, @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T20:45:33Z); jit-validate pending; prior code-review failed (exit 1), with its attribution finding resolved by amended tagged merge f7ca2d03\nTruncation recovery: re-read merge first-parent patches and current shutdown/SSE/integration sources; narrowed registry, charter, lockfile, and documentation reads; excluded unrelated repository-wide gate-log matches from the impact cone\n\n1. **F1 — blocking, issue-impact (medium):** [CHANGELOG.md:19](/home/vkaskivuo/Projects/just-in-time/CHANGELOG.md:19) says shutdown “hands a five-second deadline” to `axum-server`, but the shipping implementation creates the application-owned boundary, calls `graceful_shutdown(None)`, and invokes `handle.shutdown()` only for survivors ([shutdown.rs:143](/home/vkaskivuo/Projects/just-in-time/crates/server/src/shutdown.rs:143)). This publishes the superseded shutdown model and duplicates the canonical behavior incorrectly. References: @/charter/D-13, @/invariant/single-source-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The changelog documents the superseded handle-owned deadline rather than the shipping application-owned shutdown boundary.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CHANGELOG.md says axum-server owns the five-second deadline, but the shipping code owns that boundary in the application and uses graceful_shutdown(None) followed by shutdown() only for survivors.\",\"file\":\"CHANGELOG.md\",\"line\":19,\"references\":[\"@/charter/D-13\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
