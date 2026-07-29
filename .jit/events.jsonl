@@ -11548,3 +11548,4 @@
 {"id":"4d7710d6-1ae1-4798-875e-49017f5245f5","issue_id":"7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0","timestamp":"2026-07-29T16:12:21.852433429Z","type":"issue_completed"}
 {"from":"backlog","id":"2e4e8c1f-37d8-4b14-91b5-f1df771666d6","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-29T16:12:26.889542046Z","to":"ready","type":"issue_state_changed"}
 {"fields":["documents"],"id":"f728cbac-18b7-4cd9-91e2-9add84c4b527","issue_id":"bb302dbd-bd03-42ed-ae71-b0f035453f56","timestamp":"2026-07-29T16:13:38.259220673Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"mcp-ci","id":"a03ac3f9-0811-4159-a469-c26cb5f3c611","issue_id":"bb302dbd-bd03-42ed-ae71-b0f035453f56","timestamp":"2026-07-29T16:14:45.425155764Z","type":"gate_failed","updated_by":"auto:executor"}

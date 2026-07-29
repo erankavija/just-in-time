@@ -49,7 +49,7 @@
           "short_id": "bb302dbd",
           "title": "Remediate MCP production dependency advisories",
           "classification": "implementation",
-          "status": "merged_pending_review",
+          "status": "rework",
           "gates": [
             "mcp-ci",
             "code-review",
@@ -360,7 +360,8 @@
   "escalations": [],
   "rework_counts": {
     "7edd2fe8": 2,
-    "8fa7261b": 1
+    "8fa7261b": 1,
+    "bb302dbd": 1
   },
   "surfaced_pitfalls": [
     {

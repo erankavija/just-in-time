@@ -20,7 +20,13 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "mcp-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-29T16:14:45.425155764Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bb302dbd-bd03-42ed-ae71-b0f035453f56",
   "labels": [
     "type:bug",
@@ -30,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remediate MCP production dependency advisories",
-  "updated_at": "2026-07-29T16:13:38.259220673Z"
+  "updated_at": "2026-07-29T16:14:45.425155764Z"
 }
