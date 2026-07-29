@@ -1,10 +1,8 @@
 {
-  "id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
-  "title": "Lifecycle-aware validation enforcement and steering quality",
-  "description": "Make validation enforcement fire at the right lifecycle moments and make findings actionable enough that an agent can self-correct, so structural validation actually steers agents instead of training them to ignore it.\n\n## Background\n\nA June 2026 evaluation of the SDD example ruleset in an isolated repo found that the graph rules (criteria coverage, req/satisfies integrity) report error-severity findings during the entire legitimate planning phase, while the one moment they should bite is unenforced: an epic with declared `req:` labels, an uncovered `[hard]` criterion, and zero children transitions to `done` with exit 0. A fabricated `req:` id and a not-yet-implemented one produce identical findings. Schema findings for unparsed sections are content-free (`[] has less than 1 item`). The engine also lacks primitives for requirement-to-check mapping, evidence freshness, and cross-graph analysis, and there is no way to measure whether rule changes improve agent steering.\n\n## Success Criteria\n\n- [ ] A correctly authored in-flight parent issue with declared `req:` labels and incomplete children produces zero error-severity findings from `jit validate`\n- [ ] An issue cannot transition to `done` while an enforcing graph rule fails for it (blocked, exit 4, findings shown)\n- [ ] A `req:` label whose id is absent from the canonical criteria section yields a finding distinct from a declared-but-unsatisfied one\n- [ ] Schema findings name the failing section/field; the empty-section case states that items must be Markdown bullets\n- [ ] Criteria-to-check mapping, gate-result recency, and repo-wide graph scope are each available as engine primitives and demonstrated by an example ruleset under docs/examples/\n- [ ] A non-software example ruleset demonstrates the engine on a hierarchy without epics or milestones\n- [ ] A deterministic steering-scenario suite runs in CI, and an LLM-agent eval measures iterations-to-green against the same scenarios",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": "agent:project-lead",
+  "context": {},
+  "created_at": "2026-06-09T21:52:58.354367064Z",
   "dependencies": [
     "690f618a-6b40-44b2-969d-582335cf768f",
     "6a6af4e3-ef20-4540-b039-fd6de2d60568",
@@ -12,39 +10,42 @@
     "3a86f34e-23da-44a8-9b16-4217ea4dfe80",
     "872cdccd-a25d-4f61-8495-e7310358ddc4"
   ],
+  "description": "Make validation enforcement fire at the right lifecycle moments and make findings actionable enough that an agent can self-correct, so structural validation actually steers agents instead of training them to ignore it.\n\n## Background\n\nA June 2026 evaluation of the SDD example ruleset in an isolated repo found that the graph rules (criteria coverage, req/satisfies integrity) report error-severity findings during the entire legitimate planning phase, while the one moment they should bite is unenforced: an epic with declared `req:` labels, an uncovered `[hard]` criterion, and zero children transitions to `done` with exit 0. A fabricated `req:` id and a not-yet-implemented one produce identical findings. Schema findings for unparsed sections are content-free (`[] has less than 1 item`). The engine also lacks primitives for requirement-to-check mapping, evidence freshness, and cross-graph analysis, and there is no way to measure whether rule changes improve agent steering.\n\n## Success Criteria\n\n- [ ] A correctly authored in-flight parent issue with declared `req:` labels and incomplete children produces zero error-severity findings from `jit validate`\n- [ ] An issue cannot transition to `done` while an enforcing graph rule fails for it (blocked, exit 4, findings shown)\n- [ ] A `req:` label whose id is absent from the canonical criteria section yields a finding distinct from a declared-but-unsatisfied one\n- [ ] Schema findings name the failing section/field; the empty-section case states that items must be Markdown bullets\n- [ ] Criteria-to-check mapping, gate-result recency, and repo-wide graph scope are each available as engine primitives and demonstrated by an example ruleset under docs/examples/\n- [ ] A non-software example ruleset demonstrates the engine on a hierarchy without epics or milestones\n- [ ] A deterministic steering-scenario suite runs in CI, and an LLM-agent eval measures iterations-to-green against the same scenarios",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Design Document",
+      "path": "dev/archive/94d26c42-validation-lifecycle/features/94d26c42-validation-lifecycle-design.md"
+    }
+  ],
+  "done_at": "2026-06-11T05:32:06.324569320Z",
+  "first_ready_at": "2026-06-10T20:12:15.951418930Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-11T05:28:56.507559863Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-11T05:27:00.781481134Z"
+      "updated_at": "2026-06-11T05:27:00.781481134Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-11T05:28:56.507559863Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/features/94d26c42-validation-lifecycle-design.md",
-      "commit": null,
-      "label": "Design Document",
-      "doc_type": "design",
-      "format": "markdown"
-    }
-  ],
+  "id": "94d26c42-3f4f-4a5e-99cc-0e82475a7635",
   "labels": [
     "type:epic",
     "epic:validation-lifecycle",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-09T21:52:58.354367064Z",
-  "updated_at": "2026-07-05T19:51:13.039646834Z",
-  "first_ready_at": "2026-06-10T20:12:15.951418930Z",
-  "done_at": "2026-06-11T05:32:06.324569320Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Lifecycle-aware validation enforcement and steering quality",
+  "updated_at": "2026-07-29T09:08:29.451161686Z"
 }

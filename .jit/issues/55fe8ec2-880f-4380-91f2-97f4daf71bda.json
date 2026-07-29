@@ -5,46 +5,28 @@
   "dependencies": [
     "1cc809de-4669-45d4-960f-f881e716663d"
   ],
-  "description": "Planning node for Issue-based development artifact layout and serviceable archival (8e071e18). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/8e071e18-plan.md and link it to this node once written.",
+  "description": "Planning node for Issue-based development artifact layout and serviceable archival (8e071e18). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md and link it to this node once written.",
   "documents": [
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/8e071e18-investigation.md"
-    },
-    {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "39bb431a5a0de1692279d3a06ee05c95ffe58a4ee57a06b56b0cd7beec460189",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "8e071e18-investigation.md",
-          "resolved_path": "dev/active/8e071e18-investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "8f327a196a1e582282438179e072772d531de581efb6a9f91f983435b1860046",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "8e071e18-breakdown.json",
-          "resolved_path": "dev/active/8e071e18-breakdown.json"
-        }
-      ],
-      "commit": null,
-      "doc_type": null,
-      "format": "markdown",
-      "label": null,
-      "path": "dev/active/8e071e18-plan.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/8e071e18-breakdown.json"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-breakdown.json"
     }
   ],
   "done_at": "2026-07-25T13:19:14.064364439Z",
@@ -68,5 +50,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-25T13:19:14.064364439Z"
+  "updated_at": "2026-07-29T09:12:06.115312898Z"
 }

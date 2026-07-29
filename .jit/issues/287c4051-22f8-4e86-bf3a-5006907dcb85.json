@@ -1,13 +1,31 @@
 {
-  "id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
-  "title": "Documentation accuracy and audience boundary cleanup",
-  "description": "Shipped documentation has drifted from the current CLI, storage layout, and repository structure, and jit self-documentation has leaked into the adopter-facing docs tree. This epic corrects verified drift and makes the boundary between adopter documentation (docs/) and jit's own contributor documentation (dev/, CLAUDE.md) explicit.\n\n## Background\n\nA source-verified audit (2026-07-06, findings document linked to this issue) confirmed 46 findings: stale paths and counts, wrong semantic claims about git requirements and storage locations, legacy narration in shipped references, an incomplete command reference, and self-documentation misplaced in the adopter tree. CLAUDE.md corrections landed separately ahead of this epic.\n\n## Success Criteria\n\n- [hard] REQ-01: Every shipped doc statement about CLI behavior, storage layout, and repository structure matches the current source tree\n- [hard] REQ-02: Adopter-facing docs describe the shipped surface only; repo-local dogfood configuration is relocated to dev/ or explicitly signalled as this repository's setup\n- [hard] REQ-03: Shipped docs state current behavior only, with no legacy narration\n- [hard] REQ-04: A documentation review gate exists, is required on this epic, and passes before the epic completes\n- [hard] REQ-05: Every diagram in docs/ is a Mermaid block; ASCII-art diagrams are forbidden in docs",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-09T23:14:10.794038049Z",
+  "context": {},
+  "created_at": "2026-07-06T15:39:58.875830140Z",
   "dependencies": [
     "6ce0f14e-7768-45ea-ada7-c39b0cd2957e"
   ],
+  "description": "Shipped documentation has drifted from the current CLI, storage layout, and repository structure, and jit self-documentation has leaked into the adopter-facing docs tree. This epic corrects verified drift and makes the boundary between adopter documentation (docs/) and jit's own contributor documentation (dev/, CLAUDE.md) explicit.\n\n## Background\n\nA source-verified audit (2026-07-06, findings document linked to this issue) confirmed 46 findings: stale paths and counts, wrong semantic claims about git requirements and storage locations, legacy narration in shipped references, an incomplete command reference, and self-documentation misplaced in the adopter tree. CLAUDE.md corrections landed separately ahead of this epic.\n\n## Success Criteria\n\n- [hard] REQ-01: Every shipped doc statement about CLI behavior, storage layout, and repository structure matches the current source tree\n- [hard] REQ-02: Adopter-facing docs describe the shipped surface only; repo-local dogfood configuration is relocated to dev/ or explicitly signalled as this repository's setup\n- [hard] REQ-03: Shipped docs state current behavior only, with no legacy narration\n- [hard] REQ-04: A documentation review gate exists, is required on this epic, and passes before the epic completes\n- [hard] REQ-05: Every diagram in docs/ is a Mermaid block; ASCII-art diagrams are forbidden in docs",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "analysis",
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/287c4051-docs-accuracy/287c4051-completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "analysis",
+      "format": "markdown",
+      "label": "Audit findings",
+      "path": "dev/archive/287c4051-docs-accuracy/bug-fixes/287c4051-docs-audit-findings.md"
+    }
+  ],
+  "done_at": "2026-07-10T15:57:43.981501682Z",
+  "first_ready_at": "2026-07-06T15:39:58.875830550Z",
   "gates_required": [
     "repo-validate",
     "doc-review"
@@ -15,41 +33,24 @@
   "gates_status": {
     "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T15:55:38.691443305Z"
+      "updated_at": "2026-07-10T15:55:38.691443305Z",
+      "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T15:57:04.231491727Z"
+      "updated_at": "2026-07-10T15:57:04.231491727Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/287c4051-completion-report.md",
-      "commit": null,
-      "label": "Completion report",
-      "doc_type": "analysis",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/archive/bug-fixes/287c4051-docs-audit-findings.md",
-      "commit": null,
-      "label": "Audit findings",
-      "doc_type": "analysis",
-      "format": "markdown"
-    }
-  ],
+  "id": "287c4051-22f8-4e86-bf3a-5006907dcb85",
   "labels": [
     "type:epic",
     "epic:docs-accuracy",
     "milestone:v1.0",
     "component:docs"
   ],
-  "created_at": "2026-07-06T15:39:58.875830140Z",
-  "updated_at": "2026-07-10T15:58:35.910980464Z",
-  "first_ready_at": "2026-07-06T15:39:58.875830550Z",
-  "claimed_at": "2026-07-09T23:14:10.794038049Z",
-  "done_at": "2026-07-10T15:57:43.981501682Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Documentation accuracy and audience boundary cleanup",
+  "updated_at": "2026-07-29T09:08:29.184151206Z"
 }

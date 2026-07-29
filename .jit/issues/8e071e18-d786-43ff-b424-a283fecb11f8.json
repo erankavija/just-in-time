@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": null,
   "context": {},
   "created_at": "2026-07-25T07:17:03.106580363Z",
@@ -17,139 +18,63 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session 4 handoff",
-      "path": "dev/active/8e071e18-dev-artifact-layout/handoff-3.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/handoff-3.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Archive run evidence",
-      "path": "dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session 6 handoff",
-      "path": "dev/active/8e071e18-dev-artifact-layout/handoff-4.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/handoff-4.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Showcase-theme disposition",
-      "path": "dev/active/8e071e18-dev-artifact-layout/disposition-showcase-theme.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/disposition-showcase-theme.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Pitfall-criterion reconciliation",
-      "path": "dev/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Completion report",
-      "path": "dev/active/8e071e18-dev-artifact-layout/completion-report.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/completion-report.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "39bb431a5a0de1692279d3a06ee05c95ffe58a4ee57a06b56b0cd7beec460189",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "8e071e18-investigation.md",
-          "resolved_path": "dev/active/8e071e18-investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "aaa292b67d3affaddfed6c7a84a97d896deaeaa0f1da52ce78fd56250eb72b08",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "8e071e18-breakdown.json",
-          "resolved_path": "dev/active/8e071e18-breakdown.json"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Epic plan",
-      "path": "dev/active/8e071e18-plan.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Investigation",
-      "path": "dev/active/8e071e18-investigation.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "themes/rust.css",
-          "resolved_path": "dev/presentations/8e071e18-dev-artifact-layout/themes/rust.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "9cbc5082797d938f0ee780328790a131ae3d7bc5c09c176e77927c174f29e60a",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/reveal.css",
-          "resolved_path": "dev/presentations/8e071e18-dev-artifact-layout/vendor/reveal.js/reveal.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "fcfd6ebfd05700d24f7509bb7b6075b5e322b8f503c65ea29999920c0f079132",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/fonts/fonts.css",
-          "resolved_path": "dev/presentations/8e071e18-dev-artifact-layout/vendor/fonts/fonts.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "9736bf3d8918e391e8c07c85c53773800d4004dc25f948916e319ca371ca881a",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/reveal.js",
-          "resolved_path": "dev/presentations/8e071e18-dev-artifact-layout/vendor/reveal.js/reveal.js"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "3d58fbfb3fb64e4c2c1c0288347ab4174847b281538fe93f056e90b9b5a608ca",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/plugin/highlight/highlight.js",
-          "resolved_path": "dev/presentations/8e071e18-dev-artifact-layout/vendor/reveal.js/plugin/highlight/highlight.js"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "3eee700d74c829a3cc7fffcc279b9765a31f88e5ff055648115b0b5eaabca1c3",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "base.css",
-          "resolved_path": "dev/presentations/8e071e18-dev-artifact-layout/base.css"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "1aa8e84c9cabcbfe4d95b19879fe48b9c2c5e6d54574cbe679bc22edb9fe12b6",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "vendor/reveal.js/reset.css",
-          "resolved_path": "dev/presentations/8e071e18-dev-artifact-layout/vendor/reveal.js/reset.css"
-        }
-      ],
       "commit": null,
       "doc_type": "documentation",
       "format": "html",
       "label": "Feature showcase deck",
-      "path": "dev/presentations/8e071e18-dev-artifact-layout/talk.html"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/presentations/8e071e18-dev-artifact-layout/talk.html"
     }
   ],
   "done_at": "2026-07-27T14:38:26.591625803Z",
@@ -177,7 +102,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "done",
+  "state": "archived",
   "title": "Issue-based development artifact layout and serviceable archival",
-  "updated_at": "2026-07-27T15:16:23.061189177Z"
+  "updated_at": "2026-07-29T09:09:42.671520241Z"
 }

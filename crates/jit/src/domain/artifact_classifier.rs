@@ -3078,7 +3078,8 @@ mod tests {
     const CITED_SOURCE: &str = "dev/active/plan.md";
 
     /// Scanned file text covering the citation kinds the in-content census in
-    /// `dev/active/8e071e18-investigation.md` measured: a production Rust module
+    /// `dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md`
+    /// measured: a production Rust module
     /// doc comment, an adopter-facing inline code span, a shell-script comment
     /// beside an executable default, and one file citing the path twice on a
     /// single line. The last entry is one of the census's verified

@@ -1,10 +1,9 @@
 {
-  "id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
-  "title": "Generic issue & label validation engine (JSON-Schema-based), with SDD as first application",
-  "description": "# Generic Issue & Label Validation Engine\n\nA configurable, declarative validation engine for issues and labels, built on\nJSON Schema. Rules live in `.jit/rules.toml`; SDD is the first application,\nshipped only as example rules + schemas. The engine is deliberately general so\njit becomes a flexible substrate for many methodologies, not an SDD-specific\ntool.\n\n## Design\n\nThe authoritative design and all decisions live in the linked decision record\n`dev/active/f6a704d0-validation-engine.md` (revision 2). This description does\nnot restate it.\n\n## Success Criteria\n\n- [hard] Rules load from `.jit/rules.toml`; schemas inline or from `.jit/schemas/`; the loader rejects mixing shorthand and raw schema in one rule.\n- [hard] Selector matrix (type, label, state, doc-type) matches issues; applicable rules union.\n- [hard] Local rules evaluate on create/update; per-rule `enforce` (default false) blocks when set; `--force` bypasses.\n- [hard] Graph rules (coverage, reference-integrity, dependency-shape) run only in `jit validate`/gate checkers.\n- [hard] Validation runs against the enriched projection; Markdown in the default build, HTML/XML behind optional features, all behind one parser trait.\n- [hard] JSON Schema validation via the `jsonschema` crate; shorthand kinds desugar to JSON Schema.\n- [hard] The COMPLETE set of existing checks (validation.rs + validate.rs + `[validation]` + `[namespaces]` enforcement) is re-expressed as default rules with preserved behavior; legacy enforcement keys are migrated and removed (no backward-compat aliases).\n- [hard] `jit init` scaffolds defaults; existing repos migrate without silently losing checks.\n- [hard] `jit validate [<id>] [--json] [--explain]` reports rule name, severity, message; gates invoke it via `$JIT_ISSUE_ID`.\n- [hard] SDD ships as example rules + schemas + docs; description `[hard]`/`[aspirational]` criteria are canonical and labels derived; >=1 non-SDD example included.\n- [hard] `cargo clippy --workspace --all-targets` and `cargo fmt` clean; tests cover engine, projection, parsers, desugaring, migration.\n- [aspirational] The `x-jit-*` custom-keyword extension point is demonstrated.\n\n## Non-goals\n\n- Delta-spec authoring / merge-on-Done (dropped).\n- CEL as a top-level rule type (deferred; checker-command covers the gap).\n- A preset subsystem (SDD is docs/examples).\n- Backward-compat aliases for migrated legacy config keys (hard migration).\n- Deep per-format semantic adapters (one generic projection + JSON Schema).\n\n\n## Scope Expansion 2 (2026-06-07, user-directed after epic-gate review)\n\nThe epic-level code-review gate surfaced findings; the user expanded scope. Amended/added criteria (tracked as child tasks 5e79ba48/e93af54b/2fb9f910/d4188154; see dev/active/f6a704d0-expansion2-plan.md):\n\n- [hard] Criterion 5 AMENDED: validation selects the content parser per-issue via a `content_format` field, with a per-repo config default and Markdown fallback; HTML/XML parsers (behind features) are exercised IN PRODUCTION, and a CI `--features html,xml` job executes the cross-format path. (task e93af54b)\n- [hard] Criteria 7/8 AMENDED (hard removal): legacy `[validation]` enforcement keys + `[namespaces].{values,pattern,required}` parsing and the entire migration/coexistence/deprecated-scan machinery are REMOVED; `rules.toml` is the sole source; `jit init` scaffolds a fixed default; an absent rules.toml builds defaults in-memory (no read-path write) and is materialized only by init. (task d4188154)\n- [hard] jit AND gf2 are migrated to rules.toml as deliverables. (task 2fb9f910; this repo already dogfooded)\n- [hard] Epic-review correctness findings fixed: schema-name collision (serialize), checker-command `enforce=true` rejected at load, gate-execution PID-safety (reap-then-signal ordering). (task 5e79ba48)\n- [aspirational deviation] custom `label_regex` validate-path deviation remains documented (DR §8.3a); after hard removal, label_regex itself is gone, so this becomes moot for new repos.",
-  "state": "done",
-  "priority": "high",
+  "archived_from": "done",
   "assignee": "agent:project-lead",
+  "claimed_at": "2026-06-07T15:30:10.937922253Z",
+  "context": {},
+  "created_at": "2026-06-06T15:48:56.227134229Z",
   "dependencies": [
     "33f23ec7-8d51-4640-8529-88ed0d85d669",
     "00525fe0-9193-4f12-91dc-2ed1848de047",
@@ -12,152 +11,154 @@
     "0abaddc0-9433-42a6-9572-bb08995420ce",
     "d4188154-f465-44f0-9b63-753ad1494204"
   ],
+  "description": "# Generic Issue & Label Validation Engine\n\nA configurable, declarative validation engine for issues and labels, built on\nJSON Schema. Rules live in `.jit/rules.toml`; SDD is the first application,\nshipped only as example rules + schemas. The engine is deliberately general so\njit becomes a flexible substrate for many methodologies, not an SDD-specific\ntool.\n\n## Design\n\nThe authoritative design and all decisions live in the linked decision record\n`dev/active/f6a704d0-validation-engine.md` (revision 2). This description does\nnot restate it.\n\n## Success Criteria\n\n- [hard] Rules load from `.jit/rules.toml`; schemas inline or from `.jit/schemas/`; the loader rejects mixing shorthand and raw schema in one rule.\n- [hard] Selector matrix (type, label, state, doc-type) matches issues; applicable rules union.\n- [hard] Local rules evaluate on create/update; per-rule `enforce` (default false) blocks when set; `--force` bypasses.\n- [hard] Graph rules (coverage, reference-integrity, dependency-shape) run only in `jit validate`/gate checkers.\n- [hard] Validation runs against the enriched projection; Markdown in the default build, HTML/XML behind optional features, all behind one parser trait.\n- [hard] JSON Schema validation via the `jsonschema` crate; shorthand kinds desugar to JSON Schema.\n- [hard] The COMPLETE set of existing checks (validation.rs + validate.rs + `[validation]` + `[namespaces]` enforcement) is re-expressed as default rules with preserved behavior; legacy enforcement keys are migrated and removed (no backward-compat aliases).\n- [hard] `jit init` scaffolds defaults; existing repos migrate without silently losing checks.\n- [hard] `jit validate [<id>] [--json] [--explain]` reports rule name, severity, message; gates invoke it via `$JIT_ISSUE_ID`.\n- [hard] SDD ships as example rules + schemas + docs; description `[hard]`/`[aspirational]` criteria are canonical and labels derived; >=1 non-SDD example included.\n- [hard] `cargo clippy --workspace --all-targets` and `cargo fmt` clean; tests cover engine, projection, parsers, desugaring, migration.\n- [aspirational] The `x-jit-*` custom-keyword extension point is demonstrated.\n\n## Non-goals\n\n- Delta-spec authoring / merge-on-Done (dropped).\n- CEL as a top-level rule type (deferred; checker-command covers the gap).\n- A preset subsystem (SDD is docs/examples).\n- Backward-compat aliases for migrated legacy config keys (hard migration).\n- Deep per-format semantic adapters (one generic projection + JSON Schema).\n\n\n## Scope Expansion 2 (2026-06-07, user-directed after epic-gate review)\n\nThe epic-level code-review gate surfaced findings; the user expanded scope. Amended/added criteria (tracked as child tasks 5e79ba48/e93af54b/2fb9f910/d4188154; see dev/active/f6a704d0-expansion2-plan.md):\n\n- [hard] Criterion 5 AMENDED: validation selects the content parser per-issue via a `content_format` field, with a per-repo config default and Markdown fallback; HTML/XML parsers (behind features) are exercised IN PRODUCTION, and a CI `--features html,xml` job executes the cross-format path. (task e93af54b)\n- [hard] Criteria 7/8 AMENDED (hard removal): legacy `[validation]` enforcement keys + `[namespaces].{values,pattern,required}` parsing and the entire migration/coexistence/deprecated-scan machinery are REMOVED; `rules.toml` is the sole source; `jit init` scaffolds a fixed default; an absent rules.toml builds defaults in-memory (no read-path write) and is materialized only by init. (task d4188154)\n- [hard] jit AND gf2 are migrated to rules.toml as deliverables. (task 2fb9f910; this repo already dogfooded)\n- [hard] Epic-review correctness findings fixed: schema-name collision (serialize), checker-command `enforce=true` rejected at load, gate-execution PID-safety (reap-then-signal ordering). (task 5e79ba48)\n- [aspirational deviation] custom `label_regex` validate-path deviation remains documented (DR §8.3a); after hard removal, label_regex itself is gone, so this becomes moot for new repos.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "format": "markdown",
+      "label": "Implementation Plan",
+      "path": "dev/archive/f6a704d0-validation-engine/features/f6a704d0-validation-engine-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Decision Record",
+      "path": "dev/archive/f6a704d0-validation-engine/features/f6a704d0-validation-engine.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "base.css",
+          "resolved_path": "dev/archive/f6a704d0-validation-engine/features/f6a704d0-validation-engine-deck/base.css"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.gstatic.com",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "themes/rust.css",
+          "resolved_path": "dev/archive/f6a704d0-validation-engine/features/f6a704d0-validation-engine-deck/themes/rust.css"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.googleapis.com",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "html",
+      "label": "Validation Engine — How-to Presentation",
+      "path": "dev/archive/f6a704d0-validation-engine/features/f6a704d0-validation-engine-deck/talk.html"
+    }
+  ],
+  "done_at": "2026-06-08T06:09:39.436787137Z",
+  "first_ready_at": "2026-06-07T15:29:06.862029071Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-08T06:03:43.487494529Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-08T06:01:08.807040605Z"
+      "updated_at": "2026-06-08T06:01:08.807040605Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-08T06:03:43.487494529Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "dev/archive/features/f6a704d0-validation-engine.md",
-      "commit": null,
-      "label": "Decision Record",
-      "doc_type": "design",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/archive/features/f6a704d0-validation-engine-plan.md",
-      "commit": null,
-      "label": "Implementation Plan",
-      "doc_type": "implementation",
-      "format": "markdown"
-    },
-    {
-      "path": "dev/archive/features/f6a704d0-validation-engine-deck/talk.html",
-      "commit": null,
-      "label": "Validation Engine — How-to Presentation",
-      "doc_type": "design",
-      "format": "html",
-      "assets": [
-        {
-          "original_path": "https://fonts.googleapis.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "themes/rust.css",
-          "resolved_path": "dev/archive/features/f6a704d0-validation-engine-deck/themes/rust.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "base.css",
-          "resolved_path": "dev/archive/features/f6a704d0-validation-engine-deck/base.css",
-          "asset_type": "local",
-          "mime_type": null,
-          "content_hash": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059",
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.gstatic.com",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        },
-        {
-          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "f6a704d0-1f01-447b-a8aa-42251fa7c3eb",
   "labels": [
     "type:epic",
     "epic:validation-engine",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-06T15:48:56.227134229Z",
-  "updated_at": "2026-07-05T19:51:13.121131183Z",
-  "first_ready_at": "2026-06-07T15:29:06.862029071Z",
-  "claimed_at": "2026-06-07T15:30:10.937922253Z",
-  "done_at": "2026-06-08T06:09:39.436787137Z"
+  "priority": "high",
+  "state": "archived",
+  "title": "Generic issue & label validation engine (JSON-Schema-based), with SDD as first application",
+  "updated_at": "2026-07-29T09:08:30.540525789Z"
 }

@@ -602,7 +602,7 @@ but no source-neutral foundation lands beside the live embedded-only runtime?
   multi-target publication boundary; those are expected postconditions, not facts about
   the repository tree today
   (`.jit/issues/cdc840ad-9332-4936-9381-772318967f0f.json`,
-  `dev/archive/cdc840ad-plan.md`).
+  `dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md`).
 - **VERIFIED:** `33f76b11` currently depends only on the completed v1 profile MVP, so profile
   lifecycle planning can complete before `cdc840ad` implementation
   (`jit graph deps 33f76b11 --json`, observed 2026-07-18).
@@ -666,7 +666,7 @@ but no source-neutral foundation lands beside the live embedded-only runtime?
   landing implementation issues. They may be internally organized within the cutover, but
   its acceptance and merge boundary is one live end-to-end issue depending on `cdc840ad`.
 - **RECOMMENDATION — ASSUMED:** Treat every name and removal listed in
-  `dev/archive/cdc840ad-plan.md` only as an expected prerequisite postcondition. After the
+  `dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md` only as an expected prerequisite postcondition. After the
   issue reaches Done, verify the actual canonical types, behaviors, absence set, and public
   contracts; rebase the v1.1 blast radius and deletion list to what remains. Do not claim
   prerequisite removals as v1.1 work or reintroduce plan-era names that changed.

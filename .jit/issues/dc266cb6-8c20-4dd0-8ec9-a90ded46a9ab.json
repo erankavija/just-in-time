@@ -9,22 +9,22 @@
       "commit": null,
       "doc_type": "research",
       "format": "markdown",
-      "label": "Architecture research",
-      "path": "dev/archive/cdc840ad-research.md"
-    },
-    {
-      "commit": null,
-      "doc_type": "research",
-      "format": "markdown",
       "label": "Current-system investigation",
-      "path": "dev/archive/cdc840ad-investigation.md"
+      "path": "dev/archive/cdc840ad-repository-materialization/cdc840ad-investigation.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/cdc840ad-plan.md"
+      "path": "dev/archive/cdc840ad-repository-materialization/cdc840ad-plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Architecture research",
+      "path": "dev/archive/cdc840ad-repository-materialization/cdc840ad-research.md"
     }
   ],
   "done_at": "2026-07-18T14:26:26.120455387Z",
@@ -52,5 +52,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Transactional repository materialization and derived-state coherence",
-  "updated_at": "2026-07-23T15:03:41.602525728Z"
+  "updated_at": "2026-07-29T09:08:28.913732001Z"
 }

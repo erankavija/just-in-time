@@ -37,14 +37,14 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Archival completeness record",
-      "path": "dev/active/8e071e18-dev-artifact-layout/archive-completeness-record.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/archive-completeness-record.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Consolidated in-content citation warnings",
-      "path": "dev/active/8e071e18-dev-artifact-layout/citation-warning-consolidation.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/citation-warning-consolidation.md"
     }
   ],
   "done_at": "2026-07-27T11:27:21.815115096Z",
@@ -73,5 +73,5 @@
   "priority": "high",
   "state": "done",
   "title": "Confirm the archival runs serviced the development root",
-  "updated_at": "2026-07-27T11:27:21.815115096Z"
+  "updated_at": "2026-07-29T09:09:42.671520241Z"
 }
