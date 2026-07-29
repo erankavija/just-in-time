@@ -13,14 +13,14 @@
       "commit": null,
       "doc_type": null,
       "label": "Optimized build samples",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/optimized.json"
+      "path": "dev/archive/6eb585bc-core-maintenance/benchmarks/rust-build-efficiency/optimized.json"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": "Baseline vs optimized benchmark report",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/report.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/benchmarks/rust-build-efficiency/report.md"
     }
   ],
   "done_at": "2026-07-15T16:48:32.010823039Z",

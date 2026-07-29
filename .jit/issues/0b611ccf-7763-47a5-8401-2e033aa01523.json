@@ -12,21 +12,21 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Addressing v2 design brief (research input)",
-      "path": "dev/archive/2821e177-addressing-v2/dev/studies/addressing-v2-rule-gate-items.md"
+      "path": "dev/archive/2821e177-addressing-v2/studies/addressing-v2-rule-gate-items.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/2821e177-addressing-v2/dev/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md"
+      "path": "dev/archive/2821e177-addressing-v2/active/2821e177-2d2d-4b25-b64a-4f38723e7fe6-plan.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Addressing v2 grounding investigation",
-      "path": "dev/archive/2821e177-addressing-v2/dev/active/2821e177-investigation.md"
+      "path": "dev/archive/2821e177-addressing-v2/active/2821e177-investigation.md"
     }
   ],
   "done_at": "2026-07-01T23:15:00.324975531Z",

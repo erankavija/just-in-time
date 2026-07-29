@@ -11,21 +11,21 @@
       "doc_type": "study",
       "format": "markdown",
       "label": "MVP Current-System Investigation",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-investigation.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-investigation.md"
     },
     {
       "commit": null,
       "doc_type": "research",
       "format": "markdown",
       "label": "Profiles Architecture Research",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-research.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-research.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Profiles MVP Plan",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-plan.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-plan.md"
     }
   ],
   "done_at": "2026-07-14T22:21:49.756845825Z",

@@ -11,21 +11,21 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Design Document",
-      "path": "dev/archive/ad601a15-parallel-work/dev/design/cli-quality-improvements.md"
+      "path": "dev/archive/ad601a15-parallel-work/design/cli-quality-improvements.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session Notes: Phase 1-2 complete, Phase 3 in progress",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-cli-quality-phase3.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-20260115-cli-quality-phase3.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session Notes: Phase 3 Issue #7 complete - Actionable errors implemented",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-phase3-issue7-complete.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-20260115-phase3-issue7-complete.md"
     }
   ],
   "done_at": "2026-01-15T21:52:33.209696634Z",

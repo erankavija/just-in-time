@@ -11,14 +11,14 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Use-case analysis",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/3e12ffbd-batch-export-use-cases.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/active/3e12ffbd-batch-export-use-cases.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Batch export design",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/3e12ffbd-batch-export-design.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/active/3e12ffbd-batch-export-design.md"
     }
   ],
   "done_at": "2026-07-17T06:44:03.776493288Z",

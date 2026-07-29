@@ -10,14 +10,14 @@
       "commit": null,
       "doc_type": "design",
       "label": "Implementation Plan",
-      "path": "dev/archive/14303b30-phase5-2/dev/active/quiet-mode-plan.md"
+      "path": "dev/archive/14303b30-phase5-2/active/quiet-mode-plan.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session Notes - In Progress",
-      "path": "dev/archive/14303b30-phase5-2/dev/sessions/session-2025-12-29-quiet-flag-implementation.md"
+      "path": "dev/archive/14303b30-phase5-2/sessions/session-2025-12-29-quiet-flag-implementation.md"
     }
   ],
   "done_at": "2025-12-29T23:21:52.786362765Z",

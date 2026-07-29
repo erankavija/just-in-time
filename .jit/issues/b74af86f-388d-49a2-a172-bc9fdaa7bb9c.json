@@ -18,21 +18,21 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Design Document",
-      "path": "dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md"
+      "path": "dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Parallel Work Session Notes",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-parallel.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-claim-coordination-parallel.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Implementation Review & Testing Gap Analysis",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-claim-coordination-review.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-claim-coordination-review.md"
     }
   ],
   "done_at": "2026-01-07T23:32:21.327082557Z",

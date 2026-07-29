@@ -14,28 +14,28 @@
       "commit": null,
       "doc_type": "design",
       "label": "Design Document",
-      "path": "dev/archive/4a00b2b0-agent-validation/dev/active/agent-validation-design.md"
+      "path": "dev/archive/4a00b2b0-agent-validation/active/agent-validation-design.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Worktree Merge Analysis",
-      "path": "dev/archive/4a00b2b0-agent-validation/dev/studies/worktree-merge-analysis.md"
+      "path": "dev/archive/4a00b2b0-agent-validation/studies/worktree-merge-analysis.md"
     },
     {
       "commit": null,
       "doc_type": "study",
       "format": "markdown",
       "label": "AI Tool Worktree Compatibility Study",
-      "path": "dev/archive/4a00b2b0-agent-validation/dev/studies/ai-tool-worktree-compatibility.md"
+      "path": "dev/archive/4a00b2b0-agent-validation/studies/ai-tool-worktree-compatibility.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/4a00b2b0-agent-validation/dev/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md"
+      "path": "dev/archive/4a00b2b0-agent-validation/active/4a00b2b0-a527-4f04-9475-62f1d838f903-plan.md"
     }
   ],
   "done_at": "2026-06-01T22:34:01.166883980Z",

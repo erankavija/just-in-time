@@ -9,14 +9,14 @@
       "commit": null,
       "doc_type": "notes",
       "label": "Refactor analysis - status of 7 issues",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-1bdc5395-analysis.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-20260201-refactor-1bdc5395-analysis.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Analysis of items 5 & 7 (test helpers, error messages)",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260201-refactor-items-5-7.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-20260201-refactor-items-5-7.md"
     }
   ],
   "done_at": "2026-02-01T16:24:42.300189221Z",

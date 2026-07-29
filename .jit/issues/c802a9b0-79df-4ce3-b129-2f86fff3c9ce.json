@@ -10,7 +10,7 @@
       "doc_type": "implementation-plan",
       "format": "markdown",
       "label": "Implementation Plan",
-      "path": "dev/archive/d7bfd4a4-observability/dev/plans/stalled-detection-c802a9b0.md"
+      "path": "dev/archive/d7bfd4a4-observability/plans/stalled-detection-c802a9b0.md"
     }
   ],
   "gates_required": [

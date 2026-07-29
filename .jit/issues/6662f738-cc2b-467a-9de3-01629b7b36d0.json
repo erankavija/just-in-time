@@ -13,14 +13,14 @@
       "doc_type": "implementation",
       "format": "markdown",
       "label": "Adapted trigger-eval runner (fixes self-hosted-skill shadowing confound)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/eval/skill-triggers/run_trigger_eval.py"
+      "path": "dev/archive/f2532a2d-jit-project-lead/eval/skill-triggers/run_trigger_eval.py"
     },
     {
       "commit": null,
       "doc_type": "documentation",
       "format": "markdown",
       "label": "Trigger eval runner rationale and usage",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/eval/skill-triggers/README.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/eval/skill-triggers/README.md"
     },
     {
       "commit": null,

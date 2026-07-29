@@ -11,21 +11,21 @@
       "doc_type": "study",
       "format": "markdown",
       "label": "Production Readiness Investigation",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-investigation.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/8b05a612-investigation.md"
     },
     {
       "commit": null,
       "doc_type": "research",
       "format": "markdown",
       "label": "Production Readiness Research",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-research.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/8b05a612-research.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Production Readiness Plan",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/8b05a612-plan.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/8b05a612-plan.md"
     }
   ],
   "done_at": "2026-07-15T09:01:27.631783209Z",

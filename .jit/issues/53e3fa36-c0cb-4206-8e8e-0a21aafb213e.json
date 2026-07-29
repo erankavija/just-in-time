@@ -16,14 +16,14 @@
       "doc_type": "study",
       "format": "markdown",
       "label": "Session-mining findings & prioritized fixes",
-      "path": "dev/archive/53e3fa36-agent-ergonomics/dev/studies/session-mining-jit-improvements.md"
+      "path": "dev/archive/53e3fa36-agent-ergonomics/studies/session-mining-jit-improvements.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Decomposition plan (P node, plan-review approved)",
-      "path": "dev/archive/53e3fa36-agent-ergonomics/dev/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md"
+      "path": "dev/archive/53e3fa36-agent-ergonomics/active/53e3fa36-c0cb-4206-8e8e-0a21aafb213e-plan.md"
     },
     {
       "commit": null,

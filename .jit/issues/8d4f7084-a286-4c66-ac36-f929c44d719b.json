@@ -12,14 +12,14 @@
       "commit": null,
       "doc_type": null,
       "label": "Consolidation inventory diff (REQ-04 map)",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json"
+      "path": "dev/archive/6eb585bc-core-maintenance/benchmarks/rust-build-efficiency/consolidation-inventory-diff.json"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": "REQ-04 machine verification script",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/benchmarks/rust-build-efficiency/verify-consolidation-inventory.py"
+      "path": "dev/archive/6eb585bc-core-maintenance/benchmarks/rust-build-efficiency/verify-consolidation-inventory.py"
     }
   ],
   "done_at": "2026-07-15T07:05:55.989564845Z",

@@ -20,20 +20,20 @@
       "commit": null,
       "doc_type": null,
       "label": "Design Document",
-      "path": "dev/archive/14303b30-phase5-2/dev/active/ci-gate-integration-design.md"
+      "path": "dev/archive/14303b30-phase5-2/active/ci-gate-integration-design.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "label": "Examples",
-      "path": "dev/archive/14303b30-phase5-2/dev/active/gate-examples.md"
+      "path": "dev/archive/14303b30-phase5-2/active/gate-examples.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/14303b30-phase5-2/dev/active/14303b30-75b2-4b21-8963-bc6563b95b91-plan.md"
+      "path": "dev/archive/14303b30-phase5-2/active/14303b30-75b2-4b21-8963-bc6563b95b91-plan.md"
     }
   ],
   "done_at": "2026-02-19T19:07:20.759244149Z",

@@ -19,7 +19,7 @@
       "doc_type": "reference",
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/cfb3ba94-docs/dev/studies/documentation-organization-strategy.md"
+      "path": "dev/archive/cfb3ba94-docs/studies/documentation-organization-strategy.md"
     },
     {
       "commit": null,
@@ -33,7 +33,7 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/cfb3ba94-docs/dev/active/cfb3ba94-7406-4bc3-9f36-cecdcebacf0e-plan.md"
+      "path": "dev/archive/cfb3ba94-docs/active/cfb3ba94-7406-4bc3-9f36-cecdcebacf0e-plan.md"
     }
   ],
   "done_at": "2026-02-04T12:05:13.124989066Z",

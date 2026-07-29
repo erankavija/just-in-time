@@ -13,14 +13,14 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "registry-first invariant kind: source-of-truth routing in project_items",
-      "path": "dev/archive/25064508-structured-knowledge/dev/active/93480b00-invariant-registry-first-kind.md"
+      "path": "dev/archive/25064508-structured-knowledge/active/93480b00-invariant-registry-first-kind.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "registry-first invariant kind: reservation + explicit registry binding (rework)",
-      "path": "dev/archive/25064508-structured-knowledge/dev/active/93480b00-invariant-registry-first-kind.md"
+      "path": "dev/archive/25064508-structured-knowledge/active/93480b00-invariant-registry-first-kind.md"
     }
   ],
   "done_at": "2026-06-25T19:28:02.653908995Z",

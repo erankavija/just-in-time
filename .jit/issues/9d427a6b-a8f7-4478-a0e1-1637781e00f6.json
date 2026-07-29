@@ -24,21 +24,21 @@
       "commit": null,
       "doc_type": "design",
       "label": "Design Document",
-      "path": "dev/archive/9d427a6b-production-polish/dev/active/production-polish-design.md"
+      "path": "dev/archive/9d427a6b-production-polish/active/production-polish-design.md"
     },
     {
       "commit": null,
       "doc_type": "study",
       "format": "markdown",
       "label": "Agent UX Observations",
-      "path": "dev/archive/9d427a6b-production-polish/dev/studies/agent-ux-observations.md"
+      "path": "dev/archive/9d427a6b-production-polish/studies/agent-ux-observations.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/9d427a6b-production-polish/dev/active/9d427a6b-a8f7-4478-a0e1-1637781e00f6-plan.md"
+      "path": "dev/archive/9d427a6b-production-polish/active/9d427a6b-a8f7-4478-a0e1-1637781e00f6-plan.md"
     }
   ],
   "done_at": "2026-03-14T19:37:51.524399732Z",

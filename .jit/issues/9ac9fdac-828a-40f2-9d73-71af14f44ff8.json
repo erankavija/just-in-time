@@ -15,14 +15,14 @@
       "doc_type": "documentation",
       "format": "markdown",
       "label": "Completion report",
-      "path": "dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-completion-report.md"
+      "path": "dev/archive/9ac9fdac-graph-templates/active/9ac9fdac-completion-report.md"
     },
     {
       "commit": null,
       "doc_type": "slides",
       "format": "html",
       "label": "Showcase slides",
-      "path": "dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-graph-templates-showcase/talk.html"
+      "path": "dev/archive/9ac9fdac-graph-templates/active/9ac9fdac-graph-templates-showcase/talk.html"
     },
     {
       "commit": null,
@@ -36,7 +36,7 @@
       "doc_type": "reference",
       "format": "markdown",
       "label": "Showcase alternate theme",
-      "path": "dev/archive/9ac9fdac-graph-templates/dev/active/9ac9fdac-graph-templates-showcase/themes/gruvbox.css"
+      "path": "dev/archive/9ac9fdac-graph-templates/active/9ac9fdac-graph-templates-showcase/themes/gruvbox.css"
     }
   ],
   "done_at": "2026-06-24T05:30:05.247973747Z",

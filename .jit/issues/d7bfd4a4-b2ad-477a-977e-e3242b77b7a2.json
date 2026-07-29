@@ -13,14 +13,14 @@
       "commit": null,
       "doc_type": "design",
       "label": "Design Document",
-      "path": "dev/archive/d7bfd4a4-observability/dev/active/observability-design.md"
+      "path": "dev/archive/d7bfd4a4-observability/active/observability-design.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/d7bfd4a4-observability/dev/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md"
+      "path": "dev/archive/d7bfd4a4-observability/active/d7bfd4a4-b2ad-477a-977e-e3242b77b7a2-plan.md"
     }
   ],
   "gates_required": [

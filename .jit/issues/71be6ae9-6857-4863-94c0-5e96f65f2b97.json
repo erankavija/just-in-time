@@ -11,14 +11,14 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Code-review reliability design",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/71be6ae9-code-review-reliability.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/active/71be6ae9-code-review-reliability.md"
     },
     {
       "commit": null,
       "doc_type": "report",
       "format": "markdown",
       "label": "Live code-review verification",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/71be6ae9-live-review-report.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/active/71be6ae9-live-review-report.md"
     }
   ],
   "done_at": "2026-07-12T18:15:41.872908224Z",

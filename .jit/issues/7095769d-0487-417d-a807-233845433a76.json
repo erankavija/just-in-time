@@ -24,13 +24,13 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Smell-Hunt Report",
-      "path": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-smell-hunt-report.md"
+      "path": "dev/archive/7095769d-code-smell-cleanup/active/7095769d-smell-hunt-report.md"
     },
     {
       "commit": null,
       "doc_type": "progress",
       "label": "Progress record",
-      "path": "dev/archive/7095769d-code-smell-cleanup/dev/active/7095769d-progress.json"
+      "path": "dev/archive/7095769d-code-smell-cleanup/active/7095769d-progress.json"
     }
   ],
   "done_at": "2026-06-26T17:55:29.421106564Z",

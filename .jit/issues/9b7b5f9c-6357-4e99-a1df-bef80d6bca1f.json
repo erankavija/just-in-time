@@ -13,14 +13,14 @@
       "commit": null,
       "doc_type": "design",
       "label": "MVP Scope Brief",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-mvp-scope-brief.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-mvp-scope-brief.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "html",
       "label": "Showcase Deck (reveal.js)",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/talk.html"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/presentations/9b7b5f9c/talk.html"
     },
     {
       "commit": null,
@@ -34,49 +34,49 @@
       "doc_type": "reference",
       "format": "markdown",
       "label": "Showcase alternate theme",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/presentations/9b7b5f9c/themes/gruvbox.css"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/presentations/9b7b5f9c/themes/gruvbox.css"
     },
     {
       "commit": null,
       "doc_type": "session",
       "format": "markdown",
       "label": "Session handoff",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-2.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-handoff-2.md"
     },
     {
       "commit": null,
       "doc_type": "session",
       "format": "markdown",
       "label": "Session handoff",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-3.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-handoff-3.md"
     },
     {
       "commit": null,
       "doc_type": "session",
       "format": "markdown",
       "label": "Session handoff",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-4.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-handoff-4.md"
     },
     {
       "commit": null,
       "doc_type": "session",
       "format": "markdown",
       "label": "Session handoff",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff-5.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-handoff-5.md"
     },
     {
       "commit": null,
       "doc_type": "session",
       "format": "markdown",
       "label": "Session handoff",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-handoff.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-handoff.md"
     },
     {
       "commit": null,
       "doc_type": "planning",
       "format": "markdown",
       "label": "Planning brief",
-      "path": "dev/archive/9b7b5f9c-jit-profiles/dev/active/9b7b5f9c-jit-profiles-planning-brief.md"
+      "path": "dev/archive/9b7b5f9c-jit-profiles/active/9b7b5f9c-jit-profiles-planning-brief.md"
     }
   ],
   "done_at": "2026-07-16T20:56:51.974957142Z",

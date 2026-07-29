@@ -17,28 +17,28 @@
       "commit": null,
       "doc_type": null,
       "label": "Design Document",
-      "path": "dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md"
+      "path": "dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session Notes: TTL=0 & Design Review",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260103-parallel-work-design-review.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-20260103-parallel-work-design-review.md"
     },
     {
       "commit": null,
       "doc_type": "experiment",
       "format": "markdown",
       "label": "Worktree Manual Coordination Experiment",
-      "path": "dev/archive/ad601a15-parallel-work/dev/experiments/worktree-manual-coordination-experiment.md"
+      "path": "dev/archive/ad601a15-parallel-work/experiments/worktree-manual-coordination-experiment.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/ad601a15-parallel-work/dev/active/ad601a15-5217-439f-9b3c-94a52c06c18b-plan.md"
+      "path": "dev/archive/ad601a15-parallel-work/active/ad601a15-5217-439f-9b3c-94a52c06c18b-plan.md"
     }
   ],
   "done_at": "2026-02-02T18:06:44.514883239Z",

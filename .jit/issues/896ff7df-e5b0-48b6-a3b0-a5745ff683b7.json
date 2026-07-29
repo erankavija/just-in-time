@@ -12,14 +12,14 @@
       "commit": null,
       "doc_type": "design",
       "label": "Implementation Guide",
-      "path": "dev/archive/71373e37-docs-lifecycle/dev/active/doc-archive-implementation-guide.md"
+      "path": "dev/archive/71373e37-docs-lifecycle/active/doc-archive-implementation-guide.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": "Session notes",
-      "path": "dev/archive/71373e37-docs-lifecycle/dev/sessions/session-2025-12-27-doc-archive.md"
+      "path": "dev/archive/71373e37-docs-lifecycle/sessions/session-2025-12-27-doc-archive.md"
     }
   ],
   "done_at": "2025-12-27T22:39:58.626326065Z",

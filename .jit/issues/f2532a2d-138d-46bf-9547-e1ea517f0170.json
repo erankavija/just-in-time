@@ -17,14 +17,14 @@
       "doc_type": "session",
       "format": "markdown",
       "label": "Design session: jit-project-lead role (2026-06-24)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260624-project-lead-role-design.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/sessions/session-20260624-project-lead-role-design.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Bracket plan (D1-D9)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/active/f2532a2d-138d-46bf-9547-e1ea517f0170-plan.md"
     },
     {
       "commit": null,
@@ -38,14 +38,14 @@
       "doc_type": "session",
       "format": "markdown",
       "label": "Session handoff",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-handoff-2.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/active/f2532a2d-handoff-2.md"
     },
     {
       "commit": null,
       "doc_type": "session",
       "format": "markdown",
       "label": "Session handoff",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/f2532a2d-handoff.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/active/f2532a2d-handoff.md"
     }
   ],
   "done_at": "2026-07-03T07:53:15.803424209Z",

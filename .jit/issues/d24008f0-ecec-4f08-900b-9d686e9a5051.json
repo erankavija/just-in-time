@@ -13,7 +13,7 @@
       "doc_type": "analysis",
       "format": "markdown",
       "label": "REQ-01 mechanism trace + real scoped run (unscoped deferred to audits)",
-      "path": "dev/archive/2d109173-docs-exhaustive-audit/dev/active/d24008f0-req01-evidence.md"
+      "path": "dev/archive/2d109173-docs-exhaustive-audit/active/d24008f0-req01-evidence.md"
     },
     {
       "commit": null,

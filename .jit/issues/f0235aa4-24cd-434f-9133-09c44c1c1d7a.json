@@ -23,14 +23,14 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Design Document",
-      "path": "dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md"
+      "path": "dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Review Session: Implementation verification and manual testing",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260115-story-review-f023.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-20260115-story-review-f023.md"
     }
   ],
   "done_at": "2026-02-01T15:32:42.655469574Z",

@@ -25,7 +25,7 @@
           "is_shared": false,
           "mime_type": null,
           "original_path": "breakdown.json",
-          "resolved_path": "dev/archive/a2546471-json-error-contract/dev/active/a2546471-json-error-contract/breakdown.json"
+          "resolved_path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/breakdown.json"
         },
         {
           "asset_type": "local",
@@ -33,7 +33,7 @@
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "investigation-guard-docs.md",
-          "resolved_path": "dev/archive/a2546471-json-error-contract/dev/active/a2546471-json-error-contract/investigation-guard-docs.md"
+          "resolved_path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/investigation-guard-docs.md"
         },
         {
           "asset_type": "local",
@@ -41,21 +41,21 @@
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "investigation.md",
-          "resolved_path": "dev/archive/a2546471-json-error-contract/dev/active/a2546471-json-error-contract/investigation.md"
+          "resolved_path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/investigation.md"
         }
       ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Authoritative plan",
-      "path": "dev/archive/a2546471-json-error-contract/dev/active/a2546471-json-error-contract/plan.md"
+      "path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/plan.md"
     },
     {
       "commit": null,
       "doc_type": "report",
       "format": "markdown",
       "label": "Completion report",
-      "path": "dev/archive/a2546471-json-error-contract/dev/active/a2546471-json-error-contract/completion-report.md"
+      "path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/completion-report.md"
     }
   ],
   "done_at": "2026-07-28T22:31:15.544274657Z",

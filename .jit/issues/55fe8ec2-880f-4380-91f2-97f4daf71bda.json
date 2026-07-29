@@ -5,28 +5,28 @@
   "dependencies": [
     "1cc809de-4669-45d4-960f-f881e716663d"
   ],
-  "description": "Planning node for Issue-based development artifact layout and serviceable archival (8e071e18). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md and link it to this node once written.",
+  "description": "Planning node for Issue-based development artifact layout and serviceable archival (8e071e18). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-plan.md and link it to this node once written.",
   "documents": [
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-investigation.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-plan.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-breakdown.json"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-breakdown.json"
     }
   ],
   "done_at": "2026-07-25T13:19:14.064364439Z",

@@ -13,28 +13,28 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation Plan",
-      "path": "dev/archive/5fe00921-production-stability/dev/active/multi-issue-bulk-operations-plan.md"
+      "path": "dev/archive/5fe00921-production-stability/active/multi-issue-bulk-operations-plan.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session Notes - Phase 1-3 Complete",
-      "path": "dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-operations-progress.md"
+      "path": "dev/archive/5fe00921-production-stability/sessions/session-2025-12-30-bulk-operations-progress.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session Notes - Phase 4 Complete",
-      "path": "dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-cli-integration.md"
+      "path": "dev/archive/5fe00921-production-stability/sessions/session-2025-12-30-bulk-cli-integration.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session Notes - Phase 5 Complete",
-      "path": "dev/archive/5fe00921-production-stability/dev/sessions/session-2025-12-30-bulk-phase5-docs.md"
+      "path": "dev/archive/5fe00921-production-stability/sessions/session-2025-12-30-bulk-phase5-docs.md"
     }
   ],
   "done_at": "2025-12-30T23:52:43.123456430Z",

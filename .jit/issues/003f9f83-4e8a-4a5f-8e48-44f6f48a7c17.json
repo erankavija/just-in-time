@@ -10,13 +10,13 @@
       "commit": null,
       "doc_type": "design",
       "label": "Implementation Plan",
-      "path": "dev/archive/14303b30-phase5-2/dev/studies/short-hash-implementation-plan.md"
+      "path": "dev/archive/14303b30-phase5-2/studies/short-hash-implementation-plan.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "label": "Session Notes",
-      "path": "dev/archive/14303b30-phase5-2/dev/sessions/session-2025-12-21-short-hash-progress.md"
+      "path": "dev/archive/14303b30-phase5-2/sessions/session-2025-12-21-short-hash-progress.md"
     }
   ],
   "done_at": "2025-12-21T22:59:22.473720923Z",

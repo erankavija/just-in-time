@@ -11,14 +11,14 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Referenced in implementation plan (embedded in issue description)",
-      "path": "dev/archive/ad601a15-parallel-work/dev/design/worktree-parallel-work.md"
+      "path": "dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Manual testing report - all 7 tests passed",
-      "path": "dev/archive/ad601a15-parallel-work/dev/sessions/session-20260118-f849-manual-testing.md"
+      "path": "dev/archive/ad601a15-parallel-work/sessions/session-20260118-f849-manual-testing.md"
     }
   ],
   "done_at": "2026-01-18T23:10:13.047932373Z",

@@ -18,63 +18,63 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session 4 handoff",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/handoff-3.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/handoff-3.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Archive run evidence",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/archive-run-evidence.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/archive-run-evidence.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session 6 handoff",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/handoff-4.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/handoff-4.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Showcase-theme disposition",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/disposition-showcase-theme.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/disposition-showcase-theme.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Pitfall-criterion reconciliation",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/pitfall-criterion-reconciliation.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Completion report",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-dev-artifact-layout/completion-report.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/completion-report.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Epic plan",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-plan.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-plan.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Investigation",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/active/8e071e18-investigation.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-investigation.md"
     },
     {
       "commit": null,
       "doc_type": "documentation",
       "format": "html",
       "label": "Feature showcase deck",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/dev/presentations/8e071e18-dev-artifact-layout/talk.html"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/presentations/8e071e18-dev-artifact-layout/talk.html"
     }
   ],
   "done_at": "2026-07-27T14:38:26.591625803Z",

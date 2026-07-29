@@ -14,7 +14,7 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Adversarial audit (evidence source)",
-      "path": "dev/archive/1cc809de-repository-state-quality/dev/studies/cdc840ad-audit-2026-07-23.md"
+      "path": "dev/archive/1cc809de-repository-state-quality/studies/cdc840ad-audit-2026-07-23.md"
     },
     {
       "commit": null,
@@ -28,7 +28,7 @@
       "doc_type": "reference",
       "format": "markdown",
       "label": "Showcase alternate theme",
-      "path": "dev/archive/1cc809de-repository-state-quality/dev/presentations/1cc809de/themes/gruvbox.css"
+      "path": "dev/archive/1cc809de-repository-state-quality/presentations/1cc809de/themes/gruvbox.css"
     }
   ],
   "done_at": "2026-07-25T06:32:35.869622377Z",

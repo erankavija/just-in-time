@@ -21,20 +21,20 @@
       "commit": null,
       "doc_type": "notes",
       "label": "Completion Report",
-      "path": "dev/archive/2e926e39-agent-seamlessness/dev/active/2e926e39-completion-report.md"
+      "path": "dev/archive/2e926e39-agent-seamlessness/active/2e926e39-completion-report.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "label": "Showcase Deck (reveal.js)",
-      "path": "dev/archive/2e926e39-agent-seamlessness/dev/presentations/2e926e39/talk.html"
+      "path": "dev/archive/2e926e39-agent-seamlessness/presentations/2e926e39/talk.html"
     },
     {
       "commit": null,
       "doc_type": "reference",
       "format": "markdown",
       "label": "Showcase alternate theme",
-      "path": "dev/archive/2e926e39-agent-seamlessness/dev/presentations/2e926e39/themes/gruvbox.css"
+      "path": "dev/archive/2e926e39-agent-seamlessness/presentations/2e926e39/themes/gruvbox.css"
     }
   ],
   "done_at": "2026-06-28T05:48:08.360783593Z",

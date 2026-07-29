@@ -13,20 +13,20 @@
       "doc_type": null,
       "format": "markdown",
       "label": "Story completion report",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-completion-report.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/active/73482aa1-completion-report.md"
     },
     {
       "commit": null,
       "doc_type": "progress",
       "label": "Progress record",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-progress.json"
+      "path": "dev/archive/6eb585bc-core-maintenance/active/73482aa1-progress.json"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Rust build efficiency study",
-      "path": "dev/archive/6eb585bc-core-maintenance/dev/active/73482aa1-rust-build-efficiency.md"
+      "path": "dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md"
     }
   ],
   "done_at": "2026-07-15T17:39:24.653807378Z",

@@ -19,13 +19,13 @@
       "commit": null,
       "doc_type": "design",
       "label": "Implementation Strategy",
-      "path": "dev/archive/71373e37-docs-lifecycle/dev/studies/documentation-lifecycle-strategy.md"
+      "path": "dev/archive/71373e37-docs-lifecycle/studies/documentation-lifecycle-strategy.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "label": "Authoritative Design",
-      "path": "dev/archive/71373e37-docs-lifecycle/dev/active/documentation-lifecycle-design.md"
+      "path": "dev/archive/71373e37-docs-lifecycle/active/documentation-lifecycle-design.md"
     },
     {
       "commit": null,
@@ -39,7 +39,7 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/archive/71373e37-docs-lifecycle/dev/active/71373e37-bb30-41d2-af0c-f08f381e027e-plan.md"
+      "path": "dev/archive/71373e37-docs-lifecycle/active/71373e37-bb30-41d2-af0c-f08f381e027e-plan.md"
     }
   ],
   "done_at": "2025-12-28T01:16:20.027436271Z",

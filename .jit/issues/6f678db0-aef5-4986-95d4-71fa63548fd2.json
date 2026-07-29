@@ -11,13 +11,13 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Phase 2 Implementation Plan",
-      "path": "dev/archive/9d427a6b-production-polish/dev/design/phase2-collapse-expand.md"
+      "path": "dev/archive/9d427a6b-production-polish/design/phase2-collapse-expand.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "label": "Hierarchy Type Icons Configuration Plan",
-      "path": "dev/archive/9d427a6b-production-polish/dev/design/hierarchy-icons-config.md"
+      "path": "dev/archive/9d427a6b-production-polish/design/hierarchy-icons-config.md"
     }
   ],
   "done_at": "2026-02-08T18:23:39.867393530Z",

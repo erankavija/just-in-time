@@ -14,13 +14,13 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "DAG exploration plan",
-      "path": "dev/archive/9d427a6b-production-polish/dev/design/exploration-dag.md"
+      "path": "dev/archive/9d427a6b-production-polish/design/exploration-dag.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "label": "Subgraph Clustering Layout Implementation Plan",
-      "path": "dev/archive/9d427a6b-production-polish/dev/design/subgraph-clustering-layout.md"
+      "path": "dev/archive/9d427a6b-production-polish/design/subgraph-clustering-layout.md"
     }
   ],
   "done_at": "2026-02-08T19:43:31.269743341Z",

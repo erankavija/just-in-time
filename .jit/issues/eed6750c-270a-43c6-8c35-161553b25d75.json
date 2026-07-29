@@ -13,35 +13,35 @@
       "doc_type": "session",
       "format": "markdown",
       "label": "Design session: planning skill (2026-06-20)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260620-planning-skill-design.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/sessions/session-20260620-planning-skill-design.md"
     },
     {
       "commit": null,
       "doc_type": "session",
       "format": "markdown",
       "label": "Planning-skill observations from a live run (2026-06-23)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260623-planning-skill-observations.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/sessions/session-20260623-planning-skill-observations.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Planning failures and churn from a live run (session 7ec82da2)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260622-planning-failures-and-churn.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/sessions/session-20260622-planning-failures-and-churn.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Build session: jit-plan authoring (2026-06-25)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/sessions/session-20260625-planning-skill-authoring.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/sessions/session-20260625-planning-skill-authoring.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Session handoff (2026-06-25)",
-      "path": "dev/archive/f2532a2d-jit-project-lead/dev/active/eed6750c-handoff.md"
+      "path": "dev/archive/f2532a2d-jit-project-lead/active/eed6750c-handoff.md"
     }
   ],
   "done_at": "2026-07-03T07:20:00.830667483Z",

@@ -10,14 +10,14 @@
       "commit": null,
       "doc_type": "design",
       "label": "Implementation Plan",
-      "path": "dev/archive/9d427a6b-production-polish/dev/active/dependency-display-improvements-plan.md"
+      "path": "dev/archive/9d427a6b-production-polish/active/dependency-display-improvements-plan.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Item 12 Implementation Plan",
-      "path": "dev/archive/9d427a6b-production-polish/dev/active/json-output-standardization-plan.md"
+      "path": "dev/archive/9d427a6b-production-polish/active/json-output-standardization-plan.md"
     }
   ],
   "done_at": "2026-02-17T19:10:35.401877273Z",
