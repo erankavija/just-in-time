@@ -180,6 +180,9 @@ pub struct ListingFingerprint {
     container: Option<EntryIdentity>,
     /// Sorted child name to exact child identity; `None` is not representable.
     children: BTreeMap<String, EntryIdentity>,
+    /// True when an advisory scan could identify the directory but could not
+    /// enumerate it due to permission denial.
+    advisory_unreadable: bool,
     /// SHA-256 of the boundary's canonical listing serialization.
     sha256: String,
 }
@@ -187,7 +190,7 @@ pub struct ListingFingerprint {
 impl ListingFingerprint {
     /// Construct a deterministic fingerprint.
     pub fn new(children: BTreeMap<String, EntryIdentity>) -> Result<Self, CaptureError> {
-        Self::with_container(None, children)
+        Self::with_container(None, children, false)
     }
 
     /// Construct a fingerprint for one present directory and its complete children.
@@ -195,17 +198,24 @@ impl ListingFingerprint {
         container: EntryIdentity,
         children: BTreeMap<String, EntryIdentity>,
     ) -> Result<Self, CaptureError> {
-        Self::with_container(Some(container), children)
+        Self::with_container(Some(container), children, false)
     }
 
     /// Construct a fingerprint for an absent listing root.
     pub fn for_absent() -> Result<Self, CaptureError> {
-        Self::with_container(None, BTreeMap::new())
+        Self::with_container(None, BTreeMap::new(), false)
+    }
+
+    /// Capture an advisory scan directory whose metadata was readable but whose
+    /// children could not be enumerated due to permission denial.
+    pub fn for_advisory_unreadable(container: EntryIdentity) -> Result<Self, CaptureError> {
+        Self::with_container(Some(container), BTreeMap::new(), true)
     }
 
     fn with_container(
         container: Option<EntryIdentity>,
         children: BTreeMap<String, EntryIdentity>,
+        advisory_unreadable: bool,
     ) -> Result<Self, CaptureError> {
         if let Some(identity) = &container {
             identity.validate()?;
@@ -224,6 +234,14 @@ impl ListingFingerprint {
             }
             None => hash_field(&mut hasher, b"absent"),
         }
+        hash_field(
+            &mut hasher,
+            if advisory_unreadable {
+                b"advisory-unreadable"
+            } else {
+                b"complete"
+            },
+        );
         for (name, identity) in &children {
             hash_field(&mut hasher, name.as_bytes());
             hash_field(&mut hasher, identity.object.as_bytes());
@@ -233,6 +251,7 @@ impl ListingFingerprint {
         Ok(Self {
             container,
             children,
+            advisory_unreadable,
             sha256: format!("{:x}", hasher.finalize()),
         })
     }
@@ -240,6 +259,11 @@ impl ListingFingerprint {
     /// Sorted child identities used to derive this fingerprint.
     pub fn children(&self) -> &BTreeMap<String, EntryIdentity> {
         &self.children
+    }
+
+    /// Whether this listing intentionally omits an unreadable advisory subtree.
+    pub fn is_advisory_unreadable(&self) -> bool {
+        self.advisory_unreadable
     }
 
     /// Exact listed-directory identity, or `None` when it was absent.
@@ -260,7 +284,12 @@ impl ListingFingerprint {
             validate_listing_name(name)?;
             identity.validate()?;
         }
-        if Self::with_container(self.container.clone(), self.children.clone())?.sha256
+        if Self::with_container(
+            self.container.clone(),
+            self.children.clone(),
+            self.advisory_unreadable,
+        )?
+        .sha256
             != self.sha256
         {
             return Err(CaptureError::ListingFingerprintMismatch);

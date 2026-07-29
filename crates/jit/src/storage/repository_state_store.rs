@@ -790,7 +790,9 @@ fn capture_capability_image(
         .map(|path| {
             let entry = match inspect_capability_entry(layout, roots, path) {
                 Ok(entry) => entry,
-                Err(RepositoryStateStoreError::Io(_)) if spec.is_advisory(path) => {
+                Err(RepositoryStateStoreError::Io(error))
+                    if spec.is_advisory(path) && error.kind() == ErrorKind::PermissionDenied =>
+                {
                     advisory_unreadable_entry(path)?
                 }
                 Err(error) => return Err(error),
@@ -1137,12 +1139,33 @@ fn inspect_capability_listing(
     let directory = if path.relative().is_root() {
         root.try_clone()?
     } else {
-        open_descendant_dir_nofollow(root, path.relative().as_path())?
+        match open_descendant_dir_nofollow(root, path.relative().as_path()) {
+            Ok(directory) => directory,
+            Err(RepositoryStateStoreError::Io(error))
+                if advisory && error.kind() == ErrorKind::PermissionDenied =>
+            {
+                return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
+            }
+            Err(error) => return Err(error),
+        }
     };
     let physical_directory = layout.resolve(path)?;
     let mut children = BTreeMap::new();
-    for entry in directory.entries()? {
-        let entry = entry?;
+    let entries = match directory.entries() {
+        Ok(entries) => entries,
+        Err(error) if advisory && error.kind() == ErrorKind::PermissionDenied => {
+            return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
+        }
+        Err(error) => return Err(error.into()),
+    };
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) if advisory && error.kind() == ErrorKind::PermissionDenied => {
+                return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
+            }
+            Err(error) => return Err(error.into()),
+        };
         let name = entry
             .file_name()
             .into_string()
@@ -1150,7 +1173,11 @@ fn inspect_capability_listing(
         let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
         let child_entry = match inspect_capability_entry(layout, roots, &child) {
             Ok(entry) => entry,
-            Err(RepositoryStateStoreError::Io(_)) if advisory => advisory_unreadable_entry(&child)?,
+            Err(RepositoryStateStoreError::Io(error))
+                if advisory && error.kind() == ErrorKind::PermissionDenied =>
+            {
+                advisory_unreadable_entry(&child)?
+            }
             Err(error) => return Err(error),
         };
         let identity = child_entry
