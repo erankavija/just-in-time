@@ -171,7 +171,7 @@
           "short_id": "625cc07f",
           "title": "Strip the development root from container archive destinations",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "depends_on": [
             "c7f8ebc7"
           ],
@@ -198,8 +198,15 @@
           "dispatch_order": 1,
           "planned_model": "gpt-5.6-terra/high",
           "branch": "worktree-agent-f9e42a43",
-          "rework_attempts": 1,
-          "review_note": "First pre-merge review found commit-pinned directory targets still collapsed to Missing. Rework must propagate target kind through captured pinned evidence and cover pinned link/direct-reference regressions."
+          "branch_head": "4dab2e1b",
+          "merge_commit": "cbeec711",
+          "commits": 3,
+          "uncommitted": 0,
+          "reported": "yes",
+          "rework_attempts": 2,
+          "review_note": "Round 1 propagated directory kinds through commit-pinned evidence and added version-divergence regressions. Round 2 corrected Git symlink/gitlink classification using exact tree mode/type evidence and removed the inferred compatibility constructor, leaving one explicit semantic target-kind API.",
+          "gate_note": "Exact-commit verification passed. The first authoritative run was sandbox-blocked; the next passed 4,099 tests but its final postcheck found 6.2 GiB of worker incremental caches. After deleting exactly those two regenerable caches, cargo-ci and code-review passed on merge cbeec711 with zero review findings.",
+          "completed_at": "2026-07-29T22:20:52.842092140Z"
         }
       ]
     },

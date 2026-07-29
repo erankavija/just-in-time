@@ -6,12 +6,24 @@
   "dependencies": [],
   "description": "A markdown link whose target is a directory is treated consistently across archival discovery, link checking and validation.\n\n## Background\n\nArchival discovery treats a link target that resolves to a directory as navigation: it contributes no artifact entry, no edge and no warning, so a plan reaching one stays eligible. That is the shipped, deliberate behaviour.\n\nThe same link reaches two other commands, which disagree with it and with each other. Measured on a freshly initialized repository, with a document linking `[the studies area](../studies)` where `dev/studies` is a real directory:\n\n- `jit doc add` records the asset as `original_path: ../studies`, `resolved_path: dev/studies`, `asset_type: missing`.\n- `jit doc check-links` then reports it as a `missing_asset` **error**, plus a `scan_error` reading `Failed to scan document for links: Is a directory (os error 21)`.\n\nSeparately, a directory linked directly as an issue's own document — `jit doc add <id> dev/studies` — makes `jit validate` fail with `Invalid document reference in issue '<id>': file 'dev/studies' not found in the working tree or at HEAD`, for a path that exists. Archival blocks the same case as `unsupported-artifact-type`, which reads correctly; the validator's message does not.\n\nAn adopter who writes an ordinary relative link to a directory therefore gets a clean archive plan and a failing link check, with no way to tell which command is right.\n\n## Success Criteria\n\n- [hard] REQ-01: A link target that resolves to an existing directory is classified consistently by asset scanning and by link checking, and neither reports it as missing.\n- [hard] REQ-02: Link checking reports no scan error for a link target that is a directory.\n- [hard] REQ-03: A document reference naming an existing directory produces a diagnostic that says the path is not a supported artifact type rather than that it was not found.\n- [hard] REQ-04: The archival treatment of a directory link target as navigation is unchanged.\n\n## Notes\n\nSurfaced by the archival-layout epic `8e071e18` while verifying its REQ-15 on a fresh repository. Outside every one of that epic's criteria: REQ-15 and `@/issue/8e071e18/decision/D-18` both scope themselves to artifact discovery and the `unsupported-artifact-type` blocker, which the shipped behaviour satisfies. Recorded there as pitfall P25.",
   "documents": [],
+  "done_at": "2026-07-29T22:20:52.842092140Z",
   "first_ready_at": "2026-07-27T10:44:23.643747816Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-29T22:15:41.272576674Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-29T22:20:39.563362280Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
   "labels": [
     "milestone:v1.0",
@@ -21,7 +33,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Treat a directory link target consistently across discovery, link checking and validation",
-  "updated_at": "2026-07-29T21:18:14.670073708Z"
+  "updated_at": "2026-07-29T22:20:52.842092140Z"
 }

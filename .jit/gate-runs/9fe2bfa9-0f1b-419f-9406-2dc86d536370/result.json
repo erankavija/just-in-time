@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "cbeec7113b5565ed51153aea50d715af1b6b98e1",
+  "completed_at": "2026-07-29T22:20:39.282345258Z",
+  "duration_ms": 289286,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied in the current tree; recorded Cargo CI passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f9e42a43-e382-4e1b-9e15-91984def9977",
+  "message": null,
+  "run_id": "9fe2bfa9-0f1b-419f-9406-2dc86d536370",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T22:15:49.995674142Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 996d8168, 6984af18, e11211a0, 4dab2e1b, cbeec711 (`jit:f9e42a43`; workflow-only and unrelated merge metadata excluded)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8e071e18/decision/D-18, @/issue/8b05a612/requirement/REQ-11 (.jit/issues); @/gate/jit-validate (.jit/gates.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T22:08:08Z); code-review pending\nTruncation recovery: re-read individual commit and merge path partitions; narrowed archival inspection to artifact_discovery.rs\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied in the current tree; recorded Cargo CI passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
