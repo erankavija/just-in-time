@@ -538,7 +538,7 @@ await runTest('accepts valid arguments', () => {
   assert.strictEqual(result.data.title, 'Test');
 });
 
-await runTest('rejects missing required fields', () => {
+await runTest('rejects missing required fields and names the offending property', () => {
   const schema = {
     properties: {
       title: { type: 'string' },
@@ -547,7 +547,54 @@ await runTest('rejects missing required fields', () => {
   };
   const result = validateArguments({}, schema);
   assert.ok(!result.success);
-  assert.ok(result.error.includes('Required'), `error should mention Required: ${result.error}`);
+  assert.strictEqual(result.data, undefined, 'a rejected call must not yield arguments');
+  // The caller sends the message straight back to the MCP client, so it has to
+  // identify which property was at fault. The wording belongs to the validation
+  // library; the property name is this module's contract.
+  assert.ok(result.error.includes('title'), `error should name the property: ${result.error}`);
+});
+
+await runTest('rejects a non-integer value for an integer-typed property', () => {
+  const schema = {
+    properties: {
+      depth: { type: 'integer' },
+    },
+    required: ['depth'],
+  };
+  assert.ok(validateArguments({ depth: 3 }, schema).success);
+  const fractional = validateArguments({ depth: 3.5 }, schema);
+  assert.ok(!fractional.success, 'integer properties must reject fractional numbers');
+  assert.ok(fractional.error.includes('depth'), `error should name the property: ${fractional.error}`);
+});
+
+await runTest('accepts any value for a property with no recognised type', () => {
+  const schema = {
+    properties: {
+      payload: { type: 'unmapped-type' },
+    },
+    required: ['payload'],
+  };
+  // Unrecognised schema types fall through to an unconstrained validator so a
+  // new CLI type never blocks a tool call before it reaches the CLI.
+  for (const value of ['text', 42, { nested: true }, ['a']]) {
+    const result = validateArguments({ payload: value }, schema);
+    assert.ok(result.success, `unmapped type should accept ${JSON.stringify(value)}`);
+    assert.deepStrictEqual(result.data.payload, value);
+  }
+});
+
+await runTest('reports the index path of an offending array item', () => {
+  const schema = {
+    properties: {
+      label: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['label'],
+  };
+  const result = validateArguments({ label: ['type:task', 7] }, schema);
+  assert.ok(!result.success);
+  // Nested failures are reported by their full path so the client can tell
+  // which array element was rejected.
+  assert.ok(result.error.includes('label.1'), `error should locate the item: ${result.error}`);
 });
 
 await runTest('accepts optional fields when missing', () => {
@@ -601,31 +648,33 @@ await runTest('validates array type with string items', () => {
   assert.ok(!bad.success);
 });
 
-await runTest('default values on optional fields do not apply (known Zod ordering issue)', () => {
-  // validator.js chains .default() before .optional(), so Zod's optional()
-  // swallows undefined before the default can kick in. This test documents
-  // the current behavior. Defaults only work on required fields.
+await runTest('a schema default applies to an omitted argument whether or not it is required', () => {
+  // tools/list advertises each argument's `default` in the tool inputSchema, so
+  // a client that omits the argument must get exactly that value back.
+  for (const required of [[], ['mode']]) {
+    const schema = {
+      properties: {
+        mode: { type: 'string', default: 'manual' },
+      },
+      required,
+    };
+    const result = validateArguments({}, schema);
+    assert.ok(result.success);
+    assert.strictEqual(result.data.mode, 'manual',
+      `default should apply with required=${JSON.stringify(required)}`);
+  }
+});
+
+await runTest('an explicit value overrides a schema default', () => {
   const schema = {
     properties: {
       mode: { type: 'string', default: 'manual' },
     },
     required: [],
   };
-  const result = validateArguments({}, schema);
+  const result = validateArguments({ mode: 'auto' }, schema);
   assert.ok(result.success);
-  assert.strictEqual(result.data.mode, undefined);
-});
-
-await runTest('default values on required fields do apply', () => {
-  const schema = {
-    properties: {
-      mode: { type: 'string', default: 'manual' },
-    },
-    required: ['mode'],
-  };
-  const result = validateArguments({}, schema);
-  assert.ok(result.success);
-  assert.strictEqual(result.data.mode, 'manual');
+  assert.strictEqual(result.data.mode, 'auto');
 });
 
 await runTest('createValidator produces reusable validator', () => {
@@ -745,6 +794,18 @@ await runTest('skips undefined and empty string values', () => {
   const result = buildCliArgs(['issue', 'show'], { id: 'abc', title: undefined }, cmdDef);
   assert.ok(!result.includes('--title'), 'should skip undefined flag');
   assert.ok(!result.includes('undefined'), 'should not have literal undefined');
+});
+
+await runTest('a positional argument defaulted to the empty string stays off the command line', () => {
+  // `item search` declares an empty-string default for its query, which
+  // validation materialises. An empty positional would shift every argument
+  // after it, so it must be dropped here.
+  const cmdDef = {
+    args: [{ name: 'query', type: 'string' }],
+    flags: [{ name: 'json', type: 'boolean' }],
+  };
+  const result = buildCliArgs(['item', 'search'], { query: '' }, cmdDef);
+  assert.deepStrictEqual(result, ['item', 'search', '--json']);
 });
 
 await runTest('command path forms the start of args', () => {
