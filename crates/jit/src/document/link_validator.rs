@@ -109,8 +109,10 @@ impl LinkValidator {
     /// Validate a single link from a document against the working tree
     pub fn validate_link(&self, from_doc: &Path, link: &InternalLink) -> LinkValidationResult {
         self.validate_link_at(from_doc, link, |target| {
-            let full_path = self.repo_root.join(target);
-            full_path.exists() && full_path.is_file()
+            self.all_document_paths.contains(target) || {
+                let full_path = self.repo_root.join(target);
+                full_path.exists() && full_path.is_file()
+            }
         })
     }
 
@@ -345,6 +347,10 @@ mod tests {
         // A target registered in the working tree may have been introduced
         // after the pinned document's commit, so registration alone cannot
         // satisfy a versioned link check.
+        assert!(matches!(
+            validator.validate_link(&from, &link),
+            LinkValidationResult::Valid
+        ));
         assert!(matches!(
             validator.validate_link_at(&from, &link, |path| path == target),
             LinkValidationResult::Valid
