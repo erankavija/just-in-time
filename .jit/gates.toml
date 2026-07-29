@@ -181,11 +181,9 @@ timeout_seconds = 300
 pass_context = false
 
 [gates.checker.env]
-# The adopter documentation surface, supplied explicitly. The checker's own
-# fallback derives a footprint from [documentation].permanent_paths, which
-# denotes the artifacts that archive by copy — a deliberately different set
-# from the adopter surface once development areas carry permanent entries
-# (@/issue/8e071e18/decision/D-13).
+# The adopter documentation surface, supplied explicitly. The checker defaults
+# to this same shipped surface when invoked without an override; repository
+# citation scanning and archival permanence are separate configured contracts.
 DOCS_FOOTPRINT = "docs/"
 
 [gates.reserved]

@@ -5,7 +5,15 @@
   "created_at": "2026-07-26T19:29:56.941091209Z",
   "dependencies": [],
   "description": "The plan-doc location resolver in the commands layer has no production caller, so its behaviour is exercised only by its own tests.\n\n## Background\n\nThree functions — the location resolver, the plan-content loader, and the plan-doc projector — are reachable only from their module's own test section. Nothing re-exports them, no command arm calls them, and the HTTP server does not reach them. The projector calls the general projection entry point rather than being called by it. The error type these functions produce has a wired rendering arm in the binary's error handling, but nothing in production constructs that error, so the arm is unreachable.\n\nWhole-repository validation locates a plan from the planning node's recorded document reference rather than by re-deriving the template's location, which is why nothing needs the resolver on that path.\n\nThe condition predates the work that most recently rewrote the module: it holds at that work's base commit too.\n\n## Success Criteria\n\n- [hard] REQ-01: The plan-doc location resolver, the plan-content loader, and the plan-doc projector each either have a production caller or are absent from the tree.\n- [hard] REQ-02: No variant of the plan-doc error type has a rendering arm that production code cannot reach.\n- [hard] REQ-03: The choice between wiring the surface to a caller and removing it is recorded with its reasoning and the rejected alternative.\n\n## Notes\n\nIf a production path that derives a plan location is reintroduced, the resolver already substitutes the template's container-directory token correctly, so the wiring choice does not require re-deriving that behaviour.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "decision",
+      "format": "markdown",
+      "label": "Removal decision record",
+      "path": "dev/active/985ab96d/985ab96d-decision.md"
+    }
+  ],
   "first_ready_at": "2026-07-26T19:29:56.941091209Z",
   "gates_required": [
     "cargo-ci",
@@ -23,5 +31,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Unreferenced plan-doc location resolver",
-  "updated_at": "2026-07-29T14:11:02.954873053Z"
+  "updated_at": "2026-07-29T15:38:27.627836255Z"
 }
