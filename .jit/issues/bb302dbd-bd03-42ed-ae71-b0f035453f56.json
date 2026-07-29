@@ -5,7 +5,15 @@
   "created_at": "2026-07-15T09:12:53.169848366Z",
   "dependencies": [],
   "description": "The committed MCP production dependency graph is advisory-free while preserving schema-generated server startup and protocol behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: npm audit --omit=dev --audit-level=info exits zero in mcp-server/ against the committed package-lock.json with no audit exception.\n- [hard] REQ-02: MCP unit, integration, startup, initialize, and tools/list tests pass with the release CLI schema after the dependency changes.\n- [hard] REQ-03: Any SDK or validation API migration updates every affected MCP consumer and regression test in the same change.\n\n## Notes\n\nBlast radius: `mcp-server/package.json`, `mcp-server/package-lock.json`, and affected `mcp-server/` implementation/tests; CLI behavior remains a consumed schema contract.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": "Production dependency audit evidence",
+      "path": "dev/active/bb302dbd/production-audit-evidence.md"
+    }
+  ],
   "first_ready_at": "2026-07-15T09:12:53.169848706Z",
   "gates_required": [
     "mcp-ci",
@@ -22,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remediate MCP production dependency advisories",
-  "updated_at": "2026-07-29T14:10:38.504470245Z"
+  "updated_at": "2026-07-29T16:13:38.259220673Z"
 }
