@@ -66,16 +66,16 @@
           "short_id": "f04f7888",
           "title": "Implement graceful jit-server process shutdown",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "reported",
           "gates": [
             "cargo-ci",
             "code-review",
             "jit-validate"
           ],
-          "branch_head": "a8182e6f",
-          "commits": 0,
-          "uncommitted": 10,
-          "reported": "no",
+          "branch_head": "cb64d918",
+          "commits": 4,
+          "uncommitted": 0,
+          "reported": "yes",
           "branch": "worktree-agent-f04f7888"
         },
         {
@@ -398,18 +398,31 @@
     {
       "file": "CHANGELOG.md",
       "branches": [
-        "worktree-agent-7edd2fe8",
-        "worktree-agent-c7f8ebc7"
+        "7edd2fe8",
+        "c7f8ebc7",
+        "f04f7888"
       ],
-      "resolution": "Both add Unreleased entries. Keep both; this is an additive conflict, not a semantic one."
+      "resolution": "Three additive Unreleased entries. Keep all three; no semantic conflict."
     },
     {
       "file": "docs/reference/cli-commands.md",
       "branches": [
-        "worktree-agent-c7f8ebc7",
+        "c7f8ebc7",
+        "f04f7888",
         "(wave 1b) ef118aea"
       ],
-      "resolution": "c7f8ebc7 reflowed the moving-path-citation paragraph without changing the execution-evidence sentences' wording. Merge c7f8ebc7 first, then dispatch ef118aea against the merged text."
+      "resolution": "c7f8ebc7 reflowed the moving-path-citation paragraph; f04f7888 edited the shutdown sentence. Different paragraphs, but the same file across three branches. Merge c7f8ebc7 then f04f7888, verify the moving-path-citation paragraph survived the second merge intact, and only then dispatch ef118aea against the merged text."
+    },
+    {
+      "file": "crates/server/tests/",
+      "branches": [
+        "f04f7888"
+      ],
+      "resolution": "f04f7888 git-renamed tests/document_api_tests.rs into tests/server_integration/. A rename plus another branch's edit to the old path would merge badly, but no other wave-1a branch touches crates/server/. Verify before merging any later wave that does."
     }
-  ]
+  ],
+  "build_budget_watch": {
+    "current": "integration-targets=11/12, active-executables=15, bytes=1344087296/2147483648",
+    "note": "f04f7888 deliberately folded its real-process test into a new server_integration suite rather than adding a 12th target, which would have left zero headroom. Any later issue adding an integration target must re-check @/inv/bounded-rust-build-footprint first."
+  }
 }
