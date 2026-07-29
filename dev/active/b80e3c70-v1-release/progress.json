@@ -7,7 +7,7 @@
     {
       "wave_number": 1,
       "sub_wave": "1a",
-      "footprint_rationale": "Eight disjoint footprints: .github+scripts, web/, mcp-server/, crates/server/, commands/document.rs, domain/artifact_plan.rs, scripts/docs-mechanical.sh, commands/plan_doc.rs.",
+      "footprint_rationale": "Eight disjoint footprints: .github+scripts, web/, mcp-server/, crates/server/, commands/document.rs, domain/artifact_plan.rs, scripts/docs-mechanical.sh, and the plan-doc surface under commands/ (which 985ab96d removed).",
       "issues": [
         {
           "id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
@@ -130,7 +130,7 @@
           "short_id": "985ab96d",
           "title": "Unreferenced plan-doc location resolver",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "reported",
           "gates": [
             "cargo-ci",
             "code-review"
@@ -139,7 +139,11 @@
           "commits": 1,
           "uncommitted": 0,
           "reported": "no",
-          "branch": "worktree-agent-985ab96d"
+          "branch": "worktree-agent-985ab96d",
+          "lead_actions_on_main": [
+            "jit doc add 985ab96d dev/active/985ab96d/985ab96d-decision.md",
+            "Mirror the REQ-01 remove-vs-wire decision into the issue as a ## Decisions item"
+          ]
         }
       ]
     },

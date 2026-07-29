@@ -50,6 +50,7 @@ Worker branch state at handoff (`worktree-agent-<short-id>`, worktrees under
 - [ ] Merge each branch into `main` sequentially with `git merge --no-ff`, running `scripts/verify-commit-builds.sh` after **each** merge before the next one.
 - [ ] Evaluate gates **sequentially**, from the main checkout, with an explicit `cwd` — see trap 5.
 - [ ] Review each issue through all six tiers of `references/lead-review-protocol.md` before transitioning anything to `done`.
+- [ ] `985ab96d` needs two lead actions on `main` after merge, which the worker was barred from doing: `jit doc add 985ab96d dev/active/985ab96d/985ab96d-decision.md`, and mirror its REQ-01 remove-vs-wire decision into the issue as a `## Decisions` item. REQ-03 is only satisfied once the decision is recorded and discoverable.
 - [ ] Fix the stale comment in `.jit/gates.toml` under `[gates.checker.env]` above `DOCS_FOOTPRINT = "docs/"`, which asserts the checker's fallback derives from `[documentation].permanent_paths`. `eeee8a1a` makes that false. It is a TOML comment, not the `description` field, so no gate contract changes and `docs/reference/rules-and-gates.md` stays projection-fresh. Commit under `jit:eeee8a1a`.
 - [ ] Add `CHANGELOG.md` entries for the dependency majors. Workers were kept out of the root manifest, so this is the lead's.
 - [ ] Then dispatch sub-wave 1b (`f9e42a43`, `ef118aea`), then 1c (`a122b9b3`) alone.
