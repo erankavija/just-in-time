@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **An archive preview's `moving-path-citation` warnings no longer fire on
+  citations that already name the archived destination.** The scan matched a
+  moving artifact's source path as a plain substring, and every destination it
+  plans is the destination root followed by that same source path, so a citation
+  corrected to the destination still contained the source path and still warned
+  — with the column shifted by the length of the inserted destination root.
+  Repointing a citation therefore never emptied the report, and the warning set
+  could not be used as a work list. The scan now reports an occurrence only
+  where the surrounding text names the moving path whole: text naming a longer
+  path that ends with it warns for neither, whether it is the published
+  destination, an unrelated root above it, a directory whose name ends with its
+  first segment, or a longer file name past its end. A citation of the source
+  path alone is still reported, at the column where that path begins.
+
 - **Graph-template application no longer leaves a node `ready` while a
   dependency it just wired blocks it.** `jit apply` added the edge, then read
   the dependent's dependency set back from the already-mutated map. When the new

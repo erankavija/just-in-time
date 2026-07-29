@@ -992,13 +992,13 @@ fn cite_moving_path(
     entry.with_warnings(warnings)
 }
 
-/// One [`WarningCode::MovingPathCitation`] warning per occurrence of `source` in
+/// One [`WarningCode::MovingPathCitation`] warning per citation of `source` in
 /// the text of a scanned file.
 ///
-/// Each warning names the citing file with the occurrence's 1-based line and
+/// Each warning names the citing file with the citation's 1-based line and
 /// column, spelled `<citing path>:<line>:<column>`. The position both locates a
 /// citation that structured document edges cannot see — a code comment, an
-/// inline code span, a shell-script line — and keeps every occurrence a distinct
+/// inline code span, a shell-script line — and keeps every citation a distinct
 /// warning under the plan's code-and-path warning identity, so repeated
 /// citations in one file are each reported.
 fn moving_path_citation_warnings(
@@ -1020,26 +1020,60 @@ fn moving_path_citation_warnings(
         .collect()
 }
 
-/// The 1-based character column of every occurrence of `source` in `line`,
-/// in ascending order and including occurrences that overlap each other.
+/// The 1-based character column of every citation of `source` in `line`, in
+/// ascending order.
 ///
-/// A path that ends with one of its own prefixes occurs twice in text that
-/// chains it — `a/a` occurs at columns 1 and 3 of `a/a/a` — so the search
-/// resumes one character past each occurrence's start rather than past its end.
-/// Resuming by one *character* is what keeps the traversal inside the text:
-/// every slice boundary it takes is the start or the end of a whole character,
-/// so text in any script is scanned without panicking. An empty `source` names
-/// no citation and yields nothing.
+/// The column is counted in characters, so text in any script is located where
+/// its reader sees it. An empty `source` matches only empty text, which cites
+/// nothing.
+///
+/// The search resumes past the end of each occurrence it examines. That loses
+/// no citation: an occurrence starting inside another is preceded by the cited
+/// path's own opening characters, which name path content, so
+/// [`is_whole_path_citation`] rejects it.
 fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = usize> + 'a {
-    let leading = source.chars().next();
-    std::iter::successors(Some((line, 1usize, None)), move |&(rest, column, _)| {
-        let resume = leading?.len_utf8();
-        rest.find(source).map(|offset| {
-            let found = column + rest[..offset].chars().count();
-            (&rest[offset + resume..], found + 1, Some(found))
+    line.match_indices(source)
+        .filter(move |(offset, matched)| {
+            !matched.is_empty() && is_whole_path_citation(line, *offset, source)
         })
-    })
-    .filter_map(|(_, _, found)| found)
+        .map(move |(offset, _)| line[..offset].chars().count() + 1)
+}
+
+/// Whether the occurrence of `source` at byte `offset` in `line` cites that path
+/// whole, rather than sitting inside a longer one.
+///
+/// A longer path reaches the occurrence through a directory name, whether it
+/// stands above the cited path (`dev/archive/8e071e18/dev/active/plan.md`, the
+/// destination every relocation publishes) or merely ends with the cited path's
+/// first segment (`mydev/active/plan.md`), and it extends past the occurrence
+/// through a longer name (`dev/active/plan.mdx`). So the path characters
+/// against the occurrence on either side must name nothing of their own for it
+/// to be a citation.
+///
+/// Punctuation carrying no name leaves the citation whole, which is how the
+/// citations prose and code actually write are kept: a quote or bracket around
+/// the path, the `-` of a shell default (`${OUT:-dev/active/plan.md}`), a
+/// sentence period after it, and a relative `./` or `../` before it, which adds
+/// no directory and marks a citation the same relocation breaks.
+fn is_whole_path_citation(line: &str, offset: usize, source: &str) -> bool {
+    let before = line[..offset]
+        .chars()
+        .rev()
+        .take_while(|character| is_path_character(*character));
+    let after = line[offset + source.len()..]
+        .chars()
+        .take_while(|character| is_path_character(*character));
+    !before.chain(after).any(is_name_character)
+}
+
+/// Whether `character` can belong to a repository path as text spells one.
+fn is_path_character(character: char) -> bool {
+    is_name_character(character) || matches!(character, '/' | '.' | '-')
+}
+
+/// Whether `character` names a path segment rather than punctuating one.
+fn is_name_character(character: char) -> bool {
+    character.is_alphanumeric() || character == '_'
 }
 
 fn selected_destination_roots(
@@ -3197,24 +3231,26 @@ mod tests {
                 "{citing}:{line}:{column} does not locate a citation"
             );
         }
-        // Every occurrence earns exactly one warning, counted over the fixture
+        // Every citation earns exactly one warning, counted over the fixture
         // text independently of the scan, so a file citing the path twice on one
         // line is reported twice and a file citing another path is silent.
         for (citing, text) in &files {
             assert_eq!(
                 located.iter().filter(|(cited, ..)| cited == citing).count(),
                 occurrences(text, CITED_SOURCE),
-                "{citing} earns one warning per occurrence"
+                "{citing} earns one warning per citation"
             );
         }
     }
 
-    /// Every occurrence of `cited` in `text`, overlapping ones included.
+    /// Every occurrence of `cited` in `text`, whether or not it stands alone.
     ///
     /// The count comes from a candidate start at every character of the text,
-    /// which shares no search with the scan under test: the scan resumes from
-    /// the character after an occurrence it found, while this examines each
-    /// position on its own and so cannot inherit a skipped position from it.
+    /// which shares no search with the scan under test: the scan skips ahead
+    /// through the text as it matches, while this examines each position on its
+    /// own and so cannot inherit a skipped position from it. It counts warnings
+    /// only for text whose every occurrence of `cited` names that path whole,
+    /// which is how the fixtures above cite it.
     fn occurrences(text: &str, cited: &str) -> usize {
         text.char_indices()
             .filter(|(offset, _)| text[*offset..].starts_with(cited))
@@ -3236,43 +3272,203 @@ mod tests {
         )
     }
 
-    #[test]
-    fn test_classify_artifacts_warns_for_each_of_two_overlapping_occurrences_of_a_moving_path() {
-        // A path ending with one of its own prefixes occurs twice in text that
-        // chains it: `dev/active/dev` starts again at the `dev` that ends the
-        // first occurrence, the minimal shape of `a/a` in `a/a/a`. A search
-        // resuming past the end of an occurrence sees only the first, so this
-        // fixture separates any-occurrence scanning from non-overlapping
-        // scanning.
-        let source = "dev/active/dev";
-        let files = [("dev/studies/tooling.md", "`dev/active/dev/active/dev`\n")];
-        let plan = scanned_plan_for(default_policy(), source, &files);
+    /// A container plan relocating several present sources, scanning `files`.
+    fn scanned_plan_for_sources(sources: &[&str], files: &[(&str, &str)]) -> ArtifactPlan {
+        let present = sources
+            .iter()
+            .map(|source| {
+                (
+                    *source,
+                    ArtifactLocation::Regular(identity(source.as_bytes())),
+                    ArtifactLocation::Missing,
+                )
+            })
+            .collect::<Vec<_>>();
+        container(
+            sources
+                .iter()
+                .map(|source| explicit(source, vec![owner("i", State::Done, true)]))
+                .collect(),
+            ArtifactClassificationFacts {
+                citations: citations(files),
+                ..locations(&present)
+            },
+        )
+    }
+
+    /// The destination a plan publishes for `source`, read from a plan of that
+    /// same artifact, so a fixture cites the path an operator repoints to
+    /// instead of a copy of the destination rule.
+    fn planned_destination(source: &str) -> String {
+        let plan = scanned_plan_for(default_policy(), source, &[]);
         let artifact = entry(&plan, source);
         assert_eq!(artifact.action(), ArtifactAction::Move);
-        let located = cited_locations(artifact);
+        artifact
+            .destination()
+            .expect("a moving artifact publishes a destination")
+            .to_string()
+    }
 
-        assert_eq!(located.len(), occurrences(files[0].1, source));
-        assert!(located
+    #[test]
+    fn test_classify_artifacts_reports_no_citation_warning_for_a_citation_repointed_to_the_archived_destination(
+    ) {
+        let destination = planned_destination(CITED_SOURCE);
+        // The shape that makes this more than a spelling difference: a
+        // destination is the destination root followed by the source path, so
+        // the repointed citation still holds the source path inside it.
+        assert!(
+            destination.contains(CITED_SOURCE),
+            "a destination carries the source path, which is what makes the repointed citation ambiguous"
+        );
+        let text = format!("Superseded, see `{destination}` for the design.\n");
+        let files = [("dev/studies/tooling.md", text.as_str())];
+
+        let plan = scanned_plan_for(default_policy(), CITED_SOURCE, &files);
+        let artifact = entry(&plan, CITED_SOURCE);
+
+        assert_eq!(artifact.action(), ArtifactAction::Move);
+        assert!(
+            cited_locations(artifact).is_empty(),
+            "a citation naming the destination is already repointed and leaves the report"
+        );
+    }
+
+    #[test]
+    fn test_classify_artifacts_reports_a_citation_of_only_the_source_path_at_the_column_it_begins()
+    {
+        let line = format!("See `{CITED_SOURCE}` for the design.");
+        let text = format!("{line}\n");
+        let files = [("dev/studies/tooling.md", text.as_str())];
+
+        let plan = scanned_plan_for(default_policy(), CITED_SOURCE, &files);
+        let located = cited_locations(entry(&plan, CITED_SOURCE));
+
+        // The one citation is reported where the cited path begins, located
+        // independently of the scan by examining each character position of the
+        // line on its own.
+        let begins = line
+            .char_indices()
+            .position(|(offset, _)| line[offset..].starts_with(CITED_SOURCE))
+            .map(|index| index + 1)
+            .expect("the fixture must cite the path for the column to mean anything");
+        assert_eq!(
+            located
+                .iter()
+                .map(|(_, _, column)| *column)
+                .collect::<Vec<_>>(),
+            vec![begins]
+        );
+        assert!(reads_back(&files, &located[0], CITED_SOURCE));
+    }
+
+    #[test]
+    fn test_classify_artifacts_warns_once_for_a_line_citing_one_moving_source_and_another_moving_destination(
+    ) {
+        let repointed = "dev/active/design.md";
+        let destination = planned_destination(repointed);
+        let text = format!("Superseded `{CITED_SOURCE}`, now `{destination}`.\n");
+        let files = [("dev/studies/tooling.md", text.as_str())];
+
+        let plan = scanned_plan_for_sources(&[CITED_SOURCE, repointed], &files);
+
+        // Both artifacts relocate, so both read the same line and the reported
+        // citation is a property of the text rather than of which artifact the
+        // plan happens to carry.
+        assert!(plan
+            .artifacts()
             .iter()
-            .all(|location| reads_back(&files, location, source)));
-        // The two occurrences really do overlap, which is what makes the count
-        // above differ from one that resumes past an occurrence's end.
-        let columns = located
+            .all(|artifact| artifact.action() == ArtifactAction::Move));
+        let located = plan
+            .artifacts()
             .iter()
-            .map(|(_, _, column)| *column)
-            .collect::<BTreeSet<_>>();
-        assert!(matches!(
-            columns.iter().copied().collect::<Vec<_>>().as_slice(),
-            [first, second] if second - first < source.chars().count()
-        ));
+            .flat_map(cited_locations)
+            .collect::<Vec<_>>();
+        assert_eq!(located.len(), 1, "{text} cites one path that still moves");
+        assert!(
+            reads_back(&files, &located[0], CITED_SOURCE),
+            "the reported citation is the one naming a source path"
+        );
+    }
+
+    /// Whether the one occurrence of the cited path in `line` cites it.
+    fn cites(line: &str) -> bool {
+        let offset = line
+            .find(CITED_SOURCE)
+            .expect("the fixture must carry the cited path");
+        is_whole_path_citation(line, offset, CITED_SOURCE)
+    }
+
+    #[test]
+    fn test_is_whole_path_citation_separates_the_cited_path_from_a_longer_path_around_it() {
+        // Text naming the path and nothing more. What sits against it carries
+        // no name of its own: the delimiters prose and code write, a shell
+        // default's `-`, a sentence period, a relative prefix that adds no
+        // directory.
+        for line in [
+            format!("See `{CITED_SOURCE}` for the design."),
+            format!("See [the design]({CITED_SOURCE})."),
+            format!("OUT=\"${{PLAN_OUT:-{CITED_SOURCE}}}\""),
+            format!("The design lives in {CITED_SOURCE}."),
+            format!("See ./{CITED_SOURCE} from the repository root."),
+        ] {
+            assert!(cites(&line), "{line} cites the path");
+        }
+        // Text whose path continues past the occurrence in either direction.
+        for line in [
+            format!("Mirrored at `dev/archive/abcdef12/{CITED_SOURCE}`."),
+            format!("Vendored at `my{CITED_SOURCE}`."),
+            format!("Rendered as `{CITED_SOURCE}x`."),
+            format!("Superseded by `{CITED_SOURCE}-old`."),
+        ] {
+            assert!(!cites(&line), "{line} names a longer path");
+        }
+    }
+
+    #[test]
+    fn test_classify_artifacts_reports_no_citation_warning_for_a_longer_path_ending_with_the_cited_path(
+    ) {
+        // Every way a longer path can carry the cited path inside it: a root
+        // above it, a root above it named outside ASCII, a directory whose name
+        // merely ends with its first segment, a longer name past its end, and
+        // text chaining the path into itself.
+        let cases = [
+            (
+                CITED_SOURCE,
+                format!("Mirrored at `docs/mirror/{CITED_SOURCE}`.\n"),
+            ),
+            (
+                CITED_SOURCE,
+                format!("Mirrored at `äänet/{CITED_SOURCE}`.\n"),
+            ),
+            (CITED_SOURCE, format!("Vendored at `my{CITED_SOURCE}`.\n")),
+            (CITED_SOURCE, format!("Rendered as `{CITED_SOURCE}x`.\n")),
+            (
+                "dev/active/dev",
+                "`dev/active/dev/active/dev`\n".to_string(),
+            ),
+        ];
+
+        for (source, text) in cases {
+            assert!(
+                text.contains(source),
+                "{text} must carry {source} inside it for the case to bite"
+            );
+            let files = [("dev/studies/tooling.md", text.as_str())];
+            let plan = scanned_plan_for(default_policy(), source, &files);
+            let artifact = entry(&plan, source);
+
+            assert_eq!(artifact.action(), ArtifactAction::Move);
+            assert!(
+                cited_locations(artifact).is_empty(),
+                "{text} names a longer path and does not cite {source}"
+            );
+        }
     }
 
     #[test]
     fn test_classify_artifacts_reports_a_character_column_for_a_citation_among_multibyte_text() {
-        // A repository whose roots are not ASCII: the cited path opens with a
-        // two-byte character, so one byte past an occurrence's start is inside
-        // that character and slicing there would panic, and the prose ahead of
-        // the occurrence is multi-byte too, so a column counted in bytes would
+        // A repository whose roots are not ASCII: the cited path and the prose
+        // ahead of it are both multi-byte, so a column counted in bytes would
         // overshoot the one the text reads back at.
         let policy = ArtifactClassificationPolicy::configured(
             "äänet",

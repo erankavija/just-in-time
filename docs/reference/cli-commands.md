@@ -237,15 +237,18 @@ A preview also reports the in-content citations a relocation would break as
 universe — the repository-relative directories and files whose text the scan
 reads, which need not lie under the development root ([Citation scan
 roots](configuration.md#citation-scan-roots)). Only a relocating artifact earns
-them, and every occurrence is its own warning whose `path` names the citing file
-with the occurrence's 1-based line and column, spelled
-`<citing path>:<line>:<column>`. The warnings are advisory: they carry no action
-and no blocker, so eligibility, `--execute`, and issue transitions all behave as
-they would with no citation present. Execution relocates bytes and relinks
-document records while rewriting no document content, so a citing file survives
-byte for byte and keeps a stale citation until an adopter edits it. An execution
-plan is built without citation evidence, so a preview is where these warnings
-are read.
+them, and every citation is its own warning whose `path` names the citing file
+with the citation's 1-based line and column, spelled
+`<citing path>:<line>:<column>`. A citation is text naming the moving path
+whole, so text naming a longer path that ends with it — the destination the
+relocation publishes, or an unrelated path — reports nothing, and repointing a
+citation to the destination removes its warning. The warnings are advisory: they
+carry no action and no blocker, so eligibility, `--execute`, and issue
+transitions all behave as they would with no citation present. Execution
+relocates bytes and relinks document records while rewriting no document
+content, so a citing file survives byte for byte and keeps a stale citation
+until an adopter edits it. An execution plan is built without citation evidence,
+so a preview is where these warnings are read.
 
 `jit archive candidates` is the read-only container report. It lists every
 effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of those
