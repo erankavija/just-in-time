@@ -7,7 +7,10 @@
 import { z } from "zod";
 
 /**
- * Convert JSON Schema property to Zod schema
+ * Convert JSON Schema property to Zod schema.
+ *
+ * A property that declares a `default` resolves to that value when the client
+ * omits it, matching the `default` the tool's advertised inputSchema carries.
  * @param {Object} property - JSON Schema property definition
  * @param {boolean} isRequired - Whether the property is required
  * @returns {z.ZodType} Zod schema
