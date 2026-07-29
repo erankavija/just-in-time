@@ -800,18 +800,16 @@ type DocumentClosure = (
 /// planning-node resolution) is added as a working-tree path so a container whose
 /// criteria live in an external plan validates against image-projected content.
 fn document_capture_closure(issues: &[Issue], config: &JitConfig) -> Result<DocumentClosure> {
+    use crate::document::DocumentReferenceRequests;
     use crate::repository_state::VirtualPath;
     let mut worktree = Vec::new();
     let mut pinned = Vec::new();
     for issue in issues {
         for document in &issue.documents {
-            match &document.commit {
-                Some(commit) => pinned.push((commit.clone(), document.path.clone())),
-                None => {
-                    worktree.push(VirtualPath::worktree(&document.path)?);
-                    pinned.push(("HEAD".to_string(), document.path.clone()));
-                }
-            }
+            let requests = DocumentReferenceRequests::for_reference(document)?;
+            worktree.extend(requests.worktree().cloned());
+            let (revision, path) = requests.pinned();
+            pinned.push((revision.to_string(), path.to_string()));
         }
     }
     let templates = &config.templates;

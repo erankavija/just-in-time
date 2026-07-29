@@ -19,7 +19,7 @@ use crate::domain::item::{
 };
 use crate::domain::{parse_known_events, Issue, ReadinessCorrection, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
-use crate::repository_state::{RepositoryEntry, RepositoryImage, RepositoryIndex};
+use crate::repository_state::{RepositoryImage, RepositoryIndex};
 use crate::validation::engine::Finding;
 use crate::validation::report::{ReportedFinding, RuleReport};
 use anyhow::{anyhow, Context, Result};
@@ -456,55 +456,18 @@ fn validate_integrity(
     }
 
     // Document references resolve against boundary-acquired evidence in the closed
-    // image, never live Git or filesystem I/O (plan §2 "Pinned document evidence").
-    // A pinned reference is checked against the pinned evidence for its
-    // `(commit, path)` request; an unpinned reference is present when its captured
-    // working-tree entry exists, falling back to boundary-acquired HEAD evidence.
-    // When Git is unavailable the pinned evidence carries a stable unavailable
-    // reason, reproducing the typed pinned-read diagnostic without requiring Git.
+    // image, never live Git or filesystem I/O (plan §2 "Pinned document evidence"),
+    // through the rule `jit doc check-links` shares
+    // ([`resolve_document_reference`](crate::document::resolve_document_reference)).
     for issue in issues {
         for document in &issue.documents {
-            if let Some(reference) = document.commit.as_deref() {
-                let evidence = image
-                    .pinned_evidence()
-                    .get(&(reference.to_string(), document.path.clone()));
-                match evidence {
-                    Some(evidence) if evidence.exists() => {}
-                    Some(evidence) => {
-                        return Err(anyhow!(
-                            "Invalid document reference in issue '{}': pinned document '{}' at commit '{}' is unavailable: {}",
-                            issue.id,
-                            document.path,
-                            reference,
-                            evidence.unavailable_reason().unwrap_or("not found")
-                        ));
-                    }
-                    None => {
-                        return Err(anyhow!(
-                            "Invalid document reference in issue '{}': pinned document '{}' at commit '{}' was not captured",
-                            issue.id,
-                            document.path,
-                            reference
-                        ));
-                    }
-                }
-            } else {
-                let worktree = crate::repository_state::VirtualPath::worktree(&document.path)?;
-                let present = matches!(image.entry(&worktree)?, RepositoryEntry::File { .. });
-                if !present {
-                    let head = image
-                        .pinned_evidence()
-                        .get(&("HEAD".to_string(), document.path.clone()));
-                    let in_head =
-                        head.is_some_and(crate::repository_state::PinnedDocumentEvidence::exists);
-                    if !in_head {
-                        return Err(anyhow!(
-                            "Invalid document reference in issue '{}': file '{}' not found in the working tree or at HEAD",
-                            issue.id,
-                            document.path
-                        ));
-                    }
-                }
+            if let Some(reason) = crate::document::resolve_document_reference(image, document)?
+                .unresolved()
+            {
+                return Err(anyhow!(
+                    "Invalid document reference in issue '{}': {reason}",
+                    issue.id
+                ));
             }
         }
     }

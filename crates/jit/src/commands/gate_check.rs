@@ -858,13 +858,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         )?;
         if matches!(checker, GateChecker::Exec { .. }) {
             for document in &issue.documents {
-                match &document.commit {
-                    Some(commit) => spec.discover_pinned(commit.clone(), document.path.clone())?,
-                    None => {
-                        spec.discover_paths([VirtualPath::worktree(&document.path)?])?;
-                        spec.discover_pinned("HEAD", document.path.clone())?;
-                    }
+                let requests =
+                    crate::document::DocumentReferenceRequests::for_reference(document)?;
+                if let Some(worktree) = requests.worktree() {
+                    spec.discover_paths([worktree.clone()])?;
                 }
+                let (revision, path) = requests.pinned();
+                spec.discover_pinned(revision, path)?;
             }
         }
         if let GateChecker::Exec {
