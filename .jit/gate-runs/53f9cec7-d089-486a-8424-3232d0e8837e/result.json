@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "a9f20fccce76da172e6a1f42df7600def4ebfc3c",
+  "completed_at": "2026-07-29T18:19:00.397438781Z",
+  "duration_ms": 148242,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/artifact_classifier.rs",
+        "id": "F1",
+        "line": 1071,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c7f8ebc7/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "Whole-path detection treats paths with characters such as '+' adjacent to the source as standalone citations, violating REQ-04."
+      }
+    ],
+    "summary": "The whole-path boundary check still reports source paths embedded in longer valid paths containing characters outside its narrow allowlist.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
+  "message": null,
+  "run_id": "53f9cec7-d089-486a-8424-3232d0e8837e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T18:16:32.155139732Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2374 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faf17-ad8a-7603-83cd-87a3dcebb26e\n--------\nuser\n--- 2361 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c8750579, 977c3894, a85b7866\nPolicy sources: AGENTS.md\nResolved items: @/issue/c7f8ebc7/requirement/REQ-01–REQ-04 (issue description, markdown-first); @/issue/b80e3c70/requirement/REQ-11 (issue description, markdown-first); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/inv/semantic-test-assertions, @/inv/shared-test-contracts, @/inv/architecture-dependency-direction (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T18:09:12Z); code-review pending, no prior run\nTruncation recovery: re-read artifact classifier lines 3420–3525 and resolved the specific parent REQ-11 after a broad issue search truncated; unrelated issue matches were excluded\n\n1. [blocking][issue-impact] `crates/jit/src/domain/artifact_classifier.rs:1071` recognizes only alphanumeric, `_`, `/`, `.`, and `-` as path characters. A valid longer repository path such as `other+dev/active/design.md` is therefore treated as a whole citation of `dev/active/design.md`, because scanning stops at the adjacent `+` and emits a warning. This violates REQ-04; include non-delimiter filename characters (or define boundaries by actual path delimiters) and add a regression case. References: @/issue/c7f8ebc7/requirement/REQ-04.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The whole-path boundary check still reports source paths embedded in longer valid paths containing characters outside its narrow allowlist.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Whole-path detection treats paths with characters such as '+' adjacent to the source as standalone citations, violating REQ-04.\",\"file\":\"crates/jit/src/domain/artifact_classifier.rs\",\"line\":1071,\"references\":[\"@/issue/c7f8ebc7/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

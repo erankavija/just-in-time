@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-29T18:16:20.199994832Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-29T18:19:00.676251070Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
   "labels": [
     "milestone:v1.0",
@@ -23,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Archival citation warnings fire on citations that already name the destination",
-  "updated_at": "2026-07-29T14:10:53.167032732Z"
+  "updated_at": "2026-07-29T18:19:00.676251070Z"
 }
