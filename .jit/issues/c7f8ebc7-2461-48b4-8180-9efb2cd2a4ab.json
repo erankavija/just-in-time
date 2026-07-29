@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "An in-content citation corrected to an artifact's archived destination still reports as a breaking citation, because the match is a plain substring find and every destination path contains the source path.\n\n## Background\n\nAn archival plan warns about occurrences of a moving artifact's repository-relative source path in the text of the files it scans. Every destination this planner produces is the destination root followed by that same source path, so a citation that correctly names the destination still contains the source path as a trailing substring and still warns. The reported column is shifted by exactly the length of the inserted destination-root prefix.\n\nMeasured on two citation-repointing runs: the warning counts were unchanged after the repoint, at 5 and 3 respectively, with the columns shifted by 35 and 39 characters.\n\nThe warning is advisory. It changes no action, no blocker, and no plan eligibility, so nothing is blocked by it. What it costs is the ability to use the warning set as an acceptance signal — \"the warnings disappear once the citation is repointed\" is unsatisfiable, and anyone who expects that has to be corrected.\n\n## Success Criteria\n\n- [hard] REQ-01: A citation naming an artifact's archived destination reports no moving-path citation warning for that artifact.\n- [hard] REQ-02: A citation naming only the artifact's source path still reports the warning, at the column where the source path begins.\n- [hard] REQ-03: A line citing the source path of one moving artifact and the archived destination of another reports exactly one warning.\n- [hard] REQ-04: A citation whose text contains the source path as part of a longer unrelated path reports no warning for that artifact.\n\n## Notes\n\nBoth halves matter: the report is only useful as a work list if a repointed citation leaves it, and only trustworthy if an unrepointed one stays.",
   "documents": [],
+  "done_at": "2026-07-29T20:17:52.877428734Z",
   "first_ready_at": "2026-07-26T19:30:00.790799615Z",
   "gates_required": [
     "cargo-ci",
@@ -14,12 +15,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-29T19:25:51.487537940Z",
+      "updated_at": "2026-07-29T20:14:36.839561296Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-29T19:30:52.862894130Z",
+      "status": "passed",
+      "updated_at": "2026-07-29T20:17:30.733591628Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,7 +33,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archival citation warnings fire on citations that already name the destination",
-  "updated_at": "2026-07-29T19:30:52.862894130Z"
+  "updated_at": "2026-07-29T20:17:52.877428734Z"
 }

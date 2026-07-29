@@ -11,19 +11,20 @@
 ## Current state
 
 - Epic `b80e3c70` remains `backlog`, assigned to `agent:jit-execution-lead`, and blocked by sink child `bb03df0a` as designed.
-- Execution is paused in wave 1, sub-wave 1a. Wave 1b and later waves have not been dispatched.
-- Six of the eight wave-1a issues are Done:
+- Execution is active in wave 1, sub-wave 1a. Wave 1b and later waves have not been dispatched.
+- Seven of the eight wave-1a issues are Done:
   - `7edd2fe8` — required CI on every PR
   - `8fa7261b` — web production dependency advisories
   - `bb302dbd` — MCP production dependency advisories
   - `f289ff18` — pinned document link checking
   - `eeee8a1a` — docs checker default footprint
   - `985ab96d` — removed unused plan-doc resolver
-- Two wave-1a issues are still `in_progress` with passing non-review gates and failed code review after the configured two rework rounds:
-  - `f04f7888` — graceful server shutdown
   - `c7f8ebc7` — archival citation-warning boundaries
-- Main is clean. All four rework worktrees were verified clean and fully merged, then removed; their branches remain available.
-- The only other registered worktrees are the pre-existing `lead-install-clean` and `steward-v1-readiness` worktrees.
+- One wave-1a issue remains in exceptional rework:
+  - `f04f7888` — graceful server shutdown
+- Main includes the verified c7 exceptional merge. Its gate/completion state is committed separately from code before the f04 merge.
+- The c7 exceptional worktree was verified clean and removed with its branch preserved. The f04 exceptional worktree is clean and committed, awaiting isolated merge and verification.
+- The pre-existing `lead-install-clean` and `steward-v1-readiness` worktrees remain registered.
 
 ## Exceptional rework approved
 
@@ -46,6 +47,7 @@ The execution-lead policy permits two normal rework rounds. Both issues below re
 - Prepared resolution: recognize shell defaults only in proven parameter-expansion context such as `${NAME:-...}`, with explicit counterexamples for raw `notes:-...`, concatenated longer paths, malformed/unclosed expansions, and valid variable-name forms.
 - Approved execution: one exceptional third rework round using a focused high-reasoning implementation model. Shell-default recognition must prove actual parameter-expansion context rather than accepting the raw two-character suffix.
 - Alternatives: explicitly accept the false-positive edge case, or defer/remove the issue from v1.0. Accepting a known REQ-04 violation is not recommended.
+- Resolution: exceptional branch `7327d1c0` merged as `3cc41bca`; cargo-ci passed with 4,088 tests after removal of exactly the regenerable incremental cache, code-review passed with zero findings, and the issue is Done.
 
 ## User-directed archive-layout finding
 

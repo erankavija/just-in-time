@@ -24,7 +24,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Strip the development root from container archive destinations",
-  "updated_at": "2026-07-29T19:46:29.701614046Z"
+  "updated_at": "2026-07-29T20:17:58.311509619Z"
 }

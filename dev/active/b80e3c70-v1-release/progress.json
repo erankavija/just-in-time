@@ -99,16 +99,19 @@
           "short_id": "c7f8ebc7",
           "title": "Archival citation warnings fire on citations that already name the destination",
           "classification": "implementation",
-          "status": "exceptional_rework_authorized",
+          "status": "done",
           "gates": [
             "cargo-ci",
             "code-review"
           ],
-          "branch_head": "977c3894",
-          "commits": 2,
+          "branch_head": "7327d1c0",
+          "merge_commit": "3cc41bca",
+          "commits": 1,
           "uncommitted": 0,
           "reported": "yes",
-          "branch": "worktree-agent-c7f8ebc7"
+          "branch": "worktree-agent-c7f8ebc7-r3",
+          "exceptional_rework_attempts": 1,
+          "gate_note": "cargo-ci first passed all substantive checks but failed its incremental-state postcheck because diagnostics had created target/debug/incremental. After deleting exactly that regenerable cache, cargo-ci passed with 4,088 tests; final code-review passed with zero findings."
         },
         {
           "id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",

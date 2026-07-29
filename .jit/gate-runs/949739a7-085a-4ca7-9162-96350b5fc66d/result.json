@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "3cc41bca96205dfca7d6f769efcfdb90c6943d3f",
+  "completed_at": "2026-07-29T20:17:30.453113276Z",
+  "duration_ms": 163546,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are covered by the current implementation and regression tests; the prior shell-default boundary finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
+  "message": null,
+  "run_id": "949739a7-085a-4ca7-9162-96350b5fc66d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T20:14:46.906796427Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 55beb5b7, e15a5577, d9217303, 867cf72e, a85b7866, 977c3894, c8750579\nPolicy sources: AGENTS.md\nResolved items: @/issue/c7f8ebc7/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (issue description, markdown-first); @/issue/8b05a612/requirement/REQ-11 (scope brief, markdown-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-29T20:07:19.492587863+00:00)\nTruncation recovery: recovered classifier patches and current source/tests in commit-, path-, and line-bounded reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are covered by the current implementation and regression tests; the prior shell-default boundary finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
