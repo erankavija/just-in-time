@@ -16,10 +16,14 @@ use axum::Router;
 use clap::Parser;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
 use jit::commands::CommandExecutor;
+use jit_server::shutdown::{
+    await_shutdown_signal, run_shutdown_sequence, ServerHandle, GRACEFUL_DRAIN_TIMEOUT,
+};
 use jit_server::{prepare_server_storage, resolve_listener, ListenerSource};
 use routes::AppState;
 
@@ -94,10 +98,16 @@ async fn main() -> Result<()> {
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| "jit".to_string());
 
+    // One cancellation token for the whole process: cloned into the application
+    // state, and from there into every event stream the router serves, so a
+    // shutdown ends those streams instead of waiting out their keepalives.
+    let shutdown = CancellationToken::new();
+
     let state = AppState {
         executor,
         tracker,
         project_name,
+        shutdown: shutdown.clone(),
     };
 
     // Build CORS layer for local development
@@ -137,14 +147,36 @@ async fn main() -> Result<()> {
     // process (listenfd); only bind `--bind` when none was handed down. This
     // keeps the port bound continuously across the jit→jit-server handoff.
     let (std_listener, source) = resolve_listener(&args.bind)?;
-    let listener = tokio::net::TcpListener::from_std(std_listener)?;
-    let local_addr = listener.local_addr()?;
+    let local_addr = std_listener.local_addr()?;
     match source {
         ListenerSource::Inherited => info!("Server listening on http://{local_addr} (inherited)"),
         ListenerSource::Bound => info!("Server listening on http://{local_addr}"),
     }
 
-    axum::serve(listener, app).await?;
+    // The handle owns the listener and the live connections; the shutdown
+    // sequence drives both through it once a signal arrives.
+    let handle = ServerHandle::new();
+    let shutdown_sequence = tokio::spawn(run_shutdown_sequence(
+        handle.clone(),
+        shutdown,
+        GRACEFUL_DRAIN_TIMEOUT,
+        await_shutdown_signal(),
+    ));
+
+    axum_server::from_tcp(std_listener)?
+        .handle(handle)
+        .serve(app.into_make_service())
+        .await
+        .context("HTTP server stopped with an error")?;
+
+    // Serving ended, so the drain is over. Joining reports its outcome before
+    // the process exits, and surfaces a signal-registration failure as this
+    // process's exit status.
+    shutdown_sequence
+        .await
+        .context("shutdown sequence did not complete")?
+        .context("shutdown signal handling failed")?;
+    info!("Shutdown complete");
 
     Ok(())
 }

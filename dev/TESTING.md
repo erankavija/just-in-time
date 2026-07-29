@@ -229,7 +229,10 @@ Reserve this layer for what only it can see: user-facing command contracts, `--j
 shapes, flag combinations, and regression tests for reported CLI bugs. Workflow coverage
 belongs in the harness layer, where it runs faster and fails more legibly.
 
-`crates/server/tests/` holds the equivalent layer for the web UI server crate.
+`crates/server/tests/` holds the equivalent layer for the web UI server crate, organized
+the same way: one `server_integration` suite whose `main.rs` declares the modules, covering
+both the in-process API cases and the real-process shutdown cases that spawn the compiled
+`jit-server` binary through `env!("CARGO_BIN_EXE_jit-server")`.
 
 Run a whole suite with `cargo test --test cli_repo_workflow`, or filter to one module or case
 with `cargo test --test cli_repo_workflow integration_test`.
