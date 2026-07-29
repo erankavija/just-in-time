@@ -32,8 +32,9 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
 - D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - D-13: Give each adopter-facing fact one canonical documentation home
-- D-14: Gate source freeze on completed profiles MVP and core maintenance
+- D-14: Gate the v1.0 tag on completed profiles MVP and core maintenance
 - D-15: Fix scoped validation in core rather than weakening bracket evidence
+- D-16: Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
 
 ## Decision Details
 
@@ -219,22 +220,21 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   enforces `@/inv/single-source-prose` across the public documentation surface.
 - **Date:** 2026-07-14
 
-### D-14: Source freeze consumes the two completed upstream delivery streams
+### D-14: The v1.0 tag consumes the two completed upstream delivery streams
 
-- **Chosen:** Keep the production-readiness source-freeze boundary directly
-  dependent on profiles MVP `9b7b5f9c` and core maintenance `6eb585bc`. Complete
-  core maintenance as a terminal v1.0 prerequisite before production readiness
-  crosses that boundary; the release work consumes both delivered contracts
-  without changing or duplicating them.
+- **Chosen:** Keep the release boundary directly dependent on profiles MVP
+  `9b7b5f9c` and core maintenance `6eb585bc`. Both reach a terminal state before
+  the `v1.0.0` tag is created; the release work consumes their delivered
+  contracts without changing or duplicating them.
 - **Rejected:** Creating an intermediate v1.0 core-maintenance checkpoint only
   to make the dependency terminal; keeping core maintenance intentionally open
-  as a living epic; and copying either upstream stream's work into production
-  readiness, which creates competing ownership.
+  as a living epic; and copying either upstream stream's work into the release
+  container, which creates competing ownership.
 - **Reasoning:** The existing DAG expresses the intended ordering. Planning and
-  independent release hardening can proceed while core maintenance finishes,
-  but source freezing and candidate production require the completed core fixes
-  and profile quickstart. A synthetic checkpoint would add lifecycle ceremony
-  without changing that contract.
+  independent release hardening can proceed while core maintenance finishes, but
+  tagging requires the completed core fixes and the profile quickstart. A
+  synthetic checkpoint would add lifecycle ceremony without changing that
+  contract.
 - **Date:** 2026-07-15
 
 ### D-15: Scoped bracket validation is a core-maintenance prerequisite
@@ -255,3 +255,32 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   project-wide validation primitive belongs to the already-prioritized core
   maintenance stream, consistent with D-3 and D-14.
 - **Date:** 2026-07-15
+
+### D-16: One tag-triggered workflow publishes one GitHub release
+
+- **Chosen:** v1.0 publishes a single GitHub release, produced by one workflow
+  that reacts to a maintainer-pushed annotated tag. That workflow runs the normal
+  validation suites and the blocking audits on the tagged commit, builds the
+  Linux x86_64 musl archive and the MCP tarball, smoke-tests the extracted
+  binaries, and publishes the release with checksums, license texts, and release
+  notes. Package-registry and container-registry publication stay out of v1.0, so
+  the release requires no stored publishing credential and no registry account,
+  and the supported container path is an image the operator builds from the
+  repository.
+- **Rejected:** A multi-workflow candidate-publication protocol built around an
+  immutable candidate escrow, versioned transition ledgers, a fixed-ref tag
+  authority primitive, and reconstruction from expired evidence. It is bespoke to
+  a single version rather than reusable across releases, it manufactures the
+  irreversibility it defends against by requiring immutable releases before the
+  tag, and its ongoing cost — protected environments, a repository App with
+  write authority, and hosted cross-workflow fixtures — outlives the one release
+  it serves.
+- **Reasoning:** The failure modes that protocol addressed are real but cheap
+  here. The project has no downstream consumers and no prior tags, and the
+  release has one atomic publication target, so recovery from a botched
+  publication is deleting a tag and cutting another one. The supply-chain
+  properties worth keeping — blocking audits, full-SHA action pins, and a smoke
+  gate ahead of publication — are retained directly; the transaction protocol
+  wrapped around them does not amortize across a single release. Distribution
+  breadth is a separate decision, taken once the release path itself is proven.
+- **Date:** 2026-07-29

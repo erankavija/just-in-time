@@ -113,8 +113,9 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **D-11** — Release v1.0 with no known dependency advisories and blocking security audits
 - **D-12** — Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - **D-13** — Give each adopter-facing fact one canonical documentation home
-- **D-14** — Gate source freeze on completed profiles MVP and core maintenance
+- **D-14** — Gate the v1.0 tag on completed profiles MVP and core maintenance
 - **D-15** — Fix scoped validation in core rather than weakening bracket evidence
+- **D-16** — Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
 <!-- jit:charter:end -->
 
 <!-- jit:dogfood-guidance:begin -->
