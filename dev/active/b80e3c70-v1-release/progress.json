@@ -76,7 +76,8 @@
           "commits": 4,
           "uncommitted": 0,
           "reported": "yes",
-          "branch": "worktree-agent-f04f7888"
+          "branch": "worktree-agent-f04f7888",
+          "criterion_amendment": "REQ-02 was updated before the exceptional merge to replace the obsolete axum-server-owned graceful_shutdown(Some(timeout)) mechanism with the user-approved single application-owned boundary: graceful_shutdown(None), boundary-time sampling, then shutdown() only for survivors."
         },
         {
           "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",

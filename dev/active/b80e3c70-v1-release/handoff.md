@@ -38,6 +38,7 @@ The execution-lead policy permits two normal rework rounds. Both issues below re
 - Prepared resolution: remove the second deadline domain. Call `handle.graceful_shutdown(None)` to stop acceptance and begin indefinite graceful draining, own the one configured timeout in JIT, sample `connection_count` at that exact boundary, and call public `handle.shutdown()` only when survivors remain. This makes the sampled count and force-close action share one boundary.
 - Approved execution: one exceptional third rework round using a frontier model at high reasoning because the fix must align two asynchronous deadline domains and add deterministic timing coverage.
 - Alternatives: explicitly accept the inaccurate log/count, or defer/remove the issue from the v1.0 epic. Accepting the known defect is not recommended.
+- Contract alignment: stored REQ-02 was amended before merge to state the approved single application-owned deadline outcome rather than the superseded `graceful_shutdown(Some(...))` mechanism. The amended description also now follows the repository content-standard structure.
 
 ### `c7f8ebc7`
 
