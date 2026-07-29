@@ -13,9 +13,14 @@ import { mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { strict as assert } from 'node:assert';
-import { CURATION } from './lib/tool-generator.js';
+import { CURATION, getCommandByPath } from './lib/tool-generator.js';
+import { loadSchema } from './lib/schema-loader.js';
 
 const TIMEOUT = 5000;
+
+// The CLI schema the server under test also loads, used to derive expectations
+// instead of restating command shapes here.
+const { schema } = await loadSchema();
 
 // ---------------------------------------------------------------------------
 // MCPTester — spawns an isolated MCP server for testing
@@ -28,6 +33,7 @@ class MCPTester {
     this.pendingRequests = new Map();
     this.nextId = 1;
     this.testDir = null;
+    this.stderr = '';
   }
 
   async start() {
@@ -48,7 +54,7 @@ class MCPTester {
         this._processResponses();
       });
 
-      this.server.stderr.on('data', () => {});
+      this.server.stderr.on('data', (data) => { this.stderr += data.toString(); });
       this.server.on('error', reject);
 
       setTimeout(resolve, 500);
@@ -168,6 +174,22 @@ async function main() {
 
     console.log('Protocol');
 
+    await runTest('startup connects the stdio transport and reports its tool counts', () => {
+      // index.js writes the readiness banner only after server.connect(transport)
+      // resolves, so the banner is evidence the SDK transport came up against a
+      // schema loaded from the CLI.
+      assert.ok(!tester.stderr.includes('Fatal error:'),
+        `startup reported a fatal error: ${tester.stderr}`);
+      assert.ok(/^Version: \S+$/m.test(tester.stderr),
+        `startup should report the schema version: ${tester.stderr}`);
+      const counts = tester.stderr.match(/Tools: (\d+) listed \((\d+) total\)/);
+      assert.ok(counts, `startup should report tool counts: ${tester.stderr}`);
+      const [, listed, total] = counts.map(Number);
+      assert.strictEqual(listed, Object.keys(CURATION.include).length,
+        'startup should list exactly the curated include set');
+      assert.ok(total >= listed, 'total tool count should cover the listed set');
+    });
+
     await runTest('initialize returns server info', async () => {
       const resp = await tester.request('initialize', {
         protocolVersion: '2024-11-05',
@@ -263,7 +285,16 @@ async function main() {
       assert.ok(result.isError);
       const parsed = JSON.parse(result.content[0].text);
       assert.strictEqual(parsed.error.code, 'VALIDATION_ERROR');
-      assert.ok(parsed.error.message.includes('Required'));
+      // The rejection names the argument the client omitted; the wording of the
+      // rest of the message belongs to the validation library.
+      const required = getCommandByPath(schema, ['doc', 'assets', 'list']).args
+        .filter(arg => arg.required)
+        .map(arg => arg.name);
+      assert.ok(required.length > 0, 'fixture command should declare a required argument');
+      for (const name of required) {
+        assert.ok(parsed.error.message.includes(name),
+          `validation error should name '${name}': ${parsed.error.message}`);
+      }
     });
 
     await runTest('CLI error returns structured error envelope', async () => {

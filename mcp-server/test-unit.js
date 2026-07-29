@@ -538,7 +538,7 @@ await runTest('accepts valid arguments', () => {
   assert.strictEqual(result.data.title, 'Test');
 });
 
-await runTest('rejects missing required fields', () => {
+await runTest('rejects missing required fields and names the offending property', () => {
   const schema = {
     properties: {
       title: { type: 'string' },
@@ -547,7 +547,54 @@ await runTest('rejects missing required fields', () => {
   };
   const result = validateArguments({}, schema);
   assert.ok(!result.success);
-  assert.ok(result.error.includes('Required'), `error should mention Required: ${result.error}`);
+  assert.strictEqual(result.data, undefined, 'a rejected call must not yield arguments');
+  // The caller sends the message straight back to the MCP client, so it has to
+  // identify which property was at fault. The wording belongs to the validation
+  // library; the property name is this module's contract.
+  assert.ok(result.error.includes('title'), `error should name the property: ${result.error}`);
+});
+
+await runTest('rejects a non-integer value for an integer-typed property', () => {
+  const schema = {
+    properties: {
+      depth: { type: 'integer' },
+    },
+    required: ['depth'],
+  };
+  assert.ok(validateArguments({ depth: 3 }, schema).success);
+  const fractional = validateArguments({ depth: 3.5 }, schema);
+  assert.ok(!fractional.success, 'integer properties must reject fractional numbers');
+  assert.ok(fractional.error.includes('depth'), `error should name the property: ${fractional.error}`);
+});
+
+await runTest('accepts any value for a property with no recognised type', () => {
+  const schema = {
+    properties: {
+      payload: { type: 'unmapped-type' },
+    },
+    required: ['payload'],
+  };
+  // Unrecognised schema types fall through to an unconstrained validator so a
+  // new CLI type never blocks a tool call before it reaches the CLI.
+  for (const value of ['text', 42, { nested: true }, ['a']]) {
+    const result = validateArguments({ payload: value }, schema);
+    assert.ok(result.success, `unmapped type should accept ${JSON.stringify(value)}`);
+    assert.deepStrictEqual(result.data.payload, value);
+  }
+});
+
+await runTest('reports the index path of an offending array item', () => {
+  const schema = {
+    properties: {
+      label: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['label'],
+  };
+  const result = validateArguments({ label: ['type:task', 7] }, schema);
+  assert.ok(!result.success);
+  // Nested failures are reported by their full path so the client can tell
+  // which array element was rejected.
+  assert.ok(result.error.includes('label.1'), `error should locate the item: ${result.error}`);
 });
 
 await runTest('accepts optional fields when missing', () => {
