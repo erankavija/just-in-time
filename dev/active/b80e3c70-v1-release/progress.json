@@ -14,17 +14,18 @@
           "short_id": "7edd2fe8",
           "title": "Establish deterministic workflow contract verification",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "reported",
           "gates": [
             "repo-validate",
             "code-review",
             "jit-validate"
           ],
-          "branch_head": "0c6baa2d",
-          "commits": 3,
-          "uncommitted": 4,
-          "reported": "no",
-          "branch": "worktree-agent-7edd2fe8"
+          "branch_head": "bc0ca679",
+          "commits": 5,
+          "uncommitted": 0,
+          "reported": "yes",
+          "branch": "worktree-agent-7edd2fe8",
+          "touches_shared_file": "CHANGELOG.md \u2014 the only wave-1a branch that edits it, so no cross-branch conflict"
         },
         {
           "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
@@ -369,6 +370,12 @@
       "detail": ".github/workflows/security-audit.yml:49 runs `npm audit --production` with no --audit-level, laxer than epic REQ-02 states.",
       "routed_to": "f7f80d53",
       "criterion_check": "epic REQ-02 names the audit invocation; confirm f7f80d53 closes it"
+    },
+    {
+      "subject": "ci.yml YAML parse defect (fixed)",
+      "detail": "ci.yml's profile-adoption step scalar (profile_acceptance_tests:: -- --nocapture) made the file unparseable to a strict YAML parser at base commit a8182e6f. 7edd2fe8 fixed it by quoting. Pre-existing, not introduced by this wave.",
+      "routed_to": "7edd2fe8",
+      "criterion_check": "closed in-wave"
     }
   ],
   "started_at": "2026-07-29T14:20:00+00:00",
