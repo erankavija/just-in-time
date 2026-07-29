@@ -7,8 +7,8 @@
 ## Current state
 
 - Epic: `b80e3c70` — state: backlog, assigned `agent:jit-execution-lead`
-- Wave in progress: wave 1, sub-wave 1a of 7 waves
-- Children summary: 0 done, 8 claimed and dispatched, 14 backlog/ready, 0 rejected
+- Wave in progress: wave 1, sub-wave 1a of 7 waves — **all 8 workers complete and reported**; nothing merged, gated, or transitioned
+- Children summary: 0 done, 8 claimed with delivered branches, 14 backlog/ready, 0 rejected
 - Active claims: `7edd2fe8`, `8fa7261b`, `bb302dbd`, `f04f7888`, `f289ff18`, `c7f8ebc7`, `eeee8a1a`, `985ab96d` — all `agent:worker`, claimed 2026-07-29 ~14:12Z
 - Open escalations: None.
 - Progress file: `progress.json` in this directory
@@ -19,16 +19,18 @@ transitioned. Every worker branch is anchored to `a8182e6f`.
 Worker branch state at handoff (`worktree-agent-<short-id>`, worktrees under
 `.agents/worktrees/agent-<short-id>`):
 
-| Issue | HEAD | Commits | Uncommitted | Reported |
-|---|---|---|---|---|
-| 7edd2fe8 | 0c6baa2d | 3 | 4 | no — still working |
-| 8fa7261b | 45bd85c5 | 2 | 0 | yes, in full |
-| bb302dbd | 0d9d28ba | 3 | 0 | yes; one lead question outstanding |
-| f04f7888 | a8182e6f | 0 | 10 | no — still working |
-| f289ff18 | f08ae5f9 | 1 | 3 | no — still working |
-| c7f8ebc7 | c8750579 | 1 | 1 | no — still working |
-| eeee8a1a | ac46b11d | 2 | 0 | yes, in full |
-| 985ab96d | 8d538c93 | 1 | 0 | no — still working |
+| Issue | HEAD | Commits | Reported |
+|---|---|---|---|
+| 7edd2fe8 | bc0ca679 | 5 | yes |
+| 8fa7261b | 45bd85c5 | 2 | yes |
+| bb302dbd | 0d9d28ba | 3 | yes |
+| f04f7888 | cb64d918 | 4 | yes |
+| f289ff18 | f4418c21 | 2 | yes |
+| c7f8ebc7 | 977c3894 | 2 | yes |
+| eeee8a1a | ac46b11d | 2 | yes |
+| 985ab96d | 8d538c93 | 1 | yes |
+
+All eight trees are clean; no worker left uncommitted work.
 
 ## What just happened
 
@@ -54,7 +56,7 @@ Worker branch state at handoff (`worktree-agent-<short-id>`, worktrees under
 - [ ] `985ab96d` needs two lead actions on `main` after merge, which the worker was barred from doing: `jit doc add 985ab96d dev/active/985ab96d/985ab96d-decision.md`, and mirror its REQ-01 remove-vs-wire decision into the issue as a `## Decisions` item. REQ-03 is only satisfied once the decision is recorded and discoverable.
 - [ ] Fix the stale comment in `.jit/gates.toml` under `[gates.checker.env]` above `DOCS_FOOTPRINT = "docs/"`, which asserts the checker's fallback derives from `[documentation].permanent_paths`. `eeee8a1a` makes that false. It is a TOML comment, not the `description` field, so no gate contract changes and `docs/reference/rules-and-gates.md` stays projection-fresh. Commit under `jit:eeee8a1a`.
 - [ ] Add `CHANGELOG.md` entries for the dependency majors. Workers were kept out of the root manifest, so this is the lead's.
-- [ ] Then dispatch sub-wave 1b (`f9e42a43`, `ef118aea`), then 1c (`a122b9b3`) alone.
+- [ ] Then dispatch sub-wave 1b (`f9e42a43`, `ef118aea`), then 1c (`a122b9b3`) alone. **Re-read `f9e42a43`'s dispatch assumptions before writing its prompt.** `f289ff18` moved the ground under it: an unpinned document reference naming a directory or symlink now classifies as `missing_document`, and `f9e42a43`'s REQ-03 requires exactly that case to say "not a supported artifact type" rather than "not found". The message now lives in the shared resolver `crates/jit/src/document/reference.rs`, which both `jit validate` and `jit doc check-links` call — so the fix is one edit in one place, but only if `f289ff18` is merged first. Dispatching `f9e42a43` against the pre-merge tree would send it to a code shape that no longer exists. Full detail is in `progress.json` under its `blocking_predecessor_note`.
 - [ ] Reclaim wave-1a worktrees once merged (`git worktree remove` only for branches in `git branch --merged main`).
 
 ## Traps — do not repeat these
