@@ -99,15 +99,15 @@
           "short_id": "c7f8ebc7",
           "title": "Archival citation warnings fire on citations that already name the destination",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "reported",
           "gates": [
             "cargo-ci",
             "code-review"
           ],
-          "branch_head": "c8750579",
-          "commits": 1,
-          "uncommitted": 1,
-          "reported": "no",
+          "branch_head": "977c3894",
+          "commits": 2,
+          "uncommitted": 0,
+          "reported": "yes",
           "branch": "worktree-agent-c7f8ebc7"
         },
         {
@@ -174,7 +174,8 @@
             "cargo-ci",
             "code-review",
             "doc-review"
-          ]
+          ],
+          "merge_note": "c7f8ebc7 reflowed the whole moving-path-citation paragraph in docs/reference/cli-commands.md, which contains the two sentences about an execution plan being built without citation evidence. Expect a textual conflict there if ef118aea rewrites that paragraph. Dispatch ef118aea only after c7f8ebc7 is merged."
         }
       ]
     },
@@ -392,5 +393,23 @@
   "base_commit": "a8182e6f20476d547e3a0f969ef0ed4c636e4b56",
   "handoffs": [
     "dev/active/b80e3c70-v1-release/handoff.md"
+  ],
+  "merge_conflicts_expected": [
+    {
+      "file": "CHANGELOG.md",
+      "branches": [
+        "worktree-agent-7edd2fe8",
+        "worktree-agent-c7f8ebc7"
+      ],
+      "resolution": "Both add Unreleased entries. Keep both; this is an additive conflict, not a semantic one."
+    },
+    {
+      "file": "docs/reference/cli-commands.md",
+      "branches": [
+        "worktree-agent-c7f8ebc7",
+        "(wave 1b) ef118aea"
+      ],
+      "resolution": "c7f8ebc7 reflowed the moving-path-citation paragraph without changing the execution-evidence sentences' wording. Merge c7f8ebc7 first, then dispatch ef118aea against the merged text."
+    }
   ]
 }
