@@ -164,14 +164,14 @@
     {
       "wave_number": 1,
       "sub_wave": "1b",
-      "footprint_rationale": "Both issues are implementation-disjoint in core code, but both are likely to add a Fixed entry at the same existing CHANGELOG.md insertion point. Serialize f9e42a43 before 625cc07f to avoid a predictable same-file conflict; 625cc07f then supplies the canonical archive layout required by wave 1c ef118aea.",
+      "footprint_rationale": "The f9e42a43 first submission did not touch CHANGELOG.md, eliminating the predicted shared-file conflict. Its focused pinned-evidence rework and the cross-cutting 625cc07f archive-layout migration therefore proceed concurrently; 625cc07f still lands before ef118aea so later reporting exercises the canonical path.",
       "issues": [
         {
           "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
           "short_id": "625cc07f",
           "title": "Strip the development root from container archive destinations",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "depends_on": [
             "c7f8ebc7"
           ],
@@ -180,9 +180,10 @@
             "code-review",
             "docs-mechanical"
           ],
-          "footprint_note": "Expected to own archive destination derivation, its tests, the repository archive migration, and canonical archive-layout documentation. Run after f9e42a43 to avoid a changelog insertion conflict, and before ef118aea so execution/reporting tests exercise the corrected layout.",
+          "footprint_note": "Owns archive destination derivation, its tests, the repository archive migration, and canonical archive-layout documentation. Dispatched alongside f9e42a43 rework after its first submission proved CHANGELOG-disjoint; must land before ef118aea so execution/reporting tests exercise the corrected layout.",
           "dispatch_order": 2,
-          "planned_model": "gpt-5.6-sol/high"
+          "planned_model": "gpt-5.6-sol/high",
+          "branch": "worktree-agent-625cc07f"
         },
         {
           "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
@@ -195,7 +196,10 @@
             "code-review"
           ],
           "dispatch_order": 1,
-          "planned_model": "gpt-5.6-terra/high"
+          "planned_model": "gpt-5.6-terra/high",
+          "branch": "worktree-agent-f9e42a43",
+          "rework_attempts": 1,
+          "review_note": "First pre-merge review found commit-pinned directory targets still collapsed to Missing. Rework must propagate target kind through captured pinned evidence and cover pinned link/direct-reference regressions."
         }
       ]
     },
