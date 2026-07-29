@@ -804,29 +804,35 @@ fn capture_capability_image(
         .pinned()
         .iter()
         .map(|(revision, path)| {
-            let evidence = match resolver.read_pinned_path(revision, path) {
+            let evidence = match resolver.inspect_pinned_target(revision, path) {
                 Ok(read) => {
-                    let bytes = read.bytes().to_vec();
                     let commit = read.version().as_str().to_string();
-                    let blob_oid = read.blob_oid().to_string();
+                    let object_oid = read.object_oid().map(str::to_string);
+                    let bytes = read.bytes().map(<[u8]>::to_vec);
+                    let identity = bytes
+                        .as_ref()
+                        .zip(object_oid.as_deref())
+                        .map(|(bytes, oid)| {
+                            EntryIdentity::for_bytes(format!("git-blob:{oid}"), bytes)
+                        })
+                        .transpose()?;
                     PinnedDocumentEvidence::new(
                         revision.clone(),
                         path.clone(),
                         PinnedSourceClass::GitObject,
+                        read.target_kind(),
                         Some(commit.clone()),
-                        Some(blob_oid.clone()),
-                        Some(EntryIdentity::for_bytes(
-                            format!("git-blob:{blob_oid}"),
-                            &bytes,
-                        )?),
-                        Some(bytes),
-                        None,
+                        object_oid,
+                        identity,
+                        bytes,
+                        read.unavailable_reason().map(stable_unavailable_reason),
                     )?
                 }
                 Err(error) => PinnedDocumentEvidence::new(
                     revision.clone(),
                     path.clone(),
                     PinnedSourceClass::GitUnavailable,
+                    crate::repository_state::RepositoryTargetKind::Missing,
                     None,
                     None,
                     None,
@@ -879,6 +885,7 @@ fn capture_memory_image(
                     revision.clone(),
                     path.clone(),
                     PinnedSourceClass::GitUnavailable,
+                    crate::repository_state::RepositoryTargetKind::Missing,
                     None,
                     None,
                     None,

@@ -55,17 +55,21 @@ enum CheckedDocument {
 /// A pinned document's content and neighbourhood, read at its commit.
 struct PinnedDocumentReading {
     links: Vec<crate::document::InternalLink>,
-    present: std::collections::BTreeSet<std::path::PathBuf>,
+    target_kinds:
+        std::collections::BTreeMap<std::path::PathBuf, crate::document::DocumentTargetKind>,
     scan_error: Option<String>,
 }
 
 impl PinnedDocumentReading {
-    /// Whether `path` holds a file at the pinned commit.
+    /// Captured kind of `path` at the pinned commit.
     ///
     /// Answers only for the assets and link targets the capture requested; any
     /// other path is reported absent rather than read from the working tree.
-    fn holds(&self, path: &std::path::Path) -> bool {
-        self.present.contains(path)
+    fn target_kind(&self, path: &std::path::Path) -> crate::document::DocumentTargetKind {
+        self.target_kinds
+            .get(path)
+            .copied()
+            .unwrap_or(crate::document::DocumentTargetKind::Missing)
     }
 
     /// The internal links the pinned content names, or why it could not be
@@ -1160,7 +1164,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     AssetType::Local => {
                         if let Some(ref resolved) = asset.resolved_path {
                             let present = match pinned {
-                                Some(pinned) => pinned.holds(resolved),
+                                Some(pinned) => pinned.target_kind(resolved).is_file(),
                                 None => {
                                     repo_root.join(resolved).exists()
                                         || check_asset_in_git(&git_repo, resolved)
@@ -1201,6 +1205,21 @@ impl<S: IssueStore> CommandExecutor<S> {
                             "type": "missing_asset",
                             "asset": asset.original_path,
                             "message": format!("Asset classified as missing: {}", asset.original_path),
+                        }));
+                    }
+                    AssetType::Directory => {
+                        // Directories are Markdown navigation targets, not assets.
+                    }
+                    AssetType::Unsupported => {
+                        errors.push(serde_json::json!({
+                            "issue_id": issue_id,
+                            "document": doc.path,
+                            "type": "unsupported_asset",
+                            "asset": asset.original_path,
+                            "message": format!(
+                                "Asset resolves to an unsupported artifact type: {}",
+                                asset.original_path
+                            ),
                         }));
                     }
                     AssetType::External => {
@@ -1251,7 +1270,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         let result = match pinned {
                             Some(pinned) => {
                                 link_validator.validate_link_at(&doc_path_rel, &link, |target| {
-                                    pinned.holds(target)
+                                    pinned.target_kind(target)
                                 })
                             }
                             None => link_validator.validate_link(&doc_path_rel, &link),
@@ -1465,16 +1484,17 @@ fn pinned_text(
         .map_err(|error| error.to_string())
 }
 
-/// Whether the pinned evidence captured for `(revision, path)` holds a file.
-fn pinned_holds(
+/// Captured kind for `(revision, path)`, or missing when it was not requested.
+fn pinned_target_kind(
     image: &crate::repository_state::RepositoryImage,
     revision: &str,
     path: &std::path::Path,
-) -> bool {
+) -> crate::document::DocumentTargetKind {
     image
         .pinned_evidence()
         .get(&(revision.to_string(), path.to_string_lossy().into_owned()))
-        .is_some_and(crate::repository_state::PinnedDocumentEvidence::exists)
+        .map(crate::repository_state::PinnedDocumentEvidence::target_kind)
+        .unwrap_or(crate::document::DocumentTargetKind::Missing)
 }
 
 /// The link targets every pinned document's captured content names, as pinned
@@ -1536,18 +1556,21 @@ fn read_document(
             Some(format!("Failed to scan document for links: {error}")),
         ),
     };
-    let present = local_asset_paths(document)
+    let target_kinds = local_asset_paths(document)
         .map(std::path::Path::to_path_buf)
         .chain(
             links
                 .iter()
                 .filter_map(|link| link_validator.resolve_target(from, link)),
         )
-        .filter(|path| pinned_holds(image, commit, path))
+        .map(|path| {
+            let kind = pinned_target_kind(image, commit, &path);
+            (path, kind)
+        })
         .collect();
     Ok(CheckedDocument::Pinned(PinnedDocumentReading {
         links,
-        present,
+        target_kinds,
         scan_error,
     }))
 }
@@ -1730,10 +1753,22 @@ fn hydrate_document_scan(
                     let evidence = image.pinned_evidence().get(&key).ok_or_else(|| {
                         anyhow!("pinned evidence for '{}' at '{revision}' is absent", key.1)
                     })?;
-                    if let Some(bytes) = evidence.bytes() {
-                        asset.asset_type = AssetType::Local;
-                        asset.mime_type = crate::document::AssetScanner::detect_mime_type(path);
-                        asset.content_hash = Some(format!("{:x}", Sha256::digest(bytes)));
+                    match evidence.target_kind() {
+                        crate::document::DocumentTargetKind::File => {
+                            let bytes = evidence.bytes().ok_or_else(|| {
+                                anyhow!("pinned file evidence for '{}' has no bytes", key.1)
+                            })?;
+                            asset.asset_type = AssetType::Local;
+                            asset.mime_type = crate::document::AssetScanner::detect_mime_type(path);
+                            asset.content_hash = Some(format!("{:x}", Sha256::digest(bytes)));
+                        }
+                        crate::document::DocumentTargetKind::Directory => {
+                            asset.asset_type = AssetType::Directory;
+                        }
+                        crate::document::DocumentTargetKind::Unsupported => {
+                            asset.asset_type = AssetType::Unsupported;
+                        }
+                        crate::document::DocumentTargetKind::Missing => {}
                     }
                 }
             }

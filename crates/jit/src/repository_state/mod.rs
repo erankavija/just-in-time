@@ -58,7 +58,7 @@ pub use image::{
     ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
     ListingFingerprint, MaterializationIntent, PinnedDocumentEvidence, PinnedSourceClass,
     PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositorySeed, RepositorySeedKind, SeedError, TargetClaim,
+    RepositorySeed, RepositorySeedKind, RepositoryTargetKind, SeedError, TargetClaim,
 };
 pub use index::RepositoryIndexError;
 pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};

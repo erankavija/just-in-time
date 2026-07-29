@@ -105,6 +105,47 @@ fn test_git_revision_resolver_never_falls_back_on_invalid_revision_or_failed_blo
     assert_eq!(historical.bytes(), b"working tree content");
 }
 
+#[cfg(unix)]
+#[test]
+fn test_inspect_pinned_target_classifies_tree_modes_without_worktree_fallback() {
+    use jit::repository_state::RepositoryTargetKind;
+    use std::os::unix::fs::symlink;
+
+    let repo = Repo::new();
+    repo.write("docs/file.md", b"pinned regular file");
+    repo.write("docs/section/.keep", b"pinned directory");
+    symlink("file.md", repo.root.join("docs/link.md")).unwrap();
+    let revision = repo.commit("add typed pinned targets");
+
+    fs::remove_file(repo.root.join("docs/file.md")).unwrap();
+    fs::remove_dir_all(repo.root.join("docs/section")).unwrap();
+    fs::remove_file(repo.root.join("docs/link.md")).unwrap();
+    repo.write("docs/link.md", b"working tree fallback bait");
+
+    let resolver = GitRevisionResolver::new(&repo.root);
+    let regular = resolver
+        .inspect_pinned_target(&revision, "docs/file.md")
+        .unwrap();
+    let directory = resolver
+        .inspect_pinned_target(&revision, "docs/section")
+        .unwrap();
+    let symlink = resolver
+        .inspect_pinned_target(&revision, "docs/link.md")
+        .unwrap();
+    let missing = resolver
+        .inspect_pinned_target(&revision, "docs/missing.md")
+        .unwrap();
+
+    assert_eq!(regular.target_kind(), RepositoryTargetKind::File);
+    assert_eq!(regular.bytes(), Some(b"pinned regular file".as_slice()));
+    assert_eq!(directory.target_kind(), RepositoryTargetKind::Directory);
+    assert_eq!(directory.bytes(), None);
+    assert_eq!(symlink.target_kind(), RepositoryTargetKind::Unsupported);
+    assert_eq!(symlink.bytes(), None);
+    assert_eq!(missing.target_kind(), RepositoryTargetKind::Missing);
+    assert_eq!(missing.bytes(), None);
+}
+
 #[test]
 fn test_git_revision_resolver_reports_unavailable_git() {
     let repo = Repo::new();

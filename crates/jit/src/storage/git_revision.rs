@@ -6,6 +6,7 @@
 //! hash-algorithm-agnostic OID to the domain layer.
 
 use crate::domain::artifact_plan::ArtifactVersion;
+use crate::repository_state::RepositoryTargetKind;
 use crate::storage::validate_repo_relative_path;
 use std::path::PathBuf;
 use std::process::{Command, Output};
@@ -49,6 +50,43 @@ pub struct PinnedArtifactRead {
     version: ArtifactVersion,
     blob_oid: String,
     bytes: Vec<u8>,
+}
+
+/// No-follow classification of one target at a resolved historical commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinnedTargetRead {
+    version: ArtifactVersion,
+    target_kind: RepositoryTargetKind,
+    object_oid: Option<String>,
+    bytes: Option<Vec<u8>>,
+    unavailable_reason: Option<String>,
+}
+
+impl PinnedTargetRead {
+    /// Canonical historical commit used for this classification.
+    pub fn version(&self) -> &ArtifactVersion {
+        &self.version
+    }
+
+    /// Captured filesystem kind at the named commit.
+    pub fn target_kind(&self) -> RepositoryTargetKind {
+        self.target_kind
+    }
+
+    /// Git object id for a present target.
+    pub fn object_oid(&self) -> Option<&str> {
+        self.object_oid.as_deref()
+    }
+
+    /// Exact bytes for an ordinary file target.
+    pub fn bytes(&self) -> Option<&[u8]> {
+        self.bytes.as_deref()
+    }
+
+    /// Stable reason when the target is missing at a resolved commit.
+    pub fn unavailable_reason(&self) -> Option<&str> {
+        self.unavailable_reason.as_deref()
+    }
 }
 
 impl PinnedArtifactRead {
@@ -152,6 +190,73 @@ impl GitRevisionResolver {
         })
     }
 
+    /// Resolve and classify `path` at `revision` without consulting the
+    /// working tree.
+    ///
+    /// Unlike [`read_pinned_path`](Self::read_pinned_path), directories and
+    /// unsupported Git tree entries are successful, typed results. A path
+    /// absent from an otherwise resolved commit is likewise represented as
+    /// [`RepositoryTargetKind::Missing`] with its boundary diagnostic.
+    pub fn inspect_pinned_target(
+        &self,
+        revision: &str,
+        path: &str,
+    ) -> Result<PinnedTargetRead, GitRevisionError> {
+        validate_repo_relative_path(path)?;
+        let version = self.resolve_commit(revision)?;
+        let entry_output =
+            self.run(["ls-tree", "-z", "--full-tree", version.as_str(), "--", path])?;
+        if !entry_output.status.success() {
+            return Err(GitRevisionError::PinnedReadFailed {
+                revision: revision.to_string(),
+                path: path.to_string(),
+                stderr: stderr(&entry_output),
+            });
+        }
+        let Some((mode, object_type, object_oid)) =
+            parse_pinned_tree_entry(&entry_output.stdout, path).map_err(|reason| {
+                GitRevisionError::PinnedReadFailed {
+                    revision: revision.to_string(),
+                    path: path.to_string(),
+                    stderr: reason,
+                }
+            })?
+        else {
+            return Ok(PinnedTargetRead {
+                version,
+                target_kind: RepositoryTargetKind::Missing,
+                object_oid: None,
+                bytes: None,
+                unavailable_reason: Some("not found in commit tree".into()),
+            });
+        };
+        let target_kind = match (mode.as_str(), object_type.as_str()) {
+            ("100644" | "100755", "blob") => RepositoryTargetKind::File,
+            ("040000", "tree") => RepositoryTargetKind::Directory,
+            _ => RepositoryTargetKind::Unsupported,
+        };
+        let bytes = if target_kind.is_file() {
+            let output = self.run(["cat-file", "blob", object_oid.as_str()])?;
+            if !output.status.success() {
+                return Err(GitRevisionError::PinnedReadFailed {
+                    revision: revision.to_string(),
+                    path: path.to_string(),
+                    stderr: stderr(&output),
+                });
+            }
+            Some(output.stdout)
+        } else {
+            None
+        };
+        Ok(PinnedTargetRead {
+            version,
+            target_kind,
+            object_oid: Some(object_oid),
+            bytes,
+            unavailable_reason: None,
+        })
+    }
+
     /// Return paths changed between two revisions, using NUL-delimited Git
     /// output so unusual but valid repository paths cannot be confused with
     /// record separators.
@@ -202,6 +307,43 @@ impl GitRevisionResolver {
                 source,
             })
     }
+}
+
+/// Parse the one exact NUL-delimited `git ls-tree` entry requested for a
+/// pinned path. Git emits `mode SP type SP oid TAB path NUL`; parse bytes so a
+/// path containing whitespace never changes the field boundary.
+fn parse_pinned_tree_entry(
+    output: &[u8],
+    expected_path: &str,
+) -> Result<Option<(String, String, String)>, String> {
+    let entries = output
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+        .collect::<Vec<_>>();
+    let [] = entries.as_slice() else {
+        let [entry] = entries.as_slice() else {
+            return Err("git ls-tree returned multiple entries for one path".into());
+        };
+        let Some(tab_index) = entry.iter().position(|byte| *byte == b'\t') else {
+            return Err("git ls-tree entry lacks a path separator".into());
+        };
+        let (header, path_with_separator) = entry.split_at(tab_index);
+        let path = &path_with_separator[1..];
+        if path != expected_path.as_bytes() {
+            return Err("git ls-tree returned a different path than requested".into());
+        }
+        let fields = header.split(|byte| *byte == b' ').collect::<Vec<_>>();
+        let [mode, object_type, oid] = fields.as_slice() else {
+            return Err("git ls-tree entry has an invalid header".into());
+        };
+        let decode = |field: &[u8]| {
+            std::str::from_utf8(field)
+                .map(str::to_owned)
+                .map_err(|_| "git ls-tree entry is not UTF-8".to_string())
+        };
+        return Ok(Some((decode(mode)?, decode(object_type)?, decode(oid)?)));
+    };
+    Ok(None)
 }
 
 fn parse_changed_paths(output: Output, operation: String) -> Result<Vec<String>, GitRevisionError> {

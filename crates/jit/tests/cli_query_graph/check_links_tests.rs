@@ -483,6 +483,179 @@ fn test_missing_document_file() {
 }
 
 #[test]
+fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Directory link", "Description");
+    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+    fs::create_dir_all(ctx.repo_path().join("dev/notes")).unwrap();
+    fs::write(
+        ctx.repo_path().join("dev/notes/guide.md"),
+        "See [the studies area](../studies).\n",
+    )
+    .unwrap();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "dev/notes/guide.md"])
+        .success();
+
+    let report = ctx.check_links_report();
+    assert!(
+        errors_for_document(&report, "dev/notes/guide.md")
+            .iter()
+            .all(|error| error["type"] != "missing_asset" && error["type"] != "broken_link"),
+        "an existing directory is navigation, not a missing asset: {report}"
+    );
+    assert!(
+        report["warnings"]
+            .as_array()
+            .expect("warnings array")
+            .iter()
+            .all(|warning| warning["type"] != "scan_error"),
+        "a directory target must not make link scanning fail: {report}"
+    );
+}
+
+#[test]
+fn test_validate_reports_direct_directory_reference_as_unsupported_artifact_type() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Directory reference", "Description");
+    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "dev/studies"])
+        .success();
+
+    ctx.run_jit(&["validate"])
+        .failure()
+        .stderr(predicate::str::contains("unsupported artifact type"))
+        .stderr(predicate::str::contains("dev/studies"))
+        .stderr(predicate::str::contains("not found").not());
+}
+
+#[test]
+fn test_pinned_directory_link_target_is_navigation_at_its_commit() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned directory link", "Description");
+    fs::create_dir_all(ctx.repo_path().join("docs/studies")).unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/studies/.keep"),
+        "tracked directory\n",
+    )
+    .unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/report.md"),
+        "See [the studies area](studies).\n",
+    )
+    .unwrap();
+    ctx.commit_all("add pinned directory navigation");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
+        .success();
+
+    fs::remove_dir_all(ctx.repo_path().join("docs/studies")).unwrap();
+    fs::write(ctx.repo_path().join("docs/studies"), "now a file\n").unwrap();
+    ctx.commit_all("replace navigation directory");
+
+    let report = ctx.check_links_report();
+    assert!(
+        errors_for_document(&report, "docs/report.md").is_empty(),
+        "the pinned directory target must remain navigation: {report}"
+    );
+    assert!(
+        report["warnings"]
+            .as_array()
+            .expect("warnings array")
+            .iter()
+            .all(|warning| warning["type"] != "scan_error"),
+        "the pinned directory target must not produce a scan error: {report}"
+    );
+}
+
+#[test]
+fn test_pinned_directory_reference_is_unsupported_at_its_commit() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned directory reference", "Description");
+    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+    fs::write(
+        ctx.repo_path().join("dev/studies/.keep"),
+        "tracked directory\n",
+    )
+    .unwrap();
+    ctx.commit_all("add pinned directory reference");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "dev/studies", "--commit", &pin])
+        .success();
+
+    fs::remove_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+    fs::write(ctx.repo_path().join("dev/studies"), "now a file\n").unwrap();
+    ctx.commit_all("replace pinned directory reference");
+
+    ctx.run_jit(&["validate"])
+        .failure()
+        .stderr(predicate::str::contains("unsupported artifact type"))
+        .stderr(predicate::str::contains("dev/studies"))
+        .stderr(predicate::str::contains("not found").not());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_pinned_symlink_target_is_unsupported_at_its_commit() {
+    use std::os::unix::fs::symlink;
+
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Pinned symlink target", "Description");
+    fs::create_dir_all(ctx.repo_path().join("docs")).unwrap();
+    fs::write(ctx.repo_path().join("docs/target.md"), "Pinned target\n").unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/report.md"),
+        "See [the linked target](linked.md).\n",
+    )
+    .unwrap();
+    symlink("target.md", ctx.repo_path().join("docs/linked.md")).unwrap();
+    ctx.commit_all("add pinned symlink target");
+    let pin = ctx.head_commit();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "docs/report.md", "--commit", &pin])
+        .success();
+
+    fs::remove_file(ctx.repo_path().join("docs/linked.md")).unwrap();
+    fs::write(
+        ctx.repo_path().join("docs/linked.md"),
+        "This ordinary working-tree file must not be used.\n",
+    )
+    .unwrap();
+    ctx.commit_all("replace symlink with regular file");
+
+    let report = ctx.check_links_report();
+    let errors = errors_for_document(&report, "docs/report.md");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error["type"] == "unsupported_asset"),
+        "the pinned symlink must be diagnosed as unsupported: {report}"
+    );
+    assert!(
+        errors.iter().any(|error| {
+            error["type"] == "broken_link"
+                && error["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains("unsupported artifact type"))
+        }),
+        "the pinned symlink must not resolve through the current regular file: {report}"
+    );
+}
+
+#[test]
 fn test_git_versioned_asset_exists() {
     let ctx = TestContext::new();
     ctx.init_repo();

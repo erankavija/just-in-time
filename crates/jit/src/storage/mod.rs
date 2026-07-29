@@ -56,7 +56,9 @@ pub use errors::{
 // Storage-only: the transaction kernel publishes into repository roots, so no
 // command may name it. Commands publish through `RepositoryStateStore` sessions.
 pub(in crate::storage) use file_transaction::{FileTransactionKernel, TransactionControlLocation};
-pub use git_revision::{GitRevisionError, GitRevisionResolver, PinnedArtifactRead};
+pub use git_revision::{
+    GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
+};
 pub use json::{JsonFileStorage, RetainedMutationSessionGuard, RetainedSessionSuspendedError};
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
