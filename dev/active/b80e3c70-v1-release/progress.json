@@ -9,14 +9,138 @@
       "sub_wave": "1a",
       "footprint_rationale": "Eight disjoint footprints: .github+scripts, web/, mcp-server/, crates/server/, commands/document.rs, domain/artifact_plan.rs, scripts/docs-mechanical.sh, commands/plan_doc.rs.",
       "issues": [
-        {"id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0", "short_id": "7edd2fe8", "title": "Establish deterministic workflow contract verification", "classification": "implementation", "status": "dispatched", "gates": ["repo-validate", "code-review", "jit-validate"]},
-        {"id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9", "short_id": "8fa7261b", "title": "Remediate web production dependency advisories", "classification": "implementation", "status": "dispatched", "gates": ["npm-ci", "code-review", "jit-validate"]},
-        {"id": "bb302dbd-bd03-42ed-ae71-b0f035453f56", "short_id": "bb302dbd", "title": "Remediate MCP production dependency advisories", "classification": "implementation", "status": "dispatched", "gates": ["mcp-ci", "code-review", "jit-validate"]},
-        {"id": "f04f7888-a828-4677-aea8-f640a6702375", "short_id": "f04f7888", "title": "Implement graceful jit-server process shutdown", "classification": "implementation", "status": "dispatched", "gates": ["cargo-ci", "code-review", "jit-validate"]},
-        {"id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8", "short_id": "f289ff18", "title": "Honour a document reference's commit pin when checking links", "classification": "implementation", "status": "dispatched", "gates": ["cargo-ci", "code-review"]},
-        {"id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab", "short_id": "c7f8ebc7", "title": "Archival citation warnings fire on citations that already name the destination", "classification": "implementation", "status": "dispatched", "gates": ["cargo-ci", "code-review"]},
-        {"id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf", "short_id": "eeee8a1a", "title": "Mechanical documentation checker defaults to the archival permanent paths", "classification": "implementation", "status": "dispatched", "gates": ["code-review", "docs-mechanical"]},
-        {"id": "985ab96d-7ad4-4f0d-b6ab-083d2dbfe3d3", "short_id": "985ab96d", "title": "Unreferenced plan-doc location resolver", "classification": "implementation", "status": "dispatched", "gates": ["cargo-ci", "code-review"]}
+        {
+          "id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
+          "short_id": "7edd2fe8",
+          "title": "Establish deterministic workflow contract verification",
+          "classification": "implementation",
+          "status": "dispatched",
+          "gates": [
+            "repo-validate",
+            "code-review",
+            "jit-validate"
+          ],
+          "branch_head": "0c6baa2d",
+          "commits": 3,
+          "uncommitted": 4,
+          "reported": "no",
+          "branch": "worktree-agent-7edd2fe8"
+        },
+        {
+          "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
+          "short_id": "8fa7261b",
+          "title": "Remediate web production dependency advisories",
+          "classification": "implementation",
+          "status": "reported",
+          "gates": [
+            "npm-ci",
+            "code-review",
+            "jit-validate"
+          ],
+          "branch_head": "45bd85c5",
+          "commits": 2,
+          "uncommitted": 0,
+          "reported": "yes",
+          "branch": "worktree-agent-8fa7261b"
+        },
+        {
+          "id": "bb302dbd-bd03-42ed-ae71-b0f035453f56",
+          "short_id": "bb302dbd",
+          "title": "Remediate MCP production dependency advisories",
+          "classification": "implementation",
+          "status": "reported-pending-question",
+          "gates": [
+            "mcp-ci",
+            "code-review",
+            "jit-validate"
+          ],
+          "branch_head": "0d9d28ba",
+          "commits": 3,
+          "uncommitted": 0,
+          "reported": "yes",
+          "branch": "worktree-agent-bb302dbd"
+        },
+        {
+          "id": "f04f7888-a828-4677-aea8-f640a6702375",
+          "short_id": "f04f7888",
+          "title": "Implement graceful jit-server process shutdown",
+          "classification": "implementation",
+          "status": "dispatched",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "jit-validate"
+          ],
+          "branch_head": "a8182e6f",
+          "commits": 0,
+          "uncommitted": 10,
+          "reported": "no",
+          "branch": "worktree-agent-f04f7888"
+        },
+        {
+          "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
+          "short_id": "f289ff18",
+          "title": "Honour a document reference's commit pin when checking links",
+          "classification": "implementation",
+          "status": "dispatched",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "branch_head": "f08ae5f9",
+          "commits": 1,
+          "uncommitted": 3,
+          "reported": "no",
+          "branch": "worktree-agent-f289ff18"
+        },
+        {
+          "id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
+          "short_id": "c7f8ebc7",
+          "title": "Archival citation warnings fire on citations that already name the destination",
+          "classification": "implementation",
+          "status": "dispatched",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "branch_head": "c8750579",
+          "commits": 1,
+          "uncommitted": 1,
+          "reported": "no",
+          "branch": "worktree-agent-c7f8ebc7"
+        },
+        {
+          "id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
+          "short_id": "eeee8a1a",
+          "title": "Mechanical documentation checker defaults to the archival permanent paths",
+          "classification": "implementation",
+          "status": "reported",
+          "gates": [
+            "code-review",
+            "docs-mechanical"
+          ],
+          "branch_head": "ac46b11d",
+          "commits": 2,
+          "uncommitted": 0,
+          "reported": "yes",
+          "branch": "worktree-agent-eeee8a1a"
+        },
+        {
+          "id": "985ab96d-7ad4-4f0d-b6ab-083d2dbfe3d3",
+          "short_id": "985ab96d",
+          "title": "Unreferenced plan-doc location resolver",
+          "classification": "implementation",
+          "status": "dispatched",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "branch_head": "8d538c93",
+          "commits": 1,
+          "uncommitted": 0,
+          "reported": "no",
+          "branch": "worktree-agent-985ab96d"
+        }
       ]
     },
     {
@@ -24,8 +148,29 @@
       "sub_wave": "1b",
       "footprint_rationale": "f9e42a43 edits commands/document.rs and check_links_tests.rs, which 1a's f289ff18 owns. ef118aea edits the archival citation planner, which 1a's c7f8ebc7 owns.",
       "issues": [
-        {"id": "f9e42a43-e382-4e1b-9e15-91984def9977", "short_id": "f9e42a43", "title": "Treat a directory link target consistently across discovery, link checking and validation", "classification": "implementation", "status": "pending", "gates": ["cargo-ci", "code-review"]},
-        {"id": "ef118aea-51b4-452b-9aba-fa2bcdf64b9c", "short_id": "ef118aea", "title": "Archive execution reports no citation warnings", "classification": "implementation", "status": "pending", "gates": ["cargo-ci", "code-review", "doc-review"]}
+        {
+          "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
+          "short_id": "f9e42a43",
+          "title": "Treat a directory link target consistently across discovery, link checking and validation",
+          "classification": "implementation",
+          "status": "pending",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ]
+        },
+        {
+          "id": "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
+          "short_id": "ef118aea",
+          "title": "Archive execution reports no citation warnings",
+          "classification": "implementation",
+          "status": "pending",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review"
+          ]
+        }
       ]
     },
     {
@@ -33,54 +178,208 @@
       "sub_wave": "1c",
       "footprint_rationale": "a122b9b3 adds whole-tree invariant enforcement across crates/, mcp-server/, and web/, and must fix every violation the enforced tree then reports. It collides with every other wave-1 issue and runs alone, last, so it sees all landed code.",
       "issues": [
-        {"id": "a122b9b3-0f2a-49bd-bbcf-7dce34703dea", "short_id": "a122b9b3", "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction", "classification": "implementation", "status": "pending", "gates": ["cargo-ci", "mcp-ci", "repo-validate", "code-review", "npm-ci"]}
+        {
+          "id": "a122b9b3-0f2a-49bd-bbcf-7dce34703dea",
+          "short_id": "a122b9b3",
+          "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
+          "classification": "implementation",
+          "status": "pending",
+          "gates": [
+            "cargo-ci",
+            "mcp-ci",
+            "repo-validate",
+            "code-review",
+            "npm-ci"
+          ]
+        }
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2", "short_id": "5e538f48", "title": "Align the v1.0 product version and tag contract", "classification": "implementation", "status": "pending", "depends_on": ["8fa7261b"]},
-        {"id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc", "short_id": "e0fed1bb", "title": "Make the normal validation suites reusable", "classification": "implementation", "status": "pending", "depends_on": ["7edd2fe8"]},
-        {"id": "f7f80d53-508e-4b03-b045-5209061c8d0a", "short_id": "f7f80d53", "title": "Enforce reusable blocking dependency audits", "classification": "implementation", "status": "pending", "depends_on": ["8fa7261b", "7edd2fe8", "bb302dbd", "f04f7888"]},
-        {"id": "3b033738-a6ef-40ab-8fc1-d296f3fbb863", "short_id": "3b033738", "title": "Build the single server and web production image", "classification": "implementation", "status": "pending", "depends_on": ["f04f7888"]}
+        {
+          "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
+          "short_id": "5e538f48",
+          "title": "Align the v1.0 product version and tag contract",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "8fa7261b"
+          ]
+        },
+        {
+          "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
+          "short_id": "e0fed1bb",
+          "title": "Make the normal validation suites reusable",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "7edd2fe8"
+          ]
+        },
+        {
+          "id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
+          "short_id": "f7f80d53",
+          "title": "Enforce reusable blocking dependency audits",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "8fa7261b",
+            "7edd2fe8",
+            "bb302dbd",
+            "f04f7888"
+          ]
+        },
+        {
+          "id": "3b033738-a6ef-40ab-8fc1-d296f3fbb863",
+          "short_id": "3b033738",
+          "title": "Build the single server and web production image",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "f04f7888"
+          ]
+        }
       ]
     },
     {
       "wave_number": 3,
       "issues": [
-        {"id": "22d374bd-1416-48f7-b933-d73cc4cff6d7", "short_id": "22d374bd", "title": "Add the dual-license and compatibility release record", "classification": "documentation", "status": "pending", "depends_on": ["5e538f48"]},
-        {"id": "cdee58b3-1428-4874-9814-dacefc517605", "short_id": "cdee58b3", "title": "Enforce the declared MSRV recency window", "classification": "implementation", "status": "pending", "depends_on": ["f04f7888", "5e538f48"]},
-        {"id": "3a3b5704-b385-4358-98e3-23e095b2ee97", "short_id": "3a3b5704", "title": "Remove obsolete Docker topologies and migrate every active consumer", "classification": "implementation", "status": "pending", "depends_on": ["3b033738"]}
+        {
+          "id": "22d374bd-1416-48f7-b933-d73cc4cff6d7",
+          "short_id": "22d374bd",
+          "title": "Add the dual-license and compatibility release record",
+          "classification": "documentation",
+          "status": "pending",
+          "depends_on": [
+            "5e538f48"
+          ]
+        },
+        {
+          "id": "cdee58b3-1428-4874-9814-dacefc517605",
+          "short_id": "cdee58b3",
+          "title": "Enforce the declared MSRV recency window",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "f04f7888",
+            "5e538f48"
+          ]
+        },
+        {
+          "id": "3a3b5704-b385-4358-98e3-23e095b2ee97",
+          "short_id": "3a3b5704",
+          "title": "Remove obsolete Docker topologies and migrate every active consumer",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "3b033738"
+          ]
+        }
       ]
     },
     {
       "wave_number": 4,
       "issues": [
-        {"id": "f9af9788-9d54-4200-8da4-98818cc67fa9", "short_id": "f9af9788", "title": "Publish v1.0 through one tag-triggered release workflow", "classification": "implementation", "status": "pending", "depends_on": ["22d374bd", "3a3b5704", "cdee58b3", "e0fed1bb", "f7f80d53"]}
+        {
+          "id": "f9af9788-9d54-4200-8da4-98818cc67fa9",
+          "short_id": "f9af9788",
+          "title": "Publish v1.0 through one tag-triggered release workflow",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "22d374bd",
+            "3a3b5704",
+            "cdee58b3",
+            "e0fed1bb",
+            "f7f80d53"
+          ]
+        }
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"id": "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2", "short_id": "e90b9a3b", "title": "Establish canonical installation, deployment, MCP, source, and release references", "classification": "documentation", "status": "pending", "depends_on": ["f9af9788"]}
+        {
+          "id": "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2",
+          "short_id": "e90b9a3b",
+          "title": "Establish canonical installation, deployment, MCP, source, and release references",
+          "classification": "documentation",
+          "status": "pending",
+          "depends_on": [
+            "f9af9788"
+          ]
+        }
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"id": "080e54c6-8b70-40c5-9bbe-6a9f720a09ce", "short_id": "080e54c6", "title": "Prune repeated entry-point and component documentation", "classification": "documentation", "status": "pending", "depends_on": ["e90b9a3b"]}
+        {
+          "id": "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
+          "short_id": "080e54c6",
+          "title": "Prune repeated entry-point and component documentation",
+          "classification": "documentation",
+          "status": "pending",
+          "depends_on": [
+            "e90b9a3b"
+          ]
+        }
       ]
     },
     {
       "wave_number": 7,
       "issues": [
-        {"id": "bb03df0a-65c7-496a-bb09-2620eb253fd5", "short_id": "bb03df0a", "title": "Cut the v1.0.0 tag and verify the published release", "classification": "implementation", "status": "pending", "depends_on": ["080e54c6", "985ab96d", "a122b9b3", "c7f8ebc7", "eeee8a1a", "ef118aea", "f289ff18", "f9e42a43"]}
+        {
+          "id": "bb03df0a-65c7-496a-bb09-2620eb253fd5",
+          "short_id": "bb03df0a",
+          "title": "Cut the v1.0.0 tag and verify the published release",
+          "classification": "implementation",
+          "status": "pending",
+          "depends_on": [
+            "080e54c6",
+            "985ab96d",
+            "a122b9b3",
+            "c7f8ebc7",
+            "eeee8a1a",
+            "ef118aea",
+            "f289ff18",
+            "f9e42a43"
+          ]
+        }
       ]
     }
   ],
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
-  "started_at": "2026-07-29T14:20:00+00:00"
+  "surfaced_pitfalls": [
+    {
+      "subject": "web dev-only advisories",
+      "detail": "11 high advisories remain in web/'s eslint/minimatch chain, needing major bumps. Outside 8fa7261b REQ-01 and epic REQ-02, both scoped to --omit=dev.",
+      "routed_to": null,
+      "criterion_check": "not named by any criterion"
+    },
+    {
+      "subject": "security-audit workflow threshold",
+      "detail": ".github/workflows/security-audit.yml:49 runs `npm audit --production` with no --audit-level, laxer than epic REQ-02 states.",
+      "routed_to": "f7f80d53",
+      "criterion_check": "epic REQ-02 names the audit invocation; confirm f7f80d53 closes it"
+    }
+  ],
+  "started_at": "2026-07-29T14:20:00+00:00",
+  "lead_decisions": [
+    {
+      "issue": "bb302dbd",
+      "decision": "Accept the zod 3 -> 4 major bump.",
+      "reasoning": "Declared ^3.24.1 floors below SDK 1.30's peer range ^3.25 || ^4.0, so the range had to move regardless of the audit; zod 3.x stopped shipping while 4.x is current, so under @/charter/D-11 a later zod-3 advisory would have no in-range fix. REQ-03 contemplates a validation-API migration.",
+      "rejected_alternative": "Pin zod ^3.25.76, audit-clean today, reverting two test changes.",
+      "open_verification": "Enumerate every advertised inputSchema default across all 112 tools; a non-empty default on an optional property would change the CLI argv under zod 4."
+    }
+  ],
+  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
+  "base_commit": "a8182e6f20476d547e3a0f969ef0ed4c636e4b56",
+  "handoffs": [
+    "dev/active/b80e3c70-v1-release/handoff.md"
+  ]
 }
