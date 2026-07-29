@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "97fd72ea574f5ccef28d7f15d4a2a9d1fae578be",
+  "completed_at": "2026-07-29T18:07:24.035330710Z",
+  "duration_ms": 199159,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md",
+        "id": "F1",
+        "line": 454,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "The new self-test shifted line ranges, leaving attributable investigation citations pointing to unrelated code rather than the documented checker blocks and clone setup."
+      }
+    ],
+    "summary": "One issue-attributable documentation-citation defect remains.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
+  "message": null,
+  "run_id": "05159139-7645-4e26-86cd-b0b4e3e23111",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T18:04:04.875432847Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2889 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.145.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019faf0c-4691-7210-92e8-d630dd51ab17\n--------\nuser\n--- 2876 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0f04e470, ac46b11d, 295a0a6c, 83c441f4, b5073514, 97fd72ea (`jit:eeee8a1a`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/issue/8e071e18/decision/D-14; @/issue/b80e3c70/requirement/REQ-11; @/gate/docs-mechanical (.jit/gates.toml)\nGate evidence: docs-mechanical passed (exit 0); prior code-review failed (exit 1), with its missing-test finding addressed by b5073514\nTruncation recovery: Narrowed reads of current scripts, configuration, container criterion, and self-test citations after broad outputs truncated.\n\n1. **[blocking][issue-impact][low] F1:** The new self-test shifted line ranges, leaving the attributable investigation’s self-test citations stale. [e204e63d-investigation.md:454](/home/vkaskivuo/Projects/just-in-time/dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md:454) cites blocks at `55-64`, `66-81`, and `121-152`, while those ranges now contain helpers/fixture setup/citation tests; the referenced checker blocks begin at lines 104, 115, and 171. Its clone citation at line 457 similarly points to unrelated lines 126-127. This makes the documentation’s source citations inaccurate. References: @/invariant/single-source-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-attributable documentation-citation defect remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new self-test shifted line ranges, leaving attributable investigation citations pointing to unrelated code rather than the documented checker blocks and clone setup.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md\",\"line\":454,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
