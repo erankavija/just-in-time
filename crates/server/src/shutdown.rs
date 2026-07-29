@@ -137,9 +137,13 @@ where
     // Order matters: event streams end first, so the drain below is only ever
     // waiting on connections that have real work left.
     shutdown.cancel();
+    // Start this observation boundary before notifying the handle. The handle
+    // begins its own duration once its serving task receives that notification,
+    // so this observer cannot trail the force-close deadline it reports on.
+    let expiry = Instant::now() + drain_deadline;
     handle.graceful_shutdown(Some(drain_deadline));
 
-    let outcome = observe_drain(&handle, drain_deadline).await;
+    let outcome = observe_drain(&handle, expiry).await;
     match outcome {
         DrainOutcome::Drained => info!("All connections finished before the drain deadline"),
         DrainOutcome::ForcedClosed { connections } => warn!(
@@ -151,27 +155,25 @@ where
     Ok(outcome)
 }
 
-/// Watches the live connection count until `deadline` expires.
+/// Watches the live connection count until `expiry`.
 ///
-/// The count is sampled up to one interval before expiry and never after it:
-/// once the deadline forces the survivors closed the count reads zero, which is
-/// indistinguishable from a voluntary finish.
-async fn observe_drain(handle: &ServerHandle, deadline: Duration) -> DrainOutcome {
-    let expiry = Instant::now() + deadline;
+/// Every count is sampled after its preceding wait. In particular, the final
+/// count is taken at the observation boundary rather than before the final
+/// polling interval, so a connection that drains in that interval is not
+/// reported as forced closed.
+async fn observe_drain(handle: &ServerHandle, expiry: Instant) -> DrainOutcome {
     loop {
-        let remaining = expiry.saturating_duration_since(Instant::now());
-        if remaining <= DRAIN_SAMPLE_INTERVAL {
-            let connections = handle.connection_count();
-            sleep(remaining).await;
-            return match connections {
-                0 => DrainOutcome::Drained,
-                connections => DrainOutcome::ForcedClosed { connections },
-            };
-        }
-        sleep(DRAIN_SAMPLE_INTERVAL).await;
-        if handle.connection_count() == 0 {
+        let connections = handle.connection_count();
+        if connections == 0 {
             return DrainOutcome::Drained;
         }
+
+        let remaining = expiry.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return DrainOutcome::ForcedClosed { connections };
+        }
+
+        sleep(remaining.min(DRAIN_SAMPLE_INTERVAL)).await;
     }
 }
 
@@ -184,6 +186,7 @@ mod tests {
     use std::time::Duration;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
+    use tokio::sync::oneshot;
     use tokio::task::JoinHandle;
     use tokio::time::timeout;
     use tokio_util::sync::CancellationToken;
@@ -296,6 +299,59 @@ mod tests {
             .expect("the stalled connection is closed within the test budget")
             .expect("read the closed connection");
         assert_eq!(read, 0, "the stalled connection must be force-closed");
+    }
+
+    #[tokio::test]
+    async fn test_run_shutdown_sequence_reports_drained_when_final_interval_empties() {
+        let handle = ServerHandle::new();
+        let (addr, serving) = serve_on_loopback(&handle).await;
+        let mut completing = open_stalled_connection(addr).await;
+        wait_for_connection_count(&handle, 1).await;
+        let drain_deadline = DRAIN_SAMPLE_INTERVAL.saturating_mul(4);
+        let (signal_sent, signal_started) = oneshot::channel();
+        let shutdown_task = tokio::spawn(run_shutdown_sequence(
+            handle.clone(),
+            CancellationToken::new(),
+            drain_deadline,
+            async move {
+                signal_sent
+                    .send(())
+                    .expect("the test waits for the shutdown signal");
+                Ok(ShutdownSignal::Terminate)
+            },
+        ));
+
+        signal_started
+            .await
+            .expect("the shutdown sequence starts before the connection completes");
+        // The connection remains live through the first three 100 ms samples,
+        // then completes halfway through the final polling interval. The drain
+        // outcome therefore selects the non-forced-close logging branch.
+        sleep(DRAIN_SAMPLE_INTERVAL.saturating_mul(3) + DRAIN_SAMPLE_INTERVAL / 2).await;
+        completing
+            .write_all(b"\r\n")
+            .await
+            .expect("complete the request during the final polling interval");
+        completing
+            .flush()
+            .await
+            .expect("flush the completed request");
+
+        let outcome = timeout(TEST_BUDGET, shutdown_task)
+            .await
+            .expect("the shutdown sequence completes within the test budget")
+            .expect("the shutdown task does not panic")
+            .expect("a delivered signal is not an error");
+        assert_eq!(
+            outcome,
+            DrainOutcome::Drained,
+            "a connection that drains in the final interval must not report a forced close"
+        );
+        timeout(TEST_BUDGET, serving)
+            .await
+            .expect("the serve future ends within the test budget")
+            .expect("the serve task does not panic")
+            .expect("the serve future returns Ok after the final-interval drain");
     }
 
     #[tokio::test]
