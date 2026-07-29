@@ -130,8 +130,18 @@ impl LinkValidator {
             return LinkValidationResult::Valid;
         };
 
-        // Check if target exists in our document set
-        if self.all_document_paths.contains(&normalized) {
+        // A link must hold a file in the version being checked. In particular,
+        // a target currently registered by another document may not have
+        // existed at a pinned document's commit.
+        if !holds_target(&normalized) {
+            LinkValidationResult::Broken {
+                reason: format!(
+                    "Document '{}' not found (resolved to {})",
+                    link.target,
+                    normalized.display()
+                ),
+            }
+        } else if self.all_document_paths.contains(&normalized) {
             // Check if it's risky
             if self.is_risky_path(&link.target) {
                 LinkValidationResult::Risky {
@@ -143,29 +153,16 @@ impl LinkValidator {
             } else {
                 LinkValidationResult::Valid
             }
+        } else if link.link_type == LinkType::RootRelative && self.is_permanent_path(&normalized) {
+            // Root-relative links to permanent paths (docs/, README.md) are safe.
+            LinkValidationResult::Valid
         } else {
-            // Check if the target holds a file at the version being read
-            if holds_target(&normalized) {
-                // Root-relative links to permanent paths (docs/, README.md) are safe
-                if link.link_type == LinkType::RootRelative && self.is_permanent_path(&normalized) {
-                    return LinkValidationResult::Valid;
-                }
-
-                // File exists but not tracked as a document
-                LinkValidationResult::Risky {
-                    warning: format!(
-                        "Link to '{}' exists but is not tracked as a document",
-                        link.target
-                    ),
-                }
-            } else {
-                LinkValidationResult::Broken {
-                    reason: format!(
-                        "Document '{}' not found (resolved to {})",
-                        link.target,
-                        normalized.display()
-                    ),
-                }
+            // The file exists at the named version but is not tracked as a document.
+            LinkValidationResult::Risky {
+                warning: format!(
+                    "Link to '{}' exists but is not tracked as a document",
+                    link.target
+                ),
             }
         }
     }
@@ -331,22 +328,26 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_link_at_reads_the_version_its_predicate_names() {
+    fn test_validate_link_at_requires_registered_target_at_named_version() {
         let temp_dir = tempfile::tempdir().unwrap();
         let from = PathBuf::from("docs/report.md");
-        let validator = LinkValidator::new(temp_dir.path().to_path_buf(), vec![from.clone()]);
+        let target = PathBuf::from("docs/appendix.md");
+        let validator = LinkValidator::new(
+            temp_dir.path().to_path_buf(),
+            vec![from.clone(), target.clone()],
+        );
         let link = InternalLink {
             target: "appendix.md".to_string(),
             line_number: 1,
             link_type: LinkType::Relative,
         };
-        let target = validator.resolve_target(&from, &link).unwrap();
 
-        // The working tree holds no target at all, so the answer follows the
-        // predicate rather than the filesystem.
+        // A target registered in the working tree may have been introduced
+        // after the pinned document's commit, so registration alone cannot
+        // satisfy a versioned link check.
         assert!(matches!(
             validator.validate_link_at(&from, &link, |path| path == target),
-            LinkValidationResult::Risky { .. }
+            LinkValidationResult::Valid
         ));
         assert!(matches!(
             validator.validate_link_at(&from, &link, |_| false),
