@@ -398,6 +398,12 @@
       "detail": "ci.yml's profile-adoption step scalar (profile_acceptance_tests:: -- --nocapture) made the file unparseable to a strict YAML parser at base commit a8182e6f. 7edd2fe8 fixed it by quoting. Pre-existing, not introduced by this wave.",
       "routed_to": "7edd2fe8",
       "criterion_check": "closed in-wave"
+    },
+    {
+      "subject": "archive destinations duplicate the full development-root path",
+      "detail": "Confirmed production behavior: artifact_mirror_destination(destination_root, source) appends the entire repository-relative source, yielding paths such as dev/archive/<container>/dev/active/plan.md. This is a user-identified design smell, not merely a defensive c7 example. Prefer stripping the configured development_root before mirroring, subject to collision and migration design.",
+      "routed_to": null,
+      "criterion_check": "not owned by c7f8ebc7; requires an explicit archive-layout decision before changing persisted paths"
     }
   ],
   "started_at": "2026-07-29T14:20:00+00:00",
