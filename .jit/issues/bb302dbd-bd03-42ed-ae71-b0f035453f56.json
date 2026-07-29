@@ -14,6 +14,7 @@
       "path": "dev/active/bb302dbd/production-audit-evidence.md"
     }
   ],
+  "done_at": "2026-07-29T16:49:12.544382396Z",
   "first_ready_at": "2026-07-15T09:12:53.169848706Z",
   "gates_required": [
     "mcp-ci",
@@ -21,9 +22,19 @@
     "jit-validate"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-29T16:48:39.197724871Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-29T16:48:42.256151243Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-29T16:14:45.425155764Z",
+      "status": "passed",
+      "updated_at": "2026-07-29T16:46:15.627676140Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +45,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remediate MCP production dependency advisories",
-  "updated_at": "2026-07-29T16:14:45.425155764Z"
+  "updated_at": "2026-07-29T16:49:12.544382396Z"
 }

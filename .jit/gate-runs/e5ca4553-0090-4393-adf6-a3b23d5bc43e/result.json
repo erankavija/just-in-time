@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "d262c7da072fb712619e49c0702377ca1147978e",
+  "completed_at": "2026-07-29T16:48:38.894650393Z",
+  "duration_ms": 142350,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Dependency remediation, current lockfile audit evidence, SDK/Zod migration coverage, and latest MCP CI evidence satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bb302dbd-bd03-42ed-ae71-b0f035453f56",
+  "message": null,
+  "run_id": "e5ca4553-0090-4393-adf6-a3b23d5bc43e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T16:46:16.544125745Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ca2407ef, 15b1fe1a, 0d9d28ba, 2577c1f7, d4879dca, 349a86fe, 0b3d333b, 6f6964bc, 077a7bc9\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-11 — dev/vision/9db27a3a-charter.md; @/invariant/canonical-cutover — .jit/invariants.toml; @/invariant/semantic-test-assertions — .jit/invariants.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: mcp-ci passed (exit 0, 2026-07-29T16:46:15Z); code-review pending; jit-validate pending\nTruncation recovery: none\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Dependency remediation, current lockfile audit evidence, SDK/Zod migration coverage, and latest MCP CI evidence satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

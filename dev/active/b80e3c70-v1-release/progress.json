@@ -49,7 +49,7 @@
           "short_id": "bb302dbd",
           "title": "Remediate MCP production dependency advisories",
           "classification": "implementation",
-          "status": "rework",
+          "status": "done",
           "gates": [
             "mcp-ci",
             "code-review",
