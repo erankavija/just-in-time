@@ -3429,8 +3429,8 @@ jit serve [OPTIONS]
 
 `--stop`, `--status`, and `--fg` are mutually exclusive.
 
-`--stop` and Ctrl+C under `--fg` shut the server down gracefully. It stops
-accepting connections at once and releases its port, live event streams
+`--stop` and Ctrl+C under `--fg` shut the server down gracefully. The server
+stops accepting connections at once and releases its port, live event streams
 (`/api/events/stream`) end so subscribers see the stream close, requests still
 in flight get up to five seconds to finish, and anything still open when that
 deadline expires is closed by the server. The process then exits `0`, so a
