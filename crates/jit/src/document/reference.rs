@@ -19,6 +19,58 @@ use crate::repository_state::{
 };
 use thiserror::Error;
 
+/// Semantic type of a repository target named by a document operation.
+///
+/// This classification deliberately separates an absent path from a present
+/// directory.  The latter is navigation when reached by a Markdown link, but
+/// is not a supported issue-document artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentTargetKind {
+    /// An ordinary file whose bytes can be read as a document or asset.
+    File,
+    /// A directory, which can be a Markdown navigation target.
+    Directory,
+    /// No occupant exists at the named path.
+    Missing,
+    /// A present occupant that document operations cannot read as a file.
+    Unsupported,
+}
+
+impl DocumentTargetKind {
+    /// Classify a captured repository entry without doing filesystem I/O.
+    pub fn from_entry(entry: &RepositoryEntry) -> Self {
+        match entry {
+            RepositoryEntry::File { .. } => Self::File,
+            RepositoryEntry::Directory { .. } => Self::Directory,
+            RepositoryEntry::Absent => Self::Missing,
+            RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
+                Self::Unsupported
+            }
+        }
+    }
+
+    /// Classify a filesystem path for working-tree-only link checks.
+    ///
+    /// This deliberately uses no-follow metadata, matching captured
+    /// [`RepositoryEntry`] classification. An unreadable target is unsupported
+    /// rather than missing: it may exist, but cannot safely be treated as a
+    /// document file.
+    pub fn from_filesystem(path: &std::path::Path) -> Self {
+        match std::fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_file() => Self::File,
+            Ok(metadata) if metadata.file_type().is_dir() => Self::Directory,
+            Ok(_) => Self::Unsupported,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Self::Missing,
+            Err(_) => Self::Unsupported,
+        }
+    }
+
+    /// Whether this target names an ordinary file.
+    pub fn is_file(self) -> bool {
+        matches!(self, Self::File)
+    }
+}
+
 /// Revision an unpinned reference falls back to when the working tree lacks its
 /// file — the reference names the current version, which `HEAD` still carries
 /// after a working-tree deletion.
@@ -79,6 +131,14 @@ impl DocumentReferenceRequests {
 /// Why a document reference does not resolve at the version it names.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum UnresolvedDocumentReference {
+    /// The reference names a present target which is not an ordinary file.
+    #[error("unsupported artifact type at '{path}': {kind}")]
+    UnsupportedArtifactType {
+        /// Repository-relative path the reference names.
+        path: String,
+        /// Stable description of the captured target kind.
+        kind: &'static str,
+    },
     /// The pinned `(commit, path)` pair carried no bytes at the capture
     /// boundary, either because the path is absent at that commit or because
     /// the commit itself could not be resolved.
@@ -178,9 +238,22 @@ pub fn resolve_document_reference(
         });
     };
 
-    let in_worktree = matches!(image.entry(worktree)?, RepositoryEntry::File { .. });
+    let in_worktree = DocumentTargetKind::from_entry(image.entry(worktree)?);
+    let unsupported_kind = match in_worktree {
+        DocumentTargetKind::Directory => Some("directory"),
+        DocumentTargetKind::Unsupported => Some("unsupported"),
+        DocumentTargetKind::File | DocumentTargetKind::Missing => None,
+    };
+    if let Some(kind) = unsupported_kind {
+        return Ok(DocumentReferenceResolution::Unresolved(
+            UnresolvedDocumentReference::UnsupportedArtifactType {
+                path: path.to_string(),
+                kind,
+            },
+        ));
+    }
     let in_head = evidence.is_some_and(crate::repository_state::PinnedDocumentEvidence::exists);
-    Ok(if in_worktree || in_head {
+    Ok(if in_worktree.is_file() || in_head {
         DocumentReferenceResolution::Resolved
     } else {
         DocumentReferenceResolution::Unresolved(

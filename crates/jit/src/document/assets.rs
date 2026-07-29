@@ -38,6 +38,10 @@ pub enum AssetType {
     External,
     /// File not found at resolved path
     Missing,
+    /// Existing directory navigation target.
+    Directory,
+    /// Existing target which is not a readable ordinary file.
+    Unsupported,
 }
 
 /// Asset scanner for documents
@@ -119,15 +123,34 @@ impl AssetScanner {
                 };
                 let virtual_path = crate::repository_state::VirtualPath::worktree(path)
                     .map_err(|error| error.to_string())?;
-                let bytes = image
-                    .file_bytes(&virtual_path)
-                    .map_err(|error| error.to_string())?;
-                if let Some(bytes) = bytes {
-                    let mut hasher = Sha256::new();
-                    hasher.update(bytes);
-                    asset.asset_type = AssetType::Local;
-                    asset.mime_type = Self::detect_mime_type(path);
-                    asset.content_hash = Some(format!("{:x}", hasher.finalize()));
+                match crate::document::DocumentTargetKind::from_entry(
+                    image
+                        .entry(&virtual_path)
+                        .map_err(|error| error.to_string())?,
+                ) {
+                    crate::document::DocumentTargetKind::File => {
+                        let bytes = image
+                            .file_bytes(&virtual_path)
+                            .map_err(|error| error.to_string())?
+                            .ok_or_else(|| {
+                                format!(
+                                    "captured file '{}' has no bytes",
+                                    virtual_path.relative().as_path().display()
+                                )
+                            })?;
+                        let mut hasher = Sha256::new();
+                        hasher.update(bytes);
+                        asset.asset_type = AssetType::Local;
+                        asset.mime_type = Self::detect_mime_type(path);
+                        asset.content_hash = Some(format!("{:x}", hasher.finalize()));
+                    }
+                    crate::document::DocumentTargetKind::Directory => {
+                        asset.asset_type = AssetType::Directory;
+                    }
+                    crate::document::DocumentTargetKind::Unsupported => {
+                        asset.asset_type = AssetType::Unsupported;
+                    }
+                    crate::document::DocumentTargetKind::Missing => {}
                 }
                 Ok(asset)
             })
@@ -215,13 +238,21 @@ impl AssetScanner {
 
         // Check if file exists
         let full_path = self.repo_root.join(&resolved);
-        let (asset_type, mime_type, content_hash) = if full_path.exists() && full_path.is_file() {
-            let mime = Self::detect_mime_type(&resolved);
-            let hash = compute_file_hash(&full_path).ok();
-            (AssetType::Local, mime, hash)
-        } else {
-            (AssetType::Missing, None, None)
-        };
+        let (asset_type, mime_type, content_hash) =
+            match crate::document::DocumentTargetKind::from_filesystem(&full_path) {
+                crate::document::DocumentTargetKind::File => {
+                    let mime = Self::detect_mime_type(&resolved);
+                    let hash = compute_file_hash(&full_path).ok();
+                    (AssetType::Local, mime, hash)
+                }
+                crate::document::DocumentTargetKind::Directory => {
+                    (AssetType::Directory, None, None)
+                }
+                crate::document::DocumentTargetKind::Missing => (AssetType::Missing, None, None),
+                crate::document::DocumentTargetKind::Unsupported => {
+                    (AssetType::Unsupported, None, None)
+                }
+            };
 
         Ok(Asset {
             original_path: asset_path.to_string(),
@@ -425,6 +456,40 @@ mod tests {
         assert_eq!(assets[0].asset_type, AssetType::Local);
         assert!(assets[0].content_hash.is_some());
         assert_eq!(assets[0].mime_type, Some("image/png".to_string()));
+    }
+
+    #[test]
+    fn test_asset_scanner_existing_directory_is_navigation_not_missing() {
+        let temp = TempDir::new().unwrap();
+        let registry = AdapterRegistry::with_builtins();
+        let scanner = AssetScanner::new(registry, temp.path());
+        fs::create_dir_all(temp.path().join("studies")).unwrap();
+
+        let assets = scanner
+            .scan_document(Path::new("notes/guide.md"), "[Studies](../studies)")
+            .unwrap();
+
+        assert_eq!(assets.len(), 1);
+        assert_eq!(assets[0].asset_type, AssetType::Directory);
+        assert_eq!(assets[0].resolved_path, Some(PathBuf::from("studies")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_asset_scanner_symlink_is_unsupported_without_following_it() {
+        use std::os::unix::fs::symlink;
+
+        let temp = TempDir::new().unwrap();
+        let registry = AdapterRegistry::with_builtins();
+        let scanner = AssetScanner::new(registry, temp.path());
+        fs::write(temp.path().join("actual.png"), b"png bytes").unwrap();
+        symlink("actual.png", temp.path().join("linked.png")).unwrap();
+
+        let assets = scanner
+            .scan_document(Path::new("guide.md"), "![Linked](linked.png)")
+            .unwrap();
+
+        assert_eq!(assets[0].asset_type, AssetType::Unsupported);
     }
 
     #[test]

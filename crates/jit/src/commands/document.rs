@@ -1203,6 +1203,21 @@ impl<S: IssueStore> CommandExecutor<S> {
                             "message": format!("Asset classified as missing: {}", asset.original_path),
                         }));
                     }
+                    AssetType::Directory => {
+                        // Directories are Markdown navigation targets, not assets.
+                    }
+                    AssetType::Unsupported => {
+                        errors.push(serde_json::json!({
+                            "issue_id": issue_id,
+                            "document": doc.path,
+                            "type": "unsupported_asset",
+                            "asset": asset.original_path,
+                            "message": format!(
+                                "Asset resolves to an unsupported artifact type: {}",
+                                asset.original_path
+                            ),
+                        }));
+                    }
                     AssetType::External => {
                         // Validate external URLs
                         match Self::validate_external_url(&asset.original_path) {
@@ -1251,7 +1266,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                         let result = match pinned {
                             Some(pinned) => {
                                 link_validator.validate_link_at(&doc_path_rel, &link, |target| {
-                                    pinned.holds(target)
+                                    if pinned.holds(target) {
+                                        crate::document::DocumentTargetKind::File
+                                    } else {
+                                        crate::document::DocumentTargetKind::Missing
+                                    }
                                 })
                             }
                             None => link_validator.validate_link(&doc_path_rel, &link),

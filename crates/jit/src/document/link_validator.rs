@@ -109,15 +109,16 @@ impl LinkValidator {
     /// Validate a single link from a document against the working tree
     pub fn validate_link(&self, from_doc: &Path, link: &InternalLink) -> LinkValidationResult {
         self.validate_link_at(from_doc, link, |target| {
-            self.all_document_paths.contains(target) || {
-                let full_path = self.repo_root.join(target);
-                full_path.exists() && full_path.is_file()
+            if self.all_document_paths.contains(target) {
+                crate::document::DocumentTargetKind::File
+            } else {
+                crate::document::DocumentTargetKind::from_filesystem(&self.repo_root.join(target))
             }
         })
     }
 
     /// Validate a single link from a document, asking `holds_target` whether the
-    /// resolved repository-relative path holds a file.
+    /// resolved repository-relative path's semantic kind.
     ///
     /// The predicate names the version the link is read at, so a commit-pinned
     /// document's links resolve at its commit rather than in the working tree.
@@ -125,20 +126,33 @@ impl LinkValidator {
         &self,
         from_doc: &Path,
         link: &InternalLink,
-        holds_target: impl Fn(&Path) -> bool,
+        holds_target: impl Fn(&Path) -> crate::document::DocumentTargetKind,
     ) -> LinkValidationResult {
         // A same-document anchor names no path, and is always valid
         let Some(normalized) = self.resolve_target(from_doc, link) else {
             return LinkValidationResult::Valid;
         };
 
+        let target_kind = holds_target(&normalized);
+        if target_kind == crate::document::DocumentTargetKind::Directory {
+            return LinkValidationResult::Valid;
+        }
+
         // A link must hold a file in the version being checked. In particular,
         // a target currently registered by another document may not have
         // existed at a pinned document's commit.
-        if !holds_target(&normalized) {
+        if target_kind == crate::document::DocumentTargetKind::Missing {
             LinkValidationResult::Broken {
                 reason: format!(
                     "Document '{}' not found (resolved to {})",
+                    link.target,
+                    normalized.display()
+                ),
+            }
+        } else if target_kind == crate::document::DocumentTargetKind::Unsupported {
+            LinkValidationResult::Broken {
+                reason: format!(
+                    "Document '{}' resolves to an unsupported artifact type ({})",
                     link.target,
                     normalized.display()
                 ),
@@ -330,6 +344,24 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_link_to_existing_directory_is_navigation() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let doc = PathBuf::from("docs/guide.md");
+        std::fs::create_dir_all(temp_dir.path().join("docs/studies")).unwrap();
+        let validator = LinkValidator::new(temp_dir.path().to_path_buf(), vec![doc.clone()]);
+        let link = InternalLink {
+            target: "studies".to_string(),
+            line_number: 1,
+            link_type: LinkType::Relative,
+        };
+
+        assert!(matches!(
+            validator.validate_link(&doc, &link),
+            LinkValidationResult::Valid
+        ));
+    }
+
+    #[test]
     fn test_validate_link_at_requires_registered_target_at_named_version() {
         let temp_dir = tempfile::tempdir().unwrap();
         let from = PathBuf::from("docs/report.md");
@@ -352,11 +384,19 @@ mod tests {
             LinkValidationResult::Valid
         ));
         assert!(matches!(
-            validator.validate_link_at(&from, &link, |path| path == target),
+            validator.validate_link_at(&from, &link, |path| {
+                if path == target {
+                    crate::document::DocumentTargetKind::File
+                } else {
+                    crate::document::DocumentTargetKind::Missing
+                }
+            }),
             LinkValidationResult::Valid
         ));
         assert!(matches!(
-            validator.validate_link_at(&from, &link, |_| false),
+            validator.validate_link_at(&from, &link, |_| {
+                crate::document::DocumentTargetKind::Missing
+            }),
             LinkValidationResult::Broken { .. }
         ));
     }

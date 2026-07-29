@@ -20,7 +20,7 @@ pub use parser::{
 };
 pub use reference::{
     resolve_document_reference, DocumentReferenceError, DocumentReferenceRequests,
-    DocumentReferenceResolution, UnresolvedDocumentReference,
+    DocumentReferenceResolution, DocumentTargetKind, UnresolvedDocumentReference,
 };
 pub use scope::{DocumentScope, DocumentScopeParseError};
 

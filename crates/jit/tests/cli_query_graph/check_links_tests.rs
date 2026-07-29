@@ -483,6 +483,58 @@ fn test_missing_document_file() {
 }
 
 #[test]
+fn test_directory_link_target_is_navigation_not_a_missing_asset_or_scan_error() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Directory link", "Description");
+    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+    fs::create_dir_all(ctx.repo_path().join("dev/notes")).unwrap();
+    fs::write(
+        ctx.repo_path().join("dev/notes/guide.md"),
+        "See [the studies area](../studies).\n",
+    )
+    .unwrap();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "dev/notes/guide.md"])
+        .success();
+
+    let report = ctx.check_links_report();
+    assert!(
+        errors_for_document(&report, "dev/notes/guide.md")
+            .iter()
+            .all(|error| error["type"] != "missing_asset" && error["type"] != "broken_link"),
+        "an existing directory is navigation, not a missing asset: {report}"
+    );
+    assert!(
+        report["warnings"]
+            .as_array()
+            .expect("warnings array")
+            .iter()
+            .all(|warning| warning["type"] != "scan_error"),
+        "a directory target must not make link scanning fail: {report}"
+    );
+}
+
+#[test]
+fn test_validate_reports_direct_directory_reference_as_unsupported_artifact_type() {
+    let ctx = TestContext::new();
+    ctx.init_repo();
+
+    let issue_id = ctx.create_issue("Directory reference", "Description");
+    fs::create_dir_all(ctx.repo_path().join("dev/studies")).unwrap();
+
+    ctx.run_jit(&["doc", "add", &issue_id, "dev/studies"])
+        .success();
+
+    ctx.run_jit(&["validate"])
+        .failure()
+        .stderr(predicate::str::contains("unsupported artifact type"))
+        .stderr(predicate::str::contains("dev/studies"))
+        .stderr(predicate::str::contains("not found").not());
+}
+
+#[test]
 fn test_git_versioned_asset_exists() {
     let ctx = TestContext::new();
     ctx.init_repo();
