@@ -79,15 +79,23 @@ fn test_cargo_ci_disables_incremental_compilation_before_the_first_step() {
     let export_pos = script
         .find("export CARGO_INCREMENTAL=0")
         .unwrap_or_else(|| panic!("scripts/cargo-ci.sh must export CARGO_INCREMENTAL=0"));
+    let preflight_pos = script
+        .find("run_step incremental-preflight")
+        .expect("scripts/cargo-ci.sh must check existing incremental state first");
     let first_step_pos = script
         .find("run_step fmt")
         .expect("scripts/cargo-ci.sh must run the fmt step");
 
     assert!(
-        export_pos < first_step_pos,
+        export_pos < preflight_pos && preflight_pos < first_step_pos,
         "CARGO_INCREMENTAL=0 must be exported before the first gate step so it \
          covers every Rust compilation the gate performs (fmt, clippy, test, \
          provenance)"
+    );
+    assert!(
+        script[preflight_pos..first_step_pos].contains("if [ \"$failed\" -ne 0 ]"),
+        "a failed incremental-state preflight must exit before the expensive \
+         fmt, clippy, test, provenance, and budget steps"
     );
 }
 

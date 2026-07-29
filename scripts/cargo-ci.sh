@@ -236,6 +236,16 @@ fi
 
 # Run all steps (continue through failures so every problem is reported, unlike
 # a short-circuiting `&&` chain). Same checks the inline gate ran.
+# Reject pre-existing incremental state before paying for any compilation. The
+# final incremental-state step remains authoritative for state created during
+# this run; this preflight only avoids an expensive gate that is already known
+# to be unable to pass.
+run_step incremental-preflight check_no_incremental_state
+if [ "$failed" -ne 0 ]; then
+  echo "$summary"
+  exit 1
+fi
+
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
 run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
 run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
