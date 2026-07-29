@@ -1,3 +1,7 @@
-# A pull-request path filter would let some pull requests bypass the contract.
+# A pull-request branch or path filter would let some pull requests bypass the
+# contract. One vector exercises every prohibited filter key.
 exit: 1
+trigger 'pull_request' declares forbidden filter 'branches'
+trigger 'pull_request' declares forbidden filter 'branches-ignore'
+trigger 'pull_request' declares forbidden filter 'paths'
 trigger 'pull_request' declares forbidden filter 'paths-ignore'

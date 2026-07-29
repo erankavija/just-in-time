@@ -36,11 +36,12 @@ Exit codes are `0` clean, `1` findings, `2` environment or contract error. An
 environment error is never reported as a pass.
 
 The same two commands run in the `workflow-contract` job of
-[`ci.yml`](../.github/workflows/ci.yml), which runs on every pull request to
-`main`, including documentation-only pull requests. The contract forbids
-`paths` and `paths-ignore` filters on that pull-request trigger, so no edit to a
-workflow, to the contract, or to the harness itself reaches `main` without
-them: a change that violates a declared assertion fails its pull request.
+[`ci.yml`](../.github/workflows/ci.yml), which runs on every pull request,
+regardless of its base branch or changed paths. The contract forbids `branches`,
+`branches-ignore`, `paths`, and `paths-ignore` filters on that pull-request
+trigger, so no edit to a workflow, to the contract, or to the harness itself
+reaches `main` without them: a change that violates a declared assertion fails
+its pull request.
 
 ## Declaring assertions
 
@@ -91,8 +92,9 @@ workflows:
 
 Within a required event mapping, `forbidden_filters` names filter keys that may
 not appear on that event. The CI contract uses
-`forbidden_filters: [paths, paths-ignore]` for `pull_request`, ensuring its
-workflow-contract job is scheduled for every pull request.
+`forbidden_filters: [branches, branches-ignore, paths, paths-ignore]` for
+`pull_request`, ensuring its workflow-contract job is scheduled for every base
+branch and changed path.
 
 `needs` is transitive on purpose. Declaring that publication needs validation
 states that no path reaches publication while validation fails, whatever

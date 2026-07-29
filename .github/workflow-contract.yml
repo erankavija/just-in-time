@@ -32,10 +32,9 @@ workflows:
         push:
           branches: [main]
         pull_request:
-          branches: [main]
-          # This job is the PR workflow gate. Path filters would allow a
-          # documentation-only change to bypass the workflow contract.
-          forbidden_filters: [paths, paths-ignore]
+          # This job is the PR workflow gate. Branch or path filters would let
+          # a pull request bypass the workflow contract.
+          forbidden_filters: [branches, branches-ignore, paths, paths-ignore]
       # A fork pull request must not run with repository write credentials.
       forbidden: [pull_request_target]
     permissions:
