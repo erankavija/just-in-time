@@ -32,7 +32,7 @@
           "short_id": "8fa7261b",
           "title": "Remediate web production dependency advisories",
           "classification": "implementation",
-          "status": "rework",
+          "status": "done",
           "gates": [
             "npm-ci",
             "code-review",

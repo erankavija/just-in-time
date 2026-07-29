@@ -14,6 +14,7 @@
       "path": "dev/active/8fa7261b/production-audit-evidence.md"
     }
   ],
+  "done_at": "2026-07-29T16:06:35.171697788Z",
   "first_ready_at": "2026-07-15T09:12:53.169206806Z",
   "gates_required": [
     "npm-ci",
@@ -22,13 +23,18 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-29T15:52:32.950068272Z",
+      "status": "passed",
+      "updated_at": "2026-07-29T16:05:47.574169718Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-29T16:05:50.661693817Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
       "status": "passed",
-      "updated_at": "2026-07-29T15:46:28.714056678Z",
+      "updated_at": "2026-07-29T16:02:41.585352122Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,7 +45,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remediate web production dependency advisories",
-  "updated_at": "2026-07-29T16:01:26.272608060Z"
+  "updated_at": "2026-07-29T16:06:35.171697788Z"
 }

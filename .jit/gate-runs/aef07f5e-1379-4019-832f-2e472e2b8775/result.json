@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "30bd4454ac6a70b77c5af7b2190a14ed4982e4dc",
+  "completed_at": "2026-07-29T16:05:47.269519048Z",
+  "duration_ms": 184782,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The lock-bound zero-vulnerability audit evidence matches the committed lockfile, and the dependency migration is covered by the passing web validation and direct Mermaid regression tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
+  "message": null,
+  "run_id": "aef07f5e-1379-4019-832f-2e472e2b8775",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-29T16:02:42.487439234Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 30bd4454, 0904b7ef, 14be26a6, 63325967, 0ee5c22a, 45bd85c5, bbbd98b1 (all reachable from HEAD)\nPolicy sources: AGENTS.md; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-11 — dev/vision/9db27a3a-charter.md; @/gate/jit-validate — .jit/gates.toml\nGate evidence: npm-ci passed (exit 0, 2026-07-29T16:02:27Z); code-review previously failed (exit 1, prior F1 resolved); jit-validate pending (no run)\nTruncation recovery: narrowed the long npm-ci stdout to its authoritative metadata; separately read all relevant result findings, evidence, and individual patches\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The lock-bound zero-vulnerability audit evidence matches the committed lockfile, and the dependency migration is covered by the passing web validation and direct Mermaid regression tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
