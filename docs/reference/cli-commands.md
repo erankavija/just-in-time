@@ -432,9 +432,8 @@ shelling out to the CLI.
 
 The tool surface is **generated from the CLI schema**, so it stays in lockstep
 with the commands documented above rather than being maintained by hand.
-[`mcp-server/README.md`](../../mcp-server/README.md) is the authoritative
-reference for setup, client configuration, and the live tool list; the
-generation model in brief:
+[MCP Integration](../how-to/mcp-integration.md) installs the server and starts
+it from a client; the generation model in brief:
 
 - **Tools mirror commands.** Every leaf command in `jit --schema` becomes one
   tool named `jit_<command_path>` — `jit doc assets list` is
@@ -447,18 +446,12 @@ generation model in brief:
   checking gates, and reading repository structure. The include/exclude decisions and their
   rationale live in
   [`mcp-server/curated-tools.json`](../../mcp-server/curated-tools.json).
-- **Full set on demand.** Setting `JIT_MCP_ALL_TOOLS=1` exposes every generated
-  tool, not just the curated subset.
-
-```bash
-cd mcp-server && npm install
-# List the curated tools (add JIT_MCP_ALL_TOOLS=1 for the full generated set)
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node index.js
-```
+- **Full set on demand.** Setting `JIT_MCP_ALL_TOOLS=1` in the server's
+  environment exposes every generated tool, not just the curated subset.
 
 ### See Also
 
-- [MCP Server README](../../mcp-server/README.md) - Setup, client configuration, and the tool list
+- [MCP Integration](../how-to/mcp-integration.md) - Installing the server and starting it from a client
 - [Core Model](../concepts/core-model.md) - Understanding issues, gates, dependencies
 - [How-To: Custom Gates](../how-to/custom-gates.md) - Gate usage patterns
 - [Quickstart Tutorial](../tutorials/quickstart.md) - Getting started

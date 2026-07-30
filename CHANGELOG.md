@@ -152,6 +152,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Installation, deployment, MCP, and release facts each have one documented
+  home.** The installation guide carried the container deployment, the web
+  bundle build, and the MCP install beside the native archive, while the
+  README, the deployment guide, and the package READMEs restated pieces of
+  each, so one command lived in several places and drifted independently.
+  `INSTALL.md` now owns the published archive — download, checksum
+  verification, and the version, target and profile `jit version --json`
+  reports — plus the contributor build from a source checkout.
+  `docs/how-to/deployment.md` owns the container deployment including building
+  the image, and the web bundle `jit-server` embeds. A new
+  `docs/how-to/mcp-integration.md` owns installing the released MCP tarball and
+  starting it from a client, and the CLI reference's MCP section points there
+  for setup instead of naming the package README authoritative.
+  `docs/reference/release-policy.md` owns the product-version procedure and the
+  release's complete published output — one GitHub release per version tag, no
+  package registry, no container registry, no separate web bundle — and cites
+  the compatibility record the version contract reads rather than absorbing it.
+  Every command, artifact name, mount path, health URL and prerequisite on
+  those pages names the workflow, manifest, or image definition that keeps it
+  true.
+
+- **The documentation gate fails when a canonical home rots.**
+  `docs-mechanical` gains a fourth check, `scripts/docs-check-canonical.sh`
+  (M6), over the canonical-home manifest `scripts/docs-canonical-homes.toml`.
+  Each entry binds one adopter-facing fact to the page that owns it, the
+  literal an adopter acts on, and the automation carrying that literal: the
+  check reports MISSING when the home, its anchor, its statement, or its
+  navigation link is gone, STALE when a source stops carrying what the page
+  states, and DUPLICATE when a second scanned page states the same literal. The
+  orchestrator appends every declared home to the resolved footprint, so the
+  link and citation checks reach a canonical page outside the adopter
+  documentation root — the installation guide is one. Each defect class is
+  seeded and reverted against an isolated fixture repository in
+  `scripts/docs-check-selftest.sh`.
+
 - **The release is published by one tag-triggered workflow.** `release.yml`
   packaged binaries on any `v*` tag: it ran no validation suite and no security
   audit, never started what it packaged, carried no license text, and rendered a
