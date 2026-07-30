@@ -289,8 +289,9 @@ def verify_release_note(
 
     if FENCED_BLOCK_PATTERN.search(text):
         findings.append(
-            f"release note at {relative} carries a fenced command block; "
-            "installation commands belong in the canonical installation guide"
+            f"release note at {relative} carries a fenced block; it cites the "
+            "canonical installation guide instead of repeating installation "
+            "commands"
         )
 
     targets = linked_paths(relative, text)
