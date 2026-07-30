@@ -53,11 +53,16 @@ python3 scripts/rust-version-policy.py --declared  # the declared version alone
 python3 scripts/rust_version_policy_test.py        # the command's own tests
 ```
 
-Two callers run it. CI's `msrv` job takes the declared version as the compiler
-it installs, checks the window, and then builds and tests the committed
-workspace on exactly that compiler against the committed `Cargo.lock`. The
-pre-tag check runs the command against the commit a release tag will point at,
-so a tag carries a declaration that was inside the window when it was created.
+Two callers run it:
+
+| Caller | When |
+| --- | --- |
+| CI's `msrv` job | every push and pull request. It takes the declared version as the compiler it installs, checks the window, then builds and tests the committed workspace on that compiler against the committed `Cargo.lock`. |
+| the pre-tag check | against the commit a release tag will point at, before that tag is created, so a tag carries a declaration that was inside the window at creation. |
+
+The command judges a tree rather than an environment — `--root` names the tree,
+the verdict goes to stdout — so both callers run the same comparison and can
+record the result they acted on.
 
 ### Refreshing the declaration
 
