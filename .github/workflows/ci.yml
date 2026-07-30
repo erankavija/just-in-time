@@ -156,15 +156,18 @@ jobs:
           cd crates/jit
           cargo test --test '*' --verbose
 
-  # Enforce the declared MSRV. The authoritative policy is the single
-  # `rust-version` under `[workspace.package]` in Cargo.toml; this job reads it
-  # from the manifest (no hand-duplicated version literal) and builds the whole
-  # workspace on exactly that pinned toolchain. A change that requires a newer
-  # compiler than the declared minimum fails here, keeping the manifest claim
-  # honest. `cargo` itself also refuses to build the crates on an older
-  # toolchain because of the same `rust-version` field.
+  # Enforce the declared MSRV and its recency window. The authoritative policy
+  # is the single `rust-version` under `[workspace.package]` in Cargo.toml,
+  # which every crate inherits; `scripts/rust-version-policy.py` derives it from
+  # cargo metadata, so the toolchain this job installs follows the manifest and
+  # this file carries no version literal of its own. The workspace is then built
+  # and tested on exactly that compiler, `--locked`, so the committed Cargo.lock
+  # is the dependency set under test. The same command compares the declaration
+  # with the current stable release it derives from the Rust release channel;
+  # docs/reference/release-policy.md states the window and the refresh
+  # procedure a finding calls for.
   msrv:
-    name: MSRV (build on declared rust-version)
+    name: MSRV (build and test on declared rust-version)
     runs-on: ubuntu-latest
 
     steps:
@@ -180,18 +183,27 @@ jobs:
           sudo docker image prune --all --force
           df -h
 
-      - name: Read MSRV from Cargo.toml
+      # Reading the declaration is itself a cargo call, so a toolchain has to
+      # exist before the declared one is known.
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
+
+      - name: Self-test the Rust version policy
+        run: python3 scripts/rust_version_policy_test.py
+
+      - name: Read the declared MSRV from Cargo metadata
         id: msrv
         run: |
-          version=$(grep -m1 -E '^rust-version' Cargo.toml | sed -E 's/.*"([0-9.]+)".*/\1/')
-          if [ -z "$version" ]; then
-            echo "Could not read rust-version from Cargo.toml" >&2
-            exit 1
-          fi
+          version=$(python3 scripts/rust-version-policy.py --declared)
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Declared MSRV: $version"
 
-      - name: Install pinned Rust toolchain
+      - name: Check the declared MSRV against current stable
+        run: python3 scripts/rust-version-policy.py
+
+      - name: Install the declared Rust toolchain
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
@@ -207,8 +219,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-msrv-
 
+      - name: Install ripgrep (for search tests)
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Configure git default branch
+        run: git config --global init.defaultBranch main
+
       - name: Build workspace on MSRV toolchain
-        run: cargo +${{ steps.msrv.outputs.version }} build --workspace --all-targets --all-features --verbose
+        run: cargo +${{ steps.msrv.outputs.version }} build --workspace --all-targets --all-features --locked --verbose
+
+      - name: Test workspace on MSRV toolchain
+        run: cargo +${{ steps.msrv.outputs.version }} test --workspace --all-features --locked --verbose
 
   # The html/xml content parsers and their production-dispatch tests are behind
   # optional cargo features that the default `cargo test` build never compiles.

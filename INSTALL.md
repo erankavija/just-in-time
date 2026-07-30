@@ -101,7 +101,7 @@ Podman, backups, and troubleshooting.
 
 ### Prerequisites
 
-- Rust 1.97 or newer — the workspace minimum supported version (`rust-version` in `Cargo.toml`), which CI's MSRV job builds against so a change requiring a newer compiler fails the pipeline (`.github/workflows/ci.yml`). Install via rustup: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- Rust at the workspace minimum supported version or newer — `rust-version` under `[workspace.package]` in `Cargo.toml` declares it, and [the release policy](docs/reference/release-policy.md#supported-rust-version) covers how it is derived, kept within one minor release of current stable, and enforced. Install via rustup: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 - Node.js 20+ (for MCP server and Web UI; the CI floor, `.github/workflows/ci.yml`)
 - ripgrep (optional, for search: `sudo apt install ripgrep`)
 
