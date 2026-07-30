@@ -110,12 +110,12 @@ acyclic.
 
 A reusable workflow states once, in its own entry, what a caller gets by
 calling it. `callers.require_needs` names its own jobs, and binds every
-workflow in the tree that calls it by file name — `uses:
-./.github/workflows/<file>`, the form that runs the called workflow on the
-caller's commit.
+workflow in the tree that calls it by file name (`uses:` a
+`./.github/workflows/…` path, the form that runs the called workflow on the
+caller's own commit).
 
 Each job a caller runs itself has to reach that call through `needs`, so
-nothing of the caller's starts while an inherited job is still running. One
+nothing of the caller's starts before every inherited job has succeeded. One
 edge at the head of the caller's graph carries the whole graph, since `needs`
 is transitive. A caller job that calls another workflow of this repository is
 exempt: it is a verified boundary of the same kind, and making it wait would

@@ -39,7 +39,7 @@ Caller obligations (per reusable workflow)
     A reusable workflow names the jobs a caller inherits by calling it. Each
     has to exist and to run unconditionally, and every job a caller runs of its
     own has to reach the call through `needs`, so nothing of the caller's
-    starts while an inherited job is still failing on the same commit.
+    starts before every inherited job has succeeded on the same commit.
 
 Exit codes
 ----------
@@ -162,7 +162,7 @@ def workflow_jobs(doc) -> dict:
 
 def job_uses(job) -> str:
     """The workflow or action a job runs in place of steps, or the empty string."""
-    return str(as_mapping(job).get("uses") or "").strip("\"'")
+    return str(as_mapping(job).get("uses") or "")
 
 
 def step_label(index: int, step) -> str:
@@ -731,8 +731,7 @@ def check_caller_obligation(workflow: Workflow, declaration, documents: dict) ->
             finding(
                 caller.relative,
                 f"job {name!r} does not reach the {reference!r} call through 'needs', "
-                "so it runs while the jobs that workflow promises its callers are "
-                "still running on the same commit",
+                "so it starts before every job that call promises has succeeded",
             )
             for name, job in sorted(caller_jobs.items())
             if name not in calls
