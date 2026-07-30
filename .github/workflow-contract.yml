@@ -47,12 +47,13 @@ workflows:
       secrets:
         allowed: []
     callers:
-      # What a caller inherits by calling this workflow: the repository,
-      # Rust, exact-MSRV, MCP, and web validation this repository considers
-      # normal. Each has to exist here and to run unconditionally, and every
-      # job a caller runs of its own has to wait for the call.
+      # What a caller inherits by calling this workflow: every suite this
+      # repository considers normal validation. Each job named below has to
+      # exist here and to run unconditionally, and every job a caller runs of
+      # its own has to wait for the call.
       require_needs:
         - workflow-contract
+        - repo-validate
         - test-rust
         - test-rust-features
         - profile-adoption

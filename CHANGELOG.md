@@ -11,9 +11,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **The normal validation suites are callable from another workflow.** `ci.yml`
   accepts `workflow_call` beside its branch-push and pull-request triggers, so
   a branch build, a pull request, and any workflow of this repository that
-  calls it run one maintained definition of the repository, Rust, exact-MSRV,
-  MCP, and web jobs on their own commit. The call takes no input and no
-  secret, so a caller cannot aim the suites at a different commit.
+  calls it run one maintained definition of the repository-validation, Rust,
+  exact-MSRV, MCP, and web jobs on their own commit. The call takes no input
+  and no secret, so a caller cannot aim the suites at a different commit.
+
+- **CI validates the repository's own tracked data.** A `repo-validate` job in
+  `ci.yml` runs `jit validate` with no issue id — every rule over the whole
+  repository plus the repository-integrity checks — against a full-depth
+  checkout, since integrity resolves document references pinned to a commit
+  that a shallow checkout cannot look up. It is one of the jobs a caller of
+  `ci.yml` inherits.
   `.github/workflow-contract.yml` gains a `callers.require_needs` declaration
   for that promise: a reusable workflow names the jobs a caller inherits, and
   the verifier then requires each of them to exist and to carry no `if:`
