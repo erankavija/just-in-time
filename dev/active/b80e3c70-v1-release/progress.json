@@ -594,6 +594,12 @@
    "detail": "22d374bd's code-review raised two blocking issue-impact findings against the superseded packaging workflow: release.yml:70 archives only the two binaries, omitting LICENSE-MIT and LICENSE-APACHE, and release.yml:175 uses a hard-coded release body instead of docs/release-notes/v1.0.0.md. Both are f9af9788 deliverables and that issue deletes the cited workflow under its REQ-07.",
    "routed_to": "f9af9788",
    "criterion_check": "f9af9788 REQ-03 requires the musl archive to carry both license texts; REQ-05 requires release notes derived from the committed release-note source. Epic REQ-09 names both. Verify at f9af9788 review and again at epic completion."
+  },
+  {
+   "subject": "release workflow does not call the reusable security workflow",
+   "detail": "f7f80d53's code-review raised one blocking issue-impact finding: release.yml:26 never calls security-audit.yml, so the three audit boundaries are predecessors of nothing in the publication path. The contract assertion exists and binds any caller; the caller does not exist yet.",
+   "routed_to": "f9af9788",
+   "criterion_check": "f9af9788 REQ-02 requires the reusable normal suites and the reusable blocking security workflow to run against the tagged commit before any artifact is built, and REQ-09 requires the contract to assert no publication job is reachable without them. Epic REQ-03 names the same predecessor relation. Verify at f9af9788 review and again at epic completion."
   }
  ],
  "started_at": "2026-07-29T14:20:00+00:00",

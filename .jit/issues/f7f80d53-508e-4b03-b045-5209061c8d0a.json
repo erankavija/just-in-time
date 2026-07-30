@@ -9,7 +9,7 @@
     "bb302dbd-bd03-42ed-ae71-b0f035453f56",
     "f04f7888-a828-4677-aea8-f640a6702375"
   ],
-  "description": "One reusable security workflow blocks pull requests and the release workflow on audit installation, data-source, or advisory failure.\n\n## Success Criteria\n\n- [hard] REQ-01: The security workflow runs on pull requests and through `workflow_call`, installs a pinned `cargo-audit` with `--locked`, and executes `cargo audit -D warnings` plus both `npm audit --omit=dev --audit-level=info` commands against the committed locks.\n- [hard] REQ-02: Installation, registry, database, and finding failures each propagate as a job failure; the workflow contains no `continue-on-error`, shell fallback, blanket ignore, or advisory allowlist.\n- [hard] REQ-03: The shared workflow-contract checks assert that each of the three audit boundaries is a `needs` predecessor of every artifact-producing job in the release workflow, and that no path reaches publication while one of them fails.\n\n## Notes\n\nBlast radius: `.github/workflows/security-audit.yml` plus the assertions it declares to the shared workflow-contract harness. Gate-preset examples in `.jit/` remain repository-local configuration examples, not a substitute for the hosted check.\n",
+  "description": "One reusable security workflow blocks pull requests and the release workflow on audit installation, data-source, or advisory failure.\n\n## Success Criteria\n\n- [hard] REQ-01: The security workflow runs on pull requests and through `workflow_call`, installs a pinned `cargo-audit` with `--locked`, and executes `cargo audit -D warnings` plus both `npm audit --omit=dev --audit-level=info` commands against the committed locks.\n- [hard] REQ-02: Installation, registry, database, and finding failures each propagate as a job failure; the workflow contains no `continue-on-error`, shell fallback, blanket ignore, or advisory allowlist.\n- [hard] REQ-03: The shared workflow-contract checks assert that each of the three audit boundaries is a `needs` predecessor of every artifact-producing job in the release workflow, and that no path reaches publication while one of them fails.\n\n## Notes\n\nBlast radius: `.github/workflows/security-audit.yml` plus the assertions it declares to the shared workflow-contract harness. Gate-preset examples in `.jit/` remain repository-local configuration examples, not a substitute for the hosted check.\n\n\n## Scope boundary\n\nThis issue makes the three audit boundaries blocking and states their caller\nobligation once, on the security workflow, so any workflow that calls it is\nbound to reach its own jobs only through that call. Wiring a publication path to\nthat call belongs to `f9af9788`, which owns `.github/workflows/release.yml` and\nreplaces the superseded packaging workflow in a single change. Running the\nreusable security workflow against the tagged commit before any artifact is\nbuilt is that issue's REQ-02, evaluated against the workflow it writes rather\nthan the one it deletes.\n",
   "documents": [],
   "first_ready_at": "2026-07-15T09:12:53.170390817Z",
   "gates_required": [
@@ -20,7 +20,38 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T18:50:22.416986960Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-30T18:53:57.695569173Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T18:50:51.564293537Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T18:50:45.496144812Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T18:50:42.574077759Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T18:50:48.514087219Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
   "labels": [
     "type:task",
@@ -30,5 +61,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Enforce reusable blocking dependency audits",
-  "updated_at": "2026-07-30T18:24:43.439460778Z"
+  "updated_at": "2026-07-30T18:54:28.607086059Z"
 }

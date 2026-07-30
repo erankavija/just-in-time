@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "fc4c147595a30620faafe2fde9e6e0f358b82100",
+  "completed_at": "2026-07-30T18:53:57.410518734Z",
+  "duration_ms": 182339,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".github/workflows/release.yml",
+        "id": "F1",
+        "line": 26,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-11"
+        ],
+        "severity": "high",
+        "summary": "Release workflow never calls security-audit, so audit jobs are not predecessors of artifact production or publication."
+      }
+    ],
+    "summary": "Release artifacts and publication are not blocked by the reusable audit workflow.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
+  "message": null,
+  "run_id": "812c522d-0a36-45a6-946e-09513a25f509",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T18:50:55.071241291Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4366 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb45d-860f-7482-a2aa-a38f8a107ac2\n--------\nuser\n--- 4353 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 404c2347, 4fc6c771, fc4c1475\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-11 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml); @/issue/7edd2fe8/requirement/REQ-04 (issue description)\nGate evidence: cargo-ci, npm-ci, mcp-ci, repo-validate, and jit-validate passed (0); code-review pending\nTruncation recovery: per-path implementation and merge-parent patches, current workflow files, and caller-verifier lines 677–741 were read separately\n\n1. F1 — blocking, issue-impact, high: `.github/workflows/release.yml:26`, `:85`, and `:114` start artifact-producing jobs after only `version-contract`; no job calls `./.github/workflows/security-audit.yml`. The declaration at `.github/workflow-contract.yml:96` applies only to existing callers, and `scripts/workflow-contract.py:721` skips workflows with no call, so it cannot assert the required audit predecessors for the actual release. This fails hard REQ-03 and `@/charter/D-11`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Release artifacts and publication are not blocked by the reusable audit workflow.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Release workflow never calls security-audit, so audit jobs are not predecessors of artifact production or publication.\",\"file\":\".github/workflows/release.yml\",\"line\":26,\"references\":[\"@/charter/D-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
