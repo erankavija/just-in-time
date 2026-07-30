@@ -1,9 +1,9 @@
 {
  "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
  "epic_short_id": "b80e3c70",
- "current_wave": 2,
- "current_sub_wave": "2b",
- "wave_note": "Session 5 resumed at subwave 2b: e0fed1bb is claimed, in_progress, and dispatched to a worker in a SHA-anchored worktree based on 47959ec2. Subwave 2c (f7f80d53) stays serialized behind it because both own the workflow-contract authority. Session scope authorized by the invoker is waves 2 and 3 only, then report.",
+ "current_wave": 4,
+ "current_sub_wave": null,
+ "wave_note": "Waves 2 and 3 are complete. e0fed1bb, f7f80d53, 22d374bd, cdee58b3, and 3a3b5704 are Done with every configured gate passed and merged to main. Wave 4 is f9af9788, Ready and undispatched; it carries three findings routed from waves 2-3 and must close them. Session 5 stopped here because the invoker scoped it to waves 2 and 3.",
  "waves": [
   {
    "wave_number": 1,
@@ -352,7 +352,7 @@
      "short_id": "e0fed1bb",
      "title": "Make the normal validation suites reusable",
      "classification": "implementation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "7edd2fe8"
      ],
@@ -363,7 +363,7 @@
      "short_id": "f7f80d53",
      "title": "Enforce reusable blocking dependency audits",
      "classification": "implementation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "8fa7261b",
       "7edd2fe8",
@@ -402,7 +402,7 @@
      "short_id": "22d374bd",
      "title": "Add the dual-license and compatibility release record",
      "classification": "documentation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "5e538f48"
      ]
@@ -412,7 +412,7 @@
      "short_id": "cdee58b3",
      "title": "Enforce the declared MSRV recency window",
      "classification": "implementation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "f04f7888",
       "5e538f48"
@@ -423,7 +423,7 @@
      "short_id": "3a3b5704",
      "title": "Remove obsolete Docker topologies and migrate every active consumer",
      "classification": "implementation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "3b033738"
      ]
@@ -701,7 +701,12 @@
  "base_commit": "a8182e6f20476d547e3a0f969ef0ed4c636e4b56",
  "handoffs": [
   "dev/active/b80e3c70-v1-release/handoff.md",
-  "dev/active/b80e3c70-v1-release/handoff-3.md"
+  "dev/active/b80e3c70-v1-release/handoff-3.md",
+  {
+   "session": 5,
+   "path": "dev/active/b80e3c70-v1-release/handoff-5.md",
+   "summary": "Waves 2 and 3 closed: five issues Done. Three code-review findings routed to f9af9788."
+  }
  ],
  "merge_conflicts_expected": [
   {
