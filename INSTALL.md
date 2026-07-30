@@ -88,21 +88,12 @@ export JIT_GID=$(stat -c '%g' "$JIT_REPO")
 docker compose up -d     # from this checkout; reads the three variables above
 ```
 
-`http://localhost:3000` then serves the API and the Web UI. `docker compose
-down` stops it.
-
-The equivalent without Compose:
-
-```bash
-docker run -d --name jit-server \
-  --user "$JIT_UID:$JIT_GID" \
-  --publish 3000:3000 \
-  --volume "$JIT_REPO:/repo" \
-  jit-server:local
-```
+`http://localhost:3000` then serves the API and the Web UI, and
+`docker compose down` stops it.
 
 [Deployment](docs/how-to/deployment.md#container-deployment-team-server) covers
-the mount contract, rootless Podman, backups, and troubleshooting.
+the mount contract, the plain `docker run` and `podman run` forms, rootless
+Podman, backups, and troubleshooting.
 
 ## From Source
 
