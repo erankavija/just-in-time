@@ -467,7 +467,7 @@
      "short_id": "c5c324df",
      "title": "Align the embedded profile package's compatible jit range",
      "classification": "implementation",
-     "status": "pending"
+     "status": "done"
     }
    ]
   },
@@ -566,7 +566,8 @@
   "eeee8a1a": 2,
   "f04f7888": 2,
   "f289ff18": 2,
-  "cdee58b3": 1
+  "cdee58b3": 1,
+  "e90b9a3b": 1
  },
  "surfaced_pitfalls": [
   {
@@ -740,6 +741,13 @@
    "decision": "Accept the worker's two-workflow split: release-publish.yml on the tag, release-artifacts.yml reusable and on every pull request.",
    "reasoning": "It satisfies REQ-02 by placing every build behind the artifacts call, which needs validate and security, and REQ-08 by giving the artifact workflow its own pull-request trigger, without calling ci.yml and security-audit.yml a second time per pull request. No if: condition is needed anywhere, so forbid_failure_escapes holds without relying on the event-discriminating carve-out.",
    "rejected_alternative": "One workflow triggered on both events with publication gated by github.event_name, which needs a condition and doubles PR CI if the suites are called from the shared path."
+  },
+  {
+   "issue": "e90b9a3b",
+   "decision": "Absorb 080e54c6's entry-point pruning into e90b9a3b: widen the canonical-home scan to README.md, mcp-server/README.md, contrib/README.md and AGENTS.md, and remove the duplicated adopter walkthroughs the widening exposes.",
+   "reasoning": "doc-review blocked e90b9a3b on a checker scope the successor owns, and the successor cannot start until this issue is Done \u2014 a deadlock. The invoker chose absorption over a scope-boundary amendment or dropping the dependency, so the reviewer is satisfied literally with no criteria softened.",
+   "rejected_alternative": "Record the scope boundary in the description and re-run doc-review (the e0fed1bb remedy), or drop the 080e54c6 dependency and run both as one wave.",
+   "consequence": "080e54c6 shrinks to entry-point framing and the leave-archives-unchanged criterion; re-scope it after this lands."
   }
  ],
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
