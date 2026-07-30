@@ -1,0 +1,8 @@
+# A caller job that no longer calls the workflow it is declared to call. Every
+# other assertion still holds: the job exists, publication still reaches it
+# through 'needs', and the caller obligation says nothing, because a workflow
+# nothing calls binds nobody. Naming the call in the declaration is what turns
+# "a job called validate" back into "the validation suites ran".
+exit: 1
+job 'validate' does not call './.github/workflows/ci.yml'; it runs steps of its own
+workflow-contract: 1 finding(s)

@@ -1,0 +1,8 @@
+name: Publish Docs
+description: Create a release carrying the documentation bundle.
+runs:
+  using: composite
+  steps:
+    - name: Create the documentation release
+      shell: bash
+      run: gh release create "docs-$GITHUB_SHA" docs.tar.gz

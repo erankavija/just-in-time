@@ -1,0 +1,8 @@
+# A second workflow that publishes a GitHub release: once from a step of its
+# own, once from a local composite action it uses, which is where a second
+# publication path would be easiest to miss. The declared publication workflow
+# publishes in the same tree and is silent.
+exit: 1
+job 'deploy' step 1 (Attach the documentation bundle) creates a GitHub release with 'gh release upload'; .github/workflows/release-publish.yml is the only workflow that publishes
+./.github/actions/publish-docs step 1 (Create the documentation release) creates a GitHub release with 'gh release create'; .github/workflows/release-publish.yml is the only workflow that publishes
+workflow-contract: 2 finding(s)

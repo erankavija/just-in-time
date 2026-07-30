@@ -1,0 +1,18 @@
+name: Docs
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Attach the documentation bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" docs.tar.gz
+      - name: Publish the documentation release
+        uses: ./.github/actions/publish-docs

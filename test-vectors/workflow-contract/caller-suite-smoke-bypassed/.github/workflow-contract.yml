@@ -1,0 +1,34 @@
+# Case vector: a release workflow that builds and smokes its artifacts and
+# publishes without waiting for the result.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  release-artifacts.yml:
+    triggers:
+      required:
+        workflow_call: {}
+        pull_request: {}
+    permissions:
+      contents: read
+    callers:
+      require_needs: [build-native, smoke]
+
+  release-publish.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read
+    jobs:
+      artifacts:
+        uses: ./.github/workflows/release-artifacts.yml
+      publish:
+        permissions:
+          contents: write

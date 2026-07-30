@@ -1,0 +1,8 @@
+# A registry push is a finding wherever it appears: in the container workflow,
+# and in the declared publication workflow itself, whose output is one GitHub
+# release and nothing else. Being the workflow allowed to publish a release is
+# not permission to publish a package or an image.
+exit: 1
+job 'build-and-push' step 2 (Push the image) publishes to a package or container registry with 'docker push'
+job 'publish' step 2 (Publish the package) publishes to a package or container registry with 'npm publish'
+workflow-contract: 2 finding(s)

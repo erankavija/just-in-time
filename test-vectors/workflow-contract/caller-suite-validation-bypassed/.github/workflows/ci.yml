@@ -1,0 +1,14 @@
+name: CI
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  test-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./rust.sh
+  test-web-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./web.sh

@@ -1,0 +1,20 @@
+# Case vector: a publication declaration naming a workflow file that is not
+# committed.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+  publication:
+    github_release: publish.yml
+    forbid_registry: true
+
+workflows:
+  ci.yml:
+    triggers:
+      required:
+        pull_request: {}
+    permissions:
+      contents: read
