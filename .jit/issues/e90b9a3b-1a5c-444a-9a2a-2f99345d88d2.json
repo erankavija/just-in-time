@@ -7,7 +7,26 @@
     "f9af9788-9d54-4200-8da4-98818cc67fa9"
   ],
   "description": "Every supported installation, deployment, MCP, compatibility, upgrade, and version-policy workflow has one maintained adopter-facing home.\n\n## Success Criteria\n\n- [hard] REQ-01: `INSTALL.md` owns installing the published native archive and verifying its checksum, plus the contributor build-from-checkout path; `docs/how-to/deployment.md` owns the one-image `/repo` deployment including building that image locally; a canonical MCP guide owns installing the released tarball and starting it from a client; and the release-policy reference owns version, compatibility, upgrade, artifact, and MSRV procedures.\n- [hard] REQ-02: Every command, artifact name, mount path, health URL, runtime prerequisite, and version policy stated in those homes is exercised by automation or derived from a maintained manifest or workflow source.\n- [hard] REQ-03: The canonical pages distinguish the published artifacts from contributor source-checkout workflows, and no instruction depends on an artifact the release does not publish.\n- [hard] REQ-04: Link, command-snippet, and support-matrix checks fail when a canonical path is missing, stale, or duplicated.\n- [hard] REQ-05: The pages state that v1.0 publishes one GitHub release and no package-registry or container-registry version, so an adopter can tell which distribution paths are supported without inferring it.\n\n## Notes\n\nBlast radius: `INSTALL.md`, `docs/how-to/deployment.md`, the canonical MCP integration page (created if absent), one release-policy reference, navigation, and documentation checks; historical and unrelated conceptual documents are unchanged.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "documentation",
+      "label": "Canonical MCP integration guide",
+      "path": "docs/how-to/mcp-integration.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "label": "Canonical documentation home declarations",
+      "path": "scripts/docs-canonical-homes.toml"
+    },
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "label": "Canonical-home checker (docs-mechanical M6)",
+      "path": "scripts/docs-check-canonical.sh"
+    }
+  ],
   "first_ready_at": "2026-07-15T09:12:53.176872871Z",
   "gates_required": [
     "docs-mechanical",
@@ -25,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Establish canonical installation, deployment, MCP, source, and release references",
-  "updated_at": "2026-07-30T21:48:49.550989495Z"
+  "updated_at": "2026-07-30T22:02:55.521562835Z"
 }
