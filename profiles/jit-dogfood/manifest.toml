@@ -2,7 +2,7 @@
 manifest-version = 1
 id = "jit-dogfood"
 version = "1.0.0"
-jit = ">=0.2.1, <0.3.0"
+jit = ">=1.0.0, <2.0.0"
 
 # Repository-neutral workflow taxonomy. The four ordinary hierarchy entries
 # are shared with neutral `jit init`; the profile adds bracket and task
