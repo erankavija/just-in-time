@@ -17,6 +17,13 @@ set -euo pipefail
 #   DUPLICATE a second scanned page states the same literal, so the fact has
 #             two homes and one of them will rot.
 #
+# A binding may declare `[[fact.binding.exempt]]` entries, each naming one path
+# and the reason the same literal there is a different statement rather than a
+# copy of the canonical one — a contributor-facing command that happens to spell
+# the same thing. An exemption is itself checked: if the exempt path stops
+# stating the literal, the exemption has outlived its cause and is a MISSING
+# finding, so the table cannot quietly accumulate dead entries.
+#
 # Both comparison sides are derived at run time: the pages, the automation, and
 # the navigation are all read from the tree. The manifest declares only which
 # fact is bound to which pair, never the fact's value.
@@ -122,7 +129,24 @@ for index, fact in enumerate(facts):
         source_token = binding.get("source_token", doc)
         if not isinstance(source_token, str) or not source_token:
             fail(f"{binding_where}: source_token must be a non-empty string")
-        parsed_bindings.append((doc, source_token, sources))
+        exemptions = binding.get("exempt", [])
+        if not isinstance(exemptions, list):
+            fail(f"{binding_where}: exempt must be a list of tables")
+        parsed_exemptions = {}
+        for slot, exemption in enumerate(exemptions):
+            exempt_where = f"{binding_where} exempt #{slot + 1}"
+            if not isinstance(exemption, dict):
+                fail(f"{exempt_where}: not a table")
+            exempt_path = exemption.get("path")
+            reason = exemption.get("reason")
+            if not isinstance(exempt_path, str) or not exempt_path:
+                fail(f"{exempt_where}: path must be a non-empty string")
+            # An exemption without a stated reason is an unexplained hole in the
+            # uniqueness rule, so the manifest cannot express one.
+            if not isinstance(reason, str) or not reason:
+                fail(f"{exempt_where}: reason must be a non-empty string")
+            parsed_exemptions[os.path.normpath(exempt_path)] = reason
+        parsed_bindings.append((doc, source_token, sources, parsed_exemptions))
     path, _, anchor = home.partition("#")
     declarations.append((identifier, path, anchor, parsed_bindings))
 
@@ -221,7 +245,7 @@ for identifier, path, anchor, bindings in declarations:
             f"MISSING: {identifier}: canonical home {path} is not linked from "
             f"navigation ({', '.join(navigation)})"
         )
-    for doc, source_token, sources in bindings:
+    for doc, source_token, sources, exemptions in bindings:
         if doc not in home_text:
             findings.append(
                 f"MISSING: {identifier}: canonical home {path} no longer states "
@@ -244,7 +268,17 @@ for identifier, path, anchor, bindings in declarations:
             f"DUPLICATE: {identifier}: {other} also states {doc!r}; the canonical "
             f"home is {path}"
             for other in scanned
-            if other != home_normalized and doc in (text_of(other) or "")
+            if other != home_normalized
+            and other not in exemptions
+            and doc in (text_of(other) or "")
+        ]
+        # A declared exemption whose page stopped stating the literal has
+        # outlived its cause and belongs out of the table.
+        findings += [
+            f"MISSING: {identifier}: exemption for {exempt_path} no longer applies "
+            f"— it does not state {doc!r} ({reason})"
+            for exempt_path, reason in exemptions.items()
+            if doc not in (text_of(exempt_path) or "")
         ]
 
 if findings:

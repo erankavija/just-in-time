@@ -18,60 +18,18 @@ the JIT schema and generates tools from its leaf commands.
 - **Operational hardening** - timeouts (30s) and concurrency limits (10 concurrent commands)
 - **Modular architecture** - clean separation of concerns for maintainability
 
-## Installation
+## Installing and Running It
 
-`jit` must already be installed or built and available on `PATH`: the server loads
-`jit --schema` before it starts. For a source checkout:
+[MCP Integration](../docs/how-to/mcp-integration.md) is the guide for using this
+server: installing the tarball the release publishes, the prerequisite `jit`
+binary the server loads `jit --schema` from, the client configuration block that
+launches it, and the failures worth recognizing. Working on the server itself
+starts at [Development](#development) below.
 
-```bash
-cargo build --release
-export PATH="$(pwd)/target/release:$PATH"
-cd mcp-server
-npm install
-```
-
-## Usage
-
-### As MCP Server
-
-The server communicates over stdio using the Model Context Protocol:
+The server communicates over stdio, so a checkout runs it directly:
 
 ```bash
 node index.js
-```
-
-### With GitHub Copilot CLI
-
-**Note**: GitHub Copilot CLI and the MCP server both need `jit` on `PATH`.
-
-1. Build the CLI and add to PATH:
-   ```bash
-   cd /path/to/just-in-time
-   cargo build --release
-   export PATH="$(pwd)/target/release:$PATH"
-   ```
-
-2. Add and verify the local stdio server:
-   ```bash
-   copilot mcp add jit -- node /path/to/just-in-time/mcp-server/index.js
-   copilot mcp list
-   ```
-
-   The [GitHub Copilot CLI MCP guide](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers) documents this workflow and the user configuration file at `~/.copilot/mcp-config.json`.
-
-### MCP Client Configuration Example
-
-Add this server definition to your MCP client's configuration:
-
-```json
-{
-  "mcpServers": {
-    "jit": {
-      "command": "node",
-      "args": ["/path/to/just-in-time/mcp-server/index.js"]
-    }
-  }
-}
 ```
 
 ## Available Tools
@@ -293,9 +251,10 @@ npm install
 
 ### Node version issues
 
-Requires Node.js 20+, matching the CI floor (`.github/workflows/ci.yml`):
+The runtime floor is the Node.js version in [optional
+dependencies](../INSTALL.md#optional-dependencies):
 ```bash
-node --version  # Should be v20 or later
+node --version
 ```
 
 ## Architecture
@@ -337,6 +296,7 @@ MIT OR Apache-2.0 (matches parent project)
 ## See Also
 
 - [JIT CLI Documentation](../README.md)
+- [MCP Integration](../docs/how-to/mcp-integration.md) - Installing the published server and starting it from a client
 - [MCP Tools Reference](../docs/reference/cli-commands.md#mcp-tools-reference)
 - [CLI and MCP Strategy](../dev/architecture/cli-and-mcp-strategy.md)
 - [Model Context Protocol](https://modelcontextprotocol.io/)
