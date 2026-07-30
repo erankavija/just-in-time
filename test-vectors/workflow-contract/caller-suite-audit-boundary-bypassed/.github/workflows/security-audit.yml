@@ -1,0 +1,19 @@
+name: Security Audit
+on:
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cargo audit -D warnings
+  npm-audit-mcp-server:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm audit --omit=dev --audit-level=info
+  npm-audit-web:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm audit --omit=dev --audit-level=info

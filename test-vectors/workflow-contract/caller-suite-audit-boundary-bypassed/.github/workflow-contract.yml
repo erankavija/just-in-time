@@ -1,0 +1,40 @@
+# Case vector: a caller that routes publication through the audits but lets one
+# artifact job start beside them. The declaration is the same one the
+# conforming tree carries; what differs is the caller's `needs` graph.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  security-audit.yml:
+    triggers:
+      required:
+        pull_request:
+          forbidden_filters: [branches, branches-ignore, paths, paths-ignore]
+        workflow_call: {}
+    permissions:
+      contents: read
+    workflow_call:
+      inputs:
+        allowed: []
+      secrets:
+        allowed: []
+    callers:
+      require_needs: [cargo-audit, npm-audit-mcp-server, npm-audit-web]
+
+  release.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read
+    jobs:
+      create-release:
+        permissions:
+          contents: write
+        needs: [audit]
