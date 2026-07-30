@@ -1,650 +1,688 @@
 {
-  "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
-  "epic_short_id": "b80e3c70",
-  "current_wave": 2,
-  "current_sub_wave": "2b",
-  "wave_note": "Wave 2a is complete and handed off. Subwave 2b (e0fed1bb) is next but remains undispatched; subwave 2c (f7f80d53) stays serialized behind it because both own the workflow-contract authority.",
-  "waves": [
+ "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
+ "epic_short_id": "b80e3c70",
+ "current_wave": 2,
+ "current_sub_wave": "2b",
+ "wave_note": "Session 5 resumed at subwave 2b: e0fed1bb is claimed, in_progress, and dispatched to a worker in a SHA-anchored worktree based on 47959ec2. Subwave 2c (f7f80d53) stays serialized behind it because both own the workflow-contract authority. Session scope authorized by the invoker is waves 2 and 3 only, then report.",
+ "waves": [
+  {
+   "wave_number": 1,
+   "sub_wave": "1a",
+   "footprint_rationale": "Eight disjoint footprints: .github+scripts, web/, mcp-server/, crates/server/, commands/document.rs, domain/artifact_plan.rs, scripts/docs-mechanical.sh, and the plan-doc surface under commands/ (which 985ab96d removed).",
+   "issues": [
     {
-      "wave_number": 1,
-      "sub_wave": "1a",
-      "footprint_rationale": "Eight disjoint footprints: .github+scripts, web/, mcp-server/, crates/server/, commands/document.rs, domain/artifact_plan.rs, scripts/docs-mechanical.sh, and the plan-doc surface under commands/ (which 985ab96d removed).",
-      "issues": [
-        {
-          "id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
-          "short_id": "7edd2fe8",
-          "title": "Establish deterministic workflow contract verification",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "repo-validate",
-            "code-review",
-            "jit-validate"
-          ],
-          "branch_head": "bc0ca679",
-          "commits": 5,
-          "uncommitted": 0,
-          "reported": "yes",
-          "branch": "worktree-agent-7edd2fe8",
-          "touches_shared_file": "CHANGELOG.md \u2014 the only wave-1a branch that edits it, so no cross-branch conflict"
-        },
-        {
-          "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
-          "short_id": "8fa7261b",
-          "title": "Remediate web production dependency advisories",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "npm-ci",
-            "code-review",
-            "jit-validate"
-          ],
-          "branch_head": "45bd85c5",
-          "commits": 2,
-          "uncommitted": 0,
-          "reported": "yes",
-          "branch": "worktree-agent-8fa7261b"
-        },
-        {
-          "id": "bb302dbd-bd03-42ed-ae71-b0f035453f56",
-          "short_id": "bb302dbd",
-          "title": "Remediate MCP production dependency advisories",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "mcp-ci",
-            "code-review",
-            "jit-validate"
-          ],
-          "branch_head": "0d9d28ba",
-          "commits": 3,
-          "uncommitted": 0,
-          "reported": "yes",
-          "branch": "worktree-agent-bb302dbd"
-        },
-        {
-          "id": "f04f7888-a828-4677-aea8-f640a6702375",
-          "short_id": "f04f7888",
-          "title": "Implement graceful jit-server process shutdown",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "cargo-ci",
-            "code-review",
-            "jit-validate"
-          ],
-          "branch_head": "abc54594",
-          "merge_commit": "f7ca2d03",
-          "commits": 1,
-          "uncommitted": 0,
-          "reported": "yes",
-          "branch": "worktree-agent-f04f7888-r3",
-          "exceptional_rework_attempts": 1,
-          "criterion_amendment": "REQ-02 was updated before the exceptional merge to replace the obsolete axum-server-owned graceful_shutdown(Some(timeout)) mechanism with the user-approved single application-owned boundary: graceful_shutdown(None), boundary-time sampling, then shutdown() only for survivors.",
-          "traceability_note": "The first exceptional code-review found no behavior defect but rejected the worker's spaced `jit: f04f7888` tag because reviewer attribution requires literal `jit:f04f7888`. The just-created unpushed merge message was amended to `jit:f04f7888`; old and new merge commits have identical tree 35fe99260ea81ebd6ca6f5bd2a3e71e8ab1e1e16, and amended commit f7ca2d03 passed exact-commit verification.",
-          "gate_note": "Final main d7425437 passes cargo-ci with 4,089 tests, code-review with zero findings, and jit-validate. The final docs-only repair corrected the stale axum-server-owned timeout prose without changing implementation.",
-          "final_docs_branch_head": "5d400cc2",
-          "final_merge_commit": "d7425437",
-          "final_docs_rework_attempts": 1,
-          "completed_at": "2026-07-29T21:16:00.107193823Z"
-        },
-        {
-          "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
-          "short_id": "f289ff18",
-          "title": "Honour a document reference's commit pin when checking links",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "cargo-ci",
-            "code-review"
-          ],
-          "branch_head": "f08ae5f9",
-          "commits": 1,
-          "uncommitted": 3,
-          "reported": "no",
-          "branch": "worktree-agent-f289ff18"
-        },
-        {
-          "id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
-          "short_id": "c7f8ebc7",
-          "title": "Archival citation warnings fire on citations that already name the destination",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "cargo-ci",
-            "code-review"
-          ],
-          "branch_head": "7327d1c0",
-          "merge_commit": "3cc41bca",
-          "commits": 1,
-          "uncommitted": 0,
-          "reported": "yes",
-          "branch": "worktree-agent-c7f8ebc7-r3",
-          "exceptional_rework_attempts": 1,
-          "gate_note": "cargo-ci first passed all substantive checks but failed its incremental-state postcheck because diagnostics had created target/debug/incremental. After deleting exactly that regenerable cache, cargo-ci passed with 4,088 tests; final code-review passed with zero findings."
-        },
-        {
-          "id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
-          "short_id": "eeee8a1a",
-          "title": "Mechanical documentation checker defaults to the archival permanent paths",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "code-review",
-            "docs-mechanical"
-          ],
-          "branch_head": "ac46b11d",
-          "commits": 2,
-          "uncommitted": 0,
-          "reported": "yes",
-          "branch": "worktree-agent-eeee8a1a"
-        },
-        {
-          "id": "985ab96d-7ad4-4f0d-b6ab-083d2dbfe3d3",
-          "short_id": "985ab96d",
-          "title": "Unreferenced plan-doc location resolver",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "cargo-ci",
-            "code-review"
-          ],
-          "branch_head": "8d538c93",
-          "commits": 1,
-          "uncommitted": 0,
-          "reported": "no",
-          "branch": "worktree-agent-985ab96d",
-          "lead_actions_on_main": [
-            "jit doc add 985ab96d dev/active/985ab96d/985ab96d-decision.md",
-            "Mirror the REQ-01 remove-vs-wire decision into the issue as a ## Decisions item"
-          ]
-        }
-      ]
+     "id": "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0",
+     "short_id": "7edd2fe8",
+     "title": "Establish deterministic workflow contract verification",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "repo-validate",
+      "code-review",
+      "jit-validate"
+     ],
+     "branch_head": "bc0ca679",
+     "commits": 5,
+     "uncommitted": 0,
+     "reported": "yes",
+     "branch": "worktree-agent-7edd2fe8",
+     "touches_shared_file": "CHANGELOG.md — the only wave-1a branch that edits it, so no cross-branch conflict"
     },
     {
-      "wave_number": 1,
-      "sub_wave": "1b",
-      "footprint_rationale": "The f9e42a43 first submission did not touch CHANGELOG.md, eliminating the predicted shared-file conflict. Its focused pinned-evidence rework and the cross-cutting 625cc07f archive-layout migration therefore proceed concurrently; 625cc07f still lands before ef118aea so later reporting exercises the canonical path.",
-      "issues": [
-        {
-          "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
-          "short_id": "625cc07f",
-          "title": "Strip the development root from container archive destinations",
-          "classification": "implementation",
-          "status": "done",
-          "depends_on": [
-            "c7f8ebc7"
-          ],
-          "gates": [
-            "cargo-ci",
-            "code-review",
-            "docs-mechanical"
-          ],
-          "footprint_note": "Owns archive destination derivation, its tests, the repository archive migration, and canonical archive-layout documentation. Dispatched alongside f9e42a43 rework after its first submission proved CHANGELOG-disjoint; must land before ef118aea so execution/reporting tests exercise the corrected layout.",
-          "dispatch_order": 2,
-          "planned_model": "gpt-5.6-sol/high",
-          "branch": "worktree-agent-625cc07f",
-          "branch_head": "0d899de0",
-          "merge_commit": "483ade2a",
-          "commits": 2,
-          "uncommitted": 0,
-          "reported": "yes",
-          "rework_attempts": 1,
-          "review_note": "The independent review found four blockers in historical-event reconciliation, moved links and live JIT references, a superseded test representation, and current-vs-historical prose. One cumulative rework closed all four; re-review passed and a physical layout sweep found no remaining container/dev or container/archive nesting.",
-          "gate_note": "The exact merged commit passed the build verifier. The lead migrated 265 live document paths, 3 asset resolved paths, and 7 co-resident current descriptions while preserving 6 description-only histories and the immutable event log. cargo-ci, code-review, and docs-mechanical then passed sequentially; cargo-ci's new incremental preflight ran first.",
-          "completed_at": "2026-07-29T22:58:44.272607435Z"
-        },
-        {
-          "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
-          "short_id": "f9e42a43",
-          "title": "Treat a directory link target consistently across discovery, link checking and validation",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "cargo-ci",
-            "code-review"
-          ],
-          "dispatch_order": 1,
-          "planned_model": "gpt-5.6-terra/high",
-          "branch": "worktree-agent-f9e42a43",
-          "branch_head": "4dab2e1b",
-          "merge_commit": "cbeec711",
-          "commits": 3,
-          "uncommitted": 0,
-          "reported": "yes",
-          "rework_attempts": 2,
-          "review_note": "Round 1 propagated directory kinds through commit-pinned evidence and added version-divergence regressions. Round 2 corrected Git symlink/gitlink classification using exact tree mode/type evidence and removed the inferred compatibility constructor, leaving one explicit semantic target-kind API.",
-          "gate_note": "Exact-commit verification passed. The first authoritative run was sandbox-blocked; the next passed 4,099 tests but its final postcheck found 6.2 GiB of worker incremental caches. After deleting exactly those two regenerable caches, cargo-ci and code-review passed on merge cbeec711 with zero review findings.",
-          "completed_at": "2026-07-29T22:20:52.842092140Z"
-        }
-      ]
+     "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
+     "short_id": "8fa7261b",
+     "title": "Remediate web production dependency advisories",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "npm-ci",
+      "code-review",
+      "jit-validate"
+     ],
+     "branch_head": "45bd85c5",
+     "commits": 2,
+     "uncommitted": 0,
+     "reported": "yes",
+     "branch": "worktree-agent-8fa7261b"
     },
     {
-      "wave_number": 1,
-      "sub_wave": "1c",
-      "footprint_rationale": "ef118aea depends on the execution-discovered archive-layout correction and is intentionally delayed until that canonical path has landed.",
-      "issues": [
-        {
-          "id": "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
-          "short_id": "ef118aea",
-          "title": "Archive execution reports no citation warnings",
-          "classification": "implementation",
-          "status": "done",
-          "gates": [
-            "cargo-ci",
-            "code-review",
-            "doc-review"
-          ],
-          "depends_on": [
-            "625cc07f"
-          ],
-          "merge_note": "c7f8ebc7 reflowed the moving-path-citation paragraph in docs/reference/cli-commands.md. Dispatch only after 625cc07f lands, then verify both citation-boundary and canonical archive-layout wording survive.",
-          "dispatch_order": 1,
-          "planned_model": "gpt-5.6-terra/high",
-          "branch": "worktree-agent-ef118aea",
-          "branch_head": "4d51cec3",
-          "merge_commit": "11c58278",
-          "commits": 4,
-          "uncommitted": 0,
-          "reported": "yes",
-          "rework_attempts": 2,
-          "exceptional_rework_attempts": 1,
-          "exceptional_model": "gpt-5.6-sol/high",
-          "review_note": "The initial implementation aligned execution warnings with preview. Normal rework closed the 256-listing capture cap and added revalidatable unreadable-entry/listing evidence, but cumulative review found preview still dropped readable siblings beside a permission-denied subtree. The user-approved exceptional round made preview skip only the inaccessible subtree and added CLI parity, fingerprint distinction, pre-publication retry, and hard-error classification regressions. Final cumulative review passed with no findings.",
-          "gate_note": "The exact merged commit passed the workspace build verifier. The addressable @/issue/ef118aea/decision/D-01 records execution warning parity and the rejected preview-only alternative. cargo-ci, code-review, and doc-review passed sequentially on the clean merged tree.",
-          "completed_at": "2026-07-30T04:59:10.562559447Z"
-        }
-      ]
+     "id": "bb302dbd-bd03-42ed-ae71-b0f035453f56",
+     "short_id": "bb302dbd",
+     "title": "Remediate MCP production dependency advisories",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "mcp-ci",
+      "code-review",
+      "jit-validate"
+     ],
+     "branch_head": "0d9d28ba",
+     "commits": 3,
+     "uncommitted": 0,
+     "reported": "yes",
+     "branch": "worktree-agent-bb302dbd"
     },
     {
-      "wave_number": 1,
-      "sub_wave": "1d",
-      "footprint_rationale": "a122b9b3 adds whole-tree invariant enforcement across crates/, mcp-server/, and web/, and must fix every violation the enforced tree then reports. It collides with every other wave-1 issue and runs alone, last, so it sees all landed code.",
-      "issues": [
-        {
-          "id": "a122b9b3-0f2a-49bd-bbcf-7dce34703dea",
-          "short_id": "a122b9b3",
-          "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
-          "classification": "implementation",
-          "status": "rejected",
-          "gates": [
-            "cargo-ci",
-            "mcp-ci",
-            "repo-validate",
-            "code-review",
-            "npm-ci"
-          ],
-          "dispatch_order": 1,
-          "planned_model": "gpt-5.6-sol/xhigh",
-          "branch": "worktree-agent-a122b9b3",
-          "rejection_reason": "User rejected the issue as ill-planned after the implementation audit showed that its three whole-tree invariants could not be enforced reliably at the promised breadth without a substantial rearchitecture or brittle semantic inference. No implementation commits were merged."
-        }
-      ]
+     "id": "f04f7888-a828-4677-aea8-f640a6702375",
+     "short_id": "f04f7888",
+     "title": "Implement graceful jit-server process shutdown",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "cargo-ci",
+      "code-review",
+      "jit-validate"
+     ],
+     "branch_head": "abc54594",
+     "merge_commit": "f7ca2d03",
+     "commits": 1,
+     "uncommitted": 0,
+     "reported": "yes",
+     "branch": "worktree-agent-f04f7888-r3",
+     "exceptional_rework_attempts": 1,
+     "criterion_amendment": "REQ-02 was updated before the exceptional merge to replace the obsolete axum-server-owned graceful_shutdown(Some(timeout)) mechanism with the user-approved single application-owned boundary: graceful_shutdown(None), boundary-time sampling, then shutdown() only for survivors.",
+     "traceability_note": "The first exceptional code-review found no behavior defect but rejected the worker's spaced `jit: f04f7888` tag because reviewer attribution requires literal `jit:f04f7888`. The just-created unpushed merge message was amended to `jit:f04f7888`; old and new merge commits have identical tree 35fe99260ea81ebd6ca6f5bd2a3e71e8ab1e1e16, and amended commit f7ca2d03 passed exact-commit verification.",
+     "gate_note": "Final main d7425437 passes cargo-ci with 4,089 tests, code-review with zero findings, and jit-validate. The final docs-only repair corrected the stale axum-server-owned timeout prose without changing implementation.",
+     "final_docs_branch_head": "5d400cc2",
+     "final_merge_commit": "d7425437",
+     "final_docs_rework_attempts": 1,
+     "completed_at": "2026-07-29T21:16:00.107193823Z"
     },
     {
-      "wave_number": 2,
-      "subwaves": [
-        {
-          "order": "2a",
-          "issues": ["7b29019c", "5e538f48", "3b033738"],
-          "rationale": "Disjoint primary footprints: archive derivation/current archive data, product manifests/version contract, and root Docker image/runtime fixtures."
-        },
-        {
-          "order": "2b",
-          "issues": ["e0fed1bb"],
-          "rationale": "Owns ci.yml and the shared workflow-contract assertions."
-        },
-        {
-          "order": "2c",
-          "issues": ["f7f80d53"],
-          "rationale": "Runs after e0fed1bb because both edit the workflow-contract authority; additionally owns security-audit.yml and release.yml audit predecessors."
-        }
-      ],
-      "issues": [
-        {
-          "id": "7b29019c-7316-4991-87a5-3fbbe7264b73",
-          "short_id": "7b29019c",
-          "title": "Remove repeated container slugs from archive destinations",
-          "classification": "implementation",
-          "status": "done",
-          "discovered_during": "a122b9b3",
-          "footprint_note": "Owns archive path derivation, its regressions, and canonicalization of 54 tracked repeated-owner paths without rewriting immutable history.",
-          "planned_model": "gpt-5.6-sol/xhigh",
-          "branch": "worktree-agent-7b29019c",
-          "agent": "/root/archive_owner_cutover",
-          "branch_head": "037c9a09",
-          "merge_commit": "6ade0d31",
-          "rework_attempts": 1,
-          "review_note": "Initial review found owner stripping incorrectly assumed one-component areas. Rework derives exact normalized issue-scoped areas from configuration, supports nested areas, and preserves matching-looking directories in flat managed areas. Independent re-review passed.",
-          "gate_note": "The exact merged commit passed workspace build verification. The lead migrated 34 document paths and 3 structured asset resolved paths while preserving historical prose. cargo-ci, corrected code-review, and docs-mechanical passed sequentially. The first code-review correctly rejected a dangling satisfies:REQ-13 label; the label was removed and the rerun passed.",
-          "residual_path_note": "A separately surfaced bare-short-ID family remains outside this exact-full-slug fix: 46 paths total (25 current presentations, 21 legacy features). Legitimate vendor/reveal.js/reveal.js repetition remains allowed.",
-          "completed_at": "2026-07-30T08:56:05.171064090Z"
-        },
-        {
-          "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
-          "short_id": "5e538f48",
-          "title": "Align the v1.0 product version and tag contract",
-          "classification": "implementation",
-          "status": "done",
-          "depends_on": [
-            "8fa7261b"
-          ],
-          "planned_model": "gpt-5.6-sol/xhigh",
-          "branch": "worktree-agent-5e538f48",
-          "agent": "/root/whole_tree_invariants",
-          "branch_head": "b7efb540",
-          "merge_commit": "7574ebfa",
-          "rework_attempts": 1,
-          "review_note": "Initial review found duplicate compatibility markers were accepted and stale v0.1.0 tag guidance remained. Rework enforces exactly one marker, adds duplicate/conflict regressions, and points release tagging to the manifest authority. Independent re-review passed.",
-          "gate_note": "Exact-commit verification passed. cargo-ci, npm-ci, mcp-ci, repo-validate, code-review, and jit-validate passed sequentially; the first cargo-ci attempt was preserved as a sandbox-only ~/.cache permission failure before the authorized rerun passed.",
-          "completed_at": "2026-07-30T08:31:39.758668069Z"
-        },
-        {
-          "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
-          "short_id": "e0fed1bb",
-          "title": "Make the normal validation suites reusable",
-          "classification": "implementation",
-          "status": "pending",
-          "depends_on": [
-            "7edd2fe8"
-          ],
-          "subwave": "2b"
-        },
-        {
-          "id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
-          "short_id": "f7f80d53",
-          "title": "Enforce reusable blocking dependency audits",
-          "classification": "implementation",
-          "status": "pending",
-          "depends_on": [
-            "8fa7261b",
-            "7edd2fe8",
-            "bb302dbd",
-            "f04f7888"
-          ],
-          "subwave": "2c"
-        },
-        {
-          "id": "3b033738-a6ef-40ab-8fc1-d296f3fbb863",
-          "short_id": "3b033738",
-          "title": "Build the single server and web production image",
-          "classification": "implementation",
-          "status": "done",
-          "depends_on": [
-            "f04f7888"
-          ],
-          "planned_model": "gpt-5.6-sol/xhigh",
-          "branch": "worktree-agent-3b033738",
-          "agent": "/root/whole_tree_invariants/semantic_family_audit",
-          "branch_head": "bddb4ac2",
-          "merge_commit": "f93a30c4",
-          "rework_attempts": 2,
-          "review_note": "The first review found runtime validation failed open, packaged log evidence was too shallow, and SPA deep-link fallback was absent. The first rework closed the test findings. The user authorized one narrow server-layer expansion; the second rework added a security-bounded embedded fallback and packaged deep-link proof. Final cumulative independent review passed with no findings.",
-          "gate_note": "The exact merged commit passed workspace build verification. cargo-ci, npm-ci, mcp-ci, repo-validate, corrected code-review, and jit-validate passed sequentially. The first configured review correctly surfaced the still-active legacy Compose topology; the stored issue boundary now records that the already-wired dependent cutover owns split definitions, Compose, scripts, and docs. That dependent issue became Ready when 3b033738 completed.",
-          "runtime_note": "Full rebuilt Podman contract passed in both default 10001:10001 and host-mapped UID:GID modes, including mounted issue/document search, host-visible writes, PID 1, deep-link HTML/no-cache, 3 SSE streams, a stalled ordinary connection, five-second application force-close, clean exit before ten seconds, and no auto-init. Docker was unavailable for live parity.",
-          "completed_at": "2026-07-30T10:01:33.229945885Z"
-        }
-      ]
+     "id": "f289ff18-8e8e-47bc-8f1a-0eaa8b0433b8",
+     "short_id": "f289ff18",
+     "title": "Honour a document reference's commit pin when checking links",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "cargo-ci",
+      "code-review"
+     ],
+     "branch_head": "f08ae5f9",
+     "commits": 1,
+     "uncommitted": 3,
+     "reported": "no",
+     "branch": "worktree-agent-f289ff18"
     },
     {
-      "wave_number": 3,
-      "issues": [
-        {
-          "id": "22d374bd-1416-48f7-b933-d73cc4cff6d7",
-          "short_id": "22d374bd",
-          "title": "Add the dual-license and compatibility release record",
-          "classification": "documentation",
-          "status": "pending",
-          "depends_on": [
-            "5e538f48"
-          ]
-        },
-        {
-          "id": "cdee58b3-1428-4874-9814-dacefc517605",
-          "short_id": "cdee58b3",
-          "title": "Enforce the declared MSRV recency window",
-          "classification": "implementation",
-          "status": "pending",
-          "depends_on": [
-            "f04f7888",
-            "5e538f48"
-          ]
-        },
-        {
-          "id": "3a3b5704-b385-4358-98e3-23e095b2ee97",
-          "short_id": "3a3b5704",
-          "title": "Remove obsolete Docker topologies and migrate every active consumer",
-          "classification": "implementation",
-          "status": "pending",
-          "depends_on": [
-            "3b033738"
-          ]
-        }
-      ]
+     "id": "c7f8ebc7-2461-48b4-8180-9efb2cd2a4ab",
+     "short_id": "c7f8ebc7",
+     "title": "Archival citation warnings fire on citations that already name the destination",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "cargo-ci",
+      "code-review"
+     ],
+     "branch_head": "7327d1c0",
+     "merge_commit": "3cc41bca",
+     "commits": 1,
+     "uncommitted": 0,
+     "reported": "yes",
+     "branch": "worktree-agent-c7f8ebc7-r3",
+     "exceptional_rework_attempts": 1,
+     "gate_note": "cargo-ci first passed all substantive checks but failed its incremental-state postcheck because diagnostics had created target/debug/incremental. After deleting exactly that regenerable cache, cargo-ci passed with 4,088 tests; final code-review passed with zero findings."
     },
     {
-      "wave_number": 4,
-      "issues": [
-        {
-          "id": "f9af9788-9d54-4200-8da4-98818cc67fa9",
-          "short_id": "f9af9788",
-          "title": "Publish v1.0 through one tag-triggered release workflow",
-          "classification": "implementation",
-          "status": "pending",
-          "depends_on": [
-            "22d374bd",
-            "3a3b5704",
-            "cdee58b3",
-            "e0fed1bb",
-            "f7f80d53"
-          ]
-        }
-      ]
+     "id": "eeee8a1a-84ee-49e6-a5d0-0b41268259cf",
+     "short_id": "eeee8a1a",
+     "title": "Mechanical documentation checker defaults to the archival permanent paths",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "code-review",
+      "docs-mechanical"
+     ],
+     "branch_head": "ac46b11d",
+     "commits": 2,
+     "uncommitted": 0,
+     "reported": "yes",
+     "branch": "worktree-agent-eeee8a1a"
     },
     {
-      "wave_number": 5,
-      "issues": [
-        {
-          "id": "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2",
-          "short_id": "e90b9a3b",
-          "title": "Establish canonical installation, deployment, MCP, source, and release references",
-          "classification": "documentation",
-          "status": "pending",
-          "depends_on": [
-            "f9af9788"
-          ]
-        }
-      ]
-    },
-    {
-      "wave_number": 6,
-      "issues": [
-        {
-          "id": "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
-          "short_id": "080e54c6",
-          "title": "Prune repeated entry-point and component documentation",
-          "classification": "documentation",
-          "status": "pending",
-          "depends_on": [
-            "e90b9a3b"
-          ]
-        }
-      ]
-    },
-    {
-      "wave_number": 7,
-      "issues": [
-        {
-          "id": "bb03df0a-65c7-496a-bb09-2620eb253fd5",
-          "short_id": "bb03df0a",
-          "title": "Cut the v1.0.0 tag and verify the published release",
-          "classification": "implementation",
-          "status": "pending",
-          "depends_on": [
-            "080e54c6",
-            "985ab96d",
-            "a122b9b3",
-            "c7f8ebc7",
-            "eeee8a1a",
-            "ef118aea",
-            "f289ff18",
-            "f9e42a43"
-          ]
-        }
-      ]
+     "id": "985ab96d-7ad4-4f0d-b6ab-083d2dbfe3d3",
+     "short_id": "985ab96d",
+     "title": "Unreferenced plan-doc location resolver",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "cargo-ci",
+      "code-review"
+     ],
+     "branch_head": "8d538c93",
+     "commits": 1,
+     "uncommitted": 0,
+     "reported": "no",
+     "branch": "worktree-agent-985ab96d",
+     "lead_actions_on_main": [
+      "jit doc add 985ab96d dev/active/985ab96d/985ab96d-decision.md",
+      "Mirror the REQ-01 remove-vs-wire decision into the issue as a ## Decisions item"
+     ]
     }
-  ],
-  "created_during_execution": [
-    {
-      "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
-      "short_id": "625cc07f",
-      "title": "Strip the development root from container archive destinations",
-      "reason": "Pre-cutover production archive destination derivation repeated the configured development-root segment, yielding paths such as dev/archive/<container>/dev/active/plan.md.",
-      "wiring": "Depends on c7f8ebc7; ef118aea depends on this issue; bb03df0a therefore retains release-gate coverage transitively.",
-      "content_standards_review": "Passed after removing tracker-context and sibling references from the draft description before commit.",
-      "scope_audit": "A 2026-07-29 scan found 297 repository-owned archive files under a duplicated */dev/* segment and 20 live non-history files referencing that shape. REQ-06 prevents a helper-only fix that leaves those materializations behind; immutable event payloads remain audit history."
-    }
-  ],
-  "escalations": [
-    {
-      "issue": "f04f7888",
-      "reason": "Code review found a distinct notification-to-deadline timing gap after the configured two rework rounds were exhausted.",
-      "finding": "The drain observer can report forced closure before axum-server starts its own drain deadline, so the count and log can be false.",
-      "decision_needed": "Authorize one exceptional third rework round, accept the known logging defect, or defer/remove the issue from the v1.0 epic.",
-      "resolution": "User authorized one exceptional third rework round."
-    },
-    {
-      "issue": "c7f8ebc7",
-      "reason": "Code review found a distinct shell-default-prefix ambiguity after the configured two rework rounds were exhausted.",
-      "finding": "The citation matcher accepts any prefix ending in ':-', so a longer path such as 'notes:-dev/active/design.md' still warns.",
-      "decision_needed": "Authorize one exceptional third rework round, accept the known false-positive edge case, or defer/remove the issue from the v1.0 epic.",
-      "resolution": "User authorized one exceptional third rework round."
-    },
-    {
-      "issue": "f04f7888",
-      "reason": "The explicitly approved exceptional third round resolved the shutdown race, but post-merge review found a stale changelog sentence after the attribution-only correction.",
-      "finding": "CHANGELOG.md says the five-second deadline is handed to axum-server, while shipping code owns the sole boundary in JIT, calls graceful_shutdown(None), samples survivors, then calls shutdown().",
-      "decision_needed": "Authorize one final docs-only repair and full gate rerun, provide alternate guidance/take over, or reject/defer f04f7888 from the v1.0 epic.",
-      "resolution": "User authorized the recommended final documentation-only repair and full gate rerun on 2026-07-30."
-    },
-    {
-      "issue": "ef118aea",
-      "reason": "Two normal rework rounds closed the archive listing-budget and captured unreadable-directory failures, but cumulative review found preview still drops an entire scan root when one nested directory is unreadable.",
-      "finding": "Preview omits readable-sibling citation warnings while execution preserves them, so an unchanged archive target still reports different semantic warning sets; the new advisory listing state also lacks durable retry and error-classification regressions.",
-      "decision_needed": "Authorize one exceptional third rework round to make preview traversal skip only the inaccessible subtree and add the exact parity, fingerprint, retry, and error-classification regressions, or defer ef118aea.",
-      "resolution": "User authorized one exceptional third rework round on 2026-07-30."
-    }
-  ],
-  "rework_counts": {
-    "7edd2fe8": 2,
-    "8fa7261b": 1,
-    "bb302dbd": 1,
-    "c7f8ebc7": 2,
-    "eeee8a1a": 2,
-    "f04f7888": 2,
-    "f289ff18": 2
+   ]
   },
-  "surfaced_pitfalls": [
+  {
+   "wave_number": 1,
+   "sub_wave": "1b",
+   "footprint_rationale": "The f9e42a43 first submission did not touch CHANGELOG.md, eliminating the predicted shared-file conflict. Its focused pinned-evidence rework and the cross-cutting 625cc07f archive-layout migration therefore proceed concurrently; 625cc07f still lands before ef118aea so later reporting exercises the canonical path.",
+   "issues": [
     {
-      "subject": "web dev-only advisories",
-      "detail": "11 high advisories remain in web/'s eslint/minimatch chain, needing major bumps. Outside 8fa7261b REQ-01 and epic REQ-02, both scoped to --omit=dev.",
-      "routed_to": null,
-      "criterion_check": "not named by any criterion"
+     "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
+     "short_id": "625cc07f",
+     "title": "Strip the development root from container archive destinations",
+     "classification": "implementation",
+     "status": "done",
+     "depends_on": [
+      "c7f8ebc7"
+     ],
+     "gates": [
+      "cargo-ci",
+      "code-review",
+      "docs-mechanical"
+     ],
+     "footprint_note": "Owns archive destination derivation, its tests, the repository archive migration, and canonical archive-layout documentation. Dispatched alongside f9e42a43 rework after its first submission proved CHANGELOG-disjoint; must land before ef118aea so execution/reporting tests exercise the corrected layout.",
+     "dispatch_order": 2,
+     "planned_model": "gpt-5.6-sol/high",
+     "branch": "worktree-agent-625cc07f",
+     "branch_head": "0d899de0",
+     "merge_commit": "483ade2a",
+     "commits": 2,
+     "uncommitted": 0,
+     "reported": "yes",
+     "rework_attempts": 1,
+     "review_note": "The independent review found four blockers in historical-event reconciliation, moved links and live JIT references, a superseded test representation, and current-vs-historical prose. One cumulative rework closed all four; re-review passed and a physical layout sweep found no remaining container/dev or container/archive nesting.",
+     "gate_note": "The exact merged commit passed the build verifier. The lead migrated 265 live document paths, 3 asset resolved paths, and 7 co-resident current descriptions while preserving 6 description-only histories and the immutable event log. cargo-ci, code-review, and docs-mechanical then passed sequentially; cargo-ci's new incremental preflight ran first.",
+     "completed_at": "2026-07-29T22:58:44.272607435Z"
     },
     {
-      "subject": "security-audit workflow threshold",
-      "detail": ".github/workflows/security-audit.yml:49 runs `npm audit --production` with no --audit-level, laxer than epic REQ-02 states.",
-      "routed_to": "f7f80d53",
-      "criterion_check": "epic REQ-02 names the audit invocation; confirm f7f80d53 closes it"
-    },
-    {
-      "subject": "ci.yml YAML parse defect (fixed)",
-      "detail": "ci.yml's profile-adoption step scalar (profile_acceptance_tests:: -- --nocapture) made the file unparseable to a strict YAML parser at base commit a8182e6f. 7edd2fe8 fixed it by quoting. Pre-existing, not introduced by this wave.",
-      "routed_to": "7edd2fe8",
-      "criterion_check": "closed in-wave"
-    },
-    {
-      "subject": "archive destinations duplicate the full development-root path",
-      "detail": "Confirmed pre-cutover production behavior: artifact_mirror_destination(destination_root, source) appended the entire repository-relative source, yielding paths such as dev/archive/<container>/dev/active/plan.md. This was a user-identified design smell, not merely a defensive c7 example. The accepted cutover strips the configured development_root before mirroring.",
-      "routed_to": "625cc07f",
-      "criterion_check": "filed as an explicit canonical-cutover defect and ordered before ef118aea"
-    },
-    {
-      "subject": "archive destinations repeat the container owner after the managed area",
-      "detail": "A whole-tree path-format scan found 54 tracked paths shaped like dev/archive/<container>/<area>/<container>/..., including active and presentations artifacts for 8e071e18-dev-artifact-layout and active artifacts for a2546471-json-error-contract. This survived the development-root cutover and is the analogous redundant-owner nesting the user asked the lead to surface.",
-      "routed_to": "7b29019c",
-      "criterion_check": "filed as a new in-epic canonical-cutover bug and scheduled in wave 2; a122b9b3 was later rejected without merging its overlapping checker work"
+     "id": "f9e42a43-e382-4e1b-9e15-91984def9977",
+     "short_id": "f9e42a43",
+     "title": "Treat a directory link target consistently across discovery, link checking and validation",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "cargo-ci",
+      "code-review"
+     ],
+     "dispatch_order": 1,
+     "planned_model": "gpt-5.6-terra/high",
+     "branch": "worktree-agent-f9e42a43",
+     "branch_head": "4dab2e1b",
+     "merge_commit": "cbeec711",
+     "commits": 3,
+     "uncommitted": 0,
+     "reported": "yes",
+     "rework_attempts": 2,
+     "review_note": "Round 1 propagated directory kinds through commit-pinned evidence and added version-divergence regressions. Round 2 corrected Git symlink/gitlink classification using exact tree mode/type evidence and removed the inferred compatibility constructor, leaving one explicit semantic target-kind API.",
+     "gate_note": "Exact-commit verification passed. The first authoritative run was sandbox-blocked; the next passed 4,099 tests but its final postcheck found 6.2 GiB of worker incremental caches. After deleting exactly those two regenerable caches, cargo-ci and code-review passed on merge cbeec711 with zero review findings.",
+     "completed_at": "2026-07-29T22:20:52.842092140Z"
     }
-  ],
-  "started_at": "2026-07-29T14:20:00+00:00",
-  "lead_decisions": [
+   ]
+  },
+  {
+   "wave_number": 1,
+   "sub_wave": "1c",
+   "footprint_rationale": "ef118aea depends on the execution-discovered archive-layout correction and is intentionally delayed until that canonical path has landed.",
+   "issues": [
     {
-      "issue": "f04f7888",
-      "decision": "Authorize one final documentation-only repair after the exceptional implementation round.",
-      "reasoning": "The implementation, deterministic shutdown tests, attribution, and cargo-ci already pass; the only remaining blocker is one stale changelog sentence that contradicts the accepted single application-owned deadline.",
-      "rejected_alternative": "Reject or defer the fully working shutdown implementation from v1.0."
-    },
-    {
-      "issue": "f04f7888",
-      "decision": "Authorize one exceptional third rework round beyond the normal two-round limit.",
-      "reasoning": "The final review found a concrete deadline-origin race that can produce a false forced-close count; accepting it would violate the shutdown result contract.",
-      "rejected_alternative": "Accept the known logging defect or defer the issue from v1.0."
-    },
-    {
-      "issue": "c7f8ebc7",
-      "decision": "Authorize one exceptional third rework round beyond the normal two-round limit.",
-      "reasoning": "The final review found a concrete false-positive citation boundary for longer paths ending in ':-'; accepting it would violate the exact-token criterion.",
-      "rejected_alternative": "Accept the known false positive or defer the issue from v1.0."
-    },
-    {
-      "issue": "bb302dbd",
-      "decision": "Accept the zod 3 -> 4 major bump.",
-      "reasoning": "Declared ^3.24.1 floors below SDK 1.30's peer range ^3.25 || ^4.0, so the range had to move regardless of the audit; zod 3.x stopped shipping while 4.x is current, so under @/charter/D-11 a later zod-3 advisory would have no in-range fix. REQ-03 contemplates a validation-API migration.",
-      "rejected_alternative": "Pin zod ^3.25.76, audit-clean today, reverting two test changes.",
-      "open_verification": "CLOSED. Exactly one advertised default across all 112 tools (jit_item_search.query = \"\", optional); differential sweep shows 0 tools whose (accepted, argv) differ. tool-generator.js propagates defaults for positional args only, so a flag default cannot reach validateArguments."
-    },
-    {
-      "issue": "a122b9b3",
-      "decision": "Reject the issue as ill-planned and discard its unmerged implementation branch.",
-      "reasoning": "The user prohibited scope expansion after the audit showed that generic source scanning produced hundreds of ambiguous candidates, while reliable literal enforcement required compiler-backed semantic migrations and structural architecture changes far beyond one task. The issue bundled three distinct global policies without a defensible bounded mechanism.",
-      "rejected_alternative": "Expand the task into an unplanned cross-repository semantic-type and module-boundary rearchitecture, or accept a brittle hundreds-entry baseline."
+     "id": "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
+     "short_id": "ef118aea",
+     "title": "Archive execution reports no citation warnings",
+     "classification": "implementation",
+     "status": "done",
+     "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review"
+     ],
+     "depends_on": [
+      "625cc07f"
+     ],
+     "merge_note": "c7f8ebc7 reflowed the moving-path-citation paragraph in docs/reference/cli-commands.md. Dispatch only after 625cc07f lands, then verify both citation-boundary and canonical archive-layout wording survive.",
+     "dispatch_order": 1,
+     "planned_model": "gpt-5.6-terra/high",
+     "branch": "worktree-agent-ef118aea",
+     "branch_head": "4d51cec3",
+     "merge_commit": "11c58278",
+     "commits": 4,
+     "uncommitted": 0,
+     "reported": "yes",
+     "rework_attempts": 2,
+     "exceptional_rework_attempts": 1,
+     "exceptional_model": "gpt-5.6-sol/high",
+     "review_note": "The initial implementation aligned execution warnings with preview. Normal rework closed the 256-listing capture cap and added revalidatable unreadable-entry/listing evidence, but cumulative review found preview still dropped readable siblings beside a permission-denied subtree. The user-approved exceptional round made preview skip only the inaccessible subtree and added CLI parity, fingerprint distinction, pre-publication retry, and hard-error classification regressions. Final cumulative review passed with no findings.",
+     "gate_note": "The exact merged commit passed the workspace build verifier. The addressable @/issue/ef118aea/decision/D-01 records execution warning parity and the rejected preview-only alternative. cargo-ci, code-review, and doc-review passed sequentially on the clean merged tree.",
+     "completed_at": "2026-07-30T04:59:10.562559447Z"
     }
-  ],
-  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
-  "base_commit": "a8182e6f20476d547e3a0f969ef0ed4c636e4b56",
-  "handoffs": [
-    "dev/active/b80e3c70-v1-release/handoff.md",
-    "dev/active/b80e3c70-v1-release/handoff-3.md"
-  ],
-  "merge_conflicts_expected": [
+   ]
+  },
+  {
+   "wave_number": 1,
+   "sub_wave": "1d",
+   "footprint_rationale": "a122b9b3 adds whole-tree invariant enforcement across crates/, mcp-server/, and web/, and must fix every violation the enforced tree then reports. It collides with every other wave-1 issue and runs alone, last, so it sees all landed code.",
+   "issues": [
     {
-      "file": "CHANGELOG.md",
-      "branches": [
-        "7edd2fe8",
-        "c7f8ebc7",
-        "f04f7888"
-      ],
-      "resolution": "Three additive Unreleased entries. Keep all three; no semantic conflict."
-    },
-    {
-      "file": "docs/reference/cli-commands.md",
-      "branches": [
-        "c7f8ebc7",
-        "f04f7888",
-        "(wave 1b) ef118aea"
-      ],
-      "resolution": "c7f8ebc7 reflowed the moving-path-citation paragraph; f04f7888 edited the shutdown sentence. Different paragraphs, but the same file across three branches. Merge c7f8ebc7 then f04f7888, verify the moving-path-citation paragraph survived the second merge intact, and only then dispatch ef118aea against the merged text."
-    },
-    {
-      "file": "crates/server/tests/",
-      "branches": [
-        "f04f7888"
-      ],
-      "resolution": "f04f7888 git-renamed tests/document_api_tests.rs into tests/server_integration/. A rename plus another branch's edit to the old path would merge badly, but no other wave-1a branch touches crates/server/. Verify before merging any later wave that does."
+     "id": "a122b9b3-0f2a-49bd-bbcf-7dce34703dea",
+     "short_id": "a122b9b3",
+     "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
+     "classification": "implementation",
+     "status": "rejected",
+     "gates": [
+      "cargo-ci",
+      "mcp-ci",
+      "repo-validate",
+      "code-review",
+      "npm-ci"
+     ],
+     "dispatch_order": 1,
+     "planned_model": "gpt-5.6-sol/xhigh",
+     "branch": "worktree-agent-a122b9b3",
+     "rejection_reason": "User rejected the issue as ill-planned after the implementation audit showed that its three whole-tree invariants could not be enforced reliably at the promised breadth without a substantial rearchitecture or brittle semantic inference. No implementation commits were merged."
     }
-  ],
-  "build_budget_watch": {
-    "current": "integration-targets=11/12, active-executables=15, bytes=1348004920/2147483648",
-    "note": "f04f7888 deliberately folded its real-process test into a new server_integration suite rather than adding a 12th target, which would have left zero headroom. Any later issue adding an integration target must re-check @/inv/bounded-rust-build-footprint first."
+   ]
+  },
+  {
+   "wave_number": 2,
+   "subwaves": [
+    {
+     "order": "2a",
+     "issues": [
+      "7b29019c",
+      "5e538f48",
+      "3b033738"
+     ],
+     "rationale": "Disjoint primary footprints: archive derivation/current archive data, product manifests/version contract, and root Docker image/runtime fixtures."
+    },
+    {
+     "order": "2b",
+     "issues": [
+      "e0fed1bb"
+     ],
+     "rationale": "Owns ci.yml and the shared workflow-contract assertions."
+    },
+    {
+     "order": "2c",
+     "issues": [
+      "f7f80d53"
+     ],
+     "rationale": "Runs after e0fed1bb because both edit the workflow-contract authority; additionally owns security-audit.yml and release.yml audit predecessors."
+    }
+   ],
+   "issues": [
+    {
+     "id": "7b29019c-7316-4991-87a5-3fbbe7264b73",
+     "short_id": "7b29019c",
+     "title": "Remove repeated container slugs from archive destinations",
+     "classification": "implementation",
+     "status": "done",
+     "discovered_during": "a122b9b3",
+     "footprint_note": "Owns archive path derivation, its regressions, and canonicalization of 54 tracked repeated-owner paths without rewriting immutable history.",
+     "planned_model": "gpt-5.6-sol/xhigh",
+     "branch": "worktree-agent-7b29019c",
+     "agent": "/root/archive_owner_cutover",
+     "branch_head": "037c9a09",
+     "merge_commit": "6ade0d31",
+     "rework_attempts": 1,
+     "review_note": "Initial review found owner stripping incorrectly assumed one-component areas. Rework derives exact normalized issue-scoped areas from configuration, supports nested areas, and preserves matching-looking directories in flat managed areas. Independent re-review passed.",
+     "gate_note": "The exact merged commit passed workspace build verification. The lead migrated 34 document paths and 3 structured asset resolved paths while preserving historical prose. cargo-ci, corrected code-review, and docs-mechanical passed sequentially. The first code-review correctly rejected a dangling satisfies:REQ-13 label; the label was removed and the rerun passed.",
+     "residual_path_note": "A separately surfaced bare-short-ID family remains outside this exact-full-slug fix: 46 paths total (25 current presentations, 21 legacy features). Legitimate vendor/reveal.js/reveal.js repetition remains allowed.",
+     "completed_at": "2026-07-30T08:56:05.171064090Z"
+    },
+    {
+     "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
+     "short_id": "5e538f48",
+     "title": "Align the v1.0 product version and tag contract",
+     "classification": "implementation",
+     "status": "done",
+     "depends_on": [
+      "8fa7261b"
+     ],
+     "planned_model": "gpt-5.6-sol/xhigh",
+     "branch": "worktree-agent-5e538f48",
+     "agent": "/root/whole_tree_invariants",
+     "branch_head": "b7efb540",
+     "merge_commit": "7574ebfa",
+     "rework_attempts": 1,
+     "review_note": "Initial review found duplicate compatibility markers were accepted and stale v0.1.0 tag guidance remained. Rework enforces exactly one marker, adds duplicate/conflict regressions, and points release tagging to the manifest authority. Independent re-review passed.",
+     "gate_note": "Exact-commit verification passed. cargo-ci, npm-ci, mcp-ci, repo-validate, code-review, and jit-validate passed sequentially; the first cargo-ci attempt was preserved as a sandbox-only ~/.cache permission failure before the authorized rerun passed.",
+     "completed_at": "2026-07-30T08:31:39.758668069Z"
+    },
+    {
+     "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
+     "short_id": "e0fed1bb",
+     "title": "Make the normal validation suites reusable",
+     "classification": "implementation",
+     "status": "pending",
+     "depends_on": [
+      "7edd2fe8"
+     ],
+     "subwave": "2b"
+    },
+    {
+     "id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
+     "short_id": "f7f80d53",
+     "title": "Enforce reusable blocking dependency audits",
+     "classification": "implementation",
+     "status": "pending",
+     "depends_on": [
+      "8fa7261b",
+      "7edd2fe8",
+      "bb302dbd",
+      "f04f7888"
+     ],
+     "subwave": "2c"
+    },
+    {
+     "id": "3b033738-a6ef-40ab-8fc1-d296f3fbb863",
+     "short_id": "3b033738",
+     "title": "Build the single server and web production image",
+     "classification": "implementation",
+     "status": "done",
+     "depends_on": [
+      "f04f7888"
+     ],
+     "planned_model": "gpt-5.6-sol/xhigh",
+     "branch": "worktree-agent-3b033738",
+     "agent": "/root/whole_tree_invariants/semantic_family_audit",
+     "branch_head": "bddb4ac2",
+     "merge_commit": "f93a30c4",
+     "rework_attempts": 2,
+     "review_note": "The first review found runtime validation failed open, packaged log evidence was too shallow, and SPA deep-link fallback was absent. The first rework closed the test findings. The user authorized one narrow server-layer expansion; the second rework added a security-bounded embedded fallback and packaged deep-link proof. Final cumulative independent review passed with no findings.",
+     "gate_note": "The exact merged commit passed workspace build verification. cargo-ci, npm-ci, mcp-ci, repo-validate, corrected code-review, and jit-validate passed sequentially. The first configured review correctly surfaced the still-active legacy Compose topology; the stored issue boundary now records that the already-wired dependent cutover owns split definitions, Compose, scripts, and docs. That dependent issue became Ready when 3b033738 completed.",
+     "runtime_note": "Full rebuilt Podman contract passed in both default 10001:10001 and host-mapped UID:GID modes, including mounted issue/document search, host-visible writes, PID 1, deep-link HTML/no-cache, 3 SSE streams, a stalled ordinary connection, five-second application force-close, clean exit before ten seconds, and no auto-init. Docker was unavailable for live parity.",
+     "completed_at": "2026-07-30T10:01:33.229945885Z"
+    }
+   ]
+  },
+  {
+   "wave_number": 3,
+   "issues": [
+    {
+     "id": "22d374bd-1416-48f7-b933-d73cc4cff6d7",
+     "short_id": "22d374bd",
+     "title": "Add the dual-license and compatibility release record",
+     "classification": "documentation",
+     "status": "pending",
+     "depends_on": [
+      "5e538f48"
+     ]
+    },
+    {
+     "id": "cdee58b3-1428-4874-9814-dacefc517605",
+     "short_id": "cdee58b3",
+     "title": "Enforce the declared MSRV recency window",
+     "classification": "implementation",
+     "status": "pending",
+     "depends_on": [
+      "f04f7888",
+      "5e538f48"
+     ]
+    },
+    {
+     "id": "3a3b5704-b385-4358-98e3-23e095b2ee97",
+     "short_id": "3a3b5704",
+     "title": "Remove obsolete Docker topologies and migrate every active consumer",
+     "classification": "implementation",
+     "status": "pending",
+     "depends_on": [
+      "3b033738"
+     ]
+    }
+   ]
+  },
+  {
+   "wave_number": 4,
+   "issues": [
+    {
+     "id": "f9af9788-9d54-4200-8da4-98818cc67fa9",
+     "short_id": "f9af9788",
+     "title": "Publish v1.0 through one tag-triggered release workflow",
+     "classification": "implementation",
+     "status": "pending",
+     "depends_on": [
+      "22d374bd",
+      "3a3b5704",
+      "cdee58b3",
+      "e0fed1bb",
+      "f7f80d53"
+     ]
+    }
+   ]
+  },
+  {
+   "wave_number": 5,
+   "issues": [
+    {
+     "id": "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2",
+     "short_id": "e90b9a3b",
+     "title": "Establish canonical installation, deployment, MCP, source, and release references",
+     "classification": "documentation",
+     "status": "pending",
+     "depends_on": [
+      "f9af9788"
+     ]
+    }
+   ]
+  },
+  {
+   "wave_number": 6,
+   "issues": [
+    {
+     "id": "080e54c6-8b70-40c5-9bbe-6a9f720a09ce",
+     "short_id": "080e54c6",
+     "title": "Prune repeated entry-point and component documentation",
+     "classification": "documentation",
+     "status": "pending",
+     "depends_on": [
+      "e90b9a3b"
+     ]
+    }
+   ]
+  },
+  {
+   "wave_number": 7,
+   "issues": [
+    {
+     "id": "bb03df0a-65c7-496a-bb09-2620eb253fd5",
+     "short_id": "bb03df0a",
+     "title": "Cut the v1.0.0 tag and verify the published release",
+     "classification": "implementation",
+     "status": "pending",
+     "depends_on": [
+      "080e54c6",
+      "985ab96d",
+      "a122b9b3",
+      "c7f8ebc7",
+      "eeee8a1a",
+      "ef118aea",
+      "f289ff18",
+      "f9e42a43"
+     ]
+    }
+   ]
   }
+ ],
+ "created_during_execution": [
+  {
+   "id": "625cc07f-0174-4644-a41e-bd1a77d00b8b",
+   "short_id": "625cc07f",
+   "title": "Strip the development root from container archive destinations",
+   "reason": "Pre-cutover production archive destination derivation repeated the configured development-root segment, yielding paths such as dev/archive/<container>/dev/active/plan.md.",
+   "wiring": "Depends on c7f8ebc7; ef118aea depends on this issue; bb03df0a therefore retains release-gate coverage transitively.",
+   "content_standards_review": "Passed after removing tracker-context and sibling references from the draft description before commit.",
+   "scope_audit": "A 2026-07-29 scan found 297 repository-owned archive files under a duplicated */dev/* segment and 20 live non-history files referencing that shape. REQ-06 prevents a helper-only fix that leaves those materializations behind; immutable event payloads remain audit history."
+  }
+ ],
+ "escalations": [
+  {
+   "issue": "f04f7888",
+   "reason": "Code review found a distinct notification-to-deadline timing gap after the configured two rework rounds were exhausted.",
+   "finding": "The drain observer can report forced closure before axum-server starts its own drain deadline, so the count and log can be false.",
+   "decision_needed": "Authorize one exceptional third rework round, accept the known logging defect, or defer/remove the issue from the v1.0 epic.",
+   "resolution": "User authorized one exceptional third rework round."
+  },
+  {
+   "issue": "c7f8ebc7",
+   "reason": "Code review found a distinct shell-default-prefix ambiguity after the configured two rework rounds were exhausted.",
+   "finding": "The citation matcher accepts any prefix ending in ':-', so a longer path such as 'notes:-dev/active/design.md' still warns.",
+   "decision_needed": "Authorize one exceptional third rework round, accept the known false-positive edge case, or defer/remove the issue from the v1.0 epic.",
+   "resolution": "User authorized one exceptional third rework round."
+  },
+  {
+   "issue": "f04f7888",
+   "reason": "The explicitly approved exceptional third round resolved the shutdown race, but post-merge review found a stale changelog sentence after the attribution-only correction.",
+   "finding": "CHANGELOG.md says the five-second deadline is handed to axum-server, while shipping code owns the sole boundary in JIT, calls graceful_shutdown(None), samples survivors, then calls shutdown().",
+   "decision_needed": "Authorize one final docs-only repair and full gate rerun, provide alternate guidance/take over, or reject/defer f04f7888 from the v1.0 epic.",
+   "resolution": "User authorized the recommended final documentation-only repair and full gate rerun on 2026-07-30."
+  },
+  {
+   "issue": "ef118aea",
+   "reason": "Two normal rework rounds closed the archive listing-budget and captured unreadable-directory failures, but cumulative review found preview still drops an entire scan root when one nested directory is unreadable.",
+   "finding": "Preview omits readable-sibling citation warnings while execution preserves them, so an unchanged archive target still reports different semantic warning sets; the new advisory listing state also lacks durable retry and error-classification regressions.",
+   "decision_needed": "Authorize one exceptional third rework round to make preview traversal skip only the inaccessible subtree and add the exact parity, fingerprint, retry, and error-classification regressions, or defer ef118aea.",
+   "resolution": "User authorized one exceptional third rework round on 2026-07-30."
+  }
+ ],
+ "rework_counts": {
+  "7edd2fe8": 2,
+  "8fa7261b": 1,
+  "bb302dbd": 1,
+  "c7f8ebc7": 2,
+  "eeee8a1a": 2,
+  "f04f7888": 2,
+  "f289ff18": 2
+ },
+ "surfaced_pitfalls": [
+  {
+   "subject": "web dev-only advisories",
+   "detail": "11 high advisories remain in web/'s eslint/minimatch chain, needing major bumps. Outside 8fa7261b REQ-01 and epic REQ-02, both scoped to --omit=dev.",
+   "routed_to": null,
+   "criterion_check": "not named by any criterion"
+  },
+  {
+   "subject": "security-audit workflow threshold",
+   "detail": ".github/workflows/security-audit.yml:49 runs `npm audit --production` with no --audit-level, laxer than epic REQ-02 states.",
+   "routed_to": "f7f80d53",
+   "criterion_check": "epic REQ-02 names the audit invocation; confirm f7f80d53 closes it"
+  },
+  {
+   "subject": "ci.yml YAML parse defect (fixed)",
+   "detail": "ci.yml's profile-adoption step scalar (profile_acceptance_tests:: -- --nocapture) made the file unparseable to a strict YAML parser at base commit a8182e6f. 7edd2fe8 fixed it by quoting. Pre-existing, not introduced by this wave.",
+   "routed_to": "7edd2fe8",
+   "criterion_check": "closed in-wave"
+  },
+  {
+   "subject": "archive destinations duplicate the full development-root path",
+   "detail": "Confirmed pre-cutover production behavior: artifact_mirror_destination(destination_root, source) appended the entire repository-relative source, yielding paths such as dev/archive/<container>/dev/active/plan.md. This was a user-identified design smell, not merely a defensive c7 example. The accepted cutover strips the configured development_root before mirroring.",
+   "routed_to": "625cc07f",
+   "criterion_check": "filed as an explicit canonical-cutover defect and ordered before ef118aea"
+  },
+  {
+   "subject": "archive destinations repeat the container owner after the managed area",
+   "detail": "A whole-tree path-format scan found 54 tracked paths shaped like dev/archive/<container>/<area>/<container>/..., including active and presentations artifacts for 8e071e18-dev-artifact-layout and active artifacts for a2546471-json-error-contract. This survived the development-root cutover and is the analogous redundant-owner nesting the user asked the lead to surface.",
+   "routed_to": "7b29019c",
+   "criterion_check": "filed as a new in-epic canonical-cutover bug and scheduled in wave 2; a122b9b3 was later rejected without merging its overlapping checker work"
+  }
+ ],
+ "started_at": "2026-07-29T14:20:00+00:00",
+ "lead_decisions": [
+  {
+   "issue": "f04f7888",
+   "decision": "Authorize one final documentation-only repair after the exceptional implementation round.",
+   "reasoning": "The implementation, deterministic shutdown tests, attribution, and cargo-ci already pass; the only remaining blocker is one stale changelog sentence that contradicts the accepted single application-owned deadline.",
+   "rejected_alternative": "Reject or defer the fully working shutdown implementation from v1.0."
+  },
+  {
+   "issue": "f04f7888",
+   "decision": "Authorize one exceptional third rework round beyond the normal two-round limit.",
+   "reasoning": "The final review found a concrete deadline-origin race that can produce a false forced-close count; accepting it would violate the shutdown result contract.",
+   "rejected_alternative": "Accept the known logging defect or defer the issue from v1.0."
+  },
+  {
+   "issue": "c7f8ebc7",
+   "decision": "Authorize one exceptional third rework round beyond the normal two-round limit.",
+   "reasoning": "The final review found a concrete false-positive citation boundary for longer paths ending in ':-'; accepting it would violate the exact-token criterion.",
+   "rejected_alternative": "Accept the known false positive or defer the issue from v1.0."
+  },
+  {
+   "issue": "bb302dbd",
+   "decision": "Accept the zod 3 -> 4 major bump.",
+   "reasoning": "Declared ^3.24.1 floors below SDK 1.30's peer range ^3.25 || ^4.0, so the range had to move regardless of the audit; zod 3.x stopped shipping while 4.x is current, so under @/charter/D-11 a later zod-3 advisory would have no in-range fix. REQ-03 contemplates a validation-API migration.",
+   "rejected_alternative": "Pin zod ^3.25.76, audit-clean today, reverting two test changes.",
+   "open_verification": "CLOSED. Exactly one advertised default across all 112 tools (jit_item_search.query = \"\", optional); differential sweep shows 0 tools whose (accepted, argv) differ. tool-generator.js propagates defaults for positional args only, so a flag default cannot reach validateArguments."
+  },
+  {
+   "issue": "a122b9b3",
+   "decision": "Reject the issue as ill-planned and discard its unmerged implementation branch.",
+   "reasoning": "The user prohibited scope expansion after the audit showed that generic source scanning produced hundreds of ambiguous candidates, while reliable literal enforcement required compiler-backed semantic migrations and structural architecture changes far beyond one task. The issue bundled three distinct global policies without a defensible bounded mechanism.",
+   "rejected_alternative": "Expand the task into an unplanned cross-repository semantic-type and module-boundary rearchitecture, or accept a brittle hundreds-entry baseline."
+  },
+  {
+   "issue": "b80e3c70",
+   "decision": "Perform no remote interaction this session: main stays 386 commits ahead of the public origin and nothing is pushed.",
+   "reasoning": "The invoker reserved every push to the public repository. Wave 2 and wave 3 work is verifiable entirely from local gates, so no criterion needs a remote run yet.",
+   "rejected_alternative": "Push main after the release workflow lands so GitHub Actions exercises CI, security, and build+smoke on real runners before tagging."
+  },
+  {
+   "issue": "bb03df0a",
+   "decision": "Release authority stays with the maintainer: the invoker creates and pushes the annotated v1.0.0 tag.",
+   "reasoning": "Matches the epic's stated contract that the workflow reacts to a maintainer-pushed tag and never creates one. The lead prepares the verified commit and verifies the published release afterwards.",
+   "rejected_alternative": "The lead pushes the tag on an explicit go-ahead."
+  },
+  {
+   "issue": "b80e3c70",
+   "decision": "Session 5 drives waves 2 and 3 only, then reports.",
+   "reasoning": "The invoker limited this session to e0fed1bb, f7f80d53, 22d374bd, cdee58b3, and 3a3b5704, with a checkpoint before the release workflow f9af9788.",
+   "rejected_alternative": "Drive waves 2 through 6 and stop only before the release act."
+  },
+  {
+   "issue": "bb03df0a",
+   "decision": "Release verification will run inside a clean rootless Podman container with a fresh HOME and no repository access; REQ-06 also uses Podman.",
+   "reasoning": "A globally installed jit and this host's system state could mask a missing artifact. Docker was unavailable during wave 2a, so Podman is the available runtime.",
+   "rejected_alternative": "Verify with an isolated HOME and pruned PATH on this host, or hand the script to a separate machine."
+  },
+  {
+   "issue": "b80e3c70",
+   "decision": "Confirmed at resume that the v1.0 audit and MSRV preconditions already hold at 426fd7f6.",
+   "reasoning": "cargo audit -D warnings reports no advisories over 386 crate dependencies; npm audit --omit=dev reports zero in both web/ and mcp-server/; declared rust-version 1.97 equals current stable 1.97.1, so cdee58b3 REQ-01 needs no refresh.",
+   "rejected_alternative": "Defer the audit and MSRV checks until their owning issues run and risk discovering an unfixable advisory late."
+  }
+ ],
+ "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
+ "base_commit": "a8182e6f20476d547e3a0f969ef0ed4c636e4b56",
+ "handoffs": [
+  "dev/active/b80e3c70-v1-release/handoff.md",
+  "dev/active/b80e3c70-v1-release/handoff-3.md"
+ ],
+ "merge_conflicts_expected": [
+  {
+   "file": "CHANGELOG.md",
+   "branches": [
+    "7edd2fe8",
+    "c7f8ebc7",
+    "f04f7888"
+   ],
+   "resolution": "Three additive Unreleased entries. Keep all three; no semantic conflict."
+  },
+  {
+   "file": "docs/reference/cli-commands.md",
+   "branches": [
+    "c7f8ebc7",
+    "f04f7888",
+    "(wave 1b) ef118aea"
+   ],
+   "resolution": "c7f8ebc7 reflowed the moving-path-citation paragraph; f04f7888 edited the shutdown sentence. Different paragraphs, but the same file across three branches. Merge c7f8ebc7 then f04f7888, verify the moving-path-citation paragraph survived the second merge intact, and only then dispatch ef118aea against the merged text."
+  },
+  {
+   "file": "crates/server/tests/",
+   "branches": [
+    "f04f7888"
+   ],
+   "resolution": "f04f7888 git-renamed tests/document_api_tests.rs into tests/server_integration/. A rename plus another branch's edit to the old path would merge badly, but no other wave-1a branch touches crates/server/. Verify before merging any later wave that does."
+  }
+ ],
+ "build_budget_watch": {
+  "current": "integration-targets=11/12, active-executables=15, bytes=1348004920/2147483648",
+  "note": "f04f7888 deliberately folded its real-process test into a new server_integration suite rather than adding a 12th target, which would have left zero headroom. Any later issue adding an integration target must re-check @/inv/bounded-rust-build-footprint first."
+ }
 }
