@@ -454,6 +454,13 @@
       "finding": "CHANGELOG.md says the five-second deadline is handed to axum-server, while shipping code owns the sole boundary in JIT, calls graceful_shutdown(None), samples survivors, then calls shutdown().",
       "decision_needed": "Authorize one final docs-only repair and full gate rerun, provide alternate guidance/take over, or reject/defer f04f7888 from the v1.0 epic.",
       "resolution": "User authorized the recommended final documentation-only repair and full gate rerun on 2026-07-30."
+    },
+    {
+      "issue": "ef118aea",
+      "reason": "Two normal rework rounds closed the archive listing-budget and captured unreadable-directory failures, but cumulative review found preview still drops an entire scan root when one nested directory is unreadable.",
+      "finding": "Preview omits readable-sibling citation warnings while execution preserves them, so an unchanged archive target still reports different semantic warning sets; the new advisory listing state also lacks durable retry and error-classification regressions.",
+      "decision_needed": "Authorize one exceptional third rework round to make preview traversal skip only the inaccessible subtree and add the exact parity, fingerprint, retry, and error-classification regressions, or defer ef118aea.",
+      "resolution": "User authorized one exceptional third rework round on 2026-07-30."
     }
   ],
   "rework_counts": {
