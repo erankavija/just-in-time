@@ -11649,3 +11649,9 @@
 {"id":"758e05bd-2704-4c04-a703-e0ce8fe312c8","issue_id":"7b29019c-7316-4991-87a5-3fbbe7264b73","priority":"high","timestamp":"2026-07-30T05:29:11.322956771Z","title":"Remove repeated container slugs from archive destinations","type":"issue_created"}
 {"fields":["dependencies"],"id":"a61e0512-b601-4cfe-9b28-5e21a2cd434a","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-07-30T05:29:28.585199472Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"in_progress","id":"1eb96443-ba08-4577-8868-1453d8df4cb7","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","timestamp":"2026-07-30T07:29:26.710342969Z","to":"rejected","type":"issue_state_changed"}
+{"from":"ready","id":"5ead5411-f79b-4b3d-9de6-baf992c81e3a","issue_id":"7b29019c-7316-4991-87a5-3fbbe7264b73","timestamp":"2026-07-30T07:31:50.448206690Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"cfc93b5b-a3c4-404c-ae78-049503d32d98","issue_id":"7b29019c-7316-4991-87a5-3fbbe7264b73","timestamp":"2026-07-30T07:31:50.448206690Z","type":"issue_claimed"}
+{"from":"ready","id":"9cd09070-ec29-48e0-bd27-7699a74e638a","issue_id":"5e538f48-3118-45b8-a7e1-bc6bb6e41dc2","timestamp":"2026-07-30T07:31:55.592750859Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"a93ec8ef-caf7-4fd7-9ec5-4c20725ec753","issue_id":"5e538f48-3118-45b8-a7e1-bc6bb6e41dc2","timestamp":"2026-07-30T07:31:55.592750859Z","type":"issue_claimed"}
+{"from":"ready","id":"6dbefaa0-33bc-46b0-a59f-7e3d3cfe0e5d","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T07:32:00.742995817Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"fce8f648-f6c2-4ed9-891e-9a2057beae44","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T07:32:00.742995817Z","type":"issue_claimed"}
