@@ -35,6 +35,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 links="$here/docs-check-links.sh"
 citations="$here/docs-check-citations.sh"
 projections="$here/docs-check-projections.sh"
+canonical="$here/docs-check-canonical.sh"
 mechanical="$here/docs-mechanical.sh"
 
 fail=0
@@ -74,7 +75,7 @@ fixture_scripts="$fixture/scripts"
 fixture_log="$scratch/orchestrator.log"
 mkdir -p "$fixture_scripts"
 cp "$mechanical" "$fixture_scripts/docs-mechanical.sh"
-for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh; do
+for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh docs-check-canonical.sh; do
   # shellcheck disable=SC2016  # $0/$* and the log variable expand in the stub.
   printf '#!/usr/bin/env bash\nprintf "%%s:%%s\\n" "$(basename "$0")" "$*" >>"$DOCS_MECHANICAL_LOG"\n' >"$fixture_scripts/$checker"
   chmod +x "$fixture_scripts/$checker"
@@ -166,6 +167,85 @@ else
   echo "SKIP: read bit not enforced here (likely root) — unreadable-path assertions skipped"
 fi
 chmod 644 "$noread" 2>/dev/null || true
+echo
+
+echo "== M6 docs-check-canonical.sh =="
+# An isolated fixture repository: one canonical home stating one fact, the
+# automation that makes it true, a navigation page linking the home, a second
+# scanned page that must not restate the fact, and a manifest binding them. Each
+# defect class is seeded into that fixture and then reverted, so every assertion
+# runs against the real checker without touching this repository's own pages.
+canon="$scratch/canonical"
+mkdir -p "$canon/pages"
+write_canonical_fixture() {
+  # shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
+  printf '# Home\n\n## Section\n\nRun `deploy --now` to publish.\n' >"$canon/pages/home.md"
+  printf '# Other\n\nThis page links [Home](home.md) rather than restating it.\n' \
+    >"$canon/pages/other.md"
+  printf '# Navigation\n\n- [Home](pages/home.md)\n' >"$canon/index.md"
+  printf 'steps:\n  - run: deploy --now\n' >"$canon/automation.yml"
+  cat >"$canon/manifest.toml" <<'TOML'
+scan_roots = ["pages"]
+navigation = ["index.md"]
+
+[[fact]]
+id = "fixture-fact"
+home = "pages/home.md#section"
+
+  [[fact.binding]]
+  doc = "deploy --now"
+  sources = ["automation.yml"]
+TOML
+}
+run_canonical() { (cd "$canon" && "$canonical" manifest.toml >/dev/null 2>&1); }
+
+write_canonical_fixture
+run_canonical
+assert_rc 0 $? "canonical: home states a live, unique, navigable fact"
+
+# Defect: the home no longer states the fact it owns.
+printf '# Home\n\n## Section\n\nNothing to run here.\n' >"$canon/pages/home.md"
+run_canonical
+assert_rc 1 $? "canonical: home that stopped stating its fact is a finding"
+
+# Defect: the declared anchor no longer resolves.
+write_canonical_fixture
+# shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
+printf '# Home\n\n## Renamed\n\nRun `deploy --now` to publish.\n' >"$canon/pages/home.md"
+run_canonical
+assert_rc 1 $? "canonical: home whose declared anchor is gone is a finding"
+
+# Defect: the automation no longer carries what the home states.
+write_canonical_fixture
+printf 'steps:\n  - run: something-else\n' >"$canon/automation.yml"
+run_canonical
+assert_rc 1 $? "canonical: source that stopped carrying the stated command is a finding"
+
+# Defect: a second scanned page states the same fact, so it has two homes.
+write_canonical_fixture
+# shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
+printf '# Other\n\nRun `deploy --now` to publish.\n' >"$canon/pages/other.md"
+run_canonical
+assert_rc 1 $? "canonical: fact restated on a second page is a finding"
+
+# Defect: navigation stops linking the canonical home.
+write_canonical_fixture
+printf '# Navigation\n\nNo links here.\n' >"$canon/index.md"
+run_canonical
+assert_rc 1 $? "canonical: home no navigation page links is a finding"
+
+# Clean again, so the reverted fixture is proven to pass rather than assumed to.
+write_canonical_fixture
+run_canonical
+assert_rc 0 $? "canonical: reverted fixture is clean"
+
+# A manifest that cannot be read is an environment error, never a false-green pass.
+(cd "$canon" && "$canonical" no_such_manifest_zzz.toml >/dev/null 2>&1)
+assert_rc 2 $? "canonical: unreadable manifest is an env error"
+# So is a manifest that parses but does not conform.
+printf 'scan_roots = ["pages"]\n' >"$canon/empty.toml"
+(cd "$canon" && "$canonical" empty.toml >/dev/null 2>&1)
+assert_rc 2 $? "canonical: manifest declaring no facts is an env error"
 echo
 
 echo "== M5 docs-check-projections.sh =="

@@ -37,7 +37,8 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Custom Gates](how-to/custom-gates.md) - Define and use quality gates
 - [Dependency Management](how-to/dependency-management.md) - Graph strategies
 - [Multi-Agent Coordination](how-to/multi-agent-coordination.md) - Team and parallel work
-- [Deployment](how-to/deployment.md) - Running the web UI
+- [Deployment](how-to/deployment.md) - Serving the API and web UI natively or from the container image
+- [MCP Integration](how-to/mcp-integration.md) - Installing the published MCP server and starting it from a client
 - [Troubleshooting](how-to/troubleshooting.md) - Common issues and solutions
 
 ### 📖 [Reference](reference/) - Information-Oriented
@@ -46,8 +47,9 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [CLI Commands](reference/cli-commands.md) - Complete command reference
 - [Product Compatibility](reference/compatibility.md) - Aligned release
   version, supported capabilities, and repository-format boundary
-- [Release Policy](reference/release-policy.md) - Supported Rust version, its
-  recency window, and the refresh procedure
+- [Release Policy](reference/release-policy.md) - How the product version is
+  declared and verified, what a release publishes, and the supported Rust
+  version with its recency window
 - [Repository Profiles](reference/profiles.md) - Preferred embedded workflow setup, package contract, and recovery boundary
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
 - [Machine-readable Error Codes](reference/error-codes.md) - Generated vocabulary of error-envelope codes, meanings, and exit statuses
@@ -83,6 +85,7 @@ workflow, start with the
 
 ### 📄 Additional Resources
 
+- [Installation Guide](../INSTALL.md) - Installing the published archive and building from a source checkout
 - [Release Notes](release-notes/) - What each release publishes, per version
 - [Main README](../README.md) - Project overview and quick links
 - [Development Documentation](../dev/index.md) - For contributors working on JIT itself

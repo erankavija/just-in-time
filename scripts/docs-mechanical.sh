@@ -12,9 +12,12 @@ set -uo pipefail
 #   M2  scripts/docs-check-links.sh        link + heading-anchor resolver
 #   M3  scripts/docs-check-citations.sh    source-path + @/… citation existence
 #   M5  scripts/docs-check-projections.sh  projection-freshness diff
+#   M6  scripts/docs-check-canonical.sh    canonical-home / command-snippet /
+#                                          support-matrix binding
 #
 # Footprint resolution (passed to the two footprint-taking checkers; the
-# projection check takes no footprint — its targets are configured):
+# projection and canonical checks take no footprint — their targets are
+# configured):
 #   1. positional args "$@", if any;                      else
 #   2. the DOCS_FOOTPRINT env var (space-separated), if set — the lead's
 #      per-issue scoping knob;                             else
@@ -33,8 +36,14 @@ set -uo pipefail
 # wants that footprint passes it explicitly via positional args or
 # DOCS_FOOTPRINT, same as any other non-default footprint (REQ-01, REQ-02).
 #
+# A canonical page may sit outside the adopter documentation root (the
+# installation guide does), so every home the canonical-homes manifest declares
+# is appended to the resolved footprint unless a footprint entry already covers
+# it. The link and citation checks therefore reach the canonical pages whatever
+# footprint a caller supplies.
+#
 # Exit codes (child semantics are preserved, exit 2 dominates — F4):
-#   0 — all three checks passed
+#   0 — all four checks passed
 #   1 — one or more checks reported genuine findings (child exit 1) and no
 #       check hit an environment error
 #   2 — a check hit an environment/usage error (child exit 2 or other unexpected
@@ -54,6 +63,27 @@ else
   FOOTPRINT=("docs")
 fi
 
+# A canonical home the resolved footprint does not already cover is scanned
+# beside it. An unreadable or malformed manifest yields no homes here; the M6
+# run below reports it as the environment error it is.
+covered() {
+  local candidate="$1" entry
+  for entry in "${FOOTPRINT[@]}"; do
+    entry=${entry%/}
+    [ "$candidate" = "$entry" ] && return 0
+    case "$candidate" in "$entry"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+homes=()
+if home_list=$("$here/docs-check-canonical.sh" --homes 2>/dev/null); then
+  while IFS= read -r home; do
+    [ -n "$home" ] || continue
+    covered "$home" || homes+=("$home")
+  done <<<"$home_list"
+fi
+
 env_error=0
 finding=0
 
@@ -71,9 +101,10 @@ run() {
   echo
 }
 
-run "M2 links & anchors" "$here/docs-check-links.sh" "${FOOTPRINT[@]}"
-run "M3 citations" "$here/docs-check-citations.sh" "${FOOTPRINT[@]}"
+run "M2 links & anchors" "$here/docs-check-links.sh" "${FOOTPRINT[@]}" ${homes[@]+"${homes[@]}"}
+run "M3 citations" "$here/docs-check-citations.sh" "${FOOTPRINT[@]}" ${homes[@]+"${homes[@]}"}
 run "M5 projections" "$here/docs-check-projections.sh"
+run "M6 canonical homes" "$here/docs-check-canonical.sh"
 
 if [ "$env_error" -eq 1 ]; then
   exit 2
