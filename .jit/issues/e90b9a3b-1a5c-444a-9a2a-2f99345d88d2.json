@@ -27,6 +27,7 @@
       "path": "scripts/docs-check-canonical.sh"
     }
   ],
+  "done_at": "2026-07-30T22:31:16.755037659Z",
   "first_ready_at": "2026-07-15T09:12:53.176872871Z",
   "gates_required": [
     "docs-mechanical",
@@ -35,18 +36,18 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-07-30T22:23:41.610909435Z",
+      "status": "passed",
+      "updated_at": "2026-07-30T22:31:06.806281528Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-30T22:21:19.344810563Z",
+      "updated_at": "2026-07-30T22:29:09.236594780Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_at": "2026-07-30T22:21:22.456805611Z",
+      "updated_at": "2026-07-30T22:29:12.295472893Z",
       "updated_by": "auto:executor"
     }
   },
@@ -58,7 +59,7 @@
     "satisfies:REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Establish canonical installation, deployment, MCP, source, and release references",
-  "updated_at": "2026-07-30T22:23:41.610909435Z"
+  "updated_at": "2026-07-30T22:31:16.755037659Z"
 }

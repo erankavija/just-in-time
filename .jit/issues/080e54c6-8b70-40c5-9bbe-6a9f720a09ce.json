@@ -21,7 +21,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Prune repeated entry-point and component documentation",
-  "updated_at": "2026-07-29T13:45:20.901287541Z"
+  "updated_at": "2026-07-30T22:31:21.920809502Z"
 }
