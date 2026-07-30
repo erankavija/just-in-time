@@ -1,17 +1,18 @@
 name: Release Publish
 
-# The one workflow that publishes. An annotated version tag is its only
-# trigger, one GitHub release for that tag is its only output, and it creates,
-# moves, and deletes no git ref: the maintainer owns the tag, this workflow
-# reacts to it.
+# The one workflow that publishes. A `v*` tag push is its only trigger, that
+# tag's annotation is verified before anything is published, one GitHub release
+# for the tag is its only output, and it creates, moves, and deletes no git ref:
+# the maintainer owns the tag, this workflow reacts to it.
 #
 # The order is the guarantee. The reusable validation suites and the reusable
 # security audits run first, on the tagged commit; every artifact is built and
 # smoked downstream of both, in release-artifacts.yml; and publication waits for
 # that whole call, so nothing is released that was not validated, audited, and
-# started at least once. `.github/workflow-contract.yml` states each of those
-# edges, and `dev/workflow-contract.md` explains how a called workflow's job
-# list gives one `needs` edge the content of a whole suite.
+# started from the archive an adopter downloads.
+# `.github/workflow-contract.yml` states each of those edges, and
+# `dev/workflow-contract.md` explains how a called workflow's job list gives one
+# `needs` edge the content of a whole suite.
 #
 # The artifact build is not defined here. release-artifacts.yml owns it and runs
 # on every pull request in its own right, so the artifact-producing path is
