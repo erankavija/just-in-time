@@ -115,7 +115,9 @@ workflow in the tree that calls it by file name (`uses:` a
 caller's own commit).
 
 Each job a caller runs itself has to reach that call through `needs`, so
-nothing of the caller's starts before every inherited job has succeeded. One
+nothing of the caller's starts before every inherited job has succeeded. A
+caller holds one node for the whole called graph, so the edge it can declare
+names the call; the job list here is what gives that edge its content. One
 edge at the head of the caller's graph carries the whole graph, since `needs`
 is transitive. A caller job that calls another workflow of this repository is
 exempt: it is a verified boundary of the same kind, and making it wait would
