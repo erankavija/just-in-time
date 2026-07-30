@@ -47,6 +47,8 @@ pub struct ArtifactClassificationPolicy {
     pub managed_paths: Vec<String>,
     /// Repository-relative roots whose sources must remain available.
     pub permanent_paths: Vec<String>,
+    /// Exact repository-relative areas that organize one owner directory per issue.
+    pub issue_scoped_areas: Vec<String>,
     /// Repository-relative destination root.
     pub archive_root: String,
     /// Repository-relative roots whose file text the in-content citation scan reads.
@@ -66,6 +68,9 @@ impl ArtifactClassificationPolicy {
                 .unwrap_or_default(),
             permanent_paths: documentation
                 .map(DocumentationConfig::permanent_paths)
+                .unwrap_or_default(),
+            issue_scoped_areas: documentation
+                .map(DocumentationConfig::issue_scoped_areas)
                 .unwrap_or_default(),
             archive_root: documentation
                 .map(DocumentationConfig::archive_root)
@@ -95,10 +100,17 @@ impl ArtifactClassificationPolicy {
             development_root: development_root.into(),
             managed_paths,
             permanent_paths,
+            issue_scoped_areas: Vec::new(),
             archive_root: archive_root.into(),
             citation_scan_roots: Vec::new(),
         }
         .normalized()
+    }
+
+    /// Declare the exact areas that organize one owner directory per issue.
+    pub fn with_issue_scoped_areas(mut self, areas: Vec<String>) -> Self {
+        self.issue_scoped_areas = normalized_paths(areas);
+        self
     }
 
     /// Declare the repository-relative roots the in-content citation scan reads.
@@ -170,6 +182,7 @@ impl ArtifactClassificationPolicy {
         self.development_root = normalize_artifact_path(&self.development_root);
         self.managed_paths = normalized_paths(self.managed_paths);
         self.permanent_paths = normalized_paths(self.permanent_paths);
+        self.issue_scoped_areas = normalized_paths(self.issue_scoped_areas);
         self.archive_root = normalize_artifact_path(&self.archive_root);
         self.citation_scan_roots = normalized_paths(self.citation_scan_roots);
         self
@@ -397,7 +410,7 @@ pub fn classification_facts_from_evidence(
         .map(|artifact| {
             let source = artifact.source();
             let destination =
-                artifact_archive_destination(destination_root, &policy.development_root, source);
+                artifact_archive_destination(target, destination_root, policy, source);
             Ok((
                 source.to_string(),
                 ArtifactLocationFacts {
@@ -417,13 +430,7 @@ pub fn classification_facts_from_evidence(
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
     let container_destination = match target {
         PlanTarget::Container { id } if inspect_destinations => {
-            container_destination_from_evidence(
-                destination_root,
-                &policy.development_root,
-                id,
-                artifacts,
-                evidence,
-            )?
+            container_destination_from_evidence(destination_root, policy, id, artifacts, evidence)?
         }
         _ => ContainerDestinationState::Absent,
     };
@@ -453,11 +460,14 @@ fn location_from_evidence(
 
 fn container_destination_from_evidence(
     destination_root: &str,
-    development_root: &str,
+    policy: &ArtifactClassificationPolicy,
     container_id: &str,
     artifacts: &[ArtifactPlanEntry],
     evidence: &ArtifactEvidenceMap,
 ) -> anyhow::Result<ContainerDestinationState> {
+    let target = PlanTarget::Container {
+        id: container_id.to_string(),
+    };
     let entries = match required_evidence(evidence, destination_root)? {
         ArtifactEvidence::Missing => return Ok(ContainerDestinationState::Absent),
         ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
@@ -496,7 +506,7 @@ fn container_destination_from_evidence(
         .iter()
         .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
         .filter_map(|artifact| {
-            artifact_archive_destination(destination_root, development_root, artifact.source())
+            artifact_archive_destination(&target, destination_root, policy, artifact.source())
         })
         .collect::<BTreeSet<_>>();
     Ok(if entries.iter().all(|entry| accounted.contains(entry)) {
@@ -610,9 +620,10 @@ pub fn classify_artifacts(
         &mut needs_destination,
     );
     destination_source_conflicts(
+        &inventory.target,
         &needs_destination,
         &destination_root,
-        &policy.development_root,
+        &policy,
     )
     .into_values()
     .filter(|sources| sources.len() > 1)
@@ -666,13 +677,14 @@ pub fn classify_artifacts(
 /// emits one blocker naming each conflicting source, while ordinary occupied
 /// destination checks name the destination itself.
 fn destination_source_conflicts(
+    target: &PlanTarget,
     sources: &BTreeSet<String>,
     destination_root: &str,
-    development_root: &str,
+    policy: &ArtifactClassificationPolicy,
 ) -> BTreeMap<String, Vec<String>> {
     sources.iter().fold(BTreeMap::new(), |mut grouped, source| {
         if let Some(destination) =
-            artifact_archive_destination(destination_root, development_root, source)
+            artifact_archive_destination(target, destination_root, policy, source)
         {
             grouped
                 .entry(destination)
@@ -867,7 +879,7 @@ fn classify_entry(
         (false, _) => ArtifactAction::Retain,
     };
 
-    let mirror = artifact_archive_destination(destination_root, &policy.development_root, &source)
+    let mirror = artifact_archive_destination(target, destination_root, policy, &source)
         .unwrap_or_else(|| source.clone());
     let mut blockers = entry
         .blockers()
@@ -1554,25 +1566,89 @@ fn container_short_id(id: &str) -> String {
 /// Place one repository-relative source beneath a target destination root.
 ///
 /// Sources inside a configured development root retain only their path relative
-/// to that policy boundary. An empty development root represents the repository
-/// root. Sources outside a non-empty development root return `None` because
-/// classification retains them and must not assign a publication destination.
+/// to that policy boundary. A container target also removes a matching
+/// `<issue-scoped-area>/<container>/` owner prefix: the destination root already
+/// records that ownership, while the exact configured area and artifact-relative
+/// suffix remain. Flat managed areas never participate. Document targets retain
+/// every source component beneath the development root because they have no
+/// container owner in their destination root.
+///
+/// An empty development root represents the repository root. Sources outside a
+/// non-empty development root return `None` because classification retains them
+/// and must not assign a publication destination.
 pub(crate) fn artifact_archive_destination(
+    target: &PlanTarget,
     destination_root: &str,
-    development_root: &str,
+    policy: &ArtifactClassificationPolicy,
     source: &str,
 ) -> Option<String> {
-    let development_root = normalize_artifact_path(development_root);
+    let development_root = &policy.development_root;
     let source = normalize_artifact_path(source);
-    if development_root.is_empty() {
-        return Some(join_path(destination_root, &source));
-    }
-    if source == development_root {
+    let relative = if development_root.is_empty() {
+        source.as_str()
+    } else if source == development_root.as_str() {
         return Some(normalize_artifact_path(destination_root));
+    } else {
+        source.strip_prefix(&format!("{development_root}/"))?
+    };
+    let relative = if matches!(target, PlanTarget::Container { .. }) {
+        strip_matching_container_owner(
+            destination_root,
+            development_root,
+            &policy.issue_scoped_areas,
+            relative,
+        )
+    } else {
+        relative.to_string()
+    };
+    Some(join_path(destination_root, &relative))
+}
+
+/// Remove the redundant owner from one exact configured issue-scoped area.
+///
+/// Areas may contain multiple components. Only the component immediately
+/// beneath a complete configured area participates; matching-looking directories
+/// in flat managed areas and repeated third-party names deeper in an artifact,
+/// such as `vendor/reveal.js/reveal.js`, remain ordinary structure.
+fn strip_matching_container_owner(
+    destination_root: &str,
+    development_root: &str,
+    issue_scoped_areas: &[String],
+    relative: &str,
+) -> String {
+    let destination_root = normalize_artifact_path(destination_root);
+    let Some(container) = destination_root.rsplit('/').next() else {
+        return relative.to_string();
+    };
+    issue_scoped_areas
+        .iter()
+        .filter_map(|area| development_relative_area(development_root, area))
+        .find_map(|area| {
+            let beneath_area = if area.is_empty() {
+                relative
+            } else {
+                relative.strip_prefix(&format!("{area}/"))?
+            };
+            let artifact = beneath_area.strip_prefix(&format!("{container}/"))?;
+            Some(join_path(&area, artifact))
+        })
+        .unwrap_or_else(|| relative.to_string())
+}
+
+/// Express one exact configured area relative to the development boundary.
+fn development_relative_area(development_root: &str, area: &str) -> Option<String> {
+    let development_root = normalize_artifact_path(development_root);
+    let area = normalize_artifact_path(area);
+    if area.is_empty() {
+        None
+    } else if development_root.is_empty() {
+        Some(area)
+    } else if area == development_root {
+        Some(String::new())
+    } else {
+        area.strip_prefix(&format!("{development_root}/"))
+            .map(str::to_string)
     }
-    source
-        .strip_prefix(&format!("{development_root}/"))
-        .map(|relative| join_path(destination_root, relative))
 }
 
 fn join_path(left: &str, right: &str) -> String {
@@ -1656,9 +1732,13 @@ mod tests {
             "./dev/active/plan.md".to_string(),
             "dev/active/plan.md".to_string(),
         ]);
+        let target = PlanTarget::Document {
+            path: "dev/active/plan.md".to_string(),
+        };
+        let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "archive");
 
         assert_eq!(
-            destination_source_conflicts(&sources, "archive/container", "dev"),
+            destination_source_conflicts(&target, &sources, "archive/container", &policy),
             BTreeMap::from([(
                 "archive/container/active/plan.md".to_string(),
                 vec![
@@ -1666,6 +1746,213 @@ mod tests {
                     "dev/active/plan.md".to_string(),
                 ],
             )]),
+        );
+    }
+
+    #[test]
+    fn test_artifact_archive_destination_strips_matching_owners_in_configured_issue_scoped_areas() {
+        let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "dev/archive")
+            .with_issue_scoped_areas(vec!["dev/active".into(), "dev/presentations".into()]);
+        let cases = [
+            (
+                "dev/active/abcdef12-platform/plan.md",
+                "dev/archive/abcdef12-platform/active/plan.md",
+            ),
+            (
+                "dev/presentations/abcdef12-platform/vendor/reveal.js/reveal.js",
+                "dev/archive/abcdef12-platform/presentations/vendor/reveal.js/reveal.js",
+            ),
+        ];
+
+        cases.into_iter().for_each(|(source, expected)| {
+            assert_eq!(
+                artifact_archive_destination(
+                    &PlanTarget::Container {
+                        id: CONTAINER.to_string(),
+                    },
+                    "dev/archive/abcdef12-platform",
+                    &policy,
+                    source,
+                ),
+                Some(expected.to_string()),
+            );
+        });
+    }
+
+    #[test]
+    fn test_artifact_archive_destination_preserves_nonmatching_owner_directories_and_document_paths(
+    ) {
+        let container = PlanTarget::Container {
+            id: CONTAINER.to_string(),
+        };
+        let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "dev/archive")
+            .with_issue_scoped_areas(vec!["dev/active".into(), "dev/presentations".into()]);
+        for source in [
+            "dev/active/fedcba98-other/plan.md",
+            "dev/presentations/fedcba98-other/talk.html",
+        ] {
+            let relative = source.strip_prefix("dev/").unwrap();
+            assert_eq!(
+                artifact_archive_destination(
+                    &container,
+                    "dev/archive/abcdef12-platform",
+                    &policy,
+                    source,
+                ),
+                Some(format!("dev/archive/abcdef12-platform/{relative}")),
+            );
+        }
+
+        assert_eq!(
+            artifact_archive_destination(
+                &PlanTarget::Document {
+                    path: "dev/active/archive/plan.md".to_string(),
+                },
+                "dev/archive",
+                &policy,
+                "dev/active/archive/plan.md",
+            ),
+            Some("dev/archive/active/archive/plan.md".to_string()),
+            "document archival must not interpret a matching directory as a container owner",
+        );
+    }
+
+    #[test]
+    fn test_destination_source_conflicts_detects_nested_issue_scoped_owner_collisions() {
+        let sources = BTreeSet::from([
+            "dev/team/active/abcdef12-platform/plan.md".to_string(),
+            "dev/team/active/plan.md".to_string(),
+        ]);
+        let target = PlanTarget::Container {
+            id: CONTAINER.to_string(),
+        };
+        let policy = ArtifactClassificationPolicy::configured(
+            "dev",
+            vec!["dev/team/active".into()],
+            vec![],
+            "dev/archive",
+        )
+        .with_issue_scoped_areas(vec!["./dev/team/active/".into()]);
+
+        assert_eq!(
+            destination_source_conflicts(
+                &target,
+                &sources,
+                "dev/archive/abcdef12-platform",
+                &policy,
+            ),
+            BTreeMap::from([(
+                "dev/archive/abcdef12-platform/team/active/plan.md".to_string(),
+                vec![
+                    "dev/team/active/abcdef12-platform/plan.md".to_string(),
+                    "dev/team/active/plan.md".to_string(),
+                ],
+            )]),
+        );
+
+        let artifacts = sources
+            .iter()
+            .map(|source| explicit(source, vec![owner("i", State::Done, true)]))
+            .collect();
+        let facts = locations(&[
+            (
+                "dev/team/active/abcdef12-platform/plan.md",
+                ArtifactLocation::Regular(identity(b"owned")),
+                ArtifactLocation::Missing,
+            ),
+            (
+                "dev/team/active/plan.md",
+                ArtifactLocation::Regular(identity(b"flat")),
+                ArtifactLocation::Missing,
+            ),
+        ]);
+        let plan = classify_artifacts(
+            ArtifactClassificationInventory::new(target, artifacts, Vec::new())
+                .with_destination_root("dev/archive/abcdef12-platform"),
+            policy,
+            facts,
+        )
+        .unwrap();
+        assert!(!plan.eligible());
+        assert_eq!(
+            plan.blockers()
+                .iter()
+                .filter(|blocker| blocker.code == BlockerCode::DestinationConflict)
+                .filter_map(|blocker| blocker.path.clone())
+                .collect::<BTreeSet<_>>(),
+            sources,
+            "classification must block every source collapsed by owner stripping",
+        );
+    }
+
+    #[test]
+    fn test_container_destination_preserves_matching_directory_in_flat_managed_area() {
+        let source = "dev/generated/abcdef12-platform/report.md";
+        let policy = ArtifactClassificationPolicy::from_documentation(Some(&DocumentationConfig {
+            development_root: Some("dev".to_string()),
+            managed_paths: Some(vec!["dev/generated".to_string()]),
+            archive_root: Some("dev/archive".to_string()),
+            permanent_paths: Some(Vec::new()),
+            issue_scoped_areas: Some(vec!["dev/team/active".to_string()]),
+            citation_scan_roots: Some(Vec::new()),
+        }));
+        let plan = classify_artifacts(
+            ArtifactClassificationInventory::new(
+                PlanTarget::Container {
+                    id: CONTAINER.to_string(),
+                },
+                vec![explicit(source, vec![owner("i", State::Done, true)])],
+                Vec::new(),
+            )
+            .with_destination_root("dev/archive/abcdef12-platform"),
+            policy,
+            locations(&[(
+                source,
+                ArtifactLocation::Regular(identity(b"flat")),
+                ArtifactLocation::Missing,
+            )]),
+        )
+        .unwrap();
+
+        assert_eq!(
+            entry(&plan, source).destination(),
+            Some("dev/archive/abcdef12-platform/generated/abcdef12-platform/report.md"),
+            "a matching-looking directory in a flat managed area is artifact structure",
+        );
+    }
+
+    #[test]
+    fn test_container_destination_strips_owner_in_normalized_nested_issue_scoped_area() {
+        let source = "dev/team/active/abcdef12-platform/plan.md";
+        let policy = ArtifactClassificationPolicy::from_documentation(Some(&DocumentationConfig {
+            development_root: Some("./dev/".to_string()),
+            managed_paths: Some(vec!["dev/team/active".to_string()]),
+            archive_root: Some("dev/archive".to_string()),
+            permanent_paths: Some(Vec::new()),
+            issue_scoped_areas: Some(vec!["./dev/team/active/".to_string()]),
+            citation_scan_roots: Some(Vec::new()),
+        }));
+        let plan = classify_artifacts(
+            ArtifactClassificationInventory::new(
+                PlanTarget::Container {
+                    id: CONTAINER.to_string(),
+                },
+                vec![explicit(source, vec![owner("i", State::Done, true)])],
+                Vec::new(),
+            )
+            .with_destination_root("dev/archive/abcdef12-platform"),
+            policy,
+            locations(&[(
+                source,
+                ArtifactLocation::Regular(identity(b"nested")),
+                ArtifactLocation::Missing,
+            )]),
+        )
+        .unwrap();
+
+        assert_eq!(
+            entry(&plan, source).destination(),
+            Some("dev/archive/abcdef12-platform/team/active/plan.md"),
         );
     }
 
@@ -1681,11 +1968,18 @@ mod tests {
             let archive_root = archive_segments.join("/");
             let destination_root = format!("{archive_root}/container");
             let source = format!("./{development_root}/{relative}");
+            let policy = ArtifactClassificationPolicy::configured(
+                format!("./{development_root}/"),
+                vec![],
+                vec![],
+                "archive",
+            );
 
             prop_assert_eq!(
                 artifact_archive_destination(
+                    &PlanTarget::Document { path: source.clone() },
                     &format!("./{destination_root}/"),
-                    &format!("./{development_root}/"),
+                    &policy,
                     &source,
                 ),
                 Some(format!("{destination_root}/{relative}")),
@@ -1701,10 +1995,17 @@ mod tests {
             let left = left.join("/");
             let right = right.join("/");
             prop_assume!(left != right);
+            let target = PlanTarget::Document { path: format!("{development_root}/{left}") };
+            let policy = ArtifactClassificationPolicy::configured(
+                development_root.clone(),
+                vec![],
+                vec![],
+                "archives",
+            );
 
             prop_assert_ne!(
-                artifact_archive_destination("archives/container", &development_root, &format!("{development_root}/{left}")),
-                artifact_archive_destination("archives/container", &development_root, &format!("{development_root}/{right}")),
+                artifact_archive_destination(&target, "archives/container", &policy, &format!("{development_root}/{left}")),
+                artifact_archive_destination(&target, "archives/container", &policy, &format!("{development_root}/{right}")),
             );
         }
     }
@@ -2300,6 +2601,7 @@ mod tests {
             vec!["docs".into()],
             "dev/archive",
         )
+        .with_issue_scoped_areas(vec!["dev/active".into()])
     }
 
     fn classify_with_policy(
@@ -2804,9 +3106,13 @@ mod tests {
         );
         let artifact = entry(&plan, "dev/active/shared.md");
         assert_eq!(artifact.action(), ArtifactAction::Copy);
-        let mirror =
-            artifact_archive_destination(plan.destination_root(), "dev", "dev/active/shared.md")
-                .unwrap();
+        let mirror = artifact_archive_destination(
+            plan.target(),
+            plan.destination_root(),
+            &default_policy(),
+            "dev/active/shared.md",
+        )
+        .unwrap();
         assert_eq!(
             artifact.reference_changes(),
             &[ReferenceChange {
@@ -2840,10 +3146,17 @@ mod tests {
         let inside = "dev/vision/charter.md";
         let plan = container_with_policy(policy(), selected_root(inside), present_source(inside));
         let artifact = entry(&plan, inside);
+        let destination_policy = policy();
         assert_eq!(artifact.action(), ArtifactAction::Copy);
         assert_eq!(
             artifact.destination(),
-            artifact_archive_destination(plan.destination_root(), "dev", inside).as_deref()
+            artifact_archive_destination(
+                plan.target(),
+                plan.destination_root(),
+                &destination_policy,
+                inside,
+            )
+            .as_deref()
         );
         assert!(artifact.evidence().contains(&EvidenceCode::PermanentPath));
         assert!(artifact.pending_deletions().is_empty());
@@ -3631,8 +3944,16 @@ mod tests {
 
     #[test]
     fn test_is_whole_path_citation_separates_the_cited_path_from_a_longer_path_around_it() {
-        let canonical_destination =
-            artifact_archive_destination("dev/archive/abcdef12", "dev", CITED_SOURCE).unwrap();
+        let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "dev/archive");
+        let canonical_destination = artifact_archive_destination(
+            &PlanTarget::Document {
+                path: CITED_SOURCE.to_string(),
+            },
+            "dev/archive/abcdef12",
+            &policy,
+            CITED_SOURCE,
+        )
+        .unwrap();
         assert_eq!(canonical_destination, "dev/archive/abcdef12/active/plan.md");
         assert!(!canonical_destination.contains(CITED_SOURCE));
         // Text naming the path and nothing more. What sits against it carries

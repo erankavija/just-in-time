@@ -101,7 +101,7 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
         );
         if inspect_destinations {
             if let Some(destination) =
-                artifact_archive_destination(destination_root, &policy.development_root, source)
+                artifact_archive_destination(target, destination_root, policy, source)
             {
                 evidence.insert(
                     destination.clone(),

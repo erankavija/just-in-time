@@ -150,8 +150,13 @@ area is not itself one. An absent key resolves to the shipped declaration shown
 above; an authored list replaces that declaration whole, so an empty list opts
 every area out of the convention. Adoption is independent of the archival
 classification — an area may be managed and issue-scoped, managed and flat,
-permanent and issue-scoped, or neither — and an issue-scoped area archives its
-artifacts exactly as a flat one does. The key is not part of the three-key
+permanent and issue-scoped, or neither — and the two shapes classify the same
+way. During container archival, a matching owner directory immediately beneath
+the complete normalized issue-scoped area is omitted because the destination
+container root already records that owner. Areas may contain multiple path
+components. A matching-looking directory in a managed area absent from this
+registry remains artifact-relative structure. Document archival has no container
+root and retains the owner directory. The key is not part of the three-key
 completeness that authorizes archival mutation.
 
 The directory an issue owns inside a declared area is `<area>/<short-id>-<slug>`

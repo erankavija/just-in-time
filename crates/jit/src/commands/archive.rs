@@ -883,8 +883,9 @@ impl CommandExecutor<JsonFileStorage> {
             .filter(|a| !a.version().is_pinned())
             .flat_map(|a| {
                 std::iter::once(a.source().to_string()).chain(artifact_archive_destination(
+                    &plan_target,
                     &destination,
-                    &policy.development_root,
+                    &policy,
                     a.source(),
                 ))
             })
@@ -1627,6 +1628,90 @@ mod tests {
                 .len(),
             event_count
         );
+    }
+
+    #[test]
+    fn test_container_preview_and_execution_share_owner_relative_destinations_across_areas() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        fs::create_dir_all(storage.root()).unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            concat!(
+                "[documentation]\n",
+                "development_root = \"workspace\"\n",
+                "managed_paths = [\"workspace/active\", \"workspace/presentations\"]\n",
+                "issue_scoped_areas = [\"workspace/active\", \"workspace/presentations\"]\n",
+                "permanent_paths = []\n",
+                "archive_root = \"workspace/archive\"\n\n",
+                "[type_hierarchy]\n",
+                "types = { epic = 1, task = 2 }\n",
+                "[type_hierarchy.label_associations]\n",
+                "epic = \"epic\"\n",
+            ),
+        )
+        .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+
+        let mut container =
+            crate::domain::types::fixture_issue("Owned archive layout".into(), String::new());
+        container.state = State::Done;
+        container.labels = vec!["type:epic".into(), "epic:platform-archive".into()];
+        let owner = format!("{}-platform-archive", container.short_id());
+        let sources = [
+            format!("workspace/active/{owner}/plan.md"),
+            format!("workspace/presentations/{owner}/vendor/reveal.js/reveal.js"),
+            "workspace/presentations/another-owner/notes.md".to_string(),
+        ];
+        sources.iter().for_each(|source| {
+            let path = repo.path().join(source);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, source).unwrap();
+        });
+        container.documents = sources
+            .iter()
+            .map(|source| DocumentReference::new(source.clone()))
+            .collect();
+        let id = container.id.clone();
+        seed_archive_issue_precondition(&storage, container);
+        let executor = executor(&repo, storage);
+        let destination_root = format!("workspace/archive/{owner}");
+        let expected = [
+            (
+                sources[0].as_str(),
+                format!("{destination_root}/active/plan.md"),
+            ),
+            (
+                sources[1].as_str(),
+                format!("{destination_root}/presentations/vendor/reveal.js/reveal.js"),
+            ),
+            (
+                sources[2].as_str(),
+                format!("{destination_root}/presentations/another-owner/notes.md"),
+            ),
+        ];
+
+        let preview = executor.preview_archive_container(&id).unwrap();
+        expected.iter().for_each(|(source, destination)| {
+            let artifact = preview
+                .artifacts()
+                .iter()
+                .find(|artifact| artifact.source() == *source)
+                .unwrap();
+            assert_eq!(artifact.destination(), Some(destination.as_str()));
+        });
+
+        let execution = executor.execute_archive_container(&id).unwrap();
+        expected.iter().for_each(|(source, destination)| {
+            assert!(execution.publications.iter().any(|publication| {
+                publication.source.as_deref() == Some(*source)
+                    && publication.destination == *destination
+            }));
+            assert!(repo.path().join(destination).exists());
+            assert!(!repo.path().join(source).exists());
+        });
     }
 
     #[cfg(unix)]
