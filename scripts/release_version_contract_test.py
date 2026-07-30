@@ -33,7 +33,8 @@ APACHE_PHRASES = (
     "END OF TERMS AND CONDITIONS",
     "APPENDIX: How to apply the Apache License to your work.",
 )
-MIT_COPYRIGHT_LINE = "Copyright (c) 2026 Example Holder"
+AUTHOR = "Example Holder"
+MIT_COPYRIGHT_LINE = f"Copyright (c) 2026 {AUTHOR}"
 COMPATIBILITY_RECORD = "docs/reference/compatibility.md"
 
 
@@ -71,16 +72,15 @@ class ReleaseVersionContractTests(unittest.TestCase):
         self._write(
             "Cargo.toml",
             '[workspace]\nmembers = ["crates/jit", "crates/server"]\n\n'
-            f'[workspace.package]\nlicense = "{LICENSE_EXPRESSION}"\n',
+            f'[workspace.package]\nlicense = "{LICENSE_EXPRESSION}"\n'
+            f'authors = ["{AUTHOR}"]\n',
         )
-        self._write(
-            "crates/jit/Cargo.toml",
-            f'[package]\nname = "jit"\nversion = "{self.version}"\n',
-        )
-        self._write(
-            "crates/server/Cargo.toml",
-            f'[package]\nname = "jit-server"\nversion = "{self.version}"\n',
-        )
+        for directory, crate in (("jit", "jit"), ("server", "jit-server")):
+            self._write(
+                f"crates/{directory}/Cargo.toml",
+                f'[package]\nname = "{crate}"\nversion = "{self.version}"\n'
+                "authors.workspace = true\n",
+            )
         self._write(
             "Cargo.lock",
             "version = 4\n\n"
@@ -92,7 +92,11 @@ class ReleaseVersionContractTests(unittest.TestCase):
             ("mcp-server", "@erankavija/jit-mcp-server"),
             ("web", "web"),
         ):
-            manifest: dict[str, object] = {"name": name, "version": self.version}
+            manifest: dict[str, object] = {
+                "name": name,
+                "version": self.version,
+                "author": AUTHOR,
+            }
             if directory == "mcp-server":
                 manifest["license"] = LICENSE_EXPRESSION
             self._write_json(f"{directory}/package.json", manifest)
@@ -268,6 +272,33 @@ class ReleaseVersionContractTests(unittest.TestCase):
         self._edit("LICENSE-MIT", MIT_COPYRIGHT_LINE, "Copyright (c) <year> <holders>")
 
         self._assert_fails_with("copyright line")
+
+    def test_contract_rejects_license_copyright_line_naming_another_holder(
+        self,
+    ) -> None:
+        self._edit("LICENSE-MIT", AUTHOR, "Someone Else")
+
+        self._assert_fails_with(AUTHOR)
+
+    def test_contract_rejects_missing_author_declaration(self) -> None:
+        self._edit("Cargo.toml", f'authors = ["{AUTHOR}"]\n', "")
+
+        self._assert_fails_with("copyright holder")
+
+    def test_contract_rejects_empty_author_declaration(self) -> None:
+        self._edit("Cargo.toml", f'authors = ["{AUTHOR}"]', "authors = []")
+
+        self._assert_fails_with("copyright holder")
+
+    def test_contract_rejects_crate_not_inheriting_the_author_declaration(self) -> None:
+        self._edit("crates/server/Cargo.toml", "authors.workspace = true\n", "")
+
+        self._assert_fails_with("crates/server/Cargo.toml")
+
+    def test_contract_rejects_mismatched_node_author(self) -> None:
+        self._edit("web/package.json", AUTHOR, "Someone Else")
+
+        self._assert_fails_with("web/package.json")
 
     def test_contract_rejects_license_expression_without_a_completeness_contract(
         self,

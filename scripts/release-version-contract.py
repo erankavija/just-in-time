@@ -46,27 +46,35 @@ RELEASE_NOTES_ROOT = Path("docs/release-notes")
 MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
 FENCED_BLOCK_PATTERN = re.compile(r"^```", re.MULTILINE)
 
-# The workspace manifest owns the SPDX expression; the published npm package
-# restates it and must agree.
-LICENSE_EXPRESSION_MANIFEST = Path("Cargo.toml")
+# The workspace manifest owns the SPDX expression and the author declaration
+# the copyright holder is derived from. The crate manifests inherit that
+# declaration and the npm manifests restate it; all of them must agree.
+WORKSPACE_MANIFEST = Path("Cargo.toml")
 PUBLISHED_PACKAGE_MANIFEST = Path("mcp-server/package.json")
-LICENSE_OPERATORS = frozenset({"OR", "AND", "WITH"})
-FILLED_COPYRIGHT_PATTERN = re.compile(
-    r"^Copyright \(c\) \d{4} [^<\n]+$", re.MULTILINE
+INHERITING_CRATE_MANIFESTS = (
+    Path("crates/jit/Cargo.toml"),
+    Path("crates/server/Cargo.toml"),
 )
+AUTHOR_RESTATING_MANIFESTS = (
+    PUBLISHED_PACKAGE_MANIFEST,
+    Path("web/package.json"),
+)
+CARGO_INHERITED = {"workspace": True}
+LICENSE_OPERATORS = frozenset({"OR", "AND", "WITH"})
 
 
 class LicenseContract(NamedTuple):
     """Completeness contract for one SPDX license identifier.
 
     `phrases` are structural anchors spanning the whole text, so a truncated or
-    paraphrased copy fails. `requires_filled_copyright` marks the licenses whose
-    text carries a project-specific copyright line rather than a placeholder the
-    upstream text keeps verbatim.
+    paraphrased copy fails. `requires_declared_copyright` marks the licenses
+    whose text carries the project's own copyright line, which has to name the
+    holder the workspace manifest declares; the licenses that keep an upstream
+    placeholder verbatim do not.
     """
 
     phrases: tuple[str, ...]
-    requires_filled_copyright: bool
+    requires_declared_copyright: bool
 
 
 LICENSE_CONTRACTS: dict[str, LicenseContract] = {
@@ -76,7 +84,7 @@ LICENSE_CONTRACTS: dict[str, LicenseContract] = {
             "The above copyright notice and this permission notice shall be included",
             'THE SOFTWARE IS PROVIDED "AS IS"',
         ),
-        requires_filled_copyright=True,
+        requires_declared_copyright=True,
     ),
     "Apache-2.0": LicenseContract(
         phrases=(
@@ -86,7 +94,7 @@ LICENSE_CONTRACTS: dict[str, LicenseContract] = {
             "END OF TERMS AND CONDITIONS",
             "APPENDIX: How to apply the Apache License to your work.",
         ),
-        requires_filled_copyright=False,
+        requires_declared_copyright=False,
     ),
 }
 
@@ -104,12 +112,17 @@ def read_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def nested_string(value: dict[str, Any], *keys: str) -> str:
+def nested_value(value: dict[str, Any], *keys: str) -> Any:
     current: Any = value
     for key in keys:
         if not isinstance(current, dict) or key not in current:
             raise ValueError(f"missing {'.'.join(keys)}")
         current = current[key]
+    return current
+
+
+def nested_string(value: dict[str, Any], *keys: str) -> str:
+    current = nested_value(value, *keys)
     if not isinstance(current, str) or not current:
         raise ValueError(f"{'.'.join(keys)} is not a non-empty string")
     return current
@@ -161,6 +174,60 @@ def load_version(
         return None
 
 
+def read_copyright_holder(path: Path) -> str:
+    """Return the copyright holder the workspace manifest's authors declare."""
+    authors = nested_value(read_toml(path), "workspace", "package", "authors")
+    if (
+        not isinstance(authors, list)
+        or not authors
+        or not all(isinstance(author, str) and author for author in authors)
+    ):
+        raise ValueError(
+            "workspace.package.authors is not a non-empty list of non-empty names"
+        )
+    return ", ".join(authors)
+
+
+def copyright_line_pattern(holder: str) -> re.Pattern[str]:
+    """Return the pattern a license's copyright line must match for `holder`."""
+    return re.compile(rf"^Copyright \(c\) \d{{4}} {re.escape(holder)}$", re.MULTILINE)
+
+
+def verify_author_declaration(root: Path, findings: list[str]) -> str | None:
+    """Check every restatement of the declared author; return the holder it names."""
+    try:
+        holder = read_copyright_holder(root / WORKSPACE_MANIFEST)
+    except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
+        findings.append(f"copyright holder at {WORKSPACE_MANIFEST}: {error}")
+        return None
+
+    for relative in INHERITING_CRATE_MANIFESTS:
+        try:
+            inherited = nested_value(read_toml(root / relative), "package", "authors")
+        except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
+            findings.append(f"author inheritance at {relative}: {error}")
+            continue
+        if inherited != CARGO_INHERITED:
+            findings.append(
+                f"author inheritance at {relative} declares {inherited!r}; expected "
+                f"the workspace inheritance {CARGO_INHERITED!r}"
+            )
+
+    for relative in AUTHOR_RESTATING_MANIFESTS:
+        try:
+            restated = nested_string(read_json(root / relative), "author")
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            findings.append(f"author at {relative}: {error}")
+            continue
+        if restated != holder:
+            findings.append(
+                f"author {restated!r} at {relative} differs from the declared "
+                f"copyright holder {holder!r} at {WORKSPACE_MANIFEST}"
+            )
+
+    return holder
+
+
 def license_identifiers(expression: str) -> tuple[str, ...]:
     """Return the SPDX identifiers an expression names, in declaration order."""
     return tuple(
@@ -177,18 +244,20 @@ def license_text_path(identifier: str) -> Path:
     return Path(f"LICENSE-{identifier.split('-')[0].upper()}")
 
 
-def verify_license_texts(root: Path, findings: list[str]) -> tuple[Path, ...]:
+def verify_license_texts(
+    root: Path, holder: str | None, findings: list[str]
+) -> tuple[Path, ...]:
     """Check the license texts the manifest expression names; return their paths."""
     try:
         expression = nested_string(
-            read_toml(root / LICENSE_EXPRESSION_MANIFEST),
+            read_toml(root / WORKSPACE_MANIFEST),
             "workspace",
             "package",
             "license",
         )
     except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
         findings.append(
-            f"license expression at {LICENSE_EXPRESSION_MANIFEST}: {error}"
+            f"license expression at {WORKSPACE_MANIFEST}: {error}"
         )
         return ()
 
@@ -202,7 +271,7 @@ def verify_license_texts(root: Path, findings: list[str]) -> tuple[Path, ...]:
         if published != expression:
             findings.append(
                 f"license expression {published!r} at {PUBLISHED_PACKAGE_MANIFEST} "
-                f"differs from {expression!r} at {LICENSE_EXPRESSION_MANIFEST}"
+                f"differs from {expression!r} at {WORKSPACE_MANIFEST}"
             )
 
     carried: list[Path] = []
@@ -228,12 +297,14 @@ def verify_license_texts(root: Path, findings: list[str]) -> tuple[Path, ...]:
             for phrase in contract.phrases
             if phrase not in text
         )
-        if contract.requires_filled_copyright and not FILLED_COPYRIGHT_PATTERN.search(
-            text
+        if (
+            contract.requires_declared_copyright
+            and holder is not None
+            and not copyright_line_pattern(holder).search(text)
         ):
             findings.append(
-                f"license text at {relative} has no filled copyright line "
-                "(expected 'Copyright (c) <year> <holder>')"
+                f"license text at {relative} has no copyright line naming the "
+                f"declared holder (expected 'Copyright (c) <year> {holder}')"
             )
 
     return tuple(carried)
@@ -415,7 +486,8 @@ def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
             if section not in compatibility_text
         )
 
-    license_paths = verify_license_texts(root, findings)
+    holder = verify_author_declaration(root, findings)
+    license_paths = verify_license_texts(root, holder, findings)
 
     if expected is not None:
         verify_changelog(root, expected, findings)

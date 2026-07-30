@@ -4,6 +4,7 @@ version = "1.0.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+authors.workspace = true
 description = "REST API server for JIT issue tracker"
 
 [lib]

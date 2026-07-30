@@ -616,10 +616,13 @@ rendered from.
 
 - **The repository carries both texts of its declared `MIT OR Apache-2.0`
   license.** `LICENSE-MIT` and `LICENSE-APACHE` sit at the repository root and
-  ship inside the published native archive. The release-metadata check refuses
-  a release whose license texts, changelog entry, compatibility-and-upgrade
-  record, or release-note source is missing or names a version other than the
-  declared product version.
+  ship inside the published native archive. The workspace manifest declares the
+  copyright holder once; the crate manifests inherit it, the npm manifests
+  restate it, and the MIT copyright line is checked against that declaration
+  rather than maintained by hand. The release-metadata check refuses a release
+  whose license texts, changelog entry, compatibility-and-upgrade record, or
+  release-note source is missing or names a version other than the declared
+  product version.
 
 ### Removed
 

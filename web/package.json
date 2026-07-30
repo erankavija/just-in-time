@@ -2,6 +2,7 @@
   "name": "web",
   "private": true,
   "version": "1.0.0",
+  "author": "erankavija",
   "type": "module",
   "scripts": {
     "dev": "vite",
