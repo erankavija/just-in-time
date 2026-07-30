@@ -284,6 +284,15 @@
       "wave_number": 2,
       "issues": [
         {
+          "id": "7b29019c-7316-4991-87a5-3fbbe7264b73",
+          "short_id": "7b29019c",
+          "title": "Remove repeated container slugs from archive destinations",
+          "classification": "implementation",
+          "status": "pending",
+          "discovered_during": "a122b9b3",
+          "footprint_note": "Runs after whole-tree enforcement because both touch archive path checks and commands/document.rs. The implementation must canonicalize 54 tracked repeated-owner paths without rewriting immutable history."
+        },
+        {
           "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
           "short_id": "5e538f48",
           "title": "Align the v1.0 product version and tag contract",
@@ -510,6 +519,12 @@
       "detail": "Confirmed pre-cutover production behavior: artifact_mirror_destination(destination_root, source) appended the entire repository-relative source, yielding paths such as dev/archive/<container>/dev/active/plan.md. This was a user-identified design smell, not merely a defensive c7 example. The accepted cutover strips the configured development_root before mirroring.",
       "routed_to": "625cc07f",
       "criterion_check": "filed as an explicit canonical-cutover defect and ordered before ef118aea"
+    },
+    {
+      "subject": "archive destinations repeat the container owner after the managed area",
+      "detail": "A whole-tree path-format scan found 54 tracked paths shaped like dev/archive/<container>/<area>/<container>/..., including active and presentations artifacts for 8e071e18-dev-artifact-layout and active artifacts for a2546471-json-error-contract. This survived the development-root cutover and is the analogous redundant-owner nesting the user asked the lead to surface.",
+      "routed_to": "7b29019c",
+      "criterion_check": "filed as a new in-epic canonical-cutover bug and scheduled after a122b9b3 because their archive/checker footprints overlap"
     }
   ],
   "started_at": "2026-07-29T14:20:00+00:00",
