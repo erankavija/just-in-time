@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "8fbc739a532b585e5ec2964ed41df782bfb53dfd",
+  "completed_at": "2026-07-30T18:07:12.605475637Z",
+  "duration_ms": 176043,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable container-topology cutover satisfies its hard criteria; the prior changelog finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3a3b5704-b385-4358-98e3-23e095b2ee97",
+  "message": null,
+  "run_id": "b66a89db-9d08-44be-ae22-8599a4f96857",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T18:04:16.561533746Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9a7fd536, 9248b854, 038e4a25, 2cfc7945, 97f65de6, de4cbc86, 8fbc739a\nPolicy sources: AGENTS.md\nResolved items: @/issue/3a3b5704/requirement/REQ-01–REQ-05 (.jit/issues/3a3b5704-b385-4358-98e3-23e095b2ee97.json); @/issue/8b05a612/requirement/REQ-06, @/issue/8b05a612/requirement/REQ-10 (.jit/issues/8b05a612-91e6-43c8-b36e-557e2417c88e.json); @/charter/D-10, @/charter/D-16 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci, npm-ci, mcp-ci, repo-validate, and jit-validate passed (exit 0); prior code-review failed (exit 1), and its structured F1 is resolved by 8fbc739a’s REQ-05 clarification\nTruncation recovery: Narrowed per-commit/path patch reads, current Dockerfile and contract-test reads, and active-surface residue searches after truncated broad output\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable container-topology cutover satisfies its hard criteria; the prior changelog finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

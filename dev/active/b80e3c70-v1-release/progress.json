@@ -588,6 +588,12 @@
    "detail": "e0fed1bb's code-review raised two blocking issue-impact findings: release.yml:14 never calls ci.yml, so a tagged build can reach publication without the normal suites, and scripts/workflow-contract.py:727 only binds callers that exist, so it cannot reject an absent caller edge. Both are one root cause and both are f9af9788's deliverables; that issue replaces release.yml wholesale under its REQ-07, so wiring the edge into e0fed1bb would be discarded work.",
    "routed_to": "f9af9788",
    "criterion_check": "epic REQ-09 names the tag-triggered workflow running the normal suites before any artifact is built; f9af9788 REQ-02 and REQ-09 own the edge and the contract assertion. Confirm both at f9af9788 review and again at epic completion."
+  },
+  {
+   "subject": "release workflow packages no license text and hard-codes the release body",
+   "detail": "22d374bd's code-review raised two blocking issue-impact findings against the superseded packaging workflow: release.yml:70 archives only the two binaries, omitting LICENSE-MIT and LICENSE-APACHE, and release.yml:175 uses a hard-coded release body instead of docs/release-notes/v1.0.0.md. Both are f9af9788 deliverables and that issue deletes the cited workflow under its REQ-07.",
+   "routed_to": "f9af9788",
+   "criterion_check": "f9af9788 REQ-03 requires the musl archive to carry both license texts; REQ-05 requires release notes derived from the committed release-note source. Epic REQ-09 names both. Verify at f9af9788 review and again at epic completion."
   }
  ],
  "started_at": "2026-07-29T14:20:00+00:00",
@@ -664,6 +670,18 @@
    "decision": "Amend REQ-05 to exclude CHANGELOG.md from the residue sweep alongside dev/archive.",
    "reasoning": "The invoker authorized the amendment. REQ-05 targets active consumer surfaces (scripts, Compose, workflows, docs, fixtures), but CHANGELOG.md is the one file this project mandates for removal narration, so the sweep as written forbade the record it requires. Code-review read the criterion correctly; the criterion was the defect.",
    "rejected_alternative": "Rewrite the entry to name no removed Dockerfile, entrypoint or nginx path, /data volume, or registry, or drop the changelog entry entirely and reach v1.0 with no record of the container cutover."
+  },
+  {
+   "issue": "b80e3c70",
+   "decision": "Standing rule authorized by the invoker: when code-review attributes a finding to a successor issue that already carries the criterion, record the scope boundary and route the finding, without escalating each instance.",
+   "reasoning": "The reviewer's issue-impact lens repeatedly pulls successor work into its prerequisite. Three instances occurred in session 5 alone (e0fed1bb release-to-CI edge, 3a3b5704 changelog residue, 22d374bd archive packaging). Each remedy was identical and each escalation cost a decision round trip. Findings still reach the epic-completion reconciliation through surfaced_pitfalls, so nothing is dropped.",
+   "rejected_alternative": "Escalate every instance individually, or implement successor work inside its prerequisite and discard it when the successor replaces the surface."
+  },
+  {
+   "issue": "22d374bd",
+   "decision": "Scope REQ-01's archive clause to f9af9788 REQ-03 rather than editing the superseded packaging workflow.",
+   "reasoning": "Both issues state the same fact, and f9af9788 REQ-07 deletes the workflow the reviewer cited, so packaging added here would be discarded. The license texts, the manifest-derived copyright holder, and the metadata check remain 22d374bd's.",
+   "rejected_alternative": "Add the license files and release-note wiring to the current release.yml, or hold 22d374bd open until f9af9788 lands."
   }
  ],
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",

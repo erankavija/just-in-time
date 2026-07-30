@@ -16,6 +16,7 @@
       "path": "dev/active/8b05a612-production-readiness/3a3b5704-container-cutover-smoke.md"
     }
   ],
+  "done_at": "2026-07-30T18:07:26.185529112Z",
   "first_ready_at": "2026-07-15T09:12:53.175975111Z",
   "gates_required": [
     "cargo-ci",
@@ -32,8 +33,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-30T17:46:17.339243629Z",
+      "status": "passed",
+      "updated_at": "2026-07-30T18:07:12.918775671Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
@@ -66,7 +67,7 @@
     "satisfies:REQ-10"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove obsolete Docker topologies and migrate every active consumer",
-  "updated_at": "2026-07-30T18:04:01.192075531Z"
+  "updated_at": "2026-07-30T18:07:26.185529112Z"
 }
