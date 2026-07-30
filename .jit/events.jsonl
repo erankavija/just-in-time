@@ -11701,3 +11701,4 @@
 {"gate_key":"code-review","id":"230738f2-4b13-4faa-8def-418fe113a3b5","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:22:12.980611339Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"72dbfbf9-bdb9-4581-a697-58b127422d4f","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:23:13.796209901Z","to":"done","type":"issue_state_changed"}
 {"id":"0b06dcf6-0565-4921-91cb-503baddb0fe5","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:23:13.796209901Z","type":"issue_completed"}
+{"fields":["documents"],"id":"8593c60c-408f-48e1-bb4c-301f5229d1ea","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:04:51.937330675Z","type":"issue_updated","updated_by":"doc-add"}

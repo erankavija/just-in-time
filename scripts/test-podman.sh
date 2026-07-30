@@ -1,137 +1,67 @@
-#!/bin/bash
-# Test script for Podman deployment
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
+# test-podman — build and runtime-smoke the supported server image with Podman.
+#
+# The image built from the repository-root Dockerfile is the whole supported
+# topology: one `jit-server` process serving the API and the built web UI on
+# port 3000, against a whole repository bind-mounted at /repo.
+#
+# Identity. The image runs as UID:GID 10001:10001, a fixed numeric default that
+# owns nothing on the host, so an unmapped container can only serve a mount that
+# 10001 may read, write, and search. A deployment maps the repository owner onto
+# the container identity instead:
+#
+#   JIT_UID=$(stat -c '%u' /path/to/repo)
+#   JIT_GID=$(stat -c '%g' /path/to/repo)
+#   podman run --userns keep-id --user "$JIT_UID:$JIT_GID" ...
+#
+# docs/how-to/deployment.md is the canonical account of that contract; this
+# script prints the two values for the repository it is pointed at, so the smoke
+# and the deployment speak about the same identity.
+#
+# The smoke itself is the container contract suite, which builds the image and
+# exercises both identity arrangements, the API and SPA routes, repository
+# document search, the bounded shutdown drain, and the refusal to start against
+# an uninitialized mount.
+#
+# Usage:
+#   test-podman.sh [REPO]
+# REPO is the repository whose ownership is reported; it defaults to this
+# repository. The suite serves fixtures it creates in temporary directories, so
+# REPO is never mounted or written to.
+#
+# Exit codes:
+#   0 — the image builds and every contract test passes
+#   1 — a contract test failed
+#   2 — environment error: Podman is unavailable, the `jit` the fixtures are
+#       seeded with is not on PATH, or REPO is not a directory
 
-echo "🐳 Testing JIT with Podman..."
-echo "=============================="
-echo
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TARGET_REPO="${1:-$ROOT}"
 
-# Check Podman is available
-if ! command -v podman &> /dev/null; then
-    echo "❌ Podman not found. Please install: sudo apt install podman"
-    exit 1
+if ! command -v podman >/dev/null 2>&1; then
+    echo "test-podman: podman is not installed" >&2
+    exit 2
 fi
 
-echo "✅ Podman version: $(podman --version)"
+if ! command -v "${JIT_BIN:-jit}" >/dev/null 2>&1; then
+    echo "test-podman: the suite seeds its fixtures with '${JIT_BIN:-jit}', which is not on PATH" >&2
+    echo "test-podman: build it with 'cargo build --bin jit', or set JIT_BIN" >&2
+    exit 2
+fi
+
+if [ ! -d "$TARGET_REPO" ]; then
+    echo "test-podman: '$TARGET_REPO' is not a directory" >&2
+    exit 2
+fi
+
+echo "podman: $(podman --version)"
+echo "repository the reported identity is derived from: $TARGET_REPO"
+printf 'mount identity: JIT_UID=%s JIT_GID=%s (the image defaults to 10001:10001)\n' \
+    "$(stat -c '%u' "$TARGET_REPO")" \
+    "$(stat -c '%g' "$TARGET_REPO")"
 echo
 
-# Build images
-echo "🔨 Building Docker images with Podman..."
-echo
-
-echo "1️⃣  Building CLI image..."
-podman build -t jit-cli:test -f docker/Dockerfile.cli .
-echo "   ✅ CLI image built"
-echo
-
-echo "2️⃣  Building API server image..."
-podman build -t jit-api:test -f docker/Dockerfile.api .
-echo "   ✅ API image built"
-echo
-
-echo "3️⃣  Building Web UI image..."
-podman build -t jit-web:test -f docker/Dockerfile.web .
-echo "   ✅ Web image built"
-echo
-
-# List images
-echo "📦 Built images:"
-podman images | grep "jit-.*:test"
-echo
-
-# Test CLI
-echo "🧪 Testing CLI..."
-podman run --rm jit-cli:test --version
-echo "   ✅ CLI works"
-echo
-
-# Create pod for API + Web
-echo "🚀 Creating pod with API + Web..."
-POD_NAME="jit-test-pod"
-
-# Stop and remove existing pod if it exists
-podman pod exists $POD_NAME 2>/dev/null && podman pod rm -f $POD_NAME
-
-# Create pod with port mappings
-podman pod create --name $POD_NAME -p 3000:3000 -p 8080:80
-echo "   ✅ Pod created: $POD_NAME"
-echo
-
-# Start API server in pod
-echo "🔧 Starting API server..."
-podman run -d --pod $POD_NAME \
-  --name jit-api-test \
-  -v jit-test-data:/data:z \
-  -e JIT_DATA_DIR=/data \
-  jit-api:test
-echo "   ✅ API server started"
-echo
-
-# Wait for API to be ready
-echo "⏳ Waiting for API to be ready..."
-for i in {1..30}; do
-    if curl -s http://localhost:3000/api/health > /dev/null 2>&1; then
-        echo "   ✅ API is responding"
-        break
-    fi
-    if [ $i -eq 30 ]; then
-        echo "   ❌ API didn't start in time"
-        podman logs jit-api-test
-        exit 1
-    fi
-    sleep 1
-done
-echo
-
-# Start Web UI in pod
-echo "🌐 Starting Web UI..."
-podman run -d --pod $POD_NAME \
-  --name jit-web-test \
-  jit-web:test
-echo "   ✅ Web UI started"
-echo
-
-# Test API endpoint
-echo "🧪 Testing API endpoints..."
-echo -n "   Health check: "
-curl -s http://localhost:3000/api/health | grep -q "ok" && echo "✅" || echo "❌"
-
-echo -n "   Status endpoint: "
-curl -s http://localhost:3000/api/status > /dev/null && echo "✅" || echo "❌"
-
-echo -n "   Issues endpoint: "
-curl -s http://localhost:3000/api/issues > /dev/null && echo "✅" || echo "❌"
-echo
-
-# Test Web UI
-echo "🧪 Testing Web UI..."
-echo -n "   Homepage loads: "
-curl -s http://localhost:8080/ | grep -q "<!DOCTYPE html>" && echo "✅" || echo "❌"
-echo
-
-# Show running containers
-echo "📊 Running containers in pod:"
-podman pod ps
-echo
-podman ps --pod
-echo
-
-# Show logs sample
-echo "📋 API Server logs (last 10 lines):"
-podman logs --tail 10 jit-api-test
-echo
-
-echo "✨ All tests passed!"
-echo
-echo "📌 Services running:"
-echo "   API:    http://localhost:3000"
-echo "   Web UI: http://localhost:8080"
-echo
-echo "📋 Management commands:"
-echo "   View logs:     podman logs -f jit-api-test"
-echo "   CLI command:   podman run --rm -v jit-test-data:/data:z jit-cli:test issue list"
-echo "   Stop all:      podman pod stop $POD_NAME"
-echo "   Remove all:    podman pod rm -f $POD_NAME"
-echo "   Remove volume: podman volume rm jit-test-data"
-echo
+CONTAINER_ENGINE=podman JIT_IMAGE_RUNTIME=1 \
+    python3 "$ROOT/test-vectors/container-image/test_image_contract.py"

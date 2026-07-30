@@ -58,97 +58,42 @@ sha256sum -c checksums.txt
 
 ## Docker
 
-**Best for running API + Web UI together.**
+**Best for running the API and Web UI together.** One image, built from this
+repository, runs a single `jit-server` process that serves both on port 3000
+against a repository bind-mounted at `/repo`.
 
-### Quick Start with Docker Compose
+### Build the Image
 
 ```bash
-# Clone repository (or download docker-compose.yml)
 git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
-
-# Initialize the shared data volume first — the API server refuses to start
-# against an uninitialized directory. The cli service mounts the same volume
-# and sets JIT_DATA_DIR=/data, so profiled init targets it.
-docker-compose run --rm --entrypoint jit cli init --profile jit-dogfood
-
-# Start all services (API + Web UI)
-docker-compose up -d
-
-# Access services
-# - Web UI: http://localhost:8080
-# - API: http://localhost:3000
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+docker build -t jit-server:local .
 ```
 
-### Pre-built Images (GitHub Container Registry)
+### Serve a Repository
+
+Initialize the repository on the host first (`jit init --profile jit-dogfood`);
+the container serves an existing one and creates nothing.
+
+The image runs as UID:GID `10001:10001`, an identity that owns nothing on the
+host, so an unmapped container reaches the mount only if the repository already
+grants `10001` read, write, and execute permission. Map the repository's owner
+onto the container user instead — that is what `JIT_UID` and `JIT_GID` carry:
 
 ```bash
-# Pull component images by the rolling :main branch tag, a release-version,
-# or a commit-sha tag.
-docker pull ghcr.io/erankavija/just-in-time-api:main       # API server only
-docker pull ghcr.io/erankavija/just-in-time-web:main       # Web UI only
-docker pull ghcr.io/erankavija/just-in-time-cli:main       # CLI only
+export JIT_REPO=/path/to/your/repo
+export JIT_UID=$(stat -c '%u' "$JIT_REPO")
+export JIT_GID=$(stat -c '%g' "$JIT_REPO")
+
+docker compose up -d     # from this checkout; reads the three variables above
 ```
 
-### Run Individual Containers
+`http://localhost:3000` then serves the API and the Web UI, and
+`docker compose down` stops it.
 
-The Web UI image proxies `/api/` to the hostname `api` on its Docker network. Create a
-user-defined network and give the API container that network alias before starting the Web UI.
-
-#### API Server
-
-```bash
-docker network create jit-network
-
-# Initialize the named volume once before starting the API server.
-docker run --rm \
-  --workdir /data \
-  -v jit-data:/data \
-  ghcr.io/erankavija/just-in-time-cli:main init --profile jit-dogfood
-
-docker run -d \
-  --name jit-api \
-  --network jit-network \
-  --network-alias api \
-  -p 3000:3000 \
-  -v jit-data:/data \
-  -e JIT_DATA_DIR=/data \
-  ghcr.io/erankavija/just-in-time-api:main
-```
-
-#### Web UI
-
-```bash
-docker run -d \
-  --name jit-web \
-  --network jit-network \
-  -p 8080:80 \
-  ghcr.io/erankavija/just-in-time-web:main
-```
-
-#### CLI (Interactive)
-
-```bash
-# Run CLI commands
-docker run --rm \
-  -v jit-data:/data \
-  -e JIT_DATA_DIR=/data \
-  ghcr.io/erankavija/just-in-time-cli:main \
-  issue list
-
-# Interactive shell
-docker run --rm -it \
-  --entrypoint sh \
-  -v $(pwd):/data \
-  -e JIT_DATA_DIR=/data \
-  ghcr.io/erankavija/just-in-time-cli:main
-```
+[Deployment](docs/how-to/deployment.md#container-deployment-team-server) covers
+the mount contract, the plain `docker run` and `podman run` forms, rootless
+Podman, backups, and troubleshooting.
 
 ## From Source
 
@@ -250,7 +195,7 @@ Add this server definition to your MCP client's configuration:
 ## Optional Dependencies
 
 - **Git**: Core issue tracking is Git-optional, but advisory leases (`jit claim`) and worktree coordination need a Git repository with a resolvable `HEAD` (`apt install git`)
-- **Docker**: For containerized deployment (`apt install docker.io docker-compose`)
+- **Docker or Podman**: For containerized deployment (`apt install docker.io docker-compose-v2`, or `apt install podman podman-compose`)
 - **Node.js** (20+): Required for the MCP server and to build or develop the Web UI (`apt install nodejs npm`); the CI floor is Node 20 (`.github/workflows/ci.yml`)
 - **ripgrep**: For full-text search (`apt install ripgrep` or `yum install ripgrep`)
 
@@ -279,18 +224,18 @@ chmod +x jit
 sudo mv jit /usr/local/bin/
 ```
 
-### Docker: Cannot Connect to API
+### Docker: Cannot Connect to the Server
 
 ```bash
-# Check if services are running
-docker-compose ps
+# Check whether the service is running
+docker compose ps
 
-# Check logs
-docker-compose logs api
-
-# Restart services
-docker-compose restart
+# Check logs; status 78 names the mount check that failed
+docker compose logs jit-server
 ```
+
+[Deployment troubleshooting](docs/how-to/deployment.md#troubleshooting) covers
+the mount-identity failures behind status 78.
 
 ### Search Not Working
 
@@ -330,9 +275,11 @@ sudo rm /usr/local/bin/jit-server
 ### Docker
 
 ```bash
-docker-compose down -v  # Remove containers and volumes
-docker rmi ghcr.io/erankavija/just-in-time:latest
+docker compose down          # Stop and remove the container
+docker rmi jit-server:local  # Remove the image you built
 ```
+
+The served repository is a host directory and outlives both.
 
 ### NPM
 

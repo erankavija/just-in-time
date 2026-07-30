@@ -81,64 +81,88 @@ server {
 }
 ```
 
-## Docker Compose (Team Server)
+## Container Deployment (Team Server)
 
-For shared/team deployments with everything containerized:
+One image carries the whole containerized deployment: a single `jit-server`
+process serving the API and the built web UI on port 3000, against a whole
+repository bind-mounted at `/repo`. `.jit/` and the project documents linked
+from it stay in their repository context, so search and document reads resolve
+the same paths they do natively.
+
+Build it from a checkout of this repository:
 
 ```bash
-# Clone and initialize the named data volume before starting the API service.
 git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
-
-# `jit-server` requires an initialized JIT data directory. The Compose CLI
-# service shares the named `jit-data` volume with the API service.
-docker compose run --rm --entrypoint jit cli init --profile jit-dogfood
-
-# Start the API and reverse-proxied Web UI.
-docker compose up -d
-
-# API: http://localhost:3000
-# Web: http://localhost:8080
+docker build -t jit-server:local .
 ```
 
-The profile is the preferred workflow setup and does not require Git or network
-access inside the container. Use plain `init` for a methodology-neutral data
-volume. See [Repository Profiles](../reference/profiles.md).
+The served repository is initialized on the host before the container starts —
+`jit init --profile jit-dogfood` for the preferred workflow setup, plain
+`jit init` for a methodology-neutral one (see
+[Repository Profiles](../reference/profiles.md)). A container started against a
+directory without `.jit/` exits with status 78 and creates nothing.
 
-### Custom Data Directory
+### Mount Identity
+
+The image runs as UID:GID `10001:10001`, a fixed numeric identity that owns
+nothing on the host. Running the container unmapped therefore has an ownership
+prerequisite: the mounted repository and its `.jit/` directory must already
+grant `10001` read, write, and execute permission, which on a repository owned
+by someone else means world access.
+
+A deployment normally maps the repository's own owner onto the container user
+instead, which is what `JIT_UID` and `JIT_GID` carry:
 
 ```bash
-# Mount the existing JIT data directory itself, not its repository parent.
-# `/data` is the Docker configuration; native jit-server defaults to `./.jit`.
-docker compose run --rm \
-  -v /path/to/your/repo/.jit:/data \
-  api
+export JIT_REPO=/path/to/your/repo
+export JIT_UID=$(stat -c '%u' "$JIT_REPO")
+export JIT_GID=$(stat -c '%g' "$JIT_REPO")
 ```
+
+Rootless Podman needs `--userns keep-id` alongside `--user` so the mapped ids
+mean the same thing inside the container as they do on the host.
+
+### Compose
+
+`docker-compose.yml` in this repository declares that one service and reads the
+three variables above:
+
+```bash
+docker compose up -d          # http://localhost:3000 serves the API and web UI
+docker compose logs -f
+docker compose down
+```
+
+`JIT_PORT` publishes the service on a host port other than 3000.
+
+### Plain `docker run` / `podman run`
+
+```bash
+docker run -d --name jit-server \
+  --user "$JIT_UID:$JIT_GID" \
+  --publish 3000:3000 \
+  --volume "$JIT_REPO:/repo" \
+  jit-server:local
+```
+
+`./scripts/test-podman.sh` builds the image and runtime-smokes both identity
+arrangements with Podman.
 
 ## Backup and Recovery
 
-### Backup
+The container serves the repository in place, so a deployment is backed up the
+same way a native one is: archive the repository's `.jit/` directory.
 
 ```bash
-# Docker - backup the data volume
-docker run --rm -v jit-data:/data -v $(pwd):/backup alpine \
-  tar czf /backup/jit-backup-$(date +%Y%m%d).tar.gz -C /data .
-
-# Native
 tar czf jit-backup-$(date +%Y%m%d).tar.gz -C .jit .
 ```
 
-### Restore
+Restore into a stopped deployment:
 
 ```bash
-# Stop services first
 docker compose down
-
-# Restore to volume
-docker run --rm -v jit-data:/data -v $(pwd):/backup alpine \
-  tar xzf /backup/jit-backup-YYYYMMDD.tar.gz -C /data
-
-# Restart
+tar xzf jit-backup-YYYYMMDD.tar.gz -C .jit
 docker compose up -d
 ```
 
@@ -146,21 +170,30 @@ docker compose up -d
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `JIT_DATA_DIR` | `./.jit` | Native `jit-server` data directory; Docker and Compose explicitly set it to `/data` |
+| `JIT_DATA_DIR` | `./.jit` | Native `jit-server` data directory; the container serves `/repo/.jit` from its bind mount |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 | `JIT_LOCK_TIMEOUT` | `5` | Lock timeout in seconds (the default is the lock-acquisition timeout in [Runtime Coordination Defaults](../reference/runtime-defaults.md)) |
+
+The Compose service reads three further variables of its own: `JIT_REPO`, the
+repository to mount, and `JIT_UID`/`JIT_GID`, the [mount identity](#mount-identity)
+it runs as.
 
 ## Troubleshooting
 
 ### Service won't start
 
+A container that exits with status 78 reports which mount check failed on
+stderr: `/repo` missing, `/repo/.jit` missing, or the container identity lacking
+read, write, or search permission on either.
+
 ```bash
 # Check logs
-docker compose logs api
-journalctl -u jit-api -f
+docker compose logs jit-server
+journalctl --user -u jit-server -f
 
-# Verify permissions
-ls -la .jit
+# Compare the repository's owner with the identity the container runs as
+stat -c '%u:%g' "$JIT_REPO"
+docker compose exec jit-server id
 ```
 
 ### Health check failing

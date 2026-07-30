@@ -46,7 +46,6 @@ dev/
 !README.md
 
 # Unused product surfaces and image fixtures
-docker/
 docker-compose.yml
 mcp-server/
 test-vectors/

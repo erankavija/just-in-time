@@ -116,6 +116,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   configuration and inspection verbs), and in-repo docs and tests were swept
   to the canonical spellings.
 
+- **The split API/web images, the CLI image, and every container registry
+  publication are gone.** Docker support was four overlapping topologies —
+  `docker/Dockerfile.api`, `docker/Dockerfile.web`, `docker/Dockerfile.cli` with
+  their `docker/entrypoint.sh` and `docker/nginx.conf`, plus the root all-in-one
+  image — wired together by a Compose file that ran three services against a
+  detached `jit-data` volume at `/data`, and published by a workflow that pushed
+  six image names to `ghcr.io`. Docker support is now the root `Dockerfile`
+  alone: one `jit-server` process serving the API and the built web UI on port
+  3000 against a whole repository bind-mounted at `/repo`, so `.jit/` and the
+  documents linked from it keep their repository context. `docker-compose.yml`
+  declares that one service, mounting `JIT_REPO` and running as
+  `JIT_UID`:`JIT_GID`, which a deployment derives from the served repository's
+  owner; unset, the service runs as the image's fixed `10001:10001`. The
+  container workflow builds and runtime-smokes that image on pull requests and
+  `main`, and pushes to no registry: the image is something an operator builds
+  from the repository. `scripts/test-podman.sh` drives the same contract suite
+  under Podman, and `scripts/validate-setup.sh`, `INSTALL.md`, and
+  `docs/how-to/deployment.md` describe the repository-mount contract.
+
 ### Changed
 
 - **Build provenance no longer tracks Git metadata or the wall clock.**
