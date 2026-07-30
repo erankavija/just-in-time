@@ -14,13 +14,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   calls it run one maintained definition of the repository-validation, Rust,
   exact-MSRV, MCP, and web jobs on their own commit. The call takes no input
   and no secret, so a caller cannot aim the suites at a different commit.
-
-- **CI validates the repository's own tracked data.** A `repo-validate` job in
-  `ci.yml` runs `jit validate` with no issue id — every rule over the whole
-  repository plus the repository-integrity checks — against a full-depth
-  checkout, since integrity resolves document references pinned to a commit
-  that a shallow checkout cannot look up. It is one of the jobs a caller of
-  `ci.yml` inherits.
   `.github/workflow-contract.yml` gains a `callers.require_needs` declaration
   for that promise: a reusable workflow names the jobs a caller inherits, and
   the verifier then requires each of them to exist and to carry no `if:`
@@ -30,6 +23,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `test-vectors/workflow-contract/` cover an unrouted caller job, an absent
   and a conditional promised job, a caller obligation on a workflow nothing can
   call, and the conforming shape.
+
+- **CI validates the repository's own tracked data.** A `repo-validate` job in
+  `ci.yml` runs `jit validate` with no issue id — every rule over the whole
+  repository plus the repository-integrity checks — against a full-depth
+  checkout, since integrity resolves document references pinned to a commit
+  that a shallow checkout cannot look up. It is one of the jobs a caller of
+  `ci.yml` inherits.
 
 - **`jit-server` shuts down gracefully instead of dying mid-connection.** The
   server awaited `axum::serve` bare, with no signal handling at all, so a
