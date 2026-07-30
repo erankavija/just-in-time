@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "0361b2235316c297dcea2842f93584654ad532eb",
+  "completed_at": "2026-07-30T08:50:32.279709041Z",
+  "duration_ms": 281136,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/7b29019c-7316-4991-87a5-3fbbe7264b73.json",
+        "id": "F1",
+        "line": 27,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The added satisfies:REQ-13 label does not resolve to a hard criterion on its containing release container."
+      }
+    ],
+    "summary": "One attributable relationship label is dangling from its containing container's criteria.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7b29019c-7316-4991-87a5-3fbbe7264b73",
+  "message": null,
+  "run_id": "5678054a-69f5-4cee-8f2a-290ebd5dbc93",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T08:45:51.142901781Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11166 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb233-9097-7662-b836-dd7e553f8c8c\n--------\nuser\n--- 11153 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 48f67067, 417bf35d, dbdf466e, 037c9a09, 6ade0d31, 0361b223 (all `jit:7b29019c`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml); @/issue/8e071e18/requirement/REQ-13 (.jit/issues/8e071e18-d786-43ff-b424-a283fecb11f8.json)\nGate evidence: cargo-ci passed (exit 0, 2026-07-30T08:37:00Z); docs-mechanical pending\nTruncation recovery: per-commit/path patches, current source/test/config slices, and targeted archive/reference scans\n\n1. [blocking, issue-impact] `.jit/issues/7b29019c-7316-4991-87a5-3fbbe7264b73.json:27` adds `satisfies:REQ-13`, but `satisfies` is configured to name a hard criterion on the containing container. Its container, `b80e3c70`, defines only REQ-01 through REQ-11, so this attribution claim is dangling. The repository has several unrelated issue-scoped REQ-13 items; none is linked by this issue’s empty dependency list. Remove the label or replace it with a criterion actually declared by the release container.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One attributable relationship label is dangling from its containing container's criteria.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The added satisfies:REQ-13 label does not resolve to a hard criterion on its containing release container.\",\"file\":\".jit/issues/7b29019c-7316-4991-87a5-3fbbe7264b73.json\",\"line\":27,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

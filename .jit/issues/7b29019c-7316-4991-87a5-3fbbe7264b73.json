@@ -12,18 +12,28 @@
     "code-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:45:38.682148397Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-30T08:50:32.561958815Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7b29019c-7316-4991-87a5-3fbbe7264b73",
   "labels": [
     "epic:v1-release",
     "milestone:v1.0",
     "component:core",
-    "satisfies:REQ-13",
     "enforces:@/invariant/canonical-cutover",
     "type:bug"
   ],
   "priority": "high",
   "state": "in_progress",
   "title": "Remove repeated container slugs from archive destinations",
-  "updated_at": "2026-07-30T07:31:50.448206690Z"
+  "updated_at": "2026-07-30T08:51:20.867211854Z"
 }
