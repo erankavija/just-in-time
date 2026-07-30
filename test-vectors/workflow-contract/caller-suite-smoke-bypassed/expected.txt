@@ -1,0 +1,6 @@
+# Publication beside the artifact call rather than downstream of it. The build
+# and the smoke test run, and the release is created without waiting to learn
+# whether the archive it carries starts.
+exit: 1
+job 'publish' does not reach the './.github/workflows/release-artifacts.yml' call through 'needs'
+workflow-contract: 1 finding(s)

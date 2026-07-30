@@ -1,0 +1,33 @@
+# Case vector: a release workflow that calls the validation suites and
+# publishes without waiting for them.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  ci.yml:
+    triggers:
+      required:
+        workflow_call: {}
+    permissions:
+      contents: read
+    callers:
+      require_needs: [test-rust, test-web-ui]
+
+  release-publish.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read
+    jobs:
+      validate:
+        uses: ./.github/workflows/ci.yml
+      publish:
+        permissions:
+          contents: write

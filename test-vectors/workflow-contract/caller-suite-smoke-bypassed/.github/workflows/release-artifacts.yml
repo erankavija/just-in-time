@@ -1,0 +1,16 @@
+name: Release Artifacts
+on:
+  workflow_call:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build-native:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./build-native.sh
+  smoke:
+    runs-on: ubuntu-latest
+    needs: [build-native]
+    steps:
+      - run: ./smoke.sh

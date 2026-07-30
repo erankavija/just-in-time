@@ -1,0 +1,34 @@
+# Case vector: a declaration that names the call a job has to make, over a
+# caller that replaced the call with work of its own.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  ci.yml:
+    triggers:
+      required:
+        workflow_call: {}
+    permissions:
+      contents: read
+    callers:
+      require_needs: [suite]
+
+  release-publish.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read
+    jobs:
+      validate:
+        uses: ./.github/workflows/ci.yml
+      publish:
+        permissions:
+          contents: write
+        needs: [validate]

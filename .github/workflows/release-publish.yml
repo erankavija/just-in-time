@@ -1,0 +1,135 @@
+name: Release Publish
+
+# The one workflow that publishes. A `v*` tag push is its only trigger, that
+# tag's annotation is verified before anything is published, one GitHub release
+# for the tag is its only output, and it creates, moves, and deletes no git ref:
+# the maintainer owns the tag, this workflow reacts to it.
+#
+# The order is the guarantee. The reusable validation suites and the reusable
+# security audits run first, on the tagged commit; every artifact is built and
+# smoked downstream of both, in release-artifacts.yml; and publication waits for
+# that whole call, so nothing is released that was not validated, audited, and
+# started from the archive an adopter downloads.
+# `.github/workflow-contract.yml` states each of those edges, and
+# `dev/workflow-contract.md` explains how a called workflow's job list gives one
+# `needs` edge the content of a whole suite.
+#
+# The artifact build is not defined here. release-artifacts.yml owns it and runs
+# on every pull request in its own right, so the artifact-producing path is
+# exercised continuously rather than first on the tag — and a pull request
+# cannot reach this workflow at all.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  # One publication at a time, and never cancelled: a run that has started
+  # creating a release is not restartable from the middle, so a second tag
+  # waits for the first to finish rather than interrupting it.
+  group: release-publish
+  cancel-in-progress: false
+
+jobs:
+  # Every suite this repository considers normal validation, on the tagged
+  # commit. The call passes nothing in, so it cannot be aimed elsewhere.
+  validate:
+    name: Normal Validation Suites
+    uses: ./.github/workflows/ci.yml
+
+  # The three dependency-advisory boundaries, on the tagged commit
+  # (@/charter/D-11). It runs beside the suites: both are verified boundaries,
+  # and everything below waits for both.
+  security:
+    name: Blocking Security Audits
+    uses: ./.github/workflows/security-audit.yml
+
+  # The web bundle, the native archive, the MCP tarball, and the smoke test over
+  # the extracted archive. Nothing is built until validation and the audits have
+  # succeeded.
+  artifacts:
+    name: Build and Smoke the Release Artifacts
+    needs: [validate, security]
+    uses: ./.github/workflows/release-artifacts.yml
+
+  publish:
+    name: Publish the GitHub Release
+    runs-on: ubuntu-latest
+    needs: [artifacts]
+
+    # The only write scope in the workflow, held by the only job that publishes.
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # The tag has to name the version the manifests, locks, changelog,
+      # compatibility record, and release-note source already agree on. The
+      # version that names the release note below is read from those manifests,
+      # so no version literal lives in this workflow.
+      - name: Verify the tag against the manifests and derive the version
+        id: version
+        run: |
+          version="$(python3 scripts/release-version-contract.py --tag "${GITHUB_REF_NAME}" --declared)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Publishing product version ${version}"
+
+      # The maintainer's annotated tag is the authorization to publish, read
+      # from the ref itself rather than from what the run was handed.
+      - name: Verify the tag is annotated
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          object=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${GITHUB_REF_NAME}" --jq '.object.type')
+          if [ "${object}" != "tag" ]; then
+            echo "refs/tags/${GITHUB_REF_NAME} points at a ${object} object; a release tag is annotated"
+            exit 1
+          fi
+
+      # The two built artifacts, named one by one: the run also carries the web
+      # bundle the server embeds, which ships inside jit-server rather than as
+      # an asset of its own.
+      - name: Download the native archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: native-archive
+          path: dist
+
+      - name: Download the MCP tarball
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: mcp-tarball
+          path: dist
+
+      # One directory holding exactly what the release carries, checksummed
+      # where it is assembled so the sums cover the bytes that are uploaded.
+      - name: Assemble the release assets
+        run: |
+          cp LICENSE-MIT LICENSE-APACHE dist/
+          cd dist
+          sha256sum jit-linux-x64.tar.gz *.tgz > checksums.txt
+          cat checksums.txt
+
+      # One release for the tag, carrying the two artifacts, their checksums,
+      # both license texts, and the committed release note as its body. No
+      # package registry, no container registry, no other output.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --verify-tag \
+            --title "JIT ${GITHUB_REF_NAME}" \
+            --notes-file "docs/release-notes/v${VERSION}.md" \
+            dist/jit-linux-x64.tar.gz \
+            dist/*.tgz \
+            dist/checksums.txt \
+            dist/LICENSE-MIT \
+            dist/LICENSE-APACHE

@@ -1,0 +1,301 @@
+name: Release Artifacts
+
+# The two artifacts a release ships, and the smoke test that proves the native
+# one runs. Nothing here publishes: this workflow produces run artifacts, and
+# release-publish.yml is the only workflow that turns them into a release.
+#
+# Two paths run it. release-publish.yml calls it on a version tag, downstream of
+# the reusable validation and security workflows, so a failure in either
+# prevents every build below from starting. Every pull request runs it directly,
+# on the pull-request commit, which keeps the artifact-producing path exercised
+# continuously rather than first on the release tag — and no publication step
+# exists here to be reached from a pull request.
+#
+# The suites are deliberately not called from here. `ci.yml` and
+# `security-audit.yml` already run on every pull request in their own right;
+# calling them from this workflow would run both twice per pull request. The tag
+# path binds them once, in the workflow that publishes, where the obligation
+# belongs.
+
+on:
+  # A caller runs these jobs on its own commit and hands nothing in, so it
+  # cannot aim the build at a different one.
+  workflow_call:
+  # Every pull request, whatever its base branch and whatever it touches: what
+  # breaks a release build is rarely a change that looks like release
+  # configuration.
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-web-ui:
+    name: Build the Web Bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build the production bundle
+        working-directory: web
+        run: npm run build
+
+      - name: Upload the web bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: web-bundle
+          path: web/dist
+          if-no-files-found: error
+
+  # `crates/server/build.rs` embeds whatever `web/dist` holds when jit-server is
+  # compiled, and substitutes an empty stub when that directory is absent — a
+  # server that starts, answers its API, and serves no UI. The bundle is
+  # therefore a predecessor of this job rather than a step beside the compile,
+  # and it is restored into place before cargo runs.
+  build-native:
+    name: Build the Linux x86_64 musl Archive
+    runs-on: ubuntu-latest
+    needs: build-web-ui
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Restore the web bundle the server embeds
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: web-bundle
+          path: web/dist
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
+
+      - name: Add the musl target
+        run: rustup target add x86_64-unknown-linux-musl
+
+      - name: Install musl tooling
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Cache Cargo registry
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-musl-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-musl-
+
+      # `--locked` so the committed Cargo.lock is the dependency set shipped.
+      - name: Build the CLI and the server against the embedded bundle
+        run: |
+          cargo build --locked --release \
+            --target x86_64-unknown-linux-musl \
+            --bin jit --bin jit-server
+
+      # The archive is flat: the binaries land wherever it is extracted, and
+      # both license texts travel with them.
+      - name: Assemble the archive
+        run: |
+          mkdir -p stage dist
+          cp target/x86_64-unknown-linux-musl/release/jit stage/jit
+          cp target/x86_64-unknown-linux-musl/release/jit-server stage/jit-server
+          strip stage/jit stage/jit-server
+          cp LICENSE-MIT LICENSE-APACHE stage/
+          tar -czf dist/jit-linux-x64.tar.gz -C stage \
+            jit jit-server LICENSE-MIT LICENSE-APACHE
+          tar -tzf dist/jit-linux-x64.tar.gz
+
+      - name: Upload the native archive
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-archive
+          path: dist/jit-linux-x64.tar.gz
+          if-no-files-found: error
+
+  # One `npm pack`, whose output name and version come from the package
+  # manifest. The tarball ships as a release asset rather than a registry
+  # version, so adopters install it from the release URL.
+  package-mcp-server:
+    name: Package the MCP Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Pack the tarball
+        working-directory: mcp-server
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/dist"
+          npm pack --pack-destination "${GITHUB_WORKSPACE}/dist"
+
+      - name: Upload the MCP tarball
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mcp-tarball
+          path: dist/*.tgz
+          if-no-files-found: error
+
+  # The archive as an adopter receives it: extracted into an empty prefix, with
+  # nothing of this checkout on PATH. What is asserted here is what the
+  # installation guide promises — the binaries run, a repository initializes
+  # through the profile quickstart, and the machine-readable surfaces answer.
+  smoke:
+    name: Smoke the Extracted Archive
+    runs-on: ubuntu-latest
+    needs: build-native
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Download the native archive
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: native-archive
+          path: dist
+
+      - name: Extract the archive into a clean prefix
+        run: |
+          prefix="${RUNNER_TEMP}/prefix"
+          mkdir -p "$prefix"
+          tar -xzf dist/jit-linux-x64.tar.gz -C "$prefix"
+          echo "$prefix" >> "$GITHUB_PATH"
+
+      - name: Verify what the archive carries
+        run: |
+          prefix="${RUNNER_TEMP}/prefix"
+          for asset in jit jit-server LICENSE-MIT LICENSE-APACHE; do
+            if [ ! -s "$prefix/$asset" ]; then
+              echo "the archive carries no $asset"
+              exit 1
+            fi
+          done
+
+      - name: Verify the version, target, and profile the binaries report
+        env:
+          EXPECTED_TARGET: x86_64-unknown-linux-musl
+        run: |
+          EXPECTED_VERSION="$(python3 scripts/release-version-contract.py --declared)"
+          export EXPECTED_VERSION
+          jit version
+          jit-server --version
+          jit version --json > "${RUNNER_TEMP}/version.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          report = json.load(open(os.environ["RUNNER_TEMP"] + "/version.json"))
+          expected = os.environ["EXPECTED_VERSION"]
+          assert report["version"] == expected, f"{report['version']} != manifest {expected}"
+          assert report["target"] == os.environ["EXPECTED_TARGET"], report["target"]
+          assert report["build_profile"] == "release", report["build_profile"]
+          PY
+
+      - name: Initialize a repository through the profile quickstart
+        run: |
+          workspace="${RUNNER_TEMP}/smoke-repo"
+          mkdir -p "$workspace"
+          cd "$workspace"
+          jit init --profile jit-dogfood
+          jit validate
+          jit profile list --json > profiles.json
+          jit profile apply jit-dogfood --dry-run --json > plan.json
+          python3 - <<'PY'
+          import json
+
+          listing = json.load(open("profiles.json"))
+          assert listing["count"] == len(listing["profiles"]), listing
+          assert "jit-dogfood" in {profile["id"] for profile in listing["profiles"]}, listing
+
+          # Re-planning an exact installation reports no work, which is what
+          # makes the quickstart's result observable rather than merely quiet.
+          plan = json.load(open("plan.json"))
+          assert plan["status"] == "unchanged", plan
+          PY
+
+      - name: Verify the machine contract the archive carries
+        run: |
+          cd "${RUNNER_TEMP}/smoke-repo"
+          description=$(printf '%s\n' \
+            "Created by the release smoke test." \
+            "" \
+            "## Success Criteria" \
+            "" \
+            "- [hard] REQ-01: The extracted archive tracks an issue.")
+          jit issue create "Release smoke fixture" --description "$description" --json > created.json
+          jit issue list --json > issues.json
+          jit --schema > schema.json
+          python3 - <<'PY'
+          import json
+
+          created = json.load(open("created.json"))
+          listing = json.load(open("issues.json"))
+          assert listing["count"] == len(listing["issues"]), listing
+          assert created["id"] in {issue["id"] for issue in listing["issues"]}, listing
+
+          schema = json.load(open("schema.json"))
+          for section in ("commands", "types", "exit_codes"):
+              assert schema[section], f"the schema carries no {section}"
+          PY
+
+      # An empty embedded bundle serves a healthy API and no UI, so a health
+      # check alone would pass on a server built before the web bundle existed.
+      # The served document is what tells the two apart.
+      - name: Serve the repository from the archived server
+        run: |
+          cd "${RUNNER_TEMP}/smoke-repo"
+          jit-server --data-dir .jit --bind 127.0.0.1:3000 &
+          server=$!
+          ready=""
+          for _ in $(seq 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health > /dev/null; then
+              ready=answered
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$ready" ]; then
+            echo "jit-server never answered /api/health"
+            kill "$server"
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:3000/ > index.html
+          kill "$server"
+          grep -q '<div id="root">' index.html

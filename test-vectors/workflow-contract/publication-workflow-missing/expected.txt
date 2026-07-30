@@ -1,0 +1,6 @@
+# The declaration names a publication workflow the tree does not carry. A typo
+# here would otherwise pass silently while every workflow was measured against
+# a name nothing holds, so the contract itself is the finding.
+exit: 1
+publication workflow 'publish.yml' is not a committed workflow file
+workflow-contract: 1 finding(s)

@@ -1,0 +1,33 @@
+# Case vector: a tree that pushes an image from one workflow and a package from
+# the workflow that is allowed to publish the release.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+  publication:
+    github_release: release-publish.yml
+    forbid_registry: true
+
+workflows:
+  release-publish.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read
+    jobs:
+      publish:
+        permissions:
+          contents: write
+
+  docker.yml:
+    triggers:
+      required:
+        push:
+          branches: [main]
+    permissions:
+      contents: read

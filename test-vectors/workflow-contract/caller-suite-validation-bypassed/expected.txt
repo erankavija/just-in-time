@@ -1,0 +1,6 @@
+# Publication beside the validation call rather than downstream of it. The call
+# runs, so the run looks validated; the release is created while the suites are
+# still running, and a red suite lands after the release exists.
+exit: 1
+job 'publish' does not reach the './.github/workflows/ci.yml' call through 'needs'
+workflow-contract: 1 finding(s)

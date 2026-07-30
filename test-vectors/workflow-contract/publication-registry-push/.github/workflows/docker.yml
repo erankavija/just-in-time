@@ -1,0 +1,14 @@
+name: Container Image
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build the image
+        run: docker build -t ghcr.io/example/app:latest .
+      - name: Push the image
+        run: docker push ghcr.io/example/app:latest

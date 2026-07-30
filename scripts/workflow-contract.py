@@ -31,7 +31,14 @@ Failure escapes (global)
     script. Matrix `fail-fast: false` is not an escape: it changes how sibling
     matrix legs are cancelled, not whether a failure fails the run.
 
-Triggers, `workflow_call`, `needs`, permissions (per workflow)
+Publication (global)
+    One declared workflow publishes the GitHub release, and no workflow
+    publishes to a package or container registry. Both are read from the
+    constructs a step runs — the action it uses, or the command its script
+    carries — following local composite actions, so a second publication path
+    cannot hide one level down.
+
+Triggers, `workflow_call`, `needs`, permissions, calls (per workflow)
     Checked against that workflow's declaration; see the contract file and
     dev/workflow-contract.md for the declaration grammar.
 
@@ -411,6 +418,124 @@ def check_failure_escapes(relative: Path, doc) -> list[Finding]:
 
 
 # --------------------------------------------------------------------------
+# Publication
+# --------------------------------------------------------------------------
+#
+# What a workflow publishes is read from what its steps run. A release
+# construct belongs to the one workflow the contract names; a registry
+# construct belongs nowhere, because the release's whole published output is
+# one GitHub release (@/charter/D-16, @/charter/D-9). Packaging is not
+# publication: `npm pack` writes a tarball into the workspace and reaches no
+# registry, which is how the MCP server ships as a release asset.
+#
+# Each command marker is a tuple of substrings that all have to appear in the
+# same script, so the REST form of a release call is caught without every `gh
+# api` call being read as publication.
+RELEASE_PUBLICATION_ACTIONS = (
+    "softprops/action-gh-release",
+    "ncipollo/release-action",
+    "actions/create-release",
+)
+RELEASE_PUBLICATION_COMMANDS = (
+    ("gh release create",),
+    ("gh release upload",),
+    ("gh release edit",),
+    ("gh release delete",),
+    ("gh api", "/releases"),
+)
+# `docker/build-push-action` is named whatever its `push:` input says: this
+# repository builds its image from a Dockerfile in a test of its own, so the
+# action reappearing at all is the review question.
+REGISTRY_PUBLICATION_ACTIONS = (
+    "docker/build-push-action",
+    "redhat-actions/push-to-registry",
+    "JS-DevTools/npm-publish",
+)
+REGISTRY_PUBLICATION_COMMANDS = (
+    ("npm publish",),
+    ("yarn publish",),
+    ("pnpm publish",),
+    ("cargo publish",),
+    ("docker push",),
+    ("podman push",),
+    ("buildah push",),
+    ("skopeo copy",),
+    ("docker buildx build", "--push"),
+)
+
+
+def publication_constructs(step, actions, commands) -> list[str]:
+    """The publication constructs one step carries, named as they are written."""
+    step = as_mapping(step)
+    used = str(step.get("uses") or "").split("@")[0]
+    script = str(step.get("run") or "")
+    return [action for action in actions if used == action] + [
+        " ".join(marker)
+        for marker in commands
+        if all(part in script for part in marker)
+    ]
+
+
+def composite_steps(root: Path, ref: str, seen: set) -> list:
+    """Every step a local composite action runs, recursively, with its label."""
+    if not ref.startswith("./"):
+        return []
+    resolved = resolve_local_reference(root, ref)
+    if resolved is None or resolved in seen:
+        return []
+    seen.add(resolved)
+    doc, error = load_yaml(resolved)
+    if error:
+        return []  # reported as a finding by the `uses:` scan
+    collected = []
+    for index, raw_step in enumerate(as_mapping(as_mapping(doc).get("runs")).get("steps") or [], start=1):
+        step = as_mapping(raw_step)
+        collected.append((f"{ref} {step_label(index, step)}", step))
+        collected.extend(composite_steps(root, str(step.get("uses") or ""), seen))
+    return collected
+
+
+def workflow_steps(root: Path, doc) -> list:
+    """Every step a workflow runs, following the local composite actions it uses."""
+    collected = []
+    seen: set = set()
+    for name, job in sorted(workflow_jobs(doc).items()):
+        for index, raw_step in enumerate(job.get("steps") or [], start=1):
+            step = as_mapping(raw_step)
+            collected.append((f"job {name!r} {step_label(index, step)}", step))
+            collected.extend(composite_steps(root, str(step.get("uses") or ""), seen))
+    return collected
+
+
+def check_publication(root: Path, workflow: Workflow, publisher: str, forbid_registry: bool) -> list[Finding]:
+    """Check that only `publisher` publishes, and that nothing reaches a registry."""
+    findings = []
+    for label, step in workflow_steps(root, workflow.doc):
+        if workflow.name != publisher:
+            findings.extend(
+                finding(
+                    workflow.relative,
+                    f"{label} creates a GitHub release with {construct!r}; "
+                    f"{WORKFLOW_RELDIR.as_posix()}/{publisher} is the only workflow that publishes",
+                )
+                for construct in publication_constructs(
+                    step, RELEASE_PUBLICATION_ACTIONS, RELEASE_PUBLICATION_COMMANDS
+                )
+            )
+        if forbid_registry:
+            findings.extend(
+                finding(
+                    workflow.relative,
+                    f"{label} publishes to a package or container registry with {construct!r}",
+                )
+                for construct in publication_constructs(
+                    step, REGISTRY_PUBLICATION_ACTIONS, REGISTRY_PUBLICATION_COMMANDS
+                )
+            )
+    return findings
+
+
+# --------------------------------------------------------------------------
 # Job graph
 # --------------------------------------------------------------------------
 def needs_graph(doc) -> dict[str, list[str]]:
@@ -641,7 +766,13 @@ def check_permissions(relative: Path, doc, declaration, require_workflow_permiss
 
 
 def check_declared_jobs(relative: Path, doc, declaration) -> list[Finding]:
-    """Declared jobs must exist and must reach their declared predecessors."""
+    """Declared jobs must exist, make their declared call, and reach their predecessors.
+
+    A `needs` edge onto a job named `validate` says nothing about what that job
+    runs. Declaring the call it makes is what keeps the edge's content: the
+    suites a caller inherits are stated by the called workflow, and this is the
+    assertion that the call to it is still there to inherit them through.
+    """
     jobs = workflow_jobs(doc)
     graph = needs_graph(doc)
     findings = []
@@ -651,6 +782,16 @@ def check_declared_jobs(relative: Path, doc, declaration) -> list[Finding]:
                 finding(relative, f"contract declares job {name!r}, which the workflow does not define")
             )
             continue
+        required_call = as_mapping(job_declaration).get("uses")
+        if required_call is not None and job_uses(jobs[name]) != str(required_call):
+            made = job_uses(jobs[name])
+            findings.append(
+                finding(
+                    relative,
+                    f"job {name!r} does not call {str(required_call)!r}; "
+                    + (f"it calls {made!r}" if made else "it runs steps of its own"),
+                )
+            )
         reached = transitive_predecessors(graph, name)
         findings.extend(
             finding(
@@ -770,6 +911,9 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
     require_workflow_permissions = is_truthy(rules.get("require_workflow_permissions", True))
     forbid_failure_escapes = is_truthy(rules.get("forbid_failure_escapes", True))
     require_sha_pinned_uses = is_truthy(rules.get("require_sha_pinned_uses", True))
+    publication = as_mapping(rules.get("publication"))
+    publisher = str(publication.get("github_release") or "")
+    forbid_registry = is_truthy(publication.get("forbid_registry", True))
 
     declarations = as_mapping(contract.get("workflows"))
     workflows = sorted(
@@ -790,6 +934,16 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
         for name in sorted(declarations)
         if name not in committed
     ]
+
+    # A publication declaration naming nothing in the tree would measure every
+    # workflow against a name no file holds, so the declaration itself fails.
+    if publication and publisher not in committed:
+        findings.append(
+            finding(
+                CONTRACT_RELPATH,
+                f"publication workflow {publisher!r} is not a committed workflow file",
+            )
+        )
 
     # Parsed once, up front: a caller obligation is stated by the called
     # workflow and checked against every other workflow in the same tree.
@@ -813,6 +967,8 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
             findings.extend(check_uses(root, workflow.path, False, doc, visited))
         if forbid_failure_escapes:
             findings.extend(check_failure_escapes(relative, doc))
+        if publication:
+            findings.extend(check_publication(root, workflow, publisher, forbid_registry))
         findings.extend(check_triggers(relative, doc, declaration.get("triggers")))
         findings.extend(check_workflow_call(relative, doc, declaration.get("workflow_call")))
         findings.extend(

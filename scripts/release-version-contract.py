@@ -7,6 +7,11 @@ record. The same run checks the release's legal and narrative metadata: the
 license texts the manifest expression names, the changelog entry for the
 declared version, the compatibility-and-upgrade record, and the committed
 release-note source the publication workflow renders.
+
+With `--declared` the run prints the version it derived instead of its summary,
+which is how the publication workflow names the release note it renders without
+carrying a version literal of its own. A disagreeing tree still fails, so that
+value is only ever printed once every declaration above agrees.
 """
 
 from __future__ import annotations
@@ -508,6 +513,12 @@ def main(argv: list[str] | None = None) -> int:
         "--tag",
         help="release tag to verify; omitted for manifest-only CI checks",
     )
+    parser.add_argument(
+        "--declared",
+        action="store_true",
+        help="print the manifest-derived product version alone, for a caller "
+        "that names a release input after it",
+    )
     arguments = parser.parse_args(argv)
 
     expected, findings = verify(arguments.root.resolve(), arguments.tag)
@@ -515,6 +526,13 @@ def main(argv: list[str] | None = None) -> int:
         for finding in findings:
             print(f"release-version-contract: {finding}", file=sys.stderr)
         return 1
+
+    # The version alone, and only from a tree whose declarations agree: a
+    # caller that names an artifact or a release note after this value never
+    # receives one the contract has not just verified.
+    if arguments.declared:
+        print(expected)
+        return 0
 
     print(
         "release-version-contract: "

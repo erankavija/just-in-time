@@ -56,15 +56,29 @@ entry per workflow file name.
 | `require_workflow_permissions` | every workflow states a workflow-level `permissions` block rather than inheriting the repository default |
 | `forbid_failure_escapes` | no `continue-on-error`; no `if:` that survives a failed predecessor (`always()`, `cancelled()`, or `failure()` in a disjunction); no `\|\| true`, `\|\| :`, `\|\| exit 0`, or `set +e` in a `run:` script |
 | `require_sha_pinned_uses` | every external `uses:` is a 40-character lowercase commit SHA carrying an upstream-version comment; every `./…` reference resolves in the tree and is scanned recursively; every `docker://` reference carries an image digest |
+| `publication` | `github_release` names the one workflow that may create a GitHub release; `forbid_registry` forbids package- and container-registry publication in every workflow |
 
 Matrix `fail-fast: false` is not a failure escape: it governs whether sibling
 matrix legs are cancelled, not whether a failure fails the run.
+
+What a workflow publishes is read from what its steps run — the action a step
+uses, or the command its script carries — following local composite actions, so
+a second publication path cannot hide one level down. The recognized release
+constructs are `gh release create`, `upload`, `edit` and `delete`, a `gh api`
+call naming `/releases`, and the `softprops/action-gh-release`,
+`ncipollo/release-action` and `actions/create-release` actions; the recognized
+registry constructs are `npm`, `yarn`, `pnpm` and `cargo publish`, `docker`,
+`podman` and `buildah push`, `skopeo copy`, a `docker buildx build --push`, and
+the `docker/build-push-action`, `redhat-actions/push-to-registry` and
+`JS-DevTools/npm-publish` actions. Packaging is not publication: `npm pack`
+writes a tarball into the workspace and reaches no registry, which is how the
+MCP server ships as a release asset.
 
 ### Per-workflow declarations
 
 ```yaml
 workflows:
-  release.yml:
+  release-publish.yml:
     triggers:
       required:                  # the event must exist, and must carry every listed filter value
         push:
@@ -86,11 +100,18 @@ workflows:
     callers:                     # only for reusable workflows
       require_needs: [validate]  # own jobs every caller inherits
     jobs:
-      create-release:            # declaring a job asserts the workflow defines it
+      artifacts:                 # declaring a job asserts the workflow defines it
+        uses: ./.github/workflows/release-artifacts.yml   # the call it makes
+      publish:
         permissions:             # exact match against that job's block
           contents: write
-        needs: [build-binaries]  # transitive predecessors in the `needs` graph
+        needs: [artifacts]       # transitive predecessors in the `needs` graph
 ```
+
+A `needs` edge onto a job named `validate` says nothing about what that job
+runs. `uses` is what keeps the edge's content: the suites a caller inherits are
+stated by the called workflow, and this declaration asserts that the call to it
+is still there to inherit them through.
 
 Within a required event mapping, `forbidden_filters` names filter keys that may
 not appear on that event. The CI contract uses
