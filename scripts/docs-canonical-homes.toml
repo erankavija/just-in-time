@@ -100,6 +100,12 @@ home = "docs/how-to/deployment.md#container-deployment"
   doc = "/api/health"
   sources = ["Dockerfile", ".github/workflows/release-artifacts.yml"]
 
+  [[fact.binding]]
+  # The Compose command that starts the deployment, spelled the same way in the
+  # service manifest it drives.
+  doc = "docker compose up -d"
+  sources = ["docker-compose.yml"]
+
 [[fact]]
 id = "web-bundle-build"
 home = "docs/how-to/deployment.md#building-the-web-ui"
@@ -165,4 +171,10 @@ home = "docs/reference/compatibility.md"
   # The declaration line the version contract parses out of this record.
   doc = "**Product compatibility version:**"
   source_token = "Product compatibility version:"
+  sources = ["scripts/release-version-contract.py"]
+
+  [[fact.binding]]
+  # One capability of the aligned set, which the version contract requires this
+  # record to carry, so the supported set has one statement.
+  doc = "`jit-server` Rust server and API"
   sources = ["scripts/release-version-contract.py"]
