@@ -1980,6 +1980,23 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn test_listing_fingerprint_distinguishes_complete_empty_from_advisory_unreadable() {
+        let identity = EntryIdentity::for_bytes("scan-root", b"directory").unwrap();
+        let complete =
+            ListingFingerprint::for_directory(identity.clone(), BTreeMap::new()).unwrap();
+        let unreadable = ListingFingerprint::for_advisory_unreadable(identity).unwrap();
+
+        assert!(!complete.is_advisory_unreadable());
+        assert!(unreadable.is_advisory_unreadable());
+        assert_ne!(complete.sha256(), unreadable.sha256());
+        assert_ne!(complete, unreadable);
+        assert_ne!(
+            serde_json::to_value(&complete).unwrap(),
+            serde_json::to_value(&unreadable).unwrap()
+        );
+    }
+
     fn close_listing(
         path: &str,
         children: &[&str],

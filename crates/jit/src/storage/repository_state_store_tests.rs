@@ -7,6 +7,84 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Mutex;
 use tempfile::TempDir;
 
+#[test]
+fn test_advisory_error_classification_only_accepts_permission_denied_io() {
+    let errors = [
+        RepositoryStateStoreError::Io(std::io::Error::other("hard I/O failure")),
+        RepositoryStateStoreError::Capture(CaptureError::PathBudgetExceeded {
+            actual: 2,
+            maximum: 1,
+        }),
+        RepositoryStateStoreError::RetryableConflict {
+            path: "changed".into(),
+        },
+        RepositoryStateStoreError::UnsafeTarget("unsafe".into()),
+    ];
+
+    assert!(is_advisory_permission_denied(
+        &RepositoryStateStoreError::Io(std::io::Error::new(ErrorKind::PermissionDenied, "denied",))
+    ));
+    assert!(errors
+        .iter()
+        .all(|error| !is_advisory_permission_denied(error)));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_json_apply_retries_when_advisory_unreadable_listing_becomes_readable() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let secret = worktree.path().join("notes/secret");
+    std::fs::create_dir(&data).unwrap();
+    std::fs::create_dir_all(&secret).unwrap();
+    std::fs::write(secret.join("citation.md"), b"citation").unwrap();
+    std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o000)).unwrap();
+
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let storage = JsonFileStorage::new(&data);
+    let secret_path = VirtualPath::worktree("notes/secret").unwrap();
+    let published_path = VirtualPath::worktree("published.txt").unwrap();
+    let spec = || {
+        let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+        spec.discover_advisory_paths([secret_path.clone()]).unwrap();
+        spec.discover_paths([published_path.clone()]).unwrap();
+        spec.discover_listing(secret_path.clone()).unwrap();
+        spec
+    };
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::write_file(
+            published_path.clone(),
+            "archive",
+            ExpectedPreimage::Absent,
+            b"published".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let unreadable = session.capture(spec()).unwrap();
+    assert!(unreadable.listing_fingerprints()[&secret_path].is_advisory_unreadable());
+    std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+    assert!(matches!(
+        session.apply(&test_plan(&unreadable, &delta)),
+        Err(RepositoryStateStoreError::RetryableConflict { .. })
+    ));
+    assert!(!worktree.path().join("published.txt").exists());
+
+    let readable = session.capture(spec()).unwrap();
+    assert!(!readable.listing_fingerprints()[&secret_path].is_advisory_unreadable());
+    session.apply(&test_plan(&readable, &delta)).unwrap();
+    assert_eq!(
+        std::fs::read(worktree.path().join("published.txt")).unwrap(),
+        b"published"
+    );
+}
+
 #[cfg(windows)]
 #[test]
 fn test_windows_metadata_identity_distinguishes_equal_size_files_and_directories() {

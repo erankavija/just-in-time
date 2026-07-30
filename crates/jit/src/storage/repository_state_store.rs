@@ -71,6 +71,16 @@ pub enum RepositoryStateStoreError {
     Other(#[from] anyhow::Error),
 }
 
+/// Whether an advisory capture may replace this failure with unreadable
+/// evidence. Semantic capture failures and non-permission I/O stay hard.
+pub(crate) fn is_advisory_permission_denied(error: &RepositoryStateStoreError) -> bool {
+    matches!(
+        error,
+        RepositoryStateStoreError::Io(error)
+            if error.kind() == ErrorKind::PermissionDenied
+    )
+}
+
 /// Guards that a storage instance is reentered only for one canonical layout.
 ///
 /// A retained CLI session holds the reentrant lock chain while dispatch opens a
@@ -790,9 +800,7 @@ fn capture_capability_image(
         .map(|path| {
             let entry = match inspect_capability_entry(layout, roots, path) {
                 Ok(entry) => entry,
-                Err(RepositoryStateStoreError::Io(error))
-                    if spec.is_advisory(path) && error.kind() == ErrorKind::PermissionDenied =>
-                {
+                Err(error) if spec.is_advisory(path) && is_advisory_permission_denied(&error) => {
                     advisory_unreadable_entry(path)?
                 }
                 Err(error) => return Err(error),
@@ -1141,9 +1149,7 @@ fn inspect_capability_listing(
     } else {
         match open_descendant_dir_nofollow(root, path.relative().as_path()) {
             Ok(directory) => directory,
-            Err(RepositoryStateStoreError::Io(error))
-                if advisory && error.kind() == ErrorKind::PermissionDenied =>
-            {
+            Err(error) if advisory && is_advisory_permission_denied(&error) => {
                 return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
             }
             Err(error) => return Err(error),
@@ -1173,9 +1179,7 @@ fn inspect_capability_listing(
         let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
         let child_entry = match inspect_capability_entry(layout, roots, &child) {
             Ok(entry) => entry,
-            Err(RepositoryStateStoreError::Io(error))
-                if advisory && error.kind() == ErrorKind::PermissionDenied =>
-            {
+            Err(error) if advisory && is_advisory_permission_denied(&error) => {
                 advisory_unreadable_entry(&child)?
             }
             Err(error) => return Err(error),

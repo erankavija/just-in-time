@@ -1644,35 +1644,7 @@ fn archived_citation_with_scan_directories(directory_count: usize) -> ArchivedCi
     });
     fs::write(repo.path().join("fixtures/appendix.md"), "appendix body\n").unwrap();
 
-    let created = jit(
-        &repo,
-        &[
-            "issue",
-            "create",
-            "--title",
-            "Citing container",
-            "--type",
-            "epic",
-            "--json",
-        ],
-    );
-    assert_success(&created);
-    let container = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    for path in [CITED_ARTIFACT, "fixtures/appendix.md"] {
-        assert_success(&jit(
-            &repo,
-            &["doc", "add", &container, path, "--skip-scan", "--json"],
-        ));
-    }
-    assert_success(&jit(
-        &repo,
-        &[
-            "issue", "update", &container, "--state", "rejected", "--json",
-        ],
-    ));
+    let container = terminal_citation_container(&repo);
 
     let previewed = jit(&repo, &["archive", "container", &container, "--json"]);
     assert_success(&previewed);
@@ -1711,6 +1683,44 @@ fn archived_citation_with_scan_directories(directory_count: usize) -> ArchivedCi
         before,
         after,
     }
+}
+
+/// Create the terminal container shared by citation preview/execution tests.
+fn terminal_citation_container(repo: &TempDir) -> String {
+    terminal_container_with_documents(repo, &[CITED_ARTIFACT, "fixtures/appendix.md"])
+}
+
+fn terminal_container_with_documents(repo: &TempDir, documents: &[&str]) -> String {
+    let created = jit(
+        repo,
+        &[
+            "issue",
+            "create",
+            "--title",
+            "Citing container",
+            "--type",
+            "epic",
+            "--json",
+        ],
+    );
+    assert_success(&created);
+    let container = serde_json::from_slice::<Value>(&created.stdout).unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    for path in documents {
+        assert_success(&jit(
+            repo,
+            &["doc", "add", &container, *path, "--skip-scan", "--json"],
+        ));
+    }
+    assert_success(&jit(
+        repo,
+        &[
+            "issue", "update", &container, "--state", "rejected", "--json",
+        ],
+    ));
+    container
 }
 
 /// REQ-01 (`jit:3be32cad`): execution relocates artifacts, so every artifact
@@ -1794,6 +1804,73 @@ fn test_archive_container_execution_reports_the_preview_warning_set() {
         archive_warning_set(&run.execution),
         archive_warning_set(&run.preview),
         "execution must report the warning set preview computed for the same archive target"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_archive_container_preview_and_execution_preserve_citations_beside_unreadable_subtree() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let repo = TempDir::new().unwrap();
+    assert_success(&jit(&repo, &["init", "--json"]));
+    set_documentation_policy(
+        &repo,
+        concat!(
+            "[documentation]\n",
+            "development_root = \"dev\"\n",
+            "managed_paths = [\"dev/active\"]\n",
+            "permanent_paths = []\n",
+            "archive_root = \"dev/archive\"\n",
+            "citation_scan_roots = [\"dev/scan\"]\n",
+        ),
+    );
+    fs::create_dir_all(repo.path().join("dev/active")).unwrap();
+    fs::create_dir_all(repo.path().join("dev/scan")).unwrap();
+    fs::write(repo.path().join("dev/active/design.md"), "moving design\n").unwrap();
+    fs::write(
+        repo.path().join("dev/scan/readable.md"),
+        concat!(
+            "First: dev/active/design.md\n",
+            "Second: dev/active/design.md\n",
+            "Third: dev/active/design.md\n",
+        ),
+    )
+    .unwrap();
+    let secret = repo.path().join("dev/scan/secret");
+    fs::create_dir(&secret).unwrap();
+    fs::write(secret.join("hidden.md"), "dev/active/design.md\n").unwrap();
+    fs::set_permissions(&secret, fs::Permissions::from_mode(0o000)).unwrap();
+    let container = terminal_container_with_documents(&repo, &["dev/active/design.md"]);
+
+    let previewed = jit(&repo, &["archive", "container", &container, "--json"]);
+    let executed = jit(
+        &repo,
+        &["archive", "container", &container, "--execute", "--json"],
+    );
+    fs::set_permissions(&secret, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_success(&previewed);
+    assert_success(&executed);
+    let preview: Value = serde_json::from_slice(&previewed.stdout).unwrap();
+    let execution: Value = serde_json::from_slice(&executed.stdout).unwrap();
+    let expected = BTreeSet::from([
+        "dev/scan/readable.md:1:8".to_string(),
+        "dev/scan/readable.md:2:9".to_string(),
+        "dev/scan/readable.md:3:8".to_string(),
+    ]);
+    let preview_citations = citation_warning_paths(&preview, "dev/active/design.md")
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+    let execution_citations = archive_warning_set(&execution)
+        .into_iter()
+        .filter_map(|(code, path)| (code == "moving-path-citation").then_some(path).flatten())
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(preview_citations, expected);
+    assert_eq!(execution_citations, expected);
+    assert_eq!(
+        archive_warning_set(&execution),
+        archive_warning_set(&preview)
     );
 }
 
