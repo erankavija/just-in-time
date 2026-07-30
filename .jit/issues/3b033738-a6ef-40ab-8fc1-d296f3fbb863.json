@@ -8,6 +8,7 @@
   ],
   "description": "One production image serves the built web UI and Rust API from a single correctly supervised non-root jit-server process against a mounted repository.\n\n## Success Criteria\n\n- [hard] REQ-01: The multi-stage build completes web/dist before compiling jit-server with usable embedded assets, and runtime smoke serves both the SPA root/fallback and /api/health.\n- [hard] REQ-02: The runtime declares numeric non-root default 10001:10001, contains no nginx, Node, MCP server, or CLI service, and launches the signal-aware jit-server as PID 1 through an exec-form ENTRYPOINT or CMD.\n- [hard] REQ-03: The runtime declares WORKDIR /repo and starts the server there, accepts an explicit numeric UID:GID override, requires /repo and /repo/.jit to be readable and writable by that effective identity, fails clearly otherwise, and never changes host ownership or permissions from inside the container.\n- [hard] REQ-04: With either a repository prepared for 10001:10001 or a UID:GID mapped to the host repository owner, the image passes --data-dir /repo/.jit, starts read/write behavior without auto-initializing the repository, and preserves linked document access plus host-visible .jit changes.\n- [hard] REQ-05: Each runtime fixture seeds distinguishable issue and linked-document terms inside the mounted repository, calls the web-used /api/search route, and proves both issue and document results come from /repo; a healthy server that searches the image build filesystem fails smoke.\n- [hard] REQ-06: The image health check targets /api/health. Both runtime fixtures configure a ten-second Docker/Podman stop timeout, send SIGTERM with multiple SSE plus a deliberately stalled ordinary response/connection active, observe prompt SSE EOF, forced ordinary close at the application five-second deadline, connection-count/deadline logs, and exit 0 before ten seconds; SIGKILL/137 fails.\n\n## Notes\n\nBlast radius: root `Dockerfile`, `.dockerignore`, focused image-runtime fixtures, and the server's embedded static-asset fallback. The user-authorized server change is limited to SPA routing and cache behavior; no domain, storage, or API behavior changes.\n\nLegacy Compose definitions, split-image files, and active deployment scripts and documentation are a successor cutover performed only after this replacement image passes runtime smoke. This issue leaves those predecessor surfaces unchanged; its completed image contract unblocks their deletion and migration rather than asserting repository-wide topology convergence.\n",
   "documents": [],
+  "done_at": "2026-07-30T10:01:33.229945885Z",
   "first_ready_at": "2026-07-15T09:12:53.175511580Z",
   "gates_required": [
     "cargo-ci",
@@ -24,8 +25,13 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-30T09:53:34.999583868Z",
+      "status": "passed",
+      "updated_at": "2026-07-30T10:01:11.106205501Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T10:01:19.063196266Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -51,7 +57,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Build the single server and web production image",
-  "updated_at": "2026-07-30T09:56:13.625760299Z"
+  "updated_at": "2026-07-30T10:01:33.229945885Z"
 }

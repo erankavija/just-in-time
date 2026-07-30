@@ -26,7 +26,7 @@
     "satisfies:REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove obsolete Docker topologies and migrate every active consumer",
-  "updated_at": "2026-07-29T13:53:08.134277190Z"
+  "updated_at": "2026-07-30T10:01:38.346936610Z"
 }

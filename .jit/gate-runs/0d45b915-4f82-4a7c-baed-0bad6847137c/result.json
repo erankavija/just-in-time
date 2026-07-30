@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "3c8db804448083a6bc1742a682be073032c9ff34",
+  "completed_at": "2026-07-30T10:01:10.824252047Z",
+  "duration_ms": 262060,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable production-image implementation satisfies the issue-scoped runtime contract; the prior Compose finding is superseded by the explicit successor-cutover boundary.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3b033738-a6ef-40ab-8fc1-d296f3fbb863",
+  "message": null,
+  "run_id": "0d45b915-4f82-4a7c-baed-0bad6847137c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T09:56:48.764007128Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b5c39554, 6df7ab03, bddb4ac2, f93a30c4, 3c8db804 (`jit:3b033738`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-9 and @/charter/D-10 — dev/vision/9db27a3a-charter.md; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (0); npm-ci passed (0); mcp-ci passed (0); repo-validate passed (0); jit-validate pending (none)\nTruncation recovery: re-read each affected patch and current runtime file in file/line-range chunks; inspected the merge first-parent footprint, excluding its unrelated second-parent mainline diff\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable production-image implementation satisfies the issue-scoped runtime contract; the prior Compose finding is superseded by the explicit successor-cutover boundary.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
