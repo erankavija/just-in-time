@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-30T20:35:58.228773006Z",
   "context": {},
   "created_at": "2026-07-29T13:46:32.658976373Z",
   "dependencies": [
@@ -30,7 +31,7 @@
     "per:@/charter/D-16"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Publish v1.0 through one tag-triggered release workflow",
-  "updated_at": "2026-07-30T20:11:51.959543962Z"
+  "updated_at": "2026-07-30T20:35:58.228773006Z"
 }
