@@ -282,6 +282,13 @@ class RuntimeImageContractTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             return response.read().decode("utf-8")
 
+    def request_spa(self, port: int, path: str) -> str:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=5) as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers.get_content_type(), "text/html")
+            self.assertEqual(response.headers.get("Cache-Control"), "no-cache")
+            return response.read().decode("utf-8")
+
     def start_container(self, root: Path, name: str, user: str | None) -> tuple[str, int]:
         args = [
             self.engine,
@@ -358,9 +365,11 @@ class RuntimeImageContractTests(unittest.TestCase):
                 expected_gid = os.getgid() if mapped else 10001
                 self.assertEqual(identity, f"{expected_uid}:{expected_gid}:jit-server")
 
-                root_html = self.request_text(port, "/")
+                root_html = self.request_spa(port, "/")
                 self.assertIn('<div id="root">', root_html)
-                self.assertIn('<div id="root">', self.request_text(port, "/index.html"))
+                self.assertIn('<div id="root">', self.request_spa(port, "/index.html"))
+                deep_link = self.request_spa(port, "/issues/deep-link-3b033738")
+                self.assertIn('<div id="root">', deep_link)
 
                 issue_search = self.request_json(
                     port, "/api/search?" + urllib.parse.urlencode({"q": issue_term})
