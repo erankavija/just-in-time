@@ -100,9 +100,12 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
             inspect_artifact_evidence(storage, source, ArtifactListingScope::MetadataOnly)?,
         );
         if inspect_destinations {
-            if let Some(destination) =
-                artifact_archive_destination(destination_root, &policy.development_root, source)
-            {
+            if let Some(destination) = artifact_archive_destination(
+                target,
+                destination_root,
+                &policy.development_root,
+                source,
+            ) {
                 evidence.insert(
                     destination.clone(),
                     inspect_artifact_evidence(

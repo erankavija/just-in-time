@@ -396,8 +396,12 @@ pub fn classification_facts_from_evidence(
         .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
         .map(|artifact| {
             let source = artifact.source();
-            let destination =
-                artifact_archive_destination(destination_root, &policy.development_root, source);
+            let destination = artifact_archive_destination(
+                target,
+                destination_root,
+                &policy.development_root,
+                source,
+            );
             Ok((
                 source.to_string(),
                 ArtifactLocationFacts {
@@ -458,6 +462,9 @@ fn container_destination_from_evidence(
     artifacts: &[ArtifactPlanEntry],
     evidence: &ArtifactEvidenceMap,
 ) -> anyhow::Result<ContainerDestinationState> {
+    let target = PlanTarget::Container {
+        id: container_id.to_string(),
+    };
     let entries = match required_evidence(evidence, destination_root)? {
         ArtifactEvidence::Missing => return Ok(ContainerDestinationState::Absent),
         ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
@@ -496,7 +503,12 @@ fn container_destination_from_evidence(
         .iter()
         .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
         .filter_map(|artifact| {
-            artifact_archive_destination(destination_root, development_root, artifact.source())
+            artifact_archive_destination(
+                &target,
+                destination_root,
+                development_root,
+                artifact.source(),
+            )
         })
         .collect::<BTreeSet<_>>();
     Ok(if entries.iter().all(|entry| accounted.contains(entry)) {
@@ -610,6 +622,7 @@ pub fn classify_artifacts(
         &mut needs_destination,
     );
     destination_source_conflicts(
+        &inventory.target,
         &needs_destination,
         &destination_root,
         &policy.development_root,
@@ -666,13 +679,14 @@ pub fn classify_artifacts(
 /// emits one blocker naming each conflicting source, while ordinary occupied
 /// destination checks name the destination itself.
 fn destination_source_conflicts(
+    target: &PlanTarget,
     sources: &BTreeSet<String>,
     destination_root: &str,
     development_root: &str,
 ) -> BTreeMap<String, Vec<String>> {
     sources.iter().fold(BTreeMap::new(), |mut grouped, source| {
         if let Some(destination) =
-            artifact_archive_destination(destination_root, development_root, source)
+            artifact_archive_destination(target, destination_root, development_root, source)
         {
             grouped
                 .entry(destination)
@@ -867,8 +881,9 @@ fn classify_entry(
         (false, _) => ArtifactAction::Retain,
     };
 
-    let mirror = artifact_archive_destination(destination_root, &policy.development_root, &source)
-        .unwrap_or_else(|| source.clone());
+    let mirror =
+        artifact_archive_destination(target, destination_root, &policy.development_root, &source)
+            .unwrap_or_else(|| source.clone());
     let mut blockers = entry
         .blockers()
         .iter()
@@ -1554,25 +1569,58 @@ fn container_short_id(id: &str) -> String {
 /// Place one repository-relative source beneath a target destination root.
 ///
 /// Sources inside a configured development root retain only their path relative
-/// to that policy boundary. An empty development root represents the repository
-/// root. Sources outside a non-empty development root return `None` because
-/// classification retains them and must not assign a publication destination.
+/// to that policy boundary. A container target also removes a matching
+/// `<area>/<container>/` owner prefix: the destination root already records that
+/// ownership, while the area and artifact-relative suffix remain. Document
+/// targets retain every source component beneath the development root because
+/// they have no container owner in their destination root.
+///
+/// An empty development root represents the repository root. Sources outside a
+/// non-empty development root return `None` because classification retains them
+/// and must not assign a publication destination.
 pub(crate) fn artifact_archive_destination(
+    target: &PlanTarget,
     destination_root: &str,
     development_root: &str,
     source: &str,
 ) -> Option<String> {
     let development_root = normalize_artifact_path(development_root);
     let source = normalize_artifact_path(source);
-    if development_root.is_empty() {
-        return Some(join_path(destination_root, &source));
-    }
-    if source == development_root {
+    let relative = if development_root.is_empty() {
+        source.as_str()
+    } else if source == development_root {
         return Some(normalize_artifact_path(destination_root));
+    } else {
+        source.strip_prefix(&format!("{development_root}/"))?
+    };
+    let relative = if matches!(target, PlanTarget::Container { .. }) {
+        strip_matching_container_owner(destination_root, relative)
+    } else {
+        relative.to_string()
+    };
+    Some(join_path(destination_root, &relative))
+}
+
+/// Remove the redundant owner component from `<area>/<container>/<artifact>`.
+///
+/// Only the component immediately beneath the area participates. Repeated
+/// third-party names deeper in the artifact, such as
+/// `vendor/reveal.js/reveal.js`, remain ordinary artifact-relative structure.
+fn strip_matching_container_owner(destination_root: &str, relative: &str) -> String {
+    let destination_root = normalize_artifact_path(destination_root);
+    let Some(container) = destination_root.rsplit('/').next() else {
+        return relative.to_string();
+    };
+    let mut components = relative.splitn(3, '/');
+    let area = components.next();
+    let owner = components.next();
+    let artifact = components.next();
+    match (area, owner, artifact) {
+        (Some(area), Some(owner), Some(artifact)) if owner == container => {
+            join_path(area, artifact)
+        }
+        _ => relative.to_string(),
     }
-    source
-        .strip_prefix(&format!("{development_root}/"))
-        .map(|relative| join_path(destination_root, relative))
 }
 
 fn join_path(left: &str, right: &str) -> String {
@@ -1656,9 +1704,12 @@ mod tests {
             "./dev/active/plan.md".to_string(),
             "dev/active/plan.md".to_string(),
         ]);
+        let target = PlanTarget::Document {
+            path: "dev/active/plan.md".to_string(),
+        };
 
         assert_eq!(
-            destination_source_conflicts(&sources, "archive/container", "dev"),
+            destination_source_conflicts(&target, &sources, "archive/container", "dev"),
             BTreeMap::from([(
                 "archive/container/active/plan.md".to_string(),
                 vec![
@@ -1666,6 +1717,126 @@ mod tests {
                     "dev/active/plan.md".to_string(),
                 ],
             )]),
+        );
+    }
+
+    #[test]
+    fn test_artifact_archive_destination_strips_a_matching_container_owner_after_any_area() {
+        let cases = [
+            (
+                "dev/active/abcdef12-platform/plan.md",
+                "dev/archive/abcdef12-platform/active/plan.md",
+            ),
+            (
+                "dev/presentations/abcdef12-platform/vendor/reveal.js/reveal.js",
+                "dev/archive/abcdef12-platform/presentations/vendor/reveal.js/reveal.js",
+            ),
+        ];
+
+        cases.into_iter().for_each(|(source, expected)| {
+            assert_eq!(
+                artifact_archive_destination(
+                    &PlanTarget::Container {
+                        id: CONTAINER.to_string(),
+                    },
+                    "dev/archive/abcdef12-platform",
+                    "dev",
+                    source,
+                ),
+                Some(expected.to_string()),
+            );
+        });
+    }
+
+    #[test]
+    fn test_artifact_archive_destination_preserves_nonmatching_owner_directories_and_document_paths(
+    ) {
+        let container = PlanTarget::Container {
+            id: CONTAINER.to_string(),
+        };
+        for source in [
+            "dev/active/fedcba98-other/plan.md",
+            "dev/presentations/fedcba98-other/talk.html",
+        ] {
+            let relative = source.strip_prefix("dev/").unwrap();
+            assert_eq!(
+                artifact_archive_destination(
+                    &container,
+                    "dev/archive/abcdef12-platform",
+                    "dev",
+                    source,
+                ),
+                Some(format!("dev/archive/abcdef12-platform/{relative}")),
+            );
+        }
+
+        assert_eq!(
+            artifact_archive_destination(
+                &PlanTarget::Document {
+                    path: "dev/active/archive/plan.md".to_string(),
+                },
+                "dev/archive",
+                "dev",
+                "dev/active/archive/plan.md",
+            ),
+            Some("dev/archive/active/archive/plan.md".to_string()),
+            "document archival must not interpret a matching directory as a container owner",
+        );
+    }
+
+    #[test]
+    fn test_destination_source_conflicts_detects_owner_stripping_collisions() {
+        let sources = BTreeSet::from([
+            "dev/active/abcdef12-platform/plan.md".to_string(),
+            "dev/active/plan.md".to_string(),
+        ]);
+        let target = PlanTarget::Container {
+            id: CONTAINER.to_string(),
+        };
+
+        assert_eq!(
+            destination_source_conflicts(&target, &sources, "dev/archive/abcdef12-platform", "dev",),
+            BTreeMap::from([(
+                "dev/archive/abcdef12-platform/active/plan.md".to_string(),
+                vec![
+                    "dev/active/abcdef12-platform/plan.md".to_string(),
+                    "dev/active/plan.md".to_string(),
+                ],
+            )]),
+        );
+
+        let artifacts = sources
+            .iter()
+            .map(|source| explicit(source, vec![owner("i", State::Done, true)]))
+            .collect();
+        let facts = locations(&[
+            (
+                "dev/active/abcdef12-platform/plan.md",
+                ArtifactLocation::Regular(identity(b"owned")),
+                ArtifactLocation::Missing,
+            ),
+            (
+                "dev/active/plan.md",
+                ArtifactLocation::Regular(identity(b"flat")),
+                ArtifactLocation::Missing,
+            ),
+        ]);
+        let plan = classify_artifacts(
+            ArtifactClassificationInventory::new(target, artifacts, Vec::new())
+                .with_destination_root("dev/archive/abcdef12-platform"),
+            default_policy(),
+            facts,
+        )
+        .unwrap();
+        assert!(!plan.eligible());
+        assert_eq!(
+            plan.blockers()
+                .iter()
+                .filter(|blocker| blocker.code == BlockerCode::DestinationConflict)
+                .filter_map(|blocker| blocker.path.clone())
+                .collect::<BTreeSet<_>>(),
+            sources,
+            "classification must block every source collapsed by owner stripping",
         );
     }
 
@@ -1684,6 +1855,7 @@ mod tests {
 
             prop_assert_eq!(
                 artifact_archive_destination(
+                    &PlanTarget::Document { path: source.clone() },
                     &format!("./{destination_root}/"),
                     &format!("./{development_root}/"),
                     &source,
@@ -1701,10 +1873,11 @@ mod tests {
             let left = left.join("/");
             let right = right.join("/");
             prop_assume!(left != right);
+            let target = PlanTarget::Document { path: format!("{development_root}/{left}") };
 
             prop_assert_ne!(
-                artifact_archive_destination("archives/container", &development_root, &format!("{development_root}/{left}")),
-                artifact_archive_destination("archives/container", &development_root, &format!("{development_root}/{right}")),
+                artifact_archive_destination(&target, "archives/container", &development_root, &format!("{development_root}/{left}")),
+                artifact_archive_destination(&target, "archives/container", &development_root, &format!("{development_root}/{right}")),
             );
         }
     }
@@ -2804,9 +2977,13 @@ mod tests {
         );
         let artifact = entry(&plan, "dev/active/shared.md");
         assert_eq!(artifact.action(), ArtifactAction::Copy);
-        let mirror =
-            artifact_archive_destination(plan.destination_root(), "dev", "dev/active/shared.md")
-                .unwrap();
+        let mirror = artifact_archive_destination(
+            plan.target(),
+            plan.destination_root(),
+            "dev",
+            "dev/active/shared.md",
+        )
+        .unwrap();
         assert_eq!(
             artifact.reference_changes(),
             &[ReferenceChange {
@@ -2843,7 +3020,8 @@ mod tests {
         assert_eq!(artifact.action(), ArtifactAction::Copy);
         assert_eq!(
             artifact.destination(),
-            artifact_archive_destination(plan.destination_root(), "dev", inside).as_deref()
+            artifact_archive_destination(plan.target(), plan.destination_root(), "dev", inside)
+                .as_deref()
         );
         assert!(artifact.evidence().contains(&EvidenceCode::PermanentPath));
         assert!(artifact.pending_deletions().is_empty());
@@ -3631,8 +3809,15 @@ mod tests {
 
     #[test]
     fn test_is_whole_path_citation_separates_the_cited_path_from_a_longer_path_around_it() {
-        let canonical_destination =
-            artifact_archive_destination("dev/archive/abcdef12", "dev", CITED_SOURCE).unwrap();
+        let canonical_destination = artifact_archive_destination(
+            &PlanTarget::Document {
+                path: CITED_SOURCE.to_string(),
+            },
+            "dev/archive/abcdef12",
+            "dev",
+            CITED_SOURCE,
+        )
+        .unwrap();
         assert_eq!(canonical_destination, "dev/archive/abcdef12/active/plan.md");
         assert!(!canonical_destination.contains(CITED_SOURCE));
         // Text naming the path and nothing more. What sits against it carries

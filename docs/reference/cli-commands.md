@@ -353,12 +353,20 @@ input to that name, so a container's title has no part in it and retitling one
 leaves its destination where it is.
 
 Every archived artifact beneath that container root keeps its path relative to
-the configured `development_root`. For example, with `development_root = "dev"`,
-archiving `dev/active/<artifact>` publishes
-`<archive_root>/<container-short-id>-<slug>/active/<artifact>`; it does not repeat
-the `dev` policy boundary inside the container. The same rule uses any authored
-development-root name and applies to document and container archival. A source
-outside that boundary remains at its source and receives no archive destination.
+the configured `development_root`. When the source begins with the matching
+`<area>/<container-short-id>-<slug>/` owner prefix, container archival removes
+that owner directory too: the destination container root already expresses the
+same ownership. For example, with `development_root = "dev"`, archiving
+`dev/active/<container-short-id>-<slug>/plan.md` publishes
+`<archive_root>/<container-short-id>-<slug>/active/plan.md`. The result contains
+the development-root boundary zero times and the container owner once.
+
+Only that matching owner component immediately below the area is removed.
+Nonmatching directories remain artifact-relative structure, as do deeper names
+such as `vendor/reveal.js/reveal.js`. Document archival has no container root,
+so it strips only `development_root` and retains every component beneath it. A
+source outside the development-root boundary remains at its source and receives
+no archive destination.
 
 Execution creates a `.jit-container` marker containing the resolved full
 container ID followed by a newline. The short ID and marker-recorded full ID
