@@ -283,25 +283,46 @@
     },
     {
       "wave_number": 2,
+      "subwaves": [
+        {
+          "order": "2a",
+          "issues": ["7b29019c", "5e538f48", "3b033738"],
+          "rationale": "Disjoint primary footprints: archive derivation/current archive data, product manifests/version contract, and root Docker image/runtime fixtures."
+        },
+        {
+          "order": "2b",
+          "issues": ["e0fed1bb"],
+          "rationale": "Owns ci.yml and the shared workflow-contract assertions."
+        },
+        {
+          "order": "2c",
+          "issues": ["f7f80d53"],
+          "rationale": "Runs after e0fed1bb because both edit the workflow-contract authority; additionally owns security-audit.yml and release.yml audit predecessors."
+        }
+      ],
       "issues": [
         {
           "id": "7b29019c-7316-4991-87a5-3fbbe7264b73",
           "short_id": "7b29019c",
           "title": "Remove repeated container slugs from archive destinations",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "discovered_during": "a122b9b3",
-          "footprint_note": "Runs after whole-tree enforcement because both touch archive path checks and commands/document.rs. The implementation must canonicalize 54 tracked repeated-owner paths without rewriting immutable history."
+          "footprint_note": "Owns archive path derivation, its regressions, and canonicalization of 54 tracked repeated-owner paths without rewriting immutable history.",
+          "planned_model": "gpt-5.6-sol/xhigh",
+          "branch": "worktree-agent-7b29019c"
         },
         {
           "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
           "short_id": "5e538f48",
           "title": "Align the v1.0 product version and tag contract",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "depends_on": [
             "8fa7261b"
-          ]
+          ],
+          "planned_model": "gpt-5.6-terra/high",
+          "branch": "worktree-agent-5e538f48"
         },
         {
           "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
@@ -311,7 +332,8 @@
           "status": "pending",
           "depends_on": [
             "7edd2fe8"
-          ]
+          ],
+          "subwave": "2b"
         },
         {
           "id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
@@ -324,17 +346,20 @@
             "7edd2fe8",
             "bb302dbd",
             "f04f7888"
-          ]
+          ],
+          "subwave": "2c"
         },
         {
           "id": "3b033738-a6ef-40ab-8fc1-d296f3fbb863",
           "short_id": "3b033738",
           "title": "Build the single server and web production image",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "depends_on": [
             "f04f7888"
-          ]
+          ],
+          "planned_model": "gpt-5.6-sol/xhigh",
+          "branch": "worktree-agent-3b033738"
         }
       ]
     },
