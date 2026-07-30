@@ -73,6 +73,12 @@ workflows:
   security-audit.yml:
     triggers:
       required:
+        pull_request:
+          # The dependency-advisory gate for a pull request. A branch or path
+          # filter would let a pull request merge while one of the audits had
+          # never run on its commit.
+          forbidden_filters: [branches, branches-ignore, paths, paths-ignore]
+        workflow_call: {}
         schedule: {}
         workflow_dispatch: {}
         push:
@@ -80,8 +86,24 @@ workflows:
       forbidden: [pull_request_target]
     permissions:
       contents: read
-    jobs:
-      security-audit: {}
+    workflow_call:
+      # No input and no secret. A caller audits the locks committed at its own
+      # commit; an input would be the knob that aims the audits elsewhere.
+      inputs:
+        allowed: []
+      secrets:
+        allowed: []
+    callers:
+      # The three audit boundaries, named one by one. Each has to exist here
+      # and to run unconditionally, and every job a caller runs of its own has
+      # to reach the call through `needs`. Together that makes each boundary a
+      # predecessor of everything a caller does — artifact production and
+      # publication alike — so no path gets past a failing audit
+      # (@/charter/D-11).
+      require_needs:
+        - cargo-audit
+        - npm-audit-mcp-server
+        - npm-audit-web
 
   docker.yml:
     triggers:

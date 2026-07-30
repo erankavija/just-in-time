@@ -1,0 +1,41 @@
+# Case vector: a reusable workflow that is both its own pull-request gate and a
+# callable boundary, carrying three independent audit jobs. Naming all three in
+# one caller obligation makes each of them a predecessor of everything a caller
+# runs, artifact production and publication alike.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  security-audit.yml:
+    triggers:
+      required:
+        pull_request:
+          forbidden_filters: [branches, branches-ignore, paths, paths-ignore]
+        workflow_call: {}
+    permissions:
+      contents: read
+    workflow_call:
+      inputs:
+        allowed: []
+      secrets:
+        allowed: []
+    callers:
+      require_needs: [cargo-audit, npm-audit-mcp-server, npm-audit-web]
+
+  release.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read
+    jobs:
+      create-release:
+        permissions:
+          contents: write
+        needs: [audit]

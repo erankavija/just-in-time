@@ -1,16 +1,26 @@
 name: Security Audit
 
+# Three dependency-advisory boundaries, one per committed lock. Each is its own
+# job, so a caller inherits them by name and a report says which ecosystem is
+# affected. A finding, an unreachable registry or advisory database, and a
+# failed install all end the same way: a red job (@/charter/D-11).
+
 on:
-  # Run weekly on Monday at 00:00 UTC
-  schedule:
-    - cron: '0 0 * * 1'
-  # Run on dependency file changes
+  # Every pull request, whatever its base branch and whatever it touches: a new
+  # advisory reaches a lock no commit changed, so "the locks are untouched" is
+  # not evidence that they are clean.
+  pull_request:
+  # Any workflow of this repository may run these audits on its own commit.
+  workflow_call:
   push:
     branches: [ main ]
     paths:
       - '**/Cargo.lock'
       - '**/package-lock.json'
-  # Allow manual trigger
+  # A clock, because an advisory is published on the advisory database's
+  # schedule rather than on this repository's.
+  schedule:
+    - cron: '0 0 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -20,40 +30,65 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  security-audit:
-    name: Security Audit
+  cargo-audit:
+    name: Rust advisories
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
         with:
           toolchain: stable
-      
-      - name: Cache cargo-audit
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/.cargo/bin/cargo-audit
-          key: ${{ runner.os }}-cargo-audit
-      
+
+      # Pinned to an exact release and built from its own lock, so the auditor
+      # is the reviewed one and a bad publish upstream cannot change what runs
+      # here. Resolve a new version against crates.io before moving the pin.
       - name: Install cargo-audit
-        run: cargo install cargo-audit
-      
-      - name: Run Rust security audit
+        run: cargo install cargo-audit --version 0.22.2 --locked
+
+      # `-D warnings` promotes every advisory class the database carries —
+      # unmaintained, unsound, yanked — to an error, alongside the
+      # vulnerabilities that fail the run on their own. cargo-audit fetches the
+      # advisory database first and fails when it cannot.
+      - name: Audit Cargo.lock
         run: cargo audit -D warnings
-      
+
+  npm-audit-mcp-server:
+    name: MCP server advisories
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
-      
-      - name: Audit MCP server dependencies
+
+      # Resolved from the committed package-lock.json. `--omit=dev` scopes the
+      # report to what ships; `--audit-level=info` makes the lowest severity the
+      # database reports enough to fail the job.
+      - name: Audit package-lock.json
         working-directory: mcp-server
-        run: npm audit --production
-      
-      - name: Audit Web UI dependencies
+        run: npm audit --omit=dev --audit-level=info
+
+  npm-audit-web:
+    name: Web UI advisories
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+
+      - name: Audit package-lock.json
         working-directory: web
-        run: npm audit --production
+        run: npm audit --omit=dev --audit-level=info

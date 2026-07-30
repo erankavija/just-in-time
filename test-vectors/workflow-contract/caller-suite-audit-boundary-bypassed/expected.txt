@@ -1,0 +1,8 @@
+# Wiring publication downstream of the audits is not enough on its own. An
+# artifact job beside the call builds and uploads while the three boundaries are
+# still running, so the release carries an artifact no audit ever cleared —
+# and the check names that job. The single finding is the assertion: the three
+# jobs that are wired correctly, publication among them, stay silent.
+exit: 1
+job 'build-binaries' does not reach the './.github/workflows/security-audit.yml' call through 'needs'
+workflow-contract: 1 finding(s)

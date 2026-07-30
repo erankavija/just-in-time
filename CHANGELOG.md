@@ -185,6 +185,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   registry, so a profile's projection is byte-equal to the config an adopter
   reads.
 
+- **The dependency audits block a pull request and every workflow that calls
+  them.** `security-audit.yml` previously ran one job whose audits were advisory
+  in practice: `cargo install cargo-audit` took no version, `npm audit
+  --production` took no `--audit-level`, and the workflow answered to a weekly
+  schedule, a lock-file push, and a manual dispatch but never to a pull request.
+  It is now three jobs, one per committed lock — `cargo-audit`,
+  `npm-audit-mcp-server`, and `npm-audit-web` — running `cargo audit -D
+  warnings` after installing `cargo-audit 0.22.2` with `--locked`, and `npm
+  audit --omit=dev --audit-level=info` against each `package-lock.json`. A
+  failed toolchain or auditor install, an unreachable registry or advisory
+  database, and any finding each end as a red job; the workflow carries no
+  `continue-on-error`, shell fallback, ignore flag, or allowlist. `pull_request`
+  — filtered by neither base branch nor changed path, because an advisory
+  reaches a lock no commit touched — and `workflow_call` join the existing
+  triggers. The workflow's `callers.require_needs` entry names all three
+  boundaries, so every job a calling workflow runs of its own has to reach the
+  call through `needs`, artifact production and publication alike. Two case
+  vectors under `test-vectors/workflow-contract/` cover the conforming
+  three-boundary shape and an artifact job wired beside the call while
+  publication is wired behind it.
+
 ### Added
 
 - **One static harness verifies every committed GitHub workflow.**

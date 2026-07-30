@@ -1,0 +1,5 @@
+# A reusable workflow answers to pull_request and workflow_call at once: it is
+# the pull-request gate on its own account, and the same three jobs are what a
+# caller inherits. Every job the caller runs itself sits downstream of the one
+# call, so all three boundaries precede all of them.
+exit: 0

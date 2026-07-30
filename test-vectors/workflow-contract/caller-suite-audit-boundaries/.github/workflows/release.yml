@@ -1,0 +1,31 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  audit:
+    uses: ./.github/workflows/security-audit.yml
+  build-binaries:
+    runs-on: ubuntu-latest
+    needs: [audit]
+    steps:
+      - run: ./build-binaries.sh
+  package-mcp-server:
+    runs-on: ubuntu-latest
+    needs: [audit]
+    steps:
+      - run: ./package-mcp-server.sh
+  build-web-ui:
+    runs-on: ubuntu-latest
+    needs: [audit]
+    steps:
+      - run: ./build-web-ui.sh
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [build-binaries, package-mcp-server, build-web-ui]
+    permissions:
+      contents: write
+    steps:
+      - run: ./create-release.sh
