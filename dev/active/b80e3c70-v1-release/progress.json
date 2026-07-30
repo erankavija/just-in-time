@@ -266,14 +266,17 @@
           "short_id": "a122b9b3",
           "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
           "classification": "implementation",
-          "status": "pending",
+          "status": "in_progress",
           "gates": [
             "cargo-ci",
             "mcp-ci",
             "repo-validate",
             "code-review",
             "npm-ci"
-          ]
+          ],
+          "dispatch_order": 1,
+          "planned_model": "gpt-5.6-sol/xhigh",
+          "branch": "worktree-agent-a122b9b3"
         }
       ]
     },
