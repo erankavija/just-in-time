@@ -1,0 +1,42 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-30T21:25:55.630273243Z",
+  "dependencies": [],
+  "description": "The embedded profile package declares a compatible jit range that excludes the shipping product version, and no check catches the disagreement.\n\n## Background\n\n`profiles/jit-dogfood/manifest.toml` declares `jit = \">=0.2.1, <0.3.0\"` while the product declares `1.0.0` across the CLI, the server, the MCP package, and the web package. The range is parsed for syntax when a package is validated, but it is never matched against the running version, so nothing rejects the contradiction and applying the profile succeeds.\n\nThe range is published rather than internal: the machine-readable profile listing reports it beside the profile's own version, so an adopter on 1.0.0 reads that the only shipped profile requires a version below 0.3.0.\n\nThe release version contract already compares the manifests, the locks, the tag, the changelog entry, the compatibility record, and the release-note source against one derived product version. The profile package's declared range is the one version-bearing manifest that contract does not read.\n\n## Success Criteria\n\n- [hard] REQ-01: The embedded profile package declares a compatible jit range that admits the product version the manifests derive, and the machine-readable profile listing reports that range.\n- [hard] REQ-02: The release version contract reads the profile package's declared range and fails when the derived product version falls outside it, with a message naming the manifest and both values.\n- [hard] REQ-03: The contract's own test suite covers an admitting range and an excluding range, and the excluding case fails with the derived version withheld.\n- [hard] REQ-04: No product version literal enters the profile manifest check; both sides are derived from the tree at run time.\n\n## Notes\n\nBlast radius: the profile package manifest, the release version contract and its tests. Profile application semantics, the enforcement question of whether a range mismatch should block applying a package, and every other manifest the contract already reads are unchanged.",
+  "documents": [],
+  "first_ready_at": "2026-07-30T21:25:55.630273243Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "jit-validate"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-07-30T21:26:12.854871183Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-07-30T21:26:13.229621456Z",
+      "updated_by": null
+    },
+    "jit-validate": {
+      "status": "pending",
+      "updated_at": "2026-07-30T21:26:13.605747621Z",
+      "updated_by": null
+    }
+  },
+  "id": "c5c324df-662e-45cb-978e-b90d74280c62",
+  "labels": [
+    "epic:v1-release",
+    "milestone:v1.0",
+    "component:release",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Align the embedded profile package's compatible jit range",
+  "updated_at": "2026-07-30T21:26:13.605747621Z"
+}

@@ -11754,3 +11754,8 @@
 {"from":"in_progress","id":"c8a0ea62-a7ce-4da4-a0e2-606e0a903c66","issue_id":"f9af9788-9d54-4200-8da4-98818cc67fa9","timestamp":"2026-07-30T21:25:08.265363258Z","to":"done","type":"issue_state_changed"}
 {"id":"e33df6dd-8e7a-444c-bd94-1c235629d0a0","issue_id":"f9af9788-9d54-4200-8da4-98818cc67fa9","timestamp":"2026-07-30T21:25:08.265363258Z","type":"issue_completed"}
 {"from":"backlog","id":"bec4a9ae-00f4-4433-8c9b-7c308649b90b","issue_id":"e90b9a3b-1a5c-444a-9a2a-2f99345d88d2","timestamp":"2026-07-30T21:25:13.406167301Z","to":"ready","type":"issue_state_changed"}
+{"id":"8c293fa6-a2d6-435c-b94c-bc45263f7852","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","priority":"high","timestamp":"2026-07-30T21:25:55.630273243Z","title":"Align the embedded profile package's compatible jit range","type":"issue_created"}
+{"fields":["dependencies"],"id":"835c533e-16bb-472b-9ee3-6887640d5f6e","issue_id":"bb03df0a-65c7-496a-bb09-2620eb253fd5","timestamp":"2026-07-30T21:26:10.891582633Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"b8221eef-9ef0-4cd8-a9a0-98ae3dfe7acd","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:12.854871183Z","type":"gate_added"}
+{"gate_key":"code-review","id":"d9ce48ef-35ad-4ad3-bafd-7d2862dcb5c2","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:13.229621456Z","type":"gate_added"}
+{"gate_key":"jit-validate","id":"641aa792-9eb2-4f84-b661-c0f9bb38cef1","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:13.605747621Z","type":"gate_added"}
