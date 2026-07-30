@@ -11759,3 +11759,7 @@
 {"gate_key":"cargo-ci","id":"b8221eef-9ef0-4cd8-a9a0-98ae3dfe7acd","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:12.854871183Z","type":"gate_added"}
 {"gate_key":"code-review","id":"d9ce48ef-35ad-4ad3-bafd-7d2862dcb5c2","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:13.229621456Z","type":"gate_added"}
 {"gate_key":"jit-validate","id":"641aa792-9eb2-4f84-b661-c0f9bb38cef1","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:13.605747621Z","type":"gate_added"}
+{"from":"ready","id":"d22e1cc6-74b5-4ff5-944c-52d8cefeece3","issue_id":"e90b9a3b-1a5c-444a-9a2a-2f99345d88d2","timestamp":"2026-07-30T21:26:34.922121066Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"2fe400bb-2355-43fd-8ed7-aed6b2201f0a","issue_id":"e90b9a3b-1a5c-444a-9a2a-2f99345d88d2","timestamp":"2026-07-30T21:26:34.922121066Z","type":"issue_claimed"}
+{"from":"ready","id":"22175223-057e-46f4-9bfa-8623e8252dc1","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:40.100188539Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"4509f2f7-a766-4543-bd7e-712ce1b384f5","issue_id":"c5c324df-662e-45cb-978e-b90d74280c62","timestamp":"2026-07-30T21:26:40.100188539Z","type":"issue_claimed"}
