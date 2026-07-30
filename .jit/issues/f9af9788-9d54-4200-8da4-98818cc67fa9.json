@@ -30,7 +30,7 @@
     "per:@/charter/D-16"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Publish v1.0 through one tag-triggered release workflow",
-  "updated_at": "2026-07-29T13:55:38.773587817Z"
+  "updated_at": "2026-07-30T20:11:51.959543962Z"
 }

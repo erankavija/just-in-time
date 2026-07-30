@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b14015ccc112cfec1d8727469b8391a25848c792",
+  "completed_at": "2026-07-30T20:05:01.249475977Z",
+  "duration_ms": 149490,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": ".github/workflows/release.yml",
+        "id": "F1",
+        "line": 21,
+        "origin": "pre-existing",
+        "references": [
+          "@/charter/D-11"
+        ],
+        "severity": "high",
+        "summary": "Release workflow still does not call the reusable security audit workflow; its integration is owned by f9af9788."
+      }
+    ],
+    "summary": "Reusable blocking dependency audits meet this issue's amended scope; the release-path integration remains separately owned pre-existing work.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f7f80d53-508e-4b03-b045-5209061c8d0a",
+  "message": null,
+  "run_id": "d7fade94-5fe8-4a6a-a73b-fe42794b2928",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T20:02:31.758727318Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 404c2347, 4fc6c771, fc4c1475, dbb84fa9, b14015cc\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-11 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci, npm-ci, mcp-ci, repo-validate, and jit-validate passed (0); prior code-review failed (1)\nTruncation recovery: merge-parent patch, current workflows, contract verifier, vectors, and prior finding were read separately\n\n1. F1 — advisory, pre-existing, high: `.github/workflows/release.yml:21` still builds release artifacts without calling `security-audit.yml`. This remains a release-path gap under `@/charter/D-11`, but it predates this issue’s attributable workflow patch and the amended scope assigns its integration to `f9af9788` REQ-02/REQ-09; f7f80d53’s caller contract correctly enforces the requirement for any caller that exists.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Reusable blocking dependency audits meet this issue's amended scope; the release-path integration remains separately owned pre-existing work.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Release workflow still does not call the reusable security audit workflow; its integration is owned by f9af9788.\",\"file\":\".github/workflows/release.yml\",\"line\":21,\"references\":[\"@/charter/D-11\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

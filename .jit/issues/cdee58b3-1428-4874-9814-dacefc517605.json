@@ -9,6 +9,7 @@
   ],
   "description": "CI proves the workspace on its exact declared compiler, and one tested command reports whether that declaration has fallen behind current stable.\n\n## Success Criteria\n\n- [hard] REQ-01: Workspace `rust-version` is 1.97 unless the stable comparison requires a refresh, and every Rust crate inherits that single declaration.\n- [hard] REQ-02: The exact-MSRV job derives its compiler from Cargo metadata and builds and tests the committed workspace — including `axum-server`, `tokio-util`, and the committed `Cargo.lock` — with that compiler.\n- [hard] REQ-03: A deterministic command derives current stable at run time, emits the declared and stable versions in machine-readable form, and fails when the declared minor is newer than stable or when stable exceeds the declaration by more than one minor release. Unit fixtures cover current, one-behind, too-old, and future values.\n- [hard] REQ-04: The command is reusable by CI and by the pre-tag check, and one canonical policy documents its derivation and refresh procedure without copying the current stable number into workflow configuration or additional prose.\n\n## Notes\n\nBlast radius: root `Cargo.toml`, the existing MSRV CI job, a focused version-policy script and its tests, and the canonical release-policy page.\n",
   "documents": [],
+  "done_at": "2026-07-30T20:11:46.957537302Z",
   "first_ready_at": "2026-07-15T09:12:53.172302098Z",
   "gates_required": [
     "cargo-ci",
@@ -22,8 +23,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-30T19:09:36.917081443Z",
+      "status": "passed",
+      "updated_at": "2026-07-30T20:11:30.031882794Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
@@ -40,7 +41,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Enforce the declared MSRV recency window",
-  "updated_at": "2026-07-30T19:09:36.917081443Z"
+  "updated_at": "2026-07-30T20:11:46.957537302Z"
 }

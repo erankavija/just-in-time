@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "ba4a32dfa0b9de0d896ac2a83b158ac664d479db",
+  "completed_at": "2026-07-30T20:11:29.743884050Z",
+  "duration_ms": 174116,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met; the prior pre-tag finding is resolved by the documented maintainer procedure.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cdee58b3-1428-4874-9814-dacefc517605",
+  "message": null,
+  "run_id": "1c204e9b-306c-4c1a-9062-207559d2758e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T20:08:35.627415351Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 404c2347, d6a85589, fe3037f1, 0a846914, fe5054f3, 72861505, 33514cf0, ba4a32df\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-12 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml); @/issue/b80e3c70/requirement/REQ-05 (.jit/issues/b80e3c70-cf7d-4f72-b53d-6e556363be58.json)\nGate evidence: cargo-ci passed (exit 0, 2026-07-30T18:55:16Z); jit-validate passed (exit 0, 2026-07-30T19:02:51Z)\nTruncation recovery: Re-read affected paths and source items in narrow ranges; combined merge diffs showed no merge-only changes. Excluded unrelated historical issue-search output.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met; the prior pre-tag finding is resolved by the documented maintainer procedure.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
