@@ -10,7 +10,8 @@ echo
 echo "📁 Checking required files..."
 files=(
     ".github/workflows/ci.yml"
-    ".github/workflows/release.yml"
+    ".github/workflows/release-publish.yml"
+    ".github/workflows/release-artifacts.yml"
     ".github/workflows/docker.yml"
     "Dockerfile"
     "docker-compose.yml"
@@ -100,7 +101,7 @@ echo "📋 Next steps:"
 echo "  1. git add ."
 echo "  2. git commit -m 'Add CI/CD pipeline and Docker support'"
 echo "  3. git push"
-echo "  4. Create release: tag v<product-version> from" \
+echo "  4. Create release: git tag -a v<product-version> from" \
     "crates/jit/Cargo.toml, then git push --tags"
 echo "  5. Serve a repository: JIT_REPO=<repo> JIT_UID=\$(stat -c '%u' <repo>)" \
     "JIT_GID=\$(stat -c '%g' <repo>) docker compose up -d"

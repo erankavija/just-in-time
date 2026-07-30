@@ -152,6 +152,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **The release is published by one tag-triggered workflow.** `release.yml`
+  packaged binaries on any `v*` tag: it ran no validation suite and no security
+  audit, never started what it packaged, carried no license text, and rendered a
+  hand-written body advertising an npm install it never performed. Two workflows
+  replace it. `release-publish.yml` answers a version tag alone, under a
+  non-cancelling concurrency group that keeps two release runs from overlapping.
+  It calls `ci.yml` and `security-audit.yml` on the tagged commit, builds and
+  smokes every artifact downstream of both, verifies that the tag is annotated
+  and names the version the manifests declare, and then creates one GitHub
+  release carrying the Linux x86_64 musl archive, the MCP tarball, a SHA-256
+  file covering both, both license texts, and `docs/release-notes/v<version>.md`
+  as its body — reaching no package registry and no container registry, and
+  creating, moving and deleting no git ref. `release-artifacts.yml` owns the
+  build: the web bundle is a predecessor of the native build, since
+  `crates/server/build.rs` embeds whatever `web/dist` holds when `jit-server`
+  compiles and substitutes an empty stub when it is absent, and the smoke job
+  extracts the archive into a clean prefix, runs `jit version`, `jit init`, the
+  profile quickstart and the `--json` and `--schema` surfaces, and reads the
+  document the archived server actually serves. That workflow also runs on every
+  pull request, so the artifact path is exercised continuously rather than first
+  on the release tag, and it holds no publication step for a pull request to
+  reach. `.github/workflow-contract.yml` gains two assertions for the shape:
+  `jobs.<name>.uses` states the workflow a caller job calls, so a `needs` edge
+  keeps the content the call gave it, and `global.publication` names the one
+  workflow that may create a GitHub release and forbids package- and
+  container-registry publication everywhere, following local composite actions
+  so a second publication path cannot hide one level down. Case vectors under
+  `test-vectors/workflow-contract/` cover a replaced call, a release published
+  from another workflow and from a composite it uses, a registry push inside and
+  outside the publication workflow, a publication declaration naming an
+  uncommitted file, and publication reaching past the validation and artifact
+  calls. `scripts/release-version-contract.py --declared` prints the
+  manifest-derived product version, which is how publication names the release
+  note it renders without carrying a version literal of its own.
+
 - **Build provenance no longer tracks Git metadata or the wall clock.**
   `crates/jit/build.rs` previously watched `.git/index`, `HEAD`, and refs and
   stamped the current time, so staging or committing unchanged Rust sources
