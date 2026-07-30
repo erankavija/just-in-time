@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
-"""Verify that every shipped component shares one product release version."""
+"""Verify that the release metadata of every shipped component agrees.
+
+One product release version has to reach the CLI, the server, the MCP package,
+the web bundle, their lock metadata, the release tag, and the compatibility
+record. The same run checks the release's legal and narrative metadata: the
+license texts the manifest expression names, the changelog entry for the
+declared version, the compatibility-and-upgrade record, and the committed
+release-note source the publication workflow renders.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os.path
 from pathlib import Path
 import re
 import sys
 import tomllib
-from typing import Any, Callable
+from typing import Any, Callable, NamedTuple
 
 
 COMPATIBILITY_PATH = Path("docs/reference/compatibility.md")
@@ -22,6 +31,64 @@ REQUIRED_CAPABILITIES = (
     "built web UI",
     "`@erankavija/jit-mcp-server` MCP server",
 )
+# The compatibility record is also the upgrade record: this heading is what
+# makes the upgrade expectations observable to the check.
+REQUIRED_COMPATIBILITY_SECTIONS = ("## Upgrade expectations",)
+
+CHANGELOG_PATH = Path("CHANGELOG.md")
+# A released Keep a Changelog entry: a semantic version and its release date.
+# `## [Unreleased]` deliberately does not match.
+CHANGELOG_RELEASE_PATTERN = re.compile(
+    r"^## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}\s*$", re.MULTILINE
+)
+
+RELEASE_NOTES_ROOT = Path("docs/release-notes")
+MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
+FENCED_BLOCK_PATTERN = re.compile(r"^```", re.MULTILINE)
+
+# The workspace manifest owns the SPDX expression; the published npm package
+# restates it and must agree.
+LICENSE_EXPRESSION_MANIFEST = Path("Cargo.toml")
+PUBLISHED_PACKAGE_MANIFEST = Path("mcp-server/package.json")
+LICENSE_OPERATORS = frozenset({"OR", "AND", "WITH"})
+FILLED_COPYRIGHT_PATTERN = re.compile(
+    r"^Copyright \(c\) \d{4} [^<\n]+$", re.MULTILINE
+)
+
+
+class LicenseContract(NamedTuple):
+    """Completeness contract for one SPDX license identifier.
+
+    `phrases` are structural anchors spanning the whole text, so a truncated or
+    paraphrased copy fails. `requires_filled_copyright` marks the licenses whose
+    text carries a project-specific copyright line rather than a placeholder the
+    upstream text keeps verbatim.
+    """
+
+    phrases: tuple[str, ...]
+    requires_filled_copyright: bool
+
+
+LICENSE_CONTRACTS: dict[str, LicenseContract] = {
+    "MIT": LicenseContract(
+        phrases=(
+            "Permission is hereby granted, free of charge",
+            "The above copyright notice and this permission notice shall be included",
+            'THE SOFTWARE IS PROVIDED "AS IS"',
+        ),
+        requires_filled_copyright=True,
+    ),
+    "Apache-2.0": LicenseContract(
+        phrases=(
+            "Apache License",
+            "Version 2.0, January 2004",
+            "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+            "END OF TERMS AND CONDITIONS",
+            "APPENDIX: How to apply the Apache License to your work.",
+        ),
+        requires_filled_copyright=False,
+    ),
+}
 
 
 def read_toml(path: Path) -> dict[str, Any]:
@@ -92,6 +159,148 @@ def load_version(
     except (OSError, ValueError, json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
         findings.append(f"{label} at {relative}: {error}")
         return None
+
+
+def license_identifiers(expression: str) -> tuple[str, ...]:
+    """Return the SPDX identifiers an expression names, in declaration order."""
+    return tuple(
+        dict.fromkeys(
+            token
+            for token in re.split(r"[()\s]+", expression)
+            if token and token.upper() not in LICENSE_OPERATORS
+        )
+    )
+
+
+def license_text_path(identifier: str) -> Path:
+    """Return the repository-root license file an SPDX identifier is carried in."""
+    return Path(f"LICENSE-{identifier.split('-')[0].upper()}")
+
+
+def verify_license_texts(root: Path, findings: list[str]) -> tuple[Path, ...]:
+    """Check the license texts the manifest expression names; return their paths."""
+    try:
+        expression = nested_string(
+            read_toml(root / LICENSE_EXPRESSION_MANIFEST),
+            "workspace",
+            "package",
+            "license",
+        )
+    except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
+        findings.append(
+            f"license expression at {LICENSE_EXPRESSION_MANIFEST}: {error}"
+        )
+        return ()
+
+    try:
+        published = nested_string(
+            read_json(root / PUBLISHED_PACKAGE_MANIFEST), "license"
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        findings.append(f"license expression at {PUBLISHED_PACKAGE_MANIFEST}: {error}")
+    else:
+        if published != expression:
+            findings.append(
+                f"license expression {published!r} at {PUBLISHED_PACKAGE_MANIFEST} "
+                f"differs from {expression!r} at {LICENSE_EXPRESSION_MANIFEST}"
+            )
+
+    carried: list[Path] = []
+    for identifier in license_identifiers(expression):
+        contract = LICENSE_CONTRACTS.get(identifier)
+        if contract is None:
+            findings.append(
+                f"license identifier {identifier!r} in {expression!r} has no "
+                "completeness contract; declare its required text before shipping it"
+            )
+            continue
+
+        relative = license_text_path(identifier)
+        carried.append(relative)
+        try:
+            text = (root / relative).read_text(encoding="utf-8")
+        except OSError as error:
+            findings.append(f"license text at {relative}: {error}")
+            continue
+
+        findings.extend(
+            f"license text at {relative} is missing required text {phrase!r}"
+            for phrase in contract.phrases
+            if phrase not in text
+        )
+        if contract.requires_filled_copyright and not FILLED_COPYRIGHT_PATTERN.search(
+            text
+        ):
+            findings.append(
+                f"license text at {relative} has no filled copyright line "
+                "(expected 'Copyright (c) <year> <holder>')"
+            )
+
+    return tuple(carried)
+
+
+def verify_changelog(root: Path, expected: str, findings: list[str]) -> None:
+    """Check that the changelog's newest released entry is the declared version."""
+    try:
+        text = (root / CHANGELOG_PATH).read_text(encoding="utf-8")
+    except OSError as error:
+        findings.append(f"changelog at {CHANGELOG_PATH}: {error}")
+        return
+
+    releases = CHANGELOG_RELEASE_PATTERN.findall(text)
+    if not releases:
+        findings.append(
+            f"changelog at {CHANGELOG_PATH} records no released version entry; "
+            f"expected a '## [{expected}] - YYYY-MM-DD' heading"
+        )
+    elif releases[0] != expected:
+        findings.append(
+            f"changelog at {CHANGELOG_PATH} records {releases[0]} as its newest "
+            f"release, expected {expected}"
+        )
+
+
+def linked_paths(document: Path, text: str) -> frozenset[str]:
+    """Return every intra-repository markdown link target, root-relative."""
+    return frozenset(
+        os.path.normpath(str(document.parent / target.split("#", 1)[0]))
+        for target in MARKDOWN_LINK_PATTERN.findall(text)
+        if "://" not in target and not target.startswith("#")
+    )
+
+
+def verify_release_note(
+    root: Path,
+    expected: str,
+    license_paths: tuple[Path, ...],
+    findings: list[str],
+) -> None:
+    """Check the committed release-note source the publication workflow renders."""
+    relative = RELEASE_NOTES_ROOT / f"v{expected}.md"
+    try:
+        text = (root / relative).read_text(encoding="utf-8")
+    except OSError as error:
+        findings.append(f"release note at {relative}: {error}")
+        return
+
+    heading = f"# JIT v{expected}"
+    if not text.startswith(f"{heading}\n"):
+        findings.append(f"release note at {relative} does not open with {heading!r}")
+
+    if FENCED_BLOCK_PATTERN.search(text):
+        findings.append(
+            f"release note at {relative} carries a fenced command block; "
+            "installation commands belong in the canonical installation guide"
+        )
+
+    targets = linked_paths(relative, text)
+    findings.extend(
+        f"release note at {relative} does not link shipped license asset {asset}"
+        for asset in license_paths
+        if str(asset) not in targets
+    )
+    if str(COMPATIBILITY_PATH) not in targets:
+        findings.append(f"release note at {relative} does not cite {COMPATIBILITY_PATH}")
 
 
 def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
@@ -198,6 +407,18 @@ def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
             for capability in REQUIRED_CAPABILITIES
             if capability not in compatibility_text
         )
+        findings.extend(
+            f"compatibility declaration at {COMPATIBILITY_PATH} is missing required "
+            f"section {section!r}"
+            for section in REQUIRED_COMPATIBILITY_SECTIONS
+            if section not in compatibility_text
+        )
+
+    license_paths = verify_license_texts(root, findings)
+
+    if expected is not None:
+        verify_changelog(root, expected, findings)
+        verify_release_note(root, expected, license_paths, findings)
 
     return expected, findings
 
@@ -224,8 +445,9 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         "release-version-contract: "
-        f"product version {expected}; manifests, locks, tag, compatibility, "
-        "and supported capabilities agree"
+        f"product version {expected}; manifests, locks, tag, compatibility and "
+        "upgrade record, license texts, changelog entry, and release-note source "
+        "agree"
     )
     return 0
 
