@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "b64a05c591b3b4b64b8440acdfb3cb47c7d920eb",
+  "completed_at": "2026-07-30T18:23:54.218002415Z",
+  "duration_ms": 188573,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable dual-license, compatibility record, release-note source, and metadata contract satisfy this issue's scoped hard criteria; prior workflow findings are owned by the successor release-workflow issue.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "22d374bd-1416-48f7-b933-d73cc4cff6d7",
+  "message": null,
+  "run_id": "ddff3d4e-d9a2-45a2-bb20-4471a9b7e8ee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T18:20:45.644277819Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b64a05c5, b903ff2f, dd756ead, fde7d56a, 23186323, 2b98b6f0, 64ab6d1d, d90ad21f, 9a7fd536\nPolicy sources: AGENTS.md\nResolved items: @/gate/jit-validate (.jit/gates.toml); @/charter/D-16 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/single-source-prose, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: repo-validate passed (exit 0, 2026-07-30T18:07:28Z); code-review failed (exit 1, 2026-07-30T18:11:13Z; F1/F2 were scope-routed to f9af9788); jit-validate passed (exit 0, 2026-07-30T18:07:31Z)\nTruncation recovery: Narrowed per-commit patches and reread the relevant release workflow, current contract/tests, source registries, and milestone/success-criterion slices.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable dual-license, compatibility record, release-note source, and metadata contract satisfy this issue's scoped hard criteria; prior workflow findings are owned by the successor release-workflow issue.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

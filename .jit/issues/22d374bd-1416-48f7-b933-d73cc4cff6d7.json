@@ -8,6 +8,7 @@
   ],
   "description": "The repository and the release inputs carry complete legal text plus a canonical changelog and a v1.0 compatibility and upgrade record.\n\n## Success Criteria\n\n- [hard] REQ-01: `LICENSE-MIT` and `LICENSE-APACHE` contain the complete texts matching the `MIT OR Apache-2.0` manifest expression, and the release metadata check fails when either text is missing. Packaging both into the published native archive is `f9af9788` REQ-03, evaluated against the release workflow that issue writes rather than the superseded one it deletes.\n- [hard] REQ-02: The changelog and the v1.0 release-note source state the supported capabilities, compatibility boundaries, upgrade expectations, and intentional packaging removals, without repeating installation commands.\n- [hard] REQ-03: A release metadata check fails when either license text, the v1.0 changelog entry, or the compatibility and upgrade record is missing or names a version other than the declared product version.\n\n## Notes\n\nBlast radius: repository-root license and changelog files, the canonical release-note source, and release metadata validation; installation and deployment commands remain in the canonical user guides.\n",
   "documents": [],
+  "done_at": "2026-07-30T18:24:14.005363309Z",
   "first_ready_at": "2026-07-15T09:12:53.172773318Z",
   "gates_required": [
     "repo-validate",
@@ -16,8 +17,8 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-30T18:11:13.647433481Z",
+      "status": "passed",
+      "updated_at": "2026-07-30T18:23:54.503479414Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
@@ -39,7 +40,7 @@
     "satisfies:REQ-09"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Add the dual-license and compatibility release record",
-  "updated_at": "2026-07-30T18:20:24.319014490Z"
+  "updated_at": "2026-07-30T18:24:14.005363309Z"
 }
