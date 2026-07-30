@@ -2,6 +2,7 @@
 .git
 .gitignore
 .github
+.agents
 
 # Build artifacts
 target/
@@ -40,8 +41,15 @@ test-output.log
 
 # Documentation
 docs/
+dev/
 *.md
 !README.md
+
+# Unused product surfaces and image fixtures
+docker/
+docker-compose.yml
+mcp-server/
+test-vectors/
 
 # Lock files (we copy these explicitly)
 .index.lock
