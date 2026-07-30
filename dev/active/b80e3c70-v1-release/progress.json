@@ -2,8 +2,8 @@
   "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
   "epic_short_id": "b80e3c70",
   "current_wave": 2,
-  "current_sub_wave": "2a",
-  "wave_note": "Wave 2a is partially complete: 7b29019c and 5e538f48 are Done. 3b033738 remains in progress because independent review proved that the hard SPA-fallback criterion requires a narrow server-layer change outside its declared image-only blast radius; that scope escalation is awaiting user authorization. Subwaves 2b and 2c remain serialized behind completion of 2a.",
+  "current_sub_wave": "2b",
+  "wave_note": "Wave 2a is complete and handed off. Subwave 2b (e0fed1bb) is next but remains undispatched; subwave 2c (f7f80d53) stays serialized behind it because both own the workflow-contract authority.",
   "waves": [
     {
       "wave_number": 1,
@@ -369,16 +369,20 @@
           "short_id": "3b033738",
           "title": "Build the single server and web production image",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "depends_on": [
             "f04f7888"
           ],
           "planned_model": "gpt-5.6-sol/xhigh",
           "branch": "worktree-agent-3b033738",
           "agent": "/root/whole_tree_invariants/semantic_family_audit",
-          "branch_head": "6df7ab03",
-          "rework_attempts": 1,
-          "review_note": "The image/runtime contract passes under Podman for default and mapped identities. Review-driven rework made explicit runtime mode fail closed without a healthy engine and strengthened shutdown deadline/connection-count evidence. One blocker remains: unknown client routes return 404, so the hard SPA-fallback criterion is unmet; fixing crates/server/src/embedded.rs would exceed the declared Dockerfile/.dockerignore/fixture blast radius and is awaiting user authorization."
+          "branch_head": "bddb4ac2",
+          "merge_commit": "f93a30c4",
+          "rework_attempts": 2,
+          "review_note": "The first review found runtime validation failed open, packaged log evidence was too shallow, and SPA deep-link fallback was absent. The first rework closed the test findings. The user authorized one narrow server-layer expansion; the second rework added a security-bounded embedded fallback and packaged deep-link proof. Final cumulative independent review passed with no findings.",
+          "gate_note": "The exact merged commit passed workspace build verification. cargo-ci, npm-ci, mcp-ci, repo-validate, corrected code-review, and jit-validate passed sequentially. The first configured review correctly surfaced the still-active legacy Compose topology; the stored issue boundary now records that the already-wired dependent cutover owns split definitions, Compose, scripts, and docs. That dependent issue became Ready when 3b033738 completed.",
+          "runtime_note": "Full rebuilt Podman contract passed in both default 10001:10001 and host-mapped UID:GID modes, including mounted issue/document search, host-visible writes, PID 1, deep-link HTML/no-cache, 3 SSE streams, a stalled ordinary connection, five-second application force-close, clean exit before ten seconds, and no auto-init. Docker was unavailable for live parity.",
+          "completed_at": "2026-07-30T10:01:33.229945885Z"
         }
       ]
     },
