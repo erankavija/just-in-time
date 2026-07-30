@@ -11691,3 +11691,10 @@
 {"assignee":"agent:worker","id":"bdd09046-522a-4998-903e-4eeca68096a1","issue_id":"22d374bd-1416-48f7-b933-d73cc4cff6d7","timestamp":"2026-07-30T16:55:24.040057774Z","type":"issue_claimed"}
 {"from":"ready","id":"1546db67-1223-48ac-a835-dbfdb3410b3f","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T16:55:32.372804005Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"569c85ac-4189-465e-8344-28cabf648740","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T16:55:32.372804005Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"df99feff-f0b2-4970-8275-8fccd751315a","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:08:16.776784217Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"npm-ci","id":"f2d34780-9a1c-49df-add2-b0717f49135e","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:08:37.486703986Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"56cd0076-93a7-4c9b-a0fb-f514978da5ba","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:08:42.979262716Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"repo-validate","id":"04be5460-2aa5-4e3f-8271-6a32ff11408c","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:08:49.847478739Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"jit-validate","id":"6f91b8d3-ee81-4e67-acea-f143630edd89","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:08:52.762818750Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"cd86db85-a707-4934-b43a-a3693988247c","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:14:10.235494626Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"1d65bed9-41ae-4a4e-936d-488709687c5b","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:19:13.718433659Z","type":"issue_updated","updated_by":"issue-update"}

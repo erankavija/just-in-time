@@ -6,7 +6,7 @@
   "dependencies": [
     "7edd2fe8-4e6a-4256-9f77-6f32fefa0fb0"
   ],
-  "description": "Pull requests, branch builds, and the release workflow execute one maintained definition of the full normal validation suite on their own commit.\n\n## Success Criteria\n\n- [hard] REQ-01: The normal CI workflow accepts `workflow_call` while retaining its pull-request and branch behavior, without duplicating the Rust, web, MCP, repository-validation, or MSRV job definitions.\n- [hard] REQ-02: The shared workflow-contract checks assert that a caller declares each required Rust, web, MCP, repository-validation, and exact-MSRV job as a `needs` predecessor, so no caller can reach success while one of them fails on the called commit.\n- [hard] REQ-03: Existing CI workflow checks and representative local suite commands remain green after the trigger and refactor change.\n\n## Notes\n\nBlast radius: `.github/workflows/ci.yml` and workflow-contract assertions only; security and publication stay in their dedicated workflows.\n",
+  "description": "Pull requests, branch builds, and the release workflow execute one maintained definition of the full normal validation suite on their own commit.\n\n## Success Criteria\n\n- [hard] REQ-01: The normal CI workflow accepts `workflow_call` while retaining its pull-request and branch behavior, without duplicating the Rust, web, MCP, repository-validation, or MSRV job definitions.\n- [hard] REQ-02: The shared workflow-contract checks assert that a caller declares each required Rust, web, MCP, repository-validation, and exact-MSRV job as a `needs` predecessor, so no caller can reach success while one of them fails on the called commit.\n- [hard] REQ-03: Existing CI workflow checks and representative local suite commands remain green after the trigger and refactor change.\n\n## Notes\n\nBlast radius: `.github/workflows/ci.yml` and workflow-contract assertions only; security and publication stay in their dedicated workflows.\n\n\n## Scope boundary\n\nThis issue makes the normal validation suites callable and states the caller\nobligation once, on the called workflow. Wiring a publication path to that call\nbelongs to `f9af9788`, which owns `.github/workflows/release.yml` and replaces\nthe superseded packaging workflow in a single change. The release-to-CI edge and\nthe contract declaration that binds it are that issue's REQ-02 and REQ-09\ndeliverables, evaluated against the workflow it writes rather than the one it\ndeletes.\n",
   "documents": [],
   "first_ready_at": "2026-07-15T09:12:53.171353367Z",
   "gates_required": [
@@ -17,7 +17,38 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T17:08:16.776784217Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-30T17:14:10.235494626Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T17:08:52.762818750Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T17:08:42.979262716Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T17:08:37.486703986Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T17:08:49.847478739Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
   "labels": [
     "type:task",
@@ -28,5 +59,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Make the normal validation suites reusable",
-  "updated_at": "2026-07-30T16:27:30.262472186Z"
+  "updated_at": "2026-07-30T17:19:13.718433659Z"
 }

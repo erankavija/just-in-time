@@ -1,0 +1,51 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "2f22825df50ca02ba0af668cb0cf9bcd285a8ce6",
+  "completed_at": "2026-07-30T17:14:09.938458658Z",
+  "duration_ms": 313921,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".github/workflows/release.yml",
+        "id": "F1",
+        "line": 14,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b80e3c70/requirement/REQ-09",
+          "@/charter/D-16"
+        ],
+        "severity": "high",
+        "summary": "Release does not call the reusable CI workflow, so tagged builds can bypass normal validation."
+      },
+      {
+        "disposition": "blocking",
+        "file": "scripts/workflow-contract.py",
+        "id": "F2",
+        "line": 727,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/b80e3c70/requirement/REQ-09"
+        ],
+        "severity": "high",
+        "summary": "Caller-obligation verification is conditional on an existing caller and does not reject the absent release-to-CI edge."
+      }
+    ],
+    "summary": "The reusable CI suite is implemented, but no release caller uses it and the contract does not detect that absence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
+  "message": null,
+  "run_id": "b26b2a7b-9390-4ec2-8e8a-8896c1d5ecc0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T17:08:56.016890717Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9340 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb400-2c3f-7f10-92b2-82d120a3fcc5\n--------\nuser\n--- 9327 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2f22825d, 0b0ea9a1, a0319752, 39eff8b0, d42bf1c5, 09b41aee, 0538b5a0, 47959ec2\nPolicy sources: AGENTS.md\nResolved items: @/issue/b80e3c70/requirement/REQ-04 and REQ-09 (issue description, markdown-first); @/charter/D-12 and D-16 (dev/vision/9db27a3a-charter.md, markdown-first); @/inv/semantic-test-assertions and shared-test-contracts (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci, npm-ci, mcp-ci, repo-validate, and jit-validate passed (exit 0) on 2f22825d\nTruncation recovery: narrowed recorded gate projections, parent-criterion lookup, CI/release/verifier source ranges, and the merge’s first-parent patch after broad reads truncated\n\n1. [blocking, issue-impact] The release workflow never calls the reusable CI workflow. [`release.yml`](/home/vkaskivuo/Projects/just-in-time/.github/workflows/release.yml:14) starts artifact jobs from `version-contract` only, and there is no `uses: ./.github/workflows/ci.yml` anywhere under `.github/workflows`. Thus a tag can build and publish without the Rust, web, MCP, repository-validation, or exact-MSRV suites required by the issue and `@/issue/b80e3c70/requirement/REQ-09`.\n\n2. [blocking, issue-impact] The new verifier cannot detect that omission: [`check_caller_obligation`](/home/vkaskivuo/Projects/just-in-time/scripts/workflow-contract.py:727) returns without a finding when no workflow calls `ci.yml`. The contract therefore validates a release graph that entirely bypasses normal validation, rather than asserting the required release caller and its downstream `needs` boundary.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The reusable CI suite is implemented, but no release caller uses it and the contract does not detect that absence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Release does not call the reusable CI workflow, so tagged builds can bypass normal validation.\",\"file\":\".github/workflows/release.yml\",\"line\":14,\"references\":[\"@/issue/b80e3c70/requirement/REQ-09\",\"@/charter/D-16\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Caller-obligation verification is conditional on an existing caller and does not reject the absent release-to-CI edge.\",\"file\":\"scripts/workflow-contract.py\",\"line\":727,\"references\":[\"@/issue/b80e3c70/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -582,6 +582,12 @@
    "detail": "A whole-tree path-format scan found 54 tracked paths shaped like dev/archive/<container>/<area>/<container>/..., including active and presentations artifacts for 8e071e18-dev-artifact-layout and active artifacts for a2546471-json-error-contract. This survived the development-root cutover and is the analogous redundant-owner nesting the user asked the lead to surface.",
    "routed_to": "7b29019c",
    "criterion_check": "filed as a new in-epic canonical-cutover bug and scheduled in wave 2; a122b9b3 was later rejected without merging its overlapping checker work"
+  },
+  {
+   "subject": "release workflow does not call the reusable CI suite",
+   "detail": "e0fed1bb's code-review raised two blocking issue-impact findings: release.yml:14 never calls ci.yml, so a tagged build can reach publication without the normal suites, and scripts/workflow-contract.py:727 only binds callers that exist, so it cannot reject an absent caller edge. Both are one root cause and both are f9af9788's deliverables; that issue replaces release.yml wholesale under its REQ-07, so wiring the edge into e0fed1bb would be discarded work.",
+   "routed_to": "f9af9788",
+   "criterion_check": "epic REQ-09 names the tag-triggered workflow running the normal suites before any artifact is built; f9af9788 REQ-02 and REQ-09 own the edge and the contract assertion. Confirm both at f9af9788 review and again at epic completion."
   }
  ],
  "started_at": "2026-07-29T14:20:00+00:00",
@@ -646,6 +652,12 @@
    "decision": "Confirmed at resume that the v1.0 audit and MSRV preconditions already hold at 426fd7f6.",
    "reasoning": "cargo audit -D warnings reports no advisories over 386 crate dependencies; npm audit --omit=dev reports zero in both web/ and mcp-server/; declared rust-version 1.97 equals current stable 1.97.1, so cdee58b3 REQ-01 needs no refresh.",
    "rejected_alternative": "Defer the audit and MSRV checks until their owning issues run and risk discovering an unfixable advisory late."
+  },
+  {
+   "issue": "e0fed1bb",
+   "decision": "Amend the issue with an explicit scope-boundary section rather than pulling the release-to-CI edge into it.",
+   "reasoning": "The invoker authorized the amendment. e0fed1bb's criteria never name release.yml and its notes place publication in a dedicated workflow; f9af9788 REQ-07 deletes the current release.yml, so the edge built here would be discarded. This repeats the wave-2a remedy where 3c8db804 recorded the replacement-image cutover boundary after the same successor-collapse finding.",
+   "rejected_alternative": "Wire release.yml to ci.yml inside e0fed1bb, or hold e0fed1bb open until f9af9788 lands and invert the dependency order."
   }
  ],
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
