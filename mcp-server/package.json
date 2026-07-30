@@ -1,6 +1,6 @@
 {
   "name": "@erankavija/jit-mcp-server",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "MCP server for Just-In-Time issue tracker",
   "type": "module",
   "main": "index.js",

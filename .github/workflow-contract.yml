@@ -110,6 +110,13 @@ workflows:
     permissions:
       contents: read
     jobs:
+      version-contract: {}
+      build-binaries:
+        needs: [version-contract]
+      package-mcp-server:
+        needs: [version-contract]
+      build-web-ui:
+        needs: [version-contract]
       # Publication holds the only write scope and cannot start until every
       # artifact job has succeeded.
       create-release:
