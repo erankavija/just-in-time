@@ -178,6 +178,7 @@ echo "== M6 docs-check-canonical.sh =="
 canon="$scratch/canonical"
 mkdir -p "$canon/pages"
 write_canonical_fixture() {
+  # shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
   printf '# Home\n\n## Section\n\nRun `deploy --now` to publish.\n' >"$canon/pages/home.md"
   printf '# Other\n\nThis page links [Home](home.md) rather than restating it.\n' \
     >"$canon/pages/other.md"
@@ -209,6 +210,7 @@ assert_rc 1 $? "canonical: home that stopped stating its fact is a finding"
 
 # Defect: the declared anchor no longer resolves.
 write_canonical_fixture
+# shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
 printf '# Home\n\n## Renamed\n\nRun `deploy --now` to publish.\n' >"$canon/pages/home.md"
 run_canonical
 assert_rc 1 $? "canonical: home whose declared anchor is gone is a finding"
@@ -221,6 +223,7 @@ assert_rc 1 $? "canonical: source that stopped carrying the stated command is a 
 
 # Defect: a second scanned page states the same fact, so it has two homes.
 write_canonical_fixture
+# shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
 printf '# Other\n\nRun `deploy --now` to publish.\n' >"$canon/pages/other.md"
 run_canonical
 assert_rc 1 $? "canonical: fact restated on a second page is a finding"

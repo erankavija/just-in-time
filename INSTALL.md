@@ -114,14 +114,18 @@ before the server is compiled.
 ### Install With Build Provenance
 
 ```bash
-./scripts/install-jit.sh
+./scripts/install-jit.sh              # installs the jit CLI to ~/.cargo/bin
+./scripts/install-jit.sh --force      # extra arguments reach cargo install
 ```
 
-The wrapper records the source commit in the installed binary, so jit's
-stale-binary guard can tell whether the binary matches the repository it
-validates. Plain `cargo install --path crates/jit` also installs the CLI, but
-produces a binary of unknown provenance, which the guard treats as
-unverifiable.
+The wrapper resolves the current commit, its short hash, its dirty flag, and
+its timestamp, and injects them into the build, so jit's stale-binary guard can
+tell whether the installed binary matches the repository it validates. Plain
+`cargo install --path crates/jit` installs the same CLI, but embeds `unknown`
+for that provenance, which the guard treats as unverifiable.
+
+`jit-server` is not part of that install; copy the binary built above to a
+directory on `PATH` when a source checkout needs to serve a repository.
 
 ---
 
