@@ -15,7 +15,23 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T19:02:46.060180382Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-30T19:09:36.917081443Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T19:02:53.338646605Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cdee58b3-1428-4874-9814-dacefc517605",
   "labels": [
     "type:enhancement",
@@ -26,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Enforce the declared MSRV recency window",
-  "updated_at": "2026-07-30T18:24:51.603340867Z"
+  "updated_at": "2026-07-30T19:09:36.917081443Z"
 }

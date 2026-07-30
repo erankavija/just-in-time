@@ -550,7 +550,8 @@
   "c7f8ebc7": 2,
   "eeee8a1a": 2,
   "f04f7888": 2,
-  "f289ff18": 2
+  "f289ff18": 2,
+  "cdee58b3": 1
  },
  "surfaced_pitfalls": [
   {
@@ -688,6 +689,12 @@
    "decision": "Scope REQ-01's archive clause to f9af9788 REQ-03 rather than editing the superseded packaging workflow.",
    "reasoning": "Both issues state the same fact, and f9af9788 REQ-07 deletes the workflow the reviewer cited, so packaging added here would be discarded. The license texts, the manifest-derived copyright holder, and the metadata check remain 22d374bd's.",
    "rejected_alternative": "Add the license files and release-note wiring to the current release.yml, or hold 22d374bd open until f9af9788 lands."
+  },
+  {
+   "issue": "f7f80d53",
+   "decision": "Amend REQ-03 so the caller-obligation assertion is this issue's deliverable and the release-workflow binding is f9af9788's.",
+   "reasoning": "The invoker authorized the amendment. Unlike e0fed1bb, the scope-boundary note alone did not clear the gate: REQ-03 named the release workflow and publication directly, and callers.require_needs binds only callers that exist, so the clause was literally unmet while no caller existed. f9af9788 REQ-02 and REQ-09 already carry the binding.",
+   "rejected_alternative": "Wire the superseded release.yml to the security workflow now and discard it when f9af9788 rewrites that file, or leave f7f80d53 Gated until wave 4 lands outside this session's authorized scope."
   }
  ],
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",

@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "72861505e22ff070b3dba11d956aa614afd17139",
+  "completed_at": "2026-07-30T19:09:36.631013403Z",
+  "duration_ms": 254702,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".github/workflows/release.yml",
+        "id": "F1",
+        "line": 23,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-12"
+        ],
+        "severity": "high",
+        "summary": "No pre-tag check invokes rust-version-policy.py despite the policy claiming one does."
+      }
+    ],
+    "summary": "The MSRV policy is implemented and used by CI, but no pre-tag caller invokes it.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cdee58b3-1428-4874-9814-dacefc517605",
+  "message": null,
+  "run_id": "b6dbf54c-16c0-43a9-865a-533f455b7660",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T19:05:21.928373254Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 20882 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb46a-be26-74b3-a34b-44799a5383e7\n--------\nuser\n--- 20869 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 72861505, fe5054f3, 0a846914, fe3037f1, d6a85589, 404c2347, dd756ead\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-12 (dev/vision/9db27a3a-charter.md); @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/b80e3c70/requirement/REQ-05 (issue source)\nGate evidence: cargo-ci passed (exit 0, 2026-07-30T18:55:16Z); jit-validate passed (exit 0, 2026-07-30T19:02:51Z); code-review pending\nTruncation recovery: partitioned reads by tagged commit, merge parent, affected path, and current line range\n\n1. [blocking][issue-impact] The required pre-tag caller is absent. The only release-path check is `scripts/release-version-contract.py` at [.github/workflows/release.yml](/home/vkaskivuo/Projects/just-in-time/.github/workflows/release.yml:23), but neither it nor the workflow invokes `rust-version-policy.py`; repository search finds the policy command only in CI and its own tests/docs. Thus a tag can be created without the recency check, while [docs/reference/release-policy.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/release-policy.md:61) incorrectly claims that caller exists. This leaves the issue’s hard REQ-04 and the tag-time refresh intent of @/charter/D-12 unmet.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The MSRV policy is implemented and used by CI, but no pre-tag caller invokes it.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No pre-tag check invokes rust-version-policy.py despite the policy claiming one does.\",\"file\":\".github/workflows/release.yml\",\"line\":23,\"references\":[\"@/charter/D-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
