@@ -1,43 +1,59 @@
-# Running JIT with Web UI
+# Deploying the JIT Server and Web UI
 
 > **Diátaxis Type:** How-To Guide
 
-JIT is CLI-first—most users just run `jit` commands in their repository. This guide covers adding the web UI for visualization.
+JIT is CLI-first — most work is `jit` commands in a repository. This guide adds
+the HTTP surface: the `jit-server` API and the web UI it serves, either from an
+installed binary or from one container image.
 
-## Local Development (Most Common)
+The `jit-server` binary in the [published
+archive](../../INSTALL.md#pre-built-binaries) already carries the built web UI,
+so serving a repository natively needs no Node.js toolchain. A release
+publishes no container image and no separate web bundle, so the container
+deployment below builds its image from a checkout of this repository.
 
-Build the web UI, then let `jit-server` serve the files and API from the same
-origin:
+## Serving From an Installed `jit-server`
 
 ```bash
-cd /path/to/just-in-time/web
-npm install
-npm run build
-
 cd /path/to/your/repo
+jit-server --data-dir .jit --bind 127.0.0.1:3000
+```
+
+Open `http://localhost:3000`: the API answers under `/api` and the embedded web
+UI is served from `/` on the same origin.
+
+`--web-dir` overrides the embedded assets with a built `dist/` directory, which
+is how a source checkout serves a UI it just built:
+
+```bash
 jit-server --data-dir .jit --web-dir /path/to/just-in-time/web/dist --bind 127.0.0.1:3000
 ```
 
-Open `http://localhost:3000`. The current Vite configuration has no `/api`
-proxy, so `npm run dev` alone cannot serve this UI against a separate
-`jit-server`; use the same-origin setup above or configure a reverse proxy that
-serves the built assets and proxies `/api`.
-
 ### Building the Web UI
+
+A source checkout builds the bundle with the web workspace's own toolchain
+(Node.js — see [optional
+dependencies](../../INSTALL.md#optional-dependencies)):
 
 ```bash
 cd web
 npm install
-npm run build   # Creates dist/ with static files
+npm run build   # produces dist/ with the static files
 ```
 
-Serve `dist/` with a static server that also proxies `/api` to `jit-server`, or
-pass it to `jit-server --web-dir` as shown above. The UI uses same-origin
-`/api` requests.
+Compiling `jit-server` after this step embeds the bundle into the binary;
+passing `dist/` to `--web-dir` serves it from the filesystem instead. Either
+way the UI calls `/api` on its own origin, so a third option is any static
+server that also proxies `/api` to `jit-server`.
+
+`npm run dev` starts Vite for frontend asset work. This repository's Vite
+configuration declares no `/api` proxy, so the dev server alone does not reach
+a separately started `jit-server`; use one of the three same-origin
+arrangements above, or add a reverse proxy for `/api`.
 
 ## Running as Background Services
 
-### API Server with Systemd
+### API Server With Systemd
 
 ```ini
 # ~/.config/systemd/user/jit-server.service
@@ -59,9 +75,10 @@ systemctl --user daemon-reload
 systemctl --user enable --now jit-server
 ```
 
-### Web UI with Nginx
+### Web UI With Nginx
 
-After building the web UI (`npm run build`):
+To serve the built assets from a separate web server, point it at `dist/` and
+proxy the API to `jit-server`:
 
 ```nginx
 server {
@@ -81,7 +98,7 @@ server {
 }
 ```
 
-## Container Deployment (Team Server)
+## Container Deployment
 
 One image carries the whole containerized deployment: a single `jit-server`
 process serving the API and the built web UI on port 3000, against a whole
@@ -89,13 +106,19 @@ repository bind-mounted at `/repo`. `.jit/` and the project documents linked
 from it stay in their repository context, so search and document reads resolve
 the same paths they do natively.
 
-Build it from a checkout of this repository:
+### Build the Image
 
 ```bash
 git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
 docker build -t jit-server:local .
 ```
+
+The image build compiles the web bundle and the server itself, so the host
+needs neither toolchain. `docker-compose.yml` declares the same image name and
+build context, so `docker compose up -d` builds it on first use.
+
+### Initialize the Repository First
 
 The served repository is initialized on the host before the container starts —
 `jit init --profile jit-dogfood` for the preferred workflow setup, plain
@@ -149,6 +172,15 @@ docker run -d --name jit-server \
 `./scripts/test-podman.sh` builds the image and runtime-smokes both identity
 arrangements with Podman.
 
+### Remove a Deployment
+
+```bash
+docker compose down          # stop and remove the container
+docker rmi jit-server:local  # remove the image built above
+```
+
+The served repository is a host directory and outlives both.
+
 ## Backup and Recovery
 
 The container serves the repository in place, so a deployment is backed up the
@@ -188,6 +220,7 @@ read, write, or search permission on either.
 
 ```bash
 # Check logs
+docker compose ps
 docker compose logs jit-server
 journalctl --user -u jit-server -f
 
@@ -197,6 +230,9 @@ docker compose exec jit-server id
 ```
 
 ### Health check failing
+
+The image's own healthcheck polls the same endpoint, so a failing container
+health status and a failing request here have one cause:
 
 ```bash
 # Test API directly
@@ -218,6 +254,7 @@ jit validate --fix
 
 ## See Also
 
-- [Installation Guide](../../INSTALL.md) - Local development setup
+- [Installation Guide](../../INSTALL.md) - Installing the CLI and the server
+- [MCP Integration](mcp-integration.md) - Serving agent clients over MCP
 - [Multi-Agent Coordination](multi-agent-coordination.md) - Team workflows
 - [Configuration](../reference/configuration.md) - Runtime options

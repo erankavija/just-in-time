@@ -4,6 +4,13 @@
 
 **Product compatibility version:** `1.0.0`
 
+This page is the record: the version an adopter compares an installation
+against, the capabilities that version aligns, and what an upgrade replaces.
+The procedures behind it — how the version is declared and verified across the
+manifests, and what a release publishes — are the
+[release policy](release-policy.md#product-version), whose version contract
+reads this file and fails when it disagrees with them.
+
 This release keeps the following supported capabilities aligned under one
 product version:
 

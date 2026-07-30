@@ -1,203 +1,144 @@
 # Installation Guide
 
-This guide covers the installation methods provided in this repository.
+How to install JIT from the archive a release publishes, and how to build it
+from a source checkout. Two adjacent workflows have their own homes:
+[Deployment](docs/how-to/deployment.md) serves the API and web UI from a
+container, and [MCP Integration](docs/how-to/mcp-integration.md) installs the
+MCP server for an agent client.
 
 ## Table of Contents
 
 - [Pre-built Binaries](#pre-built-binaries)
-- [Docker](#docker)
-- [From Source](#from-source)
-- [NPM (MCP Server)](#npm-mcp-server)
+- [Build From a Source Checkout](#build-from-a-source-checkout)
 - [Optional Dependencies](#optional-dependencies)
+- [Troubleshooting](#troubleshooting)
+- [Uninstallation](#uninstallation)
+- [Next Steps](#next-steps)
 
 ---
 
 ## Pre-built Binaries
 
-**Recommended for most users.** Static binaries with zero dependencies.
+**Recommended for most users.** Statically linked binaries with no runtime
+dependencies, published as a GitHub release asset. No package manager and no
+container registry carries them; [what a release
+publishes](docs/reference/release-policy.md#what-a-release-publishes) lists the
+complete asset set.
 
-### Download Latest Release
+The archive is flat and carries four files: the `jit` CLI, the `jit-server`
+binary, and both license texts.
+
+### Download and Verify
 
 ```bash
-# Download and extract
 wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
+wget https://github.com/erankavija/just-in-time/releases/latest/download/checksums.txt
+
+sha256sum --check --ignore-missing checksums.txt
 tar -xzf jit-linux-x64.tar.gz
-
-# Install to system (requires sudo)
-sudo mv jit jit-server /usr/local/bin/
-
-# Verify installation
-jit --version
-jit version
-jit-server --version
 ```
 
-### Install to User Directory (No sudo)
+The checksum file covers every archive the release carries, so
+`--ignore-missing` verifies the one just downloaded and skips the rest.
+
+### Install to System (requires sudo)
 
 ```bash
-# Extract to ~/.local/bin
+sudo mv jit jit-server /usr/local/bin/
+```
+
+### Install to a User Directory (no sudo)
+
+```bash
 mkdir -p ~/.local/bin
-tar -xzf jit-linux-x64.tar.gz -C ~/.local/bin
+mv jit jit-server ~/.local/bin/
 
 # Add to PATH (add to ~/.bashrc or ~/.zshrc)
 export PATH="$HOME/.local/bin:$PATH"
-
-# Verify
-jit --version
-jit version --json
 ```
 
-### Verify Checksums
+### Confirm the Installation
 
 ```bash
-wget https://github.com/erankavija/just-in-time/releases/latest/download/checksums.txt
-sha256sum -c checksums.txt
+jit --version
+jit version --json
+jit-server --version
 ```
+
+`jit version --json` reports the product version, the
+`x86_64-unknown-linux-musl` target the archive is built for, and the `release`
+build profile. The release smoke test asserts those same three fields against
+the extracted archive before the release is published
+(`.github/workflows/release-artifacts.yml`).
 
 ---
 
-## Docker
+## Build From a Source Checkout
 
-**Best for running the API and Web UI together.** One image, built from this
-repository, runs a single `jit-server` process that serves both on port 3000
-against a repository bind-mounted at `/repo`.
-
-### Build the Image
-
-```bash
-git clone https://github.com/erankavija/just-in-time.git
-cd just-in-time
-docker build -t jit-server:local .
-```
-
-### Serve a Repository
-
-Initialize the repository on the host first (`jit init --profile jit-dogfood`);
-the container serves an existing one and creates nothing.
-
-The image runs as UID:GID `10001:10001`, an identity that owns nothing on the
-host, so an unmapped container reaches the mount only if the repository already
-grants `10001` read, write, and execute permission. Map the repository's owner
-onto the container user instead — that is what `JIT_UID` and `JIT_GID` carry:
-
-```bash
-export JIT_REPO=/path/to/your/repo
-export JIT_UID=$(stat -c '%u' "$JIT_REPO")
-export JIT_GID=$(stat -c '%g' "$JIT_REPO")
-
-docker compose up -d     # from this checkout; reads the three variables above
-```
-
-`http://localhost:3000` then serves the API and the Web UI, and
-`docker compose down` stops it.
-
-[Deployment](docs/how-to/deployment.md#container-deployment-team-server) covers
-the mount contract, the plain `docker run` and `podman run` forms, rootless
-Podman, backups, and troubleshooting.
-
-## From Source
-
-**For developers or if you need latest changes.**
+**For contributors and for running unreleased changes.** A source build
+produces the same two binaries the archive carries, from the working tree
+rather than from a published asset.
 
 ### Prerequisites
 
-- Rust at the workspace minimum supported version or newer — `rust-version` under `[workspace.package]` in `Cargo.toml` declares it, and [the release policy](docs/reference/release-policy.md#supported-rust-version) covers how it is derived, kept within one minor release of current stable, and enforced. Install via rustup: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- Node.js 20+ (for MCP server and Web UI; the CI floor, `.github/workflows/ci.yml`)
-- ripgrep (optional, for search: `sudo apt install ripgrep`)
+- Rust at the workspace minimum supported version or newer — `rust-version`
+  under `[workspace.package]` in `Cargo.toml` declares it, and [the supported
+  Rust version](docs/reference/release-policy.md#supported-rust-version) covers
+  how it is derived, kept within one minor release of current stable, and
+  enforced. Install via rustup:
+  `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+- Node.js to build the web bundle `jit-server` embeds — see [Optional
+  Dependencies](#optional-dependencies)
 
-### Build Rust Components
+### Build the Binaries
 
 ```bash
-# Clone repository
 git clone https://github.com/erankavija/just-in-time.git
 cd just-in-time
 
-# Build all Rust binaries (CLI, API server)
-cargo build --release --workspace
+cargo build --locked --release --bin jit --bin jit-server
 
-# Binaries are in target/release/
 ./target/release/jit --version
-./target/release/jit version
 ./target/release/jit-server --version
-
-# Optional: Install to system
-sudo cp target/release/jit /usr/local/bin/
-sudo cp target/release/jit-server /usr/local/bin/
 ```
 
-### Build MCP Server
+`--locked` builds the committed dependency set, which is how the published
+archive is built (`.github/workflows/release-artifacts.yml`).
+
+`jit-server` embeds whatever `web/dist/` holds when it is compiled and falls
+back to an empty asset stub when that directory is absent — a server that
+answers its API and serves no UI. [Building the web
+UI](docs/how-to/deployment.md#building-the-web-ui) covers producing that bundle
+before the server is compiled.
+
+### Install With Build Provenance
 
 ```bash
-# `npm test` runs `jit --schema`; use the release binary built above.
-export PATH="$(pwd)/target/release:$PATH"
-cd mcp-server
-npm install
-npm test
-
-# Link globally (optional)
-npm link
-which jit-mcp-server   # confirm the linked bin is on PATH
+./scripts/install-jit.sh
 ```
 
-### Build Web UI
-
-```bash
-cd web
-npm install
-npm run build
-
-# Serve the built UI and its same-origin /api endpoint from the repository root.
-cd ..
-jit-server --data-dir .jit --web-dir web/dist
-# Open http://localhost:3000
-```
-
-`npm run dev` starts Vite for frontend asset work, but Vite has no API proxy in this
-repository. Because the UI calls `/api` on its own origin, use the same-origin command
-above to exercise the UI against JIT, or configure a reverse proxy that sends `/api` to
-`jit-server`.
-
----
-
-## NPM (MCP Server)
-
-**For AI agent integration via Model Context Protocol.**
-
-The MCP server loads `jit --schema` at startup, so keep a built or installed `jit` executable
-on `PATH` when launching `jit-mcp-server` from this package.
-
-### Install from Source
-
-```bash
-cd mcp-server
-npm install -g .
-```
-
-### MCP Client Configuration
-
-Add this server definition to your MCP client's configuration:
-
-```json
-{
-  "mcpServers": {
-    "jit": {
-      "command": "jit-mcp-server",
-      "env": {
-        "JIT_DATA_DIR": "/path/to/your/project/.jit"
-      }
-    }
-  }
-}
-```
+The wrapper records the source commit in the installed binary, so jit's
+stale-binary guard can tell whether the binary matches the repository it
+validates. Plain `cargo install --path crates/jit` also installs the CLI, but
+produces a binary of unknown provenance, which the guard treats as
+unverifiable.
 
 ---
 
 ## Optional Dependencies
 
-- **Git**: Core issue tracking is Git-optional, but advisory leases (`jit claim`) and worktree coordination need a Git repository with a resolvable `HEAD` (`apt install git`)
-- **Docker or Podman**: For containerized deployment (`apt install docker.io docker-compose-v2`, or `apt install podman podman-compose`)
-- **Node.js** (20+): Required for the MCP server and to build or develop the Web UI (`apt install nodejs npm`); the CI floor is Node 20 (`.github/workflows/ci.yml`)
-- **ripgrep**: For full-text search (`apt install ripgrep` or `yum install ripgrep`)
+- **Git**: Core issue tracking is Git-optional; advisory leases (`jit claim`)
+  and worktree coordination need a Git repository with a resolvable `HEAD`
+  (`apt install git`)
+- **Node.js 20 or newer**: Required to build the web bundle and to run the MCP
+  server (`apt install nodejs npm`); the floor is the `node-version: '20'` the
+  CI jobs install (`.github/workflows/ci.yml`)
+- **ripgrep**: For full-text search (`apt install ripgrep` or
+  `yum install ripgrep`)
+- **Docker or Podman**: For the containerized
+  [deployment](docs/how-to/deployment.md#container-deployment)
+  (`apt install docker.io docker-compose-v2`, or
+  `apt install podman podman-compose`)
 
 ---
 
@@ -224,19 +165,6 @@ chmod +x jit
 sudo mv jit /usr/local/bin/
 ```
 
-### Docker: Cannot Connect to the Server
-
-```bash
-# Check whether the service is running
-docker compose ps
-
-# Check logs; status 78 names the mount check that failed
-docker compose logs jit-server
-```
-
-[Deployment troubleshooting](docs/how-to/deployment.md#troubleshooting) covers
-the mount-identity failures behind status 78.
-
 ### Search Not Working
 
 ```bash
@@ -249,6 +177,35 @@ sudo dnf install ripgrep    # Fedora
 rg --version
 ```
 
+Container startup failures are covered by [deployment
+troubleshooting](docs/how-to/deployment.md#troubleshooting), and MCP client
+startup failures by [MCP
+troubleshooting](docs/how-to/mcp-integration.md#troubleshooting).
+
+---
+
+## Uninstallation
+
+### Binaries
+
+```bash
+sudo rm /usr/local/bin/jit
+sudo rm /usr/local/bin/jit-server
+```
+
+A user-directory install is removed the same way from `~/.local/bin`.
+
+### Data
+
+```bash
+# Remove JIT data (careful!)
+rm -rf .jit/
+```
+
+Removing a [container deployment](docs/how-to/deployment.md#container-deployment)
+and an [installed MCP server](docs/how-to/mcp-integration.md) is covered by
+their own guides.
+
 ---
 
 ## Next Steps
@@ -259,37 +216,5 @@ rg --version
   offline package contract, dry-run/apply commands, and recovery guarantees
 - Read the [Quick Start](README.md#quick-start)
 - See [Quickstart Tutorial](docs/tutorials/quickstart.md) for complete workflows
-- Check [Deployment Guide](docs/how-to/deployment.md) for production setup
-
----
-
-## Uninstallation
-
-### Binary Installation
-
-```bash
-sudo rm /usr/local/bin/jit
-sudo rm /usr/local/bin/jit-server
-```
-
-### Docker
-
-```bash
-docker compose down          # Stop and remove the container
-docker rmi jit-server:local  # Remove the image you built
-```
-
-The served repository is a host directory and outlives both.
-
-### NPM
-
-```bash
-npm uninstall -g @erankavija/jit-mcp-server
-```
-
-### Data
-
-```bash
-# Remove JIT data (careful!)
-rm -rf .jit/
-```
+- Check the [Deployment Guide](docs/how-to/deployment.md) for serving the API
+  and web UI

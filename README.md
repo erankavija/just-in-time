@@ -56,7 +56,7 @@ validates. A plain `cargo install --path crates/jit` also works but produces
 a binary with unknown provenance, which the guard treats as unverifiable.
 
 **Optional components:**
-- `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; see [Web UI installation](INSTALL.md#build-web-ui).
+- `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; see [Building the web UI](docs/how-to/deployment.md#building-the-web-ui).
 - **MCP Server**: Model Context Protocol server for AI agents (see [mcp-server/](mcp-server/))
 
 See [INSTALL.md](INSTALL.md) for all installation options.
