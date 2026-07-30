@@ -42,6 +42,9 @@ npm run test:watch   # Run Vitest in watch mode
 
 ## Local development
 
+The last step runs a `jit-server` binary, so build or install one first
+([Installation Guide](../INSTALL.md)):
+
 ```bash
 npm install
 npm run build
