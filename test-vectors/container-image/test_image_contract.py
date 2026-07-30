@@ -15,6 +15,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -47,15 +48,38 @@ def run(
 
 def container_engine() -> str:
     configured = os.environ.get("CONTAINER_ENGINE")
-    candidates = [configured] if configured else ["docker", "podman"]
-    for candidate in candidates:
-        if candidate and shutil.which(candidate):
+    if configured:
+        if not shutil.which(configured):
+            raise RuntimeError(
+                f"requested container engine {configured!r} is unavailable"
+            )
+        probe = run(configured, "info", check=False, timeout=15)
+        if probe.returncode != 0:
+            detail = (probe.stderr or probe.stdout).strip()
+            raise RuntimeError(
+                f"requested container engine {configured!r} is unhealthy: {detail}"
+            )
+        return configured
+
+    for candidate in ("docker", "podman"):
+        if shutil.which(candidate):
             probe = run(candidate, "info", check=False, timeout=15)
             if probe.returncode == 0:
                 return candidate
-    raise unittest.SkipTest(
-        "JIT_IMAGE_RUNTIME=1 requires an available Docker or Podman engine"
+    raise RuntimeError(
+        "JIT_IMAGE_RUNTIME=1 requires a healthy Docker or Podman engine"
     )
+
+
+def integer_log_field(log: str, message: str, field: str) -> int:
+    plain_log = re.sub(r"\x1b\[[0-9;]*m", "", log)
+    line = next((line for line in plain_log.splitlines() if message in line), None)
+    if line is None:
+        raise AssertionError(f"missing log event {message!r} in:\n{log}")
+    value = re.search(rf"\b{re.escape(field)}=(\d+)\b", line)
+    if value is None:
+        raise AssertionError(f"missing integer field {field!r} in log event: {line}")
+    return int(value.group(1))
 
 
 class StaticImageContractTests(unittest.TestCase):
@@ -103,6 +127,51 @@ class StaticImageContractTests(unittest.TestCase):
             self.text,
             r"HEALTHCHECK[^\n]*\n\s*CMD \[.*http://127\.0\.0\.1:3000/api/health",
         )
+
+    def test_requested_runtime_engine_failure_is_not_silently_skipped(self) -> None:
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "RuntimeImageContractTests.test_missing_repository_fails_without_initializing",
+        ]
+        environment = os.environ.copy()
+        environment["CONTAINER_ENGINE"] = "missing-container-engine-3b033738"
+        environment.pop("JIT_IMAGE_RUNTIME", None)
+        ordinary = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            capture_output=True,
+            timeout=15,
+        )
+        self.assertEqual(ordinary.returncode, 0, ordinary.stdout + ordinary.stderr)
+        self.assertIn("skipped", ordinary.stdout + ordinary.stderr)
+
+        environment["JIT_IMAGE_RUNTIME"] = "1"
+        requested = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            capture_output=True,
+            timeout=15,
+        )
+        self.assertNotEqual(requested.returncode, 0, requested.stdout + requested.stderr)
+        self.assertIn("requested container engine", requested.stdout + requested.stderr)
+
+        environment["CONTAINER_ENGINE"] = sys.executable
+        unhealthy = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=environment,
+            text=True,
+            capture_output=True,
+            timeout=15,
+        )
+        self.assertNotEqual(unhealthy.returncode, 0, unhealthy.stdout + unhealthy.stderr)
+        self.assertIn("requested container engine", unhealthy.stdout + unhealthy.stderr)
+        self.assertIn("unhealthy", unhealthy.stdout + unhealthy.stderr)
 
 
 class EventStream:
@@ -370,9 +439,15 @@ class RuntimeImageContractTests(unittest.TestCase):
                 log = logs.stdout + logs.stderr
                 self.assertNotEqual(exit_code, 137, log)
                 self.assertEqual(exit_code, 0, log)
-                self.assertIn("Shutdown signal received; draining connections", log)
-                self.assertIn("open_connections", log)
-                self.assertIn("Drain deadline expired; force-closing", log)
+                started_event = "Shutdown signal received; draining connections"
+                expired_event = "Drain deadline expired; force-closing"
+                started_count = integer_log_field(log, started_event, "open_connections")
+                expired_count = integer_log_field(log, expired_event, "open_connections")
+                self.assertEqual(integer_log_field(log, started_event, "drain_deadline_secs"), 5)
+                self.assertEqual(integer_log_field(log, expired_event, "drain_deadline_secs"), 5)
+                self.assertGreaterEqual(started_count, len(streams) + 1)
+                self.assertGreaterEqual(expired_count, 1)
+                self.assertGreaterEqual(started_count - expired_count, len(streams))
                 self.assertIn("Shutdown complete", log)
             finally:
                 if container_id:
