@@ -1,9 +1,9 @@
 {
  "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
  "epic_short_id": "b80e3c70",
- "current_wave": 6,
+ "current_wave": 7,
  "current_sub_wave": null,
- "wave_note": "Session 6 drives waves 4-6. Wave 7 (bb03df0a, the tag) is withheld: the invoker confirmed no v1.0.0 tag is cut this session. Wave 5 runs e90b9a3b beside the newly filed c5c324df; their footprints are disjoint (documentation prose versus the profile manifest and the release version contract).",
+ "wave_note": "Waves 4, 5 and 6 are complete. Wave 7 (bb03df0a) is withheld: the invoker confirmed no v1.0.0 tag is cut in session 6. The epic's own completion (Section 10) waits on that child.",
  "waves": [
   {
    "wave_number": 1,
@@ -479,7 +479,7 @@
      "short_id": "080e54c6",
      "title": "Prune repeated entry-point and component documentation",
      "classification": "documentation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "e90b9a3b"
      ]
@@ -629,6 +629,12 @@
    "detail": "The globally installed jit-server reports 0.1.0 while crates/server/Cargo.toml declares 1.0.0. scripts/install-jit.sh installs jit. Host state only; the repository manifests agree.",
    "routed_to": "bb03df0a",
    "criterion_check": "Not a criterion subject. It matters only because bb03df0a's clean-container verification must not be run against this host's stale binary."
+  },
+  {
+   "subject": "installed jit-server predates the version alignment",
+   "detail": "The installed jit-server reports 0.1.0 while crates/server/Cargo.toml declares 1.0.0; scripts/install-jit.sh installs jit only. Host state, not repository state.",
+   "routed_to": "bb03df0a",
+   "criterion_check": "Not a criterion subject. Matters only so the clean-container verification is not run against this host's stale binary."
   }
  ],
  "started_at": "2026-07-29T14:20:00+00:00",
@@ -759,13 +765,11 @@
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
  "base_commit": "a8182e6f20476d547e3a0f969ef0ed4c636e4b56",
  "handoffs": [
-  "dev/active/b80e3c70-v1-release/handoff.md",
-  "dev/active/b80e3c70-v1-release/handoff-3.md",
-  {
-   "session": 5,
-   "path": "dev/active/b80e3c70-v1-release/handoff-5.md",
-   "summary": "Waves 2 and 3 closed: five issues Done. Three code-review findings routed to f9af9788."
-  }
+  "handoff.md",
+  "handoff-3.md",
+  "handoff-4.md",
+  "handoff-5.md",
+  "handoff-6.md"
  ],
  "merge_conflicts_expected": [
   {
