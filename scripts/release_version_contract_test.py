@@ -19,6 +19,23 @@ CAPABILITIES = (
     "built web UI",
     "`@erankavija/jit-mcp-server` MCP server",
 )
+UPGRADE_SECTION = "## Upgrade expectations"
+LICENSE_EXPRESSION = "MIT OR Apache-2.0"
+MIT_PHRASES = (
+    "Permission is hereby granted, free of charge",
+    "The above copyright notice and this permission notice shall be included",
+    'THE SOFTWARE IS PROVIDED "AS IS"',
+)
+APACHE_PHRASES = (
+    "Apache License",
+    "Version 2.0, January 2004",
+    "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+    "END OF TERMS AND CONDITIONS",
+    "APPENDIX: How to apply the Apache License to your work.",
+)
+AUTHOR = "Example Holder"
+MIT_COPYRIGHT_LINE = f"Copyright (c) 2026 {AUTHOR}"
+COMPATIBILITY_RECORD = "docs/reference/compatibility.md"
 
 
 class ReleaseVersionContractTests(unittest.TestCase):
@@ -41,15 +58,29 @@ class ReleaseVersionContractTests(unittest.TestCase):
     def _write_json(self, relative: str, value: object) -> None:
         self._write(relative, json.dumps(value, indent=2) + "\n")
 
+    def _edit(self, relative: str, old: str, new: str) -> None:
+        path = self.root / relative
+        text = path.read_text(encoding="utf-8")
+        self.assertIn(old, text, relative)
+        path.write_text(text.replace(old, new), encoding="utf-8")
+
+    @property
+    def _release_note(self) -> str:
+        return f"docs/release-notes/v{self.version}.md"
+
     def _write_fixture(self) -> None:
         self._write(
-            "crates/jit/Cargo.toml",
-            f'[package]\nname = "jit"\nversion = "{self.version}"\n',
+            "Cargo.toml",
+            '[workspace]\nmembers = ["crates/jit", "crates/server"]\n\n'
+            f'[workspace.package]\nlicense = "{LICENSE_EXPRESSION}"\n'
+            f'authors = ["{AUTHOR}"]\n',
         )
-        self._write(
-            "crates/server/Cargo.toml",
-            f'[package]\nname = "jit-server"\nversion = "{self.version}"\n',
-        )
+        for directory, crate in (("jit", "jit"), ("server", "jit-server")):
+            self._write(
+                f"crates/{directory}/Cargo.toml",
+                f'[package]\nname = "{crate}"\nversion = "{self.version}"\n'
+                "authors.workspace = true\n",
+            )
         self._write(
             "Cargo.lock",
             "version = 4\n\n"
@@ -61,10 +92,14 @@ class ReleaseVersionContractTests(unittest.TestCase):
             ("mcp-server", "@erankavija/jit-mcp-server"),
             ("web", "web"),
         ):
-            self._write_json(
-                f"{directory}/package.json",
-                {"name": name, "version": self.version},
-            )
+            manifest: dict[str, object] = {
+                "name": name,
+                "version": self.version,
+                "author": AUTHOR,
+            }
+            if directory == "mcp-server":
+                manifest["license"] = LICENSE_EXPRESSION
+            self._write_json(f"{directory}/package.json", manifest)
             self._write_json(
                 f"{directory}/package-lock.json",
                 {
@@ -79,11 +114,38 @@ class ReleaseVersionContractTests(unittest.TestCase):
 
         capability_list = "\n".join(f"- {capability}" for capability in CAPABILITIES)
         self._write(
-            "docs/reference/compatibility.md",
+            COMPATIBILITY_RECORD,
             "# Product Compatibility\n\n"
             f"**Product compatibility version:** `{self.version}`\n\n"
             "Supported capabilities:\n\n"
-            f"{capability_list}\n",
+            f"{capability_list}\n\n"
+            f"{UPGRADE_SECTION}\n\n"
+            "Adopters replace the installed artifacts wholesale.\n",
+        )
+
+        self._write(
+            "LICENSE-MIT",
+            f"MIT License\n\n{MIT_COPYRIGHT_LINE}\n\n"
+            + "\n\n".join(MIT_PHRASES)
+            + "\n",
+        )
+        self._write("LICENSE-APACHE", "\n\n".join(APACHE_PHRASES) + "\n")
+
+        self._write(
+            "CHANGELOG.md",
+            "# Changelog\n\n## [Unreleased]\n\n"
+            f"## [{self.version}] - 2026-07-30\n\n"
+            "### Added\n\n- The first release.\n",
+        )
+
+        self._write(
+            self._release_note,
+            f"# JIT v{self.version}\n\n"
+            "## Release assets\n\n"
+            "- the native archive, carrying [LICENSE-MIT](../../LICENSE-MIT) and\n"
+            "  [LICENSE-APACHE](../../LICENSE-APACHE)\n\n"
+            "## Compatibility\n\n"
+            "See [the compatibility record](../reference/compatibility.md).\n",
         )
 
         # Product and repository-format versions are separate contracts. The
@@ -190,6 +252,114 @@ class ReleaseVersionContractTests(unittest.TestCase):
         )
 
         self._assert_fails_with("supported capability")
+
+    def test_contract_rejects_missing_upgrade_expectations_record(self) -> None:
+        self._edit(COMPATIBILITY_RECORD, UPGRADE_SECTION, "## Something else")
+
+        self._assert_fails_with(UPGRADE_SECTION)
+
+    def test_contract_rejects_missing_license_text(self) -> None:
+        (self.root / "LICENSE-APACHE").unlink()
+
+        self._assert_fails_with("LICENSE-APACHE")
+
+    def test_contract_rejects_incomplete_license_text(self) -> None:
+        self._edit("LICENSE-APACHE", APACHE_PHRASES[-1], "")
+
+        self._assert_fails_with(APACHE_PHRASES[-1])
+
+    def test_contract_rejects_unfilled_license_copyright_line(self) -> None:
+        self._edit("LICENSE-MIT", MIT_COPYRIGHT_LINE, "Copyright (c) <year> <holders>")
+
+        self._assert_fails_with("copyright line")
+
+    def test_contract_rejects_license_copyright_line_naming_another_holder(
+        self,
+    ) -> None:
+        self._edit("LICENSE-MIT", AUTHOR, "Someone Else")
+
+        self._assert_fails_with(AUTHOR)
+
+    def test_contract_rejects_missing_author_declaration(self) -> None:
+        self._edit("Cargo.toml", f'authors = ["{AUTHOR}"]\n', "")
+
+        self._assert_fails_with("copyright holder")
+
+    def test_contract_rejects_empty_author_declaration(self) -> None:
+        self._edit("Cargo.toml", f'authors = ["{AUTHOR}"]', "authors = []")
+
+        self._assert_fails_with("copyright holder")
+
+    def test_contract_rejects_crate_not_inheriting_the_author_declaration(self) -> None:
+        self._edit("crates/server/Cargo.toml", "authors.workspace = true\n", "")
+
+        self._assert_fails_with("crates/server/Cargo.toml")
+
+    def test_contract_rejects_mismatched_node_author(self) -> None:
+        self._edit("web/package.json", AUTHOR, "Someone Else")
+
+        self._assert_fails_with("web/package.json")
+
+    def test_contract_rejects_license_expression_without_a_completeness_contract(
+        self,
+    ) -> None:
+        for relative, old, new in (
+            ("Cargo.toml", LICENSE_EXPRESSION, "MIT OR Zlib"),
+            ("mcp-server/package.json", LICENSE_EXPRESSION, "MIT OR Zlib"),
+        ):
+            self._edit(relative, old, new)
+
+        self._assert_fails_with("Zlib")
+
+    def test_contract_rejects_mismatched_license_expression(self) -> None:
+        self._edit("mcp-server/package.json", LICENSE_EXPRESSION, "MIT")
+
+        self._assert_fails_with("license expression")
+
+    def test_contract_rejects_missing_changelog_release_entry(self) -> None:
+        self._edit("CHANGELOG.md", f"## [{self.version}] - 2026-07-30", "## Notes")
+
+        self._assert_fails_with("changelog")
+
+    def test_contract_rejects_changelog_release_entry_for_another_version(self) -> None:
+        self._edit("CHANGELOG.md", f"## [{self.version}]", "## [7.8.8]")
+
+        self._assert_fails_with("7.8.8")
+
+    def test_contract_rejects_missing_release_note_source(self) -> None:
+        (self.root / self._release_note).unlink()
+
+        self._assert_fails_with(self._release_note)
+
+    def test_contract_rejects_release_note_source_naming_another_version(self) -> None:
+        self._edit(self._release_note, f"# JIT v{self.version}", "# JIT v7.8.8")
+
+        self._assert_fails_with(f"JIT v{self.version}")
+
+    def test_contract_rejects_release_note_source_omitting_a_license_asset(
+        self,
+    ) -> None:
+        self._edit(self._release_note, "(../../LICENSE-APACHE)", "(elsewhere)")
+
+        self._assert_fails_with("LICENSE-APACHE")
+
+    def test_contract_rejects_release_note_source_omitting_the_compatibility_record(
+        self,
+    ) -> None:
+        self._edit(self._release_note, "(../reference/compatibility.md)", "(elsewhere)")
+
+        self._assert_fails_with(COMPATIBILITY_RECORD)
+
+    def test_contract_rejects_release_note_source_repeating_installation_commands(
+        self,
+    ) -> None:
+        note = self.root / self._release_note
+        note.write_text(
+            note.read_text(encoding="utf-8") + "\n```sh\ncargo install jit\n```\n",
+            encoding="utf-8",
+        )
+
+        self._assert_fails_with("installation commands")
 
 
 if __name__ == "__main__":

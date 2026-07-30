@@ -81,6 +81,7 @@ workflow, start with the
 
 ### 📄 Additional Resources
 
+- [Release Notes](release-notes/) - What each release publishes, per version
 - [Main README](../README.md) - Project overview and quick links
 - [Development Documentation](../dev/index.md) - For contributors working on JIT itself
 

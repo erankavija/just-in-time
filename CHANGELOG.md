@@ -620,3 +620,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`.jit/gate-runs/**`) and `events.jsonl` gate-related event entries are
   unaffected — both keep `gate_key` as an internal/audit field; only the
   `--json` command output surface changed.
+
+## [1.0.0] - 2026-07-30
+
+The first stable release. [The v1.0.0 release
+note](docs/release-notes/v1.0.0.md) is the source the published release body is
+rendered from.
+
+### Added
+
+- **One product version spans every supported capability.** The CLI, the
+  server and its API, the built web UI, and the MCP server ship under a single
+  version. [The product compatibility
+  record](docs/reference/compatibility.md) enumerates that capability set,
+  draws the boundary against the independent format version that governs
+  repository data, and states the upgrade expectations: an upgrade replaces the
+  installed artifacts together and leaves repository data in place.
+
+- **The repository carries both texts of its declared `MIT OR Apache-2.0`
+  license.** `LICENSE-MIT` and `LICENSE-APACHE` sit at the repository root and
+  ship inside the published native archive. The workspace manifest declares the
+  copyright holder once; the crate manifests inherit it, the npm manifests
+  restate it, and the MIT copyright line is checked against that declaration
+  rather than maintained by hand. The release-metadata check refuses a release
+  whose license texts, changelog entry, compatibility-and-upgrade record, or
+  release-note source is missing or names a version other than the declared
+  product version.
+
+### Removed
+
+- **Publication paths outside the single GitHub release.** v1.0.0 publishes one
+  GitHub release carrying the native archive, the MCP server tarball, their
+  SHA-256 checksums, and both license texts. The MCP server is installed from
+  that release tarball rather than a package-registry version; container images
+  are no longer published to a registry, and no source distribution is produced
+  beyond the source archives GitHub generates for the tag.
