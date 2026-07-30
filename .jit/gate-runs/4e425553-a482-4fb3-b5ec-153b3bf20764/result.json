@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "f93a30c41cf73f7812dbf290e79216b85810b7b9",
+  "completed_at": "2026-07-30T09:53:34.716658863Z",
+  "duration_ms": 252178,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docker-compose.yml",
+        "id": "F1",
+        "line": 5,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-9",
+          "@/charter/D-10"
+        ],
+        "severity": "high",
+        "summary": "The delivered single-image Docker runtime is not integrated into the supported Compose path, which still launches the rejected api/web/cli topology with /data volumes."
+      }
+    ],
+    "summary": "The production image is not integrated into the repository's still-supported legacy Compose topology.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3b033738-a6ef-40ab-8fc1-d296f3fbb863",
+  "message": null,
+  "run_id": "4e425553-a482-4fb3-b5ec-153b3bf20764",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T09:49:22.537738025Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5579 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb26d-b95d-7d72-b408-556d2e9cc513\n--------\nuser\n--- 5566 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b5c39554, 6df7ab03, bddb4ac2, f93a30c4 (merge; parent-one patch duplicates the feature branch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-9 (dev/vision/9db27a3a-charter.md); @/charter/D-10 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); npm-ci passed (0); mcp-ci passed (0); repo-validate passed (0); code-review pending; jit-validate pending\nTruncation recovery: reread the merge’s feature-parent patch and current container fixture/source in bounded ranges; excluded unrelated historical gate-log output\n\n1. **[blocking][issue-impact] F1 —** The new single-image runtime is not integrated with the repository’s supported Compose deployment. [docker-compose.yml](/home/vkaskivuo/Projects/just-in-time/docker-compose.yml:5) still launches separate `api`, `web`, and `cli` services using the legacy `docker/Dockerfile.*` files and `/data` volumes; [docs/how-to/deployment.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/deployment.md:84) still directs users to that topology. This leaves the rejected multi-container path as the documented Compose path rather than one `jit-server` serving API and UI from a `/repo` mount. Update or remove that surface and its instructions, then cover the supported Compose path. References: `@/charter/D-9`, `@/charter/D-10`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The production image is not integrated into the repository's still-supported legacy Compose topology.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The delivered single-image Docker runtime is not integrated into the supported Compose path, which still launches the rejected api/web/cli topology with /data volumes.\",\"file\":\"docker-compose.yml\",\"line\":5,\"references\":[\"@/charter/D-9\",\"@/charter/D-10\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

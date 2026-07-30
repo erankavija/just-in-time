@@ -11673,3 +11673,10 @@
 {"gate_key":"docs-mechanical","id":"cffdfbff-059d-49ad-b50c-1854d3be3b37","issue_id":"7b29019c-7316-4991-87a5-3fbbe7264b73","timestamp":"2026-07-30T08:55:46.140417954Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"23313bae-1bfd-4f99-b0d1-6d38710bbd20","issue_id":"7b29019c-7316-4991-87a5-3fbbe7264b73","timestamp":"2026-07-30T08:56:05.171064090Z","to":"done","type":"issue_state_changed"}
 {"id":"91f75da0-b41b-4903-b457-3a89cc565ff3","issue_id":"7b29019c-7316-4991-87a5-3fbbe7264b73","timestamp":"2026-07-30T08:56:05.171064090Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"82a49ec7-ae48-4519-88ae-f25fbd633bea","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T09:48:27.576558545Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"npm-ci","id":"58cc9c76-4e83-4108-9c3e-1b6296f9d540","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T09:48:50.350041865Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"7a80c214-8a87-45e5-9389-4b7d34994f16","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T09:49:04.183041587Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"repo-validate","id":"04307238-c73e-4fb7-b29d-6b266d2a969f","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T09:49:11.839393038Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"06eba6e0-a8fe-4f9a-bd6a-7902f75645e6","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T09:53:34.999583868Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"aecf38a3-9f57-49f8-89f1-96b3d8bcb584","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T09:55:15.771124362Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["description"],"id":"d54d8792-2aaf-47fb-8d3b-649d30ab8b1a","issue_id":"3b033738-a6ef-40ab-8fc1-d296f3fbb863","timestamp":"2026-07-30T09:56:13.625760299Z","type":"issue_updated","updated_by":"issue-update"}
