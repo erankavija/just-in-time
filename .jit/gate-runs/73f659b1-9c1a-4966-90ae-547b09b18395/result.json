@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "7574ebfae10ce0e8ee0c0fcdafb820c8d52a09fb",
+  "completed_at": "2026-07-30T08:31:05.298825262Z",
+  "duration_ms": 173686,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed version alignment satisfies the resolved v1.0 release requirement; manifests, authoritative locks, release tag contract, compatibility declaration, tests, and workflow dependencies agree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
+  "message": null,
+  "run_id": "73f659b1-9c1a-4966-90ae-547b09b18395",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T08:28:11.612701755Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 68b4efe5, b7efb540, 7574ebfa (all `jit:5e538f48`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/b80e3c70/requirement/REQ-07 (.jit/issues/b80e3c70-cf7d-4f72-b53d-6e556363be58.json, markdown-first); @/gate/jit-validate (.jit/gates.toml, registry-first); @/invariant/canonical-cutover (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci=passed (exit 0, 2026-07-30T08:17:26Z); npm-ci=passed (exit 0, 2026-07-30T08:27:16Z); mcp-ci=passed (exit 0, 2026-07-30T08:27:41Z); repo-validate=passed (exit 0, 2026-07-30T08:27:47Z); jit-validate=pending\nTruncation recovery: reread AGENTS.md in bounded ranges; reread patches by path and current contract/workflow/test ranges; omitted deleted nested-lock body after confirming its deletion and current absence\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed version alignment satisfies the resolved v1.0 release requirement; manifests, authoritative locks, release tag contract, compatibility declaration, tests, and workflow dependencies agree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

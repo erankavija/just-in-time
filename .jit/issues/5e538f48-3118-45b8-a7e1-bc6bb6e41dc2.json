@@ -8,6 +8,7 @@
   ],
   "description": "Every shipped component declares v1.0.0, and one checked contract rejects a tag or documented compatibility version that differs.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit`, `jit-server`, the MCP package, and the web package declare `1.0.0` in their manifests and in committed lock metadata where applicable.\n- [hard] REQ-02: The release version check derives the expected version from the product manifests rather than from a literal in workflow configuration, and rejects a tag whose version differs from any of them.\n- [hard] REQ-03: Version tests distinguish the product version from the `.jit` repository format version and fail for a mismatched crate, package, tag, or compatibility declaration.\n- [hard] REQ-04: The CLI, the Rust server and API, the built web UI, and the MCP server remain named supported v1.0 capabilities after alignment.\n\n## Notes\n\nBlast radius: Rust and Node manifests and locks, the version-contract script and its tests, and the one canonical compatibility declaration; no feature implementation changes.\n",
   "documents": [],
+  "done_at": "2026-07-30T08:31:39.758668069Z",
   "first_ready_at": "2026-07-15T09:12:53.171847908Z",
   "gates_required": [
     "cargo-ci",
@@ -17,7 +18,38 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:27:02.046702131Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:31:05.585810054Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:31:16.370225549Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:27:43.908232759Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:27:30.746344838Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:27:50.155483633Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
   "labels": [
     "type:task",
@@ -26,7 +58,7 @@
     "satisfies:REQ-07"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Align the v1.0 product version and tag contract",
-  "updated_at": "2026-07-30T07:31:55.592750859Z"
+  "updated_at": "2026-07-30T08:31:39.758668069Z"
 }

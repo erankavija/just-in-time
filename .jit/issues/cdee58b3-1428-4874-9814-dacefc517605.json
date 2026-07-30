@@ -23,7 +23,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Enforce the declared MSRV recency window",
-  "updated_at": "2026-07-29T13:52:58.290821829Z"
+  "updated_at": "2026-07-30T08:31:51.637327175Z"
 }

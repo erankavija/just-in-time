@@ -22,7 +22,7 @@
     "satisfies:REQ-09"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Add the dual-license and compatibility release record",
-  "updated_at": "2026-07-29T13:52:53.372043893Z"
+  "updated_at": "2026-07-30T08:31:46.502569342Z"
 }
