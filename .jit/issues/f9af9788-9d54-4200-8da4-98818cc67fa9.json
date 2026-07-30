@@ -11,7 +11,20 @@
     "f7f80d53-508e-4b03-b045-5209061c8d0a"
   ],
   "description": "One workflow reacts to an annotated version tag by validating the tagged commit, building the supported artifacts, smoke-testing them, and publishing a single GitHub release.\n\n## Background\n\nThe current release workflow packages archives on any `v*` tag without running the security audits, without proving the packaged binaries start, and without attaching checksums or license texts. The container workflow separately publishes registry images. v1.0 replaces both publication paths with one tag-triggered workflow whose only output is a GitHub release.\n\nThe maintainer creates the tag. The workflow reacts to it and never creates, moves, or deletes a ref.\n\nTwo artifacts ship: a Linux x86_64 musl archive containing `jit` and `jit-server`, and the MCP server tarball produced by `npm pack`. The MCP tarball is a release asset rather than a registry version, so adopters install it from the release URL. No source distribution is produced; GitHub's own auto-generated source archives carry no claim.\n\nThe web UI is embedded into `jit-server` at build time, and `crates/server/build.rs` substitutes an empty `web/dist` stub when the web build has not run. The build order therefore has to put the web bundle before the server compile, and the smoke step has to observe real assets rather than a healthy server with an empty UI.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow triggers on an annotated `v*` tag push, accepts no ref, SHA, or artifact-name input, and derives every version value from the tagged commit's manifests rather than from a literal in workflow configuration. It creates, moves, and deletes no git ref.\n- [hard] REQ-02: Before any artifact is built, the workflow runs the reusable normal validation suites and the reusable blocking security workflow against the tagged commit, and a failure in either prevents every build and publication job from starting.\n- [hard] REQ-03: The build produces one Linux x86_64 musl archive containing `jit`, `jit-server`, and both license texts, and one MCP tarball from a single `npm pack` invocation. The web bundle is built before `jit-server` is compiled.\n- [hard] REQ-04: A smoke job extracts the built archive into a clean prefix and verifies `jit version`, `jit init`, the profile quickstart, and representative `--json` and `--schema` output. Publication jobs do not start unless the smoke job succeeds.\n- [hard] REQ-05: Publication creates one GitHub release for the tag carrying the native archive, the MCP tarball, a SHA-256 checksum file covering both, both license texts, and release notes derived from the committed release-note source. It publishes to no package registry and no container registry.\n- [hard] REQ-06: The workflow declares least-privilege permissions, pins every external action to a full 40-character commit SHA, and runs under a concurrency group that prevents two release runs from overlapping.\n- [hard] REQ-07: The superseded packaging workflow is deleted in the same change, and a repository-wide check confirms no remaining workflow publishes a release, a package, or an image outside this one.\n- [hard] REQ-08: Pull requests run the build and smoke jobs on the pull-request commit with no publication step reachable, so the artifact-producing path is exercised continuously rather than first on the release tag.\n- [hard] REQ-09: Workflow-contract checks assert the trigger, the job graph, the permissions, the absence of failure escapes, and that no publication job is reachable without both validation and smoke succeeding.\n\n## Notes\n\nBlast radius: `.github/workflows/release.yml`, the container workflow's publication jobs, and workflow-contract assertions. Product code, documentation prose, and the image definition itself are owned elsewhere.\n\nPublication runs for the first time on the real tag. If it fails, the tag and any partial release are deleted and a corrected tag is pushed; nothing downstream depends on a given tag surviving.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "label": "Tag-triggered release publication workflow",
+      "path": ".github/workflows/release-publish.yml"
+    },
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "label": "Release artifact build and smoke workflow",
+      "path": ".github/workflows/release-artifacts.yml"
+    }
+  ],
   "first_ready_at": "2026-07-29T13:46:32.658976373Z",
   "gates_required": [
     "repo-validate",
@@ -33,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publish v1.0 through one tag-triggered release workflow",
-  "updated_at": "2026-07-30T20:35:58.228773006Z"
+  "updated_at": "2026-07-30T21:21:20.010002251Z"
 }
