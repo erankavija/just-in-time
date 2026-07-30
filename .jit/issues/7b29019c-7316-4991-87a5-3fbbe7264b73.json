@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "# Remove repeated container slugs from archive destinations\n\n## Problem\n\nThe development-root cutover removed paths shaped like dev/archive/<container>/dev/..., but retained a second owner copy when a source already lives under an area/container directory. The tracked tree currently contains 54 paths shaped like dev/archive/<container>/<area>/<container>/..., including active and presentations artifacts for 8e071e18-dev-artifact-layout and active artifacts for a2546471-json-error-contract. This repeats ownership rather than adding hierarchy and creates the same long-path failure mode as the rejected development-root duplication.\n\n## Success Criteria\n\n- [hard] Archive destination derivation strips both the configured development root and a matching area/container owner prefix, producing dev/archive/<container>/<area>/<artifact-relative-path> without a repeated container slug.\n- [hard] Preview and execution use the same canonical destination derivation, preserve collision safety, and cover active plus non-active managed areas with positive and negative regressions.\n- [hard] All 54 current repeated-owner archive paths and their live repository references are migrated to the canonical layout without rewriting immutable event history or history-only prose.\n- [hard] A repository regression check rejects dev/archive/<container>/<area>/<container>/... and analogous repeated owner nesting while allowing legitimate vendored names such as reveal.js/reveal.js.\n- [hard] Current adopter and contributor documentation states archive paths relative to development_root and container ownership exactly once; projections and link validation remain clean.\n\n## Non-goals\n\n- Renaming third-party vendored directories whose repeated name is part of the upstream package layout.\n- Rewriting immutable event records or historical narrative that only describes the former path.",
   "documents": [],
+  "done_at": "2026-07-30T08:56:05.171064090Z",
   "first_ready_at": "2026-07-30T05:29:11.322956771Z",
   "gates_required": [
     "cargo-ci",
@@ -19,8 +20,13 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-30T08:50:32.561958815Z",
+      "status": "passed",
+      "updated_at": "2026-07-30T08:55:24.975789843Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-30T08:55:46.140417954Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,7 +39,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove repeated container slugs from archive destinations",
-  "updated_at": "2026-07-30T08:51:20.867211854Z"
+  "updated_at": "2026-07-30T08:56:05.171064090Z"
 }

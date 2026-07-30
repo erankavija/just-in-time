@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "83c8674afc9fecbb3df9e5b6e15066b072cc9822",
+  "completed_at": "2026-07-30T08:55:24.690581674Z",
+  "duration_ms": 205153,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The canonical destination derivation, collision handling, regressions, 54-path migration, live references, and documentation satisfy all issue-scoped criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7b29019c-7316-4991-87a5-3fbbe7264b73",
+  "message": null,
+  "run_id": "90d359fb-edbd-4364-824f-8e7c8b2569c9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T08:51:59.537209026Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 48f67067, 417bf35d, dbdf466e, 037c9a09, 6ade0d31, 0361b223, 83c8674a (all `jit:7b29019c`)\nPolicy sources: AGENTS.md; .jit/invariants.toml\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci=passed (exit 0, 2026-07-30T08:37:00Z); code-review=failed (exit 1, prior finding fixed in 83c8674a); docs-mechanical=pending\nTruncation recovery: re-read code/docs patches by commit and path; inspected merge parents separately; re-read migrated issue-reference slices and current path/reference scans\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The canonical destination derivation, collision handling, regressions, 54-path migration, live references, and documentation satisfy all issue-scoped criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
