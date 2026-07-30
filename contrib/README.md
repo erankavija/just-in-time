@@ -17,23 +17,9 @@ Scripts and prompt templates for gate checkers.
 
 ## Usage
 
-Copy what you need into your repo and adapt:
-
-```bash
-# Copy the AI review script
-cp contrib/gates/ai-review.sh scripts/
-chmod +x scripts/ai-review.sh
-
-# Define a gate using a contrib prompt
-jit gate define ai-review \
-  --title "AI Code Review" \
-  --description "AI-powered code review" \
-  --mode auto --stage postcheck \
-  --pass-context \
-  --prompt-file "contrib/gates/prompts/code-review.md" \
-  --checker-command "./scripts/ai-review.sh" \
-  --env REVIEWER_AGENT="codex review -" \
-  --timeout 120
-```
-
-See [How-To: Custom Gates](../docs/how-to/custom-gates.md) for full documentation.
+Copy what you need into your repository and adapt it. [How-To: Custom
+Gates](../docs/how-to/custom-gates.md) is where these are wired up: [the AI
+review script](../docs/how-to/custom-gates.md#example-ai-review-script) as a
+gate checker and its reviewer command, and [the prompt
+library](../docs/how-to/custom-gates.md#prompt-library) as `--prompt-file`
+context.
