@@ -24,13 +24,8 @@ the JIT schema and generates tools from its leaf commands.
 server: installing the tarball the release publishes, the prerequisite `jit`
 binary the server loads `jit --schema` from, the client configuration block that
 launches it, and the failures worth recognizing. Working on the server itself
-starts at [Development](#development) below.
-
-The server communicates over stdio, so a checkout runs it directly:
-
-```bash
-node index.js
-```
+starts at [Development](#development) below, which sets a checkout up and runs
+it from there.
 
 ## Available Tools
 
@@ -47,7 +42,8 @@ the curation policy, the ceiling the test suite enforces, and a one-line rationa
 command it includes or excludes. Adding a CLI command fails `npm test` until the manifest decides
 it.
 
-To enumerate the listing, or the full generated set:
+From a checkout with the [source-checkout setup](#source-checkout-setup) in
+place, enumerate the listing, or the full generated set:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | node index.js
@@ -172,6 +168,31 @@ error.
 
 ## Development
 
+### Source-checkout setup
+
+The server loads `jit --schema` at startup, so a checkout needs a `jit` binary on
+`PATH` and this package's dependencies installed:
+
+```bash
+# Ensure jit is in PATH first
+cd ..
+cargo build --release
+export PATH="$(pwd)/target/release:$PATH"
+
+# Install this package's dependencies
+cd mcp-server
+npm install
+```
+
+### Running the Server
+
+With that setup in place, the server speaks the Model Context Protocol over
+stdio:
+
+```bash
+node index.js
+```
+
 ### Updating Tools
 
 Tools are generated at server startup directly from `jit --schema`; no schema file is bundled
@@ -180,16 +201,9 @@ updated binary is the one on `PATH`, then restart the MCP server.
 
 ### Testing
 
-Run the automated test suite:
+Run the automated test suite, from the same setup:
 
 ```bash
-# Ensure jit is in PATH first
-cd ..
-cargo build --release
-export PATH="$(pwd)/target/release:$PATH"
-
-# Run tests
-cd mcp-server
 npm test
 ```
 
