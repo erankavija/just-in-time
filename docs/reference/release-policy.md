@@ -44,24 +44,26 @@ the only output (`.github/workflows/release-publish.yml`). The workflow creates,
 moves, and deletes no git ref: a maintainer owns the annotated tag, and
 publication verifies that annotation before uploading anything.
 
-The release carries five assets:
+The release carries these assets:
 
 | Asset | Contents | Installed by |
 | --- | --- | --- |
 | native archive | the `jit` CLI, the `jit-server` binary, and both license texts, built for Linux x86_64 against musl | [Installation Guide](../../INSTALL.md#pre-built-binaries) |
 | MCP server tarball | the packaged MCP server | [MCP Integration](../how-to/mcp-integration.md) |
 | checksum file | SHA-256 sums covering both archives, computed where the assets are assembled | [Installation Guide](../../INSTALL.md#download-and-verify) |
-| license texts | the two texts the manifest expression names, beside the archives that also carry them | — |
+| license texts | the two texts the manifest expression names, published beside the archives that also carry them | downloaded from the release page |
 
 The committed release note for the declared version is the release body, so
 each version's published narrative is reviewed in the repository rather than
 written at the tag.
 
-That is the complete published output. `gh release create` is the only
-publishing step in the repository: no package-registry version, no
-container-registry image, and no separate web bundle — the web UI is compiled
-into `jit-server`, and a [container deployment](../how-to/deployment.md#container-deployment)
-builds its image from a checkout.
+That is the complete published output. `gh release create` in that workflow is
+the only publishing step the repository allows — `.github/workflow-contract.yml`
+names it and rejects a release or a registry push anywhere else — so there is no
+package-registry version, no container-registry image, and no separate web
+bundle. The web UI is compiled into `jit-server`, and a [container
+deployment](../how-to/deployment.md#container-deployment) builds its image from
+a checkout.
 
 Every artifact is built and smoked downstream of the validation suites and the
 security audits (`.github/workflows/release-artifacts.yml`), so nothing is
