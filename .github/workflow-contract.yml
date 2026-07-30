@@ -24,6 +24,14 @@ global:
   # Every external action and reusable workflow is pinned to a commit SHA and
   # carries the upstream version that SHA was resolved from.
   require_sha_pinned_uses: true
+  # Publication is one workflow's business. Every workflow is read for the
+  # constructs that create a GitHub release or push to a package or container
+  # registry: a release construct outside the workflow named here is a finding,
+  # and a registry push is a finding anywhere, because the whole published
+  # output of a release is one GitHub release (@/charter/D-16, @/charter/D-9).
+  publication:
+    github_release: release-publish.yml
+    forbid_registry: true
 
 workflows:
   ci.yml:
@@ -139,28 +147,75 @@ workflows:
     jobs:
       build-and-deploy: {}
 
-  release.yml:
+  release-artifacts.yml:
+    triggers:
+      required:
+        pull_request:
+          # The artifact build is a pull-request gate. A branch or path filter
+          # would let a pull request merge while the build the release ships had
+          # never run on its commit.
+          forbidden_filters: [branches, branches-ignore, paths, paths-ignore]
+        workflow_call: {}
+      # A pull request and a call from this repository are the only ways in.
+      # This workflow answers to no tag: a tag reaches publication through
+      # release-publish.yml alone.
+      allowed: [pull_request, workflow_call]
+      forbidden: [pull_request_target]
+    permissions:
+      contents: read
+    workflow_call:
+      # No input and no secret. A caller builds its own commit; an input would
+      # be the knob that aims the build at another one.
+      inputs:
+        allowed: []
+      secrets:
+        allowed: []
+    callers:
+      # What a caller inherits by calling this workflow: both shipped artifacts
+      # and the smoke test over the extracted archive. Each job named below has
+      # to exist here and to run unconditionally, and every job a caller runs of
+      # its own has to wait for the call — which is what keeps publication
+      # downstream of a smoke test that actually ran.
+      require_needs:
+        - build-web-ui
+        - build-native
+        - package-mcp-server
+        - smoke
+    jobs:
+      # The web bundle is compiled into jit-server, so it is a predecessor of
+      # the native build rather than a job beside it.
+      build-native:
+        needs: [build-web-ui]
+      # Nothing is smoked that was not built here.
+      smoke:
+        needs: [build-native]
+
+  release-publish.yml:
     triggers:
       required:
         push:
           tags: ['v*']
       # A tag push is the only thing that may reach publication: no manual
-      # dispatch, no branch push, no upstream workflow run.
+      # dispatch, no branch push, no pull request, no upstream workflow run.
       allowed: [push]
       forbidden: [pull_request_target]
     permissions:
       contents: read
     jobs:
-      version-contract: {}
-      build-binaries:
-        needs: [version-contract]
-      package-mcp-server:
-        needs: [version-contract]
-      build-web-ui:
-        needs: [version-contract]
-      # Publication holds the only write scope and cannot start until every
-      # artifact job has succeeded.
-      create-release:
+      # The calls this workflow makes, named one by one: a `needs` edge onto a
+      # job says nothing about what that job runs, and these three are what give
+      # the edges below their content — the normal suites, the audit
+      # boundaries, and the built, smoked artifacts.
+      validate:
+        uses: ./.github/workflows/ci.yml
+      security:
+        uses: ./.github/workflows/security-audit.yml
+      artifacts:
+        uses: ./.github/workflows/release-artifacts.yml
+        needs: [validate, security]
+      # Publication holds the only write scope, and reaches the tag only through
+      # validation, the audits, and the smoked artifacts.
+      publish:
         permissions:
           contents: write
-        needs: [build-binaries, package-mcp-server, build-web-ui]
+        needs: [validate, security, artifacts]

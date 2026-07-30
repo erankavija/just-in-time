@@ -155,10 +155,14 @@ class ReleaseVersionContractTests(unittest.TestCase):
             {"schema_version": 314, "all_ids": [], "deleted_ids": []},
         )
 
-    def _run(self, tag: str | None = None) -> subprocess.CompletedProcess[str]:
+    def _run(
+        self, tag: str | None = None, declared: bool = False
+    ) -> subprocess.CompletedProcess[str]:
         command = [sys.executable, str(CHECKER), "--root", str(self.root)]
         if tag is not None:
             command.extend(("--tag", tag))
+        if declared:
+            command.append("--declared")
         return subprocess.run(command, capture_output=True, check=False, text=True)
 
     def _assert_fails_with(self, expected: str, tag: str | None = None) -> None:
@@ -172,6 +176,24 @@ class ReleaseVersionContractTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(f"product version {self.version}", result.stdout)
         self.assertNotIn("314", result.stdout + result.stderr)
+
+    def test_contract_prints_the_declared_version_alone(self) -> None:
+        result = self._run(f"v{self.version}", declared=True)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.strip(), self.version)
+
+    def test_contract_withholds_the_declared_version_from_a_disagreeing_tree(self) -> None:
+        manifest = self.root / "crates/server/Cargo.toml"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8").replace(self.version, "7.8.8"),
+            encoding="utf-8",
+        )
+
+        result = self._run(f"v{self.version}", declared=True)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn(self.version, result.stdout)
 
     def test_contract_rejects_mismatched_rust_crate(self) -> None:
         manifest = self.root / "crates/server/Cargo.toml"
