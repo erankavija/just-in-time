@@ -1,0 +1,156 @@
+# Canonical documentation homes, and what makes each stated fact true.
+#
+# Read by scripts/docs-check-canonical.sh (M6 of the `docs-mechanical` gate).
+# One entry per adopter-facing fact that has exactly one home: the page that
+# states it, the literal an adopter acts on, and the automation or manifest
+# that keeps that literal true. The checker fails when a home is missing or
+# unnavigable, when the automation stops carrying what the page states, and
+# when a second page states the same literal.
+#
+# What belongs here: cross-artifact facts — a published artifact name, a
+# command an adopter runs, a mount path, a health URL, a prerequisite version,
+# a version-policy entry point. What does not: a repository path cited in
+# prose, which docs-check-citations.sh (M3) already resolves against the tree.
+#
+# `doc` is matched literally, so pick a literal that names the fact and occurs
+# nowhere else — the uniqueness check is what gives the fact one home.
+# `source_token` names the literal to look for in `sources` when the automation
+# spells it differently from the page; it defaults to `doc`.
+
+# Markdown scanned for duplicate statements, beside the homes themselves.
+scan_roots = ["docs"]
+
+# Pages that must link every home, so a canonical page cannot fall out of the
+# documentation's own navigation.
+navigation = ["docs/index.md"]
+
+[[fact]]
+id = "published-native-archive"
+home = "INSTALL.md#pre-built-binaries"
+
+  [[fact.binding]]
+  # The archive asset name, assembled by the artifact build and uploaded by the
+  # publication step.
+  doc = "jit-linux-x64.tar.gz"
+  sources = [
+    ".github/workflows/release-artifacts.yml",
+    ".github/workflows/release-publish.yml",
+  ]
+
+  [[fact.binding]]
+  # The checksum asset the verification step downloads.
+  doc = "checksums.txt"
+  sources = [".github/workflows/release-publish.yml"]
+
+  [[fact.binding]]
+  # The target triple `jit version --json` reports, asserted by the release
+  # smoke test against the extracted archive.
+  doc = "x86_64-unknown-linux-musl"
+  sources = [".github/workflows/release-artifacts.yml"]
+
+[[fact]]
+id = "source-checkout-build"
+home = "INSTALL.md#build-from-a-source-checkout"
+
+  [[fact.binding]]
+  # The flags the shipped binaries are built with, which a contributor build
+  # reproduces.
+  doc = "cargo build --locked --release"
+  sources = [".github/workflows/release-artifacts.yml"]
+
+[[fact]]
+id = "runtime-prerequisites"
+home = "INSTALL.md#optional-dependencies"
+
+  [[fact.binding]]
+  # The Node.js floor, stated as the version CI installs.
+  doc = "Node.js 20"
+  source_token = "node-version: '20'"
+  sources = [".github/workflows/ci.yml"]
+
+[[fact]]
+id = "container-deployment"
+home = "docs/how-to/deployment.md#container-deployment"
+
+  [[fact.binding]]
+  # The image the deployment builds and runs.
+  doc = "jit-server:local"
+  sources = ["docker-compose.yml"]
+
+  [[fact.binding]]
+  # The mount path the repository is bound to inside the container.
+  doc = ":/repo"
+  sources = ["docker-compose.yml"]
+
+  [[fact.binding]]
+  # The identity mapping the Compose service reads.
+  doc = "JIT_UID"
+  sources = ["docker-compose.yml"]
+
+  [[fact.binding]]
+  # The health endpoint the image polls and the release smoke test waits on.
+  doc = "/api/health"
+  sources = ["Dockerfile", ".github/workflows/release-artifacts.yml"]
+
+[[fact]]
+id = "web-bundle-build"
+home = "docs/how-to/deployment.md#building-the-web-ui"
+
+  [[fact.binding]]
+  # The bundle command the image build and the release build both run.
+  doc = "npm run build"
+  sources = ["Dockerfile", ".github/workflows/release-artifacts.yml"]
+
+[[fact]]
+id = "mcp-server-package"
+home = "docs/how-to/mcp-integration.md#install-the-released-tarball"
+
+  [[fact.binding]]
+  # The packaging step whose output name the guide derives the asset name from.
+  doc = "npm pack"
+  sources = [".github/workflows/release-artifacts.yml"]
+
+  [[fact.binding]]
+  # The executable the package installs, as the client configuration names it.
+  doc = "\"jit-mcp-server\""
+  sources = ["mcp-server/package.json"]
+
+[[fact]]
+id = "release-publication"
+home = "docs/reference/release-policy.md#what-a-release-publishes"
+
+  [[fact.binding]]
+  # The one publishing step in the repository.
+  doc = "gh release create"
+  sources = [".github/workflows/release-publish.yml"]
+
+[[fact]]
+id = "product-version-contract"
+home = "docs/reference/release-policy.md#product-version"
+
+  [[fact.binding]]
+  # The command CI and the publication workflow both run over the declarations.
+  doc = "release-version-contract.py"
+  sources = [
+    ".github/workflows/ci.yml",
+    ".github/workflows/release-publish.yml",
+  ]
+
+[[fact]]
+id = "supported-rust-version"
+home = "docs/reference/release-policy.md#supported-rust-version"
+
+  [[fact.binding]]
+  # The command CI's msrv job derives the declared version and the window from.
+  doc = "rust-version-policy.py"
+  sources = [".github/workflows/ci.yml"]
+
+[[fact]]
+id = "compatibility-record"
+home = "docs/reference/compatibility.md"
+
+  [[fact.binding]]
+  # The declaration line the version contract parses out of this record.
+  doc = "**Product compatibility version:**"
+  source_token = "Product compatibility version:"
+  sources = ["scripts/release-version-contract.py"]
