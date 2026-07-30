@@ -49,6 +49,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   signal, the deadline, the connection count at the signal and at expiry, the
   forced-close path, and clean completion.
 
+- **The declared MSRV is checked against current stable and proven by a test
+  run.** `scripts/rust-version-policy.py` derives the declaration from
+  `cargo metadata` and the current stable release from the Rust release channel
+  manifest, both at run time, and reports whether current stable is at most one
+  minor release ahead of the declaration. Its verdict is one JSON object naming
+  both versions, the distance between them, and the window that distance was
+  judged against; an underivable version exits `2`, keeping an unmade
+  comparison separate from a stale declaration. CI's `msrv` job takes the
+  declared version from that command instead of grepping `Cargo.toml`, runs the
+  window check, and then both builds and tests the workspace `--locked` on the
+  declared compiler, so `axum-server`, `tokio-util`, and the rest of the
+  committed lockfile are exercised there rather than only compiled.
+  `docs/reference/release-policy.md` is the policy's canonical home and states
+  the refresh procedure.
+
 ### Fixed
 
 - **Archive destinations no longer repeat the configured development root.**

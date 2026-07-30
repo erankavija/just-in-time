@@ -46,6 +46,8 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [CLI Commands](reference/cli-commands.md) - Complete command reference
 - [Product Compatibility](reference/compatibility.md) - Aligned release
   version, supported capabilities, and repository-format boundary
+- [Release Policy](reference/release-policy.md) - Supported Rust version, its
+  recency window, and the refresh procedure
 - [Repository Profiles](reference/profiles.md) - Preferred embedded workflow setup, package contract, and recovery boundary
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
 - [Machine-readable Error Codes](reference/error-codes.md) - Generated vocabulary of error-envelope codes, meanings, and exit statuses
