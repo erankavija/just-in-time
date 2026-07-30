@@ -1,0 +1,43 @@
+# Case vector: a tree whose caller inherits every suite it is obliged to.
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  validation.yml:
+    triggers:
+      required:
+        workflow_call: {}
+    permissions:
+      contents: read
+    workflow_call:
+      inputs:
+        allowed: []
+    callers:
+      require_needs: [rust, web]
+
+  audit.yml:
+    triggers:
+      required:
+        workflow_call: {}
+    permissions:
+      contents: read
+    callers:
+      require_needs: [advisories]
+
+  release.yml:
+    triggers:
+      required:
+        push:
+          tags: ['v*']
+    permissions:
+      contents: read
+    jobs:
+      publish:
+        permissions:
+          contents: write
+        needs: [validate, audit]

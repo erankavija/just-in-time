@@ -1,0 +1,12 @@
+name: Validation
+on:
+  workflow_call:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - run: ./rust.sh

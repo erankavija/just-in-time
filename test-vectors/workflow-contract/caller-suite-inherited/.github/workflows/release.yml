@@ -1,0 +1,23 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  validate:
+    uses: ./.github/workflows/validation.yml
+  audit:
+    uses: ./.github/workflows/audit.yml
+  build:
+    runs-on: ubuntu-latest
+    needs: [validate, audit]
+    steps:
+      - run: ./build.sh
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build]
+    permissions:
+      contents: write
+    steps:
+      - run: ./publish.sh

@@ -1,0 +1,10 @@
+name: Validation
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./rust.sh

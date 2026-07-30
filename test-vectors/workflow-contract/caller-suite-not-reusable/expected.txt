@@ -1,0 +1,4 @@
+# A caller obligation on a workflow no one can call promises nothing: the
+# assertion has to name a workflow that actually accepts 'workflow_call'.
+exit: 1
+declares a caller obligation, but the workflow declares no 'workflow_call' trigger

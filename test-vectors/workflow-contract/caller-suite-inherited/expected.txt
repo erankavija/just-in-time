@@ -1,0 +1,4 @@
+# A caller whose every job of its own sits downstream of both calls satisfies
+# each caller obligation. The two calls run beside each other: a workflow call
+# is itself a verified boundary, so it waits on no other call.
+exit: 0

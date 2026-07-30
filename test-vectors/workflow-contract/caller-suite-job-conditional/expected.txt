@@ -1,0 +1,4 @@
+# A condition on a promised suite turns it into a skip on the caller's event,
+# and a skipped job leaves the call green: the caller inherits nothing.
+exit: 1
+job 'rust' is promised to every caller but carries an 'if:' condition

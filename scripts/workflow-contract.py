@@ -35,6 +35,12 @@ Triggers, `workflow_call`, `needs`, permissions (per workflow)
     Checked against that workflow's declaration; see the contract file and
     dev/workflow-contract.md for the declaration grammar.
 
+Caller obligations (per reusable workflow)
+    A reusable workflow names the jobs a caller inherits by calling it. Each
+    has to exist and to run unconditionally, and every job a caller runs of its
+    own has to reach the call through `needs`, so nothing of the caller's
+    starts while an inherited job is still failing on the same commit.
+
 Exit codes
 ----------
 0   every declared assertion holds
@@ -72,6 +78,7 @@ WORKFLOW_RELDIR = Path(".github/workflows")
 WORKFLOW_SUFFIXES = (".yml", ".yaml")
 
 Finding = namedtuple("Finding", "path line message")
+Workflow = namedtuple("Workflow", "name path relative doc")
 
 
 def finding(path: Path, message: str, line: int | None = None) -> Finding:
@@ -151,6 +158,11 @@ def is_explicitly_false(value) -> bool:
 # --------------------------------------------------------------------------
 def workflow_jobs(doc) -> dict:
     return {str(name): as_mapping(job) for name, job in as_mapping(doc).get("jobs", {}).items()}
+
+
+def job_uses(job) -> str:
+    """The workflow or action a job runs in place of steps, or the empty string."""
+    return str(as_mapping(job).get("uses") or "").strip("\"'")
 
 
 def step_label(index: int, step) -> str:
@@ -652,6 +664,85 @@ def check_declared_jobs(relative: Path, doc, declaration) -> list[Finding]:
 
 
 # --------------------------------------------------------------------------
+# Caller obligations
+# --------------------------------------------------------------------------
+#
+# A reusable workflow is called by file name from the same tree
+# (`uses: ./.github/workflows/<file>`), which runs it on the caller's own
+# commit. Everything below is stated once, by the called workflow, and binds
+# every caller of it.
+LOCAL_CALL_PREFIX = f"./{WORKFLOW_RELDIR.as_posix()}/"
+
+
+def check_caller_obligation(workflow: Workflow, declaration, documents: dict) -> list[Finding]:
+    """Check what `workflow` promises every caller of it.
+
+    `callers.require_needs` names the jobs a caller inherits by calling this
+    workflow. The promise holds only while this workflow defines each of them
+    unconditionally — a skipped job leaves the call green, so a condition turns
+    an inherited result into an inherited nothing — and only while every caller
+    routes the work it runs itself through the call. A caller job that calls
+    another workflow of this repository is exempt: it is a verified boundary of
+    the same kind, and waiting on a sibling call would only serialize two.
+    """
+    required = as_list(as_mapping(as_mapping(declaration).get("callers")).get("require_needs"))
+    if not required:
+        return []
+
+    findings = []
+    if "workflow_call" not in normalize_triggers(workflow.doc):
+        findings.append(
+            finding(
+                workflow.relative,
+                "contract declares a caller obligation, but the workflow declares "
+                "no 'workflow_call' trigger",
+            )
+        )
+
+    jobs = workflow_jobs(workflow.doc)
+    for name in required:
+        if name not in jobs:
+            findings.append(
+                finding(
+                    workflow.relative,
+                    f"contract requires callers to inherit job {name!r}, "
+                    "which the workflow does not define",
+                )
+            )
+        elif jobs[name].get("if") is not None:
+            findings.append(
+                finding(
+                    workflow.relative,
+                    f"job {name!r} is promised to every caller but carries an 'if:' "
+                    "condition, so a caller can inherit a skip rather than a result",
+                )
+            )
+
+    reference = f"{LOCAL_CALL_PREFIX}{workflow.name}"
+    for caller in documents.values():
+        if caller.name == workflow.name:
+            continue
+        caller_jobs = workflow_jobs(caller.doc)
+        calls = {name for name, job in caller_jobs.items() if job_uses(job) == reference}
+        if not calls:
+            continue
+        graph = needs_graph(caller.doc)
+        findings.extend(
+            finding(
+                caller.relative,
+                f"job {name!r} does not reach the {reference!r} call through 'needs', "
+                "so it runs while the jobs that workflow promises its callers are "
+                "still running on the same commit",
+            )
+            for name, job in sorted(caller_jobs.items())
+            if name not in calls
+            and not job_uses(job).startswith(LOCAL_CALL_PREFIX)
+            and not transitive_predecessors(graph, name) & calls
+        )
+    return findings
+
+
+# --------------------------------------------------------------------------
 # Driver
 # --------------------------------------------------------------------------
 def verify(root: Path) -> tuple[list[Finding], str | None]:
@@ -701,6 +792,9 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
         if name not in committed
     ]
 
+    # Parsed once, up front: a caller obligation is stated by the called
+    # workflow and checked against every other workflow in the same tree.
+    documents = {}
     for path in workflows:
         relative = path.relative_to(root)
         if require_declaration and path.name not in declarations:
@@ -709,11 +803,15 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
         if error:
             findings.append(finding(relative, error))
             continue
-        declaration = as_mapping(declarations.get(path.name))
+        documents[path.name] = Workflow(path.name, path, relative, doc)
+
+    for workflow in documents.values():
+        relative, doc = workflow.relative, workflow.doc
+        declaration = as_mapping(declarations.get(workflow.name))
 
         findings.extend(check_job_graph(relative, doc))
         if require_sha_pinned_uses:
-            findings.extend(check_uses(root, path, False, doc, visited))
+            findings.extend(check_uses(root, workflow.path, False, doc, visited))
         if forbid_failure_escapes:
             findings.extend(check_failure_escapes(relative, doc))
         findings.extend(check_triggers(relative, doc, declaration.get("triggers")))
@@ -722,6 +820,7 @@ def verify(root: Path) -> tuple[list[Finding], str | None]:
             check_permissions(relative, doc, declaration, require_workflow_permissions)
         )
         findings.extend(check_declared_jobs(relative, doc, declaration))
+        findings.extend(check_caller_obligation(workflow, declaration, documents))
 
     return findings, None
 
