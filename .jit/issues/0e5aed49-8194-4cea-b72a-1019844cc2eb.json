@@ -10,28 +10,28 @@
       "doc_type": "investigation",
       "format": "markdown",
       "label": "Investigation: arm census, claim classification, exit-code parity",
-      "path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/investigation.md"
+      "path": "dev/archive/a2546471-json-error-contract/active/investigation.md"
     },
     {
       "commit": null,
       "doc_type": "investigation",
       "format": "markdown",
       "label": "Investigation: guard mechanisms, test infrastructure, documentation home",
-      "path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/investigation-guard-docs.md"
+      "path": "dev/archive/a2546471-json-error-contract/active/investigation-guard-docs.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Plan: structured failure reporting",
-      "path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/plan.md"
+      "path": "dev/archive/a2546471-json-error-contract/active/plan.md"
     },
     {
       "commit": null,
       "doc_type": "breakdown",
       "format": "markdown",
       "label": "Authoritative breakdown manifest",
-      "path": "dev/archive/a2546471-json-error-contract/active/a2546471-json-error-contract/breakdown.json"
+      "path": "dev/archive/a2546471-json-error-contract/active/breakdown.json"
     }
   ],
   "done_at": "2026-07-27T21:42:26.342207874Z",

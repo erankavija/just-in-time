@@ -37,14 +37,14 @@
       "doc_type": "notes",
       "format": "markdown",
       "label": "Archival completeness record",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/archive-completeness-record.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/archive-completeness-record.md"
     },
     {
       "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Consolidated in-content citation warnings",
-      "path": "dev/archive/8e071e18-dev-artifact-layout/active/8e071e18-dev-artifact-layout/citation-warning-consolidation.md"
+      "path": "dev/archive/8e071e18-dev-artifact-layout/active/citation-warning-consolidation.md"
     }
   ],
   "done_at": "2026-07-27T11:27:21.815115096Z",
