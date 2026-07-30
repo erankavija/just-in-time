@@ -95,6 +95,7 @@ echo "📋 Next steps:"
 echo "  1. git add ."
 echo "  2. git commit -m 'Add CI/CD pipeline and Docker support'"
 echo "  3. git push"
-echo "  4. Create release: git tag v0.1.0 && git push --tags"
+echo "  4. Create release: tag v<product-version> from" \
+    "crates/jit/Cargo.toml, then git push --tags"
 echo "  5. Test Docker: docker-compose up -d"
 echo

@@ -290,7 +290,7 @@ function App() {
       </div>
 
       <footer className="app-footer">
-        jit v0.1.0 | api: {window.location.hostname}:3000 | {theme} mode | {connected ? 'live' : 'reconnecting...'} | search: {searchQuery ? `"${searchQuery}"` : 'ready'}
+        jit v{__JIT_PRODUCT_VERSION__} | api: {window.location.hostname}:3000 | {theme} mode | {connected ? 'live' : 'reconnecting...'} | search: {searchQuery ? `"${searchQuery}"` : 'ready'}
       </footer>
 
       {/* Document Viewer Modal */}

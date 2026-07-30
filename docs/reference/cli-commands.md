@@ -507,7 +507,7 @@ Print the CLI package version plus local build provenance:
 
 ```bash
 jit --version
-# jit 0.2.1 (commit 44ee4610, dirty=false, profile release)
+# jit <package-version> (commit 44ee4610, dirty=false, profile release)
 ```
 
 Use `jit version` when you need the full provenance record.
@@ -707,7 +707,7 @@ jit version --json
 ```json
 {
   "package": "jit",
-  "version": "0.2.1",
+  "version": "<package-version>",
   "git_commit": "44ee4610bf33e7f35f4c87056c46a6cff3d13f5a",
   "git_short_commit": "44ee4610",
   "git_dirty": false,

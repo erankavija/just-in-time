@@ -254,7 +254,12 @@ See the [Configuration Reference](docs/reference/configuration.md) and [Example 
 
 ## Compatibility
 
-Each repository records its format version in `.jit/index.json`; `jit` refuses an index written with a newer format version rather than misreading it ([storage source](crates/jit/src/storage/json.rs)). Run `jit version` to report the installed CLI version.
+The [Product Compatibility reference](docs/reference/compatibility.md) owns the
+shared release version and supported component set. Repository data uses an
+independent format version in `.jit/index.json`; `jit` refuses an index written
+with a newer format version rather than misreading it
+([storage source](crates/jit/src/storage/json.rs)). Run `jit version` to report
+the installed CLI version.
 
 ## License
 

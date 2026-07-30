@@ -48,6 +48,12 @@ jobs:
       - name: Self-test the workflow contract harness
         run: ./scripts/workflow-contract-selftest.sh
 
+      - name: Verify product release versions
+        run: python3 scripts/release-version-contract.py
+
+      - name: Self-test the product release-version contract
+        run: python3 scripts/release_version_contract_test.py
+
   test-rust:
     name: Test Rust Components
     runs-on: ubuntu-latest

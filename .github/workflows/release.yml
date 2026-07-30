@@ -12,9 +12,21 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  version-contract:
+    name: Verify Product Release Version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Verify manifests, locks, compatibility, and tag
+        run: python3 scripts/release-version-contract.py --tag "${GITHUB_REF_NAME}"
+
   build-binaries:
     name: Build Linux Binaries
     runs-on: ubuntu-latest
+    needs: version-contract
     
     steps:
       - name: Checkout code
@@ -73,6 +85,7 @@ jobs:
   package-mcp-server:
     name: Package MCP Server
     runs-on: ubuntu-latest
+    needs: version-contract
     
     steps:
       - name: Checkout code
@@ -101,6 +114,7 @@ jobs:
   build-web-ui:
     name: Build Web UI
     runs-on: ubuntu-latest
+    needs: version-contract
     
     steps:
       - name: Checkout code
