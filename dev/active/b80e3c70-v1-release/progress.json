@@ -2,8 +2,8 @@
   "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
   "epic_short_id": "b80e3c70",
   "current_wave": 2,
-  "current_sub_wave": "1b",
-  "wave_note": "Wave 1 is dispatched in four sub-waves (1a, 1b, 1c, 1d). The execution-discovered archive-layout defect is ordered after c7f8ebc7 and before ef118aea so later archival reporting validates the canonical relative path. 1b is serialized behind 1a; 1c behind 1b; 1d behind all other wave-1 work.",
+  "current_sub_wave": "2a",
+  "wave_note": "Wave 2a is partially complete: 7b29019c and 5e538f48 are Done. 3b033738 remains in progress because independent review proved that the hard SPA-fallback criterion requires a narrow server-layer change outside its declared image-only blast radius; that scope escalation is awaiting user authorization. Subwaves 2b and 2c remain serialized behind completion of 2a.",
   "waves": [
     {
       "wave_number": 1,
@@ -306,25 +306,38 @@
           "short_id": "7b29019c",
           "title": "Remove repeated container slugs from archive destinations",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "discovered_during": "a122b9b3",
           "footprint_note": "Owns archive path derivation, its regressions, and canonicalization of 54 tracked repeated-owner paths without rewriting immutable history.",
           "planned_model": "gpt-5.6-sol/xhigh",
           "branch": "worktree-agent-7b29019c",
-          "agent": "/root/archive_owner_cutover"
+          "agent": "/root/archive_owner_cutover",
+          "branch_head": "037c9a09",
+          "merge_commit": "6ade0d31",
+          "rework_attempts": 1,
+          "review_note": "Initial review found owner stripping incorrectly assumed one-component areas. Rework derives exact normalized issue-scoped areas from configuration, supports nested areas, and preserves matching-looking directories in flat managed areas. Independent re-review passed.",
+          "gate_note": "The exact merged commit passed workspace build verification. The lead migrated 34 document paths and 3 structured asset resolved paths while preserving historical prose. cargo-ci, corrected code-review, and docs-mechanical passed sequentially. The first code-review correctly rejected a dangling satisfies:REQ-13 label; the label was removed and the rerun passed.",
+          "residual_path_note": "A separately surfaced bare-short-ID family remains outside this exact-full-slug fix: 46 paths total (25 current presentations, 21 legacy features). Legitimate vendor/reveal.js/reveal.js repetition remains allowed.",
+          "completed_at": "2026-07-30T08:56:05.171064090Z"
         },
         {
           "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
           "short_id": "5e538f48",
           "title": "Align the v1.0 product version and tag contract",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "depends_on": [
             "8fa7261b"
           ],
           "planned_model": "gpt-5.6-sol/xhigh",
           "branch": "worktree-agent-5e538f48",
-          "agent": "/root/whole_tree_invariants"
+          "agent": "/root/whole_tree_invariants",
+          "branch_head": "b7efb540",
+          "merge_commit": "7574ebfa",
+          "rework_attempts": 1,
+          "review_note": "Initial review found duplicate compatibility markers were accepted and stale v0.1.0 tag guidance remained. Rework enforces exactly one marker, adds duplicate/conflict regressions, and points release tagging to the manifest authority. Independent re-review passed.",
+          "gate_note": "Exact-commit verification passed. cargo-ci, npm-ci, mcp-ci, repo-validate, code-review, and jit-validate passed sequentially; the first cargo-ci attempt was preserved as a sandbox-only ~/.cache permission failure before the authorized rerun passed.",
+          "completed_at": "2026-07-30T08:31:39.758668069Z"
         },
         {
           "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
@@ -362,7 +375,10 @@
           ],
           "planned_model": "gpt-5.6-sol/xhigh",
           "branch": "worktree-agent-3b033738",
-          "agent": "/root/whole_tree_invariants/semantic_family_audit"
+          "agent": "/root/whole_tree_invariants/semantic_family_audit",
+          "branch_head": "6df7ab03",
+          "rework_attempts": 1,
+          "review_note": "The image/runtime contract passes under Podman for default and mapped identities. Review-driven rework made explicit runtime mode fail closed without a healthy engine and strengthened shutdown deadline/connection-count evidence. One blocker remains: unknown client routes return 404, so the hard SPA-fallback criterion is unmet; fixing crates/server/src/embedded.rs would exceed the declared Dockerfile/.dockerignore/fixture blast radius and is awaiting user authorization."
         }
       ]
     },
