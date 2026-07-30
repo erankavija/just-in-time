@@ -1,9 +1,9 @@
 {
  "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
  "epic_short_id": "b80e3c70",
- "current_wave": 4,
+ "current_wave": 5,
  "current_sub_wave": null,
- "wave_note": "Waves 2 and 3 are complete. e0fed1bb, f7f80d53, 22d374bd, cdee58b3, and 3a3b5704 are Done with every configured gate passed and merged to main. Wave 4 is f9af9788, Ready and undispatched; it carries three findings routed from waves 2-3 and must close them. Session 5 stopped here because the invoker scoped it to waves 2 and 3.",
+ "wave_note": "Session 6 drives waves 4-6. Wave 7 (bb03df0a, the tag) is withheld: the invoker confirmed no v1.0.0 tag is cut this session. Wave 5 runs e90b9a3b beside the newly filed c5c324df; their footprints are disjoint (documentation prose versus the profile manifest and the release version contract).",
  "waves": [
   {
    "wave_number": 1,
@@ -26,7 +26,7 @@
      "uncommitted": 0,
      "reported": "yes",
      "branch": "worktree-agent-7edd2fe8",
-     "touches_shared_file": "CHANGELOG.md — the only wave-1a branch that edits it, so no cross-branch conflict"
+     "touches_shared_file": "CHANGELOG.md \u2014 the only wave-1a branch that edits it, so no cross-branch conflict"
     },
     {
      "id": "8fa7261b-1be4-48ae-9968-ac0c7448fbc9",
@@ -438,7 +438,7 @@
      "short_id": "f9af9788",
      "title": "Publish v1.0 through one tag-triggered release workflow",
      "classification": "implementation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "22d374bd",
       "3a3b5704",
@@ -461,6 +461,13 @@
      "depends_on": [
       "f9af9788"
      ]
+    },
+    {
+     "id": "c5c324df-662e-45cb-978e-b90d74280c62",
+     "short_id": "c5c324df",
+     "title": "Align the embedded profile package's compatible jit range",
+     "classification": "implementation",
+     "status": "pending"
     }
    ]
   },
@@ -511,6 +518,14 @@
    "wiring": "Depends on c7f8ebc7; ef118aea depends on this issue; bb03df0a therefore retains release-gate coverage transitively.",
    "content_standards_review": "Passed after removing tracker-context and sibling references from the draft description before commit.",
    "scope_audit": "A 2026-07-29 scan found 297 repository-owned archive files under a duplicated */dev/* segment and 20 live non-history files referencing that shape. REQ-06 prevents a helper-only fix that leaves those materializations behind; immutable event payloads remain audit history."
+  },
+  {
+   "id": "c5c324df-662e-45cb-978e-b90d74280c62",
+   "short_id": "c5c324df",
+   "title": "Align the embedded profile package's compatible jit range",
+   "reason": "f9af9788's review surfaced that profiles/jit-dogfood/manifest.toml declares jit = \">=0.2.1, <0.3.0\" while the product declares 1.0.0. crates/jit/src/profile/package.rs:253 parses the requirement for syntax and never matches it against the running version, so nothing rejects it and jit profile list --json publishes the contradiction.",
+   "wiring": "bb03df0a depends on it, so the release act cannot precede the fix.",
+   "criterion_basis": "Epic REQ-07 names a check that rejects a manifest disagreeing with the others. Under the lead-review protocol a pitfall whose subject a criterion names is a criterion violation, not a follow-up, so it became a task inside the container rather than a deferred finding."
   }
  ],
  "escalations": [
@@ -601,6 +616,18 @@
    "detail": "f7f80d53's code-review raised one blocking issue-impact finding: release.yml:26 never calls security-audit.yml, so the three audit boundaries are predecessors of nothing in the publication path. The contract assertion exists and binds any caller; the caller does not exist yet.",
    "routed_to": "f9af9788",
    "criterion_check": "f9af9788 REQ-02 requires the reusable normal suites and the reusable blocking security workflow to run against the tagged commit before any artifact is built, and REQ-09 requires the contract to assert no publication job is reachable without them. Epic REQ-03 names the same predecessor relation. Verify at f9af9788 review and again at epic completion."
+  },
+  {
+   "subject": "release body relative links",
+   "detail": "docs/release-notes/v1.0.0.md carries ../../LICENSE-MIT, ../../LICENSE-APACHE, ../index.md and ../reference/compatibility.md. gh release create --notes-file passes the source verbatim, so if GitHub does not rewrite relative links in a release body the browser resolves them against the release-page URL and all four 404.",
+   "routed_to": "bb03df0a",
+   "criterion_check": "Epic REQ-09 requires release notes describing supported capabilities and upgrade expectations; the notes do that whether or not the links resolve, so this is a quality defect rather than a criterion violation. The invoker chose to ship and repair. Verify the rendered page when the release exists."
+  },
+  {
+   "subject": "installed jit-server binary predates the version alignment",
+   "detail": "The globally installed jit-server reports 0.1.0 while crates/server/Cargo.toml declares 1.0.0. scripts/install-jit.sh installs jit. Host state only; the repository manifests agree.",
+   "routed_to": "bb03df0a",
+   "criterion_check": "Not a criterion subject. It matters only because bb03df0a's clean-container verification must not be run against this host's stale binary."
   }
  ],
  "started_at": "2026-07-29T14:20:00+00:00",
@@ -695,6 +722,24 @@
    "decision": "Amend REQ-03 so the caller-obligation assertion is this issue's deliverable and the release-workflow binding is f9af9788's.",
    "reasoning": "The invoker authorized the amendment. Unlike e0fed1bb, the scope-boundary note alone did not clear the gate: REQ-03 named the release workflow and publication directly, and callers.require_needs binds only callers that exist, so the clause was literally unmet while no caller existed. f9af9788 REQ-02 and REQ-09 already carry the binding.",
    "rejected_alternative": "Wire the superseded release.yml to the security workflow now and discard it when f9af9788 rewrites that file, or leave f7f80d53 Gated until wave 4 lands outside this session's authorized scope."
+  },
+  {
+   "issue": "b80e3c70",
+   "decision": "Session 6 drives waves 4, 5 and 6 and stops before the release act.",
+   "reasoning": "The invoker confirmed no v1.0.0 tag is cut this session; bb03df0a needs the maintainer's push and annotated tag.",
+   "rejected_alternative": "Drive through bb03df0a and cut the tag on an explicit go-ahead."
+  },
+  {
+   "issue": "f9af9788",
+   "decision": "Publish docs/release-notes/v1.0.0.md verbatim as the release body, accepting that its four repository-relative links may 404 on the release page.",
+   "reasoning": "The invoker chose this over absolutising the links in the source or adding a rendering step. GitHub does not document whether it rewrites relative links in a release body; recovery is editing the body or re-cutting the tag, which the epic's Notes already name as the accepted failure path, so the real page settles the question at no cost.",
+   "rejected_alternative": "Absolute URLs in the committed note (loses docs-check-links coverage of those four), or a link-rendering step in the publish job (~15 lines plus a test)."
+  },
+  {
+   "issue": "f9af9788",
+   "decision": "Accept the worker's two-workflow split: release-publish.yml on the tag, release-artifacts.yml reusable and on every pull request.",
+   "reasoning": "It satisfies REQ-02 by placing every build behind the artifacts call, which needs validate and security, and REQ-08 by giving the artifact workflow its own pull-request trigger, without calling ci.yml and security-audit.yml a second time per pull request. No if: condition is needed anywhere, so forbid_failure_escapes holds without relying on the event-discriminating carve-out.",
+   "rejected_alternative": "One workflow triggered on both events with publication gated by github.event_name, which needs a condition and doubles PR CI if the suites are called from the shared path."
   }
  ],
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
