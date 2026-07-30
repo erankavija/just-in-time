@@ -35,7 +35,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "critical",
-  "state": "backlog",
+  "state": "ready",
   "title": "Cut the v1.0.0 tag and verify the published release",
-  "updated_at": "2026-07-30T21:26:10.891582633Z"
+  "updated_at": "2026-07-30T22:45:14.341750816Z"
 }
