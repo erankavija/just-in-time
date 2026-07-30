@@ -25,13 +25,30 @@
       "path": ".github/workflows/release-artifacts.yml"
     }
   ],
+  "done_at": "2026-07-30T21:25:08.265363258Z",
   "first_ready_at": "2026-07-29T13:46:32.658976373Z",
   "gates_required": [
     "repo-validate",
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-30T21:25:00.583737245Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T21:21:32.906829806Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T21:21:27.495829148Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f9af9788-9d54-4200-8da4-98818cc67fa9",
   "labels": [
     "type:task",
@@ -44,7 +61,7 @@
     "per:@/charter/D-16"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Publish v1.0 through one tag-triggered release workflow",
-  "updated_at": "2026-07-30T21:21:20.010002251Z"
+  "updated_at": "2026-07-30T21:25:08.265363258Z"
 }

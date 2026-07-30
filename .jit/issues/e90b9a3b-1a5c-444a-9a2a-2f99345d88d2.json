@@ -22,7 +22,7 @@
     "satisfies:REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Establish canonical installation, deployment, MCP, source, and release references",
-  "updated_at": "2026-07-29T13:53:03.218102218Z"
+  "updated_at": "2026-07-30T21:25:13.406167301Z"
 }
