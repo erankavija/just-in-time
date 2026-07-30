@@ -160,6 +160,26 @@ class ReleaseVersionContractTests(unittest.TestCase):
 
         self._assert_fails_with("compatibility declaration")
 
+    def test_contract_rejects_duplicate_compatibility_declarations(self) -> None:
+        declaration = self.root / "docs/reference/compatibility.md"
+        declaration.write_text(
+            declaration.read_text(encoding="utf-8")
+            + f"\n**Product compatibility version:** `{self.version}`\n",
+            encoding="utf-8",
+        )
+
+        self._assert_fails_with("expected exactly one")
+
+    def test_contract_rejects_conflicting_compatibility_declarations(self) -> None:
+        declaration = self.root / "docs/reference/compatibility.md"
+        declaration.write_text(
+            declaration.read_text(encoding="utf-8")
+            + "\n**Product compatibility version:** `7.8.8`\n",
+            encoding="utf-8",
+        )
+
+        self._assert_fails_with("conflicting product compatibility versions")
+
     def test_contract_rejects_missing_supported_capability(self) -> None:
         declaration = self.root / "docs/reference/compatibility.md"
         declaration.write_text(

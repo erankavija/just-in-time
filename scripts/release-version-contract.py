@@ -169,16 +169,29 @@ def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
     except OSError as error:
         findings.append(f"compatibility declaration at {COMPATIBILITY_PATH}: {error}")
     else:
-        match = COMPATIBILITY_PATTERN.search(compatibility_text)
-        if match is None:
+        declared_versions = COMPATIBILITY_PATTERN.findall(compatibility_text)
+        unique_versions = tuple(dict.fromkeys(declared_versions))
+        if not declared_versions:
             findings.append(
                 f"compatibility declaration at {COMPATIBILITY_PATH} is missing the "
                 "product compatibility version"
             )
-        elif expected is not None and match.group(1) != expected:
+        elif len(unique_versions) > 1:
+            rendered_versions = ", ".join(repr(version) for version in unique_versions)
+            findings.append(
+                "compatibility declaration has conflicting product compatibility "
+                f"versions {rendered_versions}; expected exactly one declaration"
+            )
+        elif len(declared_versions) > 1:
+            findings.append(
+                "compatibility declaration has "
+                f"{len(declared_versions)} product compatibility version declarations; "
+                "expected exactly one"
+            )
+        elif expected is not None and declared_versions[0] != expected:
             findings.append(
                 "compatibility declaration declares "
-                f"{match.group(1)}, expected {expected}"
+                f"{declared_versions[0]}, expected {expected}"
             )
         findings.extend(
             f"compatibility declaration is missing supported capability {capability!r}"
