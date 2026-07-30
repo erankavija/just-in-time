@@ -1,66 +1,33 @@
-version: '3.8'
+# One service: `jit-server` serving the API and the built web UI on one port,
+# against a whole repository bind-mounted at /repo.
+#
+# The mounted repository is initialized on the host (`jit init`) and the
+# container serves it in place, so `.jit/` and the project documents linked from
+# it keep their repository context.
+#
+# Point JIT_REPO at that repository and map the identity that owns it onto the
+# container user:
+#
+#   JIT_REPO=/path/to/your/repo \
+#   JIT_UID=$(stat -c '%u' /path/to/your/repo) \
+#   JIT_GID=$(stat -c '%g' /path/to/your/repo) \
+#   docker compose up -d
+#
+# Left unset, the service runs as the image default 10001:10001, which reaches
+# the mount only when that identity may read, write, and search it.
+# docs/how-to/deployment.md is the canonical account of this contract.
 
 services:
-  # API Server
-  api:
+  jit-server:
     build:
       context: .
-      dockerfile: docker/Dockerfile.api
-    container_name: jit-api
+      dockerfile: Dockerfile
+    image: jit-server:local
+    user: "${JIT_UID:-10001}:${JIT_GID:-10001}"
     ports:
-      - "3000:3000"
+      - "${JIT_PORT:-3000}:3000"
     volumes:
-      - jit-data:/data
+      - ${JIT_REPO:-.}:/repo
     environment:
-      - JIT_DATA_DIR=/data
-      - RUST_LOG=info
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
+      RUST_LOG: ${RUST_LOG:-info}
     restart: unless-stopped
-
-  # Web UI
-  web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.web
-    container_name: jit-web
-    ports:
-      - "8080:80"
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-    restart: unless-stopped
-
-  # CLI (for ad-hoc commands)
-  cli:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.cli
-    container_name: jit-cli
-    volumes:
-      - jit-data:/data
-    environment:
-      - JIT_DATA_DIR=/data
-    profiles:
-      - tools
-    entrypoint: ["sh"]
-    stdin_open: true
-    tty: true
-
-volumes:
-  jit-data:
-    driver: local
-
-networks:
-  default:
-    name: jit-network

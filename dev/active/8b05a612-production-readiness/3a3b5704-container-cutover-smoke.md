@@ -7,9 +7,8 @@ present. The deletions land in the commits that follow this record.
 ## Conditions
 
 - Date: 2026-07-30 UTC
-- Tree: `9a7fd536` with `docker/Dockerfile.api`, `docker/Dockerfile.web`,
-  `docker/Dockerfile.cli`, `docker/entrypoint.sh`, and `docker/nginx.conf` still
-  tracked.
+- Tree: `9a7fd536`, with the superseded split-image and CLI definitions under
+  `docker/` still tracked.
 - Engine: `podman version 6.0.1`. This host has no Docker daemon, so Podman is
   the runtime the contract suite was pointed at.
 

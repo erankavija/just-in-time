@@ -67,21 +67,19 @@ workflows:
       required:
         push:
           branches: [main]
-          tags: ['v*']
+        pull_request: {}
+      # A branch push and a pull request are the only events this workflow
+      # answers to: the image is built and smoked here, and a tag reaches
+      # publication through release.yml alone.
+      allowed: [push, pull_request]
       forbidden: [pull_request_target]
     permissions:
       contents: read
     jobs:
-      # Registry publication is the only reason a job here holds a write scope,
-      # and it holds no more than that.
-      build-and-push:
-        permissions:
-          contents: read
-          packages: write
-      build-all-in-one:
-        permissions:
-          contents: read
-          packages: write
+      # The workflow-level read scope is the whole token: no job here writes,
+      # so the workflow has no path to any registry.
+      build-and-smoke:
+        permissions: null
 
   docs.yml:
     triggers:
