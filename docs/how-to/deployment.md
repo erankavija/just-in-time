@@ -48,8 +48,8 @@ server that also proxies `/api` to `jit-server`.
 
 `npm run dev` starts Vite for frontend asset work. This repository's Vite
 configuration declares no `/api` proxy, so the dev server alone does not reach
-a separately started `jit-server`; use one of the three same-origin
-arrangements above, or add a reverse proxy for `/api`.
+a separately started `jit-server`: exercise the UI against JIT through one of
+the arrangements above.
 
 ## Running as Background Services
 
@@ -206,9 +206,10 @@ docker compose up -d
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
 | `JIT_LOCK_TIMEOUT` | `5` | Lock timeout in seconds (the default is the lock-acquisition timeout in [Runtime Coordination Defaults](../reference/runtime-defaults.md)) |
 
-The Compose service reads three further variables of its own: `JIT_REPO`, the
-repository to mount, and `JIT_UID`/`JIT_GID`, the [mount identity](#mount-identity)
-it runs as.
+The Compose service reads four further variables of its own: `JIT_REPO`, the
+repository to mount; `JIT_UID` and `JIT_GID`, the [mount
+identity](#mount-identity) it runs as; and `JIT_PORT`, the host port it
+publishes.
 
 ## Troubleshooting
 
