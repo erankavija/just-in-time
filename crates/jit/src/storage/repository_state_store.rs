@@ -71,6 +71,16 @@ pub enum RepositoryStateStoreError {
     Other(#[from] anyhow::Error),
 }
 
+/// Whether an advisory capture may replace this failure with unreadable
+/// evidence. Semantic capture failures and non-permission I/O stay hard.
+pub(crate) fn is_advisory_permission_denied(error: &RepositoryStateStoreError) -> bool {
+    matches!(
+        error,
+        RepositoryStateStoreError::Io(error)
+            if error.kind() == ErrorKind::PermissionDenied
+    )
+}
+
 /// Guards that a storage instance is reentered only for one canonical layout.
 ///
 /// A retained CLI session holds the reentrant lock chain while dispatch opens a
@@ -787,7 +797,16 @@ fn capture_capability_image(
 ) -> Result<RepositoryImage, RepositoryStateStoreError> {
     let entries = spec
         .paths()
-        .map(|path| Ok((path.clone(), inspect_capability_entry(layout, roots, path)?)))
+        .map(|path| {
+            let entry = match inspect_capability_entry(layout, roots, path) {
+                Ok(entry) => entry,
+                Err(error) if spec.is_advisory(path) && is_advisory_permission_denied(&error) => {
+                    advisory_unreadable_entry(path)?
+                }
+                Err(error) => return Err(error),
+            };
+            Ok((path.clone(), entry))
+        })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     let listings = spec
         .listings()
@@ -795,7 +814,7 @@ fn capture_capability_image(
         .map(|path| {
             Ok((
                 path.clone(),
-                inspect_capability_listing(layout, roots, path)?,
+                inspect_capability_listing(layout, roots, path, spec.is_advisory(path))?,
             ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
@@ -1098,10 +1117,24 @@ fn inspect_capability_entry(
     inspect_capability_leaf(&parent, &leaf)
 }
 
+fn advisory_unreadable_entry(
+    path: &VirtualPath,
+) -> Result<RepositoryEntry, RepositoryStateStoreError> {
+    Ok(RepositoryEntry::Unsupported {
+        identity: EntryIdentity::for_bytes(
+            format!("advisory-unreadable:{}", path.relative().as_str()),
+            b"",
+        )?,
+        reason: "advisory citation scan could not read this entry".into(),
+        mode: FileMode::Regular,
+    })
+}
+
 fn inspect_capability_listing(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
     path: &VirtualPath,
+    advisory: bool,
 ) -> Result<ListingFingerprint, RepositoryStateStoreError> {
     let entry = inspect_capability_entry(layout, roots, path)?;
     let RepositoryEntry::Directory { identity, .. } = entry else {
@@ -1114,18 +1147,44 @@ fn inspect_capability_listing(
     let directory = if path.relative().is_root() {
         root.try_clone()?
     } else {
-        open_descendant_dir_nofollow(root, path.relative().as_path())?
+        match open_descendant_dir_nofollow(root, path.relative().as_path()) {
+            Ok(directory) => directory,
+            Err(error) if advisory && is_advisory_permission_denied(&error) => {
+                return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
+            }
+            Err(error) => return Err(error),
+        }
     };
     let physical_directory = layout.resolve(path)?;
     let mut children = BTreeMap::new();
-    for entry in directory.entries()? {
-        let entry = entry?;
+    let entries = match directory.entries() {
+        Ok(entries) => entries,
+        Err(error) if advisory && error.kind() == ErrorKind::PermissionDenied => {
+            return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
+        }
+        Err(error) => return Err(error.into()),
+    };
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) if advisory && error.kind() == ErrorKind::PermissionDenied => {
+                return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
+            }
+            Err(error) => return Err(error.into()),
+        };
         let name = entry
             .file_name()
             .into_string()
             .map_err(|_| RepositoryStateStoreError::UnsafeTarget("non-UTF-8 entry".into()))?;
         let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
-        let identity = inspect_capability_entry(layout, roots, &child)?
+        let child_entry = match inspect_capability_entry(layout, roots, &child) {
+            Ok(entry) => entry,
+            Err(error) if advisory && is_advisory_permission_denied(&error) => {
+                advisory_unreadable_entry(&child)?
+            }
+            Err(error) => return Err(error),
+        };
+        let identity = child_entry
             .identity()
             .cloned()
             .ok_or_else(|| RepositoryStateStoreError::RetryableConflict { path: name.clone() })?;

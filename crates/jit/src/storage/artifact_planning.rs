@@ -1,7 +1,7 @@
 //! No-follow filesystem evidence acquisition for pure archive planning.
 
 use crate::domain::artifact_classifier::{
-    artifact_archive_destination, classification_facts_from_evidence,
+    artifact_archive_destination, classification_facts_from_evidence, contains_path,
     resolve_container_destination as derive_container_destination, ArtifactClassificationFacts,
     ArtifactClassificationPolicy, CitationScanEvidence, EmbeddedArtifactOwner,
     ResolvedContainerDestination,
@@ -14,7 +14,10 @@ use crate::domain::artifact_plan::{
 };
 use crate::repository_state::RootRelativePath;
 use crate::storage::file_transaction::open_regular_file_nofollow;
-use crate::storage::repository_state_store::{open_absolute_dir_nofollow, open_child_dir_nofollow};
+use crate::storage::repository_state_store::{
+    is_advisory_permission_denied, open_absolute_dir_nofollow, open_child_dir_nofollow,
+    RepositoryStateStoreError,
+};
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
 use anyhow::{anyhow, Result};
 use cap_std::fs::Dir;
@@ -127,7 +130,7 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
         evidence.insert(destination_root.to_string(), destination);
     }
     Ok(ArtifactClassificationFacts {
-        citations: collect_citation_scan_evidence(storage, &policy.citation_scan_roots),
+        citations: collect_citation_scan_evidence(storage, &policy.citation_scan_roots)?,
         ..classification_facts_from_evidence(
             target,
             destination_root,
@@ -141,12 +144,11 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
 
 /// Read the text of every file the declared citation scan roots reach.
 ///
-/// Advisory plan evidence, so no path failure reaches the caller: a declared
-/// root that is absent, a path component that is a symbolic link, a file whose
-/// bytes are not valid UTF-8, and any other unreadable path are skipped, and the
-/// plan is produced from whatever the scan did reach. A root naming one file
-/// contributes that file; a root naming a directory contributes every file
-/// beneath it.
+/// A declared root that is absent, a path component that is a symbolic link, a
+/// permission-denied subtree, and a file whose bytes are not valid UTF-8 are
+/// skipped. Other I/O failures stay hard errors. A root naming one file
+/// contributes that file; a root naming a directory contributes every readable
+/// file beneath it.
 ///
 /// The walk is [`inspect_artifact_evidence`]'s recursive listing, which opens
 /// every component with the no-follow directory handles the rest of the planner
@@ -155,31 +157,101 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
 pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
     storage: &S,
     roots: &[String],
-) -> CitationScanEvidence {
-    roots
+) -> Result<CitationScanEvidence, PathReadError> {
+    let files = roots
         .iter()
         .map(|root| normalize_artifact_path(root))
         .filter(|root| !root.is_empty())
-        .flat_map(|root| {
-            match inspect_artifact_evidence(storage, &root, ArtifactListingScope::RecursiveFiles) {
-                Ok(ArtifactEvidence::File(bytes)) => vec![(root, bytes)],
-                Ok(ArtifactEvidence::Directory { entries, .. }) => entries
+        .map(|root| {
+            match inspect_artifact_evidence_with_policy(
+                storage,
+                &root,
+                ArtifactListingScope::RecursiveFiles,
+                PermissionDeniedPolicy::Skip,
+            )? {
+                ArtifactEvidence::File(bytes) => Ok(vec![(root, bytes)]),
+                ArtifactEvidence::Directory { entries, .. } => entries
                     .into_iter()
-                    .filter_map(|entry| read_scanned_file(storage, entry))
+                    .map(|entry| read_scanned_file(storage, entry))
+                    .filter_map(Result::transpose)
                     .collect(),
-                _ => Vec::new(),
+                _ => Ok(Vec::new()),
             }
         })
+        .collect::<Result<Vec<_>, PathReadError>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    Ok(citation_scan_evidence_from_files(roots, files))
+}
+
+/// Derive advisory citation text from regular files reached by declared roots.
+///
+/// Both the ordinary preview boundary and the transactional archive boundary
+/// use this pure rule, keeping root normalization, containment, and UTF-8
+/// handling identical while their respective capture mechanisms establish the
+/// file-byte evidence.
+pub(crate) fn citation_scan_evidence_from_files(
+    roots: &[String],
+    files: impl IntoIterator<Item = (String, Vec<u8>)>,
+) -> CitationScanEvidence {
+    let roots = roots
+        .iter()
+        .map(|root| normalize_artifact_path(root))
+        .filter(|root| !root.is_empty())
+        .filter(|root| validate_repo_relative_path(root).is_ok())
+        .collect::<Vec<_>>();
+    files
+        .into_iter()
+        .map(|(path, bytes)| (normalize_artifact_path(&path), bytes))
+        .filter(|(path, _)| roots.iter().any(|root| contains_path(root, path)))
         .filter_map(|(path, bytes)| String::from_utf8(bytes).ok().map(|text| (path, text)))
         .collect()
 }
 
 /// Read one listed scan path, skipping everything that is not a regular file.
-fn read_scanned_file<S: IssueStore>(storage: &S, path: String) -> Option<(String, Vec<u8>)> {
-    match inspect_artifact_evidence(storage, &path, ArtifactListingScope::MetadataOnly) {
-        Ok(ArtifactEvidence::File(bytes)) => Some((path, bytes)),
-        _ => None,
+fn read_scanned_file<S: IssueStore>(
+    storage: &S,
+    path: String,
+) -> Result<Option<(String, Vec<u8>)>, PathReadError> {
+    match inspect_artifact_evidence_with_policy(
+        storage,
+        &path,
+        ArtifactListingScope::MetadataOnly,
+        PermissionDeniedPolicy::Skip,
+    )? {
+        ArtifactEvidence::File(bytes) => Ok(Some((path, bytes))),
+        _ => Ok(None),
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PermissionDeniedPolicy {
+    Hard,
+    Skip,
+}
+
+impl PermissionDeniedPolicy {
+    fn skips(self, error: &(dyn std::error::Error + 'static)) -> bool {
+        self == Self::Skip && is_permission_denied(error)
+    }
+}
+
+fn is_permission_denied(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut current = Some(error);
+    while let Some(cause) = current {
+        if cause
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|error| error.kind() == ErrorKind::PermissionDenied)
+            || cause
+                .downcast_ref::<RepositoryStateStoreError>()
+                .is_some_and(is_advisory_permission_denied)
+        {
+            return true;
+        }
+        current = cause.source();
+    }
+    false
 }
 
 /// Inspect one repository-relative path without following any symlink component.
@@ -187,6 +259,20 @@ pub(crate) fn inspect_artifact_evidence<S: IssueStore>(
     storage: &S,
     path: &str,
     listing_scope: ArtifactListingScope,
+) -> Result<ArtifactEvidence, PathReadError> {
+    inspect_artifact_evidence_with_policy(
+        storage,
+        path,
+        listing_scope,
+        PermissionDeniedPolicy::Hard,
+    )
+}
+
+fn inspect_artifact_evidence_with_policy<S: IssueStore>(
+    storage: &S,
+    path: &str,
+    listing_scope: ArtifactListingScope,
+    permission_denied: PermissionDeniedPolicy,
 ) -> Result<ArtifactEvidence, PathReadError> {
     if matches!(
         validate_repo_relative_path(path),
@@ -197,13 +283,14 @@ pub(crate) fn inspect_artifact_evidence<S: IssueStore>(
     validate_repo_relative_path(path)?;
     let layout = storage.repository_layout().map_err(PathReadError::Other)?;
     let root = open_absolute_dir_nofollow(layout.worktree_root()).map_err(other)?;
-    inspect_artifact_from_root(&root, path, listing_scope)
+    inspect_artifact_from_root(&root, path, listing_scope, permission_denied)
 }
 
 fn inspect_artifact_from_root(
     root: &Dir,
     path: &str,
     listing_scope: ArtifactListingScope,
+    permission_denied: PermissionDeniedPolicy,
 ) -> Result<ArtifactEvidence, PathReadError> {
     let relative = RootRelativePath::parse(path)
         .map_err(|error| PathReadError::InvalidPath(error.to_string()))?;
@@ -222,37 +309,65 @@ fn inspect_artifact_from_root(
             Err(error) if error.kind() == ErrorKind::NotFound => {
                 return Ok(ArtifactEvidence::Missing)
             }
+            Err(error) if permission_denied.skips(&error) => {
+                return Ok(ArtifactEvidence::Unsupported)
+            }
             Err(error) => return Err(error.into()),
         };
         if metadata.is_symlink() {
             return Ok(ArtifactEvidence::Symlink);
         }
-        parent = open_child_dir_nofollow(&parent, component).map_err(other)?;
+        parent = match open_child_dir_nofollow(&parent, component) {
+            Ok(parent) => parent,
+            Err(error) if permission_denied.skips(&error) => {
+                return Ok(ArtifactEvidence::Unsupported)
+            }
+            Err(error) => return Err(other(error)),
+        };
     }
     let metadata = match parent.symlink_metadata(leaf) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(ArtifactEvidence::Missing),
+        Err(error) if permission_denied.skips(&error) => return Ok(ArtifactEvidence::Unsupported),
         Err(error) => return Err(error.into()),
     };
     if metadata.is_symlink() {
         return Ok(ArtifactEvidence::Symlink);
     }
     if metadata.is_file() {
-        let mut file =
-            open_regular_file_nofollow(&parent, &leaf.to_string_lossy()).map_err(other)?;
+        let mut file = match open_regular_file_nofollow(&parent, &leaf.to_string_lossy()) {
+            Ok(file) => file,
+            Err(error) if permission_denied.skips(error.as_ref()) => {
+                return Ok(ArtifactEvidence::Unsupported)
+            }
+            Err(error) => return Err(other(error)),
+        };
         let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes).map_err(PathReadError::from)?;
+        if let Err(error) = file.read_to_end(&mut bytes) {
+            if permission_denied.skips(&error) {
+                return Ok(ArtifactEvidence::Unsupported);
+            }
+            return Err(error.into());
+        }
         return Ok(ArtifactEvidence::File(bytes));
     }
     if !metadata.is_dir() {
         return Ok(ArtifactEvidence::Unsupported);
     }
-    let directory = open_child_dir_nofollow(&parent, leaf).map_err(other)?;
+    let directory = match open_child_dir_nofollow(&parent, leaf) {
+        Ok(directory) => directory,
+        Err(error) if permission_denied.skips(&error) => return Ok(ArtifactEvidence::Unsupported),
+        Err(error) => return Err(other(error)),
+    };
     let entries = match listing_scope {
         ArtifactListingScope::MetadataOnly => Vec::new(),
         ArtifactListingScope::ImmediateChildren => list_immediate_children(&directory, path)?,
-        ArtifactListingScope::RecursiveFiles => list_recursive(&directory, path, false)?,
-        ArtifactListingScope::RecursiveEntries => list_recursive(&directory, path, true)?,
+        ArtifactListingScope::RecursiveFiles => {
+            list_recursive(&directory, path, false, permission_denied)?
+        }
+        ArtifactListingScope::RecursiveEntries => {
+            list_recursive(&directory, path, true, permission_denied)?
+        }
     };
     Ok(ArtifactEvidence::Directory {
         scope: listing_scope,
@@ -285,17 +400,35 @@ fn list_recursive(
     directory: &Dir,
     relative: &str,
     name_directories: bool,
+    permission_denied: PermissionDeniedPolicy,
 ) -> Result<Vec<String>, PathReadError> {
     let mut pending = vec![(directory.try_clone()?, relative.to_string())];
     let mut listed = Vec::new();
     while let Some((current, prefix)) = pending.pop() {
-        for entry in current.entries()? {
-            let entry = entry?;
+        let entries = match current.entries() {
+            Ok(entries) => entries,
+            Err(error) if permission_denied.skips(&error) => continue,
+            Err(error) => return Err(error.into()),
+        };
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) if permission_denied.skips(&error) => continue,
+                Err(error) => return Err(error.into()),
+            };
             let name = entry.file_name();
             let path = child_path(&prefix, name.clone())?;
-            let metadata = current.symlink_metadata(&name)?;
+            let metadata = match current.symlink_metadata(&name) {
+                Ok(metadata) => metadata,
+                Err(error) if permission_denied.skips(&error) => continue,
+                Err(error) => return Err(error.into()),
+            };
             if metadata.is_dir() && !metadata.is_symlink() {
-                let child = open_child_dir_nofollow(&current, &name).map_err(other)?;
+                let child = match open_child_dir_nofollow(&current, &name) {
+                    Ok(child) => child,
+                    Err(error) if permission_denied.skips(&error) => continue,
+                    Err(error) => return Err(other(error)),
+                };
                 pending.push((child, path.clone()));
                 if name_directories {
                     listed.push(path);

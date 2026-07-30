@@ -180,6 +180,9 @@ pub struct ListingFingerprint {
     container: Option<EntryIdentity>,
     /// Sorted child name to exact child identity; `None` is not representable.
     children: BTreeMap<String, EntryIdentity>,
+    /// True when an advisory scan could identify the directory but could not
+    /// enumerate it due to permission denial.
+    advisory_unreadable: bool,
     /// SHA-256 of the boundary's canonical listing serialization.
     sha256: String,
 }
@@ -187,7 +190,7 @@ pub struct ListingFingerprint {
 impl ListingFingerprint {
     /// Construct a deterministic fingerprint.
     pub fn new(children: BTreeMap<String, EntryIdentity>) -> Result<Self, CaptureError> {
-        Self::with_container(None, children)
+        Self::with_container(None, children, false)
     }
 
     /// Construct a fingerprint for one present directory and its complete children.
@@ -195,17 +198,24 @@ impl ListingFingerprint {
         container: EntryIdentity,
         children: BTreeMap<String, EntryIdentity>,
     ) -> Result<Self, CaptureError> {
-        Self::with_container(Some(container), children)
+        Self::with_container(Some(container), children, false)
     }
 
     /// Construct a fingerprint for an absent listing root.
     pub fn for_absent() -> Result<Self, CaptureError> {
-        Self::with_container(None, BTreeMap::new())
+        Self::with_container(None, BTreeMap::new(), false)
+    }
+
+    /// Capture an advisory scan directory whose metadata was readable but whose
+    /// children could not be enumerated due to permission denial.
+    pub fn for_advisory_unreadable(container: EntryIdentity) -> Result<Self, CaptureError> {
+        Self::with_container(Some(container), BTreeMap::new(), true)
     }
 
     fn with_container(
         container: Option<EntryIdentity>,
         children: BTreeMap<String, EntryIdentity>,
+        advisory_unreadable: bool,
     ) -> Result<Self, CaptureError> {
         if let Some(identity) = &container {
             identity.validate()?;
@@ -224,6 +234,14 @@ impl ListingFingerprint {
             }
             None => hash_field(&mut hasher, b"absent"),
         }
+        hash_field(
+            &mut hasher,
+            if advisory_unreadable {
+                b"advisory-unreadable"
+            } else {
+                b"complete"
+            },
+        );
         for (name, identity) in &children {
             hash_field(&mut hasher, name.as_bytes());
             hash_field(&mut hasher, identity.object.as_bytes());
@@ -233,6 +251,7 @@ impl ListingFingerprint {
         Ok(Self {
             container,
             children,
+            advisory_unreadable,
             sha256: format!("{:x}", hasher.finalize()),
         })
     }
@@ -240,6 +259,11 @@ impl ListingFingerprint {
     /// Sorted child identities used to derive this fingerprint.
     pub fn children(&self) -> &BTreeMap<String, EntryIdentity> {
         &self.children
+    }
+
+    /// Whether this listing intentionally omits an unreadable advisory subtree.
+    pub fn is_advisory_unreadable(&self) -> bool {
+        self.advisory_unreadable
     }
 
     /// Exact listed-directory identity, or `None` when it was absent.
@@ -260,7 +284,12 @@ impl ListingFingerprint {
             validate_listing_name(name)?;
             identity.validate()?;
         }
-        if Self::with_container(self.container.clone(), self.children.clone())?.sha256
+        if Self::with_container(
+            self.container.clone(),
+            self.children.clone(),
+            self.advisory_unreadable,
+        )?
+        .sha256
             != self.sha256
         {
             return Err(CaptureError::ListingFingerprintMismatch);
@@ -498,6 +527,7 @@ pub struct CaptureBudget {
 pub struct CaptureSpec {
     fixed: BTreeSet<VirtualPath>,
     discovered: BTreeSet<VirtualPath>,
+    advisory: BTreeSet<VirtualPath>,
     listings: BTreeSet<VirtualPath>,
     pinned: BTreeSet<(String, String)>,
     linked_worktree: BTreeSet<VirtualPath>,
@@ -513,6 +543,7 @@ impl CaptureSpec {
         let spec = Self {
             fixed: fixed.into_iter().collect(),
             discovered: BTreeSet::new(),
+            advisory: BTreeSet::new(),
             listings: BTreeSet::new(),
             pinned: BTreeSet::new(),
             linked_worktree: BTreeSet::new(),
@@ -536,6 +567,28 @@ impl CaptureSpec {
         candidate.validate()?;
         *self = candidate;
         Ok(())
+    }
+
+    /// Add paths whose unreadable file bytes are advisory rather than fatal.
+    pub fn discover_advisory_paths(
+        &mut self,
+        paths: impl IntoIterator<Item = VirtualPath>,
+    ) -> Result<(), CaptureError> {
+        let mut candidate = self.clone();
+        for path in paths {
+            if !candidate.fixed.contains(&path) {
+                candidate.discovered.insert(path.clone());
+            }
+            candidate.advisory.insert(path);
+        }
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Whether an unreadable entry is advisory for this capture.
+    pub fn is_advisory(&self, path: &VirtualPath) -> bool {
+        self.advisory.contains(path)
     }
 
     /// Require a complete non-recursive listing.
@@ -607,6 +660,9 @@ impl CaptureSpec {
         }
         if self.discovered.iter().any(|path| self.fixed.contains(path)) {
             return Err(CaptureError::DuplicateCapturePath);
+        }
+        if self.advisory.iter().any(|path| !self.contains_path(path)) {
+            return Err(CaptureError::AdvisoryPathNotCaptured);
         }
         let path_count = self.fixed.len()
             + self.discovered.len()
@@ -1520,6 +1576,8 @@ pub enum CaptureError {
     DepthBudgetExceeded(VirtualPath),
     #[error("capture spec contains the same path in fixed and discovered sets")]
     DuplicateCapturePath,
+    #[error("advisory capture path was not included in the capture read set")]
+    AdvisoryPathNotCaptured,
     #[error("phase-one fixed capture requires a Data path, got {0:?}")]
     PhaseOneRequiresDataPath(VirtualPath),
     #[error("capture did not provide requested path {0:?}")]
@@ -1920,6 +1978,23 @@ mod tests {
             ),
             Err(CaptureError::ListingFingerprintMismatch)
         ));
+    }
+
+    #[test]
+    fn test_listing_fingerprint_distinguishes_complete_empty_from_advisory_unreadable() {
+        let identity = EntryIdentity::for_bytes("scan-root", b"directory").unwrap();
+        let complete =
+            ListingFingerprint::for_directory(identity.clone(), BTreeMap::new()).unwrap();
+        let unreadable = ListingFingerprint::for_advisory_unreadable(identity).unwrap();
+
+        assert!(!complete.is_advisory_unreadable());
+        assert!(unreadable.is_advisory_unreadable());
+        assert_ne!(complete.sha256(), unreadable.sha256());
+        assert_ne!(complete, unreadable);
+        assert_ne!(
+            serde_json::to_value(&complete).unwrap(),
+            serde_json::to_value(&unreadable).unwrap()
+        );
     }
 
     fn close_listing(
