@@ -33,7 +33,23 @@
     "doc-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-07-30T22:23:41.610909435Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-30T22:21:19.344810563Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-30T22:21:22.456805611Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2",
   "labels": [
     "type:task",
@@ -44,5 +60,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Establish canonical installation, deployment, MCP, source, and release references",
-  "updated_at": "2026-07-30T22:02:55.521562835Z"
+  "updated_at": "2026-07-30T22:23:41.610909435Z"
 }

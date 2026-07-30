@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "4f833493e0893906c3e0c68380589d15533bb749",
+  "completed_at": "2026-07-30T22:05:42.598587956Z",
+  "duration_ms": 142286,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "README.md",
+        "id": "F1",
+        "line": 60,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "README routes MCP adopters to a non-canonical source-checkout README instead of the released-tarball MCP guide."
+      },
+      {
+        "disposition": "blocking",
+        "file": "scripts/docs-canonical-homes.toml",
+        "id": "F2",
+        "line": 22,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The canonical-home checker excludes root and package READMEs, so it cannot fail on duplicated adopter workflows there."
+      }
+    ],
+    "summary": "Canonical installation and release references are accurate, but MCP entry-point discoverability and duplicate detection remain incomplete.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "e90b9a3b-1a5c-444a-9a2a-2f99345d88d2",
+  "message": null,
+  "run_id": "5b8abaa2-f9dc-4076-80ac-cad7253a76a7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T22:03:20.312311411Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.lc8KaJ4rJI: binary file matches\n--- agent stderr (first 12 of 16366 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb50d-af3b-7f01-a4ab-4f3764a1a489\n--------\n--- 16354 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf `task` with no resolved children; reviewed the 10 reachable `jit:e90b9a3b` commits individually. The resulting documentation is mostly accurate, but canonical MCP discoverability and duplication enforcement remain incomplete.\n\n1. **Blocking — issue-impact (high):** The root README directs MCP adopters to the package README rather than the new canonical MCP guide, while that package README presents a separate source-checkout setup and client configuration without routing released-artifact users to the guide. This leaves the canonical release-tarball workflow undiscoverable from a primary entry point. Update [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:60) to link `docs/how-to/mcp-integration.md`, and add a prominent canonical-guide link in [mcp-server/README.md](/home/vkaskivuo/Projects/just-in-time/mcp-server/README.md:21), explicitly labelling its commands as source-checkout/development use.\n\n2. **Blocking — issue-impact (medium):** The new canonical-home checker scans only `docs/` plus declared homes, excluding the other adopter-facing pages. Consequently it passes despite the duplicated native-install and source-build instructions in [README.md](/home/vkaskivuo/Projects/just-in-time/README.md:42), and cannot detect duplicate MCP setup in `mcp-server/README.md`. Expand the scan scope in [scripts/docs-canonical-homes.toml](/home/vkaskivuo/Projects/just-in-time/scripts/docs-canonical-homes.toml:22) to cover `README.md`, `INSTALL.md`, `mcp-server/README.md`, and `web/README.md`; then consolidate or route duplicate workflows to their canonical homes.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Canonical installation and release references are accurate, but MCP entry-point discoverability and duplicate detection remain incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"README routes MCP adopters to a non-canonical source-checkout README instead of the released-tarball MCP guide.\",\"file\":\"README.md\",\"line\":60},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The canonical-home checker excludes root and package READMEs, so it cannot fail on duplicated adopter workflows there.\",\"file\":\"scripts/docs-canonical-homes.toml\",\"line\":22}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
