@@ -3,10 +3,11 @@
 
 One product release version has to reach the CLI, the server, the MCP package,
 the web bundle, their lock metadata, the release tag, and the compatibility
-record. The same run checks the release's legal and narrative metadata: the
-license texts the manifest expression names, the changelog entry for the
-declared version, the compatibility-and-upgrade record, and the committed
-release-note source the publication workflow renders.
+record, and it has to fall inside the compatible range the embedded profile
+package declares. The same run checks the release's legal and narrative
+metadata: the license texts the manifest expression names, the changelog entry
+for the declared version, the compatibility-and-upgrade record, and the
+committed release-note source the publication workflow renders.
 
 With `--declared` the run prints the version it derived instead of its summary,
 which is how the publication workflow names the release note it renders without
@@ -50,6 +51,20 @@ CHANGELOG_RELEASE_PATTERN = re.compile(
 RELEASE_NOTES_ROOT = Path("docs/release-notes")
 MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
 FENCED_BLOCK_PATTERN = re.compile(r"^```", re.MULTILINE)
+
+# The embedded profile package states which product versions it composes with.
+# The binary parses that range for syntax alone, so this is where the range and
+# the version it claims to admit are matched.
+PROFILE_PACKAGE_MANIFEST = Path("profiles/jit-dogfood/manifest.toml")
+# A released version is `major.minor.patch` throughout this contract — the
+# changelog heading it checks admits no other form — so a compatibility range is
+# read in the same terms. A comparator written as a caret, tilde, wildcard, or
+# bare version, or carrying a prerelease or build identifier, is reported rather
+# than interpreted, so a range this check cannot match exactly never passes as
+# an admitting one.
+RELEASE_SOURCE = r"(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"
+RELEASE_PATTERN = re.compile(RELEASE_SOURCE)
+COMPARATOR_PATTERN = re.compile(r"(?P<operator>>=|<=|>|<|=)\s*" + RELEASE_SOURCE)
 
 # The workspace manifest owns the SPDX expression and the author declaration
 # the copyright holder is derived from. The crate manifests inherit that
@@ -380,6 +395,101 @@ def verify_release_note(
         findings.append(f"release note at {relative} does not cite {COMPATIBILITY_PATH}")
 
 
+class Comparator(NamedTuple):
+    """One bound of a declared compatibility range."""
+
+    operator: str
+    bound: tuple[int, int, int]
+
+    def admits(self, release: tuple[int, int, int]) -> bool:
+        """Report whether one release satisfies this bound."""
+        return {
+            ">=": release >= self.bound,
+            ">": release > self.bound,
+            "<=": release <= self.bound,
+            "<": release < self.bound,
+            "=": release == self.bound,
+        }[self.operator]
+
+
+def release_of(match: re.Match[str]) -> tuple[int, int, int]:
+    """Return the release a match's `major`, `minor`, and `patch` groups name."""
+    major, minor, patch = (
+        int(match.group(part)) for part in ("major", "minor", "patch")
+    )
+    return (major, minor, patch)
+
+
+def parse_release(value: str) -> tuple[int, int, int]:
+    """Parse one release, raising `ValueError` for any other version form."""
+    match = RELEASE_PATTERN.fullmatch(value)
+    if match is None:
+        raise ValueError(f"{value!r} is not a major.minor.patch release")
+    return release_of(match)
+
+
+def parse_compatibility_range(declared: str) -> tuple[Comparator, ...]:
+    """Parse the comma-separated comparators of a declared compatibility range.
+
+    Raises `ValueError` for any comparator outside the forms this check reads,
+    so an uninterpreted range fails rather than passes.
+    """
+
+    def comparator(part: str) -> Comparator:
+        match = COMPARATOR_PATTERN.fullmatch(part.strip())
+        if match is None:
+            raise ValueError(
+                f"comparator {part.strip()!r} is outside the forms this check "
+                "reads: >=, >, <=, <, or = followed by a major.minor.patch release"
+            )
+        return Comparator(match.group("operator"), release_of(match))
+
+    return tuple(map(comparator, declared.split(",")))
+
+
+def range_admits(declared: str, version: str) -> bool:
+    """Report whether a declared compatibility range admits one version.
+
+    Raises `ValueError` when either side is outside what this check reads.
+    """
+    release = parse_release(version)
+    return all(
+        comparator.admits(release)
+        for comparator in parse_compatibility_range(declared)
+    )
+
+
+def verify_profile_compatibility(
+    root: Path, expected: str, findings: list[str]
+) -> None:
+    """Check that the embedded profile package admits the derived version."""
+    try:
+        declared = nested_string(
+            read_toml(root / PROFILE_PACKAGE_MANIFEST), "profile", "jit"
+        )
+    except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
+        findings.append(
+            f"profile compatibility range at {PROFILE_PACKAGE_MANIFEST}: {error}"
+        )
+        return
+
+    try:
+        admits = range_admits(declared, expected)
+    except ValueError as error:
+        findings.append(
+            f"profile compatibility range {declared!r} at "
+            f"{PROFILE_PACKAGE_MANIFEST} was not matched against product version "
+            f"{expected}: {error}"
+        )
+        return
+
+    if not admits:
+        findings.append(
+            f"profile compatibility range {declared!r} at "
+            f"{PROFILE_PACKAGE_MANIFEST} excludes product version {expected}"
+        )
+
+
 def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
     """Return the manifest-derived product version and all contract findings."""
     findings: list[str] = []
@@ -497,6 +607,7 @@ def verify(root: Path, tag: str | None = None) -> tuple[str | None, list[str]]:
     if expected is not None:
         verify_changelog(root, expected, findings)
         verify_release_note(root, expected, license_paths, findings)
+        verify_profile_compatibility(root, expected, findings)
 
     return expected, findings
 
@@ -537,8 +648,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "release-version-contract: "
         f"product version {expected}; manifests, locks, tag, compatibility and "
-        "upgrade record, license texts, changelog entry, and release-note source "
-        "agree"
+        "upgrade record, license texts, changelog entry, release-note source, and "
+        "embedded profile compatibility range agree"
     )
     return 0
 

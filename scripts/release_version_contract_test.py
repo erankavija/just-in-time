@@ -36,6 +36,25 @@ APACHE_PHRASES = (
 AUTHOR = "Example Holder"
 MIT_COPYRIGHT_LINE = f"Copyright (c) 2026 {AUTHOR}"
 COMPATIBILITY_RECORD = "docs/reference/compatibility.md"
+PROFILE_PACKAGE_MANIFEST = "profiles/jit-dogfood/manifest.toml"
+
+
+def bounded_range(floor: str) -> str:
+    """Return the compatibility range from `floor` up to its next major release."""
+    major = int(floor.split(".")[0])
+    return f">={floor}, <{major + 1}.0.0"
+
+
+def next_patch(version: str) -> str:
+    """Return the release immediately after `version` in patch order."""
+    major, minor, patch = (int(part) for part in version.split("."))
+    return f"{major}.{minor}.{patch + 1}"
+
+
+def series_floor(version: str) -> str:
+    """Return the first release of the minor series `version` belongs to."""
+    major, minor, _ = version.split(".")
+    return f"{major}.{minor}.0"
 
 
 class ReleaseVersionContractTests(unittest.TestCase):
@@ -146,6 +165,12 @@ class ReleaseVersionContractTests(unittest.TestCase):
             "  [LICENSE-APACHE](../../LICENSE-APACHE)\n\n"
             "## Compatibility\n\n"
             "See [the compatibility record](../reference/compatibility.md).\n",
+        )
+
+        self._write(
+            PROFILE_PACKAGE_MANIFEST,
+            '[profile]\nmanifest-version = 1\nid = "jit-dogfood"\n'
+            f'version = "{self.version}"\njit = "{bounded_range(self.version)}"\n',
         )
 
         # Product and repository-format versions are separate contracts. The
@@ -371,6 +396,36 @@ class ReleaseVersionContractTests(unittest.TestCase):
         self._edit(self._release_note, "(../reference/compatibility.md)", "(elsewhere)")
 
         self._assert_fails_with(COMPATIBILITY_RECORD)
+
+    def test_contract_accepts_profile_package_range_admitting_the_product_version(
+        self,
+    ) -> None:
+        admitting = bounded_range(series_floor(self.version))
+        self._edit(PROFILE_PACKAGE_MANIFEST, bounded_range(self.version), admitting)
+
+        result = self._run(f"v{self.version}")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_contract_rejects_profile_package_range_excluding_the_product_version(
+        self,
+    ) -> None:
+        excluding = bounded_range(next_patch(self.version))
+        self._edit(PROFILE_PACKAGE_MANIFEST, bounded_range(self.version), excluding)
+
+        result = self._run(f"v{self.version}", declared=True)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn(self.version, result.stdout)
+        for named in (PROFILE_PACKAGE_MANIFEST, excluding, self.version):
+            self.assertIn(named, result.stderr)
+
+    def test_contract_rejects_profile_package_range_in_an_unread_comparator_form(
+        self,
+    ) -> None:
+        self._edit(PROFILE_PACKAGE_MANIFEST, f">={self.version}", f"^{self.version}")
+
+        self._assert_fails_with(f"^{self.version}")
 
     def test_contract_rejects_release_note_source_repeating_installation_commands(
         self,
