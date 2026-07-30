@@ -1,89 +1,46 @@
-# Multi-stage Dockerfile for JIT Issue Tracker (Linux only)
-# Builds CLI, API server, MCP server, and Web UI in one image
+# syntax=docker/dockerfile:1
 
-# Stage 1: Build Rust binaries
-FROM rust:alpine as rust-builder
+FROM node:22-alpine AS web-builder
 
-WORKDIR /build
-
-# Install build dependencies
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
-
-# Cache buster for scripts/ directory fix (2026-02-15)
-ARG CACHE_BUST=2026-02-15
-
-# Copy Cargo workspace files
-COPY Cargo.toml Cargo.lock ./
-COPY crates/ ./crates/
-COPY scripts/ ./scripts/
-
-# Build all Rust binaries (CLI and server)
-RUN cargo build --release --workspace
-
-# Strip binaries to reduce size
-RUN strip target/release/jit && \
-    strip target/release/jit-server
-
-# Stage 2: Build Web UI
-FROM node:20-slim as web-builder
-
-WORKDIR /build
-
-# Copy web UI files
-COPY web/package*.json ./
+WORKDIR /build/web
+COPY web/package.json web/package-lock.json ./
 RUN npm ci
-
 COPY web/ ./
 RUN npm run build
 
-# Stage 3: Runtime image
-FROM node:20-slim
+FROM rust:1.97-bookworm AS server-builder
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libssl-dev pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+COPY profiles/ ./profiles/
+COPY scripts/ ./scripts/
+COPY --from=web-builder /build/web/dist ./web/dist/
+RUN cargo build --locked --release -p jit-server --bin jit-server
+
+FROM debian:bookworm-slim
 
 LABEL org.opencontainers.image.title="JIT Issue Tracker"
-LABEL org.opencontainers.image.description="CLI-first issue tracker for AI agents"
+LABEL org.opencontainers.image.description="Repository-mounted JIT HTTP server and Web UI"
 LABEL org.opencontainers.image.source="https://github.com/erankavija/just-in-time"
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
-WORKDIR /app
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates ripgrep wget \
+  && printf '%s\n' '--hidden' > /etc/jit-ripgreprc \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=server-builder /build/target/release/jit-server /usr/local/bin/jit-server
 
-# Install runtime dependencies
-RUN apt-get update && \
-    apt-get install -y nginx ripgrep curl && \
-    rm -rf /var/lib/apt/lists/*
+ENV RIPGREP_CONFIG_PATH=/etc/jit-ripgreprc
 
-# Copy Rust binaries from builder
-COPY --from=rust-builder /build/target/release/jit /usr/local/bin/
-COPY --from=rust-builder /build/target/release/jit-server /usr/local/bin/
+WORKDIR /repo
+EXPOSE 3000
 
-# Copy MCP server
-COPY mcp-server/package*.json ./mcp-server/
-RUN cd mcp-server && npm ci --production
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
 
-COPY mcp-server/ ./mcp-server/
-
-# Copy Web UI build
-COPY --from=web-builder /build/dist /var/www/html
-
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/nginx.conf
-
-# Create data directory
-RUN mkdir -p /data && chmod 777 /data
-
-# Environment variables
-ENV JIT_DATA_DIR=/data
-ENV NODE_PATH=/app/mcp-server/node_modules
-
-# Expose ports
-EXPOSE 3000 80
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
-
-# Start script
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["all"]
+USER 10001:10001
+ENTRYPOINT ["/bin/sh", "-eu", "-c", "test -d /repo || { echo 'error: /repo must be a mounted repository directory' >&2; exit 78; }; test -r /repo && test -w /repo && test -x /repo || { echo 'error: /repo must be readable, writable, and searchable by the container identity' >&2; exit 78; }; test -d /repo/.jit || { echo 'error: /repo/.jit must exist; initialize the repository on the host' >&2; exit 78; }; test -r /repo/.jit && test -w /repo/.jit && test -x /repo/.jit || { echo 'error: /repo/.jit must be readable, writable, and searchable by the container identity' >&2; exit 78; }; exec /usr/local/bin/jit-server --data-dir /repo/.jit \"$@\"", "jit-server"]
