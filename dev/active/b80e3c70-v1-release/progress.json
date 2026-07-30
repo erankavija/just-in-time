@@ -1,7 +1,7 @@
 {
  "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
  "epic_short_id": "b80e3c70",
- "current_wave": 5,
+ "current_wave": 6,
  "current_sub_wave": null,
  "wave_note": "Session 6 drives waves 4-6. Wave 7 (bb03df0a, the tag) is withheld: the invoker confirmed no v1.0.0 tag is cut this session. Wave 5 runs e90b9a3b beside the newly filed c5c324df; their footprints are disjoint (documentation prose versus the profile manifest and the release version contract).",
  "waves": [
@@ -457,7 +457,7 @@
      "short_id": "e90b9a3b",
      "title": "Establish canonical installation, deployment, MCP, source, and release references",
      "classification": "documentation",
-     "status": "pending",
+     "status": "done",
      "depends_on": [
       "f9af9788"
      ]
@@ -748,6 +748,12 @@
    "reasoning": "doc-review blocked e90b9a3b on a checker scope the successor owns, and the successor cannot start until this issue is Done \u2014 a deadlock. The invoker chose absorption over a scope-boundary amendment or dropping the dependency, so the reviewer is satisfied literally with no criteria softened.",
    "rejected_alternative": "Record the scope boundary in the description and re-run doc-review (the e0fed1bb remedy), or drop the 080e54c6 dependency and run both as one wave.",
    "consequence": "080e54c6 shrinks to entry-point framing and the leave-archives-unchanged criterion; re-scope it after this lands."
+  },
+  {
+   "issue": "080e54c6",
+   "decision": "Run 080e54c6 as written, as a verification pass over the combined entry-point surface.",
+   "reasoning": "The absorption into e90b9a3b satisfied most of its criteria already: README and mcp-server/README carry context-bearing links, and M6's scan covers exactly the file list REQ-02 names. What remains is confirming the contributor entry points copy no adopter workflow, confirming archived evidence and the cargo-audit gate examples are untouched, and putting the combined surface through its own docs-mechanical and adversarial doc-review. No description change is needed, so no re-scoping.",
+   "rejected_alternative": "Reject 080e54c6 as absorbed, or amend its description down to what remains."
   }
  ],
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",
