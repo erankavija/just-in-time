@@ -658,6 +658,12 @@
    "decision": "Amend the issue with an explicit scope-boundary section rather than pulling the release-to-CI edge into it.",
    "reasoning": "The invoker authorized the amendment. e0fed1bb's criteria never name release.yml and its notes place publication in a dedicated workflow; f9af9788 REQ-07 deletes the current release.yml, so the edge built here would be discarded. This repeats the wave-2a remedy where 3c8db804 recorded the replacement-image cutover boundary after the same successor-collapse finding.",
    "rejected_alternative": "Wire release.yml to ci.yml inside e0fed1bb, or hold e0fed1bb open until f9af9788 lands and invert the dependency order."
+  },
+  {
+   "issue": "3a3b5704",
+   "decision": "Amend REQ-05 to exclude CHANGELOG.md from the residue sweep alongside dev/archive.",
+   "reasoning": "The invoker authorized the amendment. REQ-05 targets active consumer surfaces (scripts, Compose, workflows, docs, fixtures), but CHANGELOG.md is the one file this project mandates for removal narration, so the sweep as written forbade the record it requires. Code-review read the criterion correctly; the criterion was the defect.",
+   "rejected_alternative": "Rewrite the entry to name no removed Dockerfile, entrypoint or nginx path, /data volume, or registry, or drop the changelog entry entirely and reach v1.0 with no record of the container cutover."
   }
  ],
  "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",

@@ -11702,3 +11702,11 @@
 {"from":"in_progress","id":"72dbfbf9-bdb9-4581-a697-58b127422d4f","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:23:13.796209901Z","to":"done","type":"issue_state_changed"}
 {"id":"0b06dcf6-0565-4921-91cb-503baddb0fe5","issue_id":"e0fed1bb-dd07-49d1-8321-79a2d93805dc","timestamp":"2026-07-30T17:23:13.796209901Z","type":"issue_completed"}
 {"fields":["documents"],"id":"8593c60c-408f-48e1-bb4c-301f5229d1ea","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:04:51.937330675Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"cargo-ci","id":"f8234859-4a02-425d-96ff-63cd37053856","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:34:29.869972492Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"npm-ci","id":"117b3ac3-45bd-4d30-813c-07e2ffecc74e","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:34:51.711641402Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"d6eb37fe-2710-41dd-88b8-726c8b7efbb5","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:34:54.671785396Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"repo-validate","id":"a2e7f137-6a84-411b-96fe-04e44a718e28","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:34:57.748299937Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"jit-validate","id":"3379f08c-408b-43e8-a4f5-9a6a15f9071e","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:35:00.815314363Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"c3342206-0d9b-4f36-a3fb-d8af7e101407","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:42:31.596530736Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"dca59ed6-a0fb-4ea9-a188-42beaba83b8b","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T17:46:17.339243629Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"16857b68-8776-41ef-b5fa-bac006215f23","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-07-30T18:04:01.192075531Z","type":"issue_updated","updated_by":"issue-update"}
