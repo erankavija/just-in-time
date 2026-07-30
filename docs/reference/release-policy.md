@@ -16,8 +16,9 @@ bundle, their lock metadata, the release tag, and the compatibility record.
 declares and requires every one of those declarations to agree with it,
 together with the release's legal and narrative metadata: the license texts the
 manifest expression names, the changelog entry for the declared version, the
-compatibility-and-upgrade record, and the committed release-note source the
-publication workflow renders.
+compatibility-and-upgrade record, the committed release-note source the
+publication workflow renders, and the compatibility range the embedded profile
+package declares, which has to admit the derived version.
 
 ```bash
 python3 scripts/release-version-contract.py             # the verdict
