@@ -1,7 +1,7 @@
 {
   "epic_id": "b80e3c70-cf7d-4f72-b53d-6e556363be58",
   "epic_short_id": "b80e3c70",
-  "current_wave": 1,
+  "current_wave": 2,
   "current_sub_wave": "1b",
   "wave_note": "Wave 1 is dispatched in four sub-waves (1a, 1b, 1c, 1d). The execution-discovered archive-layout defect is ordered after c7f8ebc7 and before ef118aea so later archival reporting validates the canonical relative path. 1b is serialized behind 1a; 1c behind 1b; 1d behind all other wave-1 work.",
   "waves": [
@@ -266,7 +266,7 @@
           "short_id": "a122b9b3",
           "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "rejected",
           "gates": [
             "cargo-ci",
             "mcp-ci",
@@ -276,7 +276,8 @@
           ],
           "dispatch_order": 1,
           "planned_model": "gpt-5.6-sol/xhigh",
-          "branch": "worktree-agent-a122b9b3"
+          "branch": "worktree-agent-a122b9b3",
+          "rejection_reason": "User rejected the issue as ill-planned after the implementation audit showed that its three whole-tree invariants could not be enforced reliably at the promised breadth without a substantial rearchitecture or brittle semantic inference. No implementation commits were merged."
         }
       ]
     },
@@ -524,7 +525,7 @@
       "subject": "archive destinations repeat the container owner after the managed area",
       "detail": "A whole-tree path-format scan found 54 tracked paths shaped like dev/archive/<container>/<area>/<container>/..., including active and presentations artifacts for 8e071e18-dev-artifact-layout and active artifacts for a2546471-json-error-contract. This survived the development-root cutover and is the analogous redundant-owner nesting the user asked the lead to surface.",
       "routed_to": "7b29019c",
-      "criterion_check": "filed as a new in-epic canonical-cutover bug and scheduled after a122b9b3 because their archive/checker footprints overlap"
+      "criterion_check": "filed as a new in-epic canonical-cutover bug and scheduled in wave 2; a122b9b3 was later rejected without merging its overlapping checker work"
     }
   ],
   "started_at": "2026-07-29T14:20:00+00:00",
@@ -553,6 +554,12 @@
       "reasoning": "Declared ^3.24.1 floors below SDK 1.30's peer range ^3.25 || ^4.0, so the range had to move regardless of the audit; zod 3.x stopped shipping while 4.x is current, so under @/charter/D-11 a later zod-3 advisory would have no in-range fix. REQ-03 contemplates a validation-API migration.",
       "rejected_alternative": "Pin zod ^3.25.76, audit-clean today, reverting two test changes.",
       "open_verification": "CLOSED. Exactly one advertised default across all 112 tools (jit_item_search.query = \"\", optional); differential sweep shows 0 tools whose (accepted, argv) differ. tool-generator.js propagates defaults for positional args only, so a flag default cannot reach validateArguments."
+    },
+    {
+      "issue": "a122b9b3",
+      "decision": "Reject the issue as ill-planned and discard its unmerged implementation branch.",
+      "reasoning": "The user prohibited scope expansion after the audit showed that generic source scanning produced hundreds of ambiguous candidates, while reliable literal enforcement required compiler-backed semantic migrations and structural architecture changes far beyond one task. The issue bundled three distinct global policies without a defensible bounded mechanism.",
+      "rejected_alternative": "Expand the task into an unplanned cross-repository semantic-type and module-boundary rearchitecture, or accept a brittle hundreds-entry baseline."
     }
   ],
   "dispatch_snapshot": "/tmp/lead-pre-dispatch-20260729-141201.txt",

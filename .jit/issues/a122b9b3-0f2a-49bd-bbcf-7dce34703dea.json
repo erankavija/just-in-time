@@ -30,10 +30,11 @@
     "enforces:@/invariant/architecture-dependency-direction",
     "type:task",
     "epic:v1-release",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "resolution:ill-planned"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "rejected",
   "title": "Enforce semantic types, canonical cutovers, and architecture dependency direction",
-  "updated_at": "2026-07-30T05:00:20.453329793Z"
+  "updated_at": "2026-07-30T07:29:31.859870386Z"
 }

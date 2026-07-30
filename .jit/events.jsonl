@@ -11648,3 +11648,4 @@
 {"assignee":"agent:worker","id":"e36af996-bfb2-4f22-bc7f-bd31e047ce67","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","timestamp":"2026-07-30T05:00:20.453329793Z","type":"issue_claimed"}
 {"id":"758e05bd-2704-4c04-a703-e0ce8fe312c8","issue_id":"7b29019c-7316-4991-87a5-3fbbe7264b73","priority":"high","timestamp":"2026-07-30T05:29:11.322956771Z","title":"Remove repeated container slugs from archive destinations","type":"issue_created"}
 {"fields":["dependencies"],"id":"a61e0512-b601-4cfe-9b28-5e21a2cd434a","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-07-30T05:29:28.585199472Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"in_progress","id":"1eb96443-ba08-4577-8868-1453d8df4cb7","issue_id":"a122b9b3-0f2a-49bd-bbcf-7dce34703dea","timestamp":"2026-07-30T07:29:26.710342969Z","to":"rejected","type":"issue_state_changed"}
