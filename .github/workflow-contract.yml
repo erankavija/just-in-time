@@ -121,7 +121,7 @@ workflows:
         pull_request: {}
       # A branch push and a pull request are the only events this workflow
       # answers to: the image is built and smoked here, and a tag reaches
-      # publication through release.yml alone.
+      # publication through release-publish.yml alone.
       allowed: [push, pull_request]
       forbidden: [pull_request_target]
     permissions:
