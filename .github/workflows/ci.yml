@@ -9,6 +9,11 @@ on:
       - 'LICENSE'
       - '.gitignore'
   pull_request:
+  # One definition of the normal validation suites, run by every path that
+  # needs them: a branch push, a pull request, and any workflow of this
+  # repository that calls this one. A caller runs these jobs on its own
+  # commit and passes nothing in, so it cannot aim them at another commit.
+  workflow_call:
 
 permissions:
   contents: read

@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **The normal validation suites are callable from another workflow.** `ci.yml`
+  accepts `workflow_call` beside its branch-push and pull-request triggers, so
+  a branch build, a pull request, and any workflow of this repository that
+  calls it run one maintained definition of the repository, Rust, exact-MSRV,
+  MCP, and web jobs on their own commit. The call takes no input and no
+  secret, so a caller cannot aim the suites at a different commit.
+  `.github/workflow-contract.yml` gains a `callers.require_needs` declaration
+  for that promise: a reusable workflow names the jobs a caller inherits, and
+  the verifier then requires each of them to exist and to carry no `if:`
+  condition, and requires every job a caller runs of its own to reach the call
+  through `needs`. A caller job that calls another workflow of this repository
+  is exempt, so sibling calls run beside each other. Case vectors under
+  `test-vectors/workflow-contract/` cover an unrouted caller job, an absent
+  and a conditional promised job, a caller obligation on a workflow nothing can
+  call, and the conforming shape.
+
 - **`jit-server` shuts down gracefully instead of dying mid-connection.** The
   server awaited `axum::serve` bare, with no signal handling at all, so a
   `SIGTERM` from `jit serve --stop` (or Ctrl+C under `jit serve --fg`) killed

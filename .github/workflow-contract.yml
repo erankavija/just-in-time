@@ -39,6 +39,26 @@ workflows:
       forbidden: [pull_request_target]
     permissions:
       contents: read
+    workflow_call:
+      # No input and no secret. A caller runs these suites on its own commit;
+      # an input would be the knob that lets it aim them somewhere else.
+      inputs:
+        allowed: []
+      secrets:
+        allowed: []
+    callers:
+      # What a caller inherits by calling this workflow: the repository,
+      # Rust, exact-MSRV, MCP, and web validation this repository considers
+      # normal. Each has to exist here and to run unconditionally, and every
+      # job a caller runs of its own has to wait for the call.
+      require_needs:
+        - workflow-contract
+        - test-rust
+        - test-rust-features
+        - profile-adoption
+        - msrv
+        - test-mcp-server
+        - test-web-ui
     jobs:
       # The contract check itself: deleting or renaming this job is a finding,
       # so the harness cannot be removed from pull requests silently.
