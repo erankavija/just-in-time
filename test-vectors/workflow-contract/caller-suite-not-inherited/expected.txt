@@ -1,0 +1,4 @@
+# A caller that runs a job of its own beside the call gets no ordering from it:
+# 'publish' starts while the suites are still running on the same commit.
+exit: 1
+job 'publish' does not reach the './.github/workflows/validation.yml' call through 'needs'

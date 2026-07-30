@@ -9,7 +9,7 @@ Two checkers run over the same tree:
 | Checker | Covers |
 | --- | --- |
 | `actionlint`, pinned and checksum-verified | workflow schema, expression syntax, context and `needs` reference validity, shell quoting inside `run:` |
-| [`scripts/workflow-contract.py`](../scripts/workflow-contract.py) | this repository's structural declarations — triggers, `workflow_call` interfaces, `needs` edges, permissions, failure escapes, `uses:` pinning |
+| [`scripts/workflow-contract.py`](../scripts/workflow-contract.py) | this repository's structural declarations — triggers, `workflow_call` interfaces, `needs` edges, caller obligations, permissions, failure escapes, `uses:` pinning |
 
 The linter runs with its shellcheck and pyflakes integrations off, so a run
 depends on the pinned binary alone rather than on which tools the host happens
@@ -83,6 +83,8 @@ workflows:
         allowed: [digest]
       secrets:
         allowed: []
+    callers:                     # only for reusable workflows
+      require_needs: [validate]  # own jobs every caller inherits
     jobs:
       create-release:            # declaring a job asserts the workflow defines it
         permissions:             # exact match against that job's block
@@ -103,6 +105,27 @@ intermediate jobs are added between them.
 Two structural checks run on every workflow regardless of its declaration:
 `needs` may only name jobs the workflow defines, and the job graph must be
 acyclic.
+
+### Caller obligations
+
+A reusable workflow states once, in its own entry, what a caller gets by
+calling it. `callers.require_needs` names its own jobs, and binds every
+workflow in the tree that calls it by file name (`uses:` a
+`./.github/workflows/…` path, the form that runs the called workflow on the
+caller's own commit).
+
+Each job a caller runs itself has to reach that call through `needs`, so
+nothing of the caller's starts before every inherited job has succeeded. A
+caller holds one node for the whole called graph, so the edge it can declare
+names the call; the job list here is what gives that edge its content. One
+edge at the head of the caller's graph carries the whole graph, since `needs`
+is transitive. A caller job that calls another workflow of this repository is
+exempt: it is a verified boundary of the same kind, and making it wait would
+only serialize two sets of suites that can run beside each other.
+
+The promise is checked at its source too. A named job has to exist, and has to
+carry no `if:` condition: a skipped job leaves the call green, so a condition
+would turn an inherited result into an inherited nothing.
 
 ## Case vectors
 

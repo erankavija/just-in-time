@@ -1,0 +1,4 @@
+# A suite a caller is promised has to exist here: renaming or deleting one
+# would otherwise leave every caller inheriting a guarantee nothing runs.
+exit: 1
+requires callers to inherit job 'msrv', which the workflow does not define

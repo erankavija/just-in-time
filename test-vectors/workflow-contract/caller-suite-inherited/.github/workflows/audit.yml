@@ -1,0 +1,10 @@
+name: Audit
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  advisories:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./audit.sh

@@ -1,0 +1,14 @@
+version: 1
+
+global:
+  require_declaration: true
+  require_workflow_permissions: true
+  forbid_failure_escapes: true
+  require_sha_pinned_uses: true
+
+workflows:
+  validation.yml:
+    permissions:
+      contents: read
+    callers:
+      require_needs: [rust, msrv]
