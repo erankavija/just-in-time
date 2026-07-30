@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "da35e7237288a8cffabef6fcfdb6a8d4e72cd9b0",
+  "completed_at": "2026-07-30T17:22:12.687444227Z",
+  "duration_ms": 161011,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable reusable CI workflow and caller-contract implementation meets all hard criteria; the prior release-edge finding is explicitly owned by successor issue f9af9788.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
+  "message": null,
+  "run_id": "7ab271bb-786e-4f2f-8451-7882cf3f429e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T17:19:31.676017088Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:e0fed1bb commits 47959ec2, 0538b5a0, 09b41aee, d42bf1c5, 39eff8b0, a0319752, 0b0ea9a1, 2f22825d, da35e723\nPolicy sources: AGENTS.md\nResolved items: @/issue/b80e3c70/requirement/REQ-09 (issue description); @/gate/jit-validate (.jit/gates.toml); @/charter/D-16 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci=passed/0; npm-ci=passed/0; mcp-ci=passed/0; repo-validate=passed/0; jit-validate=passed/0\nTruncation recovery: re-read CI, contract, verifier, release, documentation, and per-commit test-vector patches in bounded path and line ranges after the combined read truncated\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable reusable CI workflow and caller-contract implementation meets all hard criteria; the prior release-edge finding is explicitly owned by successor issue f9af9788.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
