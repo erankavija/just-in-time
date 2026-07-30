@@ -310,7 +310,8 @@
           "discovered_during": "a122b9b3",
           "footprint_note": "Owns archive path derivation, its regressions, and canonicalization of 54 tracked repeated-owner paths without rewriting immutable history.",
           "planned_model": "gpt-5.6-sol/xhigh",
-          "branch": "worktree-agent-7b29019c"
+          "branch": "worktree-agent-7b29019c",
+          "agent": "/root/archive_owner_cutover"
         },
         {
           "id": "5e538f48-3118-45b8-a7e1-bc6bb6e41dc2",
@@ -321,8 +322,9 @@
           "depends_on": [
             "8fa7261b"
           ],
-          "planned_model": "gpt-5.6-terra/high",
-          "branch": "worktree-agent-5e538f48"
+          "planned_model": "gpt-5.6-sol/xhigh",
+          "branch": "worktree-agent-5e538f48",
+          "agent": "/root/whole_tree_invariants"
         },
         {
           "id": "e0fed1bb-dd07-49d1-8321-79a2d93805dc",
@@ -359,7 +361,8 @@
             "f04f7888"
           ],
           "planned_model": "gpt-5.6-sol/xhigh",
-          "branch": "worktree-agent-3b033738"
+          "branch": "worktree-agent-3b033738",
+          "agent": "/root/whole_tree_invariants/semantic_family_audit"
         }
       ]
     },
