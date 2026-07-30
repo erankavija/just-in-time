@@ -16,9 +16,17 @@
 # nowhere else — the uniqueness check is what gives the fact one home.
 # `source_token` names the literal to look for in `sources` when the automation
 # spells it differently from the page; it defaults to `doc`.
+#
+# A `[[fact.binding.exempt]]` entry names one path where the same literal is a
+# different statement rather than a copy — a contributor-facing command that
+# happens to spell the same thing — and the reason it is. The reason is
+# mandatory, and an exemption whose page stops stating the literal is reported,
+# so the table cannot accumulate dead entries.
 
-# Markdown scanned for duplicate statements, beside the homes themselves.
-scan_roots = ["docs"]
+# Markdown scanned for duplicate statements, beside the homes themselves: the
+# adopter documentation root plus the entry-point and component pages a reader
+# arrives through, which is where a copied adopter workflow otherwise hides.
+scan_roots = ["docs", "README.md", "mcp-server/README.md", "contrib/README.md", "AGENTS.md"]
 
 # Pages that must link every home, so a canonical page cannot fall out of the
 # documentation's own navigation.
@@ -100,6 +108,10 @@ home = "docs/how-to/deployment.md#building-the-web-ui"
   # The bundle command the image build and the release build both run.
   doc = "npm run build"
   sources = ["Dockerfile", ".github/workflows/release-artifacts.yml"]
+
+    [[fact.binding.exempt]]
+    path = "AGENTS.md"
+    reason = "one step of the contributor validation sequence for the web workspace, not the adopter instruction for producing the bundle jit-server embeds"
 
 [[fact]]
 id = "mcp-server-package"

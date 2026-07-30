@@ -171,7 +171,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the compatibility record the version contract reads rather than absorbing it.
   Every command, artifact name, mount path, health URL and prerequisite on
   those pages names the workflow, manifest, or image definition that keeps it
-  true.
+  true. The entry points that carried copies route to those homes instead:
+  `README.md` sent MCP adopters to the component directory and restated the
+  native install walkthrough, and `mcp-server/README.md` carried its own
+  install and client-configuration walkthrough; each now links the guide that
+  owns the workflow, while README keeps the product overview and the preferred
+  quickstart and the package README keeps its component architecture.
 
 - **The documentation gate fails when a canonical home rots.**
   `docs-mechanical` gains a fourth check, `scripts/docs-check-canonical.sh`
@@ -180,7 +185,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   literal an adopter acts on, and the automation carrying that literal: the
   check reports MISSING when the home, its anchor, its statement, or its
   navigation link is gone, STALE when a source stops carrying what the page
-  states, and DUPLICATE when a second scanned page states the same literal. The
+  states, and DUPLICATE when a second scanned page states the same literal. Its
+  scan covers the adopter documentation root together with the entry-point and
+  component pages a reader arrives through — `README.md`,
+  `mcp-server/README.md`, `contrib/README.md`, and `AGENTS.md` — since a copied
+  adopter workflow otherwise hides exactly there. Where a contributor file
+  legitimately spells the same literal for a different purpose, a
+  `[[fact.binding.exempt]]` entry states the path and the reason, and an
+  exemption whose page stops stating that literal is itself reported. The
   orchestrator appends every declared home to the resolved footprint, so the
   link and citation checks reach a canonical page outside the adopter
   documentation root — the installation guide is one. Each defect class is

@@ -239,6 +239,60 @@ write_canonical_fixture
 run_canonical
 assert_rc 0 $? "canonical: reverted fixture is clean"
 
+# A scan root naming a single file is scanned like a directory root, which is
+# what lets the manifest reach entry-point and component pages that sit outside
+# the documentation root.
+write_canonical_fixture
+# shellcheck disable=SC2016  # Markdown backticks are literal fixture content.
+printf '# Entry\n\nRun `deploy --now` to publish.\n' >"$canon/entry.md"
+cat >"$canon/filescan.toml" <<'TOML'
+scan_roots = ["pages", "entry.md"]
+navigation = ["index.md"]
+
+[[fact]]
+id = "fixture-fact"
+home = "pages/home.md#section"
+
+  [[fact.binding]]
+  doc = "deploy --now"
+  sources = ["automation.yml"]
+TOML
+(cd "$canon" && "$canonical" filescan.toml >/dev/null 2>&1)
+assert_rc 1 $? "canonical: fact restated in a file scan root is a finding"
+
+# A declared exemption carries the reason one page states the same literal for a
+# different purpose, and suppresses the duplicate — and only that one.
+cat >"$canon/exempt.toml" <<'TOML'
+scan_roots = ["pages", "entry.md"]
+navigation = ["index.md"]
+
+[[fact]]
+id = "fixture-fact"
+home = "pages/home.md#section"
+
+  [[fact.binding]]
+  doc = "deploy --now"
+  sources = ["automation.yml"]
+
+    [[fact.binding.exempt]]
+    path = "entry.md"
+    reason = "the contributor entry point runs the same command as one validation step"
+TOML
+(cd "$canon" && "$canonical" exempt.toml >/dev/null 2>&1)
+assert_rc 0 $? "canonical: declared exemption suppresses that page's duplicate"
+
+# Defect: the exempt page stops stating the literal, so the exemption has
+# outlived its cause and must not linger in the table unnoticed.
+printf '# Entry\n\nNothing to run here.\n' >"$canon/entry.md"
+(cd "$canon" && "$canonical" exempt.toml >/dev/null 2>&1)
+assert_rc 1 $? "canonical: exemption that outlived its cause is a finding"
+
+# An exemption with no stated reason is an unexplained hole in the uniqueness
+# rule; the manifest cannot express one.
+sed '/^    reason = /d' "$canon/exempt.toml" >"$canon/exempt_noreason.toml"
+(cd "$canon" && "$canonical" exempt_noreason.toml >/dev/null 2>&1)
+assert_rc 2 $? "canonical: exemption without a reason is an env error"
+
 # A manifest that cannot be read is an environment error, never a false-green pass.
 (cd "$canon" && "$canonical" no_such_manifest_zzz.toml >/dev/null 2>&1)
 assert_rc 2 $? "canonical: unreadable manifest is an env error"

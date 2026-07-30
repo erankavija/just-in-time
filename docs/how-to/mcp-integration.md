@@ -64,6 +64,10 @@ repository discovery, which is what pins the tools to one repository regardless
 of the working directory the client launches from. Without it, each command
 discovers the repository by walking up from that working directory.
 
+A client with its own registration command takes the same executable, for
+example `copilot mcp add jit -- jit-mcp-server` for the GitHub Copilot CLI,
+which records it in that client's own configuration file.
+
 ## What the Client Sees
 
 Every leaf command in `jit --schema` becomes a tool named `jit_<command_path>`,

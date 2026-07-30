@@ -39,27 +39,14 @@ Canonical issue data lives in the `.jit/` directory within your project, version
 
 ### Installation
 
-**Pre-built binaries (Linux x64):**
-```bash
-wget https://github.com/erankavija/just-in-time/releases/latest/download/jit-linux-x64.tar.gz
-tar -xzf jit-linux-x64.tar.gz
-sudo mv jit /usr/local/bin/    # Core CLI tool
-```
-
-**From source:**
-```bash
-./scripts/install-jit.sh    # wraps cargo install with build provenance
-```
-The wrapper records the source commit in the binary so jit's stale-binary
-guard can tell whether an installed binary matches the repository it
-validates. A plain `cargo install --path crates/jit` also works but produces
-a binary with unknown provenance, which the guard treats as unverifiable.
+[INSTALL.md](INSTALL.md) is the installation guide: downloading the published
+Linux x64 archive and verifying its checksum, building the binaries from a
+source checkout, and the provenance-recording wrapper that keeps the
+stale-binary guard effective.
 
 **Optional components:**
-- `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; see [Building the web UI](docs/how-to/deployment.md#building-the-web-ui).
-- **MCP Server**: Model Context Protocol server for AI agents (see [mcp-server/](mcp-server/))
-
-See [INSTALL.md](INSTALL.md) for all installation options.
+- `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; [Deployment](docs/how-to/deployment.md) covers serving a repository natively or from the container image, and [Building the web UI](docs/how-to/deployment.md#building-the-web-ui) covers the bundle.
+- **MCP Server**: Model Context Protocol server for AI agents — [MCP Integration](docs/how-to/mcp-integration.md) installs the released tarball and starts it from an MCP client.
 
 ### Basic Usage
 
