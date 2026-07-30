@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-30T16:55:32.372804005Z",
   "context": {},
   "created_at": "2026-07-15T09:12:53.175974891Z",
   "dependencies": [
@@ -26,7 +27,7 @@
     "satisfies:REQ-10"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Remove obsolete Docker topologies and migrate every active consumer",
-  "updated_at": "2026-07-30T10:01:38.346936610Z"
+  "updated_at": "2026-07-30T16:55:32.372804005Z"
 }

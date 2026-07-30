@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-30T16:55:24.040057774Z",
   "context": {},
   "created_at": "2026-07-15T09:12:53.172773078Z",
   "dependencies": [
@@ -22,7 +23,7 @@
     "satisfies:REQ-09"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Add the dual-license and compatibility release record",
-  "updated_at": "2026-07-30T08:31:46.502569342Z"
+  "updated_at": "2026-07-30T16:55:24.040057774Z"
 }
