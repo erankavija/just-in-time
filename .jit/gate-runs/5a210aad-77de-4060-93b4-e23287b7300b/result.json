@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/ai-review.sh",
+  "commit": "52aa3435e4c8c1477d6b88082d5f22f8b914bb2b",
+  "completed_at": "2026-07-30T04:57:13.632679469Z",
+  "duration_ms": 162335,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Archive execution now captures citation evidence, emits the preview-equivalent warning set in JSON and human output, documents the behavior, and has focused coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ef118aea-51b4-452b-9aba-fa2bcdf64b9c",
+  "message": null,
+  "run_id": "5a210aad-77de-4060-93b4-e23287b7300b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-30T04:54:31.297431209Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ad284d7c, 95867bb, 14f4a162, 87fc8855, 422c2f3e, 4d51cec3, 11c58278 (merge), 52aa3435\nPolicy sources: AGENTS.md\nResolved items: none (item resolution was unavailable because `jit item show` encountered the existing `.jit/.index.lock`; no unresolved item was used for judgment)\nGate evidence: cargo-ci passed (exit 0, 2026-07-30T04:45:33Z); code-review pending; doc-review pending\nTruncation recovery: re-read archive capture/planning, execution finalization, CLI rendering, documentation, and focused tests in bounded ranges\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Archive execution now captures citation evidence, emits the preview-equivalent warning set in JSON and human output, documents the behavior, and has focused coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

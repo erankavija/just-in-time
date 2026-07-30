@@ -229,7 +229,7 @@
           "short_id": "ef118aea",
           "title": "Archive execution reports no citation warnings",
           "classification": "implementation",
-          "status": "in_progress",
+          "status": "done",
           "gates": [
             "cargo-ci",
             "code-review",
@@ -241,7 +241,18 @@
           "merge_note": "c7f8ebc7 reflowed the moving-path-citation paragraph in docs/reference/cli-commands.md. Dispatch only after 625cc07f lands, then verify both citation-boundary and canonical archive-layout wording survive.",
           "dispatch_order": 1,
           "planned_model": "gpt-5.6-terra/high",
-          "branch": "worktree-agent-ef118aea"
+          "branch": "worktree-agent-ef118aea",
+          "branch_head": "4d51cec3",
+          "merge_commit": "11c58278",
+          "commits": 4,
+          "uncommitted": 0,
+          "reported": "yes",
+          "rework_attempts": 2,
+          "exceptional_rework_attempts": 1,
+          "exceptional_model": "gpt-5.6-sol/high",
+          "review_note": "The initial implementation aligned execution warnings with preview. Normal rework closed the 256-listing capture cap and added revalidatable unreadable-entry/listing evidence, but cumulative review found preview still dropped readable siblings beside a permission-denied subtree. The user-approved exceptional round made preview skip only the inaccessible subtree and added CLI parity, fingerprint distinction, pre-publication retry, and hard-error classification regressions. Final cumulative review passed with no findings.",
+          "gate_note": "The exact merged commit passed the workspace build verifier. The addressable @/issue/ef118aea/decision/D-01 records execution warning parity and the rejected preview-only alternative. cargo-ci, code-review, and doc-review passed sequentially on the clean merged tree.",
+          "completed_at": "2026-07-30T04:59:10.562559447Z"
         }
       ]
     },
