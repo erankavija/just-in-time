@@ -885,7 +885,7 @@ impl CommandExecutor<JsonFileStorage> {
                 std::iter::once(a.source().to_string()).chain(artifact_archive_destination(
                     &plan_target,
                     &destination,
-                    &policy.development_root,
+                    &policy,
                     a.source(),
                 ))
             })
@@ -1641,6 +1641,7 @@ mod tests {
                 "[documentation]\n",
                 "development_root = \"workspace\"\n",
                 "managed_paths = [\"workspace/active\", \"workspace/presentations\"]\n",
+                "issue_scoped_areas = [\"workspace/active\", \"workspace/presentations\"]\n",
                 "permanent_paths = []\n",
                 "archive_root = \"workspace/archive\"\n\n",
                 "[type_hierarchy]\n",

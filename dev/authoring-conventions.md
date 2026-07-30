@@ -292,9 +292,11 @@ The planner discovers supported Markdown, HTML, and CSS dependencies, classifies
 each artifact from reference ownership and the class of the area holding it, and
 reports blockers and warnings. Destinations mirror source paths relative to the
 configured development root beneath the plan's destination root. A container
-archive also removes a matching `<area>/<container-owner>/` prefix because the
-destination root already names that owner; the area and artifact-relative path
-remain, preserving relative links without repeating ownership. Execution
+archive also removes a matching `<issue-scoped-area>/<container-owner>/` prefix
+when the complete, possibly nested area is declared in `issue_scoped_areas`,
+because the destination root already names that owner. The area and
+artifact-relative path remain, preserving relative links without repeating
+ownership; matching-looking directories in flat managed areas remain. Execution
 rechecks the plan under the repository write guard, publishes without
 overwriting, updates exact issue references, records the durable archive event,
 and only then attempts identity-guarded source deletion.

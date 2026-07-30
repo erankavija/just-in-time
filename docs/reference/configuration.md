@@ -151,11 +151,13 @@ above; an authored list replaces that declaration whole, so an empty list opts
 every area out of the convention. Adoption is independent of the archival
 classification — an area may be managed and issue-scoped, managed and flat,
 permanent and issue-scoped, or neither — and the two shapes classify the same
-way. During container archival, a matching issue-scoped owner directory is
-omitted beneath the destination's area because the destination container root
-already records that owner; document archival has no container root and retains
-the owner directory. The key is not part of the three-key completeness that
-authorizes archival mutation.
+way. During container archival, a matching owner directory immediately beneath
+the complete normalized issue-scoped area is omitted because the destination
+container root already records that owner. Areas may contain multiple path
+components. A matching-looking directory in a managed area absent from this
+registry remains artifact-relative structure. Document archival has no container
+root and retains the owner directory. The key is not part of the three-key
+completeness that authorizes archival mutation.
 
 The directory an issue owns inside a declared area is `<area>/<short-id>-<slug>`
 when the issue resolves a single membership value, and `<area>/<short-id>`
