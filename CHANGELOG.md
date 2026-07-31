@@ -152,6 +152,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **The shipped development-area classification reaches the adopter
+  configuration documents by generation.** `docs/reference/configuration.md`
+  restated all three area lists by hand and `docs/reference/example-config.toml`
+  carried a reduced illustrative subset, with nothing binding either to the
+  constant `jit init` renders, so both drifted silently. Each file now carries
+  one marked region — `<!-- jit:shipped-documentation-policy:begin/end -->` in
+  the reference, `# jit:shipped-documentation-policy:begin/end` in the example
+  — that `scripts/generate-shipped-policy-regions.sh` fills with the
+  `[documentation]` table a throwaway `jit init` writes into a temporary
+  directory, the one route to the shipped values that reads no policy belonging
+  to this repository. The example configuration therefore ships the
+  classification a fresh repository actually receives. Because that table comes
+  from the installed binary rather than from the working tree, the generator
+  establishes currency positively before writing — the binary must report a
+  build commit, that commit must resolve in the repository being written to,
+  and the binary must report itself current there — and refuses on anything
+  less, since an unknown build commit, an unresolvable head, and an unrelated
+  repository all produce the same silence as a current binary.
+  `scripts/generate-shipped-policy-regions-selftest.sh` holds the regression
+  evidence for idempotence, for byte preservation outside the markers, and for
+  each refusal arm.
+
 - **Installation, deployment, MCP, and release facts each have one documented
   home.** The installation guide carried the container deployment, the web
   bundle build, and the MCP install beside the native archive, while the
