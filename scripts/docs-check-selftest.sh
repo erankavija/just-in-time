@@ -371,6 +371,22 @@ echo "stub jit: reached '$*' without established provenance" >&2
 exit 99
 STUB
 chmod +x "$policy_stub/jit"
+# A binary whose version report succeeds but cannot be read. The classification
+# is unobtainable rather than untrusted, and the check owes the same
+# environment failure for it — reading the report must not be the one step that
+# escapes with a status of its own.
+policy_unreadable="$scratch/policy-unreadable-stub"
+mkdir -p "$policy_unreadable"
+cat >"$policy_unreadable/jit" <<'STUB'
+#!/usr/bin/env bash
+if [ "${1:-}" = "version" ]; then
+  printf '{"git_commit":\n'
+  exit 0
+fi
+echo "stub jit: reached '$*' without a readable version report" >&2
+exit 99
+STUB
+chmod +x "$policy_unreadable/jit"
 
 if git clone --local --no-hardlinks --quiet . "$policy_clone" 2>/dev/null; then
   (
@@ -401,6 +417,11 @@ if git clone --local --no-hardlinks --quiet . "$policy_clone" 2>/dev/null; then
     PATH="$policy_stub:$PATH" "$policy" >/dev/null 2>&1
     echo "$?" >"$scratch/rc_policy_unresolvable"
 
+    # An untrustworthy classification, arm 1b: a version report that parses
+    # into nothing, so no provenance can be read out of it at all.
+    PATH="$policy_unreadable:$PATH" "$policy" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_policy_unreadable"
+
     # An untrustworthy classification, arm 2: a binary that predates the
     # repository under check. Committing a change to a build input in the clone
     # makes the installed binary older than the sources there, so the table it
@@ -416,6 +437,7 @@ if git clone --local --no-hardlinks --quiet . "$policy_clone" 2>/dev/null; then
   assert_rc 0 "$(cat "$scratch/rc_policy_untouched")" "shipped policy: a run leaves the tree it checks unmodified"
   assert_rc 1 "$(cat "$scratch/rc_policy_drift")" "shipped policy: a seeded stale region is a finding"
   assert_rc 2 "$(cat "$scratch/rc_policy_unresolvable")" "shipped policy: a classification whose provenance does not resolve is an environment failure"
+  assert_rc 2 "$(cat "$scratch/rc_policy_unreadable")" "shipped policy: a version report that cannot be read is an environment failure"
   assert_rc 2 "$(cat "$scratch/rc_policy_stale")" "shipped policy: a classification from a binary predating the tree under check is an environment failure"
 else
   echo "FAIL: could not create isolated clone for the shipped-policy check"
