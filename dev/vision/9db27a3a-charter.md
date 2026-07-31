@@ -26,7 +26,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-5: A milestone-tier steward skill sits above the epic-level execution lead
 - D-6: Each item kind declares its own source of truth (markdown-first or registry-first)
 - D-7: Charter decisions are project-addressable items over the vision charter
-- D-8: Ship one offline profile discovered from a declared repository-local location in v1.0 and defer the complete profile lifecycle
+- D-8: Ship composable offline profile packages discovered from declared locations in v1.0 and defer the rest of the profile lifecycle
 - D-9: Remove redundant release surfaces without removing product capabilities
 - D-10: Support one Docker topology that serves the API and web UI from a repository mount
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
@@ -136,22 +136,29 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   rationale stays readable below them.
 - **Date:** 2026-07-07
 
-### D-8: Adoption-focused profile MVP before the complete lifecycle
+### D-8: Composable offline profile packages before the complete lifecycle
 
-- **Chosen:** v1.0 ships one offline `jit-dogfood` profile, discovered from a
-  declared repository-local location, with safe application to fresh and
-  existing repositories. Multi-profile composition, local packages beyond that
-  one declared location, variables, reconfiguration, diff, upgrade, removal, and
+- **Chosen:** v1.0 ships offline profile packages discovered from declared
+  locations, composed by declared package-to-package dependency, and applied
+  safely to fresh and existing repositories. Two packages ship: `jit-default`
+  carrying the domain vocabulary a repository needs to be usable, and
+  `jit-dogfood` carrying this project's workflow on top of it. Variables and
+  sensitive-value handling, reconfiguration, detailed diff, three-way upgrade,
+  safe removal, declared incompatibilities, search-path precedence, and
   shared-ownership semantics move intact to a post-1.0 epic.
 - **Rejected:** Shipping the full profile package manager before v1.0, which
-  makes a large new lifecycle subsystem the release critical path; and dropping
+  makes a large new lifecycle subsystem the release critical path; dropping
   profiles from v1.0 entirely, which leaves the strongest dogfooded workflow
-  difficult for adopters to install.
-- **Reasoning:** One discovered offline profile solves the immediate adoption
-  problem with a bounded surface, and holds `@/inv/domain-agnostic` without a
-  sanctioned exception for binary-shipped workflow content. Deferring lifecycle
-  breadth reduces release risk without discarding the design or any
-  already-shipped product capability.
+  difficult for adopters to install; and each package carrying a complete copy
+  of the shared vocabulary, which is a hand-maintained duplicate held correct by
+  an assertion.
+- **Reasoning:** The binary carries mechanism and no instance of it
+  (`@/inv/domain-agnostic`), so every type name, namespace, item kind, area
+  classification, and workflow rule reaches a repository as package content.
+  That makes a second package unavoidable — a usable default and this project's
+  workflow are different opinions — and two packages sharing vocabulary need
+  composition rather than duplication. The bounded surface is one dependency
+  edge resolved at application time; the deferred list stays deferred.
 - **Date:** 2026-07-14, amended 2026-07-31
 
 ### D-9: Cut redundant release surfaces, not product capabilities

@@ -11903,3 +11903,7 @@
 {"from":"in_progress","id":"d5679785-5dc5-46c0-ae7b-d3dba3d452d2","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:29:05.918022574Z","to":"done","type":"issue_state_changed"}
 {"id":"f3538adf-053f-42be-8037-2cbe24e330c5","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:29:05.918022574Z","type":"issue_completed"}
 {"fields":["description"],"id":"7dc53c68-800b-451b-8a6f-3670b22a38c0","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-31T14:56:03.483340839Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"done","id":"094d75d0-38ee-4c80-b004-f13abb08a3db","issue_id":"7eecace8-fae3-49f8-8907-2d6180ae40a3","timestamp":"2026-07-31T14:57:13.261190294Z","to":"in_progress","type":"issue_state_changed"}
+{"fields":["description"],"id":"f3715d6a-64d8-465e-bde2-ff9ae4777929","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-31T15:48:53.568455849Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"79bfbe2c-b0e4-4f6d-8d8a-9f94fbd02519","issue_id":"7cbefe7c-c0d5-4c5b-ace5-a62e42fa9dcf","priority":"high","timestamp":"2026-07-31T15:50:17.751330746Z","title":"Inventory the binary's declarative configuration and sequence its removal","type":"issue_created"}
+{"fields":["dependencies"],"id":"fc816c74-b664-4863-8e45-c46a6b0c3319","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-31T15:50:28.499949204Z","type":"issue_updated","updated_by":"dependency-add"}
