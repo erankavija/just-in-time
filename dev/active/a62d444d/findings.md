@@ -1,92 +1,69 @@
-# Findings — Whether jit's own workflow profile can leave the binary (a62d444d)
+# Findings — How jit's own workflow profile leaves the binary (a62d444d)
 
 > **Diátaxis Type:** Explanation (research findings)
-> Investigated at `170436cd`. Every claim about current behaviour cites `file:line`
-> at that revision.
+> Investigated at `170436cd`. Every claim about current behaviour cites
+> `file:line` at that revision. Three claims are backed by experiments run
+> against the installed binary; each names its result inline.
 
-## Question
+## Scope
 
-Can the `jit-dogfood` workflow profile stop being bytes compiled into the `jit`
-binary and instead reach a repository the way any other contributed profile
-would? What does that cost, what does it displace, and what does it do to the
-planning-bracket exception `@/invariant/domain-agnostic` grants?
+The owner has ruled: domain agnosticism is the durable invariant, a specific
+workflow does not belong in the source, and `@/invariant/domain-agnostic`'s
+sanctioned carve-out for the planning-bracket trio is what the ruling removes.
+This report establishes mechanism, sequencing, and consequence. It does not
+weigh the direction.
 
-## Answer in brief
+Two results are worth reading first, because both cut against the expected
+shape of the problem:
 
-Yes, mechanically — the package model is already written as if its bytes were
-untrusted external data, and only *discovery* is missing. But the question rests
-on a premise that does not hold, and the premise is the finding:
+- **The bootstrap hazard is not the bracket.** This repository has never applied
+  its own profile — `.jit/profiles/` does not exist and `jit profile list`
+  reports `applied: false`. Its bracket gates are repository-authored `exec`
+  checkers in `.jit/gates.toml`, not the packaged placeholders, and
+  `jit apply plan` resolves through the registry when a preset is absent
+  (`commands/template.rs:1236-1240`), inserting a preset definition only for a
+  key the registry lacks (`template.rs:1263`). Removing the preset trio does not
+  stop this repository planning its own containers. Proven by experiment (§5.1).
+- **The bootstrap hazard is `jit validate`.** The embedded package is loaded
+  unconditionally on every validation in every repository, profiled or not
+  (`commands/validate.rs:432,486`), and this repository's `jit-validate` and
+  `repo-validate` gates shell out to `jit validate`. Deleting the package before
+  that load is made conditional breaks every gate in the repository, including
+  the ones that would certify the removal. That is the ordering constraint §5
+  pins.
 
-1. **There is no "any other contributed profile" to be similar to.** No second
-   profile exists, no discovery path exists, and building one is the
-   *post-1.0 lifecycle `@/charter/D-8` defers by name* — its deferred list reads
-   "Multi-profile composition, **local packages**, variables, reconfiguration,
-   diff, upgrade, removal, and shared-ownership semantics"
-   (`dev/vision/9db27a3a-charter.md:141-144`). An on-disk contributed profile is
-   a local package. So the decision is not "extract or don't"; it is "does v1.0
-   build the subsystem it deferred".
-
-2. **The bracket is not what makes extraction expensive.** What the binary
-   supplies to the planning bracket is three gate definitions and one graph
-   template — about forty lines of TOML, every field of which an adopter can
-   already write into `.jit/gates.toml` by hand (measured, §3.2). The exception
-   in `@/invariant/domain-agnostic` buys convenience, not capability. It can be
-   preserved under any option at that cost.
-
-3. **What makes extraction expensive is `jit validate`.** Derived-state repair
-   loads the package unconditionally on every validation
-   (`crates/jit/src/commands/validate.rs:432,486`) and, where a profile is
-   installed, requires the stored provenance record to match the resolvable
-   package exactly (`validate.rs:594-598`). Embedding makes "the package is
-   resolvable" identical to "the binary exists". Any off-binary route has to
-   answer where those bytes live on an adopter's machine for the life of the
-   repository, and the release archive is four flat files with nowhere to put
-   them (`INSTALL.md:27`, `docs/reference/release-policy.md:52`).
-
-4. **The halted work is the owner's instinct, already half-implemented.** Epic
-   e204e63d's packaging chain deletes the 61 checked-in duplicate files under
-   `profiles/jit-dogfood/assets/live/` and leaves a manifest that names which of
-   jit's own working files constitute its workflow. That is precisely "jit does
-   not carry a separate copy of its profile in its source". Halting it moves
-   away from the stated goal, not toward it. The framing that it "tightens
-   exactly the coupling the owner wants loosened" is not accurate: the coupling
-   already exists and is enforced by a test (`crates/jit/src/profile/dogfood.rs:437-458`);
-   the epic changes who maintains the copy, not whether the binary depends on
-   those files.
-
-The recommendation (§6) is to keep the package embedded for v1.0, finish
-e204e63d, and amend the invariant's exception text — which currently understates
-what the binary carries by a factor of twenty.
+Three costs have no route back without a decision taken alongside the
+extraction; they are stated plainly in §10 rather than buried in a trade-off
+table.
 
 ## Methodology
 
-- Read the issue, `e204e63d-plan.md`, `e204e63d-investigation.md`, and
-  `progress.json`; resolved `@/invariant/domain-agnostic`, `@/charter/D-3`,
-  `@/charter/D-8` with `jit item show` and read D-3/D-8's full entries in
+- Re-read the rescoped issue, `e204e63d-plan.md`, `e204e63d-investigation.md`
+  and `progress.json`; resolved `@/invariant/domain-agnostic`, `@/charter/D-3`
+  and `@/charter/D-8` with `jit item show` and read D-3/D-8's full entries in
   `dev/vision/9db27a3a-charter.md`.
 - Read every production consumer of the embedded package and traced each to its
-  callers, rather than accepting the consumer list as given. Two of the starting
-  facts I was handed are wrong; both corrections are in §1.4.
-- Ran three experiments against the installed binary in a scratch directory, to
-  establish what an adopter actually experiences rather than inferring it: a
-  neutral `jit init`; a neutral repository with a hand-authored `plan` template;
-  and `jit init --profile jit-dogfood`. Results in §3.2.
-- Counted the manifest's declarations by parsing it rather than by grep, because
-  the region's source also sits under the live prefix and grep double-counts it.
-
-The repository had concurrent work landing on `main` during the investigation:
-`crates/jit/src/profile/template_region.rs` and `mod.rs` changed under me at
-commit `170436cd`. All citations were re-verified at that revision.
+  callers rather than accepting a consumer list. Two facts in circulation are
+  wrong; both corrections are in §1.4.
+- Swept engine code for planning-bracket vocabulary (`brackets`, `planning`,
+  `breakdown`, `plan`) to find what else the ruling reaches, and separated
+  production occurrences from tests and doc examples.
+- Ran three experiments in a scratch directory against the installed binary:
+  plain `jit init`; `jit init` plus a hand-authored `plan` template; and a
+  repository whose bracket gate names no preset supplies. Results in §4.2 and
+  §5.1.
+- Counted the manifest's declarations by parsing rather than grep, because the
+  region's source also sits under the live prefix and grep double-counts it.
 
 ---
 
-## 1. How the profile reaches a repository today (REQ-01)
+## 1. The mechanism today (REQ-01)
 
 ### 1.1 From checked-in directory to applied repository
 
 ```mermaid
 flowchart LR
-    A["profiles/jit-dogfood/<br/>65 files, 423 029 bytes"] -->|"include_dir! at compile time<br/>dogfood.rs:8-9"| B["JIT_DOGFOOD_DIRECTORY<br/>static Dir"]
+    A["profiles/jit-dogfood/<br/>65 files, 423 029 bytes"] -->|"include_dir! at compile time<br/>dogfood.rs:8-9"| B["JIT_DOGFOOD_DIRECTORY"]
     B -->|"from_dir + validate_manifest<br/>package.rs:42,232"| C["EmbeddedProfilePackage"]
     C -->|"build_profile_claims<br/>apply_claims.rs:27"| D["ProfileClaims"]
     D -->|"derive_materialization<br/>ApplyProfile"| E["one atomic delta"]
@@ -96,238 +73,288 @@ flowchart LR
 `profiles/jit-dogfood/` holds 65 files totalling 423 029 bytes: `manifest.toml`
 plus 64 declared sources — 60 one-to-one assets under `assets/live/`, 3 under
 `assets/install/`, and 1 managed-region source that also sits under
-`assets/live/` (`profiles/jit-dogfood/manifest.toml:580-584`). The manifest
-declares 29 semantic contributions, among them the six gate definitions
-(`plan-review`, `breakdown-review`, `code-review`, `coverage-preview`,
-`jit-validate`, `repo-validate`) and the `plan` graph template
-(`manifest.toml:273-274`).
+`assets/live/` (`profiles/jit-dogfood/manifest.toml:580-584`). It declares 29
+semantic contributions, among them six gate definitions (`plan-review`,
+`breakdown-review`, `code-review`, `coverage-preview`, `jit-validate`,
+`repo-validate`) and the `plan` graph template (`manifest.toml:273-274`).
 
 `include_dir!("$CARGO_MANIFEST_DIR/../../profiles/jit-dogfood")`
-(`crates/jit/src/profile/dogfood.rs:8-9`) compiles the whole directory in.
+(`crates/jit/src/profile/dogfood.rs:8-9`) compiles the directory in.
 `jit_dogfood_package()` (`dogfood.rs:37`) parses and validates it on each call;
 there is no cache, so every consumer re-validates.
 
 Application composes the package into image-independent claims
 (`crates/jit/src/profile/apply_claims.rs:27-100`) and publishes them through one
-recoverable materialization together with the provenance record
+recoverable materialization with the provenance record
 `.jit/profiles/jit-dogfood.json` and a `ProfileApplied` event
-(`crates/jit/src/commands/profile.rs:136-183`). Re-application of an exact
-installation is a no-op (`profile.rs:151-159`).
+(`commands/profile.rs:136-183`). Re-application of an exact installation is a
+no-op (`profile.rs:151-159`).
 
 The 60 live assets are byte-identical copies of files that exist independently
 in this repository — `.agents/skills/**`, `contrib/gates/**`,
 `.jit/reference/content-standards.md`. A test asserts that equality, mode
-included, and its failure message names the package as the authority
-(`crates/jit/src/profile/dogfood.rs:437-473`, message at `:457`
-`"{} drifted from the package"`).
+included, naming the package as the authority
+(`crates/jit/src/profile/dogfood.rs:437-473`, message at `:457`).
 
-### 1.2 Consumers of the embedded package, and what each loses without it
+### 1.2 Every consumer, and what each loses
 
 | # | Consumer | Site | Without the package |
 |---|---|---|---|
-| 1 | `jit profile list` | `commands/profile.rs:56-73` | Returns a hardcoded one-element list built from the package metadata (`:62-68`). Nothing to list. |
+| 1 | `jit profile list` | `commands/profile.rs:56-73` | Builds a hardcoded one-element list from the package metadata (`:62-68`). Nothing to list. |
 | 2 | `jit profile show / plan / apply`, `validate_profile_id` | `commands/profile.rs:367-374` (`embedded_profile`, the sole resolver) | No profile resolves by id; all four commands fail. |
 | 3 | `jit init --profile <id>` | `commands/init.rs:68` → `init.rs:391-393` | The profiled initialization path has no package to overlay. |
-| 4 | Built-in gate-preset **inventory** | `gate_presets/builtin.rs:35,51` → `dogfood.rs:70-117` | The preset *names* are read from the package's `plan` template node gates. Without it, `BuiltinPresets::names()` has no source. |
-| 5 | Built-in gate-preset **shapes** | `gate_presets/planning.rs:101` → `dogfood.rs:42-64` | Each of `plan-review`, `coverage-preview`, `breakdown-review` is deserialized from the package's gate contributions. Without it, the trio has no definition. |
-| 6 | `jit validate` and `jit validate --fix` | `commands/validate.rs:432,486` | The package is loaded **unconditionally, in every repository**, profiled or not. Loading is `?`-propagated, so an unresolvable package fails validation outright. |
-| 7 | Repository-local template-region render | `profile/template_region.rs:63` | Test/dev only — the module is `#[cfg(any(test, feature = "test-support"))]` (`profile/mod.rs:18-19`) and carries no production caller. |
+| 4 | Built-in gate-preset **inventory** | `gate_presets/builtin.rs:35,51` → `dogfood.rs:70-117` | Preset *names* are read from the package's `plan` template node gates; `BuiltinPresets::names()` has no source. |
+| 5 | Built-in gate-preset **shapes** | `gate_presets/planning.rs:101` → `dogfood.rs:42-64` | Each of the trio is deserialized from the package's gate contributions; the trio has no definition. |
+| 6 | `jit validate` and `jit validate --fix` | `commands/validate.rs:432,486` | Loaded **unconditionally in every repository**, profiled or not, and `?`-propagated — an unresolvable package fails validation outright. |
+| 7 | Repository-local template-region render | `profile/template_region.rs:63` | Test/dev only: the module is `#[cfg(any(test, feature = "test-support"))]` (`profile/mod.rs:18-19`) with no production caller. Relevant because it belongs to epic e204e63d's surviving projection story (§8). |
 
-Consumers 4 and 5 have a wider blast radius than their call sites suggest.
+Consumers 4 and 5 reach further than their call sites suggest.
 `load_presets_from_custom_files` seeds its map from `BuiltinPresets::load()`
 before merging any repository-authored preset (`gate_presets.rs:170`), and that
-function is the loader behind:
+function backs:
 
 - `jit gate preset list` / `show` (`storage/json.rs:1367-1373` via
   `PresetManager::new`);
 - `jit apply <template>` gate resolution (`commands/template.rs:747-760`), where
   a preset takes precedence over a registry gate of the same key
-  (`template.rs:1232-1242`) and an unresolvable name is an error (`:1241`);
+  (`template.rs:1232-1242`);
 - the built-in-name collision check in `jit gate preset create`
-  (`commands/gate.rs:1453`).
+  (`commands/gate.rs:1453`);
+- `docs/reference/gate-presets.md`, a projection of the built-in definitions
+  with a conformance test asserting the committed copy equals the projection
+  (`gate_presets/reference.rs:23,320-334`).
 
-Consumer 6 is the load-bearing one and is easy to miss. `capture_repair_plan`
-captures every package target path into the repository image before deciding
-anything (`validate.rs:553-563`), and where `.jit/profiles/<id>.json` exists it
-requires the stored record to equal `expected_record(package)` exactly —
-id, version, origin, package hash and every per-target hash
-(`validate.rs:591-598`, record built at `commands/profile.rs:337-346`). A
-mismatch is a validation *failure*, not a warning. Only on an exact match does
-it build repair claims (`validate.rs:600`) that let `jit validate --fix` restore
-a deleted or edited profile-owned file.
+Consumer 6 is the load-bearing one. `capture_repair_plan` captures every package
+target path into the repository image before deciding anything
+(`validate.rs:553-563`); where `.jit/profiles/<id>.json` exists it requires the
+stored record to equal `expected_record(package)` exactly — id, version, origin,
+package hash and every per-target hash (`validate.rs:591-598`, record built at
+`commands/profile.rs:337-346`). A mismatch is a validation *failure*. Only an
+exact match yields repair claims (`validate.rs:600`) that let
+`jit validate --fix` restore a deleted or edited profile-owned file.
 
-The practical consequence, today: because the package ships inside the binary,
-"the package is resolvable" and "the binary exists" are the same statement, and
+Because the package ships inside the binary, "the package is resolvable" and
+"the binary exists" are the same statement today, and
 `@/invariant/derived-state-coherence` holds for profile-owned targets for free.
+Extraction separates those statements; §10.2 states the consequence.
 
-### 1.3 Version compatibility is declared but never checked at runtime
+### 1.3 Version compatibility is declared, and checked only at release time
 
 `ProfileMetadata.jit` (`profile/manifest.rs:42-43`) carries a semver
-requirement — `jit = ">=1.0.0, <2.0.0"` in the shipped manifest
-(`profiles/jit-dogfood/manifest.toml:5`). `validate_manifest` only *parses* it
-(`profile/package.rs:253-258`); no `VersionReq::matches` call exists anywhere in
-the workspace (`rg VersionReq` returns exactly `package.rs:4,253`). The only
-enforcement is offline and at release time: `scripts/release-version-contract.py:462-488`
-requires the declared range to admit the product version.
+requirement — `jit = ">=1.0.0, <2.0.0"` (`manifest.toml:5`).
+`validate_manifest` only *parses* it (`profile/package.rs:253-258`); no
+`VersionReq::matches` call exists in the workspace (`rg VersionReq` returns
+exactly `package.rs:4,253`). The sole enforcement is offline, at release time:
+`scripts/release-version-contract.py:462-488` requires the declared range to
+admit the product version.
 
-That is sound while the package ships inside the binary — the two cannot
-disagree. It is the first gap any off-binary route has to close.
+That holds while package and binary ship together. It is the first gap the
+extraction closes (§3.2).
 
-### 1.4 Two corrections to the starting facts
+### 1.4 Two corrections
 
 - **`commands/init.rs:462,690` are not consumers.** `#[cfg(test)] mod tests`
   begins at `init.rs:459`; both lines are inside it. The production consumer is
-  `run_initialization` at `init.rs:68`, resolving through `init.rs:391-393`.
-- **The manifest declares 63 assets, not 64.** Parsed: 60 with sources under
-  `assets/live/`, 3 under `assets/install/`, plus 1 `[[region]]` whose source is
-  also under `assets/live/` — 64 declared sources in total, 65 files with the
-  manifest. A grep for the live prefix returns 61 because it counts the region.
-
-Neither correction changes the shape of the question, but the first removes
-`jit init`'s *test* fixtures from the constraint set and the second is the count
-any option has to move.
+  `init.rs:68`, resolving through `init.rs:391-393`.
+- **The manifest declares 63 assets, not 64.** Parsed: 60 live, 3 install-only,
+  plus 1 `[[region]]` whose source is also under `assets/live/` — 64 declared
+  sources, 65 files with the manifest. Grep on the live prefix returns 61
+  because it counts the region.
 
 ---
 
-## 2. What "a contributed profile" would mean for this codebase (REQ-02)
+## 2. The criterion, and what falls on each side (REQ-06)
 
-### 2.1 Where it would live, and how a binary would find it
+### 2.1 The criterion
 
-Nothing in the codebase discovers a profile from disk. `embedded_profile`
-(`commands/profile.rs:367-374`) is the only resolver, and it compares the
-requested id against one compiled-in package. `list_embedded_profiles` builds a
-one-element `Vec` literal (`profile.rs:62-68`). There is no search path, no
-`--from`, no `read_dir` in the profile command module, and no configuration key
-naming a profile directory.
+The ruling's own example fixes it: the template *system* stays, the planning
+bracket goes. Generalized to an operational test that can be applied to a line
+of code rather than argued about:
 
-`contrib/` is not a mechanism. It holds `contrib/gates/ai-review.sh`, three
-review prompts, and three prompt bodies under `contrib/gates/prompts/`, plus a
-README; `docs/how-to/custom-gates.md` describes copying them by hand. Nothing
-reads `contrib/` at runtime.
+> **A thing belongs in the binary if it interprets repository configuration.
+> It does not belong in the binary if it can be expressed as repository
+> configuration.**
 
-A contributed profile would therefore need three new things, in order of cost:
+The test is decidable by construction, and its answer is verifiable rather than
+a matter of taste: for any candidate, either an adopter can write it into
+`.jit/` and get the same behaviour, or they cannot. Two corollaries follow:
 
-1. **A location.** Repository-relative (`.jit/profiles/packages/<id>/`), a
-   user-level directory, or an explicit `--from <path>`. Each is a new adopter-
-   facing surface.
-2. **A resolver** replacing `embedded_profile`, returning a package from either
-   provenance, and a `list` that enumerates rather than returning a literal.
-3. **A distribution answer.** The release archive is "flat and carries four
-   files: the `jit` CLI, the `jit-server` binary, and both license texts"
-   (`INSTALL.md:27`, table at `docs/reference/release-policy.md:52`). An adopter
-   who installed from a release has the binary and nothing else. Extraction
-   without a new release asset means the profile is reachable only from a source
-   checkout — which directly contradicts the promise that applying it "needs no
-   Git repository, network access, `jq`, or JIT source checkout"
-   (`docs/reference/profiles.md:5-8`).
+- A **mechanism parameterized by declared vocabulary** is engine capability,
+  however specific its motivating use. `expand_template` interprets any
+  template; `bracket_breakdown` reads planning and breakdown types from the
+  repository's `TemplateRegistry` (`commands/breakdown.rs:12-19`);
+  `bracket_scope_ids` takes the breakdown type as an argument
+  (`domain/queries.rs:443-455`) and its own test uses a custom type `synthesis`
+  rather than the literal (`queries.rs:739`). All stay.
+- A **named instance** is a specific application, however small.
+  `PLAN_REVIEW_PRESET = "plan-review"` (`gate_presets/planning.rs:105`) names one
+  workflow's gate. It goes.
 
-### 2.2 What already generalizes
+The criterion is measurable here, not hypothetical: all three bracket gate
+definitions are ordinary `.jit/gates.toml` stanzas whose checkers are
+`review_placeholder` (×2) and `label_target_validation` (×1) — checker kinds
+available to any adopter (§4.2, Case 2 output). Nothing in the trio is
+inexpressible as configuration, so the criterion places it outside the binary
+without ambiguity.
 
-The package model was written as if the bytes were untrusted external data.
-Everything below already holds for a package of unknown provenance:
+### 2.2 Applied to every REQ-01 consumer
+
+| Consumer | Side | Reasoning under the criterion | Disposition |
+|---|---|---|---|
+| 1–2 `jit profile list / show / plan / apply` (`commands/profile.rs`) | **Engine**, with an application-shaped core | The profile *lifecycle* interprets a package; the *inventory* does not. `embedded_profile` (`profile.rs:367-374`) compares against one compiled-in id and `list_embedded_profiles` returns a one-element `Vec` literal (`:62-68`) — a named instance. | Commands stay. Resolution and enumeration become discovery (§3). |
+| 3 `jit init --profile` (`init.rs:68`) | **Engine** | The flag interprets whatever package it is given (`init.rs:391-393` delegates to the same resolver). | Stays; resolution moves with §3. |
+| 4 `BuiltinPresets` (`gate_presets/builtin.rs`) | **Application** | Its entire content is one workflow's gate names, read from that workflow's `plan` template (`builtin.rs:35`). Nothing here interprets configuration. | Removed. `load_presets_from_custom_files` (`gate_presets.rs:170`) seeds from an empty set; `PresetManager` keeps loading `.jit/config/gate-presets/`. |
+| 5 `gate_presets::planning` (`gate_presets/planning.rs`) | **Application**, except one function | `plan_review_preset`, `coverage_preview_preset`, `breakdown_review_preset` and the four `*_PRESET`/`*_GATE` constants (`:105,109,112,116`) are named instances. `preview_coverage_rule` (`:181`) is a pure rule transform parameterized by `breakdown_type`, with no production caller in `crates/jit/src/` — only doc examples and tests. | Presets and constants removed. `preview_coverage_rule` is engine-shaped but currently orphaned; §10.3. |
+| 6 `jit validate` package load (`validate.rs:432,486`) | **Engine**, with an application-shaped precondition | Derived-state repair over an installed profile is engine capability. Loading *a particular package id unconditionally* is not: a repository with no profile is made to depend on one workflow's bytes. | Load becomes conditional on the provenance record and resolved through discovery (§3, §5.2). |
+| 7 `profile/template_region.rs:63` | **Neither** | Repository-local dogfooding scaffolding, `cfg`-gated out of adopter builds (`profile/mod.rs:18-19`). | Retargeted to the discovered package when the embed goes (§8). |
+
+### 2.3 The borderline cases, resolved
+
+Three engine constants name bracket vocabulary and survive the criterion,
+because each is an **overridable default of a generic mechanism** rather than an
+instance: `DEFAULT_PLANNING_ROLE`, `DEFAULT_BREAKDOWN_ROLE` and
+`DEFAULT_CONTAINER_ANCHOR` (`templates.rs:206,210,214`), each documented as "The
+SOLE place this name lives" and each resolved through `[roles]` / `[anchors]` in
+`.jit/templates.toml` when declared. A repository using its own vocabulary needs
+no code change, which is the criterion's test.
+
+They are the closest call in the sweep and are worth naming in the amendment's
+review, because a stricter reading — "no workflow noun in the binary at all" —
+would delete them and force every repository to declare bindings it currently
+inherits. The criterion as stated in §2.1 keeps them; a reviewer applying a
+different criterion would not.
+
+---
+
+## 3. What a contributed profile is in this codebase (REQ-02, REQ-10)
+
+### 3.1 What already generalizes
+
+The package model was written as if its bytes were untrusted external data.
+Everything below holds unchanged for a package of unknown provenance:
 
 - `EmbeddedProfilePackage::from_files` (`package.rs:47-66`) takes a
   `BTreeMap<String, &[u8]>` and knows nothing about `include_dir`. Only
-  `from_dir` (`package.rs:42-45`) is embedding-specific.
+  `from_dir` (`package.rs:42-45`) is embedding-specific. **A directory walk is
+  the entire new reader.**
 - Untrusted-input defences that only make sense for external data: file-count
-  and byte bounds, 512 files / 4 MiB (`package.rs:15-18`, enforced at `:215-230`);
-  path rejection for absolute, traversal, Windows-prefix, control-character and
+  and byte bounds, 512 files / 4 MiB (`package.rs:15-18`, enforced `:215-230`);
+  rejection of absolute, traversal, Windows-prefix, control-character and
   backslash paths (`package.rs:390-416`); rejection of a declared source that is
   absent and of a package file no declaration claims (`package.rs:297-309`);
   duplicate-source and duplicate-target rejection (`package.rs:271-295`);
-  `deny_unknown_fields` on every manifest type (`manifest.rs:17,34,48,61`).
+  `deny_unknown_fields` on every manifest type (`manifest.rs:17,34,48,61`);
+  rejection of reserved interpolation tokens in package bytes
+  (`apply_claims.rs:102-133`).
 - Content addressing: domain-separated SHA-256 over the canonical manifest and
-  every embedded path, plus per-target hashes (`package.rs:452-521`). Provenance
-  verification of an on-disk package needs no new primitive.
-- `ProfileOrigin` (`domain/types.rs:1001-1006`) is a one-variant enum with the
-  doc comment "Package bytes were compiled into the running JIT binary" — a
-  vocabulary shaped for a second variant, persisted in the record
-  (`repository_state/profile_apply.rs:197,237`) and in `Event::ProfileApplied`
-  (`domain/types.rs:1308,1628`).
-- Claim construction (`apply_claims.rs:27-100`), materialization, validation
-  overlay, and the whole publication path take `&EmbeddedProfilePackage` and are
-  otherwise provenance-blind.
+  every path, plus per-target hashes (`package.rs:452-521`). Verifying a
+  discovered package needs no new primitive.
+- The wire formats: `ProfileManifest` and its schema (`manifest.rs:82-84`),
+  public through `jit profile show --json` and the MCP bridge;
+  `AppliedProfileRecord` (`repository_state/profile_apply.rs:197,237`);
+  `Event::ProfileApplied` (`domain/types.rs:1308,1628`). All carry `origin`
+  already.
+- `ProfileOrigin` (`domain/types.rs:1001-1006`) is a one-variant enum whose doc
+  comment reads "Package bytes were compiled into the running JIT binary" — a
+  vocabulary shaped for a second variant.
+- Claim construction, materialization, the validation overlay, the reserved-target
+  guard (`profile.rs:415-433`) and the whole publication path take
+  `&EmbeddedProfilePackage` and are otherwise provenance-blind.
 
-### 2.3 What does not generalize
+### 3.2 What has to be built
 
-Four concrete obstacles, all small:
+Four changes, none large:
 
-1. **Lifetime.** `EmbeddedProfilePackage<'a>` holds `&'a [u8]`
-   (`package.rs:34-38`). Disk reads produce owned `Vec<u8>`. Either the borrow
-   becomes `Cow<'a, [u8]>` or the type gains an owned twin. Mechanical.
-2. **The compatibility check** (§1.3) has to become a runtime `VersionReq::matches`
-   against the running product version, with an error variant.
-3. **`ProfileOrigin` gains a variant**, which changes the on-disk record and the
-   event wire shape. `@/invariant/canonical-cutover` and the greenfield policy in
-   `CLAUDE.md` make that unproblematic, but it is a persisted-format change.
-4. **Type and command names** say `Embedded` throughout — `EmbeddedProfilePackage`,
-   `list_embedded_profiles`, `apply_embedded_profile`, `MAX_EMBEDDED_PROFILE_*`,
-   and the CLI help text "List profiles embedded in this JIT binary"
-   (`cli.rs:2876`). `@/invariant/canonical-cutover` requires the rename rather
-   than allowing the stale name to persist.
+1. **Owned bytes.** `EmbeddedProfilePackage<'a>` holds `&'a [u8]`
+   (`package.rs:34-38`). A disk read produces `Vec<u8>`. Either the borrow
+   becomes `Cow<'a, [u8]>` or the type gains an owned twin.
+2. **A runtime compatibility check.** `VersionReq::matches` against the running
+   product version at resolve time, with an error variant (§1.3). This is the
+   one piece of validation that does not exist at all today.
+3. **A second `ProfileOrigin` variant**, changing the persisted record and the
+   event wire shape. `@/invariant/canonical-cutover` and the greenfield policy
+   make that unproblematic, but it is a persisted-format change.
+4. **A resolver and an enumerator** replacing `embedded_profile`
+   (`profile.rs:367-374`) and the literal list (`profile.rs:62-68`).
 
-The honest summary: the *model* is ready; the *lifecycle* is not, and the
-lifecycle is what `@/charter/D-8` defers.
+Plus the renames `@/invariant/canonical-cutover` requires: `EmbeddedProfilePackage`,
+`list_embedded_profiles`, `apply_embedded_profile`, `MAX_EMBEDDED_PROFILE_*`, and
+the CLI help "List profiles embedded in this JIT binary" (`cli.rs:2876`).
+
+### 3.3 Alternative: where a profile lives (REQ-10)
+
+`contrib/` is not a candidate and is not a mechanism: it holds
+`contrib/gates/ai-review.sh`, three review prompts and three prompt bodies that
+`docs/how-to/custom-gates.md` tells adopters to copy by hand. Nothing reads it
+at runtime.
+
+| Option | For | Against |
+|---|---|---|
+| **A. `--from <path>` only** | Smallest surface; no search semantics, no precedence, no ambiguity. | `jit profile list` has nothing to enumerate. Derived-state repair (`validate.rs:591-600`) has no path to re-resolve the package on a later `jit validate`, so §10.2's cost is unmitigated. |
+| **B. Repository-local, e.g. `.jit/profiles/packages/<id>/`** | The package is versioned with the repository that uses it, so repair keeps working for the life of the repository. Consistent with `@/charter/D-1` (repository-local git-versioned storage). Enumeration is a directory listing. | `.jit/profiles/` is currently the provenance-record directory and is reserved against package targets (`profile.rs:415-433`); a package subdirectory needs that guard extended. Adds ~423 KB to the adopter's repository. |
+| **C. User- or machine-level, e.g. `$XDG_CONFIG_HOME/jit/profiles/<id>/`** | Install once, use in many repositories. | A repository's derived-state repair then depends on machine state, which contradicts `@/charter/D-1`'s repository-local principle and makes `jit validate` machine-dependent. |
+| **D. Search path with precedence (repo > user > env)** | Covers every case. | Precedence is adopter-visible surface and a diagnosis burden; it is the shape `@/charter/D-8` defers most explicitly. |
+
+**Recommendation: B, with A as the install route.** `--from <path>` answers
+"where do the bytes come from the first time"; the repository-local location
+answers "where are they on the next `jit validate`". B is the only option that
+keeps derived-state repair working without either machine state or a permanent
+dependency on the source checkout. D is the eventual shape and should be left to
+the post-1.0 lifecycle rather than half-built now.
+
+### 3.4 Alternative: distribution format (REQ-10)
+
+| Option | For | Against |
+|---|---|---|
+| **Directory tree** | `from_files` already takes a path→bytes map (`package.rs:47`), so a walk is the whole reader. Diffable, git-versionable, no new dependency. | Many files to fetch if published as loose objects. |
+| **Tarball or zip** | One artefact to download and checksum, fitting the existing release-asset shape (`docs/reference/release-policy.md:52`). | Needs an archive dependency the workspace does not carry; `@/invariant/bounded-rust-build-footprint`'s dependency-policy assertions are checked at `scripts/rust-build-budget.sh` and pinned for `include_dir` at `package.rs:907-918`. |
+
+**Recommendation: a directory as the on-disk format, published as one archived
+release asset.** The archive is unpacked by the adopter or by `--from`; the
+runtime reader stays a directory walk and adds no dependency. Note that the
+release archive is currently "flat and carries four files: the `jit` CLI, the
+`jit-server` binary, and both license texts" (`INSTALL.md:27`,
+`release-policy.md:52`), so this is a new asset and touches `@/charter/D-16`.
 
 ---
 
-## 3. Consequences for the planning-bracket preset trio (REQ-03)
+## 4. The route the planning bracket takes out (REQ-03)
 
-### 3.1 What the binary actually supplies to the bracket
+### 4.1 The route
 
-`@/invariant/domain-agnostic` sanctions exactly one exception: "the
-planning-bracket preset trio (plan-review, coverage-preview, breakdown-review)
-… retained as the single binary-shipped preset bundle". Traced to source, the
-binary supplies:
+The bracket's binary-shipped content is four declarations: three gate
+contributions and the `plan` template contribution the preset inventory is
+derived from (`dogfood.rs:70-117`). All four already exist in
+`profiles/jit-dogfood/manifest.toml` — the package *is* the route. Nothing new
+has to be authored for the bracket to leave; `BuiltinPresets` and
+`gate_presets::planning`'s preset constructors are deleted, and the same
+declarations reach a repository as profile contributions instead.
 
-- the trio's **names**, read from the `plan` template's node gate arrays
-  (`dogfood.rs:70-117`, consumed at `gate_presets/builtin.rs:35,51`);
-- each preset's **shape**, deserialized from the package's gate contributions
-  (`dogfood.rs:42-64`, consumed at `gate_presets/planning.rs:101-114`).
+### 4.2 What an adopter experiences afterwards, measured
 
-So the exception's true scope is larger than its text: it also covers the `plan`
-template contribution, since the preset inventory is derived from it. And it is
-much smaller than what the binary actually carries — 64 declared sources, seven
-agent skill trees, review prompts, content standards, invariants and an
-`AGENTS.md` region are all embedded under an exception written for three gates.
-**The invariant's exception clause is inaccurate today, independent of any
-decision taken here.**
-
-### 3.2 What an adopter experiences — measured, three cases
-
-Run against the installed binary in a scratch directory.
-
-**Case 1 — plain `jit init`.** The scaffold writes `config.toml`, `gates.toml`,
-`rules.toml`, `index.json`, `events.jsonl`, `issues/`, `schemas/`. It writes **no
-`.jit/templates.toml`**. `jit gate preset list --json` reports the three
-built-ins. `jit apply plan <C>` fails:
+**Case 1 — plain `jit init` (unchanged by the extraction).** The scaffold writes
+`config.toml`, `gates.toml`, `rules.toml`, `index.json`, `events.jsonl`,
+`issues/`, `schemas/` — and **no `.jit/templates.toml`**. `jit apply plan <C>`
+fails today, before any change:
 
 ```
 Error: no template 'plan' in .jit/templates.toml; declare it or check the name
 ```
 
-So the binary-shipped trio does **not** by itself give a fresh repository a
-working bracket. That matters for how the exception is read.
+So a fresh repository has no working bracket now. The extraction does not take
+one away; it changes what a *second* command has to be for the adopter to get
+one.
 
-**Case 2 — `jit init` plus a hand-authored `plan` template.** Adding
-`planning`/`breakdown` to `[type_hierarchy].types` and writing the `plan`
-template from `docs/how-to/adopt-planning-bracket.md:70-98` is sufficient:
+**Case 2 — `jit init` plus a hand-authored `plan` template, today.** Adding
+`planning`/`breakdown` to `[type_hierarchy].types` and writing the template from
+`docs/how-to/adopt-planning-bracket.md:70-98` is sufficient, and the built-in
+presets supply the gate definitions:
 
 ```
 Applied template 'plan' to 27ce5145: breakdown=35b730bc… planning=788815fc…
 ```
 
-and `.jit/gates.toml`, previously empty of these keys, now carries all three
-definitions, written from the presets. This is exactly what the sanctioned
-exception buys: the adopter authors a template and types, and the gate
-definitions arrive without being typed.
-
-**Case 3 — `jit init --profile jit-dogfood`.** One command produces `.jit/` with
-`templates.toml`, `invariants.toml`, `reference/`, `profiles/`, plus
-`.agents/skills/`, `contrib/gates/` and a managed `AGENTS.md` region.
-
-**The decisive detail.** The three gate definitions the presets write are, in
-full, ordinary configuration:
+`.jit/gates.toml`, previously carrying none of these keys, gains all three:
 
 ```toml
 [gates.checker]
@@ -338,202 +365,321 @@ type = "label_target_validation" # coverage-preview
 label_namespace = "brackets"
 ```
 
-Both checker types are declarative and available to any adopter. **Nothing in
-the trio is inexpressible in adopter configuration.** The exception buys an
-adopter roughly forty lines of TOML they do not have to type; it buys no
-capability.
+**Case 2 after the extraction.** The same authored template still applies, and
+`jit apply plan` still succeeds — but the adopter must also write those three
+stanzas, because no preset supplies them. `resolve_captured_gate` falls through
+to the registry (`template.rs:1236-1240`), so the difference is exactly forty
+lines of TOML the adopter now types. If they write neither the stanzas nor the
+profile, `jit apply plan` fails naming the unresolvable gate
+(`template.rs:1241`).
 
-### 3.3 What each amendment would require
+**Case 3 — how the adopter obtains the bracket instead.**
+`jit init --profile jit-dogfood` today produces `.jit/` with `templates.toml`,
+`invariants.toml`, `reference/`, `profiles/`, plus `.agents/skills/`,
+`contrib/gates/` and a managed `AGENTS.md` region. After the extraction this
+becomes: obtain the package (release asset or checkout), then
+`jit init --profile jit-dogfood --from <path>` or
+`jit profile apply jit-dogfood --from <path>`. Same outcome, one more step, and
+one artefact to have fetched. §10.1 states the property that step costs.
 
-| Option | `@/invariant/domain-agnostic` | `@/charter/D-3` |
+---
+
+## 5. Sequencing (REQ-05, REQ-10)
+
+### 5.1 The break that does not happen: this repository's own planning
+
+The concern is that a step exists where the bracket has left the binary and not
+yet arrived on disk, and this repository cannot plan its own work. It does not
+arise, for three verifiable reasons.
+
+1. **The profile was never applied here.** `.jit/profiles/` does not exist;
+   `jit profile list --json` reports `"applied": false`. This repository's
+   bracket gates are hand-authored `exec` checkers —
+   `plan-review`, `breakdown-review` and `code-review` run
+   `./contrib/gates/ai-review.sh`, `coverage-preview` runs
+   `./scripts/coverage-preview.sh` (`.jit/gates.toml`, keys at `:3,85,107,295`)
+   — not the packaged `review_placeholder` and `label_target_validation`.
+2. **Preset resolution falls through to the registry.**
+   `resolve_captured_gate` consults presets first, then
+   `registry.gates.contains_key(name)`, and errors only when neither has it
+   (`commands/template.rs:1232-1242`). All three keys are in this repository's
+   registry.
+3. **A preset never overwrites an authored gate.** The preset branch inserts a
+   definition only `if !registry.gates.contains_key(&gate.key)`
+   (`template.rs:1263`); otherwise it attaches the key and leaves the authored
+   definition alone. So the presets have no effect on this repository today
+   beyond name resolution, and their removal changes only which branch resolves
+   the same three names.
+
+**Experiment.** In a scratch repository with no profile, a `plan` template whose
+node gates are `house-plan-review` and `house-coverage` — names no preset
+supplies — and both gates declared in `.jit/gates.toml`:
+
+```
+Applied template 'plan' to 50c7d77d: breakdown=0d46b65f… planning=93729037…
+```
+
+The registry-key path carries the whole bracket. This is both the proof that
+this repository is safe and the demonstration of the adopter route in §4.2.
+
+### 5.2 The break that does happen: `jit validate`
+
+`jit validate` loads the embedded package unconditionally in every repository
+(`commands/validate.rs:432,486`) and `?`-propagates the failure. This
+repository's `jit-validate` and `repo-validate` gates invoke `jit validate`
+(`.jit/gates.toml:235,317`). If the package is removed from the binary before
+that load is made conditional, then for a binary built at that commit:
+
+- `jit validate` fails in every repository, including ones that never had a
+  profile;
+- every gate in this repository that depends on it fails, so the change cannot
+  be certified by the gates that would certify it;
+- `jit validate --fix` cannot repair derived state, which
+  `@/invariant/derived-state-coherence` relies on.
+
+A second, smaller instance of the same shape: `docs/reference/gate-presets.md`
+is a projection of the built-in presets with a conformance test asserting
+committed content equals projection (`gate_presets/reference.rs:23,320-334`).
+Deleting `BuiltinPresets` without regenerating that reference in the same change
+fails the suite.
+
+### 5.3 The ordering
+
+```mermaid
+flowchart TD
+    S1["1. Make the package load conditional<br/>validate.rs:432,486 — resolve only when<br/>a provenance record names a profile"]
+    S2["2. Add discovery + owned bytes + VersionReq check<br/>+ ProfileOrigin variant<br/>package.rs:34-47, profile.rs:62-68,367-374"]
+    S3["3. Publish the package as a distribution artefact<br/>and install it in this repository"]
+    S4["4. Delete the embed and the preset trio together<br/>dogfood.rs:8-9, gate_presets/builtin.rs,<br/>gate_presets/planning.rs presets"]
+    S5["5. Regenerate docs/reference/gate-presets.md;<br/>amend the invariant; sweep stale module docs"]
+    S1 --> S2 --> S3 --> S4 --> S5
+```
+
+The load-bearing constraints, each with the reason it is an edge rather than a
+preference:
+
+- **1 before 4** — otherwise §5.2's break. This is the only strict ordering
+  requirement the investigation found, and it is absolute.
+- **2 before 3** — an artefact nothing can discover is not installable.
+- **3 before 4** — the package must be resolvable from disk before the embedded
+  copy stops existing, or there is a revision at which no repository can apply
+  the profile.
+- **4 is indivisible** — the embed and the preset trio go in one change. Deleting
+  the embed alone leaves `gate_presets/planning.rs:101` calling
+  `jit_dogfood_gate` against nothing; deleting the presets alone leaves the
+  package embedded for no consumer that needs it in the binary.
+- **5 in the same change as 4 or immediately after** — the projection
+  conformance test (`reference.rs:320-334`) fails in between.
+
+Step 1 is worth landing on its own regardless of what follows: making a
+whole-repository command stop depending on one workflow's bytes is the ruling's
+principle applied at its sharpest point, and it is independently reviewable.
+
+---
+
+## 6. The amendments (REQ-04)
+
+### 6.1 `@/invariant/domain-agnostic`
+
+Current text carves out the trio: "The one sanctioned exception is the
+planning-bracket preset trio (plan-review, coverage-preview, breakdown-review):
+it encodes jit's own plan-before-fan-out workflow (`@/charter/D-3`), not an
+adopter domain, so it is retained as the single binary-shipped preset bundle."
+
+Proposed replacement text, in the words it would carry — stating what holds,
+with no reference to what it replaces (the registry entry is the current
+statement of the rule, and `CHANGELOG` is where a change is narrated):
+
+> **domain-agnostic** — Engine logic is domain-agnostic: type names, label
+> vocabularies, gate keys, templates, and workflow shapes come from repository
+> configuration (`.jit/`), never from hardcoded domain assumptions. The binary
+> ships the mechanisms that interpret that configuration and no instance of it:
+> a specific workflow, including jit's own plan-before-fan-out bracket
+> (`@/charter/D-3`), reaches a repository as a profile package. A name a
+> mechanism resolves through declared bindings is part of the mechanism; a
+> declaration naming a particular gate, template, or node type is not.
+
+The final sentence is what keeps `DEFAULT_PLANNING_ROLE`,
+`DEFAULT_BREAKDOWN_ROLE` and `DEFAULT_CONTAINER_ANCHOR`
+(`templates.rs:206,210,214`) inside the rule rather than making the amendment
+delete them by implication (§2.3). Without it the invariant is ambiguous at
+exactly the place a reviewer will test it.
+
+### 6.2 `@/charter/D-3`
+
+**No amendment.** D-3 records the workflow: "A breakable container is bracketed
+by a planning node and a breakdown node, instantiated by the `plan` template via
+`jit apply plan`, with gates that must pass before any implementation child is
+dispatched" (`dev/vision/9db27a3a-charter.md`, D-3 entry). Every clause stays
+true — the template still instantiates the bracket, the gates still gate. The
+decision says nothing about where the gate definitions ship, so nothing in it
+goes stale. Its addressable summary row, "Plan-before-fan-out bracket gates a
+breakable container before implementation", is likewise unaffected.
+
+### 6.3 Stale prose the change carries with it
+
+Per the repository's stale-text sweep rule, the amendment's footprint includes
+four places that assert the trio is binary-shipped:
+
+- `crates/jit/src/gate_presets.rs:8-12` — module doc, "carries the presets the
+  binary ships — only the planning-bracket trio", citing `@/inv/domain-agnostic`;
+- `crates/jit/src/gate_presets/builtin.rs:1-15` — module doc, "The binary ships
+  exactly the three planning-bracket presets";
+- `crates/jit/src/gate_presets/planning.rs:1-28` — module doc, the three preset
+  descriptions;
+- `docs/reference/gate-presets.md` — a generated projection (§5.2).
+
+A supporting note rather than an amendment: `@/charter/D-2` already reads
+"Quality gates declared in `.jit/gates.toml`, not baked into the binary". The
+removed carve-out was the one place the code stood outside D-2; the ruling
+brings the two into agreement rather than changing either.
+
+---
+
+## 7. Effects traced (REQ-07)
+
+| Surface | Effect |
+|---|---|
+| **`jit init`** | Plain `jit init` unchanged — it neither reads nor needs the package (§4.2, Case 1). `jit init --profile <id>` keeps its flag and its atomic scaffold-plus-profile publication (`init.rs:68-210`); resolution moves to discovery, and the adopter supplies a location. The offline, no-checkout property is what this costs (§10.1). |
+| **Derived-state repair** | The unconditional load (`validate.rs:432,486`) becomes conditional on the provenance record. Where a record exists, repair needs the package resolvable to recompute `expected_record` (`profile.rs:337-346`, compared at `validate.rs:591-598`). A repository-local package location (§3.3 option B) preserves today's guarantee; any other location degrades it (§10.2). Where no record exists, validation stops touching profile machinery entirely — a strict improvement in a repository that never wanted a profile. |
+| **Package validation** | Unchanged in substance; §3.1 lists the defences that already assume untrusted input. Gains the runtime `VersionReq::matches` it lacks today (§1.3). `MissingContent`/`ExtraContent` (`package.rs:297-309`) apply to a discovered tree exactly as to an embedded one. |
+| **Build-footprint budget** | ~423 KB of embedded bytes leave every target that links the library; `include_dir` can leave `crates/jit/Cargo.toml:43`, retiring the dependency-policy assertion pinned at `package.rs:907-918`. The checker measures integration-target count (11 of 12 used, limit at `scripts/rust-build-budget.sh:36`) and active-executable bytes (2 GiB, `:37`), so the reduction is real but unmeasured. Discovery adds a directory walk and no dependency under §3.4's recommendation. **`crates/jit/build.rs` gains nothing**: it currently reads nothing ambient and emits only four `rerun-if-env-changed` (`build.rs:24-27`), and under the ruling it never acquires the directory `rerun-if-changed` epic e204e63d planned — so the mtime-sensitivity risk that change carried (`build.rs:6-11`, jit:5d862134) does not arise. |
+| **Adopter out-of-the-box** | `jit init` behaviour is identical. `jit gate preset list` returns zero presets in a repository with no `.jit/config/gate-presets/`. The bracket is reachable by hand-authoring three gate stanzas (§4.2) or by applying the profile from a fetched artefact. |
+| **This repository's gate registry** | **Unaffected.** All six workflow gate keys are hand-authored with `exec` checkers pointing at repository scripts (`.jit/gates.toml:3,85,107,235,295,317`); none was written by a profile, and `.jit/profiles/` does not exist. The preset trio's removal changes only which branch of `resolve_captured_gate` resolves the same three names (§5.1). The registry needs no edit at any step of the transition. |
+
+---
+
+## 8. Consequences for epic e204e63d (REQ-08)
+
+Per criterion, against the epic's own text:
+
+| Epic criterion | Verdict | Reasoning |
 |---|---|---|
-| **A** — package stays embedded | **Amendment needed anyway.** The exception names three presets; the binary carries 64 declared sources. Either widen the clause to "jit's own workflow package, retained as the single binary-shipped profile" or narrow what is embedded. Leaving it is a live `@/invariant/single-source-prose` defect in the invariant registry itself. | None. The bracket keeps its binary-shipped source. |
-| **B** — bracket bundle stays, rest leaves | **Amendment optional and clarifying.** The exception becomes literally true for the first time: the binary would carry exactly the trio plus the `plan` template that names it. Worth adding "and the `plan` template contribution the preset inventory is derived from" (`dogfood.rs:70-117`). | None textually. D-3's shipped property — "the bracket is self-contained without any per-project gate authoring" (`gate_presets/builtin.rs:5-7`) — is preserved. |
-| **C** — nothing profile-shaped in the binary | **Exception is deleted.** The invariant becomes absolute; `BuiltinPresets` has no source and either returns empty or reads from a new location, which is a different exception under a different name. | No textual amendment — D-3 decides the *workflow shape*, not where gates ship. But D-3's delivered property is lost: a fresh repository following `docs/how-to/adopt-planning-bracket.md` would have to hand-author all three gate definitions, and `jit apply plan` would fail at `commands/template.rs:1241` for any key absent from `.jit/gates.toml`. |
+| **REQ-03** — "The packaged live-asset tree is derived from the repository files it mirrors rather than carried as a second checked-in copy, and editing a live file alone cannot leave the packaged copy stale." | **Survives unchanged, and gains value.** | Every clause is about the package and the repository; none mentions the binary. Removing 61 checked-in duplicates is exactly what the ruling wants, and the derived tree becomes the distribution artefact §3.4 recommends. Only the assembly's *output destination* changes, from a build-output directory to a publishable one. |
+| **REQ-04** — "Two builds from identical sources and identical explicit environment **embed** byte-identical package content and report identical provenance, and the derivation is ordered so that the **embedded package** always reads a fully populated tree." | **Superseded.** | Both italicized terms lose their referent. The reproducibility property is worth restating as "two assemblies from identical sources produce identical package content and an identical package hash" — mechanically checkable through `EmbeddedProfilePackage::hashes().package` (`package.rs:452-521`) against the produced tree. The ordering clause (build script before `include_dir!` expansion) becomes meaningless: there is no `include_dir!`. |
+| **REQ-05** — "Every root the packaged live assets are drawn from is declared, and a repository file under any declared root that is neither declared as a packaged asset nor matched by a declared exclusion fails the test suite." | **Survives unchanged.** | A property relating the manifest to the repository, with no reference to the binary. It becomes more important, not less: once the package is a separately shipped artefact, an omitted live consumer is a defect an adopter receives rather than one a rebuild hides. |
+| **REQ-06** — "Editing a live consumer alone reports a binary installed before that edit as stale." | **Becomes meaningless.** | After extraction, editing a live consumer does not change the binary — that is the ruling's content. The staleness relation moves from binary↔live-source to package↔live-source, which is a different assertion about a different artefact. Task 779ea308 should close as superseded rather than be reworked; the equivalent property for the package is REQ-03's "editing a live file alone cannot leave the packaged copy stale". |
+
+Task-level consequences within the halted chain:
+
+- **Superseded:** `package-tree-cutover` (1d2f454e) — the embed is deleted, not
+  re-rooted; `package-content-reproducibility` (ce0172c3) — retargets to the
+  produced tree; `binary-build-input-inventory` (779ea308) — meaningless, per
+  epic REQ-06.
+- **Survive, retargeted:** `package-assembly-mechanism` (7d038e97) — produces a
+  distribution artefact rather than a build-output tree, and no longer needs the
+  `rerun-if-changed` that carried the mtime risk;
+  `citation-check-package-exclusions` (26f503cc);
+  `live-source-completeness-guard` (0cf1f351); `live-source-root-declaration`
+  (39c34568) and its two documentation successors.
+- **Unblocked and unaffected**, as the issue's Notes state: the two projection
+  stories (25bdda50, 6f8f02ba) and the convergence task (65ff0f38) — **with one
+  coupling worth flagging now.** `profile/template_region.rs:63` calls
+  `jit_dogfood_package()`, so the template-region render that story ships reads
+  the embedded package. It is `cfg`-gated test-support (`profile/mod.rs:18-19`)
+  and the change is small, but it must be retargeted to the discovered package
+  at step 4 (§5.3) or the story's freshness guard stops compiling.
 
 ---
 
-## 4. Where the framing is wrong
+## 9. Relationship to `@/charter/D-8` (REQ-09)
 
-Three premises in the brief do not survive contact with the code. Stating them
-plainly is the most useful thing here.
+**The ruling reopens D-8. Stating it plainly rather than absorbing it:**
 
-**"Epic e204e63d makes ~60 live repository files inputs to the binary,
-tightening exactly the coupling the owner wants loosened."** They are inputs
-today. `include_dir!` embeds their checked-in duplicates
-(`dogfood.rs:8-9`), a test forces the duplicates to be byte-identical to the
-live files including mode (`dogfood.rs:437-473`), and
-`BINARY_BUILD_INPUTS` already names `"profiles/jit-dogfood/"`
-(`domain/build_provenance.rs:117-127`). The epic replaces a hand-maintained
-coupling with a mechanical one and deletes 61 duplicate files. The amended
-build-input task (779ea308, `progress.json:76-83`) makes the existing dependency
-*visible* rather than creating it.
+D-8 chose "one **embedded**, offline `jit-dogfood` profile with safe application
+to fresh and existing repositories" and moved to a post-1.0 epic:
+"Multi-profile composition, **local packages**, variables, reconfiguration,
+diff, upgrade, removal, and shared-ownership semantics"
+(`dev/vision/9db27a3a-charter.md:141-144`). An on-disk contributed profile is a
+local package, named in that list. Its Rejected branch also names a failure mode
+adjacent to this work: "dropping profiles from v1.0 entirely, which leaves the
+strongest dogfooded workflow difficult for adopters to install"
+(`:145-147`) — not what the ruling does, but the property §10.1 puts at risk.
 
-**"The profile should be similar as any other contributed profile."** There is
-no other contributed profile, and there is no mechanism to be similar to. The
-mechanism is the deferred subsystem `@/charter/D-8` names.
+What fits **inside** D-8 as written: nothing about disk discovery. Its Chosen
+clause says "embedded" in the first sentence.
 
-**"The plan records that an earlier epic … made the package the authority, and
-never built the renderer that decision assumed."** True, and still true *in the
-direction the plan says it reverses* — but the reversal is partial and was
-already qualified. `crates/jit/src/profile/template_region.rs:3-8`, landed at
-`170436cd`, makes the *package* the authority for the `plan` template and the
-repository's `.jit/templates.toml` a generated region. The plan states this
-asymmetry deliberately (`e204e63d-plan.md:255`): package-authoritative for the
-template declaration, repository-authoritative for file assets. Any option here
-inherits that split; it is not an artefact to be cleaned up.
+What **reopens** it: the resolver, the location, and the distribution asset —
+items 3.2.4, 3.3 and 3.4 of this report.
 
----
+What need **not** reopen: everything else in D-8's deferred list. The ruling
+requires one profile discovered from one declared location. It does not require
+composition, variables, reconfiguration, diff, upgrade, removal, or
+shared-ownership semantics, and building any of them now would exceed the
+ruling as well as the charter.
 
-## 5. Options (REQ-04, REQ-05, REQ-06)
+**Recommendation:** amend D-8 narrowly and explicitly rather than let the
+extraction exceed it silently — replace "one embedded, offline profile" with
+"one offline profile discovered from a declared repository-local location",
+leaving the rest of the deferred list intact and its Reasoning ("solves the
+immediate adoption problem with a bounded surface") true. A narrow amendment
+also records where the boundary now sits, which is what stops the next
+container reading the reopening as permission for the whole lifecycle.
 
-### Option A — The package stays embedded; finish e204e63d
-
-The packaging chain completes: the tree is assembled at build time from declared
-live-source roots, the embed re-roots onto the build output directory, and
-`profiles/jit-dogfood/assets/live/**` is deleted from the repository. What
-remains checked in is `manifest.toml`, three install-only assets, and the region
-source — a manifest naming which of jit's own working files constitute its
-workflow.
-
-| Axis | Effect |
-|---|---|
-| `jit init` | Unchanged. `jit init --profile jit-dogfood` keeps its offline, no-checkout guarantee (`docs/reference/profiles.md:5-8`). |
-| Derived-state repair | Unchanged. The package is always resolvable, so `validate.rs:591-600` keeps working and `--fix` keeps restoring profile-owned targets. |
-| Package validation | Unchanged model; `from_dir` reads a build-output tree instead of `$CARGO_MANIFEST_DIR`. `MissingContent`/`ExtraContent` (`package.rs:297-309`) become the reconciliation check on the derived tree for free. |
-| Build-footprint budget | Embedded bytes unchanged (~423 KB). No integration-test target added; 11 of 12 used (`scripts/rust-build-budget.sh:36`). One genuine new risk: `crates/jit/build.rs` today reads nothing ambient and emits only four `rerun-if-env-changed` (`build.rs:24-27`); a directory `rerun-if-changed` reintroduces mtime sensitivity — the jit:5d862134 regression the file's own comment documents (`build.rs:6-11`). The epic already pins it as its own terminal (8e7a82dc). |
-| Adopter out-of-the-box | Best available. One command, no network, no checkout, no second artefact. |
-| e204e63d criteria | **All survive unchanged.** Nothing superseded, nothing meaningless. |
-| `@/charter/D-8` | **Fully inside it.** "one embedded, offline `jit-dogfood` profile". |
-| Amendments | `@/invariant/domain-agnostic`'s exception clause needs widening to match what the binary carries (§3.3). |
-
-Cost: does not deliver the owner's goal *as stated*. The binary still carries
-the whole workflow. It does deliver the substance of "jit should not carry its
-own profile in its source" — the duplicated source disappears.
-
-### Option B — Split: bracket bundle in the binary, workflow profile on disk
-
-The binary keeps a minimal package: the three gate contributions and the `plan`
-template contribution (the four declarations consumers 4 and 5 read). The
-remaining 60 assets, 3 install-only assets, the region and the other 25
-contributions become an on-disk package discovered by path.
-
-| Axis | Effect |
-|---|---|
-| `jit init` | `--profile jit-dogfood` must locate bytes on disk. Either a new `--from <path>`, or a search path, plus a new release asset. Breaks the "no JIT source checkout" guarantee (`docs/reference/profiles.md:5-8`) unless the release archive grows past its four files (`release-policy.md:52`), which touches `@/charter/D-16`'s one-workflow-one-release decision. |
-| Derived-state repair | **The hard problem.** `expected_record(package)` (`profile.rs:337-346`) needs the package bytes to recompute hashes. If the adopter deletes or moves the package directory, either `jit validate` fails (`validate.rs:594-598`) or the code must fall back to trusting the stored record — which silently stops repairing profile-owned targets and weakens `@/invariant/derived-state-coherence`. Neither answer is free; both are new design. The unconditional load at `validate.rs:432,486` also has to become conditional, since a repository with no profile must not require one. |
-| Package validation | Largely free (§2.2). Needs owned bytes, a runtime `VersionReq::matches`, a second `ProfileOrigin` variant, and the `Embedded*` renames. |
-| Build-footprint budget | Embedded bytes drop by ~420 KB across every target linking the lib; discovery and filesystem-walk code is added. Net roughly neutral, and invisible to the checker, which measures integration-target count and active-executable bytes (`rust-build-budget.sh:36-37`). |
-| Adopter out-of-the-box | Bracket survives intact (Case 2, §3.2). The *workflow* — skills, prompts, content standards, `AGENTS.md` guidance — becomes a two-step install with a second artefact to fetch and keep. |
-| e204e63d criteria | **Survive:** `citation-check-package-exclusions` (26f503cc), `live-source-completeness-guard` (0cf1f351), both projection stories (25bdda50, 6f8f02ba), the convergence task (65ff0f38), and `package-assembly-mechanism` (7d038e97) retargeted to produce the on-disk tree. **Superseded:** `package-tree-cutover` (1d2f454e) — the embed is not re-rooted, it is mostly removed; `package-content-reproducibility` (ce0172c3) — the compared hash becomes the on-disk package's. **Meaningless:** `binary-build-input-inventory` (779ea308) — the live sources stop being binary inputs, which is exactly the coupling the owner wants gone. |
-| `@/charter/D-8` | **Reopens it.** "local packages" is in D-8's deferred list verbatim (`9db27a3a-charter.md:141-144`). Requires an owner decision to amend the charter or to accept the epic as the deferred work arriving early. |
-| Amendments | `@/invariant/domain-agnostic`'s exception becomes accurate for the first time; a clarifying edit only. `@/charter/D-3` unaffected. |
-
-### Option C — Full extraction: no profile content in the binary
-
-`include_dir!` is deleted, `BuiltinPresets` loses its source, and `jit-dogfood`
-becomes a contributed package discovered from disk like any other.
-
-| Axis | Effect |
-|---|---|
-| `jit init` | As Option B, plus: the bracket is no longer available without the package. |
-| Derived-state repair | As Option B's problem, and unavoidable — there is no embedded fallback for anything. |
-| Package validation | As Option B. |
-| Build-footprint budget | Largest reduction in embedded bytes; `include_dir` could leave `crates/jit/Cargo.toml:43` entirely, which the dependency-policy assertion at `package.rs:907-918` currently pins. |
-| Adopter out-of-the-box | `jit init` yields an unbracketed repository with no route to the bracket except the source checkout or hand-authoring three gate stanzas. `jit gate preset list` returns zero presets. `jit apply plan` fails for any gate key absent from `.jit/gates.toml` (`template.rs:1241`). |
-| e204e63d criteria | As Option B, and additionally the whole `package-derivation` story's relationship to the *binary* dissolves — the assembled tree is a distribution artefact, not a build input. |
-| `@/charter/D-8` | **Reopens it, and contradicts its rejected branch**: D-8 explicitly rejected "dropping profiles from v1.0 entirely, which leaves the strongest dogfooded workflow difficult for adopters to install" (`9db27a3a-charter.md:145-147`). Option C is a softer form of the same outcome. |
-| Amendments | `@/invariant/domain-agnostic`'s exception is **deleted**. `@/charter/D-3` keeps its text but loses its self-contained property. |
-
-### Comparison
-
-| | A | B | C |
-|---|---|---|---|
-| Delivers "not in jit's source" | Substantially (61 files deleted) | Yes | Yes |
-| Delivers "not in jit's binary" | No | Mostly | Yes |
-| `jit init --profile` stays offline and checkout-free | Yes | Only with a new release asset | Only with a new release asset |
-| Derived-state repair keeps its guarantee | Yes | New design needed | New design needed |
-| Bracket works out of the box | Yes | Yes | No |
-| Fits `@/charter/D-8` | Yes | No | No, and contradicts its rejected branch |
-| e204e63d criteria invalidated | None | 1 meaningless, 2 superseded | 1 meaningless, 2+ superseded |
+`@/charter/D-16` (one tag-triggered workflow, one GitHub release) is touched by
+the new release asset but not contradicted: one release carrying one more asset
+is still one release. `@/charter/D-14` (v1.0 gated on completed profiles MVP)
+now has a larger MVP.
 
 ---
 
-## 6. Recommendation (REQ-07)
+## 10. Costs with no route back, stated before execution
 
-**Take Option A. Unhalt e204e63d and let it complete. Amend
-`@/invariant/domain-agnostic`'s exception clause to describe what the binary
-actually carries.**
+Not arguments against the direction. Each is a property that disappears at a
+specific step and cannot be recovered later without a decision taken at that
+step.
 
-The defence, against each alternative:
+**10.1 — `jit init --profile jit-dogfood` stops being self-contained.**
+`docs/reference/profiles.md:5-8` promises that applying the profile "needs no
+Git repository, network access, `jq`, or JIT source checkout". After step 4 the
+adopter must have obtained an artefact first. If the release asset (§3.4) is not
+shipped in the same release that removes the embed, the profile is reachable
+only from a source checkout — and that is the exact condition D-8's Rejected
+branch names. **The distribution decision must land with, not after, the
+extraction.**
 
-**Against B and C, the charter argument is dispositive on its own.** `@/charter/D-8`
-does not merely fail to authorize an on-disk profile; it names "local packages"
-in the list of things v1.0 defers, and its Rejected branch names the exact
-failure mode extraction produces — a strongest-workflow that is difficult to
-install. Reopening D-8 to move ~420 KB out of a statically linked binary is a
-poor trade for a v1.0 whose remaining scope is gated on completed profiles MVP
-and core maintenance (`@/charter/D-14`).
+**10.2 — Derived-state repair becomes conditional on an artefact the adopter can
+delete.** Today `jit validate --fix` restores a deleted profile-owned file
+because `expected_record(package)` can always be recomputed
+(`profile.rs:337-346`, `validate.rs:591-600`). Afterwards it can do so only
+while the package resolves. The choice of location decides whether the
+capability survives: §3.3's repository-local option preserves it; `--from`-only
+or machine-level storage does not, and the fallback — trusting the stored record
+when the package is unresolvable — silently converts `--fix` from "restores
+profile-owned targets" to "restores what it can still see", which is a
+regression in `@/invariant/derived-state-coherence`. If a degraded mode is
+acceptable it should be chosen and documented deliberately, not arrived at.
 
-**Against B and C, the repair argument is the one that would still hold if D-8
-did not exist.** Both leave a repository whose derived-state guarantee depends on
-an artefact the adopter can delete. `jit validate` currently fails loudly on a
-provenance mismatch (`validate.rs:594-598`), which is correct behaviour when the
-package is guaranteed present and hostile behaviour when it is not. The
-alternative — trusting the stored record — silently converts `jit validate --fix`
-from "restores profile-owned targets" to "restores whatever it can still see".
-That is a real regression in `@/invariant/derived-state-coherence`, and neither
-the issue nor the plan has scoped a design for it.
-
-**Against the instinct that motivated the question: it is mostly satisfied by
-the work already in flight.** After e204e63d, `profiles/jit-dogfood/` is a
-manifest plus four package-authored files. The 60 workflow assets exist once, in
-the repository, where contributors edit them. That is what "jit should not carry
-its own profile in its source" means operationally. The residual — the binary
-carrying its own workflow package — is a distribution property, not a source
-property, and it is the property D-8 chose on purpose.
-
-**What A does not settle, and should be stated when the decision is taken:** the
-binary will still carry an adopter-installable workflow that some adopters will
-not want. That is a cost paid in bytes and in the honesty of the invariant text,
-both of which are cheap to carry and cheap to reverse later. Option B remains
-reachable post-1.0 without rework, because §2.2 shows the package model already
-generalizes; the only work Option A adds to a future extraction is the
-build-output re-rooting, which a distribution-artefact assembly would want
-anyway.
-
-**Two small items worth carrying regardless of the option chosen**, both outside
-this issue's scope and neither blocking:
-
-1. Amend the invariant's exception clause. It is a `@/invariant/single-source-prose`
-   defect in the invariant registry itself: it states three presets where the
-   binary carries a 64-source package.
-2. Note in the profile reference that `profile.jit` is enforced at release time
-   (`release-version-contract.py:462-488`) and not at apply time, so the field
-   is not read as a runtime guard it is not.
+**10.3 — Two smaller items that would otherwise be discovered late.**
+`preview_coverage_rule` (`gate_presets/planning.rs:181`) is engine-shaped — a
+pure rule transform parameterized by `breakdown_type` — but has no production
+caller in `crates/jit/src/`; only doc examples and tests. When its module's
+presets are deleted it needs a home or a deliberate removal, and
+`@/invariant/canonical-cutover` argues against leaving it orphaned in a module
+named for the workflow that left. And `docs/reference/gate-presets.md` is a
+generated projection of the built-ins whose conformance test fails the moment
+they go (`reference.rs:320-334`); it needs regeneration in the same change, and
+its remaining subject is the portable-checker syntax reference at
+`reference.rs:25+`, not presets.
 
 ---
 
-## 7. Open questions
+## 11. Open questions
 
-1. **Does the owner's position survive the D-8 finding?** The instinct was stated
-   before "extraction = the deferred local-package lifecycle" was established. If
-   the owner reads that and still wants extraction, this becomes a charter
-   amendment decision, and the recommendation should be re-weighed as an argument
-   about sequencing rather than about direction.
-2. **Is there adopter demand for authoring a second profile?** Nothing in the
-   repository records any. If there is, Option B's cost is amortized across a
-   capability rather than spent on relocating one package, which changes the
-   arithmetic materially. If there is not, Option A is clearly right.
-3. **Can the release archive grow?** Options B and C both need a second asset.
-   `@/charter/D-16` fixes one tag-triggered workflow publishing one GitHub
-   release; adding an asset may fit inside it or may not. Not investigated — it
-   was not needed once D-8 settled the near-term answer.
-4. **Would derived-state repair accept a degraded mode?** If the owner is willing
-   to say that a repository whose profile package has been deleted keeps its
-   files but loses `--fix` for profile-owned targets, Option B's hardest problem
-   becomes a documented limitation rather than a design gap. That is a product
-   decision, not a technical one.
-5. **Unverified:** whether the build-output re-rooting in e204e63d leaves test
-   targets fresh across a branch switch. The epic already carries this as its own
-   terminal (8e7a82dc, `e204e63d-plan.md:258`); nothing here changes its status.
+1. **Which location (§3.3)?** The recommendation is repository-local, driven by
+   §10.2. It is the one open decision that changes what the extraction delivers
+   rather than how it is done, and it should be settled before step 2.
+2. **Does the release asset land in the same release (§10.1)?** If not, the
+   window between removing the embed and shipping the asset is a release in
+   which the profile is checkout-only.
+3. **Is a degraded repair mode acceptable (§10.2)?** A product decision, not a
+   technical one, and only live if the answer to (1) is not repository-local.
+4. **How narrowly is D-8 amended (§9)?** Recommended narrow. Left to the owner,
+   and worth recording as a charter decision rather than as an issue note, since
+   the next profile-adjacent container will read it.
+5. **Do `DEFAULT_PLANNING_ROLE` / `DEFAULT_BREAKDOWN_ROLE` /
+   `DEFAULT_CONTAINER_ANCHOR` stay (§2.3)?** The criterion as stated keeps them
+   and §6.1's final sentence makes that explicit. A reviewer applying a stricter
+   reading would delete them and force every repository to declare bindings it
+   currently inherits. Worth confirming when the amendment is taken, because the
+   invariant's wording is what will be cited later.
