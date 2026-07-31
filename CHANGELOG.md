@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **A profile package is read from a directory on disk.** The package model was
+  already written for untrusted external data — bounded file count and total
+  size, rejected absolute, traversal, platform-prefix, control-character and
+  backslash paths, a declared source that is absent, a package file no
+  declaration claims, and a content address over the manifest and every path —
+  but the only tree it could read was one embedded at compile time, and it
+  borrowed the byte slices it validated, which a directory read cannot supply
+  without leaking them. `ProfilePackage` (was `EmbeddedProfilePackage`) owns the
+  bytes it validates, and `ProfilePackage::from_directory` walks a directory
+  into the same path-to-bytes map the compile-time route produces: for identical
+  content the two agree in manifest, package hash, and every per-target digest,
+  because one validation sees both. No defence is weakened for the directory
+  route, and two exist only for it, each naming what it refused at read time: a
+  directory entry that is neither a regular file nor a subdirectory, and an
+  entry resolving outside the package root — which is how a symbolic link out of
+  the tree is caught before its content is used. A package directory that is
+  absent or unreadable reports that filesystem failure instead of an invalid
+  package, so a location that does not exist is not diagnosed as bad content.
+  Where a package directory comes from is decided elsewhere; this is the reader.
+
 - **A stale shipped-policy region in the adopter configuration documents fails
   the mechanical documentation checks.** Generating those regions made them
   right once; nothing kept them right, so a change to the shipped
