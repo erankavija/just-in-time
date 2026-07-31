@@ -702,4 +702,144 @@ mod tests {
             }
         }
     }
+
+    /// Every live asset's repository-relative target paired with the executable
+    /// bit the package declares for it.
+    ///
+    /// Derived from the manifest, so a newly declared live asset joins the
+    /// executable-mode contract without an edit here.
+    #[cfg(unix)]
+    fn live_asset_executable_declarations<'a>(
+        package: &'a EmbeddedProfilePackage<'_>,
+    ) -> Vec<(&'a str, bool)> {
+        package
+            .manifest()
+            .assets
+            .iter()
+            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+            .map(|asset| (asset.target.as_str(), asset.executable))
+            .collect()
+    }
+
+    /// Declarations whose repository file carries the opposite executable bit,
+    /// each paired with the mode found under `root`.
+    ///
+    /// Panics when a declared target is unreadable, since a declaration that
+    /// cannot be compared against a file is not a declaration that holds.
+    #[cfg(unix)]
+    fn executable_mode_mismatches<'a>(
+        root: &Path,
+        declarations: impl IntoIterator<Item = (&'a str, bool)>,
+    ) -> Vec<(&'a str, bool)> {
+        use std::os::unix::fs::PermissionsExt;
+        declarations
+            .into_iter()
+            .filter_map(|(target, declared)| {
+                let metadata = fs::metadata(root.join(target))
+                    .unwrap_or_else(|error| panic!("failed to stat {target}: {error}"));
+                let executable = metadata.permissions().mode() & 0o111 != 0;
+                (executable != declared).then_some((target, executable))
+            })
+            .collect()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_executable_mode_mismatches_is_empty_across_every_declared_live_asset() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let package = jit_dogfood_package().unwrap();
+        let declarations = live_asset_executable_declarations(&package);
+        assert!(
+            !declarations.is_empty(),
+            "the package declares live assets to check"
+        );
+        assert_eq!(
+            executable_mode_mismatches(&root, declarations),
+            Vec::new(),
+            "each entry names a live asset whose declared executable bit contradicts its repository file"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_executable_mode_mismatches_reports_a_permission_change_on_a_live_source() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let package = jit_dogfood_package().unwrap();
+        let declarations = live_asset_executable_declarations(&package);
+
+        // A faithful copy of the live sources, mode included, so a permission
+        // change can be made without touching the repository.
+        let mirror = TempDir::new().unwrap();
+        for (target, _) in &declarations {
+            let destination = mirror.path().join(target);
+            fs::create_dir_all(destination.parent().unwrap()).unwrap();
+            fs::copy(root.join(target), &destination).unwrap();
+        }
+        assert_eq!(
+            executable_mode_mismatches(mirror.path(), declarations.clone()),
+            Vec::new(),
+            "the copy reproduces the repository modes"
+        );
+
+        for declared in [true, false] {
+            let target = declarations
+                .iter()
+                .find_map(|(target, executable)| (*executable == declared).then_some(*target))
+                .unwrap_or_else(|| panic!("no live asset is declared executable={declared}"));
+            let path = mirror.path().join(target);
+            let mode = fs::metadata(&path).unwrap().permissions().mode();
+            let changed = if declared {
+                mode & !0o111
+            } else {
+                mode | 0o100
+            };
+
+            fs::set_permissions(&path, fs::Permissions::from_mode(changed)).unwrap();
+            assert_eq!(
+                executable_mode_mismatches(mirror.path(), declarations.clone()),
+                vec![(target, !declared)],
+                "a permission change on {target} alone goes unreported"
+            );
+
+            fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+            assert_eq!(
+                executable_mode_mismatches(mirror.path(), declarations.clone()),
+                Vec::new(),
+                "restoring {target}'s mode clears the mismatch"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_executable_mode_mismatches_reports_a_declaration_inverted_against_its_repository_file()
+    {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let package = jit_dogfood_package().unwrap();
+        let declarations = live_asset_executable_declarations(&package);
+
+        for executable in [true, false] {
+            let subject = declarations
+                .iter()
+                .find_map(|(target, declared)| (*declared == executable).then_some(*target))
+                .unwrap_or_else(|| panic!("no live asset is declared executable={executable}"));
+            let inverted = declarations.iter().map(|(target, declared)| {
+                (
+                    *target,
+                    if *target == subject {
+                        !declared
+                    } else {
+                        *declared
+                    },
+                )
+            });
+            assert_eq!(
+                executable_mode_mismatches(&root, inverted),
+                vec![(subject, executable)],
+                "a declaration claiming executable={} for {subject} goes unreported",
+                !executable
+            );
+        }
+    }
 }
