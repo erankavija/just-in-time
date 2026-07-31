@@ -561,9 +561,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// listing names them, so a repository that has applied nothing captures no
     /// package target and resolves no package. A recorded profile contributes
     /// repair claims only when its captured record exactly matches the resolved
-    /// package identity and target hashes. The record is the provenance
-    /// authority; no second ownership inventory is inferred from filenames or
-    /// occupants.
+    /// package identity and target hashes; what that profile then owns comes
+    /// from the package the record proves, never from a target's filename or
+    /// occupant.
     ///
     /// A record whose package cannot be obtained fails the whole capture rather
     /// than repairing the targets still accounted for: a repair that silently
