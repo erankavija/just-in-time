@@ -23,7 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   route, and two exist only for it, each naming what it refused at read time: a
   directory entry that is neither a regular file nor a subdirectory, and an
   entry resolving outside the package root — which is how a symbolic link out of
-  the tree is caught before its content is used. A package directory that is
+  the tree is caught before its content is used. Both are decided against the
+  entry the walk opened rather than against its name, and every entry is opened
+  without following links against the directory handle that listed it, so a name
+  relinked out of the tree while the package is being read fails to open instead
+  of substituting content from outside it. A package directory that is
   absent or unreadable reports that filesystem failure instead of an invalid
   package, so a location that does not exist is not diagnosed as bad content.
   Where a package directory comes from is decided elsewhere; this is the reader.
