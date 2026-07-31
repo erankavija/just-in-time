@@ -124,6 +124,12 @@
    "title": "Regenerating a checked-in generated artifact has one invocation form",
    "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that \u2014 six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) \u2014 so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
    "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label \u2014 the work is cross-cutting)"
+  },
+  {
+   "short_id": "7cbefe7c",
+   "title": "Inventory the binary's declarative configuration and sequence its removal",
+   "reason": "Owner-approved (2026-07-31). The clean-jit ruling widened the epic past the profile to every embedded declarative configuration. A grep-assembled survey found eight sites and is not a basis for sequencing a change of this size.",
+   "wired": "e204e63d depends on 7cbefe7c"
   }
  ],
  "escalations": [
@@ -236,6 +242,36 @@
    "at": "2026-07-31",
    "ruling": "Re-plan by amending the existing plan document; 7eecace8 and 237b15be reopen rather than a second bracket being applied.",
    "effect": "e204e63d-plan.md gains an extraction section; plan-review re-runs over the whole document; the breakdown manifest gains the extraction interior."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Clean jit before 1.0: no embedded configurations, template or otherwise. The binary carries mechanism and no instance of it.",
+   "effect": "Widens the epic past the profile. Bare `jit init` writes the structural minimum; `jit init --profile <id> --from <path>` is the populated path through the resolver REQ-08 builds; the scaffold code path is deleted. Recorded as @/issue/e204e63d/decision/D-13."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Two packages ship: jit-default (generic vocabulary) and jit-dogfood (this project's workflow), with jit-dogfood declaring a package dependency on jit-default. Composition enters v1.0.",
+   "effect": "@/charter/D-8 amended a second time to admit composition. Rejected: generating jit-default from jit-dogfood, and each package carrying a guarded copy of the shared vocabulary. Recorded as @/issue/e204e63d/decision/D-14."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Epic REQ-01's authority moves from SHIPPED_DOCUMENTATION_POLICY to the packaged default profile's [documentation] declaration; the delivered generator is retargeted, not discarded.",
+   "effect": "Story 6f8f02ba reopens when the constant's removal is planned. REQ-01 is restated then, not before, so it keeps describing what shipped. Recorded as @/issue/e204e63d/decision/D-15."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "The release archive carries both package directories alongside the binaries, so one download initializes offline.",
+   "effect": "Extends the current flat four-file archive. @/charter/D-16 intact. Rejected: separate per-package assets, and installer-placed machine-level packages. Recorded as @/issue/e204e63d/decision/D-16."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "The registry-derived default rules stay in the binary; orphan-leaf and strategic-consistency move to jit-dogfood.",
+   "effect": "label-format, namespace-registry, type-hierarchy-known and namespace-unique-<ns> are mechanism over the adopter's own declarations. Recorded as @/issue/e204e63d/decision/D-17."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "An audit inside this epic inventories the remaining embedded configuration and sequences its removal before any of it is planned; fan-out blocks on it.",
+   "effect": "Task 7cbefe7c created, wired as a dependency of the epic, claimed and dispatched. The running plan amendment finishes on the profile-extraction scope; one re-plan after the audit covers everything. Recorded as @/issue/e204e63d/decision/D-18."
   }
  ],
  "halted": {
@@ -264,6 +300,6 @@
    "REQ-06": "meaningless after extraction"
   }
  },
- "blocked": null,
+ "blocked": "Fan-out on the widened scope blocks on audit 7cbefe7c (@/issue/e204e63d/decision/D-18). Epic criteria REQ-07..REQ-10 have no coverage until the extraction interior is instantiated; the plan amendment in 7eecace8 supplies it.",
  "session": 2
 }
