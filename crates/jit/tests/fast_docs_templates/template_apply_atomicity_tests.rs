@@ -603,6 +603,10 @@ fn test_phase_two_closure_change_retries_with_same_template_node_count() {
     let jit_root = temp.path().join(".jit");
     let changed_config = r#"
 [item_kinds.invariant]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
 scope = "project"
 source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
 source-of-truth = "registry-first"
