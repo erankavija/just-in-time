@@ -25,7 +25,7 @@
     "enforces:@/invariant/architecture-dependency-direction"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Stop naming this checkout's paths in the domain and storage layers",
-  "updated_at": "2026-07-31T17:55:33.050762789Z"
+  "updated_at": "2026-07-31T23:07:16.999014920Z"
 }

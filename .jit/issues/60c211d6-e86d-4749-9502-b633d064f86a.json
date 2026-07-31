@@ -24,7 +24,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Adopt the taxonomy fixture in the repository-workflow integration target",
-  "updated_at": "2026-07-31T18:14:07.382860439Z"
+  "updated_at": "2026-07-31T23:06:29.094389476Z"
 }

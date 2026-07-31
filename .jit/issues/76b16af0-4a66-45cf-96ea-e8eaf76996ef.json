@@ -24,7 +24,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Adopt the taxonomy fixture in the modules that seed a repository directly",
-  "updated_at": "2026-07-31T18:13:36.636209708Z"
+  "updated_at": "2026-07-31T23:06:34.151843005Z"
 }

@@ -8,6 +8,7 @@
   ],
   "description": "The package-authored managed-region source moves out of the prefix that marks files mirroring a repository counterpart, so that prefix denotes exactly one relationship.\n\n## Background\n\nThe packaged tree uses a source-path prefix to mark the files it carries that also exist at working paths in this repository. Sixty-one assets sit under it and each has a repository counterpart. One file does not: the managed-region source. Its counterpart is a marked region inside a repository document, not a whole file, so nothing in the repository can be copied to produce it — it is authored inside the package.\n\nWhile the packaged tree is checked in, the mismatch is only untidy. It stops being untidy as soon as anything reads that prefix as a rule. A step that produces the packaged tree by drawing each prefixed file from its repository counterpart finds no counterpart for this one and has nothing to copy; a step that reconciles the prefix against the set of files it should contain sees a file it cannot account for and removes it. Either way the region source is the single element that makes the rule false, so it has to move before any such rule exists rather than after.\n\nMoving it is a relocation inside the package plus the declared source path that names it. Nothing about the region it produces changes: the same repository document, the same marker identity, the same placement.\n\n## Success Criteria\n\n- [hard] REQ-01: The managed-region source sits outside the prefix reserved for package files drawn from a repository counterpart.\n- [hard] REQ-02: The manifest names the relocated source, and the region it declares resolves to the same repository target under the same marker identity with the same placement.\n- [hard] REQ-03: The existing comparison between the packaged region body and the repository region body passes unchanged after the move.\n- [hard] REQ-04: No file remains under the reserved prefix without a repository counterpart, so every path beneath it denotes the same relationship.\n\n## Notes\n\nThe relocation is complete on its own and leaves the packaged content an adopter receives identical; only a source path inside the package changes.\n",
   "documents": [],
+  "done_at": "2026-07-31T23:05:59.462836459Z",
   "first_ready_at": "2026-07-28T12:17:11.984851016Z",
   "gates_required": [
     "cargo-ci",
@@ -36,7 +37,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Move the package-authored region source out of the derived prefix",
-  "updated_at": "2026-07-31T21:47:52.551442806Z"
+  "updated_at": "2026-07-31T23:05:59.462836459Z"
 }

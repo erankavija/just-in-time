@@ -8,6 +8,7 @@
   ],
   "description": "A repository that declares no label namespaces and no type hierarchy receives none, so nothing the adopter did not declare reaches their configuration.\n\n## Background\n\nThree copies of a four-level type hierarchy and one copy of a three-namespace registry live in default implementations and fallback branches, reached whenever the configuration omits the corresponding table. Their effect is measurable rather than theoretical: a repository whose configuration declares neither table is initialized with a rule set naming six namespaces and four type names it never declared, plus two committed JSON schemas enumerating them. Validation passes, so nothing reports it.\n\nThe three sites are one property, not three. One of them feeds the namespace rule and its schema, one feeds the type-hierarchy rule through a different caller, and one feeds the graph rules. Any one left behind keeps a compiled taxonomy reachable and the property unobservable.\n\nThis also has to land before the configuration the scaffold writes is removed. Deleting that template while these defaults remain makes every default initialization take exactly the route above — the failure would be silent, and it would be caused by the change intended to prevent it.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository whose configuration declares no label namespaces receives an empty namespace registry, and no rule or schema enumerating namespaces is written.\n- [hard] REQ-02: A repository whose configuration declares no type hierarchy receives no hierarchy, and no rule or schema enumerating type names is written.\n- [hard] REQ-03: A repository that declares either table is unaffected, receiving exactly what it declared.\n- [hard] REQ-04: The three compiled taxonomy sources are gone, along with the fallback branches that reached them.\n- [hard] REQ-05: A repository declaring neither table still validates, and the rule set it receives is the label grammar alone.\n\n## Notes\n\nThe rules that project a registry stay: each derives both its assertion and its membership from whatever the adopter declared, and produces nothing when they declared nothing. That property is only observable once these defaults are gone.\n",
   "documents": [],
+  "done_at": "2026-07-31T23:05:49.407571327Z",
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
   "gates_required": [
     "cargo-ci",
@@ -43,7 +44,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Stop supplying a taxonomy to a repository that declares none",
-  "updated_at": "2026-07-31T21:29:52.134781777Z"
+  "updated_at": "2026-07-31T23:05:49.407571327Z"
 }

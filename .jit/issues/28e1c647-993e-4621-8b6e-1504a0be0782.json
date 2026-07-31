@@ -8,6 +8,7 @@
   ],
   "description": "The three item-kind defaults no adopter declaration can reach are gone, and a kind resolved from configuration takes the values that configuration declared.\n\n## Background\n\nThree constants supply a section slug, a self-id pattern and a link-label namespace for an item kind that declares none. All three are domain vocabulary — a section name, an id shape, a label namespace — and none is reachable: configuration loading rejects an item-kind table missing any required field, and a repository declaring no such table has an empty kind set. So the fallbacks that consume them are dead branches behind a validation that has already run.\n\nDeleting the constants therefore changes no byte any adopter receives, which is what makes it a cutover rather than a behaviour change. What it does change is the shape of the resolution: with no value to substitute, a kind whose configuration is missing a field is reported rather than completed, which states the same contract the loader already enforces instead of quietly agreeing with it.\n\nThe tests that pass those constants as literal expectations state the literals instead, so the assertions say what they mean rather than comparing a value against itself.\n\n## Success Criteria\n\n- [hard] REQ-01: The three item-kind default constants are gone, along with the fallbacks that consumed them.\n- [hard] REQ-02: Resolving a kind whose configuration omits a required field reports the missing field rather than substituting a value.\n- [hard] REQ-03: Every kind a loadable configuration declares resolves exactly as it does today.\n- [hard] REQ-04: No test asserts a resolved value against a constant that supplied it.\n\n## Notes\n\nThe equivalent defaults in the coverage rule are a separate duplication finding and are deliberately untouched here.\n",
   "documents": [],
+  "done_at": "2026-07-31T23:07:31.878076985Z",
   "first_ready_at": "2026-07-31T17:55:01.855466366Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Delete the unreachable item-kind defaults",
-  "updated_at": "2026-07-31T22:47:41.005644747Z"
+  "updated_at": "2026-07-31T23:07:31.878076985Z"
 }

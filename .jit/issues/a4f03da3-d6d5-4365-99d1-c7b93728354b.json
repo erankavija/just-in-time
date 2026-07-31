@@ -24,7 +24,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Adopt the taxonomy fixture in the item-validation integration target",
-  "updated_at": "2026-07-31T18:13:57.383633507Z"
+  "updated_at": "2026-07-31T23:06:44.212825766Z"
 }

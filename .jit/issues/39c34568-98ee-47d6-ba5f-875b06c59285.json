@@ -27,7 +27,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Declare the repository roots the packaged live assets are drawn from",
-  "updated_at": "2026-07-31T17:30:59.399663989Z"
+  "updated_at": "2026-07-31T23:06:04.467457833Z"
 }

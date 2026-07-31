@@ -24,7 +24,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Adopt the taxonomy fixture in the initialization command tests",
-  "updated_at": "2026-07-31T18:13:26.507707198Z"
+  "updated_at": "2026-07-31T23:07:04.479930843Z"
 }

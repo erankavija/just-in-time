@@ -8,6 +8,7 @@
   ],
   "description": "The presentation-layer projection modules name no path inside this checkout from a default library build, so an adopter binary carries none of them.\n\n## Background\n\nEach of these modules publishes a pair of constants: the repository-relative path of a committed reference it projects, and the command that regenerates it. Both name this checkout — a documentation path and a script path — and both are compiled into every adopter binary, where they mean nothing.\n\nEvery reader is already on one side of a boundary that exists. The declaration of this repository's generated artifacts compiles only for the crate's own tests and the dev-dependency builds its entry point needs, and the conformance assertions that read the constants are test-only. So the constants have no production reader, and moving them behind the same boundary removes them from an adopter build without changing what any of them does.\n\nThe two here are the error-code and exit-code references, projected from the enumerations the command surface reports.\n\nIt establishes the shape the remaining pairs follow: the constants move to the module's own test-support surface, the render function keeps producing the same bytes, and the conformance assertion keeps comparing the committed file against that render.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither module's projection target path nor its generator command is reachable from a default library build.\n- [hard] REQ-02: Each render function still produces the same bytes, and each conformance assertion still compares the committed file against that render.\n- [hard] REQ-03: The declaration of this repository's generated artifacts still names each artifact's target and entry point, and the regeneration entry point behaves identically.\n- [hard] REQ-04: Each module's public surface loses exactly those constants and nothing else.\n\n## Notes\n\nOnly the constants move. No committed reference changes content.\n",
   "documents": [],
+  "done_at": "2026-07-31T23:07:11.997878872Z",
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Stop naming this checkout's paths in the presentation layer",
-  "updated_at": "2026-07-31T22:26:30.754540513Z"
+  "updated_at": "2026-07-31T23:07:11.997878872Z"
 }

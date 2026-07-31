@@ -24,7 +24,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Adopt the taxonomy fixture in the server crate",
-  "updated_at": "2026-07-31T18:16:09.623243374Z"
+  "updated_at": "2026-07-31T23:06:49.266623830Z"
 }

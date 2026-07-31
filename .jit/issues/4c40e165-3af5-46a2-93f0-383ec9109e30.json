@@ -8,6 +8,7 @@
   ],
   "description": "A package contributes the documentation-area classification and the validation defaults, so the configuration a repository receives can come from a package rather than from the binary.\n\n## Background\n\nA package's contributions reach the type hierarchy, the label associations, the namespaces, the item kinds, the strategic types, and the three registry files. Two tables the scaffold writes have no target at all: the documentation-area classification, and the validation defaults that carry a strictness and a default type name. A package cannot declare either today, so the configuration that carries them cannot move out of the binary until it can.\n\nGranularity is the design question. The documentation table is five keys, three of them lists. One target carrying the whole table would force any second package that wants one area to restate all five keys — the copy this container exists to remove. Per-key targets let a package declare only what it owns, and two packages collide only where both declare the same key, which is the conflict rule the existing merge already applies.\n\n## Success Criteria\n\n- [hard] REQ-01: A package contributes each documentation-area key independently: the two scalar keys as single values, the three list keys as sets.\n- [hard] REQ-02: A package contributes the validation strictness and the default type name independently.\n- [hard] REQ-03: Two packages declaring the same key with the same content merge to that content; declaring it with different content is the same hard conflict the existing merge raises, with no precedence between them.\n- [hard] REQ-04: A repository whose applied packages declare none of these keys receives none of them, and the tables it authored itself are untouched.\n- [hard] REQ-05: The additions are carried in the value the package's machine-readable inspection output reports.\n\n## Notes\n\nThis adds targets. What any package puts in them is decided by the work that assembles a package.\n",
   "documents": [],
+  "done_at": "2026-07-31T23:07:22.032617081Z",
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Give the contribution vocabulary the tables the scaffold writes",
-  "updated_at": "2026-07-31T22:37:17.564462869Z"
+  "updated_at": "2026-07-31T23:07:22.032617081Z"
 }

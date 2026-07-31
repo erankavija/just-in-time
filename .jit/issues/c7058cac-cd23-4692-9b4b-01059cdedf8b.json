@@ -7,6 +7,7 @@
   ],
   "description": "The generic domain vocabulary a repository needs to be usable is a package directory in this repository, so it reaches an adopter as declared content rather than as compiled-in bytes.\n\n## Background\n\nThe configuration a fresh repository receives today is rendered from a compiled template: a four-level type hierarchy, seven label namespaces, six item-kind declarations, a validation strictness and default type name, and a documentation-area classification carrying this repository's own development areas. Four of the five classes the boundary names appear in it literally.\n\nAll of it is declarable. The contribution vocabulary already reaches the hierarchy, the namespaces, the item kinds and the strategic types; the documentation and validation targets are added by the work this depends on. What remains is to author the package: a manifest declaring that content, with no assets of its own.\n\nIts item-kind set is settled: it declares the kinds whose source it ships or that a scaffolded repository always has, and leaves the one whose source file only the workflow package carries. No package names a source file it does not provide.\n\nOne detail is decided here rather than discovered. The scaffold's commented coordination guidance renders two engine constants into prose. A package is bytes, so a packaged copy of that comment cannot be a projection of them; the comment drops its numbers rather than carrying a hand-maintained copy of two defaults.\n\n## Success Criteria\n\n- [hard] REQ-01: A package directory in this repository declares the type hierarchy, the label namespaces, the item kinds, the strategic types, the validation defaults, and the documentation-area classification a repository needs to be usable.\n- [hard] REQ-02: It declares the item kinds whose source it ships or that a scaffolded repository always has, and no kind whose source file it does not provide.\n- [hard] REQ-03: It carries no asset and no workflow content: no gate, no template, no rule encoding an opinion about how work is sequenced.\n- [hard] REQ-04: Applying it to a bare repository yields a configuration equivalent to what the scaffold writes today, apart from the guidance comment's rendered constants, which it states without numbers.\n- [hard] REQ-05: The package validates as a package and reports a stable content address.\n\n## Notes\n\nNothing is removed from the binary here. The compiled template is deleted by the work that can prove this package replaces it.\n",
   "documents": [],
+  "first_ready_at": "2026-07-31T23:07:26.938809316Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Assemble the default vocabulary as a package",
-  "updated_at": "2026-07-31T17:28:56.596684919Z"
+  "updated_at": "2026-07-31T23:07:26.938809316Z"
 }
