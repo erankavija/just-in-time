@@ -561,26 +561,21 @@ source = "assets/live/.jit/reference/content-standards.md"
 target = ".jit/reference/content-standards.md"
 
 [[asset]]
-source = "assets/live/scripts/ai-review.sh"
-target = "scripts/ai-review.sh"
-executable = true
-
-[[asset]]
 source = "assets/live/contrib/gates/ai-review.sh"
 target = "contrib/gates/ai-review.sh"
 executable = true
 
 [[asset]]
-source = "assets/live/scripts/breakdown-review-prompt.md"
-target = "scripts/breakdown-review-prompt.md"
+source = "assets/live/contrib/gates/breakdown-review-prompt.md"
+target = "contrib/gates/breakdown-review-prompt.md"
 
 [[asset]]
-source = "assets/live/scripts/code-review-prompt.md"
-target = "scripts/code-review-prompt.md"
+source = "assets/live/contrib/gates/code-review-prompt.md"
+target = "contrib/gates/code-review-prompt.md"
 
 [[asset]]
-source = "assets/live/scripts/plan-review-prompt.md"
-target = "scripts/plan-review-prompt.md"
+source = "assets/live/contrib/gates/plan-review-prompt.md"
+target = "contrib/gates/plan-review-prompt.md"
 
 [[region]]
 source = "assets/live/regions/agents-jit-guidance.md"
