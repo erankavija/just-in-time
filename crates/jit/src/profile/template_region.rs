@@ -9,10 +9,11 @@
 //!
 //! Everything here is pure: the functions render bytes, compare parsed
 //! declarations, and read nothing from the filesystem. The two callers supply
-//! the I/O — the `render-template-region` example writes the registry file, and
-//! the dogfood module's drift assertions read it — and the module compiles only
-//! for the crate's own tests and for the dev-dependency-active builds those two
-//! need, so an adopter build carries none of it.
+//! the I/O — [`crate::generated_artifacts`] declares the render the `regenerate`
+//! example publishes the registry file through, and the dogfood module's drift
+//! assertions read it — and the module compiles only for the crate's own tests
+//! and for the dev-dependency-active builds those two need, so an adopter build
+//! carries none of it.
 
 use crate::profile::{jit_dogfood_package, DogfoodProfileError};
 use crate::repository_state::{
@@ -33,8 +34,11 @@ const TEMPLATE_REGION_ID: &str = "plan-template";
 /// way the registry file spells them (`[[template]]`).
 const TEMPLATE_ARRAY_PATH: &str = "template";
 
-/// The command that brings `.jit/templates.toml` back into agreement with the
-/// package, named in the registry file and in the drift assertion's message.
+/// Repo-relative path of the registry file that carries the generated region.
+pub const TEMPLATE_REGISTRY_PATH: &str = ".jit/templates.toml";
+
+/// The command that brings [`TEMPLATE_REGISTRY_PATH`] back into agreement with
+/// the package, named in the registry file and in the drift assertion's message.
 pub const TEMPLATE_REGION_GENERATOR: &str = "./scripts/generate-template-region.sh";
 
 /// A render of the generated template region that could not be produced.

@@ -35,6 +35,10 @@ use super::types::{Assignee, Event, Priority, State};
 /// the repository root.
 pub const REFERENCE_PATH: &str = "docs/reference/events.md";
 
+/// The command that renders [`REFERENCE_PATH`] from this catalog, named in the
+/// conformance test's message so a stale reference carries its own repair.
+pub const REFERENCE_GENERATOR: &str = "./scripts/generate-events-reference.sh";
+
 /// What an event is about: the state it records a change to.
 ///
 /// The scope decides whether a record carries an `issue_id`: only
@@ -774,22 +778,8 @@ mod tests {
             committed,
             render_event_reference(),
             "{REFERENCE_PATH} is stale — regenerate it from `jit::domain::event_catalog` \
-             (run: cargo test -p jit event_catalog -- --ignored regenerate)"
+             (run: {REFERENCE_GENERATOR})"
         );
-    }
-
-    /// Regenerate the committed reference from the catalog. Ignored by default;
-    /// run explicitly after changing the `Event` type:
-    ///   cargo test -p jit event_catalog -- --ignored regenerate
-    ///
-    /// Writes via the temp-file + atomic-rename pattern (`@/inv/atomic-writes`).
-    #[test]
-    #[ignore = "writes the committed reference; run explicitly to regenerate"]
-    fn test_regenerate_reference_writes_committed_doc() {
-        let path = reference_path();
-        let tmp = path.with_extension("md.tmp");
-        std::fs::write(&tmp, render_event_reference()).expect("should write the events temp file");
-        std::fs::rename(&tmp, &path).expect("should atomically replace the events reference");
     }
 
     /// The rendered page names every tag and its `issue_id` column.

@@ -174,6 +174,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Regenerating a generated artifact of this checkout has one invocation
+  form.** Six of the eight generators were `#[ignore]`d tests beside their
+  asserting sibling, reached by naming the ignored test on a cargo command line
+  — one of them by setting an environment variable while running the assertion
+  itself — while the other two were scripts, so a contributor who learned one
+  shape could not regenerate anything using the other. Every generator is now a
+  script under `scripts/`, named after its artifact and taking no arguments,
+  printing one `updated: <path>` line per file it rewrote and then one `OK: …`
+  summary, and exiting 0 when the artifact holds its rendered values, 1 when the
+  render or the publication failed, and 2 when the run was refused or the
+  environment could not support it.
+  `crates/jit/src/generated_artifacts.rs` declares the set — each artifact's
+  target, its entry point, and where its render lives — and the drift assertions
+  cite the same declarations, so an assertion and the repair it names read one
+  render. A generator whose values come from library code renders through the
+  single `regenerate` example rather than one example apiece, and one whose
+  values can only be read out of an already-installed binary keeps its render in
+  its own script. `dev/index.md` states the convention.
+
 - **A repository decides for itself whether validation needs a profile
   package.** Whole-repository validation and derived-state repair each took a
   profile package by an identity compiled into the binary, before opening their

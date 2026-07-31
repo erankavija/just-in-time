@@ -70,6 +70,45 @@ planned destinations are named from the container.
 
 ---
 
+## Regenerating a Generated Artifact
+
+Some files in this checkout are generated and committed: reference pages
+projected from engine declarations, and marked regions rendered from a packaged
+authority. Each one is guarded by an assertion that fails when the committed
+bytes differ from what its source renders, and the failure names the command
+that repairs it.
+
+Every such command is one script under `scripts/`, named `generate-` and the
+artifact, taking no arguments:
+
+```bash
+./scripts/generate-events-reference.sh
+```
+
+A run prints one `updated: <path>` line per file it rewrote and then one `OK: …`
+summary, so an unchanged artifact is distinguishable from a repaired one. It
+exits 0 when the artifact holds its rendered values, 1 when the render or the
+publication failed, and 2 when the run was refused or the environment could not
+support it. Nothing here runs during `cargo test`: the assertions read, and only
+these entry points write.
+
+The set of artifacts, each one's target and entry point, and where each render
+lives are declared in
+[crates/jit/src/generated_artifacts.rs](../crates/jit/src/generated_artifacts.rs);
+a test there holds every declared entry point against the checkout. A generator
+whose values come from library code renders through the `regenerate` example,
+which that declaration names; one whose values can only be read out of an
+already-installed binary renders inside its own script. Which of the two applies
+follows from where the artifact's authority lives, and each script's header says
+so.
+
+Regions declared as `[projection.*]` in this repository's `.jit/` configuration
+reach their targets through `jit project render`, the product command an adopter
+runs the same way; [../AGENTS.md](../AGENTS.md) states the rule for editing
+them.
+
+---
+
 ## Key Documents
 
 ### Architecture

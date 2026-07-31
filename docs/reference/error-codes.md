@@ -1,4 +1,4 @@
-<!-- Generated from `ErrorCode::ALL`, `as_str`, `description`, and `exit_code` in `jit::output` — do not edit by hand. Regenerate with: `cargo test -p jit output::tests::test_regenerate_error_code_reference -- --ignored`. -->
+<!-- Generated from `ErrorCode::ALL`, `as_str`, `description`, and `exit_code` in `jit::output` — do not edit by hand. -->
 
 # Machine-readable Error Codes
 

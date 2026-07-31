@@ -50,7 +50,7 @@ set -euo pipefail
 #   0 — both regions hold the shipped classification
 #   2 — refused to write, or an environment/usage error
 
-me=$(basename "$0")
+me=${0##*/}
 die() {
   echo "$me: $*" >&2
   exit 2
