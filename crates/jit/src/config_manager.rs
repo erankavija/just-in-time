@@ -138,7 +138,7 @@ impl ConfigManager {
     /// Get resolved icons for the current hierarchy.
     ///
     /// Returns a map of type name to icon string. Icons are resolved using the
-    /// hierarchy configuration (levels) and icon configuration (preset + custom).
+    /// hierarchy configuration (levels) and custom per-type icon configuration.
     pub fn get_hierarchy_icons(&self) -> Result<HashMap<String, String>> {
         let config = self.load()?;
 
@@ -154,7 +154,7 @@ impl ConfigManager {
             .type_hierarchy
             .as_ref()
             .and_then(|h| h.icons.as_ref())
-            .map(|icons_toml| IconConfig::new(icons_toml.preset.clone(), icons_toml.custom.clone()))
+            .map(|icons_toml| IconConfig::new(icons_toml.custom.clone()))
             .unwrap_or_default();
 
         // Resolve icons for all types
@@ -345,6 +345,52 @@ milestone = "milestone"
         // Should return defaults
         assert!(namespaces.namespaces.contains_key("type"));
         assert!(namespaces.namespaces.contains_key("epic"));
+    }
+
+    #[test]
+    fn test_get_hierarchy_icons_uses_level_defaults_without_icons() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            r#"
+[type_hierarchy]
+types = { objective = 1, initiative = 2, feature = 3, action = 4 }
+"#,
+        )
+        .unwrap();
+
+        let icons = ConfigManager::new(&jit_dir).get_hierarchy_icons().unwrap();
+
+        assert_eq!(icons.get("objective"), Some(&"⭐".to_string()));
+        assert_eq!(icons.get("initiative"), Some(&"📦".to_string()));
+        assert_eq!(icons.get("feature"), Some(&"📝".to_string()));
+        assert_eq!(icons.get("action"), Some(&"☑️".to_string()));
+    }
+
+    #[test]
+    fn test_get_hierarchy_icons_preserves_custom_values() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            r#"
+[type_hierarchy]
+types = { objective = 1, action = 4 }
+
+[type_hierarchy.icons.custom]
+objective = "🎯"
+action = "🛠️"
+"#,
+        )
+        .unwrap();
+
+        let icons = ConfigManager::new(&jit_dir).get_hierarchy_icons().unwrap();
+
+        assert_eq!(icons.get("objective"), Some(&"🎯".to_string()));
+        assert_eq!(icons.get("action"), Some(&"🛠️".to_string()));
     }
 
     #[test]
