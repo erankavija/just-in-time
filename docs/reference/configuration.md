@@ -45,6 +45,7 @@ Schema version. Required for newer features like namespace registry and document
 
 ### `[documentation]`
 
+<!-- jit:shipped-documentation-policy:begin -->
 ```toml
 [documentation]
 development_root = "dev"
@@ -74,6 +75,7 @@ issue_scoped_areas = [
   "dev/presentations",
 ]
 ```
+<!-- jit:shipped-documentation-policy:end -->
 
 Controls document lifecycle management. The table above is the one `jit init`
 scaffolds into a new repository, rendered from the `SHIPPED_DOCUMENTATION_POLICY`
