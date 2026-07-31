@@ -574,6 +574,10 @@ mod tests {
 name = "materialize-test"
 
 [item_kinds.invariant]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
 scope = "project"
 source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
 source-of-truth = "registry-first"
@@ -1541,7 +1545,7 @@ kind = "advisory"
     fn ns_and_projection_config(namespaces: &[&str]) -> String {
         let mut out = String::from(
             "[project]\nname = \"repair-target-paths-test\"\n\n\
-             [item_kinds.invariant]\nscope = \"project\"\n\
+             [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z][a-z0-9-]*\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\n\
              source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
              source-of-truth = \"registry-first\"\n\n\
              [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n\n",

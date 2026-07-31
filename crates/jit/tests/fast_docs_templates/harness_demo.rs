@@ -325,7 +325,10 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
             id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec!["[hard]".to_string()]),
             link_namespaces: Some(vec!["satisfies".to_string()]),
-            ..Default::default()
+            scope: Some(jit::config::KindScopeConfig::Issue),
+            source: None,
+            source_of_truth: Some(jit::config::SourceOfTruth::MarkdownFirst),
+            aliases: None,
         },
     )
     .unwrap();
