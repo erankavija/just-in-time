@@ -215,7 +215,8 @@
   {
    "at": "2026-07-31",
    "finding": "cargo-ci is not deterministic under host load. crates/server/tests/server_integration/graceful_shutdown_tests.rs::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero failed the gate for 3e340587 with 'the stalled connection was dropped before the drain deadline' at load average 6-10 (a worker build running beside the gate). It passes 5/5 in isolation on the same commit. The assertion is that a stalled connection SURVIVES to a drain deadline, which is precisely what CPU contention breaks.",
-   "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close — a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests."
+   "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close — a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests.",
+   "correction": "Superseded: the failure is NOT load-induced flakiness. The test spends up to three consecutive 2s wait_for_close budgets after SIGTERM before asserting the stalled connection is still open, while GRACEFUL_DRAIN_TIMEOUT is 5s — so once those waits exceed 5s a CORRECT server has already force-closed the survivor and the assertion fails on conforming behaviour. It failed 2/2 whole-workspace runs including one on an idle host, and passes 10/10 in isolation. Fixed lead-direct at owner direction. The earlier 'do not run worker builds beside the gate' advice still stands on its own merits but was not the cause here."
   },
   {
    "at": "2026-07-31",
@@ -226,6 +227,11 @@
    "at": "2026-07-31",
    "finding": "0439da41's REQ-05 assertion `assert!(data.icons.is_empty())` in crates/server/src/routes.rs passed vacuously: the server test fixture declared no type hierarchy, so there were no types to resolve icons for and the endpoint's icon behaviour was never observed. a30d704d's fixture change (declaring a taxonomy, required once the compiled defaults are gone) exposed it as a cargo-ci failure on merged main.",
    "disposition": "Lead-direct fix committed as fix(jit:0439da41): the assertion now states the level-keying property — one icon per declared type, two types sharing an icon exactly when they share a level — which holds for any taxonomy the fixture declares and actually observes REQ-05. Worth carrying to the epic's holistic review as evidence for @/invariant/semantic-test-assertions: an assertion that passes because its fixture is empty is not coverage."
+  },
+  {
+   "at": "2026-08-01",
+   "finding": "Immediately after the shutdown-test edit, one run of the graceful_shutdown tests failed in 0.31s (a passing run takes 5.35s). It was not reproducible in ten subsequent runs and its message was not captured.",
+   "disposition": "Recorded rather than explained. If the whole-workspace gate fails on this test again, capture the panic message before assuming the fix is complete."
   }
  ],
  "rework_counts": {
@@ -328,6 +334,11 @@
    "at": "2026-07-31",
    "ruling": "One more plan-review round past the rework limit; hard stop after it.",
    "effect": "Round 5 dispatched with the three round-4 findings. If it fails, or the leaf-sizing class repeats a third time, work stops and returns to the owner."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Fix the graceful-shutdown test defect lead-direct, now, rather than as a task inside the epic or a standalone issue outside it.",
+   "effect": "crates/server/tests/server_integration/graceful_shutdown_tests.rs probes the mid-drain survivor only while signalled_at.elapsed() + DEADLINE_SLACK < GRACEFUL_DRAIN_TIMEOUT. Committed as fix(jit:e204e63d). No coverage lost: the stalled_closed_after assertion already states the same entitlement unconditionally. The lead noted it would be both author and reviewer of a shared-infrastructure change; the owner accepted that."
   }
  ],
  "halted": {

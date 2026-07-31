@@ -119,6 +119,25 @@ apply. New this session:
 - **Do NOT use `set -- $var` in a helper script.** The harness shell is zsh, which does not
   word-split unquoted parameters; a gate loop silently passed `"9bdf8025 npm-ci"` as one argument
   and four evaluations no-opped with "Issue not found".
+- **Do NOT accept an assertion that passes because its fixture is empty.** `0439da41`'s REQ-05
+  guard was `assert!(data.icons.is_empty())` in `crates/server/src/routes.rs`; it held only because
+  the server fixture declared no type hierarchy, so no type existed to resolve an icon for and the
+  endpoint's icon behaviour was never observed. `a30d704d` had to make that fixture declare a
+  taxonomy, and the vacuous pass became a `cargo-ci` failure on merged main. The criterion's real
+  content is the level-keying property (one icon per declared type; two types share an icon exactly
+  when they share a level), which is what the assertion now states. Three of this wave's `cargo-ci`
+  failures were of this shape: a fixture that satisfied an old contract vacuously.
+- **Do NOT let a worker add a shared fixture when a sibling in the same batch is authoring one.**
+  `a30d704d` added `HierarchyConfig::test_vocabulary()` and `declared_test_taxonomy()` while
+  `ae435979` was authoring `setup_test_repo_with_taxonomy()` from the same base — two shared test
+  taxonomies for one job, which is what `ae435979`'s own description calls "the near-duplicate setup
+  the shared-contract rule exists to prevent". Wave-1's `a53a6f09` and `76b16af0` must be briefed to
+  DELETE the parallel helpers, not adopt the fixture beside them.
+- **Do NOT expect the wave's cargo-ci to be clean just because every worker's targeted tests were.**
+  Every codex worker ran `cargo test -p jit --lib <module>` and passed; all three regressions this
+  wave were in integration targets or another crate, invisible to a lib-scoped run. Budget for one
+  gate-fix cycle per wave, and prefer stopping the pipeline over letting eleven issues each spend
+  seven minutes reproducing the same failure.
 
 ## Open questions needing invoker input
 
@@ -128,10 +147,15 @@ None blocking. Two standing items:
   7 stories). Splitting was offered and declined twice (`D-10`). Raise again only if the epic gate
   proves unworkable.
 - Gate throughput is the epic's critical path, not worker throughput. Gate evaluations must run
-  strictly sequentially (concurrent ones lose results to per-issue locks) and `cargo-ci` is ~7
-  minutes each. With ~49 issues left, gate time alone is on the order of ten hours. If that is
-  unacceptable, the question for the owner is whether `cargo-ci` can be scoped per footprint rather
-  than run whole-workspace per issue — that is a gate-definition change and therefore an escalation.
+  strictly sequentially (concurrent ones lose results to per-issue locks), `cargo-ci` is ~8 minutes,
+  and every issue merged onto one unchanged HEAD re-runs the identical whole-workspace suite. With
+  ~49 issues left, gate time alone is on the order of ten hours.
+
+  **Do not propose scoping `cargo-ci` per footprint as the remedy.** Its whole-workspace reach is
+  exactly what caught all three of this wave's cross-branch regressions, every one of which was
+  invisible to the lib-scoped runs the workers themselves had passed. The honest framing for the
+  owner is that the gate is expensive and is earning its cost; if the wall-clock is unacceptable the
+  lever is host parallelism or fewer issues per container, not less evidence per issue.
 
 ## Reference artefacts
 
