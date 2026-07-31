@@ -8,16 +8,17 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
 use std::path::{Component, Path};
 
 const TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-target-v1\0";
 const PACKAGE_HASH_DOMAIN: &[u8] = b"jit-profile-package-v1\0";
 
-/// Maximum number of files, including the manifest, in one embedded package.
-pub const MAX_EMBEDDED_PROFILE_FILES: usize = 512;
+/// Maximum number of files, including the manifest, in one profile package.
+pub const MAX_PROFILE_PACKAGE_FILES: usize = 512;
 
-/// Maximum total bytes, including the manifest, in one embedded package.
-pub const MAX_EMBEDDED_PROFILE_BYTES: usize = 4 * 1024 * 1024;
+/// Maximum total bytes, including the manifest, in one profile package.
+pub const MAX_PROFILE_PACKAGE_BYTES: usize = 4 * 1024 * 1024;
 
 /// A lowercase hexadecimal SHA-256 digest.
 pub type PackageHash = String;
@@ -25,32 +26,52 @@ pub type PackageHash = String;
 /// Canonical package and per-repository-target hashes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfilePackageHashes {
-    /// Hash of the canonical manifest plus every declared embedded source.
+    /// Hash of the canonical manifest plus every declared package source.
     pub package: PackageHash,
     /// Hash of ordered operations and source bytes grouped by repository target.
     pub targets: BTreeMap<String, PackageHash>,
 }
 
-/// A validated immutable package embedded recursively at compile time.
+/// A validated immutable package owning the bytes it validated.
+///
+/// A package comes either from a directory tree on disk
+/// ([`from_directory`](Self::from_directory)) or from a directory embedded at
+/// compile time ([`from_embedded_dir`](Self::from_embedded_dir)). Both routes
+/// own their bytes and run one validation over one path-to-bytes map, so
+/// packages built from identical content are indistinguishable in manifest,
+/// package hash, and target digests.
 #[derive(Debug, Clone)]
-pub struct EmbeddedProfilePackage<'a> {
+pub struct ProfilePackage {
     manifest: ProfileManifest,
-    files: BTreeMap<String, &'a [u8]>,
+    files: BTreeMap<String, Vec<u8>>,
     hashes: ProfilePackageHashes,
 }
 
-impl<'a> EmbeddedProfilePackage<'a> {
-    /// Parse and validate a recursively embedded directory.
-    pub fn from_dir(directory: &'a Dir<'a>) -> Result<Self, ProfilePackageError> {
-        let files = embedded_files(directory)?;
-        Self::from_files(files)
+impl ProfilePackage {
+    /// Read and validate the package tree rooted at `directory`.
+    ///
+    /// The tree is untrusted external data, so the walk rejects an entry that is
+    /// neither a regular file nor a subdirectory
+    /// ([`IrregularEntry`](ProfilePackageError::IrregularEntry)) and an entry
+    /// resolving outside `directory`
+    /// ([`EscapingEntry`](ProfilePackageError::EscapingEntry)), each naming the
+    /// entry, before the package validation every route shares sees the bytes.
+    /// A directory that is absent or cannot be read is
+    /// [`UnreadableDirectory`](ProfilePackageError::UnreadableDirectory), which
+    /// no invalid package produces.
+    pub fn from_directory(directory: &Path) -> Result<Self, ProfilePackageError> {
+        Self::from_files(read_package_directory(directory)?)
     }
 
-    fn from_files(files: BTreeMap<String, &'a [u8]>) -> Result<Self, ProfilePackageError> {
+    /// Parse and validate a recursively embedded directory.
+    pub fn from_embedded_dir(directory: &Dir<'_>) -> Result<Self, ProfilePackageError> {
+        Self::from_files(embedded_files(directory))
+    }
+
+    fn from_files(files: BTreeMap<String, Vec<u8>>) -> Result<Self, ProfilePackageError> {
         validate_package_bounds(&files)?;
         let manifest_bytes = files
             .get(MANIFEST_FILE_NAME)
-            .copied()
             .ok_or(ProfilePackageError::MissingManifest)?;
         let manifest_text = std::str::from_utf8(manifest_bytes)
             .map_err(|source| ProfilePackageError::ManifestUtf8 { source })?;
@@ -72,9 +93,9 @@ impl<'a> EmbeddedProfilePackage<'a> {
         &self.manifest
     }
 
-    /// Embedded bytes for a declared package-relative source.
-    pub fn source_bytes(&self, source: &str) -> Option<&'a [u8]> {
-        self.files.get(source).copied()
+    /// Owned bytes for a declared package-relative source.
+    pub fn source_bytes(&self, source: &str) -> Option<&[u8]> {
+        self.files.get(source).map(Vec::as_slice)
     }
 
     /// Canonical package and target hashes.
@@ -82,31 +103,51 @@ impl<'a> EmbeddedProfilePackage<'a> {
         &self.hashes
     }
 
-    /// Embedded file count, including `manifest.toml`.
+    /// Package file count, including `manifest.toml`.
     pub fn file_count(&self) -> usize {
         self.files.len()
     }
 
-    /// Total embedded byte size, including `manifest.toml`.
+    /// Total package byte size, including `manifest.toml`.
     pub fn byte_size(&self) -> usize {
-        self.files.values().map(|bytes| bytes.len()).sum()
+        self.files.values().map(Vec::len).sum()
     }
 }
 
-/// Validation failures for immutable embedded packages.
+/// Read and validation failures for immutable profile packages.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfilePackageError {
+    /// The package directory is absent or cannot be read.
+    #[error("cannot read profile package directory '{path}': {source}")]
+    UnreadableDirectory {
+        /// Path whose read failed.
+        path: String,
+        /// Underlying filesystem error.
+        source: std::io::Error,
+    },
+    /// A package directory entry is neither a regular file nor a subdirectory.
+    #[error("profile package entry '{path}' is not a regular file")]
+    IrregularEntry {
+        /// Package-relative entry path.
+        path: String,
+    },
+    /// A package directory entry resolves outside the package root.
+    #[error("profile package entry '{path}' escapes the package root")]
+    EscapingEntry {
+        /// Package-relative entry path.
+        path: String,
+    },
     /// The root manifest is absent.
-    #[error("embedded profile package is missing root manifest.toml")]
+    #[error("profile package is missing root manifest.toml")]
     MissingManifest,
     /// The manifest is not UTF-8 TOML.
-    #[error("embedded profile manifest is not UTF-8: {source}")]
+    #[error("profile manifest is not UTF-8: {source}")]
     ManifestUtf8 {
         /// UTF-8 parser error.
         source: std::str::Utf8Error,
     },
     /// TOML does not match the runtime manifest wire type.
-    #[error("invalid embedded profile manifest: {0}")]
+    #[error("invalid profile manifest: {0}")]
     ManifestToml(#[source] toml::de::Error),
     /// Unsupported wire version.
     #[error("unsupported profile manifest version {actual}; expected {expected}")]
@@ -149,16 +190,16 @@ pub enum ProfilePackageError {
         path: String,
     },
     /// A package source is declared more than once.
-    #[error("embedded source '{0}' is declared more than once")]
+    #[error("package source '{0}' is declared more than once")]
     DuplicateSource(String),
     /// Two file/region declarations target the same repository path.
     #[error("repository content target '{0}' is declared more than once")]
     DuplicateContentTarget(String),
-    /// A declaration references absent embedded bytes.
-    #[error("declared embedded source '{0}' is missing")]
+    /// A declaration references absent package bytes.
+    #[error("declared package source '{0}' is missing")]
     MissingContent(String),
-    /// Embedded bytes have no declaration.
-    #[error("embedded source '{0}' is not declared by the manifest")]
+    /// Package bytes have no declaration.
+    #[error("package source '{0}' is not declared by the manifest")]
     ExtraContent(String),
     /// Invalid semantic contribution.
     #[error("invalid contribution at index {index}: {message}")]
@@ -177,9 +218,9 @@ pub enum ProfilePackageError {
     /// Canonical serialization unexpectedly failed.
     #[error("failed to serialize canonical profile data: {0}")]
     CanonicalSerialization(#[source] serde_json::Error),
-    /// Embedded count or byte-size exceeds the compile-time package budget.
+    /// File count or byte size exceeds the package budget.
     #[error(
-        "embedded profile package exceeds bounds: {file_count} files/{byte_size} bytes; \
+        "profile package exceeds bounds: {file_count} files/{byte_size} bytes; \
          maximum is {max_files} files/{max_bytes} bytes"
     )]
     PackageBounds {
@@ -194,22 +235,87 @@ pub enum ProfilePackageError {
     },
 }
 
-fn embedded_files<'a>(
-    directory: &'a Dir<'a>,
-) -> Result<BTreeMap<String, &'a [u8]>, ProfilePackageError> {
-    fn visit<'a>(directory: &'a Dir<'a>, files: &mut BTreeMap<String, &'a [u8]>) {
+fn embedded_files(directory: &Dir<'_>) -> BTreeMap<String, Vec<u8>> {
+    fn visit(directory: &Dir<'_>, files: &mut BTreeMap<String, Vec<u8>>) {
         directory.files().for_each(|file| {
-            files.insert(normalize_embedded_path(file.path()), file.contents());
+            files.insert(
+                normalize_package_path(file.path()),
+                file.contents().to_vec(),
+            );
         });
         directory.dirs().for_each(|child| visit(child, files));
     }
 
     let mut files = BTreeMap::new();
     visit(directory, &mut files);
+    files
+}
+
+/// Walk the package tree rooted at `root` into a package-relative byte map.
+///
+/// `root` is resolved once, and every entry is required to resolve inside the
+/// result before its kind is examined, so an entry reached through a symbolic
+/// link out of the tree is reported as an escape rather than read as content.
+/// The pending list is explicit rather than recursive, and the budget is
+/// re-derived from each entry's declared size before its bytes are read, so
+/// neither the depth nor the size of an untrusted tree is taken on trust;
+/// [`validate_package_bounds`] stays the authority over what was read.
+fn read_package_directory(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, ProfilePackageError> {
+    let root = fs::canonicalize(root).map_err(|source| unreadable(root, source))?;
+    let mut pending = vec![root.clone()];
+    let mut files = BTreeMap::new();
+    let mut byte_size = 0usize;
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).map_err(|source| unreadable(&directory, source))? {
+            let path = entry
+                .map_err(|source| unreadable(&directory, source))?
+                .path();
+            let relative = match path.strip_prefix(&root) {
+                Ok(relative) => normalize_package_path(relative),
+                Err(_) => path.to_string_lossy().into_owned(),
+            };
+            if escapes_root(&root, &path) {
+                return Err(ProfilePackageError::EscapingEntry { path: relative });
+            }
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|source| unreadable(&path, source))?;
+            if metadata.is_dir() {
+                pending.push(path);
+            } else if metadata.is_file() {
+                let declared = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
+                if let Some(error) = package_bounds_failure(
+                    files.len().saturating_add(1),
+                    byte_size.saturating_add(declared),
+                ) {
+                    return Err(error);
+                }
+                let bytes = fs::read(&path).map_err(|source| unreadable(&path, source))?;
+                byte_size = byte_size.saturating_add(bytes.len());
+                files.insert(relative, bytes);
+            } else {
+                return Err(ProfilePackageError::IrregularEntry { path: relative });
+            }
+        }
+    }
     Ok(files)
 }
 
-fn normalize_embedded_path(path: &Path) -> String {
+/// Whether `path` resolves outside `root`.
+///
+/// An entry that cannot be resolved at all is not an escape: it is left to the
+/// kind check, which names what it is.
+fn escapes_root(root: &Path, path: &Path) -> bool {
+    fs::canonicalize(path).is_ok_and(|resolved| !resolved.starts_with(root))
+}
+
+fn unreadable(path: &Path, source: std::io::Error) -> ProfilePackageError {
+    ProfilePackageError::UnreadableDirectory {
+        path: path.display().to_string(),
+        source,
+    }
+}
+
+fn normalize_package_path(path: &Path) -> String {
     path.components()
         .filter_map(|component| match component {
             Component::Normal(value) => Some(value.to_string_lossy()),
@@ -219,26 +325,28 @@ fn normalize_embedded_path(path: &Path) -> String {
         .join("/")
 }
 
-fn validate_package_bounds(files: &BTreeMap<String, &[u8]>) -> Result<(), ProfilePackageError> {
-    let file_count = files.len();
+fn validate_package_bounds(files: &BTreeMap<String, Vec<u8>>) -> Result<(), ProfilePackageError> {
     let byte_size = files
         .values()
         .fold(0usize, |total, bytes| total.saturating_add(bytes.len()));
-    if file_count <= MAX_EMBEDDED_PROFILE_FILES && byte_size <= MAX_EMBEDDED_PROFILE_BYTES {
-        Ok(())
-    } else {
-        Err(ProfilePackageError::PackageBounds {
+    package_bounds_failure(files.len(), byte_size).map_or(Ok(()), Err)
+}
+
+/// The budget failure a package of this size carries, or `None` within budget.
+fn package_bounds_failure(file_count: usize, byte_size: usize) -> Option<ProfilePackageError> {
+    (file_count > MAX_PROFILE_PACKAGE_FILES || byte_size > MAX_PROFILE_PACKAGE_BYTES).then_some(
+        ProfilePackageError::PackageBounds {
             file_count,
             byte_size,
-            max_files: MAX_EMBEDDED_PROFILE_FILES,
-            max_bytes: MAX_EMBEDDED_PROFILE_BYTES,
-        })
-    }
+            max_files: MAX_PROFILE_PACKAGE_FILES,
+            max_bytes: MAX_PROFILE_PACKAGE_BYTES,
+        },
+    )
 }
 
 fn validate_manifest(
     manifest: &ProfileManifest,
-    files: &BTreeMap<String, &[u8]>,
+    files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<(), ProfilePackageError> {
     if manifest.profile.manifest_version != PROFILE_MANIFEST_VERSION {
         return Err(ProfilePackageError::ManifestVersion {
@@ -461,7 +569,7 @@ fn contribution_identity(contribution: &Contribution) -> String {
 
 fn compute_hashes(
     manifest: &ProfileManifest,
-    files: &BTreeMap<String, &[u8]>,
+    files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<ProfilePackageHashes, ProfilePackageError> {
     let mut target_frames: BTreeMap<String, Vec<Vec<u8>>> = BTreeMap::new();
 
@@ -477,7 +585,6 @@ fn compute_hashes(
             &mut frame,
             files
                 .get(&asset.source)
-                .copied()
                 .ok_or_else(|| ProfilePackageError::MissingContent(asset.source.clone()))?,
         );
         target_frames
@@ -491,7 +598,6 @@ fn compute_hashes(
             &mut frame,
             files
                 .get(&region.source)
-                .copied()
                 .ok_or_else(|| ProfilePackageError::MissingContent(region.source.clone()))?,
         );
         target_frames
@@ -574,12 +680,51 @@ mod tests {
         Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
     };
     use include_dir::{include_dir, Dir};
+    use std::path::PathBuf;
+    use tempfile::TempDir;
 
     static VALID_PACKAGE: Dir<'_> =
         include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/synthetic-valid");
 
-    fn package() -> EmbeddedProfilePackage<'static> {
-        EmbeddedProfilePackage::from_dir(&VALID_PACKAGE).expect("valid synthetic package")
+    fn package() -> ProfilePackage {
+        ProfilePackage::from_embedded_dir(&VALID_PACKAGE).expect("valid synthetic package")
+    }
+
+    /// The checked-in tree the compile-time fixture embeds.
+    fn fixture_tree() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/profile-packages/synthetic-valid")
+    }
+
+    /// A writable copy of the fixture tree, rooted inside `temp`.
+    ///
+    /// Written from the compile-time fixture rather than copied from the
+    /// checkout, so both construction routes read one authored source
+    /// (`@/invariant/shared-test-contracts`).
+    fn writable_package_tree(temp: &TempDir) -> PathBuf {
+        fn write(directory: &Dir<'_>, root: &Path) {
+            directory.files().for_each(|file| {
+                let path = root.join(file.path());
+                std::fs::create_dir_all(path.parent().expect("package file has a parent"))
+                    .expect("create package parent directory");
+                std::fs::write(path, file.contents()).expect("write package file");
+            });
+            directory.dirs().for_each(|child| write(child, root));
+        }
+
+        let root = temp.path().join("package");
+        std::fs::create_dir_all(&root).expect("create package root");
+        write(&VALID_PACKAGE, &root);
+        root
+    }
+
+    /// Replace the package manifest under `root` with `manifest_text()` mutated.
+    fn rewrite_manifest(root: &Path, old: &str, new: &str) {
+        std::fs::write(
+            root.join(MANIFEST_FILE_NAME),
+            manifest_text().replace(old, new),
+        )
+        .expect("rewrite package manifest");
     }
 
     fn manifest_text() -> String {
@@ -617,8 +762,8 @@ mod tests {
     fn test_embedded_package_recurses_and_preserves_manifest_order() {
         let package = package();
         assert_eq!(package.file_count(), 4);
-        assert!(package.file_count() <= MAX_EMBEDDED_PROFILE_FILES);
-        assert!(package.byte_size() <= MAX_EMBEDDED_PROFILE_BYTES);
+        assert!(package.file_count() <= MAX_PROFILE_PACKAGE_FILES);
+        assert!(package.byte_size() <= MAX_PROFILE_PACKAGE_BYTES);
         assert_eq!(package.manifest().profile.id.as_str(), "synthetic-workflow");
         assert_eq!(package.manifest().contributions.len(), 10);
         assert!(matches!(
@@ -672,9 +817,9 @@ mod tests {
         let manifest =
             manifest_text().replace("[profile]", "dependencies = [\"jit-default\"]\n\n[profile]");
         let mut files = package().files.clone();
-        files.insert(MANIFEST_FILE_NAME.to_string(), manifest.leak().as_bytes());
+        files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
 
-        let package = EmbeddedProfilePackage::from_files(files).unwrap();
+        let package = ProfilePackage::from_files(files).unwrap();
         assert_eq!(
             package.manifest().dependencies,
             vec![ProfileId::try_from("jit-default").unwrap()]
@@ -771,9 +916,9 @@ value = "workspace/active"
         let mut changed = first.files.clone();
         changed.insert(
             "nested/scripts/check.sh".to_string(),
-            b"#!/bin/sh\nexit 1\n",
+            b"#!/bin/sh\nexit 1\n".to_vec(),
         );
-        let changed = EmbeddedProfilePackage::from_files(changed).unwrap();
+        let changed = ProfilePackage::from_files(changed).unwrap();
         assert_ne!(first.hashes().package, changed.hashes().package);
         assert_ne!(
             first.hashes().targets["bin/check.sh"],
@@ -792,9 +937,9 @@ value = "workspace/active"
         let mut reordered = first.files.clone();
         reordered.insert(
             MANIFEST_FILE_NAME.to_string(),
-            reordered_manifest.leak().as_bytes(),
+            reordered_manifest.into_bytes(),
         );
-        let reordered = EmbeddedProfilePackage::from_files(reordered).unwrap();
+        let reordered = ProfilePackage::from_files(reordered).unwrap();
         assert_ne!(
             first.hashes().targets[".jit/config.toml"],
             reordered.hashes().targets[".jit/config.toml"]
@@ -841,11 +986,9 @@ value = "workspace/active"
             "dependencies = [\"synthetic-workflow\"]\n\n[profile]",
         );
         let mut files = package().files.clone();
-        files.insert(MANIFEST_FILE_NAME.to_string(), manifest.leak().as_bytes());
+        files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
 
-        let error = EmbeddedProfilePackage::from_files(files)
-            .unwrap_err()
-            .to_string();
+        let error = ProfilePackage::from_files(files).unwrap_err().to_string();
         assert!(error.contains("synthetic-workflow"), "{error}");
         assert!(error.contains("cannot depend on itself"), "{error}");
     }
@@ -857,12 +1000,9 @@ value = "workspace/active"
             "target = \"docs/workflow.txt\"",
             "target = \"../outside.txt\"",
         );
-        files.insert(
-            MANIFEST_FILE_NAME.to_string(),
-            unsafe_manifest.leak().as_bytes(),
-        );
+        files.insert(MANIFEST_FILE_NAME.to_string(), unsafe_manifest.into_bytes());
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(files),
+            ProfilePackage::from_files(files),
             Err(ProfilePackageError::UnsafePath { .. })
         ));
 
@@ -873,10 +1013,10 @@ value = "workspace/active"
         let mut files = package().files.clone();
         files.insert(
             MANIFEST_FILE_NAME.to_string(),
-            windows_absolute.leak().as_bytes(),
+            windows_absolute.into_bytes(),
         );
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(files),
+            ProfilePackage::from_files(files),
             Err(ProfilePackageError::UnsafePath { .. })
         ));
 
@@ -927,10 +1067,8 @@ value = "workspace/active"
         for (old, new, expected) in cases {
             let manifest = manifest_text().replace(old, new);
             let mut files = package.files.clone();
-            files.insert(MANIFEST_FILE_NAME.to_string(), manifest.leak().as_bytes());
-            let error = EmbeddedProfilePackage::from_files(files)
-                .unwrap_err()
-                .to_string();
+            files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
+            let error = ProfilePackage::from_files(files).unwrap_err().to_string();
             assert!(error.contains(expected), "{error}");
         }
     }
@@ -942,14 +1080,14 @@ value = "workspace/active"
         let mut missing = package.files.clone();
         missing.remove("assets/workflow.txt");
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(missing),
+            ProfilePackage::from_files(missing),
             Err(ProfilePackageError::MissingContent(path)) if path == "assets/workflow.txt"
         ));
 
         let mut extra = package.files.clone();
-        extra.insert("assets/undeclared.txt".to_string(), b"extra");
+        extra.insert("assets/undeclared.txt".to_string(), b"extra".to_vec());
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(extra),
+            ProfilePackage::from_files(extra),
             Err(ProfilePackageError::ExtraContent(path)) if path == "assets/undeclared.txt"
         ));
 
@@ -960,10 +1098,10 @@ value = "workspace/active"
         let mut duplicate = package.files.clone();
         duplicate.insert(
             MANIFEST_FILE_NAME.to_string(),
-            duplicate_manifest.leak().as_bytes(),
+            duplicate_manifest.into_bytes(),
         );
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(duplicate),
+            ProfilePackage::from_files(duplicate),
             Err(ProfilePackageError::DuplicateSource(path)) if path == "assets/workflow.txt"
         ));
 
@@ -974,10 +1112,10 @@ value = "workspace/active"
         let mut reserved = package.files.clone();
         reserved.insert(
             MANIFEST_FILE_NAME.to_string(),
-            reserved_manifest.leak().as_bytes(),
+            reserved_manifest.into_bytes(),
         );
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(reserved),
+            ProfilePackage::from_files(reserved),
             Err(ProfilePackageError::DuplicateSource(path)) if path == "manifest.toml"
         ));
 
@@ -988,10 +1126,10 @@ value = "workspace/active"
         let mut duplicate = package.files.clone();
         duplicate.insert(
             MANIFEST_FILE_NAME.to_string(),
-            duplicate_contribution.leak().as_bytes(),
+            duplicate_contribution.into_bytes(),
         );
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(duplicate),
+            ProfilePackage::from_files(duplicate),
             Err(ProfilePackageError::DuplicateContribution(identity))
                 if identity.contains("invariants")
         ));
@@ -1002,26 +1140,28 @@ value = "workspace/active"
         let package = package();
 
         let mut too_many = package.files.clone();
-        for index in 0..MAX_EMBEDDED_PROFILE_FILES {
-            too_many.insert(format!("undeclared/{index}.txt"), b"x");
+        for index in 0..MAX_PROFILE_PACKAGE_FILES {
+            too_many.insert(format!("undeclared/{index}.txt"), b"x".to_vec());
         }
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(too_many),
+            ProfilePackage::from_files(too_many),
             Err(ProfilePackageError::PackageBounds {
                 file_count,
                 ..
-            }) if file_count > MAX_EMBEDDED_PROFILE_FILES
+            }) if file_count > MAX_PROFILE_PACKAGE_FILES
         ));
 
-        let oversized: &'static [u8] = Vec::leak(vec![b'x'; MAX_EMBEDDED_PROFILE_BYTES]);
         let mut too_large = package.files.clone();
-        too_large.insert("undeclared/oversized.bin".to_string(), oversized);
+        too_large.insert(
+            "undeclared/oversized.bin".to_string(),
+            vec![b'x'; MAX_PROFILE_PACKAGE_BYTES],
+        );
         assert!(matches!(
-            EmbeddedProfilePackage::from_files(too_large),
+            ProfilePackage::from_files(too_large),
             Err(ProfilePackageError::PackageBounds {
                 byte_size,
                 ..
-            }) if byte_size > MAX_EMBEDDED_PROFILE_BYTES
+            }) if byte_size > MAX_PROFILE_PACKAGE_BYTES
         ));
     }
 
@@ -1036,5 +1176,166 @@ value = "workspace/active"
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood");
         assert!(production_tree.join(MANIFEST_FILE_NAME).is_file());
         assert!(!manifest_text().contains("jit-dogfood"));
+    }
+
+    #[test]
+    fn test_from_directory_reads_the_same_package_as_the_compile_time_route() {
+        let embedded = package();
+        let read = ProfilePackage::from_directory(&fixture_tree()).expect("valid package tree");
+
+        assert_eq!(read.manifest(), embedded.manifest());
+        assert_eq!(read.hashes().package, embedded.hashes().package);
+        assert_eq!(read.hashes().targets, embedded.hashes().targets);
+        assert_eq!(read.file_count(), embedded.file_count());
+        assert_eq!(read.byte_size(), embedded.byte_size());
+        assert!(read
+            .manifest()
+            .assets
+            .iter()
+            .all(|asset| read.source_bytes(&asset.source) == embedded.source_bytes(&asset.source)));
+
+        // The package outlives the tree it was read from, which is what owning
+        // the validated bytes buys: this temporary directory is deleted before
+        // anything below reads the package back.
+        let owned = {
+            let temp = TempDir::new().unwrap();
+            let root = writable_package_tree(&temp);
+            ProfilePackage::from_directory(&root).expect("valid package tree")
+        };
+        assert_eq!(owned.hashes(), embedded.hashes());
+        assert!(
+            owned
+                .manifest()
+                .assets
+                .iter()
+                .all(|asset| owned.source_bytes(&asset.source)
+                    == embedded.source_bytes(&asset.source))
+        );
+    }
+
+    #[test]
+    fn test_from_directory_applies_the_package_count_and_size_bounds() {
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        std::fs::create_dir_all(root.join("undeclared")).unwrap();
+        (0..MAX_PROFILE_PACKAGE_FILES).for_each(|index| {
+            std::fs::write(root.join(format!("undeclared/{index}.txt")), b"x").unwrap();
+        });
+        assert!(matches!(
+            ProfilePackage::from_directory(&root),
+            Err(ProfilePackageError::PackageBounds { file_count, max_files, .. })
+                if file_count > max_files
+        ));
+
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        std::fs::write(
+            root.join("oversized.bin"),
+            vec![b'x'; MAX_PROFILE_PACKAGE_BYTES],
+        )
+        .unwrap();
+        assert!(matches!(
+            ProfilePackage::from_directory(&root),
+            Err(ProfilePackageError::PackageBounds { byte_size, max_bytes, .. })
+                if byte_size > max_bytes
+        ));
+    }
+
+    #[test]
+    fn test_from_directory_applies_the_path_shape_and_declaration_defences() {
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        rewrite_manifest(
+            &root,
+            "target = \"docs/workflow.txt\"",
+            "target = \"../outside.txt\"",
+        );
+        assert!(matches!(
+            ProfilePackage::from_directory(&root),
+            Err(ProfilePackageError::UnsafePath { path, .. }) if path == "../outside.txt"
+        ));
+
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        std::fs::remove_file(root.join("assets/workflow.txt")).unwrap();
+        assert!(matches!(
+            ProfilePackage::from_directory(&root),
+            Err(ProfilePackageError::MissingContent(path)) if path == "assets/workflow.txt"
+        ));
+
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        std::fs::write(root.join("assets/undeclared.txt"), b"extra").unwrap();
+        assert!(matches!(
+            ProfilePackage::from_directory(&root),
+            Err(ProfilePackageError::ExtraContent(path)) if path == "assets/undeclared.txt"
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_from_directory_rejects_an_entry_that_is_not_a_regular_file() {
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        nix::unistd::mkfifo(&root.join("assets/pipe"), nix::sys::stat::Mode::S_IRWXU).unwrap();
+        let error = ProfilePackage::from_directory(&root).unwrap_err();
+        assert!(
+            matches!(&error, ProfilePackageError::IrregularEntry { path } if path == "assets/pipe"),
+            "{error}"
+        );
+        assert!(error.to_string().contains("assets/pipe"), "{error}");
+
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        std::os::unix::fs::symlink("workflow.txt", root.join("assets/link.txt")).unwrap();
+        let error = ProfilePackage::from_directory(&root).unwrap_err();
+        assert!(
+            matches!(&error, ProfilePackageError::IrregularEntry { path } if path == "assets/link.txt"),
+            "{error}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_from_directory_rejects_an_entry_escaping_the_package_root() {
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        std::fs::write(temp.path().join("outside.txt"), b"outside").unwrap();
+        std::os::unix::fs::symlink("../../outside.txt", root.join("assets/escape.txt")).unwrap();
+        let error = ProfilePackage::from_directory(&root).unwrap_err();
+        assert!(
+            matches!(&error, ProfilePackageError::EscapingEntry { path } if path == "assets/escape.txt"),
+            "{error}"
+        );
+        assert!(error.to_string().contains("assets/escape.txt"), "{error}");
+
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        std::os::unix::fs::symlink(temp.path(), root.join("escape")).unwrap();
+        assert!(matches!(
+            ProfilePackage::from_directory(&root),
+            Err(ProfilePackageError::EscapingEntry { path }) if path == "escape"
+        ));
+    }
+
+    #[test]
+    fn test_from_directory_reports_an_absent_or_unreadable_directory() {
+        let temp = TempDir::new().unwrap();
+        let absent = temp.path().join("no-such-package");
+        let error = ProfilePackage::from_directory(&absent).unwrap_err();
+        assert!(
+            matches!(&error, ProfilePackageError::UnreadableDirectory { source, .. }
+                if source.kind() == std::io::ErrorKind::NotFound),
+            "{error}"
+        );
+        assert!(error.to_string().contains("no-such-package"), "{error}");
+
+        let file = temp.path().join("package-file");
+        std::fs::write(&file, b"not a directory").unwrap();
+        let error = ProfilePackage::from_directory(&file).unwrap_err();
+        assert!(
+            matches!(&error, ProfilePackageError::UnreadableDirectory { .. }),
+            "{error}"
+        );
     }
 }

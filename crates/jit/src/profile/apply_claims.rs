@@ -1,6 +1,6 @@
 //! Convert an immutable profile package into image-independent repository-state claims.
 
-use super::EmbeddedProfilePackage;
+use super::ProfilePackage;
 use crate::repository_state::{
     FileMode, ProfileAssetClaim, ProfileClaims, ProfileRegionClaim, TargetClaim,
 };
@@ -16,7 +16,7 @@ pub enum ProfileClaimError {
     OverlappingTargets { first: String, second: String },
     #[error("profile source '{location}' contains unsupported interpolation token")]
     InvalidInterpolation { location: String },
-    #[error("declared embedded source '{0}' is unavailable")]
+    #[error("declared package source '{0}' is unavailable")]
     MissingSource(String),
     #[error("profile target path is not canonical: {0}")]
     Layout(#[from] crate::repository_state::RepositoryLayoutError),
@@ -25,21 +25,21 @@ pub enum ProfileClaimError {
 }
 
 pub fn build_profile_claims(
-    package: &EmbeddedProfilePackage<'_>,
+    package: &ProfilePackage,
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
     build_claims(package, layout, false)
 }
 
 pub fn build_profile_repair_claims(
-    package: &EmbeddedProfilePackage<'_>,
+    package: &ProfilePackage,
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
     build_claims(package, layout, true)
 }
 
 fn build_claims(
-    package: &EmbeddedProfilePackage<'_>,
+    package: &ProfilePackage,
     layout: &crate::repository_state::RepositoryLayout,
     replace_owned: bool,
 ) -> Result<ProfileClaims, ProfileClaimError> {
@@ -99,7 +99,7 @@ fn build_claims(
     })
 }
 
-fn validate_interpolation(package: &EmbeddedProfilePackage<'_>) -> Result<(), ProfileClaimError> {
+fn validate_interpolation(package: &ProfilePackage) -> Result<(), ProfileClaimError> {
     for source in package
         .manifest()
         .assets
@@ -132,7 +132,7 @@ fn validate_interpolation(package: &EmbeddedProfilePackage<'_>) -> Result<(), Pr
     Ok(())
 }
 
-fn validate_target_overlaps(package: &EmbeddedProfilePackage<'_>) -> Result<(), ProfileClaimError> {
+fn validate_target_overlaps(package: &ProfilePackage) -> Result<(), ProfileClaimError> {
     let semantic = package
         .manifest()
         .contributions

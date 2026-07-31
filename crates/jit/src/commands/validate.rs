@@ -705,7 +705,7 @@ fn resolve_recorded_packages(
     std::result::Result<
         Vec<(
             crate::repository_state::VirtualPath,
-            crate::profile::EmbeddedProfilePackage<'static>,
+            crate::profile::ProfilePackage,
         )>,
         crate::validation::repository::RepositoryValidationFailure,
     >,
@@ -739,7 +739,7 @@ fn captured_profile_repair_claims(
     image: &crate::repository_state::RepositoryImage,
     packages: &[(
         crate::repository_state::VirtualPath,
-        crate::profile::EmbeddedProfilePackage<'static>,
+        crate::profile::ProfilePackage,
     )],
 ) -> Result<
     Option<
