@@ -1,7 +1,7 @@
 {
  "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
  "epic_short_id": "e204e63d",
- "current_wave": 4,
+ "current_wave": 0,
  "waves": [
   {
    "wave_number": 1,
@@ -184,7 +184,8 @@
   "e1a18372": 1,
   "097b9f48": 1,
   "f77fd51b": 1,
-  "65ff0f38": 2
+  "65ff0f38": 2,
+  "7eecace8": 4
  },
  "started_at": "2026-07-31",
  "owner_rulings": [
@@ -272,6 +273,11 @@
    "at": "2026-07-31",
    "ruling": "An audit inside this epic inventories the remaining embedded configuration and sequences its removal before any of it is planned; fan-out blocks on it.",
    "effect": "Task 7cbefe7c created, wired as a dependency of the epic, claimed and dispatched. The running plan amendment finishes on the profile-extraction scope; one re-plan after the audit covers everything. Recorded as @/issue/e204e63d/decision/D-18."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "One more plan-review round past the rework limit; hard stop after it.",
+   "effect": "Round 5 dispatched with the three round-4 findings. If it fails, or the leaf-sizing class repeats a third time, work stops and returns to the owner."
   }
  ],
  "halted": {
@@ -300,7 +306,7 @@
    "REQ-06": "meaningless after extraction"
   }
  },
- "blocked": "plan-review on 7eecace8 cannot pass until audit 7cbefe7c lands and the plan is re-planned to decompose D-13/D-14 (finding F2). F1 is resolved; F3 and F4 are for the re-plan.",
+ "blocked": "plan-review on 7eecace8 (round 5 dispatched, owner-granted past the rework limit). No implementation work is dispatched until plan-review, then coverage-preview and breakdown-review on 237b15be, all pass.",
  "session": 2,
  "open_findings": [
   {
@@ -340,5 +346,59 @@
     }
    ]
   }
- ]
+ ],
+ "gate_history": [
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 1,
+   "verdict": "fail",
+   "findings": 1,
+   "summary": "Coverage: REQ-07..REQ-10 had no satisfying child. Resolved by instantiating the manifest."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 2,
+   "verdict": "fail",
+   "findings": 4,
+   "summary": "Graph not reconciled to the manifest (lead); D-13/D-14 cited but not decomposed (sequencing \u2014 the audit had not landed); accumulation rows; unordered footprint overlaps."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 3,
+   "verdict": "fail",
+   "findings": 9,
+   "summary": "Membership residue on rejected issues (lead); D-23 omitted (lead never briefed it); seven leaves oversized or mixing implementation with prose."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 4,
+   "verdict": "fail",
+   "findings": 3,
+   "summary": "Taxonomy fixture still 64 sites across 11 modules; integration split spans several target families; overlap table omitted production writers on commands/validate.rs."
+  }
+ ],
+ "graph_state": {
+  "manifest_entries": 64,
+  "manifest_edges": 85,
+  "issue_states": {
+   "ready": 12,
+   "done": 13,
+   "backlog": 40,
+   "in_progress": 2
+  },
+  "reconciled": "Every manifest entry names its issue; zero edge and zero content differences as of 944522af.",
+  "rejected": [
+   "1d2f454e",
+   "ce0172c3",
+   "779ea308",
+   "8e7a82dc",
+   "380a8e9e",
+   "e103d7a4"
+  ],
+  "note": "Rejected issues carry no membership labels, which leaves six advisory orphan-leaf warnings. jit validate passes."
+ }
 }

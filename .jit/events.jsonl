@@ -12121,3 +12121,4 @@
 {"gate_key":"docs-mechanical","id":"26e62fad-bb70-466e-9f47-d091b1246f50","issue_id":"d913a510-438e-4ec6-aeb4-425480a73c30","timestamp":"2026-07-31T17:59:08.239383767Z","type":"gate_removed"}
 {"gate_key":"mcp-ci","id":"8133dcda-fcde-42c6-8ebf-4942e6749e87","issue_id":"d913a510-438e-4ec6-aeb4-425480a73c30","timestamp":"2026-07-31T17:59:08.239383767Z","type":"gate_removed"}
 {"fields":["description","labels"],"id":"bab44df3-9370-4cfb-874b-041084180b8d","issue_id":"d913a510-438e-4ec6-aeb4-425480a73c30","timestamp":"2026-07-31T17:59:11.649658166Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"plan-review","id":"f6766970-2c19-4361-a08a-d0ceecfe50fd","issue_id":"7eecace8-fae3-49f8-8907-2d6180ae40a3","timestamp":"2026-07-31T18:04:28.995090787Z","type":"gate_failed","updated_by":"auto:executor"}

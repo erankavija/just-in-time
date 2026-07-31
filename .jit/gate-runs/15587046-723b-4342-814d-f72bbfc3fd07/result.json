@@ -1,0 +1,59 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "944522af3045b7c353158ca249b01e188c8f9c04",
+  "completed_at": "2026-07-31T18:04:28.618519431Z",
+  "duration_ms": 278171,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F1",
+        "line": 1657,
+        "references": [
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "explicit-taxonomy-test-fixture combines 64 call sites across 11 unrelated modules; split fixture creation from bounded module-family adoptions."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F2",
+        "line": 1710,
+        "references": [
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "taxonomy-fixture-integration-suites combines 13 files across multiple independent integration-target families; split it by cohesive target family."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-plan.md",
+        "id": "F3",
+        "line": 577,
+        "references": [
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "medium",
+        "summary": "The claimed complete unordered-overlap analysis omits production writers such as conditional-package-load versus repair and composition on commands/validate.rs; add edges or concrete disjoint contracts for every pair."
+      }
+    ],
+    "summary": "Two taxonomy-fixture leaves are not worker-sized, and the overlap analysis is incomplete.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7eecace8-fae3-49f8-8907-2d6180ae40a3",
+  "message": null,
+  "run_id": "15587046-723b-4342-814d-f72bbfc3fd07",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T17:59:50.446584742Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4652 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb955-1d1c-7710-a334-5e4447becc21\n--------\nuser\n--- 4639 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. F1 (high, blocking): `explicit-taxonomy-test-fixture` assigns 64 call sites across 11 unrelated modules to one terminal leaf. Its single library-suite boundary does not make that migration one focused cycle. Split fixture creation from bounded module-family adoptions, with dependencies and focused test boundaries. `e204e63d-breakdown.json:1657`\n\n2. F2 (high, blocking): `taxonomy-fixture-integration-suites` combines 13 files across multiple independent integration-target families into one terminal. Split by cohesive test-target family after the shared fixture is available. `e204e63d-breakdown.json:1710`\n\n3. F3 (medium, blocking): The overlap rationale claims to cover every unordered pair, but it omits unordered production writers such as `conditional-package-load` with both repair and composition on `commands/validate.rs`; the manifest has 71 unordered touching pairs, not the stated 46. Add real dependency edges or concrete disjoint method-level contracts for every remaining pair and correct the plan. `e204e63d-plan.md:577`\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two taxonomy-fixture leaves are not worker-sized, and the overlap analysis is incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"explicit-taxonomy-test-fixture combines 64 call sites across 11 unrelated modules; split fixture creation from bounded module-family adoptions.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":1657,\"references\":[\"@/invariant/shared-test-contracts\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"taxonomy-fixture-integration-suites combines 13 files across multiple independent integration-target families; split it by cohesive target family.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":1710,\"references\":[\"@/invariant/shared-test-contracts\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"The claimed complete unordered-overlap analysis omits production writers such as conditional-package-load versus repair and composition on commands/validate.rs; add edges or concrete disjoint contracts for every pair.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-plan.md\",\"line\":577,\"references\":[\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
