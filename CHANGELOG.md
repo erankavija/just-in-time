@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **A stale shipped-policy region in the adopter configuration documents fails
+  the mechanical documentation checks.** Generating those regions made them
+  right once; nothing kept them right, so a change to the shipped
+  development-area classification left them correct-looking until someone
+  reran the generator. `scripts/docs-check-shipped-policy.sh` joins the
+  `docs-mechanical` fan-out as M7 and reruns
+  `scripts/generate-shipped-policy-regions.sh` against a scratch clone of the
+  repository under check, carrying that repository's uncommitted tracked
+  changes so the comparison is against the working tree while every write lands
+  in a temporary directory. Drift is the difference between the fixture's tree
+  object before and after that run, so the check states no classification
+  value, no region marker, and no target path: the generator owns all three.
+  Because the classification comes from the installed binary — which, if it
+  predates the repository under check, produces an outdated table the generator
+  then agrees with — the check establishes the binary's currency positively
+  against that repository first, and reports anything short of a resolved,
+  current provenance as an environment failure rather than as a documentation
+  finding. `scripts/docs-check-selftest.sh` covers a fresh tree, a seeded stale
+  region, and both ways a classification can be untrustworthy. The
+  `docs-mechanical` gate description no longer lists its members, so adding one
+  cannot make it stale.
+
 - **The normal validation suites are callable from another workflow.** `ci.yml`
   accepts `workflow_call` beside its branch-push and pull-request triggers, so
   a branch build, a pull request, and any workflow of this repository that

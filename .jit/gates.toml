@@ -168,7 +168,7 @@ REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'
 version = 1
 key = "docs-mechanical"
 title = "Documentation Mechanical Checks"
-description = "Deterministic mechanical checks over the adopter-facing documentation surface, each deriving both comparison sides live from the tree so it encodes no product facts: markdown link + heading-anchor resolution (M2), source-path + @/… citation existence (M3), and registry projection freshness (M5, re-runs jit project render and diffs the configured targets). Runs ./scripts/docs-mechanical.sh, which fans out to the three committed checkers under scripts/ (docs-check-links.sh, docs-check-citations.sh, docs-check-projections.sh). The footprint is caller-supplied: area audits and the container's full-surface run pass their own paths via positional arguments, and this gate supplies the adopter documentation root through the DOCS_FOOTPRINT environment variable."
+description = "Deterministic mechanical checks over the adopter-facing documentation surface. Runs ./scripts/docs-mechanical.sh, which fans out to the committed checkers beside it under scripts/ and aggregates their exit statuses, an environment error dominating a finding. Each checker derives both sides of its comparison live from the tree, so the gate encodes no product fact of its own. A checker that takes a footprint receives one: area audits and the container's full-surface run pass their own paths via positional arguments, and this gate supplies the adopter documentation root through the DOCS_FOOTPRINT environment variable. A checker whose targets are fixed by configuration takes none."
 stage = "postcheck"
 mode = "auto"
 priority = 100
