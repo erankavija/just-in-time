@@ -48,7 +48,9 @@ set -euo pipefail
 #   2 — environment error (missing tooling, no git work tree, a classification
 #       that cannot be trusted, or a generator that could not run)
 
-me=$(basename "$0")
+# Expanded rather than shelled out for, so nothing can fail before `die` exists
+# to report it.
+me=${0##*/}
 die() {
   echo "$me: $*" >&2
   exit 2
@@ -69,7 +71,8 @@ generator="scripts/generate-shipped-policy-regions.sh"
 # --- the classification's trustworthiness, judged against the repo under check
 
 version_json=$(jit version --json 2>/dev/null) || die "'jit version --json' failed"
-build_commit=$(printf '%s' "$version_json" | jq -r '.git_commit // ""')
+build_commit=$(printf '%s' "$version_json" | jq -r '.git_commit // ""') ||
+  die "cannot compare: the jit binary on PATH reported a version document that cannot be read, so the classification it carries cannot be placed in $root"
 case "$build_commit" in
   "" | unknown)
     die "cannot compare: the jit binary on PATH reports no build commit, so the classification it carries cannot be placed in $root — install it with ./scripts/install-jit.sh, which injects build provenance"
@@ -131,6 +134,10 @@ fi
 {
   echo "DRIFT: a generated shipped-policy region no longer carries what repository"
   echo "       initialization produces. Rerun ./$generator and commit:"
-  git -C "$fixture" --no-pager diff "$before" "$after"
+  # The verdict is already settled by the two tree objects. Rendering the
+  # difference is explanation, so its failure must not carry a status of its
+  # own over the finding.
+  git -C "$fixture" --no-pager diff "$before" "$after" ||
+    echo "       (git could not render the difference)"
 } >&2
 exit 1
