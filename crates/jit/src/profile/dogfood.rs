@@ -631,19 +631,27 @@ mod tests {
         .templates
     }
 
-    /// The repository's committed declarations agree with the packaged ones
-    /// field for field, description strings included.
+    /// The declarations a registry's generated region carries: the extent the
+    /// package is the authority for (`@/issue/e204e63d/decision/D-1`), which is
+    /// what the drift guard compares.
+    fn region_declarations_of(registry: &[u8]) -> Vec<GraphTemplate> {
+        use crate::profile::template_region::inside_template_region;
+        template_declarations_of(inside_template_region(registry).unwrap().as_bytes())
+    }
+
+    /// The committed region's declarations agree with the packaged ones field
+    /// for field, description strings included.
     ///
-    /// Each side is compared as the value it parses into — the registry file
-    /// through the templates loader, the package through its manifest — so the
-    /// assertion carries no expectation of its own about what the bracket
-    /// declares, and it holds whether or not the region was regenerated: a hand
-    /// edit inside the generated region fails here as readily as a change to
-    /// the packaged authority.
+    /// Each side is compared as the value it parses into — the registry's
+    /// generated region through the templates loader, the package through its
+    /// manifest — so the assertion carries no expectation of its own about what
+    /// the bracket declares, and it holds whether or not the region was
+    /// regenerated: a hand edit inside the region fails here as readily as a
+    /// change to the packaged authority.
     #[test]
     fn test_committed_template_declarations_agree_with_the_packaged_declarations() {
         use crate::profile::template_region::{packaged_templates, template_drift_report};
-        let repository = template_declarations_of(&committed_template_registry());
+        let repository = region_declarations_of(&committed_template_registry());
         let packaged = packaged_templates().unwrap();
 
         if let Some(report) = template_drift_report(&repository, &packaged).unwrap() {
@@ -664,7 +672,7 @@ mod tests {
             template_drift_report, TEMPLATE_REGION_GENERATOR,
         };
         let committed = committed_template_registry();
-        let mut edited = template_declarations_of(&committed);
+        let mut edited = region_declarations_of(&committed);
         let node = edited
             .first_mut()
             .and_then(|template| template.nodes.first_mut())
@@ -677,7 +685,7 @@ mod tests {
             splice_template_region(&committed, &render_template_block(&edited).unwrap()).unwrap();
 
         let report = template_drift_report(
-            &template_declarations_of(&hand_edited),
+            &region_declarations_of(&hand_edited),
             &packaged_templates().unwrap(),
         )
         .unwrap()
@@ -701,7 +709,7 @@ mod tests {
         use crate::profile::template_region::{
             packaged_templates, template_drift_report, TEMPLATE_REGION_GENERATOR,
         };
-        let repository = template_declarations_of(&committed_template_registry());
+        let repository = region_declarations_of(&committed_template_registry());
         let mut packaged = packaged_templates().unwrap();
         let anchor = packaged
             .first_mut()
@@ -720,6 +728,41 @@ mod tests {
         );
         assert!(report.contains("a-gate-the-repository-omits"), "{report}");
         assert!(report.contains(TEMPLATE_REGION_GENERATOR), "{report}");
+    }
+
+    /// A template the repository authors outside the delimiters is not drift.
+    ///
+    /// The package is the authority for the generated region, not for the
+    /// registry's whole template inventory (`@/issue/e204e63d/decision/D-1`),
+    /// so a second declaration beyond the region leaves the guard silent even
+    /// though the file then carries more declarations than the package does.
+    #[test]
+    fn test_template_drift_report_ignores_a_template_authored_outside_the_region() {
+        use crate::profile::template_region::{
+            packaged_templates, render_template_block, template_drift_report,
+        };
+        let packaged = packaged_templates().unwrap();
+        let mut authored = packaged.clone();
+        authored
+            .first_mut()
+            .expect("the package declares a template")
+            .name = "authored-outside-the-region".to_string();
+        let registry = [
+            committed_template_registry(),
+            b"\n".to_vec(),
+            render_template_block(&authored).unwrap().into_bytes(),
+        ]
+        .concat();
+
+        assert!(
+            template_declarations_of(&registry).len() > region_declarations_of(&registry).len(),
+            "the registry under test must carry a declaration beyond its region"
+        );
+        if let Some(report) =
+            template_drift_report(&region_declarations_of(&registry), &packaged).unwrap()
+        {
+            panic!("a declaration authored outside the region was reported as drift:\n{report}");
+        }
     }
 
     #[test]

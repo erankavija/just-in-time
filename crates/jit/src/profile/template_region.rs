@@ -120,9 +120,9 @@ pub fn splice_template_region(
     .map_err(TemplateRegionError::Splice)
 }
 
-/// The registry bytes outside the generated region: everything through the
-/// begin delimiter, and everything from the end delimiter onward.
-pub fn outside_template_region(registry: &[u8]) -> Result<(String, String), TemplateRegionError> {
+/// The registry text and the bounds of its generated region: where the begin
+/// delimiter ends, and where the end delimiter starts.
+fn template_region_bounds(registry: &[u8]) -> Result<(&str, usize, usize), TemplateRegionError> {
     let text = std::str::from_utf8(registry).map_err(|_| TemplateRegionError::NotUtf8)?;
     let begin = text
         .find(TEMPLATE_REGION_BEGIN)
@@ -131,7 +131,23 @@ pub fn outside_template_region(registry: &[u8]) -> Result<(String, String), Temp
     let end = text
         .find(TEMPLATE_REGION_END)
         .ok_or(TemplateRegionError::MissingDelimiter(TEMPLATE_REGION_END))?;
+    Ok((text, begin, end))
+}
+
+/// The registry bytes outside the generated region: everything through the
+/// begin delimiter, and everything from the end delimiter onward.
+pub fn outside_template_region(registry: &[u8]) -> Result<(String, String), TemplateRegionError> {
+    let (text, begin, end) = template_region_bounds(registry)?;
     Ok((text[..begin].to_string(), text[end..].to_string()))
+}
+
+/// The registry bytes between the delimiters: the generated region's own
+/// declarations, which is the extent the package is the authority for
+/// (`@/issue/e204e63d/decision/D-1`). A template the repository authors outside
+/// the delimiters is not part of it.
+pub fn inside_template_region(registry: &[u8]) -> Result<String, TemplateRegionError> {
+    let (text, begin, end) = template_region_bounds(registry)?;
+    Ok(text[begin..end].to_string())
 }
 
 /// The registry bytes the packaged declarations render to, given the registry's
@@ -141,8 +157,8 @@ pub fn render_template_registry(existing: &[u8]) -> Result<Vec<u8>, TemplateRegi
     splice_template_region(existing, &render_template_block(&packaged_templates()?)?)
 }
 
-/// How the repository's parsed template declarations disagree with the packaged
-/// ones, or `None` when every field agrees.
+/// How the declarations of the repository's generated region disagree with the
+/// packaged ones, or `None` when every field agrees.
 ///
 /// The comparison walks the two sides as the values they parse into, so it
 /// holds no expectation of its own about what either declares and covers every
