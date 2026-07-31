@@ -12,11 +12,14 @@ set -uo pipefail
 # the adopter docs surface and that DOCS_FOOTPRINT overrides that default.
 #
 # The self-test NEVER mutates the real repository index or working tree: the
-# link/citation seeds are scratch files in a mktemp dir, and the projection
-# check — which necessarily renders into tracked targets — runs inside a
-# throwaway `git clone` of this repo under that mktemp dir. A pre-existing
-# staged or unstaged change in the real repo is therefore left untouched. The
-# harness exits 0 only if every assertion passes; it never commits a seed.
+# link/citation seeds are scratch files in a mktemp dir, and the checks whose
+# defects can only be seeded into tracked files — the projection check, which
+# renders into its targets, and the shipped-policy check, whose seeds are a
+# stale region and a committed build-input change — run inside throwaway
+# `git clone`s of this repo under that mktemp dir. A pre-existing staged or
+# unstaged change in the real repo is therefore left untouched. The harness
+# exits 0 only if every assertion passes; it never commits a seed into the real
+# repository.
 #
 # Exit codes:
 #   0 — all assertions passed
@@ -36,6 +39,7 @@ links="$here/docs-check-links.sh"
 citations="$here/docs-check-citations.sh"
 projections="$here/docs-check-projections.sh"
 canonical="$here/docs-check-canonical.sh"
+policy="$here/docs-check-shipped-policy.sh"
 mechanical="$here/docs-mechanical.sh"
 
 fail=0
@@ -75,7 +79,7 @@ fixture_scripts="$fixture/scripts"
 fixture_log="$scratch/orchestrator.log"
 mkdir -p "$fixture_scripts"
 cp "$mechanical" "$fixture_scripts/docs-mechanical.sh"
-for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh docs-check-canonical.sh; do
+for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh docs-check-canonical.sh docs-check-shipped-policy.sh; do
   # shellcheck disable=SC2016  # $0/$* and the log variable expand in the stub.
   printf '#!/usr/bin/env bash\nprintf "%%s:%%s\\n" "$(basename "$0")" "$*" >>"$DOCS_MECHANICAL_LOG"\n' >"$fixture_scripts/$checker"
   chmod +x "$fixture_scripts/$checker"
@@ -90,6 +94,7 @@ done
 assert_rc 0 $? "orchestrator: bare invocation succeeds in isolated fixture"
 assert_logged_footprint "docs-check-links.sh" "docs" "$fixture_log" "orchestrator: bare invocation selects adopter docs, not archival paths"
 assert_logged_footprint "docs-check-citations.sh" "docs" "$fixture_log" "orchestrator: bare invocation passes adopter docs to both footprint checkers"
+assert_logged_footprint "docs-check-shipped-policy.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the shipped-policy check, with no footprint"
 
 # An explicit environment footprint remains higher precedence than the default.
 : >"$fixture_log"
@@ -337,6 +342,83 @@ if git clone --local --no-hardlinks --quiet . "$clone" 2>/dev/null; then
   assert_rc 1 "$(cat "$scratch/rc_drift")" "projections: drifted target region is a finding"
 else
   echo "FAIL: could not create isolated clone for the projection check"
+  fail=1
+fi
+echo
+
+echo "== M7 docs-check-shipped-policy.sh =="
+# This checker regenerates the shipped-policy regions in a scratch fixture of
+# its own and never writes into the tree it inspects, so the throwaway clone
+# below exists only so a stale region can be seeded and a build input committed
+# without touching the real repository.
+policy_clone="$scratch/policy-repo"
+policy_target="docs/reference/configuration.md"
+policy_begin="<!-- jit:shipped-documentation-policy:begin -->"
+policy_end="<!-- jit:shipped-documentation-policy:end -->"
+# A binary reporting no build commit — the state an ordinary build with no
+# injected provenance is in. The stub answers `version --json` and nothing
+# else, so reaching any other subcommand would mean the checker compared
+# something before establishing that the classification can be trusted.
+policy_stub="$scratch/policy-stub"
+mkdir -p "$policy_stub"
+cat >"$policy_stub/jit" <<'STUB'
+#!/usr/bin/env bash
+if [ "${1:-}" = "version" ]; then
+  printf '{"git_commit":"unknown","git_short_commit":"unknown","git_dirty":null}\n'
+  exit 0
+fi
+echo "stub jit: reached '$*' without established provenance" >&2
+exit 99
+STUB
+chmod +x "$policy_stub/jit"
+
+if git clone --local --no-hardlinks --quiet . "$policy_clone" 2>/dev/null; then
+  (
+    cd "$policy_clone" || exit 3
+    "$policy" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_policy_fresh"
+    # The tree under check is left exactly as it was found.
+    if [ -z "$(git status --porcelain)" ]; then
+      echo 0
+    else
+      echo 1
+    fi >"$scratch/rc_policy_untouched"
+
+    # Defect: replace a generated region's body, leaving the markers and every
+    # byte outside them in place.
+    awk -v begin="$policy_begin" -v end="$policy_end" '
+      $0 == begin { print; print "STALE-REGION-BODY"; inside = 1; next }
+      $0 == end { inside = 0; print; next }
+      !inside { print }
+    ' "$policy_target" >"$scratch/policy_seeded" &&
+      cp "$scratch/policy_seeded" "$policy_target"
+    "$policy" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_policy_drift"
+    git checkout -q -- "$policy_target"
+
+    # An untrustworthy classification, arm 1: provenance that does not resolve
+    # against the repository under check.
+    PATH="$policy_stub:$PATH" "$policy" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_policy_unresolvable"
+
+    # An untrustworthy classification, arm 2: a binary that predates the
+    # repository under check. Committing a change to a build input in the clone
+    # makes the installed binary older than the sources there, so the table it
+    # would produce describes an earlier tree — and a rerun of the generator
+    # would agree with it, since both read the same binary.
+    printf '\n// selftest build-input touch\n' >>crates/jit/src/lib.rs
+    git add -A >/dev/null 2>&1
+    git -c user.email=selftest@invalid -c user.name=selftest commit -q -m "touch a build input"
+    "$policy" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_policy_stale"
+  )
+  assert_rc 0 "$(cat "$scratch/rc_policy_fresh")" "shipped policy: regions carrying the shipped classification pass"
+  assert_rc 0 "$(cat "$scratch/rc_policy_untouched")" "shipped policy: a run leaves the tree it checks unmodified"
+  assert_rc 1 "$(cat "$scratch/rc_policy_drift")" "shipped policy: a seeded stale region is a finding"
+  assert_rc 2 "$(cat "$scratch/rc_policy_unresolvable")" "shipped policy: a classification whose provenance does not resolve is an environment failure"
+  assert_rc 2 "$(cat "$scratch/rc_policy_stale")" "shipped policy: a classification from a binary predating the tree under check is an environment failure"
+else
+  echo "FAIL: could not create isolated clone for the shipped-policy check"
   fail=1
 fi
 echo
