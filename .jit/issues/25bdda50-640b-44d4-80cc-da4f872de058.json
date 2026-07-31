@@ -7,6 +7,7 @@
   ],
   "description": "The planning-bracket template declared in this repository's template registry is generated from the packaged contribution that is its authority, and a divergence between the two fails the test suite.\n\n## Background\n\nThe planning-bracket template is declared twice, once inline in the packaged workflow manifest and once in this repository's template registry. The two are structurally identical after parsing and differ in three description strings, and nothing compares them, so that drift has gone unreported. The byte-equality contract covering the packaged file assets does not reach this pair, because the packaged declaration is inline manifest data rather than an asset.\n\nThe packaged contribution is the shipped artifact and the repository declaration is a local consumer of it, which fixes the direction of generation. The contribution is already exposed whole through the package's machine-readable inspection output, so reading it needs no new surface.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository plan-template declaration is generated from the packaged contribution rather than authored.\n- [hard] REQ-02: A change to either declaration without the corresponding change to the other fails the test suite.\n- [hard] REQ-03: The guard rests on the two parsed declarations, not on a hand-written expectation of their contents.\n- [hard] REQ-04: Repository knowledge recorded as commentary inside the present declaration survives the change.\n- [hard] REQ-05: The template registry loads the generated file and the template still applies to the container type it applies to today.\n",
   "documents": [],
+  "first_ready_at": "2026-07-31T12:46:03.448816515Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -23,7 +24,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "The repository plan-template declaration is generated from the package",
-  "updated_at": "2026-07-28T12:17:11.984851016Z"
+  "updated_at": "2026-07-31T12:46:03.448816515Z"
 }

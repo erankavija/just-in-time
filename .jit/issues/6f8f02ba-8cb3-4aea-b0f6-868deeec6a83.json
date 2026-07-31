@@ -7,6 +7,7 @@
   ],
   "description": "The managed, permanent, and issue-scoped area lists reach the adopter configuration reference and the copyable example configuration by generation from the shipped classification, and a stale region is reported rather than shipped.\n\n## Background\n\nThe shipped development-area classification is declared once in the engine and rendered into the configuration table a new repository receives. Two adopter-facing files restate it by hand — one reproducing all three lists, one carrying an illustrative subset — with nothing binding either to its authority. Both went stale during earlier work and blocked two reviews before repair.\n\nThe classification can be obtained without reading this repository's own configuration, by initializing a throwaway repository and reading the table written there. That keeps the shipped values and this repository's local policy distinct, which the boundary between them requires.\n\nGeneration alone does not keep the copies current, so the pair of documents also needs a deterministic check that reports a region no longer matching what initialization produces.\n\n## Success Criteria\n\n- [hard] REQ-01: Both adopter configuration files obtain the three area lists from the shipped classification rather than from an authored copy.\n- [hard] REQ-02: The values reach both documents through what repository initialization writes, never through this repository's own configuration.\n- [hard] REQ-03: Bytes outside the generated regions in both files are preserved, including authored prose and every other configuration table.\n- [hard] REQ-04: A region that no longer matches freshly produced output is reported as a finding by the deterministic documentation checks.\n- [hard] REQ-05: The copyable example carries the classification a fresh repository receives, in place of its present illustrative subset.\n",
   "documents": [],
+  "first_ready_at": "2026-07-31T12:46:13.363550391Z",
   "gates_required": [
     "code-review",
     "docs-mechanical",
@@ -23,7 +24,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "The shipped area classification reaches adopter configuration by generation",
-  "updated_at": "2026-07-28T12:17:11.984851016Z"
+  "updated_at": "2026-07-31T12:46:13.363550391Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "256ae759b7dc8aa4d7396cb6b6e00ea9fcee16c7",
+  "completed_at": "2026-07-31T12:44:26.141962547Z",
+  "duration_ms": 119073,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The region-scoped parsed-declaration drift guard satisfies all issue criteria, including the prior review finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "097b9f48-d8b2-47ee-ad02-c524190fbeb2",
+  "message": null,
+  "run_id": "3778a5e7-7d73-4d1e-bce1-e56b4a10cb25",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T12:42:27.068356289Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b7ac878e, 2e6aa3b8, 861e13c5, aae5c3f8, 26a3f0d1, 256ae759\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/issue/e204e63d/decision/D-1 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T12:28:30Z); prior code-review failed (exit 1, 2026-07-31T12:19:05Z), with its F1 addressed by aae5c3f8/26a3f0d1\nTruncation recovery: Re-read individual patches, final source ranges, policy registries, package manifest, and model definitions in bounded calls.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The region-scoped parsed-declaration drift guard satisfies all issue criteria, including the prior review finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
