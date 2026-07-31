@@ -94,6 +94,7 @@ done
 assert_rc 0 $? "orchestrator: bare invocation succeeds in isolated fixture"
 assert_logged_footprint "docs-check-links.sh" "docs" "$fixture_log" "orchestrator: bare invocation selects adopter docs, not archival paths"
 assert_logged_footprint "docs-check-citations.sh" "docs" "$fixture_log" "orchestrator: bare invocation passes adopter docs to both footprint checkers"
+assert_logged_footprint "docs-check-shipped-policy.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the shipped-policy check, with no footprint"
 
 # An explicit environment footprint remains higher precedence than the default.
 : >"$fixture_log"
