@@ -102,6 +102,11 @@ already-installed binary renders inside its own script. Which of the two applies
 follows from where the artifact's authority lives, and each script's header says
 so.
 
+Regions declared as `[projection.*]` in this repository's `.jit/` configuration
+reach their targets through `jit project render`, the product command an adopter
+runs the same way; [../AGENTS.md](../AGENTS.md) states the rule for editing
+them.
+
 ---
 
 ## Key Documents
