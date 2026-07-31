@@ -48,21 +48,6 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 
-/// Default section slug scanned for items when a kind declares none.
-///
-/// Matches the `label-coverage` rule's `criteria-section` default so the built-in
-/// `requirement` kind and the coverage rule read the SAME section.
-pub const DEFAULT_ITEM_SECTION: &str = "success_criteria";
-
-/// Default self-id pattern when a kind declares none — the repo default id shape
-/// (`REQ-01`, `D-2`, `RISK-03`, ...), identical to the `label-coverage` rule's
-/// `id-pattern` default.
-pub const DEFAULT_ITEM_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
-
-/// Default link-label namespace referencing items of a kind when none is
-/// declared, matching the `label-coverage` rule's `satisfies-namespace` default.
-pub const DEFAULT_ITEM_LINK_NAMESPACE: &str = "satisfies";
-
 /// The scope sentinel that addresses project-level items not tied to any single
 /// issue. As a standalone scope token it denotes [`Scope::Project`] (REQ-01); it
 /// also opens every minted qualified id — `@/<kind>/<self-id>` for a project item,
@@ -442,6 +427,14 @@ impl KindScope {
 /// Errors raised while resolving item kinds or indexing items.
 #[derive(Debug, Error)]
 pub enum ItemError {
+    /// A declared item kind omits one or more required configuration fields.
+    #[error("item kind '{kind}' is missing required field(s): {missing}")]
+    MissingRequiredFields {
+        /// The offending kind name.
+        kind: String,
+        /// Comma-separated authored keys of the missing fields.
+        missing: String,
+    },
     /// A kind's `id-pattern` is not a valid regular expression.
     #[error("item kind '{kind}' has an invalid id-pattern '{pattern}': {source}")]
     InvalidIdPattern {
@@ -614,7 +607,7 @@ pub enum ItemError {
 }
 
 /// A resolved item-kind projection: the `(section, id-pattern, markers,
-/// link-namespaces)` four-tuple with all defaults already applied.
+/// link-namespaces)` four-tuple declared by a configuration.
 ///
 /// Resolved from an [`ItemKindConfig`] via [`ItemKind::from_config`]. The
 /// `id_pattern` is pre-compiled so indexing is regex-error-free.
@@ -623,6 +616,7 @@ pub enum ItemError {
 ///
 /// ```
 /// use jit::config::ItemKindConfig;
+/// use jit::config::{KindScopeConfig, SourceOfTruth};
 /// use jit::domain::item::ItemKind;
 ///
 /// let kind = ItemKind::from_config(
@@ -632,7 +626,10 @@ pub enum ItemError {
 ///         id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".into()),
 ///         markers: Some(vec!["[hard]".into()]),
 ///         link_namespaces: Some(vec!["satisfies".into()]),
-///         ..Default::default()
+///         scope: Some(KindScopeConfig::Issue),
+///         source: None,
+///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+///         aliases: None,
 ///     },
 /// )
 /// .unwrap();
@@ -659,39 +656,77 @@ pub struct ItemKind {
 }
 
 impl ItemKind {
-    /// Resolve a configured kind into its four-tuple, applying repo defaults for
-    /// any field the config leaves unset.
+    /// Resolve a configured kind into its declared four-tuple.
     ///
     /// `name` labels the kind (for display and `--kind` filtering only). An
-    /// invalid `id-pattern` regex is surfaced as [`ItemError::InvalidIdPattern`]
-    /// rather than silently dropped.
+    /// incomplete declaration is surfaced as [`ItemError::MissingRequiredFields`],
+    /// and an invalid `id-pattern` regex is surfaced as
+    /// [`ItemError::InvalidIdPattern`] rather than silently dropped.
     pub fn from_config(name: &str, config: &ItemKindConfig) -> Result<Self, ItemError> {
+        let missing = config.missing_required_fields();
+        if !missing.is_empty() {
+            return Err(ItemError::MissingRequiredFields {
+                kind: name.to_string(),
+                missing: missing.join(", "),
+            });
+        }
         let section = config
             .section
             .clone()
-            .unwrap_or_else(|| DEFAULT_ITEM_SECTION.to_string());
-        let id_pattern_src = config
-            .id_pattern
-            .clone()
-            .unwrap_or_else(|| DEFAULT_ITEM_ID_PATTERN.to_string());
+            .ok_or_else(|| ItemError::MissingRequiredFields {
+                kind: name.to_string(),
+                missing: "section".to_string(),
+            })?;
+        let id_pattern_src =
+            config
+                .id_pattern
+                .clone()
+                .ok_or_else(|| ItemError::MissingRequiredFields {
+                    kind: name.to_string(),
+                    missing: "id-pattern".to_string(),
+                })?;
         let id_pattern =
             regex::Regex::new(&id_pattern_src).map_err(|source| ItemError::InvalidIdPattern {
                 kind: name.to_string(),
                 pattern: id_pattern_src.clone(),
                 source,
             })?;
-        let markers = config.markers.clone().unwrap_or_default();
-        let link_namespaces = config
-            .link_namespaces
+        let markers = config
+            .markers
             .clone()
-            .unwrap_or_else(|| vec![DEFAULT_ITEM_LINK_NAMESPACE.to_string()]);
+            .ok_or_else(|| ItemError::MissingRequiredFields {
+                kind: name.to_string(),
+                missing: "markers".to_string(),
+            })?;
+        let link_namespaces =
+            config
+                .link_namespaces
+                .clone()
+                .ok_or_else(|| ItemError::MissingRequiredFields {
+                    kind: name.to_string(),
+                    missing: "link-namespaces".to_string(),
+                })?;
         // Scope is now a typed field — invalid tokens are rejected at TOML parse
         // time, so this conversion is infallible.
         let kind_scope = match config.scope {
-            None | Some(KindScopeConfig::Issue) => KindScope::Issue,
+            Some(KindScopeConfig::Issue) => KindScope::Issue,
             Some(KindScopeConfig::Project) => KindScope::Project,
+            None => {
+                return Err(ItemError::MissingRequiredFields {
+                    kind: name.to_string(),
+                    missing: "scope".to_string(),
+                })
+            }
         };
-        let source_of_truth = config.source_of_truth();
+        let source_of_truth = match config.source_of_truth {
+            Some(source_of_truth) => source_of_truth,
+            None => {
+                return Err(ItemError::MissingRequiredFields {
+                    kind: name.to_string(),
+                    missing: "source-of-truth".to_string(),
+                })
+            }
+        };
         // Split the polymorphic `source` into the markdown PATH and the structured
         // toml DESCRIPTOR; at most one is ever set (the two shapes are mutually
         // exclusive at parse time).
@@ -1007,6 +1042,7 @@ pub fn derive_scope_items(
 ///
 /// ```
 /// use jit::config::ItemKindConfig;
+/// use jit::config::{KindScopeConfig, SourceOfTruth};
 /// use jit::document::MarkdownContentParser;
 /// use jit::domain::item::{index_items, ItemKind};
 /// use jit::domain::Issue;
@@ -1021,7 +1057,11 @@ pub fn derive_scope_items(
 ///         section: Some("success_criteria".into()),
 ///         id_pattern: Some("REQ-[0-9]+".into()),
 ///         markers: Some(vec!["[hard]".into()]),
-///         ..Default::default()
+///         link_namespaces: Some(vec!["satisfies".into()]),
+///         scope: Some(KindScopeConfig::Issue),
+///         source: None,
+///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+///         aliases: None,
 ///     },
 /// )
 /// .unwrap();
@@ -1154,6 +1194,7 @@ pub struct ProjectSource {
 ///
 /// ```
 /// use jit::config::ItemKindConfig;
+/// use jit::config::{KindScopeConfig, ItemKindSource, SourceOfTruth};
 /// use jit::document::MarkdownContentParser;
 /// use jit::domain::item::{index_project_sources, ItemKind, ProjectSource, RawScopeItem};
 ///
@@ -1163,7 +1204,12 @@ pub struct ProjectSource {
 ///     &ItemKindConfig {
 ///         section: Some("core_concepts".into()),
 ///         id_pattern: Some("[A-Z][a-z]+".into()),
-///         ..Default::default()
+///         markers: Some(vec![]),
+///         link_namespaces: Some(vec!["defines".into()]),
+///         scope: Some(KindScopeConfig::Project),
+///         source: Some(ItemKindSource::Path("docs/reference/glossary.md".into())),
+///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+///         aliases: None,
 ///     },
 /// )
 /// .unwrap();
@@ -1456,7 +1502,7 @@ pub struct KindTriple {
 ///
 /// This is the ONE kind→triple resolver shared by every config layer that offers
 /// `kind =` sugar: it resolves the kind through [`ItemKind::from_config`] (so
-/// repo defaults and id-pattern validation are applied identically to indexing)
+/// declared values and id-pattern validation are applied identically to indexing)
 /// and returns the same triple [`ItemKind::as_triple`] exposes. The engine then
 /// consumes the triple and never sees the kind NAME, keeping it domain-agnostic
 /// (REQ-05). A name absent from `registry` is an [`ItemError::UnknownKind`]; a
@@ -1466,7 +1512,7 @@ pub struct KindTriple {
 ///
 /// ```
 /// use std::collections::HashMap;
-/// use jit::config::ItemKindConfig;
+/// use jit::config::{ItemKindConfig, KindScopeConfig, SourceOfTruth};
 /// use jit::domain::item::{expand_kind_triple, ItemError};
 ///
 /// let mut registry = HashMap::new();
@@ -1476,7 +1522,11 @@ pub struct KindTriple {
 ///         section: Some("success_criteria".to_string()),
 ///         markers: Some(vec!["[hard]".to_string()]),
 ///         id_pattern: Some("REQ-\\d+".to_string()),
-///         ..Default::default()
+///         link_namespaces: Some(vec!["satisfies".to_string()]),
+///         scope: Some(KindScopeConfig::Issue),
+///         source: None,
+///         source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+///         aliases: None,
 ///     },
 /// );
 /// let triple = expand_kind_triple(Some(&registry), "example").unwrap();
@@ -1748,11 +1798,14 @@ mod tests {
             "decision",
             &ItemKindConfig {
                 // Read the SAME section so both kinds see REQ-01.
-                section: Some(DEFAULT_ITEM_SECTION.to_string()),
+                section: Some("success_criteria".to_string()),
                 id_pattern: Some("REQ-\\d+".to_string()),
-                markers: None,
-                link_namespaces: None,
-                ..Default::default()
+                markers: Some(vec![]),
+                link_namespaces: Some(vec!["per".to_string()]),
+                scope: Some(KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+                aliases: None,
             },
         )
         .unwrap();
@@ -1793,9 +1846,12 @@ mod tests {
         let cfg = ItemKindConfig {
             section: Some("decisions".to_string()),
             id_pattern: Some("D-\\d+".to_string()),
-            markers: None,
+            markers: Some(vec![]),
             link_namespaces: Some(vec!["per".to_string()]),
-            ..Default::default()
+            scope: Some(KindScopeConfig::Issue),
+            source: None,
+            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            aliases: None,
         };
         let kind = ItemKind::from_config("decision", &cfg).unwrap();
         let issue = crate::domain::types::fixture_issue(
@@ -1811,11 +1867,14 @@ mod tests {
     #[test]
     fn test_invalid_id_pattern_is_typed_error() {
         let cfg = ItemKindConfig {
-            section: None,
+            section: Some("success_criteria".to_string()),
             id_pattern: Some("REQ-(".to_string()),
-            markers: None,
-            link_namespaces: None,
-            ..Default::default()
+            markers: Some(vec![]),
+            link_namespaces: Some(vec!["satisfies".to_string()]),
+            scope: Some(KindScopeConfig::Issue),
+            source: None,
+            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            aliases: None,
         };
         let err = ItemKind::from_config("broken", &cfg).unwrap_err();
         assert!(matches!(err, ItemError::InvalidIdPattern { .. }));
@@ -1887,6 +1946,36 @@ mod tests {
     }
 
     #[test]
+    fn test_item_kind_resolution_reports_missing_declared_vocabulary_fields() {
+        let config = ItemKindConfig {
+            markers: Some(vec![]),
+            scope: Some(KindScopeConfig::Issue),
+            source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+            ..Default::default()
+        };
+
+        let err = ItemKind::from_config("requirement", &config)
+            .expect_err("a kind without its declared vocabulary fields must be rejected");
+        let message = err.to_string();
+        assert!(
+            message.contains("section"),
+            "error names section: {message}"
+        );
+        assert!(
+            message.contains("id-pattern"),
+            "error names id-pattern: {message}"
+        );
+        assert!(
+            message.contains("link-namespaces"),
+            "error names link-namespaces: {message}"
+        );
+        assert!(
+            !message.contains("success_criteria") && !message.contains("satisfies"),
+            "error does not substitute defaults: {message}"
+        );
+    }
+
+    #[test]
     fn test_decision_kind_tuple() {
         // The canonical decision kind: section `decisions`, D-NN ids, no marker,
         // `per` link namespace, issue-scoped, markdown-first.
@@ -1922,8 +2011,8 @@ mod tests {
         // is rejected at resolution with a typed MissingProjectSource — never a
         // silent empty result.
         let base = |source: Option<ItemKindSource>| ItemKindConfig {
-            section: Some(DEFAULT_ITEM_SECTION.to_string()),
-            id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
+            section: Some("success_criteria".to_string()),
+            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["enforces".to_string()]),
             scope: Some(KindScopeConfig::Project),
@@ -1983,7 +2072,7 @@ mod tests {
         // accepted because the engine hardcodes no domain concept.
         let cfg = |scope: KindScopeConfig, sot: SourceOfTruth, source: Option<ItemKindSource>| {
             ItemKindConfig {
-                section: Some(DEFAULT_ITEM_SECTION.to_string()),
+                section: Some("success_criteria".to_string()),
                 id_pattern: Some("[a-z][a-z0-9-]*".to_string()),
                 markers: Some(vec![]),
                 link_namespaces: Some(vec!["enforces".to_string()]),
@@ -2023,8 +2112,8 @@ mod tests {
     fn test_markdown_first_project_kind_still_requires_source() {
         // The guard still fires for a markdown-first project kind with no source.
         let cfg = ItemKindConfig {
-            section: Some(DEFAULT_ITEM_SECTION.to_string()),
-            id_pattern: Some(DEFAULT_ITEM_ID_PATTERN.to_string()),
+            section: Some("success_criteria".to_string()),
+            id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
             markers: Some(vec![]),
             link_namespaces: Some(vec!["upholds".to_string()]),
             scope: Some(KindScopeConfig::Project),
@@ -2226,15 +2315,18 @@ name = \"bare\"
     #[test]
     fn test_resolve_item_kinds_uses_registry() {
         let mut map = HashMap::new();
-        map.insert("requirement".to_string(), ItemKindConfig::default());
+        map.insert("requirement".to_string(), req_cfg());
         map.insert(
             "decision".to_string(),
             ItemKindConfig {
                 section: Some("decisions".to_string()),
                 id_pattern: Some("D-\\d+".to_string()),
-                markers: None,
-                link_namespaces: None,
-                ..Default::default()
+                markers: Some(vec![]),
+                link_namespaces: Some(vec!["per".to_string()]),
+                scope: Some(KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+                aliases: None,
             },
         );
         let kinds = resolve_item_kinds(Some(&map)).unwrap();
@@ -2255,7 +2347,11 @@ name = \"bare\"
                 section: Some("success_criteria".to_string()),
                 markers: Some(vec!["[hard]".to_string()]),
                 id_pattern: Some("REQ-\\d+".to_string()),
-                ..Default::default()
+                link_namespaces: Some(vec!["satisfies".to_string()]),
+                scope: Some(KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+                aliases: None,
             },
         );
         let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
@@ -2267,13 +2363,25 @@ name = \"bare\"
     }
 
     #[test]
-    fn test_expand_kind_triple_applies_defaults() {
-        // A minimally-declared kind expands with the repo defaults applied.
+    fn test_expand_kind_triple_uses_declared_values() {
+        // A declared kind expands with the values its configuration supplies.
         let mut registry = HashMap::new();
-        registry.insert("requirement".to_string(), ItemKindConfig::default());
+        registry.insert(
+            "requirement".to_string(),
+            ItemKindConfig {
+                section: Some("criteria".to_string()),
+                id_pattern: Some("C-[0-9]+".to_string()),
+                markers: Some(vec![]),
+                link_namespaces: Some(vec!["references".to_string()]),
+                scope: Some(KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+                aliases: None,
+            },
+        );
         let triple = expand_kind_triple(Some(&registry), "requirement").unwrap();
-        assert_eq!(triple.section, DEFAULT_ITEM_SECTION);
-        assert_eq!(triple.id_pattern, DEFAULT_ITEM_ID_PATTERN);
+        assert_eq!(triple.section, "criteria");
+        assert_eq!(triple.id_pattern, "C-[0-9]+");
         // No markers declared -> no marker in the triple.
         assert_eq!(triple.marker, None);
     }
@@ -2296,8 +2404,14 @@ name = \"bare\"
         registry.insert(
             "broken".to_string(),
             ItemKindConfig {
+                section: Some("criteria".to_string()),
                 id_pattern: Some("REQ-(".to_string()),
-                ..Default::default()
+                markers: Some(vec![]),
+                link_namespaces: Some(vec![]),
+                scope: Some(KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+                aliases: None,
             },
         );
         let err = expand_kind_triple(Some(&registry), "broken").unwrap_err();
@@ -2702,16 +2816,28 @@ name = \"bare\"
         let alpha = ItemKind::from_config(
             "alpha",
             &ItemKindConfig {
+                section: Some("criteria".to_string()),
                 id_pattern: Some("X-[0-9]+".to_string()),
-                ..Default::default()
+                markers: Some(vec![]),
+                link_namespaces: Some(vec![]),
+                scope: Some(KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+                aliases: None,
             },
         )
         .unwrap();
         let beta = ItemKind::from_config(
             "beta",
             &ItemKindConfig {
+                section: Some("criteria".to_string()),
                 id_pattern: Some("[A-Z]-[0-9]+".to_string()),
-                ..Default::default()
+                markers: Some(vec![]),
+                link_namespaces: Some(vec![]),
+                scope: Some(KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(SourceOfTruth::MarkdownFirst),
+                aliases: None,
             },
         )
         .unwrap();

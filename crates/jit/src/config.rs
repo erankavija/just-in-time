@@ -216,9 +216,8 @@ pub struct HierarchyConfigToml {
 
 /// Icon configuration from TOML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct IconConfigToml {
-    /// Icon preset name: "simple", "navigation", "minimal", "construction" (optional).
-    pub preset: Option<String>,
     /// Custom type name to icon mapping (optional, partial overrides allowed).
     pub custom: Option<HashMap<String, String>>,
 }
@@ -558,12 +557,10 @@ pub struct NamespaceConfig {
 /// [`ItemKindConfig::missing_required_fields`] and rejects a partial declaration
 /// with a descriptive [`ItemKindConfigError::MissingFields`]. The `Option`s
 /// survive only so partial-declaration validation can report which fields are
-/// missing, and so direct struct construction in tests can rely on per-field
-/// defaults applied by
-/// [`ItemKind::from_config`](crate::domain::item::ItemKind::from_config) — NOT for
-/// any implicit kinds (the engine bakes in none; with no `[item_kinds]` table the
-/// kind set is empty). The `source` PATH (project-scope source file) is NOT one of
-/// the six and stays optional.
+/// missing and so direct struct construction in tests can exercise malformed
+/// declarations — NOT for any implicit kinds (the engine bakes in none; with no
+/// `[item_kinds]` table the kind set is empty). The `source` PATH (project-scope
+/// source file) is NOT one of the six and stays optional.
 ///
 /// # Examples
 ///
@@ -2748,6 +2745,30 @@ default_type = "task"
         let chain = format!("{err:#}");
         assert!(chain.contains("banana"), "{chain}");
         assert!(chain.contains("strictness"), "{chain}");
+    }
+
+    #[test]
+    fn test_removed_icon_preset_is_rejected_during_config_load() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("config.toml"),
+            r#"
+[type_hierarchy]
+types = { objective = 1 }
+
+[type_hierarchy.icons]
+preset = "navigation"
+"#,
+        )
+        .unwrap();
+
+        let error = JitConfig::load(temp_dir.path())
+            .expect_err("removed icon preset must not be silently ignored");
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("preset"),
+            "error names the removed key: {message}"
+        );
     }
 
     #[test]

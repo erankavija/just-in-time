@@ -578,7 +578,7 @@ source = "assets/live/contrib/gates/plan-review-prompt.md"
 target = "contrib/gates/plan-review-prompt.md"
 
 [[region]]
-source = "assets/live/regions/agents-jit-guidance.md"
+source = "assets/regions/agents-jit-guidance.md"
 target = "AGENTS.md"
 region-id = "dogfood-guidance"
 placement = "append"

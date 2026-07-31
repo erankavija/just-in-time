@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn test_jit_dogfood_package_validates_and_has_expected_workflow_inventory() {
         let package = jit_dogfood_package().unwrap();
-        assert_eq!(package.manifest().profile.id, "jit-dogfood");
+        assert_eq!(package.manifest().profile.id.as_str(), "jit-dogfood");
         assert!(package.file_count() <= super::super::MAX_PROFILE_PACKAGE_FILES);
         assert!(package.byte_size() <= super::super::MAX_PROFILE_PACKAGE_BYTES);
 
@@ -405,6 +405,17 @@ mod tests {
         assert!(!live.contains(".jit/invariants.toml"));
         assert!(!live.contains(".jit/schemas/jit-content-standards.json"));
         assert!(!live.contains(".jit/reference/rules-and-gates.md"));
+    }
+
+    #[test]
+    fn test_managed_region_sources_stay_outside_live_asset_prefix() {
+        let package = jit_dogfood_package().unwrap();
+        assert!(!package.manifest().regions.is_empty());
+        assert!(package
+            .manifest()
+            .regions
+            .iter()
+            .all(|region| !region.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX)));
     }
 
     #[test]

@@ -1980,7 +1980,10 @@ source-of-truth = "markdown-first"
                 id_pattern: Some("[A-Z][A-Z0-9]*-[0-9]+".to_string()),
                 markers: Some(vec!["[hard]".to_string()]),
                 link_namespaces: Some(vec!["satisfies".to_string()]),
-                ..Default::default()
+                scope: Some(crate::config::KindScopeConfig::Issue),
+                source: None,
+                source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
+                aliases: None,
             },
         )
         .unwrap()];
@@ -4123,7 +4126,7 @@ source-of-truth = "markdown-first"
                 link_namespaces: Some(vec!["satisfies".to_string()]),
                 scope: Some(KindScopeConfig::Issue),
                 source: None,
-                source_of_truth: None,
+                source_of_truth: Some(crate::config::SourceOfTruth::MarkdownFirst),
                 aliases: None,
             },
         );

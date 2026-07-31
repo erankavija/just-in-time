@@ -8,7 +8,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import 'katex/dist/katex.min.css';
 import './IssueDetail.css';
 import { apiClient } from '../../api/client';
-import type { Issue, DocumentReference, GateState, GateDefinition, GateRunSummary, GateRunDetail } from '../../types/models';
+import type { Issue, DocumentReference, GateState, GateDefinition, GateRunSummary, GateRunDetail, NamespaceInfo } from '../../types/models';
 import { DocumentViewer } from '../Document/DocumentViewer';
 import { LabelBadge } from '../Labels/LabelBadge';
 import { MermaidDiagram } from '../MermaidDiagram';
@@ -85,9 +85,10 @@ interface IssueDetailProps {
   onFocusInGraph?: (issueId: string) => void;
   /** Monotonic version from SSE — triggers re-fetch when changed */
   version?: number;
+  namespaces?: Record<string, NamespaceInfo>;
 }
 
-export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGraph, version }: IssueDetailProps) {
+export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGraph, version, namespaces }: IssueDetailProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -373,7 +374,7 @@ export function IssueDetail({ issueId, allIssues = [], onNavigate, onFocusInGrap
             gap: '6px',
           }}>
             {issue.labels.map((label) => (
-              <LabelBadge key={label} label={label} />
+              <LabelBadge key={label} label={label} namespaces={namespaces} />
             ))}
           </div>
         )}

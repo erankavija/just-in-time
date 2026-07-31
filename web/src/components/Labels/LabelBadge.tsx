@@ -1,24 +1,35 @@
+import type { NamespaceInfo } from '../../types/models';
+
 interface LabelBadgeProps {
   label: string;
   size?: 'small' | 'normal';
+  namespaces?: Record<string, NamespaceInfo>;
 }
 
-export function LabelBadge({ label, size = 'normal' }: LabelBadgeProps) {
+const NAMESPACE_COLORS = [
+  'var(--info)',
+  'var(--warning)',
+  'var(--success)',
+  'var(--text-secondary)',
+  'var(--accent)',
+];
+
+function getNamespaceColor(namespace: string, namespaces?: Record<string, NamespaceInfo>): string {
+  if (!namespaces || !(namespace in namespaces)) {
+    return 'var(--text-muted)';
+  }
+
+  const namespaceIndex = Object.keys(namespaces).sort().indexOf(namespace);
+  return NAMESPACE_COLORS[namespaceIndex % NAMESPACE_COLORS.length];
+}
+
+export function LabelBadge({ label, size = 'normal', namespaces }: LabelBadgeProps) {
   // Parse label into namespace:value
   const parts = label.split(':');
   const namespace = parts[0];
   const value = parts.slice(1).join(':');
 
-  // Color mapping for common namespaces
-  const namespaceColors: Record<string, string> = {
-    milestone: 'var(--info)',
-    epic: 'var(--warning)',
-    component: 'var(--success)',
-    type: 'var(--text-muted)',
-    team: 'var(--text-secondary)',
-  };
-
-  const color = namespaceColors[namespace] || 'var(--text-muted)';
+  const color = getNamespaceColor(namespace, namespaces);
   const fontSize = size === 'small' ? '9px' : '10px';
   const padding = size === 'small' ? '2px 5px' : '3px 6px';
 

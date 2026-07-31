@@ -195,7 +195,7 @@ impl CommandExecutor<JsonFileStorage> {
                 let profile = profile_status
                     .zip(package.as_ref())
                     .map(|(status, package)| ProfileApplyResult {
-                        id: package.manifest().profile.id.clone(),
+                        id: package.manifest().profile.id.to_string(),
                         version: package.manifest().profile.version.clone(),
                         status,
                         plan_hash: plan.hash().to_string(),
@@ -277,7 +277,7 @@ impl CommandExecutor<JsonFileStorage> {
         let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
         let layout = self.require_layout()?;
         Ok(ProfileApplicationInput {
-            id: metadata.id.clone(),
+            id: metadata.id.to_string(),
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
             target_hashes: package.hashes().targets.clone(),

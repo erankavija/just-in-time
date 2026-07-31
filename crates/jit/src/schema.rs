@@ -1060,15 +1060,18 @@ impl CommandSchema {
     }
 }
 
-/// Repo-relative path of the committed reference this module projects.
-pub const EXIT_CODE_REFERENCE_PATH: &str = "docs/reference/exit-codes.md";
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) mod test_support {
+    /// Repo-relative path of the committed reference this module projects.
+    pub const EXIT_CODE_REFERENCE_PATH: &str = "docs/reference/exit-codes.md";
 
-/// The command that renders [`EXIT_CODE_REFERENCE_PATH`] from the taxonomy,
-/// named in the conformance test's message so a stale reference carries its own
-/// repair.
-pub const EXIT_CODE_REFERENCE_GENERATOR: &str = "./scripts/generate-exit-code-reference.sh";
+    /// The command that renders [`EXIT_CODE_REFERENCE_PATH`] from the taxonomy,
+    /// named in the conformance test's message so a stale reference carries its own
+    /// repair.
+    pub const EXIT_CODE_REFERENCE_GENERATOR: &str = "./scripts/generate-exit-code-reference.sh";
+}
 
-/// Render the exit-code reference page ([`EXIT_CODE_REFERENCE_PATH`]).
+/// Render the exit-code reference page.
 ///
 /// The page projects the global taxonomy ([`CommandSchema::exit_codes`]) and the
 /// per-command mappings ([`CommandSchema::command_exit_codes`]) into markdown, so
@@ -1595,13 +1598,14 @@ mod tests {
     fn test_exit_code_reference_doc_is_current() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
-            .join(EXIT_CODE_REFERENCE_PATH);
+            .join(test_support::EXIT_CODE_REFERENCE_PATH);
         let committed = std::fs::read_to_string(path).expect("read the exit-code reference");
         assert_eq!(
             committed,
             render_exit_code_reference(),
-            "{EXIT_CODE_REFERENCE_PATH} is stale — regenerate it from `jit::schema` \
-             (run: {EXIT_CODE_REFERENCE_GENERATOR})"
+            "{} is stale — regenerate it from `jit::schema` (run: {})",
+            test_support::EXIT_CODE_REFERENCE_PATH,
+            test_support::EXIT_CODE_REFERENCE_GENERATOR,
         );
     }
 

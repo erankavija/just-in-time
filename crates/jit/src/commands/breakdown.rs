@@ -18,7 +18,7 @@
 //! `C → B → P` shape.
 
 use super::*;
-use crate::templates::GraphTemplate;
+use crate::templates::{GraphTemplate, RoleBindings};
 use serde::Serialize;
 
 /// One drafted implementation child for [`bracket_breakdown`].
@@ -167,9 +167,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// 1. Validates `C`'s `type:` label is in the template's `applies_to`, then
     ///    LOCATES the pre-created breakdown node `B`: the dependency of `C` typed
-    ///    as the template's breakdown type AND carrying the `brackets:<C-short-id>`
-    ///    label the apply engine seeds. If absent, errors: run `jit apply plan <C>`
-    ///    first. It does NOT create `B` or re-attach `B`'s gates.
+    ///    as the template's breakdown type AND carrying the container label the
+    ///    template declares. If absent, errors: run `jit apply plan <C>` first.
+    ///    It does NOT create `B` or re-attach `B`'s gates.
     /// 2. Finds the planning node `P` THROUGH `B`: `P` is `B`'s dependency typed as
     ///    the template's planning type (the apply engine wired `B → P`).
     /// 3. Enforces an APPROVED plan: `P`'s plan-quality gate (the planning node's
@@ -342,9 +342,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // 1b. LOCATE the pre-created breakdown node B (created by `jit apply
         //     plan <C>`): a dependency of C typed as the breakdown type AND
-        //     carrying the `brackets:<C-short-id>` label the apply engine seeds.
-        //     Breakdown consumes this B; it does not create one.
-        let breakdown_id = self.find_breakdown_node(&container, breakdown_type)?;
+        //     carrying the container label declared by the template. Breakdown
+        //     consumes this B; it does not create one.
+        let breakdown_id = self.find_breakdown_node(template, roles, &container, breakdown_type)?;
 
         // 1c. Find the planning node P THROUGH B: P is B's dependency typed as the
         //     planning type (the apply engine wired `B → P`). The container no
@@ -470,11 +470,18 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// dependencies.
     ///
     /// `B` is the dependency of `C` typed as `breakdown_type` AND carrying the
-    /// `brackets:<C-short-id>` label that `jit apply plan` seeds (matching the
-    /// engine's [`find_applied_breakdown`](super::template) convention). Errors
-    /// clearly if `C` has not been scaffolded.
-    fn find_breakdown_node(&self, container: &Issue, breakdown_type: &str) -> Result<String> {
-        let bracket_label = format!("brackets:{}", container.short_id());
+    /// container label declared by the template (matching the engine's
+    /// [`find_captured_breakdown`](super::template) convention). Errors clearly
+    /// if the template has no such declaration or `C` has not been scaffolded.
+    fn find_breakdown_node(
+        &self,
+        template: &GraphTemplate,
+        roles: &RoleBindings,
+        container: &Issue,
+        breakdown_type: &str,
+    ) -> Result<String> {
+        let bracket_label =
+            super::template_expand::declared_container_label(template, roles, container)?;
         for dep_id in &container.dependencies {
             let dep = self.storage.load_issue(dep_id)?;
             let has_type = label_utils::type_label_value(&dep.labels) == Some(breakdown_type);

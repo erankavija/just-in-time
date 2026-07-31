@@ -60,7 +60,7 @@ impl CommandExecutor<JsonFileStorage> {
             .read_installed_record(&package)?
             .is_some_and(|record| record == expected_record(&package));
         let profiles = vec![ProfileSummary {
-            id: metadata.id.clone(),
+            id: metadata.id.to_string(),
             version: metadata.version.clone(),
             origin: ProfileOrigin::Embedded,
             jit: metadata.jit.clone(),
@@ -99,7 +99,7 @@ impl CommandExecutor<JsonFileStorage> {
                 return Ok(SessionStep::Retry);
             };
             Ok(SessionStep::Done(ProfilePlanResult {
-                id: metadata.id.clone(),
+                id: metadata.id.to_string(),
                 version: metadata.version.clone(),
                 status: if plan.delta().actions().is_empty() {
                     ProfilePlanStatus::Unchanged
@@ -147,7 +147,7 @@ impl CommandExecutor<JsonFileStorage> {
             };
             if plan.delta().actions().is_empty() {
                 return Ok(SessionStep::Done(ProfileApplyResult {
-                    id: metadata.id.clone(),
+                    id: metadata.id.to_string(),
                     version: metadata.version.clone(),
                     status: ProfileApplicationStatus::Unchanged,
                     plan_hash: plan.hash().to_string(),
@@ -167,7 +167,7 @@ impl CommandExecutor<JsonFileStorage> {
             }
 
             let result = ProfileApplyResult {
-                id: metadata.id.clone(),
+                id: metadata.id.to_string(),
                 version: metadata.version.clone(),
                 status: ProfileApplicationStatus::Applied,
                 plan_hash: plan.hash().to_string(),
@@ -195,7 +195,7 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
         let metadata = &package.manifest().profile;
         reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
-        let record_path = applied_record_path(&metadata.id)?;
+        let record_path = applied_record_path(metadata.id.as_str())?;
         let profiles_dir = VirtualPath::PROFILES;
         let events_path = VirtualPath::EVENTS;
         let layout = self.require_layout()?;
@@ -306,7 +306,7 @@ impl CommandExecutor<JsonFileStorage> {
         package: &ProfilePackage,
     ) -> Result<Option<AppliedProfileRecord>> {
         let metadata = &package.manifest().profile;
-        let record_path = applied_record_path(&metadata.id)?;
+        let record_path = applied_record_path(metadata.id.as_str())?;
         let layout = self.require_layout()?;
         let budget = CaptureBudget {
             max_paths: 16,
@@ -349,7 +349,7 @@ pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
 pub(super) fn expected_record(package: &ProfilePackage) -> AppliedProfileRecord {
     let metadata = &package.manifest().profile;
     AppliedProfileRecord::new(
-        metadata.id.clone(),
+        metadata.id.to_string(),
         metadata.version.clone(),
         ProfileOrigin::Embedded,
         package.hashes().package.clone(),
@@ -365,7 +365,7 @@ fn profile_application_input(
 ) -> Result<ProfileApplicationInput> {
     let metadata = &package.manifest().profile;
     Ok(ProfileApplicationInput {
-        id: metadata.id.clone(),
+        id: metadata.id.to_string(),
         version: metadata.version.clone(),
         package_hash: package.hashes().package.clone(),
         target_hashes: package.hashes().targets.clone(),
@@ -378,7 +378,7 @@ fn profile_application_input(
 /// Resolve one embedded profile package by stable id.
 pub(super) fn embedded_profile(id: &str) -> Result<ProfilePackage> {
     let package = jit_dogfood_package()?;
-    if package.manifest().profile.id == id {
+    if package.manifest().profile.id.as_str() == id {
         Ok(package)
     } else {
         Err(crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
@@ -411,7 +411,7 @@ fn read_applied_record(
                 .map_err(|_| {
                     ProfileApplyError::InstalledRecordConflict {
                         path: repo_string(record_path),
-                        id: metadata.id.clone(),
+                        id: metadata.id.to_string(),
                         version: metadata.version.clone(),
                     }
                     .into()
