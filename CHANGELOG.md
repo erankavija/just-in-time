@@ -174,6 +174,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **A repository decides for itself whether validation needs a profile
+  package.** Whole-repository validation and derived-state repair each took a
+  profile package by an identity compiled into the binary, before opening their
+  mutation session and propagating any failure, so every repository paid for one
+  whether or not it had ever applied a profile. Both paths now read the
+  repository's own applied-profile records under `.jit/profiles/` and resolve a
+  package only for the profiles those records name. A repository that has
+  applied nothing reads no path plain validation does not. A record whose
+  package resolves has its profile-owned targets checked and repaired exactly as
+  before. A record whose package cannot be obtained fails, naming the record and
+  the profile, rather than repairing the subset it can still account for —
+  silently narrowing what `--fix` restores would breach
+  `@/invariant/derived-state-coherence` where nobody would see it.
+
 - **The shipped development-area classification reaches the adopter
   configuration documents by generation.** `docs/reference/configuration.md`
   restated all three area lists by hand and `docs/reference/example-config.toml`

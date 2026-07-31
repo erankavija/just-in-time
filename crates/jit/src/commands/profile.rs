@@ -198,7 +198,7 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
         let metadata = &package.manifest().profile;
         reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
-        let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
+        let record_path = applied_record_path(&metadata.id)?;
         let profiles_dir = VirtualPath::PROFILES;
         let events_path = VirtualPath::EVENTS;
         let layout = self.require_layout()?;
@@ -309,7 +309,7 @@ impl CommandExecutor<JsonFileStorage> {
         package: &EmbeddedProfilePackage<'_>,
     ) -> Result<Option<AppliedProfileRecord>> {
         let metadata = &package.manifest().profile;
-        let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
+        let record_path = applied_record_path(&metadata.id)?;
         let layout = self.require_layout()?;
         let budget = CaptureBudget {
             max_paths: 16,
@@ -331,6 +331,21 @@ impl CommandExecutor<JsonFileStorage> {
             )?))
         })
     }
+}
+
+/// Canonical applied-profile provenance path for one profile id.
+///
+/// Application publishes the record here and validation reads it back from the
+/// same construction, so the record's own name identifies the profile it
+/// records.
+pub(super) fn applied_record_path(id: &str) -> Result<VirtualPath> {
+    VirtualPath::data(format!("profiles/{id}.json")).map_err(Into::into)
+}
+
+/// The profile id an occupant of `.jit/profiles/` names, or `None` when the
+/// name is not a provenance-record name.
+pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
+    name.strip_suffix(".json").filter(|id| !id.is_empty())
 }
 
 /// The expected provenance record for an embedded package.
