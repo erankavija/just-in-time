@@ -13,7 +13,13 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T20:06:41.816841074Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fdae1023-6a10-45da-a56e-54916409a331",
   "labels": [
     "type:task",
@@ -27,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Take this repository's vocabulary out of the bridge's instructions",
-  "updated_at": "2026-07-31T19:26:17.369416066Z"
+  "updated_at": "2026-07-31T20:06:41.816841074Z"
 }

@@ -13,7 +13,18 @@
     "npm-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-31T20:09:40.133747104Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T20:06:38.702422372Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9bdf8025-3a36-4a5f-b48c-1d56ec1db664",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Render the web view without a built-in taxonomy",
-  "updated_at": "2026-07-31T19:26:22.487248952Z"
+  "updated_at": "2026-07-31T20:09:40.133747104Z"
 }
