@@ -16,17 +16,17 @@
   "gates_status": {},
   "id": "8d534ee7-23e0-474f-b87f-748bc66a26e8",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
-    "story:profile-extraction",
     "satisfies:REQ-08",
     "per:@/charter/D-13",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "story:configuration-removal",
+    "type:task"
   ],
   "priority": "normal",
   "state": "backlog",
   "title": "Describe obtaining and applying a profile package",
-  "updated_at": "2026-07-31T17:30:05.151320886Z"
+  "updated_at": "2026-07-31T17:34:41.068411916Z"
 }

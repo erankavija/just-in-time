@@ -18,18 +18,18 @@
   "gates_status": {},
   "id": "aa258222-a3a3-47e6-a9ac-570ef8581d6a",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
-    "story:profile-extraction",
     "satisfies:REQ-07",
     "per:@/issue/e204e63d/decision/D-12",
     "enforces:@/invariant/domain-agnostic",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "story:configuration-removal",
+    "type:task"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "State the engine-vocabulary boundary in the invariant",
-  "updated_at": "2026-07-31T17:30:10.235065697Z"
+  "updated_at": "2026-07-31T17:34:35.946128722Z"
 }

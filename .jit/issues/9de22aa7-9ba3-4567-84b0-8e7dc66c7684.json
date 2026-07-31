@@ -6,7 +6,7 @@
     "5d12a79f-c29e-43ba-b14c-1f030790c01e",
     "d94f6849-355c-47ed-9a35-ca72eb865337"
   ],
-  "description": "The release archive carries the assembled profile package beside the binaries, so an adopter who unpacks one download can apply the profile offline with no second fetch, and the release's own smoke path proves it.\n\n## Background\n\nA release publishes one GitHub release whose native archive is flat and carries four files: the two binaries and the two license texts. The profile has never been among them, because it has always travelled inside the binary. Once it does not, an adopter has to obtain it, and where it arrives decides what the install costs them.\n\nIt arrives in the same archive. A separate asset would mean a second download and a second checksum step before a repository can be initialized, which is what the profile reference's offline promise exists to avoid; putting the package directory beside the binaries keeps one download sufficient, adds no asset to the published set, and leaves the existing checksum covering it because it covers the archive. The on-disk form stays a directory, so whoever applies it points at the extracted path and the runtime needs no archive support of its own.\n\nThe smoke path is what makes the package more than a file in a tarball. It already extracts the archive into a clean prefix and initializes a repository through the profile quickstart; pointing that step at the extracted package proves the published bytes apply, and it proves it from the moment they are published rather than from the moment the compiled-in copy goes.\n\n## Success Criteria\n\n- [hard] REQ-01: The native archive carries the assembled profile package directory beside the binaries and the license texts.\n- [hard] REQ-02: The published asset set is unchanged — no asset is added — and the existing checksum file covers the archive that now carries the package.\n- [hard] REQ-03: The archive-verification step asserts the package directory is present in the extracted prefix.\n- [hard] REQ-04: The smoke path applies the profile from the extracted package rather than from the binary or from a checkout, and still observes an exact re-application reporting no work.\n- [hard] REQ-05: The adopter-facing statements of what the archive carries account for the package directory.\n- [hard] REQ-06: Any job the change introduces is declared in the workflow contract, so no undeclared workflow or job enters.\n\n## Notes\n\nThe archive carries the package directories this repository ships; there is one today, and the mechanism established here is what a second one rides on.\n\nThis lands before the compiled-in package is removed, so no published release exists in which the profile is reachable only from a jit source checkout.\n",
+  "description": "The release archive carries the assembled workflow package beside the binaries, so an adopter who unpacks one download can apply it offline with no second fetch, and the release's own smoke path proves it.\n\n## Background\n\nThe archive is flat and carries four files: the two binaries and the two license texts. The workflow package has never been among them, because it travelled inside the binary. Once it does not, an adopter has to obtain it, and the release is where it comes from.\n\nIt arrives in the same archive. A separate asset would mean a second download and a second checksum step before a repository can be initialized, which is what the offline promise exists to avoid; putting the directory beside the binaries keeps one download sufficient, adds no asset to the published set, and leaves the existing checksum covering it. The binaries stay at the extraction root so the documented install step still holds, so the package goes under a directory rather than beside them.\n\nThe smoke path is what makes it more than a file in a tarball. It already extracts the archive into a clean prefix and initializes a repository through the profile quickstart, naming the profile with no location — which resolves nothing once the compiled-in copy goes. Pointing it at the extracted package proves the published bytes apply, and it proves it from the moment they are published rather than from the moment the compiled-in copy is removed.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive carries the assembled workflow package directory beside the binaries and the license texts, with the binaries still at the extraction root.\n- [hard] REQ-02: The published asset set is unchanged — no asset is added — and the existing checksum file covers the archive that now carries the package.\n- [hard] REQ-03: The archive-verification step asserts the package directory is present in the extracted prefix.\n- [hard] REQ-04: The smoke path initializes a repository from the extracted package rather than from the binary or a checkout, and asserts over what the resolver enumerates from that location.\n- [hard] REQ-05: The adopter-facing statements of what the archive carries account for the directory, including the one that says the archive is flat.\n- [hard] REQ-06: Any job the change introduces is declared in the workflow contract, so no undeclared workflow or job enters.\n\n## Notes\n\nThis lands before the compiled-in copy is removed, so no published release exists in which the profile is reachable only from a source checkout. The archive gains a second package directory when the vocabulary that one depends on becomes a package of its own.\n",
   "documents": [],
   "gates_required": [
     "code-review",
@@ -16,7 +16,6 @@
   "gates_status": {},
   "id": "9de22aa7-9ba3-4567-84b0-8e7dc66c7684",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
@@ -24,10 +23,11 @@
     "satisfies:REQ-09",
     "per:@/issue/e204e63d/decision/D-11",
     "per:@/issue/e204e63d/decision/D-16",
-    "per:@/charter/D-16"
+    "per:@/charter/D-16",
+    "type:task"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Carry the assembled package in the release archive",
-  "updated_at": "2026-07-31T16:28:27.583411185Z"
+  "updated_at": "2026-07-31T17:34:30.407753939Z"
 }
