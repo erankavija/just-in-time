@@ -557,12 +557,10 @@ pub struct NamespaceConfig {
 /// [`ItemKindConfig::missing_required_fields`] and rejects a partial declaration
 /// with a descriptive [`ItemKindConfigError::MissingFields`]. The `Option`s
 /// survive only so partial-declaration validation can report which fields are
-/// missing, and so direct struct construction in tests can rely on per-field
-/// defaults applied by
-/// [`ItemKind::from_config`](crate::domain::item::ItemKind::from_config) — NOT for
-/// any implicit kinds (the engine bakes in none; with no `[item_kinds]` table the
-/// kind set is empty). The `source` PATH (project-scope source file) is NOT one of
-/// the six and stays optional.
+/// missing and so direct struct construction in tests can exercise malformed
+/// declarations — NOT for any implicit kinds (the engine bakes in none; with no
+/// `[item_kinds]` table the kind set is empty). The `source` PATH (project-scope
+/// source file) is NOT one of the six and stays optional.
 ///
 /// # Examples
 ///
