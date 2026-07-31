@@ -2,7 +2,7 @@ use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
-    build_profile_claims, EmbeddedProfilePackage, ProfileApplicationStatus, ProfileApplyResult,
+    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfilePackage,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
@@ -269,10 +269,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// config/gates/rules preserved), so the profile merges over the proposed neutral
     /// repository. Returns `Ok(None)` on a retryable capture conflict so the caller
     /// re-attempts the whole initialization.
-    fn profile_input(
-        &self,
-        package: &EmbeddedProfilePackage<'_>,
-    ) -> Result<ProfileApplicationInput> {
+    fn profile_input(&self, package: &ProfilePackage) -> Result<ProfileApplicationInput> {
         super::profile::reject_reserved_application_targets(
             package.hashes().targets.keys().map(String::as_str),
         )?;
@@ -389,7 +386,7 @@ fn init_validation_error(
 }
 
 /// Resolve one embedded profile package by stable id.
-fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
+fn embedded_profile(id: &str) -> Result<ProfilePackage> {
     super::profile::embedded_profile(id)
 }
 

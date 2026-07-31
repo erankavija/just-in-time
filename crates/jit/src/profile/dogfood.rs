@@ -1,6 +1,6 @@
 //! Embedded production package for jit's repository-neutral dogfood workflow.
 
-use super::{EmbeddedProfilePackage, ProfilePackageError};
+use super::{ProfilePackage, ProfilePackageError};
 use crate::declarations::GateDefinition;
 use crate::repository_state::{Contribution, KeyedArrayTarget};
 use include_dir::{include_dir, Dir};
@@ -34,8 +34,8 @@ pub enum DogfoodProfileError {
 }
 
 /// Load the recursively embedded, immutable `jit-dogfood` package.
-pub fn jit_dogfood_package() -> Result<EmbeddedProfilePackage<'static>, DogfoodProfileError> {
-    EmbeddedProfilePackage::from_dir(&JIT_DOGFOOD_DIRECTORY).map_err(Into::into)
+pub fn jit_dogfood_package() -> Result<ProfilePackage, DogfoodProfileError> {
+    ProfilePackage::from_embedded_dir(&JIT_DOGFOOD_DIRECTORY).map_err(Into::into)
 }
 
 /// Deserialize one gate definition from the package's authored gate inventory.
@@ -137,8 +137,8 @@ mod tests {
     fn test_jit_dogfood_package_validates_and_has_expected_workflow_inventory() {
         let package = jit_dogfood_package().unwrap();
         assert_eq!(package.manifest().profile.id, "jit-dogfood");
-        assert!(package.file_count() <= super::super::MAX_EMBEDDED_PROFILE_FILES);
-        assert!(package.byte_size() <= super::super::MAX_EMBEDDED_PROFILE_BYTES);
+        assert!(package.file_count() <= super::super::MAX_PROFILE_PACKAGE_FILES);
+        assert!(package.byte_size() <= super::super::MAX_PROFILE_PACKAGE_BYTES);
 
         let gates = package
             .manifest()
@@ -954,9 +954,7 @@ mod tests {
     /// Derived from the manifest, so a newly declared live asset joins the
     /// executable-mode contract without an edit here.
     #[cfg(unix)]
-    fn live_asset_executable_declarations<'a>(
-        package: &'a EmbeddedProfilePackage<'_>,
-    ) -> Vec<(&'a str, bool)> {
+    fn live_asset_executable_declarations(package: &ProfilePackage) -> Vec<(&str, bool)> {
         package
             .manifest()
             .assets

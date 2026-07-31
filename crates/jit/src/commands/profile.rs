@@ -1,7 +1,7 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
-    build_profile_claims, jit_dogfood_package, EmbeddedProfilePackage, ProfileApplicationStatus,
-    ProfileApplyResult, ProfileListResult, ProfileOrigin, ProfilePlanResult, ProfilePlanStatus,
+    build_profile_claims, jit_dogfood_package, ProfileApplicationStatus, ProfileApplyResult,
+    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePlanResult, ProfilePlanStatus,
     ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
@@ -133,10 +133,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// overlay, and publishes through `session.apply` with pre-journal revalidation.
     /// A no-op profile has an empty complete finalized delta: package targets and
     /// provenance are unchanged, and coupled default-rule/schema state is current.
-    pub fn apply_embedded_profile(
-        &self,
-        package: &EmbeddedProfilePackage<'_>,
-    ) -> Result<ProfileApplyResult> {
+    pub fn apply_embedded_profile(&self, package: &ProfilePackage) -> Result<ProfileApplyResult> {
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
         // One MutationContext per operation, reused across probe/final finalize and
@@ -193,7 +190,7 @@ impl CommandExecutor<JsonFileStorage> {
     fn prepare_embedded_profile(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
-        package: &EmbeddedProfilePackage<'_>,
+        package: &ProfilePackage,
         context: &MutationContext,
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
         let metadata = &package.manifest().profile;
@@ -306,7 +303,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// Read the installed provenance record through a recovered session capture.
     fn read_installed_record(
         &self,
-        package: &EmbeddedProfilePackage<'_>,
+        package: &ProfilePackage,
     ) -> Result<Option<AppliedProfileRecord>> {
         let metadata = &package.manifest().profile;
         let record_path = applied_record_path(&metadata.id)?;
@@ -349,7 +346,7 @@ pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
 }
 
 /// The expected provenance record for an embedded package.
-pub(super) fn expected_record(package: &EmbeddedProfilePackage<'_>) -> AppliedProfileRecord {
+pub(super) fn expected_record(package: &ProfilePackage) -> AppliedProfileRecord {
     let metadata = &package.manifest().profile;
     AppliedProfileRecord::new(
         metadata.id.clone(),
@@ -362,7 +359,7 @@ pub(super) fn expected_record(package: &EmbeddedProfilePackage<'_>) -> AppliedPr
 
 /// Convert an immutable package into neutral claims plus provenance metadata.
 fn profile_application_input(
-    package: &EmbeddedProfilePackage<'_>,
+    package: &ProfilePackage,
     layout: &crate::repository_state::RepositoryLayout,
     record_path: VirtualPath,
 ) -> Result<ProfileApplicationInput> {
@@ -379,7 +376,7 @@ fn profile_application_input(
 }
 
 /// Resolve one embedded profile package by stable id.
-pub(super) fn embedded_profile(id: &str) -> Result<EmbeddedProfilePackage<'static>> {
+pub(super) fn embedded_profile(id: &str) -> Result<ProfilePackage> {
     let package = jit_dogfood_package()?;
     if package.manifest().profile.id == id {
         Ok(package)
@@ -549,7 +546,7 @@ mod tests {
         TempDir,
         JsonFileStorage,
         CommandExecutor<JsonFileStorage>,
-        EmbeddedProfilePackage<'static>,
+        ProfilePackage,
     ) {
         let temp = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(temp.path().join(".jit"));
@@ -560,7 +557,7 @@ mod tests {
             .unwrap();
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        let package = EmbeddedProfilePackage::from_dir(&PACKAGE).unwrap();
+        let package = ProfilePackage::from_embedded_dir(&PACKAGE).unwrap();
         (temp, storage, executor, package)
     }
 

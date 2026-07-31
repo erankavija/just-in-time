@@ -1,4 +1,4 @@
-//! Immutable profile-package domain model and embedded-package validation.
+//! Immutable profile-package model and package validation.
 //!
 //! This module owns the generic, declarative package contract. It deliberately
 //! contains no profile discovery, repository loading, application lifecycle, or
@@ -35,6 +35,6 @@ pub use manifest::{
     RegionPlacement, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
 };
 pub use package::{
-    EmbeddedProfilePackage, PackageHash, ProfilePackageError, ProfilePackageHashes,
-    MAX_EMBEDDED_PROFILE_BYTES, MAX_EMBEDDED_PROFILE_FILES,
+    PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes,
+    MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
