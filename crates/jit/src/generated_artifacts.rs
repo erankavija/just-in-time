@@ -80,10 +80,10 @@ impl GeneratedArtifact {
 pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     GeneratedArtifact {
         name: "error-code-reference",
-        generator: crate::output::ERROR_CODE_REFERENCE_GENERATOR,
+        generator: crate::output::test_support::ERROR_CODE_REFERENCE_GENERATOR,
         holds: "the error-code vocabulary declared in `jit::output::ErrorCode`",
         render: ArtifactRender::InCrate {
-            target: crate::output::ERROR_CODE_REFERENCE_PATH,
+            target: crate::output::test_support::ERROR_CODE_REFERENCE_PATH,
             render: render_error_code_reference,
         },
     },
@@ -98,10 +98,10 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     },
     GeneratedArtifact {
         name: "exit-code-reference",
-        generator: crate::schema::EXIT_CODE_REFERENCE_GENERATOR,
+        generator: crate::schema::test_support::EXIT_CODE_REFERENCE_GENERATOR,
         holds: "the exit-code taxonomy declared in `jit::schema`",
         render: ArtifactRender::InCrate {
-            target: crate::schema::EXIT_CODE_REFERENCE_PATH,
+            target: crate::schema::test_support::EXIT_CODE_REFERENCE_PATH,
             render: render_exit_code_reference,
         },
     },

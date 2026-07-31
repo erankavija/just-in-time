@@ -984,13 +984,16 @@ impl ErrorCode {
     }
 }
 
-/// Repo-relative path of the committed adopter reference for [`ErrorCode`].
-pub const ERROR_CODE_REFERENCE_PATH: &str = "docs/reference/error-codes.md";
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) mod test_support {
+    /// Repo-relative path of the committed adopter reference for [`super::ErrorCode`].
+    pub const ERROR_CODE_REFERENCE_PATH: &str = "docs/reference/error-codes.md";
 
-/// The command that renders [`ERROR_CODE_REFERENCE_PATH`] from [`ErrorCode`],
-/// named in the conformance test's message so a stale reference carries its own
-/// repair.
-pub const ERROR_CODE_REFERENCE_GENERATOR: &str = "./scripts/generate-error-code-reference.sh";
+    /// The command that renders [`ERROR_CODE_REFERENCE_PATH`] from [`super::ErrorCode`],
+    /// named in the conformance test's message so a stale reference carries its own
+    /// repair.
+    pub const ERROR_CODE_REFERENCE_GENERATOR: &str = "./scripts/generate-error-code-reference.sh";
+}
 
 /// Render the complete machine-readable error-code vocabulary as adopter
 /// documentation.
@@ -3542,7 +3545,7 @@ mod tests {
     fn error_code_reference_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
-            .join(ERROR_CODE_REFERENCE_PATH)
+            .join(test_support::ERROR_CODE_REFERENCE_PATH)
     }
 
     /// Every generated row is composed from the vocabulary accessors used by
@@ -3575,8 +3578,9 @@ mod tests {
         assert_eq!(
             committed,
             render_error_code_reference(),
-            "{ERROR_CODE_REFERENCE_PATH} is stale — regenerate it from `jit::output::ErrorCode` \
-             (run: {ERROR_CODE_REFERENCE_GENERATOR})"
+            "{} is stale — regenerate it from `jit::output::ErrorCode` (run: {})",
+            test_support::ERROR_CODE_REFERENCE_PATH,
+            test_support::ERROR_CODE_REFERENCE_GENERATOR,
         );
     }
 
