@@ -9,7 +9,7 @@
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, rmSync } from 'fs';
+import { mkdirSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { strict as assert } from 'node:assert';
@@ -21,6 +21,36 @@ const TIMEOUT = 5000;
 // The CLI schema the server under test also loads, used to derive expectations
 // instead of restating command shapes here.
 const { schema } = await loadSchema();
+
+// Item kinds are repository configuration, not MCP vocabulary. Read the
+// repository's declaration so this guard never hardcodes this project's kinds.
+const itemKindsConfig = readFileSync(new URL('../.jit/config.toml', import.meta.url), 'utf8');
+const itemKinds = [...itemKindsConfig.matchAll(/^\[item_kinds\.([^\]]+)\]/gm)]
+  .map(([, kind]) => kind);
+const itemKindForms = new Map();
+for (const kind of itemKinds) {
+  for (const form of [kind, kind.endsWith('s') ? kind : `${kind}s`]) {
+    itemKindForms.set(form.toLowerCase(), kind);
+  }
+}
+const itemKindTerm = new RegExp(
+  `\\b(?:${[...itemKindForms.keys()].map(escapeRegex).join('|')})\\b`, 'gi'
+);
+const itemKindEnumeration = new RegExp(
+  `\\b(?:${[...itemKindForms.keys()].map(escapeRegex).join('|')})\\b\\s*(?:,|and)\\s*` +
+  `\\b(?:${[...itemKindForms.keys()].map(escapeRegex).join('|')})\\b`, 'i'
+);
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function presentsConfiguredKindVocabulary(text) {
+  const mentionedKinds = new Set(
+    [...text.matchAll(itemKindTerm)].map(([term]) => itemKindForms.get(term.toLowerCase()))
+  );
+  return mentionedKinds.size >= 2 && itemKindEnumeration.test(text);
+}
 
 // ---------------------------------------------------------------------------
 // MCPTester — spawns an isolated MCP server for testing
@@ -199,6 +229,43 @@ async function main() {
       assert.ok(resp.result);
       assert.strictEqual(resp.result.serverInfo.name, 'jit-mcp-server');
       assert.ok(resp.result.protocolVersion);
+    });
+
+    await runTest('test_adopter_facing_text_defers_vocabulary_to_repository_configuration', async () => {
+      const resp = await tester.request('initialize', {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'vocabulary-test', version: '1.0.0' },
+      });
+      const instructions = resp.result.instructions;
+      assert.match(instructions, /Gates are quality checkpoints.*repository's configuration/);
+      assert.doesNotMatch(instructions, /\(tests, clippy, fmt, code-review\)/);
+
+      const listed = await tester.request('tools/list');
+      const descriptionSources = [
+        ['SERVER_INSTRUCTIONS', instructions],
+        ...Object.entries(CURATION.include)
+          .map(([name, description]) => [`CURATION.include.${name}`, description]),
+        ...listed.result.tools
+          .map(({ name, description }) => [`tools/list.${name}`, description]),
+      ];
+
+      // These are the complete top-level tool-description inputs that define
+      // the default client surface: server instructions, every curated
+      // manifest entry, and every generated description returned by tools/list.
+      // CURATION.policy and CURATION.exclude are not sent to MCP clients;
+      // nested input-schema descriptions document parameters, not the tool.
+      for (const [source, description] of descriptionSources) {
+        assert.doesNotMatch(
+          description,
+          /@(?:[^/\s]+)?\/[^/\s]+\//,
+          `${source} must not advertise a qualified item address or prefix`
+        );
+        assert.ok(
+          !presentsConfiguredKindVocabulary(description),
+          `${source} must not present configured item kinds as fixed vocabulary`
+        );
+      }
     });
 
     await runTest('tools/list returns curated default set with correct shape', async () => {
