@@ -208,6 +208,11 @@
    "at": "2026-07-31",
    "finding": "scripts/verify-commit-builds.sh reports a cold `cargo build --workspace` of a fresh git-archive extraction as passing in 24-30 seconds, with no sccache, no RUSTC_WRAPPER, no VERIFY_COMMIT_TARGET_DIR, and an empty cache directory. A genuine cold build of this workspace's 260 dependencies cannot complete in that time, so the merge-integrity guard may be reporting a vacuous PASS.",
    "disposition": "Not investigated further inside this container: main's compile integrity is independently evidenced by cargo-ci, which runs `cargo test --workspace` per issue and demonstrably fails on real defects (it caught the 510297e4 regression). Worth a standalone issue at epic close — a guard that cannot fail is worse than no guard, because the protocol relies on it."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "cargo-ci is not deterministic under host load. crates/server/tests/server_integration/graceful_shutdown_tests.rs::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero failed the gate for 3e340587 with 'the stalled connection was dropped before the drain deadline' at load average 6-10 (a worker build running beside the gate). It passes 5/5 in isolation on the same commit. The assertion is that a stalled connection SURVIVES to a drain deadline, which is precisely what CPU contention breaks.",
+   "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close — a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests."
   }
  ],
  "rework_counts": {

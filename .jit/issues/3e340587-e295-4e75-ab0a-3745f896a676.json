@@ -16,7 +16,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-07-31T19:59:31.962854770Z",
+      "updated_at": "2026-07-31T20:32:53.811589311Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Move the package-authored region source out of the derived prefix",
-  "updated_at": "2026-07-31T19:59:31.962854770Z"
+  "updated_at": "2026-07-31T20:32:53.811589311Z"
 }
