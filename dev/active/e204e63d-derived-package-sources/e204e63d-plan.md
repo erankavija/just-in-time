@@ -349,34 +349,45 @@ resolved, current provenance.
 | package-derivation | The packaged asset tree is derived from the repository files it mirrors | story | The packaged tree is assembled from the repository files it mirrors, reproducibly, with omission reported. | live-source-declaration, package-assembly-publication, completeness-walk-rule | issue:cc75b4e6, REQ-03, REQ-04, REQ-05, D-2, D-5, D-6, D-7, C1, C2, C3, C10, Q1, Q2, Q3, Q5, S3.1, S3.2, S3.3, S3.4, S4.1, S4.5, S7.1, S8.1, S8.3, F3.4, F7, F8 | — | — | package-assembly-reproducibility, citation-check-package-exclusions, live-source-completeness-guard, live-source-declaration-bridge-coverage, profiles-reference-manifest-contents |
 | profile-package-directory-reader | Read a profile package from a directory on disk | task | A profile package is constructed from a directory tree, owning its bytes rather than borrowing compiled-in ones. | profile-package-resolution | issue:09aea8b3, REQ-08, F3.1, F3.2, F3.4 | touches 1 | package-discovery | — |
 | profile-source-provenance | Record where an applied package came from | task | The applied-profile record carries the worktree-relative location the package was read from, and its origin. | profile-package-resolution | issue:6c47b99a, REQ-08, D-8, F1.2, F3.1, F3.2, F10.2 | touches 3 | package-discovery | profile-package-directory-reader |
-| profile-resolution-from-record | Resolve a profile package from a given location or the repository's record | task | The profile commands read a package from a given location or from the location the repository's record names. | profile-package-resolution | issue:5d12a79f, REQ-08, D-8, F1.2, F2.2, F3.2, F3.3, F4.2 | touches 4 | package-discovery | profile-source-provenance |
+| profile-resolution-from-record | Resolve a profile package from a given location or the repository's record | task | The profile commands read a package from a given location or from the location the repository's record names. | profile-package-resolution | issue:5d12a79f, REQ-08, D-8, F1.2, F2.2, F3.2, F3.3, F4.2 | touches 3 | package-discovery | profile-source-provenance |
+| profile-location-flag-reference | Describe the supplied-location form in the command reference | task | The adopter command reference describes the supplied-location form and the resolution order. | profile-package-resolution | issue:2ce8ce1b, REQ-08, F3.3, A4.2 | touches 1 | package-discovery | profile-resolution-from-record |
 | validate-fix-package-reresolution | Repair profile-owned targets from the recorded package location | task | Repair recomputes a recorded profile's expected targets by re-reading its package from the recorded location. | profile-package-resolution | issue:8371bd46, REQ-10, D-8, F1.2, F7, F10.2 | touches 2 | package-discovery | profile-resolution-from-record |
 | package-dependency-declaration | Declare one package's dependency on another | task | A package manifest declares the package ids it depends on, and the published schema carries the declaration. | profile-package-resolution, package-content-split | issue:5dd0df5b, REQ-08, D-14, A3.2.3 | touches 2 | package-discovery | — |
 | scaffold-contribution-targets | Give the contribution vocabulary the tables the scaffold writes | task | A package contributes the documentation-area keys and the validation defaults, one key at a time. | contribution-target-granularity, package-content-split | issue:4c40e165, REQ-08, D-13, A3.2.1, A3.2.2, A3.3 | touches 2 | package-discovery | — |
 | composed-application-ordering | Apply a package together with the packages it depends on | task | Applying a package applies the packages it depends on first, each with its own record and event. | profile-package-resolution, package-content-split | issue:7835fdc0, REQ-08, D-14, A3.1, A3.2.4, A3.4, A8.4 | touches 2 | package-discovery | validate-fix-package-reresolution, package-dependency-declaration |
 | contribution-conflict-names-package | Name the declaring package when two packages collide | task | A conflict between two packages' declarations names both packages. | package-content-split | issue:d54f8f83, D-14, A3.3 | touches 2 | package-discovery | composed-application-ordering, scaffold-contribution-targets |
-| discovered-profile-packages | A profile package is read from disk, and packages compose | story | The engine reads, applies, composes, and repairs profile packages that live in repository directories. | profile-package-resolution, package-content-split, contribution-target-granularity | issue:1c0eb82e, REQ-08, REQ-10, D-8, D-14, D-19, F1.2, F3.1, F3.2, F3.3, F10.2, A3.1, A3.2.3, A3.2.4, A3.3, A3.4 | — | — | contribution-conflict-names-package |
+| discovered-profile-packages | A profile package is read from disk, and packages compose | story | The engine reads, applies, composes, and repairs profile packages that live in repository directories. | profile-package-resolution, package-content-split, contribution-target-granularity | issue:1c0eb82e, REQ-08, REQ-10, D-8, D-14, D-19, F1.2, F3.1, F3.2, F3.3, F10.2, A3.1, A3.2.3, A3.2.4, A3.3, A3.4 | — | — | contribution-conflict-names-package, profile-location-flag-reference |
 | compiled-taxonomy-defaults-removal | Stop supplying a taxonomy to a repository that declares none | task | A repository declaring no namespaces and no type hierarchy receives neither. | engine-vocabulary-boundary, scaffold-minimum | issue:a30d704d, D-13, D-17, A2.2, A2.4.1, A5.3, A5.4 | touches 3 | taxonomy-defaults | — |
-| explicit-taxonomy-test-fixture | Give the suite a fixture that declares its own taxonomy | task | Tests asserting on type names build their repository from a fixture that declares the taxonomy. | scaffold-minimum | issue:ae435979, D-13, A4.3, A8.2 | touches 6, uncertain | taxonomy-defaults | — |
+| explicit-taxonomy-test-fixture | Give the crate's own tests a fixture that declares its taxonomy | task | The crate's in-module tests build their repository from a fixture that declares the taxonomy. | scaffold-minimum | issue:ae435979, D-13, A4.3, A8.2 | touches 11 | taxonomy-defaults | — |
+| taxonomy-fixture-integration-suites | Adopt the taxonomy fixture in the crate's integration suites | task | The crate's integration suites build their repository from the shared taxonomy fixture. | scaffold-minimum | issue:45e250c6, D-13, A4.3, A8.2 | touches 13 | taxonomy-defaults | explicit-taxonomy-test-fixture |
+| taxonomy-fixture-server-crate | Adopt the taxonomy fixture in the server crate | task | The server crate's tests build their repository from the shared taxonomy fixture. | scaffold-minimum | issue:a53a6f09, D-13, A4.3, A8.2 | touches 3 | taxonomy-defaults | explicit-taxonomy-test-fixture |
 | jit-default-package | Assemble the default vocabulary as a package | task | A package directory declares the generic domain vocabulary a repository needs to be usable. | package-content-split, contribution-target-granularity | issue:c7058cac, REQ-08, D-13, D-14, D-20, A2.2, A3.1, A4.2 | creates 1, touches 1 | package-content | scaffold-contribution-targets |
-| jit-dogfood-dependency-delta | Reduce the workflow package to its delta over the default | task | The workflow package depends on the default package and declares only what it adds. | package-content-split | issue:e4ba28c5, REQ-08, D-14, D-17, D-20, A2.2, A3.1, A8.5 | touches 4 | package-content | jit-default-package, package-dependency-declaration |
-| package-in-release-archive | Carry the assembled package in the release archive | task | The release archive carries the assembled workflow package, and the smoke path applies it from there. | distribution-artefact-and-release, package-assembly-publication | issue:9de22aa7, REQ-09, D-11, D-16, F3.4, F10.1, A7.1, A7.2, A7.4 | touches 4 | package-content | packaged-copy-retirement, profile-resolution-from-record |
-| default-package-in-release-archive | Carry the default package in the release archive too | task | The release archive carries the default package too, and the smoke path observes it as a resolved dependency. | distribution-artefact-and-release, package-content-split | issue:6013cd81, REQ-08, D-14, D-16, A7.2, A8.1 | touches 3 | package-content | package-in-release-archive, jit-dogfood-dependency-delta, composed-application-ordering |
-| default-vocabulary-package | The generic domain vocabulary reaches a repository as a package | story | The generic vocabulary is package content, and a repository that declares none receives none. | engine-vocabulary-boundary, package-content-split, scaffold-minimum, distribution-artefact-and-release | issue:93fef456, REQ-08, REQ-09, D-13, D-14, D-16, D-17, D-20, A2.2, A2.4.1, A3.1, A4.1, A5.3, A7.2, A8.1, A8.2 | — | — | compiled-taxonomy-defaults-removal, explicit-taxonomy-test-fixture, default-package-in-release-archive |
+| jit-dogfood-dependency-delta | Reduce the workflow package to its delta over the default | task | The workflow package depends on the default package and declares only what it adds. | package-content-split | issue:e4ba28c5, REQ-08, D-14, D-20, A2.2, A3.1 | touches 1 | package-content | jit-default-package, package-dependency-declaration |
+| workflow-rules-relocation | Move the two workflow rules into the workflow package | task | The two opinionated rules are contributed by the workflow package rather than seeded by the engine. | engine-vocabulary-boundary, package-content-split | issue:590ff4db, D-17, A2.2, A8.5 | touches 2 | package-content | jit-dogfood-dependency-delta |
+| scaffolded-rule-set-documentation | Say which rules a repository is actually scaffolded with | task | The adopter statements of the scaffolded rule set describe the rules a repository now receives. | engine-vocabulary-boundary | issue:59f12ba7, D-17, A8.5 | touches 2 | package-content | workflow-rules-relocation |
+| package-in-release-archive | Carry the assembled package in the release archive | task | The release archive carries the assembled workflow package, and the smoke path applies it from there. | distribution-artefact-and-release, package-assembly-publication | issue:9de22aa7, REQ-09, D-11, D-16, F3.4, F10.1, A7.1, A7.2, A7.4 | touches 2 | package-content | packaged-copy-retirement, profile-resolution-from-record |
+| default-package-in-release-archive | Carry the default package in the release archive too | task | The release archive carries the default package too, and the smoke path observes it as a resolved dependency. | distribution-artefact-and-release, package-content-split | issue:6013cd81, REQ-08, D-14, D-16, A7.2, A8.1 | touches 1 | package-content | package-in-release-archive, jit-dogfood-dependency-delta, composed-application-ordering |
+| release-archive-documentation | Say what the release archive carries | task | The adopter statements of what the release archive carries describe both package directories. | distribution-artefact-and-release | issue:25a33a83, REQ-09, D-16, A7.1, A7.4 | touches 2 | package-content | default-package-in-release-archive |
+| default-vocabulary-package | The generic domain vocabulary reaches a repository as a package | story | The generic vocabulary is package content, and a repository that declares none receives none. | engine-vocabulary-boundary, package-content-split, scaffold-minimum, distribution-artefact-and-release | issue:93fef456, REQ-08, REQ-09, D-13, D-14, D-16, D-17, D-20, A2.2, A2.4.1, A3.1, A4.1, A5.3, A7.2, A8.1, A8.2 | — | — | compiled-taxonomy-defaults-removal, taxonomy-fixture-integration-suites, taxonomy-fixture-server-crate, scaffolded-rule-set-documentation, release-archive-documentation |
 | repository-package-locator | Resolve this repository's own package from its checkout | task | This repository's tests read its profile package from the assembly rather than from the compiled-in copy. | package-assembly-publication, profile-package-resolution | issue:959274b6, F1.2, F8, Q10, S5 | touches 6 | extraction-preparation | packaged-copy-retirement, provenance-fixture-live-inputs |
 | embed-and-preset-deletion | Take the workflow profile and its presets out of the binary | task | The binary compiles in no profile package and no workflow preset, and the generated preset reference matches what remains. | engine-vocabulary-boundary, profile-package-resolution, distribution-artefact-and-release | issue:ff1bbada, REQ-07, D-10, D-13, F2.1, F2.2, F4.1, F5.1, F5.2, F5.3, A2.1, A5.3, A5.4, A6.1 | touches 10 | extraction-cutover | conditional-package-load, repository-package-locator, package-in-release-archive, composed-application-ordering |
 | scaffold-template-removal | Remove the configuration template the binary writes | task | A bare initialization writes the structural minimum, and the policy generator reads the default package. | engine-vocabulary-boundary, scaffold-minimum, shipped-policy-authority | issue:daddfc0b, REQ-01, D-13, D-15, A2.2, A4.1, A4.2, A4.3, A5.3, A5.4, A6.3, A6.4, A8.3 | touches 7 | extraction-cutover | compiled-taxonomy-defaults-removal, explicit-taxonomy-test-fixture, default-package-in-release-archive |
+| item-kind-defaults-removal | Delete the unreachable item-kind defaults | task | The three unreachable item-kind defaults are gone and a kind resolves from what its configuration declared. | engine-vocabulary-boundary | issue:28e1c647, D-23, A2.4 | touches 1 | literal-removal | — |
 | bracket-label-from-template | Read the bracket label from the template that declares it | task | The bracket label is derived from the template's declared breakdown node rather than from a literal. | engine-vocabulary-boundary | issue:510297e4, D-13, A2.3 | touches 2 | literal-removal | — |
 | icon-preset-removal | Remove the named icon presets | task | The named icon bundles are gone, and per-type declarations express what they expressed. | engine-vocabulary-boundary | issue:0439da41, D-22, A2.2, A2.4 | touches 2 | literal-removal | — |
 | bridge-instruction-vocabulary | Take this repository's vocabulary out of the bridge's instructions | task | The bridge's shipped instructions and tool descriptions name no repository's own vocabulary. | engine-vocabulary-boundary | issue:fdae1023, D-13, A2.3 | touches 2 | literal-removal | — |
 | web-hierarchy-fallback-removal | Render the web view without a built-in taxonomy | task | The web bundle renders from the configuration the API serves rather than from a built-in taxonomy. | engine-vocabulary-boundary | issue:9bdf8025, D-13, A2.3 | touches 2 | literal-removal | — |
-| projection-path-supply | Stop naming this checkout's paths in the shipped binary | task | No projection target or generator command naming this checkout is reachable from an adopter build. | engine-vocabulary-boundary | issue:f6c23c09, D-21, A2.5.4 | touches 7 | extraction-cutover | embed-and-preset-deletion |
+| projection-path-supply | Stop naming this checkout's paths in the presentation layer | task | The presentation-layer projection modules name no path inside this checkout from an adopter build. | engine-vocabulary-boundary | issue:f6c23c09, D-21, A2.5.4 | touches 3 | extraction-cutover | — |
+| projection-path-supply-domain-storage | Stop naming this checkout's paths in the domain and storage layers | task | The domain and storage projection modules name no path inside this checkout from an adopter build. | engine-vocabulary-boundary | issue:f9cab4c2, D-21, A2.5.4 | touches 3 | extraction-cutover | projection-path-supply |
+| projection-path-supply-defaults-gates | Stop naming this checkout's paths in the defaults and gate modules | task | The runtime-defaults and gate projection modules name no path inside this checkout from an adopter build. | engine-vocabulary-boundary | issue:5de2c401, D-21, A2.5.4 | touches 3 | extraction-cutover | projection-path-supply-domain-storage, embed-and-preset-deletion |
 | domain-agnostic-amendment | State the engine-vocabulary boundary in the invariant | task | The project invariant carries no sanctioned workflow exception and says which names are mechanism vocabulary. | engine-vocabulary-boundary | issue:aa258222, REQ-07, D-12, D-13, D-17, D-21, F2.3, F6.1, F6.2, F6.3, A1, A5.4, A6.5 | touches 4 | extraction-cutover | embed-and-preset-deletion, scaffold-template-removal |
 | build-input-surface-retirement | Stop naming the package a build input | task | Editing a packaged live source no longer reports an installed binary as stale. | — | issue:6fef2d7c, REQ-07, C9, S4.4, S6, F7 | touches 1 | extraction-cutover | embed-and-preset-deletion |
-| embedded-package-vocabulary-retirement | Retire the embedded-package vocabulary | task | The package type, its commands, and their help name a profile package rather than an embedded one. | profile-package-resolution | issue:d913a510, F3.2, F3.3 | touches 6, uncertain | extraction-cutover | embed-and-preset-deletion |
-| adopter-profile-documentation | Describe obtaining and applying a profile package | task | The adopter documentation describes a profile that arrives as a published package and is applied from a repository location. | distribution-artefact-and-release, profile-package-resolution | issue:8d534ee7, REQ-08, D-13, F3.3, F4.2, F10.1, A4.4, A8.3 | touches 5 | extraction-cutover | embed-and-preset-deletion, scaffold-template-removal |
-| profile-extraction | The binary carries no workflow instance | story | The workflow profile and its presets have left the binary, riding in the release archive instead. | engine-vocabulary-boundary, distribution-artefact-and-release, profile-package-resolution | issue:6df7e456, REQ-07, REQ-09, D-10, D-11, F2.1, F5.1, F5.2, F5.3, A2.1, A5.4, A6.1 | — | — | build-input-surface-retirement, embedded-package-vocabulary-retirement |
-| declarative-configuration-removal | The binary carries no configuration it writes for a repository | story | Every configuration the binary wrote, every named bundle, and every vocabulary literal has left it. | engine-vocabulary-boundary, scaffold-minimum | issue:7af6eb3d, REQ-07, REQ-08, D-13, D-21, D-22, A2.2, A2.3, A2.5.4, A4.1, A5.3, A5.4, A6.5, A8.3, A8.5 | — | — | bracket-label-from-template, icon-preset-removal, bridge-instruction-vocabulary, web-hierarchy-fallback-removal, projection-path-supply, domain-agnostic-amendment, adopter-profile-documentation |
+| embedded-package-vocabulary-retirement | Retire the embedded-package vocabulary | task | The package type, its commands, and their help name a profile package rather than an embedded one. | profile-package-resolution | issue:d913a510, F3.2, F3.3 | touches 4 | extraction-cutover | embed-and-preset-deletion |
+| profile-command-reference-rename | Follow the renamed profile surface in the command reference | task | The adopter command reference describes the profile commands in their renamed vocabulary. | profile-package-resolution | issue:62ef09b6, F3.2, F3.3 | touches 1 | extraction-cutover | embedded-package-vocabulary-retirement, profile-location-flag-reference |
+| profile-bridge-vocabulary-rename | Follow the renamed profile surface on the agent-facing bridge | task | The bridge's curated descriptions present the profile commands in their renamed vocabulary. | profile-package-resolution | issue:d198030e, F3.2, A2.3, A2.4 | touches 2 | extraction-cutover | embedded-package-vocabulary-retirement, bridge-instruction-vocabulary |
+| adopter-profile-documentation | Describe obtaining and applying a profile package | task | The adopter documentation describes a profile that arrives as a published package and is applied from a repository location. | distribution-artefact-and-release, profile-package-resolution | issue:8d534ee7, REQ-08, D-13, F3.3, F4.2, F10.1, A4.4, A8.3 | touches 5 | extraction-cutover | embed-and-preset-deletion, scaffold-template-removal, release-archive-documentation |
+| profile-extraction | The binary carries no workflow instance | story | The workflow profile and its presets have left the binary, riding in the release archive instead. | engine-vocabulary-boundary, distribution-artefact-and-release, profile-package-resolution | issue:6df7e456, REQ-07, REQ-09, D-10, D-11, F2.1, F5.1, F5.2, F5.3, A2.1, A5.4, A6.1 | — | — | build-input-surface-retirement, profile-command-reference-rename, profile-bridge-vocabulary-rename |
+| declarative-configuration-removal | The binary carries no configuration it writes for a repository | story | Every configuration the binary wrote, every named bundle, and every vocabulary literal has left it. | engine-vocabulary-boundary, scaffold-minimum | issue:7af6eb3d, REQ-07, REQ-08, D-13, D-21, D-22, A2.2, A2.3, A2.5.4, A4.1, A5.3, A5.4, A6.5, A8.3, A8.5 | — | — | bracket-label-from-template, icon-preset-removal, bridge-instruction-vocabulary, web-hierarchy-fallback-removal, item-kind-defaults-removal, projection-path-supply-defaults-gates, domain-agnostic-amendment, adopter-profile-documentation |
 
 ```mermaid
 flowchart LR
@@ -406,38 +417,49 @@ flowchart LR
     N23["profile-package-directory-reader: Read a profile package from a directory on disk"]
     N24["profile-source-provenance: Record where an applied package came from"]
     N25["profile-resolution-from-record: Resolve a profile package from a given location or the repository's record"]
-    N26["validate-fix-package-reresolution: Repair profile-owned targets from the recorded package location"]
-    N27["package-dependency-declaration: Declare one package's dependency on another"]
-    N28["scaffold-contribution-targets: Give the contribution vocabulary the tables the scaffold writes"]
-    N29["composed-application-ordering: Apply a package together with the packages it depends on"]
-    N30["contribution-conflict-names-package: Name the declaring package when two packages collide"]
-    N31["discovered-profile-packages: A profile package is read from disk, and packages compose"]
-    N32["compiled-taxonomy-defaults-removal: Stop supplying a taxonomy to a repository that declares none"]
-    N33["explicit-taxonomy-test-fixture: Give the suite a fixture that declares its own taxonomy"]
-    N34["jit-default-package: Assemble the default vocabulary as a package"]
-    N35["jit-dogfood-dependency-delta: Reduce the workflow package to its delta over the default"]
-    N36["package-in-release-archive: Carry the assembled package in the release archive"]
-    N37["default-package-in-release-archive: Carry the default package in the release archive too"]
-    N38["default-vocabulary-package: The generic domain vocabulary reaches a repository as a package"]
-    N39["repository-package-locator: Resolve this repository's own package from its checkout"]
-    N40["embed-and-preset-deletion: Take the workflow profile and its presets out of the binary"]
-    N41["scaffold-template-removal: Remove the configuration template the binary writes"]
-    N42["bracket-label-from-template: Read the bracket label from the template that declares it"]
-    N43["icon-preset-removal: Remove the named icon presets"]
-    N44["bridge-instruction-vocabulary: Take this repository's vocabulary out of the bridge's instructions"]
-    N45["web-hierarchy-fallback-removal: Render the web view without a built-in taxonomy"]
-    N46["projection-path-supply: Stop naming this checkout's paths in the shipped binary"]
-    N47["domain-agnostic-amendment: State the engine-vocabulary boundary in the invariant"]
-    N48["build-input-surface-retirement: Stop naming the package a build input"]
-    N49["embedded-package-vocabulary-retirement: Retire the embedded-package vocabulary"]
-    N50["adopter-profile-documentation: Describe obtaining and applying a profile package"]
-    N51["profile-extraction: The binary carries no workflow instance"]
-    N52["declarative-configuration-removal: The binary carries no configuration it writes for a repository"]
+    N26["profile-location-flag-reference: Describe the supplied-location form in the command reference"]
+    N27["validate-fix-package-reresolution: Repair profile-owned targets from the recorded package location"]
+    N28["package-dependency-declaration: Declare one package's dependency on another"]
+    N29["scaffold-contribution-targets: Give the contribution vocabulary the tables the scaffold writes"]
+    N30["composed-application-ordering: Apply a package together with the packages it depends on"]
+    N31["contribution-conflict-names-package: Name the declaring package when two packages collide"]
+    N32["discovered-profile-packages: A profile package is read from disk, and packages compose"]
+    N33["compiled-taxonomy-defaults-removal: Stop supplying a taxonomy to a repository that declares none"]
+    N34["explicit-taxonomy-test-fixture: Give the crate's own tests a fixture that declares its taxonomy"]
+    N35["taxonomy-fixture-integration-suites: Adopt the taxonomy fixture in the crate's integration suites"]
+    N36["taxonomy-fixture-server-crate: Adopt the taxonomy fixture in the server crate"]
+    N37["jit-default-package: Assemble the default vocabulary as a package"]
+    N38["jit-dogfood-dependency-delta: Reduce the workflow package to its delta over the default"]
+    N39["workflow-rules-relocation: Move the two workflow rules into the workflow package"]
+    N40["scaffolded-rule-set-documentation: Say which rules a repository is actually scaffolded with"]
+    N41["package-in-release-archive: Carry the assembled package in the release archive"]
+    N42["default-package-in-release-archive: Carry the default package in the release archive too"]
+    N43["release-archive-documentation: Say what the release archive carries"]
+    N44["default-vocabulary-package: The generic domain vocabulary reaches a repository as a package"]
+    N45["repository-package-locator: Resolve this repository's own package from its checkout"]
+    N46["embed-and-preset-deletion: Take the workflow profile and its presets out of the binary"]
+    N47["scaffold-template-removal: Remove the configuration template the binary writes"]
+    N48["item-kind-defaults-removal: Delete the unreachable item-kind defaults"]
+    N49["bracket-label-from-template: Read the bracket label from the template that declares it"]
+    N50["icon-preset-removal: Remove the named icon presets"]
+    N51["bridge-instruction-vocabulary: Take this repository's vocabulary out of the bridge's instructions"]
+    N52["web-hierarchy-fallback-removal: Render the web view without a built-in taxonomy"]
+    N53["projection-path-supply: Stop naming this checkout's paths in the presentation layer"]
+    N54["projection-path-supply-domain-storage: Stop naming this checkout's paths in the domain and storage layers"]
+    N55["projection-path-supply-defaults-gates: Stop naming this checkout's paths in the defaults and gate modules"]
+    N56["domain-agnostic-amendment: State the engine-vocabulary boundary in the invariant"]
+    N57["build-input-surface-retirement: Stop naming the package a build input"]
+    N58["embedded-package-vocabulary-retirement: Retire the embedded-package vocabulary"]
+    N59["profile-command-reference-rename: Follow the renamed profile surface in the command reference"]
+    N60["profile-bridge-vocabulary-rename: Follow the renamed profile surface on the agent-facing bridge"]
+    N61["adopter-profile-documentation: Describe obtaining and applying a profile package"]
+    N62["profile-extraction: The binary carries no workflow instance"]
+    N63["declarative-configuration-removal: The binary carries no configuration it writes for a repository"]
     N0 --> N1
     N2 --> N3
     N3 --> N4
     N1 --> N7
-    N41 --> N7
+    N47 --> N7
     N8 --> N9
     N2 --> N11
     N8 --> N12
@@ -459,47 +481,65 @@ flowchart LR
     N23 --> N24
     N24 --> N25
     N25 --> N26
-    N26 --> N29
-    N27 --> N29
-    N29 --> N30
+    N25 --> N27
+    N27 --> N30
     N28 --> N30
     N30 --> N31
-    N28 --> N34
+    N29 --> N31
+    N31 --> N32
+    N26 --> N32
     N34 --> N35
-    N27 --> N35
-    N17 --> N36
-    N25 --> N36
-    N36 --> N37
-    N35 --> N37
+    N34 --> N36
     N29 --> N37
-    N32 --> N38
-    N33 --> N38
     N37 --> N38
-    N17 --> N39
-    N5 --> N39
-    N9 --> N40
+    N28 --> N38
+    N38 --> N39
     N39 --> N40
-    N36 --> N40
-    N29 --> N40
-    N32 --> N41
-    N33 --> N41
-    N37 --> N41
-    N40 --> N46
-    N40 --> N47
-    N41 --> N47
-    N40 --> N48
-    N40 --> N49
-    N40 --> N50
-    N41 --> N50
-    N48 --> N51
-    N49 --> N51
-    N42 --> N52
-    N43 --> N52
-    N44 --> N52
-    N45 --> N52
-    N46 --> N52
-    N47 --> N52
-    N50 --> N52
+    N17 --> N41
+    N25 --> N41
+    N41 --> N42
+    N38 --> N42
+    N30 --> N42
+    N42 --> N43
+    N33 --> N44
+    N35 --> N44
+    N36 --> N44
+    N40 --> N44
+    N43 --> N44
+    N17 --> N45
+    N5 --> N45
+    N9 --> N46
+    N45 --> N46
+    N41 --> N46
+    N30 --> N46
+    N33 --> N47
+    N34 --> N47
+    N42 --> N47
+    N53 --> N54
+    N54 --> N55
+    N46 --> N55
+    N46 --> N56
+    N47 --> N56
+    N46 --> N57
+    N46 --> N58
+    N58 --> N59
+    N26 --> N59
+    N58 --> N60
+    N51 --> N60
+    N46 --> N61
+    N47 --> N61
+    N43 --> N61
+    N57 --> N62
+    N59 --> N62
+    N60 --> N62
+    N49 --> N63
+    N50 --> N63
+    N51 --> N63
+    N52 --> N63
+    N48 --> N63
+    N55 --> N63
+    N56 --> N63
+    N61 --> N63
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -527,12 +567,14 @@ flowchart LR
 | **D-21 — this repository's own paths** | Chosen: no adopter binary names a path inside this checkout; each projection target and generator command moves behind the test-support boundary that already excludes this repository's machinery from an adopter build. Rejected: treating them as outside the boundary because they are written into no repository, which leaves six of this checkout's paths in every adopter binary; deferring, which invites a later reviewer to read the residue as an omission. |
 | **D-22 — icons and hooks** | Chosen: the four named icon bundles are deleted, since the per-type map already expresses any of them; the accepted consequence is that the hierarchy endpoint answers differently for a repository that had selected one. The git hook scripts stay as lease and branch-drift enforcement mechanism. Rejected: moving both to a package, which makes hook installation require an applied package before it has anything to install; keeping the presets, which leaves four named vocabularies compiled in. |
 | **The coordination guidance's rendered constants** | The configuration the binary writes carries commented coordination guidance whose two timings are interpolated from engine constants, so today the comment is a projection of them. A package is bytes, so once that body is a package's declaration the comment cannot project anything: it would be a hand-maintained copy of two engine defaults, which is the exact class this container removes. Chosen: the packaged comment names the two keys and drops their numbers, pointing at the reference that projects the defaults. Rejected: carrying the numbers, which reintroduces the defect one file away from where it was removed; dropping the comment, which loses the only place an adopter is told those keys exist. |
+| **D-23 — the unreachable item-kind defaults** | Chosen: delete the three constants supplying a section slug, a self-id pattern and a link-label namespace to an item kind that declares none, and report a kind whose configuration omits a required field rather than completing it. They are domain vocabulary and they are unreachable: configuration loading rejects an item-kind table missing any required field, and a repository declaring no table has an empty kind set, so the fallbacks consuming them are dead branches behind a validation that has already run and deletion is behaviour-preserving. Rejected: retaining them as mechanism-parameter defaults, which leaves unreachable constants standing against `@/invariant/canonical-cutover`. The equivalent defaults in the coverage rule are a separate duplication finding and are untouched. |
+| **Documentation is a leaf of its own, behind the change it describes** | Where a change makes an adopter-facing statement false, the correction is a separate entry rather than a clause: implementation and prose have different consumers, different gates and different review attention, and a leaf carrying both gets reviewed as neither. Each such pair is a real edge in the direction that keeps the prose true — the archive statement after both archive changes, the scaffolded rule set after the rules move, the command reference after the resolver and again after the rename. Two corrections stay *inside* their change rather than following it, because they do not merely go stale but break: the generated preset reference is a conformance-asserted projection of the presets being deleted, and the policy generator refuses on every run the moment the table it reads stops being written. Those two are forced together; the rest are ordered apart. |
 | **Where the package lives, and what enumerates it** | Chosen: the location lives in the applied-profile record and nowhere else; the first application supplies it, later runs read it back, and enumeration reports what the repository's own records name. Rejected: a configured search root, which is a second carrier of one fact plus a precedence question, and which would still need an explicit location at initialization; a package directory under the tracker's data root, which the reserved-target guard already refuses; a machine-level location, which makes repair depend on machine state; a supplied location with no record, which leaves repair nothing to re-resolve from. The accepted cost is that inspecting a package the repository has never applied requires supplying its location. |
 | **Ordering: one chain, forced at six points, silent at one** | The two delivered projections carry no edge to what follows, because no artifact of one is an input to the other. What remains is one chain. **Removing the compiled taxonomy defaults comes first and is the silent edge**: with them in place, deleting the configuration template makes every default initialization inherit a registry from the binary, and nothing reports it (A5.3). The contribution targets precede the default package, which cannot otherwise declare the two tables it must carry. The dependency declaration precedes the workflow package's delta, which is what makes the split legitimate rather than a second copy. The resolver precedes the archive, because a package nothing can resolve is not installable. Each archive step precedes the removal whose subject it makes obtainable — the workflow package's before the compiled-in copy's deletion, the default package's before the configuration template's (D-11, A8.1). Within the packaging half, the region relocation and the root declaration precede the assembly, the assembly precedes the retirement of the checked-in copies so the two trees are compared while both exist, and the mode guard precedes it so the only executable-mode contract in the workspace is never unguarded. |
 | **Three indivisible steps, each by evidence** | The taxonomy-default removal is indivisible across its three sources: they are separate functions but one property, and any one left behind keeps a compiled taxonomy reachable through a different caller (A5.4). The embed and the preset trio are indivisible: either alone leaves the other calling nothing. The configuration template, the four hierarchy bundles, the type that carried them, and the two surfaces that named them are indivisible: they are one type, every fixture constructs it, and removing the bundles alone leaves a type whose one remaining member renders a configuration the boundary forbids. Everything separable has been made a predecessor rather than a clause — the fixture, the locator, the publication, the repair route — so what remains has no inner decomposition and splitting any of it against the cited evidence produces a revision that does not build. |
 | **The generated preset reference and the policy generator break *inside* two deletions** | Two delivered artifacts fail in the same instant as the change that causes them, so their repair is in that change rather than after it. The preset reference is a projection with a conformance assertion comparing the committed page against it, so it fails in any revision where the presets are gone and it is not regenerated. The policy generator initializes a throwaway repository and reads the table the configuration template writes; the moment that template goes it refuses on every run and both regions freeze (A6.4). Neither is bundled work: each is the same change observed from its consumer. |
 | **The invariant amendment lands in the wave that completes the removal** | The amendment's subject spans two deletion clusters, so it cannot sit inside either, and it edits a registry and a projection rather than code — a different deliverable class from the deletions it certifies. It depends on both and lands in their wave. The audit calls it indivisible with the removal in the sense that no revision should assert a carve-out whose subject has gone; the alternative — folding a registry edit and a projection regeneration into an already-indivisible code deletion — mixes deliverable classes the terminal rule forbids, so the coupling is stated as a wave constraint rather than pretended into an edge (A5.4). |
-| **Shared writers: every unordered pair, and what makes it disjoint** | Delivered entries cannot conflict with anything, so they are excluded. Most shared files are ordered by real edges: the package manifest by the relocation, then the root declaration, then the completeness walk; the dogfood module by the assembly, the copy retirement, then the removal; the profile commands by the provenance record, the resolver, the repair, the composition, then the removal and the rename. Twenty-nine pairs across thirteen files are genuinely unordered, and each is disjoint by construction. **Every pair involving the repository package locator** — in the initialization command, the profile command, the repair suite, against the resolver, the provenance record, the composition and the scaffold removal — is disjoint because the locator edits only `#[cfg(test)]` blocks and test modules while the others edit production items. **`profile/package.rs` and `profile/manifest.rs`** carry three writers apiece adding three distinct validations: root-and-exclusion parsing, an owned-bytes constructor, and dependency-id validation. **`profile/mod.rs`** carries five, each adding or removing one module declaration and its re-export; no two touch the same line. **`commands/validate.rs`** pairs the taxonomy fixture, which edits that file's test fixtures, against the repair and the composition, which edit its production repair path. **`config_manager.rs`** pairs the taxonomy-default removal, deleting two fallback branches, against the icon-preset removal, editing icon resolution. **`domain/types.rs`** pairs the provenance origin variant, the taxonomy default implementations, and the origin variant's later deletion — three distinct items. **`repository_state/profile_apply.rs`** pairs the record shape against the new contribution targets. **`cli.rs`** pairs the scaffold removal, deleting a hierarchy flag and a list subcommand, against the rename, editing profile command help. **The package manifest** pairs the workflow package's delta, which edits `[[contribution]]` blocks, against the relocation, the root declaration and the completeness walk, which edit an asset source path and the live-source root section. **The adopter profile reference** pairs the manifest-contents sentence against the documentation sweep, which is far downstream and rewrites the page's premise rather than that section. **The bridge suite** pairs one root-declaration assertion against one renamed-command assertion. Every other file has one writer or an ordered chain. |
+| **Shared writers: every unordered pair, and what makes it disjoint** | Delivered entries cannot conflict with anything, so they are excluded. Most shared files are ordered by real edges: the package manifest by the relocation, then the root declaration, then the completeness walk; the dogfood module by the assembly, the copy retirement, then the removal; the profile commands by the provenance record, the resolver, the repair, the composition, then the removal and the rename; the command reference by the location flag, then the rename sweep; the bridge curation by the instruction rewording, then the rename sweep; the generated-artifact declaration by the three projection moves in turn. Forty-six pairs across fifteen files remain unordered, and two rules account for most of them. **The taxonomy fixture and the repository package locator edit only `#[cfg(test)]` blocks and test modules**, so every pair either of them forms — with the resolver, the provenance record, the composition, the repair, the assembly, the copy retirement, the removal, the rename or the scaffold removal, in the initialization command, the profile command, the validation command, the dogfood module and the repair suite — is disjoint from a production edit by construction. **The package manifest's writers each own a different section**: the relocation an asset source path, the root declaration and the completeness walk the live-source root section, the delta and the rules relocation their own `[[contribution]]` blocks. The rest are per file. `profile/package.rs` and `profile/manifest.rs` carry three writers apiece adding three distinct validations: root-and-exclusion parsing, an owned-bytes constructor, and dependency-id validation. `profile/mod.rs` carries five, each adding or removing one module declaration and its re-export. `commands/validate.rs` pairs the fixture against the repair and the composition, which edit its production repair path. `config_manager.rs` pairs the taxonomy-default removal, deleting two fallback branches, against the icon-preset removal, editing icon resolution. `domain/types.rs` pairs the provenance origin variant, the taxonomy default implementations, and the origin variant's later deletion — three distinct items. `repository_state/profile_apply.rs` pairs the record shape against the new contribution targets. `cli.rs` pairs the scaffold removal, deleting a hierarchy flag and a list subcommand, against the rename, editing profile command help. The adopter profile reference pairs the manifest-contents sentence against the documentation sweep, far downstream and rewriting the page's premise rather than that section. The bridge suite pairs one root-declaration assertion against one tool-description assertion. Every other file has one writer or an ordered chain. |
 | **What the criteria do not describe** | The criteria under-describe D-13. REQ-07 names a workflow profile and a preset; the taxonomy defaults, the configuration template, the named bundles, the vocabulary literals in the bridge and the web bundle, and this checkout's own paths are none of those. The audit records that the criterion is satisfied by the work and deliberately not restated (A6.2). Entries beyond its literal subject therefore carry no criterion label and cite D-13 instead, so a reviewer can see the coverage boundary rather than infer it. |
 | **The package stops being applicable from this checkout** | After the copies retire, the workflow package directory is a package *source*: manifest, install-only assets, region source. A complete package exists only where the assembly writes one. Nothing here applies its own profile, so this costs nothing locally, but it means every test needing a real package assembles one, and it is why the repository package locator exists as a step of its own. |
 | **The package leaves the binary's build-input surface** | The build-input path predicate names the package directory, and that is true only while the directory is compiled in. Left in place afterwards, it reports every package edit as invalidating an installed binary it cannot affect, and every gate behind that report refuses until a rebuild that changes nothing has happened. Removing the entry is its own terminal behind the cutover, and it is the surviving half of what the retired REQ-06 asked for. |

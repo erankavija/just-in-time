@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T17:55:01.855466366Z",
+  "dependencies": [
+    "d913a510-438e-4ec6-aeb4-425480a73c30",
+    "fdae1023-6a10-45da-a56e-54916409a331"
+  ],
+  "description": "The agent-facing bridge presents the profile commands in their renamed vocabulary, so an agent reading the tool surface meets the same description an adopter does.\n\n## Background\n\nThe bridge generates its tool surface at every process start from the command schema, so the tools' names and arguments follow the renamed surface with no edit. Two checked-in files do not: three curated tool descriptions describe the profile commands as operating on packages embedded in the connected binary, and the bridge's own coverage asserts over that surface.\n\nThe descriptions are shipped adopter-facing text, so they are the substance of this change; the coverage assertion follows them.\n\n## Success Criteria\n\n- [hard] REQ-01: No curated tool description presents a profile package as embedded in the binary.\n- [hard] REQ-02: The curated descriptions match what the renamed commands do, including reading a package from a repository location.\n- [hard] REQ-03: The bridge's coverage passes against the renamed surface, with no tool changing name or arguments.\n- [hard] REQ-04: No schema artefact is checked in; the surface is still generated at process start.\n\n## Notes\n\nThe instruction block's own vocabulary is a separate entry's subject; the two touch different parts of the same curation file and neither edits the other's lines.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-31T17:55:01.855466366Z",
+  "gates_required": [
+    "mcp-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d198030e-e637-444e-b444-e4e82a3d1ccf",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-extraction",
+    "per:@/issue/e204e63d/decision/D-13",
+    "enforces:@/invariant/canonical-cutover"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Follow the renamed profile surface on the agent-facing bridge",
+  "updated_at": "2026-07-31T17:55:51.405300828Z"
+}

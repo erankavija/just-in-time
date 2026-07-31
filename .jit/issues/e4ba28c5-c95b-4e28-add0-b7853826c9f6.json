@@ -6,30 +6,27 @@
     "5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55",
     "c7058cac-cd23-4692-9b4b-01059cdedf8b"
   ],
-  "description": "The workflow package declares a dependency on the default package and only the vocabulary it adds, so the shared vocabulary exists once.\n\n## Background\n\nThe workflow package declares its own type names, namespaces and item kinds, several of which the default package now also declares. Two packages restating the same values would be the hand-maintained duplicate this container exists to remove, and the alternative the decisions rejected.\n\nThe split is already disjoint where it matters: the namespaces the two declare do not overlap, and on types the workflow package declares the default's four plus four of its own. It drops the four the default carries and keeps its own, so applying it composes rather than collides.\n\nTwo workflow rules move here in the same change. They encode an opinion — that a leaf carries a parent-membership label, that a strategic type carries its own — and neither derives from any declaration, so they belong to the workflow rather than to the engine. The package already contributes rules, so the target exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow package declares a dependency on the default package.\n- [hard] REQ-02: It declares no type name, namespace, or item kind the default package already declares, except where restating it identically is necessary and the restatement is exact.\n- [hard] REQ-03: It declares the two workflow rules that encode a sequencing opinion.\n- [hard] REQ-04: Applying it to a bare repository produces the same configuration as applying both packages by hand, and reports no conflict.\n- [hard] REQ-05: It declares the one item kind whose source file it ships and the default package does not.\n- [hard] REQ-06: The two adopter-facing statements of what the scaffolded rule set contains no longer present those two rules as scaffolded, and say what a repository receives them from.\n\n## Notes\n\nAn adopter applying the workflow package receives the default package as a resolved dependency and never names it.\n\nThe projected rules-and-gates reference is deliberately not edited: it renders this repository's own registry, which keeps declaring both rules for as long as the workflow package contributes them, so hand-editing it would be a projection defect.\n",
+  "description": "The workflow package declares a dependency on the default package and only the vocabulary it adds, so the shared vocabulary exists once.\n\n## Background\n\nThe workflow package declares its own type names, namespaces and item kinds, several of which the default package now also declares. Two packages restating the same values would be the hand-maintained duplicate this container exists to remove, and the alternative the decisions rejected.\n\nThe split is already disjoint where it matters: the namespaces the two declare do not overlap, and on types the workflow package declares the default's four plus four of its own. It drops the four the default carries and keeps its own, so applying it composes rather than collides.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow package declares a dependency on the default package.\n- [hard] REQ-02: It declares no type name, namespace, or item kind the default package already declares, except where restating it identically is necessary and the restatement is exact.\n- [hard] REQ-03: Applying it to a bare repository produces the same configuration as applying both packages by hand, and reports no conflict.\n- [hard] REQ-04: It declares the one item kind whose source file it ships and the default package does not.\n\n## Notes\n\nAn adopter applying the workflow package receives the default package as a resolved dependency and never names it.\n",
   "documents": [],
   "gates_required": [
     "cargo-ci",
-    "code-review",
-    "docs-mechanical",
-    "doc-review"
+    "code-review"
   ],
   "gates_status": {},
   "id": "e4ba28c5-c95b-4e28-add0-b7853826c9f6",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
     "story:default-vocabulary",
     "satisfies:REQ-08",
     "per:@/issue/e204e63d/decision/D-14",
-    "per:@/issue/e204e63d/decision/D-17",
     "per:@/issue/e204e63d/decision/D-20",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "type:task"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Reduce the workflow package to its delta over the default",
-  "updated_at": "2026-07-31T17:28:56.596684919Z"
+  "updated_at": "2026-07-31T17:58:48.587041590Z"
 }

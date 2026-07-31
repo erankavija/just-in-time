@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T17:55:01.855466366Z",
+  "dependencies": [
+    "5d12a79f-c29e-43ba-b14c-1f030790c01e"
+  ],
+  "description": "The adopter-facing command reference describes how a profile command is told where its package is, so the flag the resolver added is documented where adopters read command syntax.\n\n## Background\n\nThe profile commands and the profiled initialization gained a way to name the repository location a package is read from. Until that is written down, an adopter meets it only in `--help`, and the reference that documents every other flag of those commands is silently incomplete.\n\nWhat it says is the resolution order, because that is what an adopter needs to predict: a supplied location wins, the location the repository's own record names is used when none is supplied, and a recorded location that no longer resolves is an error rather than an absent profile.\n\n## Success Criteria\n\n- [hard] REQ-01: The command reference describes the supplied-location form on every command that accepts it, including profiled initialization.\n- [hard] REQ-02: It states the resolution order and what happens when a recorded location no longer resolves.\n- [hard] REQ-03: The fact has one home: other pages needing it cite the reference rather than restating it.\n- [hard] REQ-04: The mechanical documentation checks pass over the changed pages.\n\n## Notes\n\nWhat a package is and where an adopter obtains one belongs to the profile reference, not here; this page covers command syntax.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-31T17:55:01.855466366Z",
+  "gates_required": [
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "2ce8ce1b-b75c-4ffd-b598-354237add0e6",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-discovery",
+    "per:@/charter/D-13",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Describe the supplied-location form in the command reference",
+  "updated_at": "2026-07-31T17:55:07.378515624Z"
+}

@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
+    "25a33a83-145e-4b1e-bd6f-cbd20251d08d",
     "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
     "ff1bbada-b22a-432a-a75a-8506743e90f9"
   ],
@@ -28,5 +29,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Describe obtaining and applying a profile package",
-  "updated_at": "2026-07-31T17:34:41.068411916Z"
+  "updated_at": "2026-07-31T17:57:38.765709545Z"
 }

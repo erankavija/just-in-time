@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T17:55:01.855466366Z",
+  "dependencies": [
+    "e4ba28c5-c95b-4e28-add0-b7853826c9f6"
+  ],
+  "description": "The two rules that encode a sequencing opinion are contributed by the workflow package rather than emitted by the engine, so a repository receives them only if it asked for that workflow.\n\n## Background\n\nTwo of the rules the engine seeds into every repository encode an opinion about how work is shaped: that a leaf carries a parent-membership label, and that a strategic type carries its own. Neither derives from anything the adopter declared, and both are emitted unconditionally, so neither is mechanism over the adopter's registry the way the remaining four are.\n\nThey move to the package that carries the workflow they belong to. The target already exists — that package contributes rules today — so this is a relocation rather than a new mechanism.\n\nTheir evaluation subject moves with them in a second sense worth stating: they are evaluated against the type hierarchy, and a repository that declares none has nothing for them to evaluate. That is consistent with them arriving only with the package that also supplies a hierarchy.\n\n## Success Criteria\n\n- [hard] REQ-01: The engine seeds neither rule into any repository.\n- [hard] REQ-02: The workflow package contributes both, and applying it to a bare repository yields both in that repository's rule registry.\n- [hard] REQ-03: The four registry-derived rules are unchanged and are still seeded, each deriving its assertion and its membership from whatever registry the repository declares.\n- [hard] REQ-04: A repository that applies no package receives neither rule and still validates.\n\n## Notes\n\nThe behaviour change this makes visible — that a repository stops receiving those two warnings unless it applies the workflow package — is stated where adopters read what the scaffolded rule set contains.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-31T17:55:01.855466366Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "590ff4db-b549-43cb-a4bb-6e7b8521ff6b",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:default-vocabulary",
+    "per:@/issue/e204e63d/decision/D-17",
+    "enforces:@/invariant/domain-agnostic"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Move the two workflow rules into the workflow package",
+  "updated_at": "2026-07-31T17:55:23.038518096Z"
+}

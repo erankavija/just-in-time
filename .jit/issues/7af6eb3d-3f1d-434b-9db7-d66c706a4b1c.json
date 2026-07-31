@@ -4,11 +4,12 @@
   "created_at": "2026-07-31T17:28:56.596684919Z",
   "dependencies": [
     "0439da41-0a91-43b1-b080-026730fb4231",
+    "28e1c647-993e-4621-8b6e-1504a0be0782",
     "510297e4-4543-413a-b4c0-065f48aea855",
+    "5de2c401-8713-4cc6-a0f2-87d834035643",
     "8d534ee7-23e0-474f-b87f-748bc66a26e8",
     "9bdf8025-3a36-4a5f-b48c-1d56ec1db664",
     "aa258222-a3a3-47e6-a9ac-570ef8581d6a",
-    "f6c23c09-6f3e-471b-aaad-c487b294af26",
     "fdae1023-6a10-45da-a56e-54916409a331"
   ],
   "description": "The configuration a new repository receives, the named content bundles, the vocabulary literals in every shipped artefact, and this checkout's own paths have all left the binary, and the invariant states the rule that keeps them out.\n\n## Background\n\nBeyond one project's workflow, the binary carries a whole configuration it renders for every new repository, four named icon bundles selectable by name, a label namespace built from a literal in two commands, this repository's own gate keys and item ids in the agent-facing bridge's shipped text, a type hierarchy and a namespace colour table in the web bundle, and the documentation and script paths of this checkout. Each produces content an adopter never declared, so each is an instance rather than a mechanism.\n\nWhat stays is named as carefully as what goes: the defaults that name a mechanism's own parameter, and the rules that derive both their assertion and their membership from whatever registry the adopter declared. The amended invariant carries both classes explicitly, because a narrower wording would delete the first by implication and be silent where the boundary reaches furthest.\n\n## Success Criteria\n\n- [hard] REQ-01: A bare initialization writes the structural minimum, and no compiled configuration template, named hierarchy bundle, or named icon bundle remains.\n- [hard] REQ-02: No type name or label namespace literal remains in the engine's own label construction, in the agent-facing bridge's shipped text, or in the web bundle's rendering paths.\n- [hard] REQ-03: No path inside this checkout is reachable from an adopter build.\n- [hard] REQ-04: The project invariant carries no sanctioned exception and states which names belong to a mechanism, reaching every class the boundary names.\n- [hard] REQ-05: The adopter-facing documentation describes obtaining and applying the published packages, the affordance that goes with the removal, and the two workflow warnings a repository stops receiving unless it applies the workflow package.\n\n## Notes\n\nThe generated policy regions are repaired inside the change that breaks them, because their generator reads the very table the removal stops writing.\n",
@@ -39,5 +40,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "The binary carries no configuration it writes for a repository",
-  "updated_at": "2026-07-31T17:29:22.774388278Z"
+  "updated_at": "2026-07-31T17:57:33.767811622Z"
 }

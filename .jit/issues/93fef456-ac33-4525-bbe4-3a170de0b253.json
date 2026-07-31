@@ -3,9 +3,11 @@
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
   "dependencies": [
-    "6013cd81-1d9a-4952-a3a2-8739b77c1cba",
+    "25a33a83-145e-4b1e-bd6f-cbd20251d08d",
+    "45e250c6-82e8-4f35-97ae-9b28ea0eb455",
+    "59f12ba7-1e5d-40b2-bdcf-f03bf17be9d0",
     "a30d704d-05af-406c-8cb6-5031495af705",
-    "ae435979-9d43-4efc-ba05-7f7c6164af84"
+    "a53a6f09-6369-4f94-8dc7-9b4d8bbd406f"
   ],
   "description": "The vocabulary a repository needs to be usable is declared in a package an adopter applies, and a repository that applies none receives none.\n\n## Background\n\nA fresh repository today receives a four-level type hierarchy, seven label namespaces, six item kinds, validation defaults and a documentation-area classification, none of which it declared and all of which are rendered from a compiled template. A repository that declares no registry at all receives one anyway, from default implementations reached through fallback branches — so even an adopter who writes their own configuration cannot decline the engine's.\n\nBoth routes close here. The compiled defaults go, so a repository receives what it declared and nothing else. The vocabulary itself becomes a package, and the workflow package declares a dependency on it rather than restating it. Both packages then ride in the release archive, so obtaining them costs no second download.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository declaring no namespaces and no type hierarchy receives neither, and still validates.\n- [hard] REQ-02: A package declares the generic vocabulary a repository needs to be usable, carrying no workflow content.\n- [hard] REQ-03: The workflow package declares a dependency on it and only the vocabulary it adds.\n- [hard] REQ-04: The release archive carries both package directories, and the release smoke path applies the workflow package from the extracted archive.\n- [hard] REQ-05: The suite's assertions about type names rest on a fixture that declares its own taxonomy rather than on any shipped default.\n\n## Notes\n\nThe compiled template that renders today's configuration is deleted by the work that can prove these packages replace it.\n",
   "documents": [],
@@ -32,5 +34,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "The generic domain vocabulary reaches a repository as a package",
-  "updated_at": "2026-07-31T17:28:56.596684919Z"
+  "updated_at": "2026-07-31T17:58:10.699523207Z"
 }

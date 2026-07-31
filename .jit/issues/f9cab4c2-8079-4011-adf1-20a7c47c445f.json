@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T17:55:01.855466366Z",
+  "dependencies": [
+    "f6c23c09-6f3e-471b-aaad-c487b294af26"
+  ],
+  "description": "The domain and storage projection modules name no path inside this checkout from a default library build, so an adopter binary carries none of them.\n\n## Background\n\nEach of these modules publishes a pair of constants: the repository-relative path of a committed reference it projects, and the command that regenerates it. Both name this checkout — a documentation path and a script path — and both are compiled into every adopter binary, where they mean nothing.\n\nEvery reader is already on one side of a boundary that exists. The declaration of this repository's generated artifacts compiles only for the crate's own tests and the dev-dependency builds its entry point needs, and the conformance assertions that read the constants are test-only. So the constants have no production reader, and moving them behind the same boundary removes them from an adopter build without changing what any of them does.\n\nThe two here are the event catalogue and the storage-record reference, projected from the definitions their own layers own.\n\nIt follows the shape the first pair established, so nothing about the mechanism is decided here.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither module's projection target path nor its generator command is reachable from a default library build.\n- [hard] REQ-02: Each render function still produces the same bytes, and each conformance assertion still compares the committed file against that render.\n- [hard] REQ-03: The declaration of this repository's generated artifacts still names each artifact's target and entry point, and the regeneration entry point behaves identically.\n- [hard] REQ-04: Each module's public surface loses exactly those constants and nothing else.\n\n## Notes\n\nOnly the constants move. No committed reference changes content.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-31T17:55:01.855466366Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f9cab4c2-8079-4011-adf1-20a7c47c445f",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:configuration-removal",
+    "per:@/issue/e204e63d/decision/D-21",
+    "enforces:@/invariant/domain-agnostic",
+    "enforces:@/invariant/architecture-dependency-direction"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Stop naming this checkout's paths in the domain and storage layers",
+  "updated_at": "2026-07-31T17:55:33.050762789Z"
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T17:55:01.855466366Z",
+  "dependencies": [
+    "6013cd81-1d9a-4952-a3a2-8739b77c1cba"
+  ],
+  "description": "The adopter-facing statements of what a release archive contains describe both package directories beside the binaries, so the download an adopter is told to expect is the one they get.\n\n## Background\n\nTwo places state the archive's contents as a promise: the installation guide, which says in as many words that the archive is flat and carries four files, and the release policy's asset table, whose contents cell enumerates them. Both clauses of the first become false once the archive carries package directories, and the second becomes incomplete.\n\nThis is the only adopter-facing promise the archive change breaks, and it is a documentation edit rather than a capability loss: the binaries are still at the extraction root, the asset set is unchanged, and the same checksum still covers the archive.\n\nThe change lands after both directories are in the archive so the statement is true when it is written, and before the adopter profile documentation that cites it.\n\n## Success Criteria\n\n- [hard] REQ-01: The installation guide describes what the archive carries, with no claim that it is flat or that it carries four files.\n- [hard] REQ-02: The release policy's asset table describes the archive's contents including both package directories, with the asset count and the checksum coverage unchanged.\n- [hard] REQ-03: The fact has one home: the installation guide cites the policy's asset table rather than restating it.\n- [hard] REQ-04: The extraction and install steps the guide documents still hold against the archive's new shape.\n- [hard] REQ-05: The mechanical documentation checks pass over both pages.\n\n## Notes\n\nWhat a package is and how it is applied belongs to the profile reference; this covers what the download contains.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-31T17:55:01.855466366Z",
+  "gates_required": [
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "25a33a83-145e-4b1e-bd6f-cbd20251d08d",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:default-vocabulary",
+    "per:@/issue/e204e63d/decision/D-16",
+    "per:@/charter/D-13",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Say what the release archive carries",
+  "updated_at": "2026-07-31T17:55:28.049202160Z"
+}

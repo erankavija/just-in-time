@@ -1213,7 +1213,7 @@
  {
   "key": "profile-resolution-from-record",
   "title": "Resolve a profile package from a given location or the repository's record",
-  "description": "The profile commands read their package from a location the caller gives or from the location the repository's own record names, so a package that is not compiled in can be inspected, applied, and re-read.\n\n## Background\n\nResolution today compares a requested id against one compiled-in package and returns it or reports the profile missing, and enumeration returns a one-element list built from that same package. Neither can express a package that lives in a directory, so every profile command is limited to the one the binary carries.\n\nTwo routes replace it, in a fixed order. A location the caller gives answers the first application: an adopter who has obtained a package has bytes and no record yet. The location the repository's record names answers every run after that, without the caller having to remember where the package came from. While a package is still compiled in, it stays as the last resort behind both, so nothing that works today stops working before the package it depends on has left.\n\nEnumeration follows the same principle: what the repository reports is what its own records name, each resolved from its recorded location, so the answer describes this repository rather than the binary.\n\nA recorded location that no longer resolves is a failure and says so. Reporting it as an absent profile would make a deleted directory look like a repository that never applied one.\n\n## Success Criteria\n\n- [hard] REQ-01: A profile command reads its package from an explicitly given repository location when one is supplied.\n- [hard] REQ-02: With no location supplied, a profile command reads the package from the location the repository's applied-profile record names.\n- [hard] REQ-03: A supplied location takes precedence over a recorded one, and both take precedence over any package compiled into the binary.\n- [hard] REQ-04: Enumeration reports the profiles the repository's own records name, each resolved from its recorded location.\n- [hard] REQ-05: A recorded location that no longer resolves is reported as an error naming the record and the path, never as an absent profile.\n- [hard] REQ-06: The adopter-facing command reference describes the supplied-location form on every command that accepts it.\n\n## Notes\n\nInitialization applying a profile takes the same supplied location, because a repository being created has no record to read.\n",
+  "description": "The profile commands read their package from a location the caller gives or from the location the repository's own record names, so a package that is not compiled in can be inspected, applied, and re-read.\n\n## Background\n\nResolution today compares a requested id against one compiled-in package and returns it or reports the profile missing, and enumeration returns a one-element list built from that same package. Neither can express a package that lives in a directory, so every profile command is limited to the one the binary carries.\n\nTwo routes replace it, in a fixed order. A location the caller gives answers the first application: an adopter who has obtained a package has bytes and no record yet. The location the repository's record names answers every run after that, without the caller having to remember where the package came from. While a package is still compiled in, it stays as the last resort behind both, so nothing that works today stops working before the package it depends on has left.\n\nEnumeration follows the same principle: what the repository reports is what its own records name, each resolved from its recorded location, so the answer describes this repository rather than the binary.\n\nA recorded location that no longer resolves is a failure and says so. Reporting it as an absent profile would make a deleted directory look like a repository that never applied one.\n\n## Success Criteria\n\n- [hard] REQ-01: A profile command reads its package from an explicitly given repository location when one is supplied.\n- [hard] REQ-02: With no location supplied, a profile command reads the package from the location the repository's applied-profile record names.\n- [hard] REQ-03: A supplied location takes precedence over a recorded one, and both take precedence over any package compiled into the binary.\n- [hard] REQ-04: Enumeration reports the profiles the repository's own records name, each resolved from its recorded location.\n- [hard] REQ-05: A recorded location that no longer resolves is reported as an error naming the record and the path, never as an absent profile.\n\n## Notes\n\nInitialization applying a profile takes the same supplied location, because a repository being created has no record to read.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1226,9 +1226,7 @@
   ],
   "gates": [
    "cargo-ci",
-   "code-review",
-   "docs-mechanical",
-   "doc-review"
+   "code-review"
   ],
   "depends_on": [
    "profile-source-provenance"
@@ -1257,7 +1255,52 @@
      "touches": [
       "crates/jit/src/commands/profile.rs",
       "crates/jit/src/commands/init.rs",
-      "crates/jit/src/cli.rs",
+      "crates/jit/src/cli.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "profile-location-flag-reference",
+  "title": "Describe the supplied-location form in the command reference",
+  "description": "The adopter-facing command reference describes how a profile command is told where its package is, so the flag the resolver added is documented where adopters read command syntax.\n\n## Background\n\nThe profile commands and the profiled initialization gained a way to name the repository location a package is read from. Until that is written down, an adopter meets it only in `--help`, and the reference that documents every other flag of those commands is silently incomplete.\n\nWhat it says is the resolution order, because that is what an adopter needs to predict: a supplied location wins, the location the repository's own record names is used when none is supplied, and a recorded location that no longer resolves is an error rather than an absent profile.\n\n## Success Criteria\n\n- [hard] REQ-01: The command reference describes the supplied-location form on every command that accepts it, including profiled initialization.\n- [hard] REQ-02: It states the resolution order and what happens when a recorded location no longer resolves.\n- [hard] REQ-03: The fact has one home: other pages needing it cite the reference rather than restating it.\n- [hard] REQ-04: The mechanical documentation checks pass over the changed pages.\n\n## Notes\n\nWhat a package is and where an adopter obtains one belongs to the profile reference, not here; this page covers command syntax.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:profile-discovery",
+   "per:@/charter/D-13",
+   "enforces:@/invariant/single-source-prose"
+  ],
+  "gates": [
+   "code-review",
+   "docs-mechanical",
+   "doc-review"
+  ],
+  "depends_on": [
+   "profile-resolution-from-record"
+  ],
+  "planning": {
+   "outcome": "The adopter command reference describes the supplied-location form and the resolution order.",
+   "contract_refs": [
+    "profile-package-resolution"
+   ],
+   "source_refs": [
+    "issue:2ce8ce1b",
+    "REQ-08",
+    "F3.3",
+    "A4.2"
+   ],
+   "landing_group": "package-discovery",
+   "terminal": {
+    "consumer_family": "the adopter command reference",
+    "test_boundary": "the mechanical documentation checks over the adopter surface",
+    "worker_sized_reason": "One flag and one resolution order stated on the page that already documents those commands.",
+    "footprint": {
+     "touches": [
       "docs/reference/cli-commands.md"
      ]
     }
@@ -1529,7 +1572,8 @@
    "doc-review"
   ],
   "depends_on": [
-   "contribution-conflict-names-package"
+   "contribution-conflict-names-package",
+   "profile-location-flag-reference"
   ],
   "planning": {
    "outcome": "The engine reads, applies, composes, and repairs profile packages that live in repository directories.",
@@ -1611,8 +1655,8 @@
  },
  {
   "key": "explicit-taxonomy-test-fixture",
-  "title": "Give the suite a fixture that declares its own taxonomy",
-  "description": "The tests that assert on type names build their repository from a fixture that declares a taxonomy explicitly, so no test depends on the binary supplying one.\n\n## Background\n\nTest fixtures across the command suites and the server crate construct a repository through the scaffold's default hierarchy template and then assert on type names it wrote. Those assertions hold today because the binary supplies a taxonomy. They stop holding when it does not, and the change that removes it would otherwise carry a suite-wide fixture rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nLanding the fixture first separates them. Afterwards each test states the taxonomy it needs, which is also what it should have been doing: a test asserting that a strategic type resolves is testing the mechanism, not the vocabulary, and saying so makes the test independent of what any package ships.\n\n## Success Criteria\n\n- [hard] REQ-01: One shared fixture builds a repository whose configuration declares a type hierarchy and the namespaces its assertions rely on.\n- [hard] REQ-02: Every test that asserts on a type name or a namespace builds its repository through that fixture.\n- [hard] REQ-03: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-04: The fixture declares its vocabulary in the test rather than reading it from any shipped default, so it holds whether or not the binary supplies one.\n- [hard] REQ-05: The suite passes unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThe fixture's vocabulary is the suite's own, chosen for the assertions that read it, and deliberately not a copy of what any package declares.\n",
+  "title": "Give the crate's own tests a fixture that declares its taxonomy",
+  "description": "The crate's in-module tests build their repository from a fixture that declares a taxonomy explicitly, so none of them depends on the binary supplying one.\n\n## Background\n\nSixty-four call sites across the workspace construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy. They stop holding when it does not, and the change that removes it would otherwise carry a workspace-wide fixture rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nThis covers the crate's in-module tests, where the shared test-utility module already lives, so the fixture is authored here and the other suites adopt it. The call sites are enumerated rather than counted: the archive, initialization, validation, gate-check, profile, graph and config command modules, the JSON storage module, the repository validation module, and the dogfood module. The template module's own call sites are deliberately excluded \u2014 they test the type that is being deleted and go with it.\n\nAfterwards each test states the taxonomy it needs, which is also what it should have been doing: a test asserting that a strategic type resolves is testing the mechanism, not the vocabulary.\n\n## Success Criteria\n\n- [hard] REQ-01: One fixture in the shared test-utility module builds a repository whose configuration declares a type hierarchy and the namespaces its consumers assert on.\n- [hard] REQ-02: Every in-module test in the enumerated modules that asserts on a type name or a namespace builds its repository through that fixture.\n- [hard] REQ-03: An in-module test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-04: The fixture declares its vocabulary in the test rather than reading it from any shipped default, so it holds whether or not the binary supplies one.\n- [hard] REQ-05: The suite passes unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThe fixture's vocabulary is the suite's own, chosen for the assertions that read it, and deliberately not a copy of what any package declares.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1629,7 +1673,7 @@
   ],
   "depends_on": [],
   "planning": {
-   "outcome": "Tests asserting on type names build their repository from a fixture that declares the taxonomy.",
+   "outcome": "The crate's in-module tests build their repository from a fixture that declares the taxonomy.",
    "contract_refs": [
     "scaffold-minimum"
    ],
@@ -1641,19 +1685,127 @@
    ],
    "landing_group": "taxonomy-defaults",
    "terminal": {
-    "consumer_family": "this repository's repository-building test fixtures",
-    "test_boundary": "the suites that build a repository through the shared fixture",
-    "worker_sized_reason": "One fixture replaces one constructor call across suites that already share their setup helpers.",
+    "consumer_family": "the crate's in-module test fixtures",
+    "test_boundary": "the crate's own library suite",
+    "worker_sized_reason": "One fixture is authored beside the helpers those modules already share, and replaces one constructor call in each.",
     "footprint": {
      "touches": [
+      "crates/jit/src/test_utils.rs",
       "crates/jit/src/commands/archive.rs",
-      "crates/jit/src/commands/gate_check.rs",
-      "crates/jit/src/commands/config.rs",
+      "crates/jit/src/commands/init.rs",
       "crates/jit/src/commands/validate.rs",
+      "crates/jit/src/commands/gate_check.rs",
+      "crates/jit/src/commands/profile.rs",
+      "crates/jit/src/commands/graph.rs",
+      "crates/jit/src/commands/config.rs",
+      "crates/jit/src/storage/json.rs",
+      "crates/jit/src/validation/repository.rs",
+      "crates/jit/src/profile/dogfood.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-integration-suites",
+  "title": "Adopt the taxonomy fixture in the crate's integration suites",
+  "description": "The crate's integration suites build their repository from the shared taxonomy fixture, so no suite outside the library depends on the binary supplying a vocabulary.\n\n## Background\n\nThe integration suites construct repositories the same way the in-module tests did, through the scaffold's default hierarchy template, and several assert on the type names it wrote. The fixture that replaces it is authored by the work this depends on; adopting it here is the same mechanical substitution over a different suite family, under a different build target.\n\nThe suites are enumerated rather than counted: the rules suites covering config loading, default-rule derivation, label-membership validation, schema regeneration and CLI warnings; the documents-and-templates suites covering template apply atomicity and the document event log; the derived-state repair suite; and the item-validation, query-graph and repository-workflow suites.\n\n## Success Criteria\n\n- [hard] REQ-01: Every integration test that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: An integration test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No suite constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: The suites pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThe fixture is consumed, not redefined; a suite needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The crate's integration suites build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:45e250c6",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the crate's integration-test suites",
+    "test_boundary": "the crate's integration-test targets",
+    "worker_sized_reason": "One substitution repeated across suites that already share their repository setup helpers.",
+    "footprint": {
+     "touches": [
+      "crates/jit/tests/fast_rules/config_loading_tests.rs",
+      "crates/jit/tests/fast_rules/default_rules_registry_derivation_tests.rs",
+      "crates/jit/tests/fast_rules/label_membership_validation_tests.rs",
+      "crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs",
+      "crates/jit/tests/fast_rules/cli_warnings_integration_tests.rs",
+      "crates/jit/tests/fast_rules/derived_state_repair_tests.rs",
+      "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
+      "crates/jit/tests/fast_docs_templates/document_event_log_tests.rs",
+      "crates/jit/tests/cli_item_validate/decision_kind_tests.rs",
+      "crates/jit/tests/cli_item_validate/decision_risk_story_tests.rs",
+      "crates/jit/tests/cli_item_validate/risk_kind_tests.rs",
+      "crates/jit/tests/cli_query_graph/scope_validation_tests.rs",
+      "crates/jit/tests/cli_repo_workflow/doc_show_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-server-crate",
+  "title": "Adopt the taxonomy fixture in the server crate",
+  "description": "The server crate's tests build their repository from a fixture that declares a taxonomy, so the HTTP surface's tests do not depend on the binary supplying one.\n\n## Background\n\nThe server crate builds test repositories the same way, and one of its route tests asserts on the taxonomy the endpoint answers with. It is a separate crate with its own test target and its own fixture module, so adopting the shared fixture there is separate work from adopting it inside the library.\n\n## Success Criteria\n\n- [hard] REQ-01: The server crate's test repositories are built from a fixture that declares a type hierarchy explicitly.\n- [hard] REQ-02: The route test that asserts on the hierarchy the endpoint answers with reads its expectation from that fixture rather than from a shipped default.\n- [hard] REQ-03: No server test constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: The server suites pass unchanged.\n\n## Notes\n\nThe server crate consumes the library's fixture rather than declaring a second one, so one vocabulary serves both crates' assertions.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The server crate's tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:a53a6f09",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the server crate's test fixtures",
+    "test_boundary": "the server crate's test targets",
+    "worker_sized_reason": "Three call sites in one crate, consuming a fixture another entry authored.",
+    "footprint": {
+     "touches": [
       "crates/server/src/lib.rs",
-      "crates/server/src/routes.rs"
-     ],
-     "uncertainty": "Which of the enumerated call sites assert on vocabulary and which need only a repository was counted, not read per site."
+      "crates/server/src/routes.rs",
+      "crates/server/tests/server_integration/graceful_shutdown_tests.rs"
+     ]
     }
    }
   }
@@ -1716,7 +1868,7 @@
  {
   "key": "jit-dogfood-dependency-delta",
   "title": "Reduce the workflow package to its delta over the default",
-  "description": "The workflow package declares a dependency on the default package and only the vocabulary it adds, so the shared vocabulary exists once.\n\n## Background\n\nThe workflow package declares its own type names, namespaces and item kinds, several of which the default package now also declares. Two packages restating the same values would be the hand-maintained duplicate this container exists to remove, and the alternative the decisions rejected.\n\nThe split is already disjoint where it matters: the namespaces the two declare do not overlap, and on types the workflow package declares the default's four plus four of its own. It drops the four the default carries and keeps its own, so applying it composes rather than collides.\n\nTwo workflow rules move here in the same change. They encode an opinion \u2014 that a leaf carries a parent-membership label, that a strategic type carries its own \u2014 and neither derives from any declaration, so they belong to the workflow rather than to the engine. The package already contributes rules, so the target exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow package declares a dependency on the default package.\n- [hard] REQ-02: It declares no type name, namespace, or item kind the default package already declares, except where restating it identically is necessary and the restatement is exact.\n- [hard] REQ-03: It declares the two workflow rules that encode a sequencing opinion.\n- [hard] REQ-04: Applying it to a bare repository produces the same configuration as applying both packages by hand, and reports no conflict.\n- [hard] REQ-05: It declares the one item kind whose source file it ships and the default package does not.\n- [hard] REQ-06: The two adopter-facing statements of what the scaffolded rule set contains no longer present those two rules as scaffolded, and say what a repository receives them from.\n\n## Notes\n\nAn adopter applying the workflow package receives the default package as a resolved dependency and never names it.\n\nThe projected rules-and-gates reference is deliberately not edited: it renders this repository's own registry, which keeps declaring both rules for as long as the workflow package contributes them, so hand-editing it would be a projection defect.\n",
+  "description": "The workflow package declares a dependency on the default package and only the vocabulary it adds, so the shared vocabulary exists once.\n\n## Background\n\nThe workflow package declares its own type names, namespaces and item kinds, several of which the default package now also declares. Two packages restating the same values would be the hand-maintained duplicate this container exists to remove, and the alternative the decisions rejected.\n\nThe split is already disjoint where it matters: the namespaces the two declare do not overlap, and on types the workflow package declares the default's four plus four of its own. It drops the four the default carries and keeps its own, so applying it composes rather than collides.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow package declares a dependency on the default package.\n- [hard] REQ-02: It declares no type name, namespace, or item kind the default package already declares, except where restating it identically is necessary and the restatement is exact.\n- [hard] REQ-03: Applying it to a bare repository produces the same configuration as applying both packages by hand, and reports no conflict.\n- [hard] REQ-04: It declares the one item kind whose source file it ships and the default package does not.\n\n## Notes\n\nAn adopter applying the workflow package receives the default package as a resolved dependency and never names it.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1726,15 +1878,12 @@
    "story:default-vocabulary",
    "satisfies:REQ-08",
    "per:@/issue/e204e63d/decision/D-14",
-   "per:@/issue/e204e63d/decision/D-17",
    "per:@/issue/e204e63d/decision/D-20",
    "enforces:@/invariant/single-source-prose"
   ],
   "gates": [
    "cargo-ci",
-   "code-review",
-   "docs-mechanical",
-   "doc-review"
+   "code-review"
   ],
   "depends_on": [
    "jit-default-package",
@@ -1749,21 +1898,110 @@
     "issue:e4ba28c5",
     "REQ-08",
     "D-14",
-    "D-17",
     "D-20",
     "A2.2",
-    "A3.1",
-    "A8.5"
+    "A3.1"
    ],
    "landing_group": "package-content",
    "terminal": {
     "consumer_family": "the workflow profile package",
     "test_boundary": "in-crate application assertions over the composed pair",
-    "worker_sized_reason": "One dependency line, one set of removals the default package now covers, and two rules moving to a target that exists.",
+    "worker_sized_reason": "One dependency line and one set of removals the default package now covers.",
     "footprint": {
      "touches": [
-      "profiles/jit-dogfood/manifest.toml",
+      "profiles/jit-dogfood/manifest.toml"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "workflow-rules-relocation",
+  "title": "Move the two workflow rules into the workflow package",
+  "description": "The two rules that encode a sequencing opinion are contributed by the workflow package rather than emitted by the engine, so a repository receives them only if it asked for that workflow.\n\n## Background\n\nTwo of the rules the engine seeds into every repository encode an opinion about how work is shaped: that a leaf carries a parent-membership label, and that a strategic type carries its own. Neither derives from anything the adopter declared, and both are emitted unconditionally, so neither is mechanism over the adopter's registry the way the remaining four are.\n\nThey move to the package that carries the workflow they belong to. The target already exists \u2014 that package contributes rules today \u2014 so this is a relocation rather than a new mechanism.\n\nTheir evaluation subject moves with them in a second sense worth stating: they are evaluated against the type hierarchy, and a repository that declares none has nothing for them to evaluate. That is consistent with them arriving only with the package that also supplies a hierarchy.\n\n## Success Criteria\n\n- [hard] REQ-01: The engine seeds neither rule into any repository.\n- [hard] REQ-02: The workflow package contributes both, and applying it to a bare repository yields both in that repository's rule registry.\n- [hard] REQ-03: The four registry-derived rules are unchanged and are still seeded, each deriving its assertion and its membership from whatever registry the repository declares.\n- [hard] REQ-04: A repository that applies no package receives neither rule and still validates.\n\n## Notes\n\nThe behaviour change this makes visible \u2014 that a repository stops receiving those two warnings unless it applies the workflow package \u2014 is stated where adopters read what the scaffolded rule set contains.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-17",
+   "enforces:@/invariant/domain-agnostic"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "jit-dogfood-dependency-delta"
+  ],
+  "planning": {
+   "outcome": "The two opinionated rules are contributed by the workflow package rather than seeded by the engine.",
+   "contract_refs": [
+    "engine-vocabulary-boundary",
+    "package-content-split"
+   ],
+   "source_refs": [
+    "issue:590ff4db",
+    "D-17",
+    "A2.2",
+    "A8.5"
+   ],
+   "landing_group": "package-content",
+   "terminal": {
+    "consumer_family": "the seeded default rule set",
+    "test_boundary": "in-crate assertions over the rules a bare repository receives",
+    "worker_sized_reason": "Two rule constructors leave one function and arrive as two contributions in a package that already carries three.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/repository_state/default_rules.rs",
+      "profiles/jit-dogfood/manifest.toml"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "scaffolded-rule-set-documentation",
+  "title": "Say which rules a repository is actually scaffolded with",
+  "description": "The adopter-facing statements of what a fresh repository's rule set contains describe the rules it now receives, and say where the two that left come from.\n\n## Background\n\nTwo adopter-facing pages describe the scaffolded rule set and name both opinionated rules as part of it. Once those rules are contributed by a package rather than seeded by the engine, both statements are false for any repository that applied no package \u2014 which, after this container, is every repository that did not ask for the workflow.\n\nThe correction is small and has to say two things: which rules a bare repository receives, and that the two that left arrive with the workflow package. Without the second, an adopter reads the removal as a regression.\n\nOne page is deliberately not touched. The rules-and-gates reference is a projection of this repository's own registry, which keeps declaring both rules for as long as the workflow package contributes them, so it will keep showing them correctly and hand-editing it would be a projection defect.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither adopter page presents the two opinionated rules as part of what initialization scaffolds.\n- [hard] REQ-02: Both state what a bare repository's rule set contains, and where the two that left arrive from.\n- [hard] REQ-03: The fact has one home; the second page cites the first rather than restating it.\n- [hard] REQ-04: The projected rules-and-gates reference is unedited, and still renders this repository's own registry.\n- [hard] REQ-05: The mechanical documentation checks pass over the changed pages.\n\n## Notes\n\nThis states the surface as it is; a narrative of what it used to contain belongs in the release notes.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-17",
+   "per:@/charter/D-13",
+   "enforces:@/invariant/single-source-prose"
+  ],
+  "gates": [
+   "code-review",
+   "docs-mechanical",
+   "doc-review"
+  ],
+  "depends_on": [
+   "workflow-rules-relocation"
+  ],
+  "planning": {
+   "outcome": "The adopter statements of the scaffolded rule set describe the rules a repository now receives.",
+   "contract_refs": [
+    "engine-vocabulary-boundary"
+   ],
+   "source_refs": [
+    "issue:59f12ba7",
+    "D-17",
+    "A8.5"
+   ],
+   "landing_group": "package-content",
+   "terminal": {
+    "consumer_family": "the adopter-facing rule documentation",
+    "test_boundary": "the mechanical documentation checks over the adopter surface",
+    "worker_sized_reason": "Two sentences on two pages, each stating what its own page already tried to state.",
+    "footprint": {
+     "touches": [
       "docs/reference/labels.md",
       "docs/reference/configuration.md"
      ]
@@ -1774,7 +2012,7 @@
  {
   "key": "package-in-release-archive",
   "title": "Carry the assembled package in the release archive",
-  "description": "The release archive carries the assembled workflow package beside the binaries, so an adopter who unpacks one download can apply it offline with no second fetch, and the release's own smoke path proves it.\n\n## Background\n\nThe archive is flat and carries four files: the two binaries and the two license texts. The workflow package has never been among them, because it travelled inside the binary. Once it does not, an adopter has to obtain it, and the release is where it comes from.\n\nIt arrives in the same archive. A separate asset would mean a second download and a second checksum step before a repository can be initialized, which is what the offline promise exists to avoid; putting the directory beside the binaries keeps one download sufficient, adds no asset to the published set, and leaves the existing checksum covering it. The binaries stay at the extraction root so the documented install step still holds, so the package goes under a directory rather than beside them.\n\nThe smoke path is what makes it more than a file in a tarball. It already extracts the archive into a clean prefix and initializes a repository through the profile quickstart, naming the profile with no location \u2014 which resolves nothing once the compiled-in copy goes. Pointing it at the extracted package proves the published bytes apply, and it proves it from the moment they are published rather than from the moment the compiled-in copy is removed.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive carries the assembled workflow package directory beside the binaries and the license texts, with the binaries still at the extraction root.\n- [hard] REQ-02: The published asset set is unchanged \u2014 no asset is added \u2014 and the existing checksum file covers the archive that now carries the package.\n- [hard] REQ-03: The archive-verification step asserts the package directory is present in the extracted prefix.\n- [hard] REQ-04: The smoke path initializes a repository from the extracted package rather than from the binary or a checkout, and asserts over what the resolver enumerates from that location.\n- [hard] REQ-05: The adopter-facing statements of what the archive carries account for the directory, including the one that says the archive is flat.\n- [hard] REQ-06: Any job the change introduces is declared in the workflow contract, so no undeclared workflow or job enters.\n\n## Notes\n\nThis lands before the compiled-in copy is removed, so no published release exists in which the profile is reachable only from a source checkout. The archive gains a second package directory when the vocabulary that one depends on becomes a package of its own.\n",
+  "description": "The release archive carries the assembled workflow package beside the binaries, so an adopter who unpacks one download can apply it offline with no second fetch, and the release's own smoke path proves it.\n\n## Background\n\nThe archive is flat and carries four files: the two binaries and the two license texts. The workflow package has never been among them, because it travelled inside the binary. Once it does not, an adopter has to obtain it, and the release is where it comes from.\n\nIt arrives in the same archive. A separate asset would mean a second download and a second checksum step before a repository can be initialized, which is what the offline promise exists to avoid; putting the directory beside the binaries keeps one download sufficient, adds no asset to the published set, and leaves the existing checksum covering it. The binaries stay at the extraction root so the documented install step still holds, so the package goes under a directory rather than beside them.\n\nThe smoke path is what makes it more than a file in a tarball. It already extracts the archive into a clean prefix and initializes a repository through the profile quickstart, naming the profile with no location \u2014 which resolves nothing once the compiled-in copy goes. Pointing it at the extracted package proves the published bytes apply, and it proves it from the moment they are published rather than from the moment the compiled-in copy is removed.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive carries the assembled workflow package directory beside the binaries and the license texts, with the binaries still at the extraction root.\n- [hard] REQ-02: The published asset set is unchanged \u2014 no asset is added \u2014 and the existing checksum file covers the archive that now carries the package.\n- [hard] REQ-03: The archive-verification step asserts the package directory is present in the extracted prefix.\n- [hard] REQ-04: The smoke path initializes a repository from the extracted package rather than from the binary or a checkout, and asserts over what the resolver enumerates from that location.\n- [hard] REQ-05: Any job the change introduces is declared in the workflow contract, so no undeclared workflow or job enters.\n\n## Notes\n\nThis lands before the compiled-in copy is removed, so no published release exists in which the profile is reachable only from a source checkout. The archive gains a second package directory when the vocabulary that one depends on becomes a package of its own.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1788,9 +2026,7 @@
    "per:@/charter/D-16"
   ],
   "gates": [
-   "code-review",
-   "docs-mechanical",
-   "doc-review"
+   "code-review"
   ],
   "depends_on": [
    "packaged-copy-retirement",
@@ -1821,9 +2057,7 @@
     "footprint": {
      "touches": [
       ".github/workflows/release-artifacts.yml",
-      ".github/workflow-contract.yml",
-      "docs/reference/release-policy.md",
-      "INSTALL.md"
+      ".github/workflow-contract.yml"
      ]
     }
    }
@@ -1832,7 +2066,7 @@
  {
   "key": "default-package-in-release-archive",
   "title": "Carry the default package in the release archive too",
-  "description": "The release archive carries the default vocabulary package as well, so a repository can obtain everything it needs from one download once the binary writes no configuration of its own.\n\n## Background\n\nThe workflow package already rides in the archive. Two things then make a second directory necessary rather than tidy. The workflow package declares a dependency on the default package and no longer restates its vocabulary, so applying it from the archive resolves nothing unless the dependency is there beside it. And a bare initialization is about to stop writing any vocabulary at all, so a repository that applies no package has none \u2014 which is the intent, but only if a package is obtainable.\n\nThe mechanism exists: the staging step and the member list the workflow package's directory established take a second directory unchanged. What is new is the dependency the smoke path can now observe. Asserting that the default package was applied as a resolved dependency is the release's best end-to-end evidence that composition works from published bytes, so the step is strengthened rather than merely extended.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive carries the default package directory beside the workflow package, under the same directory the workflow package uses.\n- [hard] REQ-02: The published asset set is still unchanged, and the existing checksum file still covers both.\n- [hard] REQ-03: The archive-verification step asserts both package directories are present.\n- [hard] REQ-04: The smoke path applies the workflow package from the extracted archive and asserts that the default package was applied as its resolved dependency.\n- [hard] REQ-05: The adopter-facing statements of what the archive carries account for both directories.\n\n## Notes\n\nThis is a hard predecessor of removing the configuration the binary writes: without it, that removal leaves a release in which a fresh repository can obtain no vocabulary at all.\n",
+  "description": "The release archive carries the default vocabulary package as well, so a repository can obtain everything it needs from one download once the binary writes no configuration of its own.\n\n## Background\n\nThe workflow package already rides in the archive. Two things then make a second directory necessary rather than tidy. The workflow package declares a dependency on the default package and no longer restates its vocabulary, so applying it from the archive resolves nothing unless the dependency is there beside it. And a bare initialization is about to stop writing any vocabulary at all, so a repository that applies no package has none \u2014 which is the intent, but only if a package is obtainable.\n\nThe mechanism exists: the staging step and the member list the workflow package's directory established take a second directory unchanged. What is new is the dependency the smoke path can now observe. Asserting that the default package was applied as a resolved dependency is the release's best end-to-end evidence that composition works from published bytes, so the step is strengthened rather than merely extended.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive carries the default package directory beside the workflow package, under the same directory the workflow package uses.\n- [hard] REQ-02: The published asset set is still unchanged, and the existing checksum file still covers both.\n- [hard] REQ-03: The archive-verification step asserts both package directories are present.\n- [hard] REQ-04: The smoke path applies the workflow package from the extracted archive and asserts that the default package was applied as its resolved dependency.\n\n## Notes\n\nThis is a hard predecessor of removing the configuration the binary writes: without it, that removal leaves a release in which a fresh repository can obtain no vocabulary at all.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1845,9 +2079,7 @@
    "per:@/issue/e204e63d/decision/D-14"
   ],
   "gates": [
-   "code-review",
-   "docs-mechanical",
-   "doc-review"
+   "code-review"
   ],
   "depends_on": [
    "package-in-release-archive",
@@ -1875,7 +2107,54 @@
     "worker_sized_reason": "One directory joins a staging step that already carries one, and one assertion observes the dependency it makes resolvable.",
     "footprint": {
      "touches": [
-      ".github/workflows/release-artifacts.yml",
+      ".github/workflows/release-artifacts.yml"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "release-archive-documentation",
+  "title": "Say what the release archive carries",
+  "description": "The adopter-facing statements of what a release archive contains describe both package directories beside the binaries, so the download an adopter is told to expect is the one they get.\n\n## Background\n\nTwo places state the archive's contents as a promise: the installation guide, which says in as many words that the archive is flat and carries four files, and the release policy's asset table, whose contents cell enumerates them. Both clauses of the first become false once the archive carries package directories, and the second becomes incomplete.\n\nThis is the only adopter-facing promise the archive change breaks, and it is a documentation edit rather than a capability loss: the binaries are still at the extraction root, the asset set is unchanged, and the same checksum still covers the archive.\n\nThe change lands after both directories are in the archive so the statement is true when it is written, and before the adopter profile documentation that cites it.\n\n## Success Criteria\n\n- [hard] REQ-01: The installation guide describes what the archive carries, with no claim that it is flat or that it carries four files.\n- [hard] REQ-02: The release policy's asset table describes the archive's contents including both package directories, with the asset count and the checksum coverage unchanged.\n- [hard] REQ-03: The fact has one home: the installation guide cites the policy's asset table rather than restating it.\n- [hard] REQ-04: The extraction and install steps the guide documents still hold against the archive's new shape.\n- [hard] REQ-05: The mechanical documentation checks pass over both pages.\n\n## Notes\n\nWhat a package is and how it is applied belongs to the profile reference; this covers what the download contains.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-16",
+   "per:@/charter/D-13",
+   "enforces:@/invariant/single-source-prose"
+  ],
+  "gates": [
+   "code-review",
+   "docs-mechanical",
+   "doc-review"
+  ],
+  "depends_on": [
+   "default-package-in-release-archive"
+  ],
+  "planning": {
+   "outcome": "The adopter statements of what the release archive carries describe both package directories.",
+   "contract_refs": [
+    "distribution-artefact-and-release"
+   ],
+   "source_refs": [
+    "issue:25a33a83",
+    "REQ-09",
+    "D-16",
+    "A7.1",
+    "A7.4"
+   ],
+   "landing_group": "package-content",
+   "terminal": {
+    "consumer_family": "the adopter-facing release documentation",
+    "test_boundary": "the mechanical documentation checks over the adopter surface",
+    "worker_sized_reason": "Two statements of one fact, written once both directories are in the archive they describe.",
+    "footprint": {
+     "touches": [
       "INSTALL.md",
       "docs/reference/release-policy.md"
      ]
@@ -1908,8 +2187,10 @@
   ],
   "depends_on": [
    "compiled-taxonomy-defaults-removal",
-   "explicit-taxonomy-test-fixture",
-   "default-package-in-release-archive"
+   "taxonomy-fixture-integration-suites",
+   "taxonomy-fixture-server-crate",
+   "scaffolded-rule-set-documentation",
+   "release-archive-documentation"
   ],
   "planning": {
    "outcome": "The generic vocabulary is package content, and a repository that declares none receives none.",
@@ -2133,6 +2414,49 @@
   }
  },
  {
+  "key": "item-kind-defaults-removal",
+  "title": "Delete the unreachable item-kind defaults",
+  "description": "The three item-kind defaults no adopter declaration can reach are gone, and a kind resolved from configuration takes the values that configuration declared.\n\n## Background\n\nThree constants supply a section slug, a self-id pattern and a link-label namespace for an item kind that declares none. All three are domain vocabulary \u2014 a section name, an id shape, a label namespace \u2014 and none is reachable: configuration loading rejects an item-kind table missing any required field, and a repository declaring no such table has an empty kind set. So the fallbacks that consume them are dead branches behind a validation that has already run.\n\nDeleting the constants therefore changes no byte any adopter receives, which is what makes it a cutover rather than a behaviour change. What it does change is the shape of the resolution: with no value to substitute, a kind whose configuration is missing a field is reported rather than completed, which states the same contract the loader already enforces instead of quietly agreeing with it.\n\nThe tests that pass those constants as literal expectations state the literals instead, so the assertions say what they mean rather than comparing a value against itself.\n\n## Success Criteria\n\n- [hard] REQ-01: The three item-kind default constants are gone, along with the fallbacks that consumed them.\n- [hard] REQ-02: Resolving a kind whose configuration omits a required field reports the missing field rather than substituting a value.\n- [hard] REQ-03: Every kind a loadable configuration declares resolves exactly as it does today.\n- [hard] REQ-04: No test asserts a resolved value against a constant that supplied it.\n\n## Notes\n\nThe equivalent defaults in the coverage rule are a separate duplication finding and are deliberately untouched here.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:configuration-removal",
+   "per:@/issue/e204e63d/decision/D-23",
+   "enforces:@/invariant/canonical-cutover",
+   "enforces:@/invariant/domain-agnostic"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [],
+  "planning": {
+   "outcome": "The three unreachable item-kind defaults are gone and a kind resolves from what its configuration declared.",
+   "contract_refs": [
+    "engine-vocabulary-boundary"
+   ],
+   "source_refs": [
+    "issue:28e1c647",
+    "D-23",
+    "A2.4"
+   ],
+   "landing_group": "literal-removal",
+   "terminal": {
+    "consumer_family": "the configured item-kind resolution",
+    "test_boundary": "in-crate item-kind resolution assertions",
+    "worker_sized_reason": "Three constants and the three fallback branches that read them, in one module whose loader already rejects the case they covered.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/domain/item.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "bracket-label-from-template",
   "title": "Read the bracket label from the template that declares it",
   "description": "The label that ties a breakdown node to its container is read from the template's own declaration rather than rebuilt from a literal namespace in the engine.\n\n## Background\n\nTwo places in the engine build that label by formatting a hardcoded namespace into a string, independently of each other. The namespace is a label namespace, which the boundary names, and the value is already declared: the template's breakdown node declares the label it wants, with the container's identifier interpolated. The engine reconstructs by literal what the template already states.\n\nReading it from the declaration removes the literal and makes the behaviour follow the adopter's template rather than the engine's assumption \u2014 a repository whose template declares a different namespace gets what it declared, which is not true today.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither call site formats a label namespace from a literal; both derive the label from the breakdown node's declared labels.\n- [hard] REQ-02: A template declaring a different namespace for that label produces that namespace end to end, in creation and in the scope resolution that reads it back.\n- [hard] REQ-03: A template whose breakdown node declares no such label is reported where the bracket is applied, rather than silently producing nothing to resolve against.\n- [hard] REQ-04: The repository's own bracket behaviour is unchanged, because its template declares the namespace the literals named.\n\n## Notes\n\nThe two sites are one property reached from two callers, so they move together.\n",
@@ -2308,8 +2632,53 @@
  },
  {
   "key": "projection-path-supply",
-  "title": "Stop naming this checkout's paths in the shipped binary",
-  "description": "No adopter binary carries a path inside this repository, because every projection target and generator command sits behind the boundary that already excludes this repository's own machinery from an adopter build.\n\n## Background\n\nSix modules each publish a pair of constants: the repository-relative path of a committed reference they project, and the command that regenerates it. Both name this checkout \u2014 a documentation path and a script path \u2014 and both are compiled into every adopter binary, where they mean nothing.\n\nEvery reader is already on one side of a boundary that exists. The declaration of this repository's generated artifacts is compiled only for the crate's own tests and the dev-dependency builds its entry point needs; the conformance assertions that read the constants are test-only. So the constants have no production reader, and moving them behind the same boundary removes them from an adopter build without changing what any of them does.\n\n## Success Criteria\n\n- [hard] REQ-01: No projection target path or generator command naming this repository is reachable from a default library build.\n- [hard] REQ-02: Each module's render function still produces the same bytes, and each conformance assertion still compares the committed file against that render.\n- [hard] REQ-03: The declaration of this repository's generated artifacts still names every artifact's target and entry point, and the regeneration entry point behaves identically.\n- [hard] REQ-04: The public surface of each module loses exactly those constants and nothing else.\n\n## Notes\n\nThe reference this container's removals reshape is covered here once it has its final subject, so the move happens against the page that remains rather than the one being rewritten.\n",
+  "title": "Stop naming this checkout's paths in the presentation layer",
+  "description": "The presentation-layer projection modules name no path inside this checkout from a default library build, so an adopter binary carries none of them.\n\n## Background\n\nEach of these modules publishes a pair of constants: the repository-relative path of a committed reference it projects, and the command that regenerates it. Both name this checkout \u2014 a documentation path and a script path \u2014 and both are compiled into every adopter binary, where they mean nothing.\n\nEvery reader is already on one side of a boundary that exists. The declaration of this repository's generated artifacts compiles only for the crate's own tests and the dev-dependency builds its entry point needs, and the conformance assertions that read the constants are test-only. So the constants have no production reader, and moving them behind the same boundary removes them from an adopter build without changing what any of them does.\n\nThe two here are the error-code and exit-code references, projected from the enumerations the command surface reports.\n\nIt establishes the shape the remaining pairs follow: the constants move to the module's own test-support surface, the render function keeps producing the same bytes, and the conformance assertion keeps comparing the committed file against that render.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither module's projection target path nor its generator command is reachable from a default library build.\n- [hard] REQ-02: Each render function still produces the same bytes, and each conformance assertion still compares the committed file against that render.\n- [hard] REQ-03: The declaration of this repository's generated artifacts still names each artifact's target and entry point, and the regeneration entry point behaves identically.\n- [hard] REQ-04: Each module's public surface loses exactly those constants and nothing else.\n\n## Notes\n\nOnly the constants move. No committed reference changes content.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:configuration-removal",
+   "per:@/issue/e204e63d/decision/D-21",
+   "enforces:@/invariant/domain-agnostic",
+   "enforces:@/invariant/architecture-dependency-direction"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [],
+  "planning": {
+   "outcome": "The presentation-layer projection modules name no path inside this checkout from an adopter build.",
+   "contract_refs": [
+    "engine-vocabulary-boundary"
+   ],
+   "source_refs": [
+    "issue:f6c23c09",
+    "D-21",
+    "A2.5.4"
+   ],
+   "landing_group": "extraction-cutover",
+   "terminal": {
+    "consumer_family": "the command surface's generated references",
+    "test_boundary": "the projection conformance assertions in those modules",
+    "worker_sized_reason": "Two pairs of constants move behind a boundary their only readers already sit behind.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/output.rs",
+      "crates/jit/src/schema.rs",
+      "crates/jit/src/generated_artifacts.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "projection-path-supply-domain-storage",
+  "title": "Stop naming this checkout's paths in the domain and storage layers",
+  "description": "The domain and storage projection modules name no path inside this checkout from a default library build, so an adopter binary carries none of them.\n\n## Background\n\nEach of these modules publishes a pair of constants: the repository-relative path of a committed reference it projects, and the command that regenerates it. Both name this checkout \u2014 a documentation path and a script path \u2014 and both are compiled into every adopter binary, where they mean nothing.\n\nEvery reader is already on one side of a boundary that exists. The declaration of this repository's generated artifacts compiles only for the crate's own tests and the dev-dependency builds its entry point needs, and the conformance assertions that read the constants are test-only. So the constants have no production reader, and moving them behind the same boundary removes them from an adopter build without changing what any of them does.\n\nThe two here are the event catalogue and the storage-record reference, projected from the definitions their own layers own.\n\nIt follows the shape the first pair established, so nothing about the mechanism is decided here.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither module's projection target path nor its generator command is reachable from a default library build.\n- [hard] REQ-02: Each render function still produces the same bytes, and each conformance assertion still compares the committed file against that render.\n- [hard] REQ-03: The declaration of this repository's generated artifacts still names each artifact's target and entry point, and the regeneration entry point behaves identically.\n- [hard] REQ-04: Each module's public surface loses exactly those constants and nothing else.\n\n## Notes\n\nOnly the constants move. No committed reference changes content.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -2326,29 +2695,73 @@
    "code-review"
   ],
   "depends_on": [
-   "embed-and-preset-deletion"
+   "projection-path-supply"
   ],
   "planning": {
-   "outcome": "No projection target or generator command naming this checkout is reachable from an adopter build.",
+   "outcome": "The domain and storage projection modules name no path inside this checkout from an adopter build.",
    "contract_refs": [
     "engine-vocabulary-boundary"
    ],
    "source_refs": [
-    "issue:f6c23c09",
+    "issue:f9cab4c2",
     "D-21",
     "A2.5.4"
    ],
    "landing_group": "extraction-cutover",
    "terminal": {
-    "consumer_family": "this repository's generated-reference projections",
-    "test_boundary": "the projection conformance assertions in each module",
-    "worker_sized_reason": "One boundary move repeated over six pairs of constants whose only readers already sit behind it.",
+    "consumer_family": "the record-model generated references",
+    "test_boundary": "the projection conformance assertions in those modules",
+    "worker_sized_reason": "Two pairs of constants move behind a boundary their only readers already sit behind.",
     "footprint": {
      "touches": [
-      "crates/jit/src/output.rs",
-      "crates/jit/src/schema.rs",
-      "crates/jit/src/storage/reference.rs",
       "crates/jit/src/domain/event_catalog.rs",
+      "crates/jit/src/storage/reference.rs",
+      "crates/jit/src/generated_artifacts.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "projection-path-supply-defaults-gates",
+  "title": "Stop naming this checkout's paths in the defaults and gate modules",
+  "description": "The runtime-defaults and gate projection modules name no path inside this checkout from a default library build, so an adopter binary carries none of them.\n\n## Background\n\nEach of these modules publishes a pair of constants: the repository-relative path of a committed reference it projects, and the command that regenerates it. Both name this checkout \u2014 a documentation path and a script path \u2014 and both are compiled into every adopter binary, where they mean nothing.\n\nEvery reader is already on one side of a boundary that exists. The declaration of this repository's generated artifacts compiles only for the crate's own tests and the dev-dependency builds its entry point needs, and the conformance assertions that read the constants are test-only. So the constants have no production reader, and moving them behind the same boundary removes them from an adopter build without changing what any of them does.\n\nThe two here are the runtime-defaults reference and the gate reference, the second of which is covered only once the removals have given its page its final subject.\n\nIt follows the shape the first pair established, so nothing about the mechanism is decided here.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither module's projection target path nor its generator command is reachable from a default library build.\n- [hard] REQ-02: Each render function still produces the same bytes, and each conformance assertion still compares the committed file against that render.\n- [hard] REQ-03: The declaration of this repository's generated artifacts still names each artifact's target and entry point, and the regeneration entry point behaves identically.\n- [hard] REQ-04: Each module's public surface loses exactly those constants and nothing else.\n\n## Notes\n\nOnly the constants move. No committed reference changes content.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:configuration-removal",
+   "per:@/issue/e204e63d/decision/D-21",
+   "enforces:@/invariant/domain-agnostic",
+   "enforces:@/invariant/architecture-dependency-direction"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "projection-path-supply-domain-storage",
+   "embed-and-preset-deletion"
+  ],
+  "planning": {
+   "outcome": "The runtime-defaults and gate projection modules name no path inside this checkout from an adopter build.",
+   "contract_refs": [
+    "engine-vocabulary-boundary"
+   ],
+   "source_refs": [
+    "issue:5de2c401",
+    "D-21",
+    "A2.5.4"
+   ],
+   "landing_group": "extraction-cutover",
+   "terminal": {
+    "consumer_family": "the configuration-surface generated references",
+    "test_boundary": "the projection conformance assertions in those modules",
+    "worker_sized_reason": "Two pairs of constants move behind a boundary their only readers already sit behind.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/runtime_defaults.rs",
       "crates/jit/src/gate_presets/reference.rs",
       "crates/jit/src/generated_artifacts.rs"
@@ -2468,7 +2881,7 @@
  {
   "key": "embedded-package-vocabulary-retirement",
   "title": "Retire the embedded-package vocabulary",
-  "description": "The package type, the commands over it, and their help name a profile package rather than an embedded one, so no superseded name survives the cutover.\n\n## Background\n\nThe names were accurate while a package could only be compiled in: the package type, its size bounds, the resolver, the enumerator, the application entry point, and the command help that offers to list the profiles embedded in this binary. None of them is accurate afterwards \u2014 a package is read from a repository location, and the binary embeds nothing.\n\nLeaving them is the compatibility residue the cutover rule rejects, and the cost is not only tidiness: the help text is an adopter-facing statement of what the command does, and the agent-facing bridge is generated from the same command schema, so a stale name travels outward.\n\nThe rename is mechanical and belongs after the removal rather than before it, because before it the names still describe something that exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The package type, its bounds, and the profile command entry points carry names describing a profile package rather than a compiled-in one.\n- [hard] REQ-02: The command help and the adopter-facing command reference describe reading a package from a repository location.\n- [hard] REQ-03: The agent-facing bridge is regenerated from the changed command schema and its coverage still passes.\n- [hard] REQ-04: No superseded name survives as an alias or re-export.\n\n## Notes\n\nThis changes names and the text describing them; no behaviour changes with it.\n",
+  "description": "The package type, the commands over it, and their help name a profile package rather than an embedded one, so no superseded name survives the cutover.\n\n## Background\n\nThe names were accurate while a package could only be compiled in: the package type, its size bounds, the resolver, the enumerator, the application entry point, and the command help that offers to list the profiles embedded in this binary. None of them is accurate afterwards \u2014 a package is read from a repository location, and the binary embeds nothing.\n\nLeaving them is the compatibility residue the cutover rule rejects, and the cost is not only tidiness: the help text is an adopter-facing statement of what the command does, and the agent-facing bridge is generated from the same command schema, so a stale name travels outward.\n\nThe rename is mechanical and belongs after the removal rather than before it, because before it the names still describe something that exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The package type, its bounds, and the profile command entry points carry names describing a profile package rather than a compiled-in one.\n- [hard] REQ-02: The command help strings describe reading a package from a repository location.\n- [hard] REQ-03: No superseded name survives as an alias or re-export.\n\n## Notes\n\nThis changes names and the text describing them; no behaviour changes with it.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -2481,10 +2894,7 @@
   ],
   "gates": [
    "cargo-ci",
-   "code-review",
-   "mcp-ci",
-   "docs-mechanical",
-   "doc-review"
+   "code-review"
   ],
   "depends_on": [
    "embed-and-preset-deletion"
@@ -2509,11 +2919,101 @@
       "crates/jit/src/profile/package.rs",
       "crates/jit/src/profile/mod.rs",
       "crates/jit/src/commands/profile.rs",
-      "crates/jit/src/cli.rs",
-      "docs/reference/cli-commands.md",
+      "crates/jit/src/cli.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "profile-command-reference-rename",
+  "title": "Follow the renamed profile surface in the command reference",
+  "description": "The adopter-facing command reference describes the profile commands the way their help now describes them, so the reference and the binary agree.\n\n## Background\n\nThe profile commands' names for what they operate on changed: they read a package from a repository location rather than listing what is embedded in the binary. The help strings changed with them. The reference that documents those commands still describes the surface by its superseded vocabulary, so an adopter reading it meets one description in the page and another in `--help`.\n\nNothing about the commands' behaviour or arguments changes here; this is the page catching up with the surface.\n\n## Success Criteria\n\n- [hard] REQ-01: The command reference describes each profile command in the vocabulary its help now uses, naming no embedded package.\n- [hard] REQ-02: No adopter-facing page describes a profile as carried inside the binary.\n- [hard] REQ-03: The mechanical documentation checks pass over the changed pages.\n\n## Notes\n\nThe resolution order and the supplied-location form are documented by their own entry; this covers the vocabulary those descriptions are written in.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:profile-extraction",
+   "per:@/charter/D-13",
+   "enforces:@/invariant/canonical-cutover"
+  ],
+  "gates": [
+   "code-review",
+   "docs-mechanical",
+   "doc-review"
+  ],
+  "depends_on": [
+   "embedded-package-vocabulary-retirement",
+   "profile-location-flag-reference"
+  ],
+  "planning": {
+   "outcome": "The adopter command reference describes the profile commands in their renamed vocabulary.",
+   "contract_refs": [
+    "profile-package-resolution"
+   ],
+   "source_refs": [
+    "issue:62ef09b6",
+    "F3.2",
+    "F3.3"
+   ],
+   "landing_group": "extraction-cutover",
+   "terminal": {
+    "consumer_family": "the adopter command reference",
+    "test_boundary": "the mechanical documentation checks over the adopter surface",
+    "worker_sized_reason": "One vocabulary substitution on the page that documents those commands.",
+    "footprint": {
+     "touches": [
+      "docs/reference/cli-commands.md"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "profile-bridge-vocabulary-rename",
+  "title": "Follow the renamed profile surface on the agent-facing bridge",
+  "description": "The agent-facing bridge presents the profile commands in their renamed vocabulary, so an agent reading the tool surface meets the same description an adopter does.\n\n## Background\n\nThe bridge generates its tool surface at every process start from the command schema, so the tools' names and arguments follow the renamed surface with no edit. Two checked-in files do not: three curated tool descriptions describe the profile commands as operating on packages embedded in the connected binary, and the bridge's own coverage asserts over that surface.\n\nThe descriptions are shipped adopter-facing text, so they are the substance of this change; the coverage assertion follows them.\n\n## Success Criteria\n\n- [hard] REQ-01: No curated tool description presents a profile package as embedded in the binary.\n- [hard] REQ-02: The curated descriptions match what the renamed commands do, including reading a package from a repository location.\n- [hard] REQ-03: The bridge's coverage passes against the renamed surface, with no tool changing name or arguments.\n- [hard] REQ-04: No schema artefact is checked in; the surface is still generated at process start.\n\n## Notes\n\nThe instruction block's own vocabulary is a separate entry's subject; the two touch different parts of the same curation file and neither edits the other's lines.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:profile-extraction",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/canonical-cutover"
+  ],
+  "gates": [
+   "mcp-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "embedded-package-vocabulary-retirement",
+   "bridge-instruction-vocabulary"
+  ],
+  "planning": {
+   "outcome": "The bridge's curated descriptions present the profile commands in their renamed vocabulary.",
+   "contract_refs": [
+    "profile-package-resolution"
+   ],
+   "source_refs": [
+    "issue:d198030e",
+    "F3.2",
+    "A2.3",
+    "A2.4"
+   ],
+   "landing_group": "extraction-cutover",
+   "terminal": {
+    "consumer_family": "the agent-facing bridge's curated descriptions",
+    "test_boundary": "the bridge's integration suite",
+    "worker_sized_reason": "Three descriptions and the assertion that reads them, in a surface generated from a schema that already followed the rename.",
+    "footprint": {
+     "touches": [
+      "mcp-server/curated-tools.json",
       "mcp-server/test-integration.js"
-     ],
-     "uncertainty": "Which generated bridge files change follows from how the renamed command help reaches the bridge schema."
+     ]
     }
    }
   }
@@ -2540,7 +3040,8 @@
   ],
   "depends_on": [
    "embed-and-preset-deletion",
-   "scaffold-template-removal"
+   "scaffold-template-removal",
+   "release-archive-documentation"
   ],
   "planning": {
    "outcome": "The adopter documentation describes a profile that arrives as a published package and is applied from a repository location.",
@@ -2599,7 +3100,8 @@
   ],
   "depends_on": [
    "build-input-surface-retirement",
-   "embedded-package-vocabulary-retirement"
+   "profile-command-reference-rename",
+   "profile-bridge-vocabulary-rename"
   ],
   "planning": {
    "outcome": "The workflow profile and its presets have left the binary, riding in the release archive instead.",
@@ -2655,7 +3157,8 @@
    "icon-preset-removal",
    "bridge-instruction-vocabulary",
    "web-hierarchy-fallback-removal",
-   "projection-path-supply",
+   "item-kind-defaults-removal",
+   "projection-path-supply-defaults-gates",
    "domain-agnostic-amendment",
    "adopter-profile-documentation"
   ],

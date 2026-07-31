@@ -3,7 +3,7 @@
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
   "dependencies": [],
-  "description": "The tests that assert on type names build their repository from a fixture that declares a taxonomy explicitly, so no test depends on the binary supplying one.\n\n## Background\n\nTest fixtures across the command suites and the server crate construct a repository through the scaffold's default hierarchy template and then assert on type names it wrote. Those assertions hold today because the binary supplies a taxonomy. They stop holding when it does not, and the change that removes it would otherwise carry a suite-wide fixture rewrite in the same diff as a deletion — two changes that cannot be reviewed against each other.\n\nLanding the fixture first separates them. Afterwards each test states the taxonomy it needs, which is also what it should have been doing: a test asserting that a strategic type resolves is testing the mechanism, not the vocabulary, and saying so makes the test independent of what any package ships.\n\n## Success Criteria\n\n- [hard] REQ-01: One shared fixture builds a repository whose configuration declares a type hierarchy and the namespaces its assertions rely on.\n- [hard] REQ-02: Every test that asserts on a type name or a namespace builds its repository through that fixture.\n- [hard] REQ-03: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-04: The fixture declares its vocabulary in the test rather than reading it from any shipped default, so it holds whether or not the binary supplies one.\n- [hard] REQ-05: The suite passes unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThe fixture's vocabulary is the suite's own, chosen for the assertions that read it, and deliberately not a copy of what any package declares.\n",
+  "description": "The crate's in-module tests build their repository from a fixture that declares a taxonomy explicitly, so none of them depends on the binary supplying one.\n\n## Background\n\nSixty-four call sites across the workspace construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy. They stop holding when it does not, and the change that removes it would otherwise carry a workspace-wide fixture rewrite in the same diff as a deletion — two changes that cannot be reviewed against each other.\n\nThis covers the crate's in-module tests, where the shared test-utility module already lives, so the fixture is authored here and the other suites adopt it. The call sites are enumerated rather than counted: the archive, initialization, validation, gate-check, profile, graph and config command modules, the JSON storage module, the repository validation module, and the dogfood module. The template module's own call sites are deliberately excluded — they test the type that is being deleted and go with it.\n\nAfterwards each test states the taxonomy it needs, which is also what it should have been doing: a test asserting that a strategic type resolves is testing the mechanism, not the vocabulary.\n\n## Success Criteria\n\n- [hard] REQ-01: One fixture in the shared test-utility module builds a repository whose configuration declares a type hierarchy and the namespaces its consumers assert on.\n- [hard] REQ-02: Every in-module test in the enumerated modules that asserts on a type name or a namespace builds its repository through that fixture.\n- [hard] REQ-03: An in-module test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-04: The fixture declares its vocabulary in the test rather than reading it from any shipped default, so it holds whether or not the binary supplies one.\n- [hard] REQ-05: The suite passes unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThe fixture's vocabulary is the suite's own, chosen for the assertions that read it, and deliberately not a copy of what any package declares.\n",
   "documents": [],
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
   "gates_required": [
@@ -13,16 +13,16 @@
   "gates_status": {},
   "id": "ae435979-9d43-4efc-ba05-7f7c6164af84",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
     "story:default-vocabulary",
     "per:@/issue/e204e63d/decision/D-13",
-    "enforces:@/invariant/shared-test-contracts"
+    "enforces:@/invariant/shared-test-contracts",
+    "type:task"
   ],
   "priority": "high",
   "state": "ready",
-  "title": "Give the suite a fixture that declares its own taxonomy",
-  "updated_at": "2026-07-31T17:28:56.596684919Z"
+  "title": "Give the crate's own tests a fixture that declares its taxonomy",
+  "updated_at": "2026-07-31T17:58:42.920738921Z"
 }
