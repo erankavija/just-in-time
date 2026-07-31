@@ -85,6 +85,26 @@
   "surfaced_pitfalls": [
     {
       "at": "2026-07-31",
+      "finding": "`.jit/config.toml:9-49` carries a third hand-maintained copy of the managed/permanent/issue-scoped area lists, asserting at :10-11 that it adopts the shipped classification verbatim with nothing binding it. Surfaced by the 67da1d70 worker.",
+      "disposition": "Out of scope by construction. The plan's 'A residual copy this container does not remove' entry and investigation §4.3 both place it outside REQ-01: it is repository-local policy, not adopter documentation. Re-check at the epic gate against REQ-01's exact wording ('The adopter configuration reference and the copyable example configuration'), which names two documents and does not reach this one."
+    },
+    {
+      "at": "2026-07-31",
+      "finding": "CHANGELOG treatment diverged across wave-1 siblings: 67da1d70 added an Unreleased entry for its adopter-visible doc change; 9d451c98 deliberately added none for its adopter-visible packaged-target relocation, reasoning that later issues in this container re-derive the same tree and would rewrite it.",
+      "disposition": "Lead decision: leave both as landed and reconcile the container's CHANGELOG once at epic close, when the packaged tree has its final shape. Both workers' reasoning is defensible; churn now is the worse option. Revisit before the epic's holistic-review gate."
+    },
+    {
+      "at": "2026-07-31",
+      "finding": "Every worker running the full `cargo-ci` pipeline itself serialises the whole wave behind the host-wide `flock /tmp/jit-cargo-ci.lock`: four builds queued at once in wave 1, one of them verifying work already rejected in review.",
+      "disposition": "Dispatch-prompt defect on the lead's side. Waves 2-6 instruct workers to run only targeted checks (`cargo test -p jit --lib <module>`, `jit validate`, `docs-mechanical` where cheap); the lead runs the authoritative `cargo-ci` gate once per issue on main after merge."
+    },
+    {
+      "at": "2026-07-31",
+      "finding": "`crates/jit/tests/fast_docs_templates/ai_review_verdict_tests.rs:1` carries a `(REQ-11)` tag naming a requirement id local to a different epic (2e926e39). Pre-existing; surfaced by the 9d451c98 worker and left alone.",
+      "disposition": "Outside this container's criteria. Not fixed here; worth a standalone issue at epic close alongside the `jit issue create --description-file` gap."
+    },
+    {
+      "at": "2026-07-31",
       "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat …)\"` and survive shell quoting.",
       "disposition": "Dogfooding friction. File as a separate issue at epic close; not in this epic's scope."
     },
