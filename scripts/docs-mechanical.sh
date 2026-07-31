@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# NB: deliberately NOT `set -e`. All three checkers run even if an earlier one
+# NB: deliberately NOT `set -e`. Every checker runs even if an earlier one
 # fails, so a single gate run reports every class of finding at once.
 set -uo pipefail
 
 # docs-mechanical — orchestrator for the `docs-mechanical` gate (epic 2d109173).
 #
-# Runs the three committed documentation mechanical checkers and aggregates
-# their exit status. Mirrors the cargo-ci.sh convention of one gate script
-# fanning out to several independent steps.
+# Runs the committed documentation mechanical checkers and aggregates their
+# exit status. Mirrors the cargo-ci.sh convention of one gate script fanning
+# out to several independent steps.
 #
-#   M2  scripts/docs-check-links.sh        link + heading-anchor resolver
-#   M3  scripts/docs-check-citations.sh    source-path + @/… citation existence
-#   M5  scripts/docs-check-projections.sh  projection-freshness diff
-#   M6  scripts/docs-check-canonical.sh    canonical-home / command-snippet /
-#                                          support-matrix binding
+#   M2  scripts/docs-check-links.sh          link + heading-anchor resolver
+#   M3  scripts/docs-check-citations.sh      source-path + @/… citation existence
+#   M5  scripts/docs-check-projections.sh    projection-freshness diff
+#   M6  scripts/docs-check-canonical.sh      canonical-home / command-snippet /
+#                                            support-matrix binding
+#   M7  scripts/docs-check-shipped-policy.sh shipped-policy region freshness
 #
-# Footprint resolution (passed to the two footprint-taking checkers; the
-# projection and canonical checks take no footprint — their targets are
-# configured):
+# Footprint resolution (passed to the footprint-taking checkers; the checkers
+# whose targets are configured take none):
 #   1. positional args "$@", if any;                      else
 #   2. the DOCS_FOOTPRINT env var (space-separated), if set — the lead's
 #      per-issue scoping knob;                             else
@@ -43,7 +43,7 @@ set -uo pipefail
 # footprint a caller supplies.
 #
 # Exit codes (child semantics are preserved, exit 2 dominates — F4):
-#   0 — all four checks passed
+#   0 — every check passed
 #   1 — one or more checks reported genuine findings (child exit 1) and no
 #       check hit an environment error
 #   2 — a check hit an environment/usage error (child exit 2 or other unexpected
@@ -105,6 +105,7 @@ run "M2 links & anchors" "$here/docs-check-links.sh" "${FOOTPRINT[@]}" ${homes[@
 run "M3 citations" "$here/docs-check-citations.sh" "${FOOTPRINT[@]}" ${homes[@]+"${homes[@]}"}
 run "M5 projections" "$here/docs-check-projections.sh"
 run "M6 canonical homes" "$here/docs-check-canonical.sh"
+run "M7 shipped policy" "$here/docs-check-shipped-policy.sh"
 
 if [ "$env_error" -eq 1 ]; then
   exit 2
