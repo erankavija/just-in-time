@@ -32,10 +32,10 @@
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
-    "story:package-derivation"
+    "story:profile-extraction"
   ],
   "priority": "high",
   "state": "done",
   "title": "Seed the provenance fixture with the repository sources the package draws from",
-  "updated_at": "2026-07-31T11:32:32.191879249Z"
+  "updated_at": "2026-07-31T16:33:26.245252399Z"
 }

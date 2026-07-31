@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T16:28:27.583411185Z",
+  "dependencies": [
+    "5d12a79f-c29e-43ba-b14c-1f030790c01e"
+  ],
+  "description": "Derived-state repair recomputes a recorded profile's expected targets by reading its package again from the location the record names, and fails loudly when that location no longer resolves.\n\n## Background\n\nRepair works today because the package is always obtainable: the expected record can be recomputed from it and compared against the stored one, and only an exact match yields the claims that restore a deleted or edited profile-owned target. Once the package lives in a directory, \"the package is resolvable\" and \"the binary exists\" stop being the same statement, and repair needs somewhere to look.\n\nThe record's own location is that place, and it is the only one. The alternative — trusting the stored digests when the package cannot be read — would quietly turn repair from restoring profile-owned targets into restoring the ones it can still account for, which is a regression in the coherence the repair path exists to uphold.\n\nSo an unresolvable location is an error that names the record and the path. A repository with no applied-profile record is untouched: it resolves no package and reports nothing about profiles, which is already true and stays true.\n\n## Success Criteria\n\n- [hard] REQ-01: Where a record names a location that resolves, repair recomputes the expected record from the package read there and restores a deleted or edited profile-owned target.\n- [hard] REQ-02: Where the recorded location does not resolve, validation fails naming the record and the path.\n- [hard] REQ-03: No expected target is ever derived from the stored record's own digests.\n- [hard] REQ-04: A repository with no applied-profile record reads no package and reports nothing about profiles.\n- [hard] REQ-05: A stored record that disagrees with the package read from the recorded location is a validation failure rather than a repair.\n\n## Notes\n\nThis is what keeps the repair guarantee whole once the bytes leave the binary; the location's confinement to the worktree is what keeps it a property of the repository rather than of the machine.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8371bd46-5db6-4e96-8a36-82b07fcbd33b",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-discovery",
+    "satisfies:REQ-10",
+    "per:@/issue/e204e63d/decision/D-8",
+    "enforces:@/invariant/derived-state-coherence"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Repair profile-owned targets from the recorded package location",
+  "updated_at": "2026-07-31T16:28:27.583411185Z"
+}

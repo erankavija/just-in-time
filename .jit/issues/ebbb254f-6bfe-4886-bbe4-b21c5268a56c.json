@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T16:28:27.583411185Z",
+  "dependencies": [
+    "7d038e97-87e8-4d02-9101-6ffef1e8bdc0"
+  ],
+  "description": "Two assemblies from the same repository state produce the same package content and report the same content address, so the artefact an adopter receives does not depend on which run produced it.\n\n## Background\n\nOnce the packaged tree is produced rather than carried, the artefact an adopter receives is whatever the last assembly wrote. A run that ordered its walk by directory iteration, that embedded a path varying by machine, or that carried a timestamp would produce a different package from the same inputs, and nothing downstream would notice: publication archives whatever it is handed, and the provenance record records whatever digest it is given.\n\nThe package model already computes a content address over the canonical manifest and every declared path, plus one digest per installed target. Those are the values an applied-profile record carries, so they are exactly the ones that have to be stable: two repositories installing the same published package must record the same provenance, and a repository validating its own installation must recompute the same digests.\n\nThe comparison is between two assemblies into two destinations, never between an assembly and a stored constant. A stored expected digest would be a hand-maintained copy of a derived value and would have to change on every legitimate content edit.\n\n## Success Criteria\n\n- [hard] REQ-01: Two assemblies from the same repository state into two destinations produce the same set of package-relative paths, with identical bytes at each.\n- [hard] REQ-02: The package each assembly produces reports the same package hash.\n- [hard] REQ-03: The package each assembly produces reports the same per-target digests.\n- [hard] REQ-04: Both sides of the comparison are derived from the assemblies the check runs; no expected digest is stored beside it.\n- [hard] REQ-05: A content change to a declared live source changes the reported package hash, so the comparison cannot pass by comparing two empty results.\n\n## Notes\n\nThe property is about the assembly. Producing byte-identical compiled binaries is a separate concern this work does not scope.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-31T16:28:27.583411185Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ebbb254f-6bfe-4886-bbe4-b21c5268a56c",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:package-derivation",
+    "satisfies:REQ-04",
+    "per:@/issue/e204e63d/decision/D-5",
+    "per:@/issue/e204e63d/decision/D-7"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Two assemblies of the package report the same hashes",
+  "updated_at": "2026-07-31T16:28:51.612395576Z"
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T16:28:27.583411185Z",
+  "dependencies": [
+    "ff1bbada-b22a-432a-a75a-8506743e90f9"
+  ],
+  "description": "The package type, the commands over it, and their help name a profile package rather than an embedded one, so no superseded name survives the cutover.\n\n## Background\n\nThe names were accurate while a package could only be compiled in: the package type, its size bounds, the resolver, the enumerator, the application entry point, and the command help that offers to list the profiles embedded in this binary. None of them is accurate afterwards — a package is read from a repository location, and the binary embeds nothing.\n\nLeaving them is the compatibility residue the cutover rule rejects, and the cost is not only tidiness: the help text is an adopter-facing statement of what the command does, and the agent-facing bridge is generated from the same command schema, so a stale name travels outward.\n\nThe rename is mechanical and belongs after the removal rather than before it, because before it the names still describe something that exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The package type, its bounds, and the profile command entry points carry names describing a profile package rather than a compiled-in one.\n- [hard] REQ-02: The command help and the adopter-facing command reference describe reading a package from a repository location.\n- [hard] REQ-03: The agent-facing bridge is regenerated from the changed command schema and its coverage still passes.\n- [hard] REQ-04: No superseded name survives as an alias or re-export.\n\n## Notes\n\nThis changes names and the text describing them; no behaviour changes with it.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "d913a510-438e-4ec6-aeb4-425480a73c30",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-extraction",
+    "enforces:@/invariant/canonical-cutover",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Retire the embedded-package vocabulary",
+  "updated_at": "2026-07-31T16:28:27.583411185Z"
+}

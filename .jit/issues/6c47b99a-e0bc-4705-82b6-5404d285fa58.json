@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T16:28:27.583411185Z",
+  "dependencies": [
+    "09aea8b3-cc68-465a-8c9c-f7f4976f9e35"
+  ],
+  "description": "The repository's applied-profile record carries the location the package was read from, so a later run can read the same package again.\n\n## Background\n\nThe record beside an applied profile carries its id, its version, its origin, the package's content address, and a digest per installed target. Origin has one value, meaning the bytes were compiled into the binary — a vocabulary shaped for a second one but never given it. So a repository that applied a package from a directory has nowhere to say so, and nothing that runs later has anywhere to look for the bytes.\n\nThe location belongs in this record and nowhere else. It is repository-local state, versioned with the repository that applied the profile, and it is the one place that has to agree with itself. Putting the same location in a configuration key as well would create two carriers of one fact and a precedence question between them.\n\nWhere the location may point is part of the contract. A location outside the worktree makes a repository's derived-state repair depend on machine state, so the record is confined to a worktree-relative path and an application from outside it is refused rather than recorded.\n\n## Success Criteria\n\n- [hard] REQ-01: The applied-profile record carries the repository-relative location the package was read from.\n- [hard] REQ-02: The recorded location lies inside the repository worktree; applying a package from outside it is refused, naming the path.\n- [hard] REQ-03: The record's origin distinguishes a package read from a repository location from one compiled into the binary.\n- [hard] REQ-04: Application records the location it actually read from, not one supplied independently of the bytes.\n- [hard] REQ-05: A record whose location is absent or malformed is a validation failure rather than an ignored field.\n\n## Notes\n\nThe record carries a path, never package content. No package bytes are written under the tracker's data root.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "6c47b99a-e0bc-4705-82b6-5404d285fa58",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-discovery",
+    "satisfies:REQ-08",
+    "per:@/issue/e204e63d/decision/D-8",
+    "enforces:@/invariant/derived-state-coherence"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Record where an applied package came from",
+  "updated_at": "2026-07-31T16:28:27.583411185Z"
+}

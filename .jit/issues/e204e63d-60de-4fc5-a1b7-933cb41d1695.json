@@ -3,9 +3,10 @@
   "context": {},
   "created_at": "2026-07-26T19:29:45.471191451Z",
   "dependencies": [
-    "229e7389-31d3-41ce-b783-ef58a58b1699",
+    "1c0eb82e-b42b-4cfe-9351-78880b415f79",
     "25bdda50-640b-44d4-80cc-da4f872de058",
     "65ff0f38-fe0e-40bf-8ac6-75e411758142",
+    "6df7e456-d845-4a0e-b1f4-38a727285bba",
     "6f8f02ba-8cb3-4aea-b0f6-868deeec6a83",
     "7cbefe7c-c0d5-4c5b-ace5-a62e42fa9dcf",
     "cc75b4e6-dca6-4b12-be45-ee25ca6560bd"
@@ -28,5 +29,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Derived profile assets and projected policy documentation",
-  "updated_at": "2026-07-31T16:05:08.999273422Z"
+  "updated_at": "2026-07-31T16:32:39.949763524Z"
 }

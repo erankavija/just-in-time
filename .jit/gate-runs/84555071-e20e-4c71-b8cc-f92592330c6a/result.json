@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1a403729301cc29257285848233c5eeb455d43b6",
+  "completed_at": "2026-07-31T16:16:19.792929666Z",
+  "duration_ms": 244417,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json",
+        "id": "F1",
+        "line": 5,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/requirement/REQ-07",
+          "@/issue/e204e63d/requirement/REQ-08",
+          "@/issue/e204e63d/requirement/REQ-09",
+          "@/issue/e204e63d/requirement/REQ-10"
+        ],
+        "severity": "high",
+        "summary": "REQ-07 through REQ-10 have no satisfying dependency child in the current container graph; attach the profile-extraction branch and its criterion mappings before fan-out."
+      }
+    ],
+    "summary": "The revised container has four unsatisfied hard criteria in the current dependency graph.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7eecace8-fae3-49f8-8907-2d6180ae40a3",
+  "message": null,
+  "run_id": "84555071-e20e-4c71-b8cc-f92592330c6a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T16:12:15.375765490Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6294 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb8f2-a043-7720-9c4b-a2dba6090e22\n--------\nuser\n--- 6281 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **High — Coverage gap:** Repository validation fails for container `e204e63d`: REQ-07 through REQ-10 have no satisfying dependency child. Add the new profile-extraction breakdown branch to the container DAG and give its appropriate direct child/children `satisfies:REQ-07` through `satisfies:REQ-10` labels, then rerun validation. The manifest validator, generated-overview check, and batch-create dry run pass, but `jit validate --json` reports four coverage errors. (`.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json:5`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised container has four unsatisfied hard criteria in the current dependency graph.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-07 through REQ-10 have no satisfying dependency child in the current container graph; attach the profile-extraction branch and its criterion mappings before fan-out.\",\"file\":\".jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json\",\"line\":5,\"references\":[\"@/issue/e204e63d/requirement/REQ-07\",\"@/issue/e204e63d/requirement/REQ-08\",\"@/issue/e204e63d/requirement/REQ-09\",\"@/issue/e204e63d/requirement/REQ-10\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

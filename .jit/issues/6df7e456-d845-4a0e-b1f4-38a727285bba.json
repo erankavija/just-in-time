@@ -1,0 +1,38 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T16:28:27.583411185Z",
+  "dependencies": [
+    "6fef2d7c-68d7-4eb0-88b2-53bacab4240e",
+    "8d534ee7-23e0-474f-b87f-748bc66a26e8",
+    "aa258222-a3a3-47e6-a9ac-570ef8581d6a",
+    "d913a510-438e-4ec6-aeb4-425480a73c30"
+  ],
+  "description": "jit's own workflow profile and the presets derived from it are gone from the binary, riding in the release archive instead, and the invariant that governs the boundary says so without an exception.\n\n## Background\n\nThe binary compiles in one project's whole workflow: the package directory, and three gate presets whose names and shapes are read out of it. The engine that interprets a workflow is capability; a particular workflow is not, and the invariant's carve-out for these three presets is the one place the code stands outside the rule that gates are declared in repository configuration rather than baked into the binary.\n\nRemoving them is bounded by two facts and one ordering. Nothing an adopter can do today stops working: a gate key resolves through the repository's own registry when no preset supplies it. Nothing this repository does stops working: its own bracket gates are hand-authored and it has never applied its own profile. And the package must ride in the release archive and be provably applicable from it before the compiled-in copy stops existing, so no release exists in which the profile is reachable only from a jit source checkout.\n\nThis is where the boundary starts rather than where it ends. The remaining embedded declarative configuration is inventoried and sequenced by the audit beside this work, and the resolver built here is the populated route that sequencing depends on.\n\n## Success Criteria\n\n- [hard] REQ-01: The binary compiles in no profile package and no workflow preset.\n- [hard] REQ-02: The release archive carries the assembled package beside the binaries, and the release smoke path applies the profile from it.\n- [hard] REQ-03: The project invariant carries no sanctioned workflow exception and states which names belong to a mechanism.\n- [hard] REQ-04: Nothing claims the package affects the binary: editing a packaged source does not report an installed binary as stale.\n- [hard] REQ-05: No superseded embedded-package name survives, and the adopter-facing documentation describes obtaining and applying a published package.\n\n## Notes\n\nWhat the archive carries is the tree the derivation assembles, so this work consumes that artefact rather than producing one of its own.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci",
+    "jit-validate",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "6df7e456-d845-4a0e-b1f4-38a727285bba",
+  "labels": [
+    "type:story",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-extraction",
+    "per:@/issue/e204e63d/decision/D-10",
+    "per:@/issue/e204e63d/decision/D-13",
+    "enforces:@/invariant/domain-agnostic",
+    "enforces:@/invariant/canonical-cutover"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "The binary carries no workflow instance",
+  "updated_at": "2026-07-31T16:28:27.583411185Z"
+}

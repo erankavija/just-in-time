@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T16:28:27.583411185Z",
+  "dependencies": [
+    "ff1bbada-b22a-432a-a75a-8506743e90f9"
+  ],
+  "description": "The adopter-facing documentation describes a profile that arrives as a published package and is applied from a location inside the repository.\n\n## Background\n\nThe profile reference tells an adopter that this release exposes one immutable profile embedded in the binary, and that applying it needs no Git repository, network access, or jit source checkout. Half of that stays true and half stops: the application is still offline and still needs no checkout, but the bytes now have to have been obtained, and the release is where they come from.\n\nThe planning-bracket how-to has the same shape of change. Its instructions still work — a hand-authored template still applies — but the gate definitions its bracket needs are no longer supplied by the binary, so the page has to state the two routes an adopter has: apply the profile, or declare the three gates in the repository's own registry, which is what the profile would have contributed anyway.\n\nEach of these facts has one home. The release's asset list belongs with the release policy, the installation steps with the installation guide, and what a profile is and how it is applied with the profile reference; a page needing another's fact cites it rather than restating it.\n\n## Success Criteria\n\n- [hard] REQ-01: The profile reference describes a package obtained from a release and applied from a location inside the repository, and states exactly what the offline promise still covers.\n- [hard] REQ-02: The installation guide names the package asset among what a release carries.\n- [hard] REQ-03: The planning-bracket how-to states both routes to the bracket's gates.\n- [hard] REQ-04: No adopter-facing page describes a profile or a preset bundle carried inside the binary.\n- [hard] REQ-05: Each fact has one home, and a page needing another page's fact cites it.\n\n## Notes\n\nThe pages describe the surface as it is; a narrative of what it used to be belongs in the release notes.\n",
+  "documents": [],
+  "gates_required": [
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "8d534ee7-23e0-474f-b87f-748bc66a26e8",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-extraction",
+    "satisfies:REQ-08",
+    "per:@/charter/D-13",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Describe obtaining and applying a profile package",
+  "updated_at": "2026-07-31T16:28:27.583411185Z"
+}
