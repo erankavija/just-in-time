@@ -191,7 +191,7 @@ pub(crate) use profile_apply::profile_capture_closure;
 pub use profile_apply::{
     AppliedProfileRecord, CompleteProjectionConfig, Contribution, KeyedArrayTarget, MapEntryTarget,
     ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileRegionClaim,
-    ProfileTargetConflictError, SetStringTarget,
+    ProfileTargetConflictError, ScalarTarget, SetStringTarget,
 };
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,

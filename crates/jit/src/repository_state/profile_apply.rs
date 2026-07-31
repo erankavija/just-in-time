@@ -31,6 +31,10 @@ use toml_edit::{Array, ArrayOfTables, DocumentMut, InlineTable, Item, Table, Val
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum Contribution {
+    Scalar {
+        target: ScalarTarget,
+        value: String,
+    },
     MapEntry {
         target: MapEntryTarget,
         identity: String,
@@ -54,9 +58,10 @@ pub enum Contribution {
 impl Contribution {
     pub fn registry_path(&self) -> &'static str {
         match self {
-            Self::MapEntry { .. } | Self::SetString { .. } | Self::Projection { .. } => {
-                ".jit/config.toml"
-            }
+            Self::Scalar { .. }
+            | Self::MapEntry { .. }
+            | Self::SetString { .. }
+            | Self::Projection { .. } => ".jit/config.toml",
             Self::KeyedArray { target, .. } => target.registry_path(),
         }
     }
@@ -73,8 +78,20 @@ pub enum MapEntryTarget {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
+pub enum ScalarTarget {
+    DocumentationDevelopmentRoot,
+    DocumentationArchiveRoot,
+    ValidationStrictness,
+    ValidationDefaultType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub enum SetStringTarget {
     StrategicTypes,
+    DocumentationManagedPaths,
+    DocumentationPermanentPaths,
+    DocumentationIssueScopedAreas,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -172,9 +189,10 @@ impl ProfileClaims {
 impl Contribution {
     fn registry_target(&self) -> Result<VirtualPath, super::RepositoryLayoutError> {
         let relative = match self {
-            Self::MapEntry { .. } | Self::SetString { .. } | Self::Projection { .. } => {
-                "config.toml"
-            }
+            Self::Scalar { .. }
+            | Self::MapEntry { .. }
+            | Self::SetString { .. }
+            | Self::Projection { .. } => "config.toml",
             Self::KeyedArray { target, .. } => match target {
                 KeyedArrayTarget::Gates => "gates.toml",
                 KeyedArrayTarget::Rules => "rules.toml",
@@ -470,6 +488,9 @@ fn merge_contribution(
 ) -> Result<(), RepositoryStateError> {
     let semantic = semantic_document(registry, document)?;
     match contribution {
+        Contribution::Scalar { target, value } => {
+            merge_scalar(registry, document, &semantic, *target, value)
+        }
         Contribution::MapEntry {
             target,
             identity,
@@ -486,6 +507,35 @@ fn merge_contribution(
         Contribution::Projection { name, value } => {
             merge_projection(registry, document, &semantic, name, value)
         }
+    }
+}
+
+fn merge_scalar(
+    registry: &str,
+    document: &mut DocumentMut,
+    semantic: &JsonValue,
+    target: ScalarTarget,
+    candidate: &str,
+) -> Result<(), RepositoryStateError> {
+    let (table, key) = scalar_target_path(target);
+    if let Some(existing) = semantic.get(table).and_then(|table| table.get(key)) {
+        return equal_or_conflict(
+            registry,
+            &format!("{table}.{key}"),
+            existing,
+            &JsonValue::String(candidate.to_string()),
+        );
+    }
+    ensure_table(document.as_table_mut(), table, registry)?.insert(key, candidate.into());
+    Ok(())
+}
+
+fn scalar_target_path(target: ScalarTarget) -> (&'static str, &'static str) {
+    match target {
+        ScalarTarget::DocumentationDevelopmentRoot => ("documentation", "development_root"),
+        ScalarTarget::DocumentationArchiveRoot => ("documentation", "archive_root"),
+        ScalarTarget::ValidationStrictness => ("validation", "strictness"),
+        ScalarTarget::ValidationDefaultType => ("validation", "default_type"),
     }
 }
 
@@ -565,9 +615,8 @@ fn merge_set_string(
     target: SetStringTarget,
     candidate: &str,
 ) -> Result<(), RepositoryStateError> {
-    let values = match target {
-        SetStringTarget::StrategicTypes => semantic.pointer("/type_hierarchy/strategic_types"),
-    };
+    let (table, key) = set_string_target_path(target);
+    let values = semantic.get(table).and_then(|table| table.get(key));
     if let Some(values) = values {
         let values = values.as_array().ok_or_else(|| {
             profile_registry_error(registry, ProfileRegistryParseError::SetTargetNotArray)
@@ -583,12 +632,21 @@ fn merge_set_string(
         }
     }
     ensure_array(
-        ensure_table(document.as_table_mut(), "type_hierarchy", registry)?,
-        "strategic_types",
+        ensure_table(document.as_table_mut(), table, registry)?,
+        key,
         registry,
     )?
     .push(candidate);
     Ok(())
+}
+
+fn set_string_target_path(target: SetStringTarget) -> (&'static str, &'static str) {
+    match target {
+        SetStringTarget::StrategicTypes => ("type_hierarchy", "strategic_types"),
+        SetStringTarget::DocumentationManagedPaths => ("documentation", "managed_paths"),
+        SetStringTarget::DocumentationPermanentPaths => ("documentation", "permanent_paths"),
+        SetStringTarget::DocumentationIssueScopedAreas => ("documentation", "issue_scoped_areas"),
+    }
 }
 
 fn merge_keyed_array(
@@ -877,6 +935,7 @@ fn existing_file_mode(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::{CaptureBudget, CaptureSpec, EntryIdentity};
 
     #[test]
     fn test_equal_or_conflict_preserves_raw_profile_identifiers() {
@@ -914,5 +973,153 @@ mod tests {
                 && matches!(*source, ProfileRegistryParseError::NotArray { ref key }
                     if key == "strategic_types")
         ));
+    }
+
+    #[test]
+    fn test_scalar_contributions_write_documentation_and_validation_keys_independently() {
+        let mut document = "[documentation]\n[validation]\n"
+            .parse::<DocumentMut>()
+            .unwrap();
+        for (target, value) in [
+            (
+                ScalarTarget::DocumentationDevelopmentRoot,
+                "workspace".to_string(),
+            ),
+            (
+                ScalarTarget::DocumentationArchiveRoot,
+                "archive".to_string(),
+            ),
+            (ScalarTarget::ValidationStrictness, "strict".to_string()),
+            (ScalarTarget::ValidationDefaultType, "work-item".to_string()),
+        ] {
+            merge_contribution(
+                ".jit/config.toml",
+                &mut document,
+                &Contribution::Scalar { target, value },
+            )
+            .unwrap();
+        }
+
+        let json: JsonValue = toml_edit::de::from_str(&document.to_string()).unwrap();
+        assert_eq!(json["documentation"]["development_root"], "workspace");
+        assert_eq!(json["documentation"]["archive_root"], "archive");
+        assert_eq!(json["validation"]["strictness"], "strict");
+        assert_eq!(json["validation"]["default_type"], "work-item");
+    }
+
+    #[test]
+    fn test_documentation_list_contributions_merge_as_sets() {
+        let mut document = "[documentation]\n".parse::<DocumentMut>().unwrap();
+        for (target, value) in [
+            (
+                SetStringTarget::DocumentationManagedPaths,
+                "workspace/active",
+            ),
+            (
+                SetStringTarget::DocumentationManagedPaths,
+                "workspace/design",
+            ),
+            (SetStringTarget::DocumentationPermanentPaths, "README.md"),
+            (
+                SetStringTarget::DocumentationIssueScopedAreas,
+                "workspace/active",
+            ),
+        ] {
+            merge_contribution(
+                ".jit/config.toml",
+                &mut document,
+                &Contribution::SetString {
+                    target,
+                    value: value.to_string(),
+                },
+            )
+            .unwrap();
+        }
+
+        let json: JsonValue = toml_edit::de::from_str(&document.to_string()).unwrap();
+        assert_eq!(
+            json["documentation"]["managed_paths"],
+            serde_json::json!(["workspace/active", "workspace/design"])
+        );
+        assert_eq!(
+            json["documentation"]["permanent_paths"],
+            serde_json::json!(["README.md"])
+        );
+        assert_eq!(
+            json["documentation"]["issue_scoped_areas"],
+            serde_json::json!(["workspace/active"])
+        );
+    }
+
+    #[test]
+    fn test_scalar_contribution_same_value_merges_and_different_value_conflicts() {
+        let mut document = "[validation]\ndefault_type = \"task\"\n"
+            .parse::<DocumentMut>()
+            .unwrap();
+        let contribution = Contribution::Scalar {
+            target: ScalarTarget::ValidationDefaultType,
+            value: "task".to_string(),
+        };
+        merge_contribution(".jit/config.toml", &mut document, &contribution).unwrap();
+        assert_eq!(
+            document["validation"]["default_type"].as_str(),
+            Some("task")
+        );
+
+        let conflicting = Contribution::Scalar {
+            target: ScalarTarget::ValidationDefaultType,
+            value: "story".to_string(),
+        };
+        let error = merge_contribution(".jit/config.toml", &mut document, &conflicting)
+            .expect_err("different scalar declarations must conflict");
+        assert!(matches!(
+            error,
+            RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
+                identity,
+                registry
+            }) if identity == "validation.default_type" && registry == ".jit/config.toml"
+        ));
+    }
+
+    #[test]
+    fn test_empty_contributions_leave_authored_configuration_without_an_overlay() {
+        let authored = b"[documentation]\ndevelopment_root = \"notes\"\n";
+        let path = VirtualPath::data("config.toml").unwrap();
+        let layout = super::super::RepositoryLayout::new(
+            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
+            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .unwrap();
+        let mut spec = CaptureSpec::phase_one(
+            [path.clone()],
+            CaptureBudget {
+                max_paths: 4,
+                max_listings: 0,
+                max_bytes: 1024,
+                max_depth: 4,
+            },
+        )
+        .unwrap();
+        spec.discover_paths([]).unwrap();
+        let image = RepositoryImage::close(
+            layout,
+            spec,
+            BTreeMap::from([(
+                path,
+                RepositoryEntry::File {
+                    identity: EntryIdentity::for_bytes(".jit/config.toml", authored).unwrap(),
+                    bytes: authored.to_vec(),
+                    mode: FileMode::Regular,
+                },
+            )]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+
+        assert!(merge_semantic_contributions(&image, &[])
+            .unwrap()
+            .is_empty());
     }
 }
