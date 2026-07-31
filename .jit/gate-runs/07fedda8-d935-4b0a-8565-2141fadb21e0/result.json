@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "861e13c50c9eae8b51ad001147248d5dd0ff2c88",
+  "completed_at": "2026-07-31T12:24:34.358152912Z",
+  "duration_ms": 188457,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/docs-check-shipped-policy.sh",
+        "id": "F1",
+        "line": 72,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-4"
+        ],
+        "severity": "high",
+        "summary": "Malformed version JSON bypasses the mandated environment-error exit status."
+      }
+    ],
+    "summary": "One classification-trust failure path returns an arbitrary jq status instead of environment-error status 2.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f77fd51b-ea3e-4ca8-b266-32caaad6f619",
+  "message": null,
+  "run_id": "07fedda8-d935-4b0a-8565-2141fadb21e0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T12:21:25.901083514Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5323 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb81f-49ee-7cc1-94d1-1c4d778d563e\n--------\nuser\n--- 5310 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 545f5c11 (merge, no tree patch), 8f8cb341, d33a0644, e24aeff4, b3982fd7\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-4 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json), @/invariant/single-source-prose (.jit/invariants.toml), @/gate/docs-mechanical and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: docs-mechanical passed (exit 0, 2026-07-31T12:21:09Z); jit-validate passed (exit 0, 2026-07-31T12:21:20Z); doc-review pending\nTruncation recovery: narrowed reads of the generator, M7 checker, self-test M7 block, orchestrator, generated regions, and provenance logic\n\n1. [blocking][issue-impact] `scripts/docs-check-shipped-policy.sh:72` does not translate malformed `jit version --json` output into the required environment-error status. With `set -euo pipefail`, a `jq` parse failure exits directly with jq’s status rather than calling `die` and returning 2. This is a failure to obtain a trustworthy classification, so it must be an environment failure under the issue’s three-status contract. The self-test covers valid JSON with `\"unknown\"` provenance, not malformed JSON. References: @/issue/e204e63d/decision/D-4.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One classification-trust failure path returns an arbitrary jq status instead of environment-error status 2.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Malformed version JSON bypasses the mandated environment-error exit status.\",\"file\":\"scripts/docs-check-shipped-policy.sh\",\"line\":72,\"references\":[\"@/issue/e204e63d/decision/D-4\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

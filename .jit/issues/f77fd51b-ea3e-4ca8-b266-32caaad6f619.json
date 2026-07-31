@@ -15,7 +15,23 @@
     "doc-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-31T12:24:34.661402200Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-31T12:21:19.447077587Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-31T12:21:22.342120486Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f77fd51b-ea3e-4ca8-b266-32caaad6f619",
   "labels": [
     "type:task",
@@ -30,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "A mechanical freshness check for the generated shipped-policy regions",
-  "updated_at": "2026-07-31T11:44:06.226584735Z"
+  "updated_at": "2026-07-31T12:24:34.661402200Z"
 }
