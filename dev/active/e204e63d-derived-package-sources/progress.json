@@ -216,6 +216,16 @@
    "at": "2026-07-31",
    "finding": "cargo-ci is not deterministic under host load. crates/server/tests/server_integration/graceful_shutdown_tests.rs::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero failed the gate for 3e340587 with 'the stalled connection was dropped before the drain deadline' at load average 6-10 (a worker build running beside the gate). It passes 5/5 in isolation on the same commit. The assertion is that a stalled connection SURVIVES to a drain deadline, which is precisely what CPU contention breaks.",
    "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close — a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "a30d704d introduced a SECOND shared test taxonomy: HierarchyConfig::test_vocabulary() (domain/type_taxonomy.rs, milestone/epic/story/task) and declared_test_taxonomy() (commands/test_helpers.rs), alongside ae435979's setup_test_repo_with_taxonomy()/test_taxonomy() (objective/initiative/deliverable/action) which landed on main during a30d704d's run. Both were dispatched in the same batch from the same base, so the worker could not have consumed a fixture that did not yet exist. ae435979's own description rejects per-family fixtures as 'the near-duplicate setup the shared-contract rule exists to prevent'.",
+   "disposition": "Convergence is already planned rather than missing: wave-1 issues a53a6f09 (server crate) and 76b16af0 (modules that seed a repository directly) migrate exactly these call sites onto the shared fixture. Brief BOTH workers explicitly to delete declared_test_taxonomy() and HierarchyConfig::test_vocabulary() rather than adopt the fixture beside them — an adoption that leaves the parallel variant standing satisfies the criterion's letter and violates @/invariant/convention-convergence. Precedent: the owner ruled convergence mandatory inside this epic when the same class arose in session 1 (65ff0f38)."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "0439da41's REQ-05 assertion `assert!(data.icons.is_empty())` in crates/server/src/routes.rs passed vacuously: the server test fixture declared no type hierarchy, so there were no types to resolve icons for and the endpoint's icon behaviour was never observed. a30d704d's fixture change (declaring a taxonomy, required once the compiled defaults are gone) exposed it as a cargo-ci failure on merged main.",
+   "disposition": "Lead-direct fix committed as fix(jit:0439da41): the assertion now states the level-keying property — one icon per declared type, two types sharing an icon exactly when they share a level — which holds for any taxonomy the fixture declares and actually observes REQ-05. Worth carrying to the epic's holistic review as evidence for @/invariant/semantic-test-assertions: an assertion that passes because its fixture is empty is not coverage."
   }
  ],
  "rework_counts": {
