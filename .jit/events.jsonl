@@ -12238,3 +12238,4 @@
 {"assignee":"agent:worker","id":"780f8f86-3204-425d-90ee-acba628b5597","issue_id":"f6c23c09-6f3e-471b-aaad-c487b294af26","timestamp":"2026-07-31T19:32:02.319718522Z","type":"issue_claimed"}
 {"from":"ready","id":"8916ba31-0b9f-4d1f-876e-78ceba97395d","issue_id":"28e1c647-993e-4621-8b6e-1504a0be0782","timestamp":"2026-07-31T19:32:07.508582513Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"df683e44-cd97-4be6-880d-9ea06022b8d0","issue_id":"28e1c647-993e-4621-8b6e-1504a0be0782","timestamp":"2026-07-31T19:32:07.508582513Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"a6653a9b-3842-4a65-9443-d684b68f6da5","issue_id":"3e340587-e295-4e75-ab0a-3745f896a676","timestamp":"2026-07-31T19:45:39.692021368Z","type":"gate_failed","updated_by":"auto:executor"}

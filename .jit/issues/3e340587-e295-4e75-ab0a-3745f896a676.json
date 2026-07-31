@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-31T19:45:39.692021368Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3e340587-e295-4e75-ab0a-3745f896a676",
   "labels": [
     "epic:derived-package-sources",
@@ -27,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Move the package-authored region source out of the derived prefix",
-  "updated_at": "2026-07-31T19:26:07.093409408Z"
+  "updated_at": "2026-07-31T19:45:39.692021368Z"
 }
