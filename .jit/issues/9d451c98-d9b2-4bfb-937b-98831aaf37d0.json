@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-31T08:48:38.515381919Z",
   "context": {},
   "created_at": "2026-07-31T08:46:22.095826876Z",
   "dependencies": [],
@@ -24,7 +25,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Relocate the packaged gate machinery out of the script directory",
-  "updated_at": "2026-07-31T08:46:22.095826876Z"
+  "updated_at": "2026-07-31T08:48:38.515381919Z"
 }

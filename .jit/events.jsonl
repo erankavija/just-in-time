@@ -11798,3 +11798,13 @@
 {"id":"35e2d35b-499c-4bbf-87f2-ecc2b3078781","issue_id":"9d451c98-d9b2-4bfb-937b-98831aaf37d0","priority":"normal","timestamp":"2026-07-31T08:46:22.095826876Z","title":"Relocate the packaged gate machinery out of the script directory","type":"issue_created"}
 {"from":"ready","id":"cdc052ae-4e1f-4dab-8b65-05ef3a84d9fa","issue_id":"39c34568-98ee-47d6-ba5f-875b06c59285","timestamp":"2026-07-31T08:46:33.417586336Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"baa2f81a-f7be-4b6d-b39f-51c17e355dc4","issue_id":"39c34568-98ee-47d6-ba5f-875b06c59285","timestamp":"2026-07-31T08:46:33.417586336Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"3083e99e-1a2e-495f-8988-26ccb0395cb3","issue_id":"67da1d70-224b-4a54-9c22-f4a5beb73e9a","timestamp":"2026-07-31T08:48:18.971373736Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"f92c4a04-519e-4d4d-b00b-bb942b6ef387","issue_id":"67da1d70-224b-4a54-9c22-f4a5beb73e9a","timestamp":"2026-07-31T08:48:18.971373736Z","type":"issue_claimed"}
+{"from":"ready","id":"49b049d1-6f28-4b65-ad9f-c17afc43b910","issue_id":"e1a18372-af85-458f-8947-a2e48970e9a1","timestamp":"2026-07-31T08:48:23.860270494Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"fec9e874-16d9-40a2-83a2-2a9744bebb87","issue_id":"e1a18372-af85-458f-8947-a2e48970e9a1","timestamp":"2026-07-31T08:48:23.860270494Z","type":"issue_claimed"}
+{"from":"ready","id":"f330311d-a311-48f5-aa6f-ac705d0def2d","issue_id":"c7a548c3-38a3-443b-bc02-8766b3801676","timestamp":"2026-07-31T08:48:28.749719003Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"156953e8-6a97-4bd0-b02b-95844cc402f3","issue_id":"c7a548c3-38a3-443b-bc02-8766b3801676","timestamp":"2026-07-31T08:48:28.749719003Z","type":"issue_claimed"}
+{"from":"ready","id":"7faed8df-1ee6-42fb-9801-bb7533f42498","issue_id":"9943c488-9689-4b58-a1a3-e0571db52cf3","timestamp":"2026-07-31T08:48:33.631894880Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"4f430c73-43cf-4e37-9b2c-1fba68eed992","issue_id":"9943c488-9689-4b58-a1a3-e0571db52cf3","timestamp":"2026-07-31T08:48:33.631894880Z","type":"issue_claimed"}
+{"from":"ready","id":"e42ad193-f448-4f1b-a380-305415aaf6ac","issue_id":"9d451c98-d9b2-4bfb-937b-98831aaf37d0","timestamp":"2026-07-31T08:48:38.515381919Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"6edc105b-d027-4d23-b957-1ebab17ba6ae","issue_id":"9d451c98-d9b2-4bfb-937b-98831aaf37d0","timestamp":"2026-07-31T08:48:38.515381919Z","type":"issue_claimed"}

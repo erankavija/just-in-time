@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-07-31T08:48:18.971373736Z",
   "context": {},
   "created_at": "2026-07-28T12:17:11.984851016Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Render the shipped area classification into the adopter configuration reference",
-  "updated_at": "2026-07-28T12:26:22.911036584Z"
+  "updated_at": "2026-07-31T08:48:18.971373736Z"
 }
