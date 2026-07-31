@@ -9,35 +9,38 @@
    "issues": [
     {
      "short_id": "a30d704d",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "opus-agent",
      "batch": "A",
      "base": "56cc6c0f",
      "lead_review": "pass",
      "note": "Four commits. Both taxonomy-supplying Default impls (HierarchyConfig, LabelNamespaces) and the unwrap_or_default fallback branches are gone; no impl Default for remains in domain/types.rs, config.rs, config_manager.rs or graph/hierarchy.rs. A 290-line fast_rules suite proves a repository declaring neither table receives an empty registry, no enumerating rule and no schema, and still validates. Its own follow-up commit 69fe7b28 is the substantive catch: file membership followed only the namespace-unique-* prefix, so withdrawing [type_hierarchy] would have left the type-enumeration rule and both hierarchy warnings behind. Docs swept in present tense (configuration.md, example-config.toml, labels.md). Merged into main with no conflicts despite three changed-in-both files; fast_rules passes 178/178 post-merge.",
-     "gate_decision": "docs-mechanical deliberately NOT added despite three docs/reference edits: the plan's gate assignment passed breakdown-review, story 93fef456 above it already carries docs-mechanical and doc-review, and the edits are the convention-required stale-text sweep rather than a deliverable. Changing a reviewed gate assignment mid-wave is scope drift."
+     "gate_decision": "docs-mechanical deliberately NOT added despite three docs/reference edits: the plan's gate assignment passed breakdown-review, story 93fef456 above it already carries docs-mechanical and doc-review, and the edits are the convention-required stale-text sweep rather than a deliverable. Changing a reviewed gate assignment mid-wave is scope drift.",
+     "gates": "all passed"
     },
     {
      "short_id": "ae435979",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "A",
      "base": "56cc6c0f",
      "lead_review": "pass",
-     "note": "Fixture declares objective/initiative/deliverable/action and its own namespaces — deliberately not a copy of any package's vocabulary — and returns TestTaxonomy so consumers assert against what they were given. Self-verifying test proves the built repository carries exactly the declaration. Binds the 11 wave-1 adoptions."
+     "note": "Fixture declares objective/initiative/deliverable/action and its own namespaces — deliberately not a copy of any package's vocabulary — and returns TestTaxonomy so consumers assert against what they were given. Self-verifying test proves the built repository carries exactly the declaration. Binds the 11 wave-1 adoptions.",
+     "gates": "all passed"
     },
     {
      "short_id": "4c40e165",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "B",
      "base": "4abed8d8",
      "lead_review": "pass",
-     "note": "New Scalar contribution kind for the two documentation scalars and the two validation defaults; the three documentation lists join SetStringTarget. Conflict handling reuses equal_or_conflict, so no precedence is introduced."
+     "note": "New Scalar contribution kind for the two documentation scalars and the two validation defaults; the three documentation lists join SetStringTarget. Conflict handling reuses equal_or_conflict, so no precedence is introduced.",
+     "gates": "all passed"
     },
     {
      "short_id": "5dd0df5b",
-     "status": "merged-awaiting-gates",
+     "status": "gates: cargo-ci+mcp-ci passed, code-review failed (false positive, namespace amended; re-run pending)",
      "worker": "codex-luna",
      "batch": "A",
      "base": "56cc6c0f",
@@ -46,7 +49,7 @@
     },
     {
      "short_id": "09aea8b3",
-     "status": "reviewed-integrating",
+     "status": "gates: cargo-ci failed (shutdown fixture, now ignored), code-review failed (symlink-swap TOCTOU); rework 1 in flight",
      "worker": "opus-agent",
      "batch": "A",
      "base": "56cc6c0f",
@@ -55,16 +58,17 @@
     },
     {
      "short_id": "3e340587",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "A",
      "base": "56cc6c0f",
      "lead_review": "pass",
-     "note": "Region source relocated to assets/regions/; live-prefix sources and files both drop 61->60 with total package assets unchanged at 64. REQ-04 is enforced jointly by package validation (no undeclared package file), the existing per-asset counterpart comparison, and the new region-source prefix assertion."
+     "note": "Region source relocated to assets/regions/; live-prefix sources and files both drop 61->60 with total package assets unchanged at 64. REQ-04 is enforced jointly by package validation (no undeclared package file), the existing per-asset counterpart comparison, and the new region-source prefix assertion.",
+     "gates": "all passed"
     },
     {
      "short_id": "510297e4",
-     "status": "merged-awaiting-gates",
+     "status": "gates: cargo-ci passed, code-review failed (third hardcoded site at validate.rs:2434); rework 2 of 2 in flight",
      "worker": "codex-luna",
      "batch": "B",
      "base": "4abed8d8",
@@ -73,48 +77,53 @@
     },
     {
      "short_id": "0439da41",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "B",
      "base": "4abed8d8",
      "lead_review": "pass",
-     "note": "Icon presets deleted; deny_unknown_fields on the icons table reports a configuration still naming one. Swept: no residual icon-preset reference in crates/docs/web; the remaining 'preset' hits are gate presets and hierarchy-template names, a different concept."
+     "note": "Icon presets deleted; deny_unknown_fields on the icons table reports a configuration still naming one. Swept: no residual icon-preset reference in crates/docs/web; the remaining 'preset' hits are gate presets and hierarchy-template names, a different concept.",
+     "gates": "all passed"
     },
     {
      "short_id": "fdae1023",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "A",
      "base": "56cc6c0f",
      "lead_review": "pass-after-rework",
-     "note": "Round 1 FAILED lead review: REQ-02 is universal over every shipped tool description but the guard checked three hand-listed keys. Rework replaced it with a scan over SERVER_INSTRUCTIONS, every CURATION.include entry and every generated tools/list description, deriving the kind vocabulary from the repository's own config rather than hardcoding it; the worker verified the guard fires when @/inv/dag-acyclic is reinjected. npm test 12/12 unsandboxed."
+     "note": "Round 1 FAILED lead review: REQ-02 is universal over every shipped tool description but the guard checked three hand-listed keys. Rework replaced it with a scan over SERVER_INSTRUCTIONS, every CURATION.include entry and every generated tools/list description, deriving the kind vocabulary from the repository's own config rather than hardcoding it; the worker verified the guard fires when @/inv/dag-acyclic is reinjected. npm test 12/12 unsandboxed.",
+     "gates": "all passed"
     },
     {
      "short_id": "9bdf8025",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "A",
      "base": "56cc6c0f",
      "lead_review": "pass",
-     "note": "Graph fallback hierarchy removed (renders without tiers on fetch failure); label colours derived from the API namespace registry with a muted fallback. All four LabelBadge call sites pass the registry; getNamespaces had no prior caller so no duplicate fetch. REQ-03 read as the graph half: a literal reading over colours would make REQ-02/03/04 jointly unsatisfiable."
+     "note": "Graph fallback hierarchy removed (renders without tiers on fetch failure); label colours derived from the API namespace registry with a muted fallback. All four LabelBadge call sites pass the registry; getNamespaces had no prior caller so no duplicate fetch. REQ-03 read as the graph half: a literal reading over colours would make REQ-02/03/04 jointly unsatisfiable.",
+     "gates": "all passed"
     },
     {
      "short_id": "f6c23c09",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "B",
      "base": "4abed8d8",
      "lead_review": "pass",
-     "note": "Four constants moved into cfg(any(test, feature=test-support)) pub(crate) mod test_support; renders and conformance assertions unchanged; both regeneration scripts still exit 0."
+     "note": "Four constants moved into cfg(any(test, feature=test-support)) pub(crate) mod test_support; renders and conformance assertions unchanged; both regeneration scripts still exit 0.",
+     "gates": "all passed"
     },
     {
      "short_id": "28e1c647",
-     "status": "merged-awaiting-gates",
+     "status": "done",
      "worker": "codex-luna",
      "batch": "B",
      "base": "4abed8d8",
      "lead_review": "pass",
-     "note": "Three constants and their fallbacks gone; an incomplete kind declaration is reported rather than completed. The only surviving reference to the removed names is the dated audit findings record."
+     "note": "Three constants and their fallbacks gone; an incomplete kind declaration is reported rather than completed. The only surviving reference to the removed names is the dated audit findings record.",
+     "gates": "all passed"
     }
    ],
    "gate_run": "All twelve merged. Gate pipeline restarted 2026-07-31 20:36Z over the complete set on an idle host, after the first pass produced only a load-induced cargo-ci failure. Merges and gate runs are serialised against each other: merging 09aea8b3 mid-run moved HEAD under a live code-review and the stale-binary guard refused it with exit 10."
@@ -241,7 +250,8 @@
   "65ff0f38": 2,
   "7eecace8": 4,
   "fdae1023": 1,
-  "510297e4": 1
+  "510297e4": 2,
+  "09aea8b3": 1
  },
  "started_at": "2026-07-31",
  "owner_rulings": [
@@ -339,6 +349,16 @@
    "at": "2026-08-01",
    "ruling": "Fix the graceful-shutdown test defect lead-direct, now, rather than as a task inside the epic or a standalone issue outside it.",
    "effect": "crates/server/tests/server_integration/graceful_shutdown_tests.rs probes the mid-drain survivor only while signalled_at.elapsed() + DEADLINE_SLACK < GRACEFUL_DRAIN_TIMEOUT. Committed as fix(jit:e204e63d). No coverage lost: the stalled_closed_after assertion already states the same entitlement unconditionally. The lead noted it would be both author and reviewer of a shared-infrastructure change; the owner accepted that."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Amend the [namespaces.satisfies] description so the label denotes contribution to a container criterion rather than sole delivery.",
+   "effect": "'.jit/config.toml' updated to say several children may credit one id and that the label-coverage gate credits a criterion when any labelled child exists. Resolves 5dd0df5b's code-review failure at the class level rather than per issue; the same finding would otherwise have hit every partial contributor to REQ-01/03/05/08."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Mark the graceful-shutdown drain test #[ignore]d against a filed issue rather than attempting a second lead-direct fix.",
+   "effect": "crates/server/tests/server_integration/graceful_shutdown_tests.rs:425 carries #[ignore = \"... re-enable with jit:fd61b44f\"]. Issue fd61b44f created (task, milestone:v1.0, component:server, cargo-ci + code-review) with five criteria that pin the acceptance race, forbid weakening any assertion, and require evidence from consecutive whole-workspace runs rather than isolated ones. e204e63d depends on fd61b44f, so this container cannot close while the coverage its own gating disabled is still missing. The lead's first fix (the deadline guard) stays: it addresses a genuinely separate cause and is correct on its own terms."
   }
  ],
  "halted": {
