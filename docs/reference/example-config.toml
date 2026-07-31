@@ -69,16 +69,7 @@ story = "story"
 # Hierarchy type icons for visual identification (web UI)
 # Icons are assigned by hierarchy level (domain-agnostic)
 [type_hierarchy.icons]
-# Choose a preset: simple, navigation, minimal, construction
-preset = "simple"  # Optional, defaults to "simple"
-
-# Available presets:
-# - simple:       ⭐ (1) → 📦 (2) → 📝 (3) → ☑️ (4+)
-# - navigation:   🏔️ (1) → 🗺️ (2) → 🧭 (3) → 📍 (4+)
-# - minimal:      ◆ (1) → ▣ (2) → ▢ (3) → □ (4+)
-# - construction: 🏁 (1) → 🏗️ (2) → 🧱 (3) → 🔨 (4+)
-
-# Example: Full custom icons (no preset)
+# Example: per-type overrides (level defaults apply to other types)
 # [type_hierarchy.icons.custom]
 # milestone = "🎯"
 # epic = "📚"

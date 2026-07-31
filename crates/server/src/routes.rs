@@ -1493,6 +1493,7 @@ mod tests {
         // Should return hierarchy data (may be empty defaults)
         assert!(data.types.is_empty() || !data.types.is_empty());
         assert!(data.strategic_types.is_empty() || !data.strategic_types.is_empty());
+        assert!(data.icons.is_empty());
     }
 
     #[tokio::test]

@@ -111,10 +111,9 @@ strategic_types = [{strategic_array}]
 [type_hierarchy.label_associations]
 {label_assoc_lines}
 
-# Icon preset for the web UI: "simple" | "navigation" | "minimal" | "construction"
+# Optional per-type icon overrides for the web UI.
 # [type_hierarchy.icons]
-# preset = "simple"
-# custom = {{ bug = "🐛" }}   # per-type overrides (merged with preset)
+# custom = {{ bug = "🐛" }}
 
 [validation]
 # Repo-wide enforcement strictness. Modulates which rule violations block a write

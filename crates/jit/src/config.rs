@@ -216,9 +216,8 @@ pub struct HierarchyConfigToml {
 
 /// Icon configuration from TOML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct IconConfigToml {
-    /// Icon preset name: "simple", "navigation", "minimal", "construction" (optional).
-    pub preset: Option<String>,
     /// Custom type name to icon mapping (optional, partial overrides allowed).
     pub custom: Option<HashMap<String, String>>,
 }
@@ -2748,6 +2747,30 @@ default_type = "task"
         let chain = format!("{err:#}");
         assert!(chain.contains("banana"), "{chain}");
         assert!(chain.contains("strictness"), "{chain}");
+    }
+
+    #[test]
+    fn test_removed_icon_preset_is_rejected_during_config_load() {
+        let temp_dir = TempDir::new().unwrap();
+        std::fs::write(
+            temp_dir.path().join("config.toml"),
+            r#"
+[type_hierarchy]
+types = { objective = 1 }
+
+[type_hierarchy.icons]
+preset = "navigation"
+"#,
+        )
+        .unwrap();
+
+        let error = JitConfig::load(temp_dir.path())
+            .expect_err("removed icon preset must not be silently ignored");
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("preset"),
+            "error names the removed key: {message}"
+        );
     }
 
     #[test]

@@ -7,7 +7,7 @@
 //! - Icons assigned by hierarchy LEVEL, not type name (domain-agnostic)
 //! - Full flexibility through custom type name → icon mapping
 //! - Partial overrides (only specify what changes)
-//! - Fallback chain: custom → preset → level default → no icon
+//! - Fallback chain: custom → level default → no icon
 //!
 //! # Examples
 //!
@@ -20,17 +20,6 @@
 //! ```
 
 use std::collections::HashMap;
-
-/// Icon preset definitions.
-const PRESETS: &[(&str, &[(u8, &str)])] = &[
-    ("simple", &[(1, "⭐"), (2, "📦"), (3, "📝"), (4, "☑️")]),
-    ("navigation", &[(1, "🏔️"), (2, "🗺️"), (3, "🧭"), (4, "📍")]),
-    ("minimal", &[(1, "◆"), (2, "▣"), (3, "▢"), (4, "□")]),
-    (
-        "construction",
-        &[(1, "🏁"), (2, "🏗️"), (3, "🧱"), (4, "🔨")],
-    ),
-];
 
 /// Default icons by hierarchy level (domain-agnostic).
 const DEFAULT_ICONS_BY_LEVEL: &[(u8, &str)] = &[
@@ -46,16 +35,14 @@ const LEAF_ICON: &str = "☑️";
 /// Icon configuration.
 #[derive(Debug, Clone, Default)]
 pub struct IconConfig {
-    /// Icon preset name (optional).
-    pub preset: Option<String>,
     /// Custom type name to icon mapping (optional).
     pub custom: Option<HashMap<String, String>>,
 }
 
 impl IconConfig {
     /// Creates a new icon configuration.
-    pub fn new(preset: Option<String>, custom: Option<HashMap<String, String>>) -> Self {
-        Self { preset, custom }
+    pub fn new(custom: Option<HashMap<String, String>>) -> Self {
+        Self { custom }
     }
 }
 
@@ -64,10 +51,9 @@ impl IconConfig {
 /// # Resolution Priority
 ///
 /// 1. Custom type mapping (highest priority)
-/// 2. Preset for that level
-/// 3. Default level mapping
-/// 4. Leaf icon for levels >= 4
-/// 5. No icon (None)
+/// 2. Default level mapping
+/// 3. Leaf icon for levels >= 4
+/// 4. No icon (None)
 ///
 /// # Arguments
 ///
@@ -82,26 +68,17 @@ pub fn get_icon_for_type(type_name: &str, level: u8, config: &IconConfig) -> Opt
         }
     }
 
-    // 2. Check preset for this level
-    if let Some(preset_name) = &config.preset {
-        if let Some(preset) = PRESETS.iter().find(|(name, _)| name == preset_name) {
-            if let Some((_, icon)) = preset.1.iter().find(|(lvl, _)| *lvl == level) {
-                return Some(icon.to_string());
-            }
-        }
-    }
-
-    // 3. Fall back to default level mapping
+    // 2. Fall back to default level mapping
     if let Some((_, icon)) = DEFAULT_ICONS_BY_LEVEL.iter().find(|(lvl, _)| *lvl == level) {
         return Some(icon.to_string());
     }
 
-    // 4. Fall back to leaf icon for levels >= 4
+    // 3. Fall back to leaf icon for levels >= 4
     if level >= 4 {
         return Some(LEAF_ICON.to_string());
     }
 
-    // 5. No icon
+    // 4. No icon
     None
 }
 
@@ -167,34 +144,12 @@ mod tests {
     }
 
     #[test]
-    fn test_get_icon_from_preset() {
-        let config = IconConfig::new(Some("navigation".to_string()), None);
-
-        assert_eq!(
-            get_icon_for_type("milestone", 1, &config),
-            Some("🏔️".to_string())
-        );
-        assert_eq!(
-            get_icon_for_type("epic", 2, &config),
-            Some("🗺️".to_string())
-        );
-        assert_eq!(
-            get_icon_for_type("story", 3, &config),
-            Some("🧭".to_string())
-        );
-        assert_eq!(
-            get_icon_for_type("task", 4, &config),
-            Some("📍".to_string())
-        );
-    }
-
-    #[test]
     fn test_get_icon_from_custom() {
         let mut custom = HashMap::new();
         custom.insert("epic".to_string(), "🚀".to_string());
         custom.insert("bug".to_string(), "🐛".to_string());
 
-        let config = IconConfig::new(None, Some(custom));
+        let config = IconConfig::new(Some(custom));
 
         // Custom overrides
         assert_eq!(
@@ -215,19 +170,19 @@ mod tests {
         let mut custom = HashMap::new();
         custom.insert("bug".to_string(), "🐛".to_string());
 
-        let config = IconConfig::new(Some("navigation".to_string()), Some(custom));
+        let config = IconConfig::new(Some(custom));
 
         // Custom override wins
         assert_eq!(get_icon_for_type("bug", 4, &config), Some("🐛".to_string()));
 
-        // Preset used for others
+        // Level default used for others
         assert_eq!(
             get_icon_for_type("epic", 2, &config),
-            Some("🗺️".to_string())
+            Some("📦".to_string())
         );
         assert_eq!(
             get_icon_for_type("task", 4, &config),
-            Some("📍".to_string())
+            Some("☑️".to_string())
         );
     }
 
@@ -265,20 +220,5 @@ mod tests {
         assert_eq!(icons.get("initiative"), Some(&"📦".to_string()));
         assert_eq!(icons.get("feature"), Some(&"📝".to_string()));
         assert_eq!(icons.get("action"), Some(&"☑️".to_string()));
-    }
-
-    #[test]
-    fn test_all_presets_defined() {
-        let presets = vec!["simple", "navigation", "minimal", "construction"];
-
-        for preset_name in presets {
-            let config = IconConfig::new(Some(preset_name.to_string()), None);
-
-            // Each preset should have icons for levels 1-4
-            assert!(get_icon_for_type("level1", 1, &config).is_some());
-            assert!(get_icon_for_type("level2", 2, &config).is_some());
-            assert!(get_icon_for_type("level3", 3, &config).is_some());
-            assert!(get_icon_for_type("level4", 4, &config).is_some());
-        }
     }
 }
