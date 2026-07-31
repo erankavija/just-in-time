@@ -14,7 +14,13 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-31T09:39:44.156936016Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "67da1d70-224b-4a54-9c22-f4a5beb73e9a",
   "labels": [
     "type:task",
@@ -30,5 +36,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Render the shipped area classification into the adopter configuration reference",
-  "updated_at": "2026-07-31T08:48:18.971373736Z"
+  "updated_at": "2026-07-31T09:39:44.156936016Z"
 }

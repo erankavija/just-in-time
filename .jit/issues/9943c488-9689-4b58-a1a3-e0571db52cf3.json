@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T09:49:14.785503701Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9943c488-9689-4b58-a1a3-e0571db52cf3",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Give the executable-mode contract a guard of its own",
-  "updated_at": "2026-07-31T08:48:33.631894880Z"
+  "updated_at": "2026-07-31T09:49:14.785503701Z"
 }

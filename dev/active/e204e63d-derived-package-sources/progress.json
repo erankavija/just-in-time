@@ -28,7 +28,8 @@
       "issues": [
         {"id": "7d038e97", "short_id": "7d038e97", "title": "Assemble the packaged tree at build time", "classification": "implementation", "status": "pending"},
         {"id": "4873b32f", "short_id": "4873b32f", "title": "Cover the declared roots on the agent-facing bridge", "classification": "implementation", "status": "pending"},
-        {"id": "0db28190", "short_id": "0db28190", "title": "State the root declaration in the adopter manifest reference", "classification": "documentation", "status": "pending"}
+        {"id": "0db28190", "short_id": "0db28190", "title": "State the root declaration in the adopter manifest reference", "classification": "documentation", "status": "pending"},
+        {"id": "65ff0f38", "short_id": "65ff0f38", "title": "Regenerating a checked-in generated artifact has one invocation form", "classification": "implementation", "status": "pending"}
       ]
     },
     {
@@ -64,6 +65,12 @@
       "title": "Relocate the packaged gate machinery out of the script directory",
       "reason": "Owner-approved (2026-07-31) escalation outcome. The script directory had 4 packaged files of 45 tracked, with no category separating packaged from unpackaged review prompts, so it could not carry a category-shaped exclusion list. Retiring it as a live-source root also collapses the byte-identical scripts/ai-review.sh + contrib/gates/ai-review.sh pair.",
       "wired": "39c34568 depends on 9d451c98"
+    },
+    {
+      "short_id": "65ff0f38",
+      "title": "Regenerating a checked-in generated artifact has one invocation form",
+      "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that — six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) — so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
+      "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label — the work is cross-cutting)"
     }
   ],
   "escalations": [

@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T10:04:19.494351560Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c7a548c3-38a3-443b-bc02-8766b3801676",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Seed the provenance fixture with the repository sources the package draws from",
-  "updated_at": "2026-07-31T08:48:28.749719003Z"
+  "updated_at": "2026-07-31T10:04:19.494351560Z"
 }
