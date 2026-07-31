@@ -1,8 +1,8 @@
 //! Regression tests for the ai-review.sh verdict parser (REQ-11).
 //!
 //! Verifies that reviewer output whose VERDICT: PASS line is followed by
-//! additional prose is still recorded as a pass. Both parser copies are
-//! exercised: scripts/ai-review.sh and contrib/gates/ai-review.sh.
+//! additional prose is still recorded as a pass. The parser lives in the one
+//! packaged wrapper, contrib/gates/ai-review.sh.
 
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -18,6 +18,11 @@ fn repo_root() -> std::path::PathBuf {
         .parent()
         .unwrap()
         .to_path_buf()
+}
+
+/// Returns the packaged AI-review wrapper, the single copy in the repository.
+fn wrapper() -> std::path::PathBuf {
+    repo_root().join("contrib/gates/ai-review.sh")
 }
 
 /// Creates a minimal JIT_CONTEXT_FILE that ai-review.sh accepts.
@@ -42,13 +47,13 @@ fn write_fake_agent(dir: &TempDir, output: &str) -> std::path::PathBuf {
     path
 }
 
-/// Runs one ai-review.sh script and returns its exit code.
+/// Runs the ai-review.sh wrapper and returns its exit code.
 fn run_script(script: &Path, context_file: &Path, reviewer_agent: &str) -> i32 {
     let output = Command::new("bash")
         .arg(script)
         .env("JIT_CONTEXT_FILE", context_file)
         .env("REVIEWER_AGENT", reviewer_agent)
-        // Suppress diagnostic stderr from the scripts so test output stays clean.
+        // Suppress diagnostic stderr from the script so test output stays clean.
         .env("AGENT_STDERR_HEAD_LINES", "0")
         .output()
         .unwrap_or_else(|e| panic!("failed to run {}: {e}", script.display()));
@@ -70,9 +75,8 @@ fn run_script_output(
 }
 
 // REQ-11: VERDICT: PASS followed by trailing prose must still record PASS.
-// Covered for scripts/ai-review.sh.
 #[test]
-fn test_verdict_pass_with_trailing_prose_scripts_copy() {
+fn test_verdict_pass_with_trailing_prose_records_a_pass() {
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     // Reviewer emits: a finding, the verdict, then trailing prose.
@@ -81,7 +85,7 @@ fn test_verdict_pass_with_trailing_prose_scripts_copy() {
         "1. No issues found.\nTotal findings: 0\nVERDICT: PASS\nThank you for the review opportunity.\n",
     );
 
-    let script = repo_root().join("scripts").join("ai-review.sh");
+    let script = wrapper();
     assert!(script.exists(), "script not found: {}", script.display());
 
     let exit_code = run_script(&script, &context, agent.to_str().unwrap());
@@ -92,52 +96,25 @@ fn test_verdict_pass_with_trailing_prose_scripts_copy() {
     );
 }
 
-// REQ-11: VERDICT: PASS followed by trailing prose must still record PASS.
-// Covered for contrib/gates/ai-review.sh.
+// Sanity: VERDICT: FAIL is still recorded as failure.
 #[test]
-fn test_verdict_pass_with_trailing_prose_contrib_copy() {
-    let temp = TempDir::new().unwrap();
-    let context = write_context_file(&temp);
-    let agent = write_fake_agent(
-        &temp,
-        "1. No issues found.\nTotal findings: 0\nVERDICT: PASS\nThank you for the review opportunity.\n",
-    );
-
-    let script = repo_root()
-        .join("contrib")
-        .join("gates")
-        .join("ai-review.sh");
-    assert!(script.exists(), "script not found: {}", script.display());
-
-    let exit_code = run_script(&script, &context, agent.to_str().unwrap());
-    assert_eq!(
-        exit_code, 0,
-        "expected exit 0 (PASS) but got {exit_code}: \
-         trailing prose after VERDICT: PASS must not flip the verdict"
-    );
-}
-
-// Sanity: VERDICT: FAIL is still recorded as failure (scripts copy).
-#[test]
-fn test_verdict_fail_scripts_copy() {
+fn test_verdict_fail_records_a_failure() {
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(&temp, "1. Bug found.\nTotal findings: 1\nVERDICT: FAIL\n");
 
-    let script = repo_root().join("scripts").join("ai-review.sh");
-    let exit_code = run_script(&script, &context, agent.to_str().unwrap());
+    let exit_code = run_script(&wrapper(), &context, agent.to_str().unwrap());
     assert_eq!(exit_code, 1, "expected exit 1 (FAIL) but got {exit_code}");
 }
 
-// Sanity: no verdict line at all → failure (scripts copy).
+// Sanity: no verdict line at all → failure.
 #[test]
-fn test_verdict_unparseable_scripts_copy() {
+fn test_verdict_unparseable_records_a_failure() {
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(&temp, "Some prose with no verdict line.\n");
 
-    let script = repo_root().join("scripts").join("ai-review.sh");
-    let exit_code = run_script(&script, &context, agent.to_str().unwrap());
+    let exit_code = run_script(&wrapper(), &context, agent.to_str().unwrap());
     assert_ne!(
         exit_code, 0,
         "expected non-zero exit for unparseable verdict"
@@ -145,32 +122,23 @@ fn test_verdict_unparseable_scripts_copy() {
 }
 
 #[test]
-fn test_missing_prompt_fails_in_both_wrapper_copies() {
+fn test_missing_prompt_fails_with_a_diagnostic() {
     let temp = TempDir::new().unwrap();
     let context = temp.path().join("context-without-prompt.json");
     fs::write(&context, r#"{"prompt":null}"#).unwrap();
     let agent = write_fake_agent(&temp, "Total findings: 0\nVERDICT: PASS\n");
 
-    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
-        let output = run_script_output(
-            &repo_root().join(relative),
-            &context,
-            agent.to_str().unwrap(),
-        );
-        assert_eq!(
-            output.status.code(),
-            Some(1),
-            "missing prompt passed in {relative}"
-        );
-        assert!(
-            String::from_utf8_lossy(&output.stderr).contains("No prompt defined"),
-            "missing-prompt diagnostic absent in {relative}"
-        );
-    }
+    let output = run_script_output(&wrapper(), &context, agent.to_str().unwrap());
+
+    assert_eq!(output.status.code(), Some(1), "missing prompt passed");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("No prompt defined"),
+        "missing-prompt diagnostic absent"
+    );
 }
 
 #[test]
-fn test_classified_advisory_finding_passes_in_both_wrapper_copies() {
+fn test_classified_advisory_finding_passes() {
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(
@@ -178,18 +146,12 @@ fn test_classified_advisory_finding_passes_in_both_wrapper_copies() {
         "1. Existing cleanup opportunity.\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"implementation is sound\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"existing cleanup opportunity\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n",
     );
 
-    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
-        let script = repo_root().join(relative);
-        let exit_code = run_script(&script, &context, agent.to_str().unwrap());
-        assert_eq!(
-            exit_code, 0,
-            "classified advisory output failed in {relative}"
-        );
-    }
+    let exit_code = run_script(&wrapper(), &context, agent.to_str().unwrap());
+    assert_eq!(exit_code, 0, "classified advisory output failed");
 }
 
 #[test]
-fn test_classified_referenced_finding_passes_in_both_wrapper_copies() {
+fn test_classified_referenced_finding_fails_and_keeps_the_reference() {
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(
@@ -197,46 +159,42 @@ fn test_classified_referenced_finding_passes_in_both_wrapper_copies() {
         "1. Policy defect.\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"policy defect\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"policy defect\",\"references\":[\"@/inv/pid-safety\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n",
     );
 
-    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
-        let output = run_script_output(
-            &repo_root().join(relative),
-            &context,
-            agent.to_str().unwrap(),
-        );
-        assert_eq!(output.status.code(), Some(1), "wrapper failed: {relative}");
-        assert!(
-            String::from_utf8_lossy(&output.stdout).contains("@/inv/pid-safety"),
-            "wrapper did not preserve a referenced finding: {relative}"
-        );
-    }
+    let output = run_script_output(&wrapper(), &context, agent.to_str().unwrap());
+
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "wrapper passed a failing verdict"
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("@/inv/pid-safety"),
+        "wrapper did not preserve a referenced finding"
+    );
 }
 
 #[test]
 fn test_wrapper_contract_documents_optional_references_without_requiring_them() {
-    let wrapper = fs::read_to_string(repo_root().join("scripts/ai-review.sh")).unwrap();
+    let contents = fs::read_to_string(wrapper()).unwrap();
 
-    assert!(wrapper.contains("references"));
-    assert!(wrapper.contains("optional"));
-    assert!(wrapper.contains("\"references\":[\"<qualified-policy-id>\"]"));
+    assert!(contents.contains("references"));
+    assert!(contents.contains("optional"));
+    assert!(contents.contains("\"references\":[\"<qualified-policy-id>\"]"));
     assert!(
-        wrapper.contains("may be omitted"),
+        contents.contains("may be omitted"),
         "legacy findings without references must remain valid"
     );
 }
 
 #[test]
-fn test_ai_review_wrapper_copies_remain_identical() {
-    let repository = repo_root();
-    let canonical = fs::read(repository.join("scripts/ai-review.sh")).unwrap();
-    let contributed = fs::read(repository.join("contrib/gates/ai-review.sh")).unwrap();
+fn test_ai_review_wrapper_stays_tool_agnostic_and_portable() {
+    let contents = fs::read_to_string(wrapper()).unwrap();
 
-    assert_eq!(canonical, contributed);
     assert!(
-        !String::from_utf8_lossy(&canonical).contains("jq"),
+        !contents.contains("jq"),
         "portable wrapper must not require jq"
     );
     assert!(
-        !String::from_utf8(canonical).unwrap().contains("codex"),
+        !contents.contains("codex"),
         "generic wrapper must not prescribe a reviewer tool"
     );
 }
@@ -250,17 +208,12 @@ fn test_prompt_contract_does_not_execute_markdown_as_shell_commands() {
         "Total findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"clear\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n",
     );
 
-    for relative in ["scripts/ai-review.sh", "contrib/gates/ai-review.sh"] {
-        let output = run_script_output(
-            &repo_root().join(relative),
-            &context,
-            agent.to_str().unwrap(),
-        );
-        assert!(output.status.success(), "wrapper failed: {relative}");
-        assert!(
-            output.stderr.is_empty(),
-            "prompt construction emitted stderr in {relative}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    let output = run_script_output(&wrapper(), &context, agent.to_str().unwrap());
+
+    assert!(output.status.success(), "wrapper failed");
+    assert!(
+        output.stderr.is_empty(),
+        "prompt construction emitted stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

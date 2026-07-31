@@ -392,7 +392,7 @@ mod tests {
             ".agents/skills/jit-planning-lead/references/breakdown-manifest.schema.json"
         ));
         assert!(live.contains(".agents/skills/jit-planning-lead/scripts/breakdown_manifest.py"));
-        assert!(live.contains("scripts/ai-review.sh"));
+        assert!(live.contains("contrib/gates/ai-review.sh"));
         let regions: BTreeSet<&str> = package
             .manifest()
             .regions

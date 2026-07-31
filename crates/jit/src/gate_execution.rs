@@ -51,7 +51,7 @@ struct IssueDocEnvEntry<'a> {
 ///
 /// Every gate checker process receives `JIT_ISSUE_DOCS` (alongside
 /// `JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`) so a checker script — e.g.
-/// `scripts/ai-review.sh` — can inline linked design/plan docs into its
+/// `contrib/gates/ai-review.sh` — can inline linked design/plan docs into its
 /// review prompt without hand-pasting them into the issue description first.
 ///
 /// Each entry keeps only the fields a checker needs: `path`, `doc_type`, and

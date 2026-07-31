@@ -206,8 +206,8 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
 #[test]
 fn test_profiled_init_conflict_leaves_no_jit_and_preserves_occupant() {
     let repo = TempDir::new().unwrap();
-    fs::create_dir_all(repo.path().join("scripts")).unwrap();
-    let occupant = repo.path().join("scripts/ai-review.sh");
+    fs::create_dir_all(repo.path().join("contrib/gates")).unwrap();
+    let occupant = repo.path().join("contrib/gates/ai-review.sh");
     fs::write(&occupant, b"local script\n").unwrap();
 
     let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
@@ -224,8 +224,12 @@ fn test_existing_partial_profiled_init_conflict_does_not_plain_init_first() {
     fs::create_dir_all(repo.path().join(".jit")).unwrap();
     let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
     fs::write(repo.path().join(".jit/index.json"), index).unwrap();
-    fs::create_dir_all(repo.path().join("scripts")).unwrap();
-    fs::write(repo.path().join("scripts/ai-review.sh"), b"local script\n").unwrap();
+    fs::create_dir_all(repo.path().join("contrib/gates")).unwrap();
+    fs::write(
+        repo.path().join("contrib/gates/ai-review.sh"),
+        b"local script\n",
+    )
+    .unwrap();
 
     let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
 

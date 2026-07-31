@@ -114,7 +114,7 @@ fn test_doc_review_prompt_defines_holistic_container_checks() {
 
 #[test]
 fn test_ai_review_wrapper_allows_passing_advisory_findings() {
-    let wrapper = repo_file("scripts/ai-review.sh");
+    let wrapper = repo_file("contrib/gates/ai-review.sh");
     assert!(wrapper.contains("passing verdict may include advisory findings"));
     assert!(!wrapper.contains("Use \"pass\" with an empty findings array when there are none."));
 }

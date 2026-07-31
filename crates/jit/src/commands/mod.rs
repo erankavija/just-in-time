@@ -3195,9 +3195,9 @@ mod tests {
 
         assert_eq!(
             layout
-                .classify_repository_relative("./scripts/code-review-prompt.md")
+                .classify_repository_relative("./contrib/gates/code-review-prompt.md")
                 .unwrap(),
-            VirtualPath::worktree("scripts/code-review-prompt.md").unwrap()
+            VirtualPath::worktree("contrib/gates/code-review-prompt.md").unwrap()
         );
         assert_eq!(
             layout
@@ -3227,7 +3227,7 @@ mod tests {
                 "{path:?}"
             );
         }
-        assert!(VirtualPath::worktree("./scripts/code-review-prompt.md").is_err());
+        assert!(VirtualPath::worktree("./contrib/gates/code-review-prompt.md").is_err());
     }
 
     #[test]
