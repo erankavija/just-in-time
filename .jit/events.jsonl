@@ -11866,3 +11866,4 @@
 {"gate_key":"docs-mechanical","id":"3fcff8bc-d548-46a9-9b76-e2b1e7896e4f","issue_id":"f77fd51b-ea3e-4ca8-b266-32caaad6f619","timestamp":"2026-07-31T12:21:19.447077587Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"jit-validate","id":"ab51a80c-0365-4270-9d41-bac711f637ed","issue_id":"f77fd51b-ea3e-4ca8-b266-32caaad6f619","timestamp":"2026-07-31T12:21:22.342120486Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"c4633bd1-5a16-4be1-9f40-d08a8f279d72","issue_id":"f77fd51b-ea3e-4ca8-b266-32caaad6f619","timestamp":"2026-07-31T12:24:34.661402200Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"88eb3219-c16a-40da-a2db-03255e164f1e","issue_id":"097b9f48-d8b2-47ee-ad02-c524190fbeb2","timestamp":"2026-07-31T12:37:25.435204284Z","type":"gate_passed","updated_by":"auto:executor"}
