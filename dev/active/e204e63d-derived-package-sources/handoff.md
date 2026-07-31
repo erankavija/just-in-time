@@ -8,8 +8,8 @@
 
 - Epic: `e204e63d` — state: backlog (claimed `agent:jit-execution-lead`). **Cannot reach Done on its current criteria** — see Open questions.
 - Wave in progress: wave 3 of 3 executable waves. The originally planned waves 4–6 are halted.
-- Children summary: 14 done, 1 in_progress (`65ff0f38`, rework 1), 2 ready but halted (`39c34568`, `3e340587`), 10 backlog and halted, 0 rejected.
-- Active claims: `65ff0f38` (agent:worker, claimed this session). All other workers stood down.
+- Children summary: 14 done, 0 in_progress, 2 ready but halted (`39c34568`, `3e340587`), 10 backlog and halted, 0 rejected. **All executable work is complete.**
+- Active claims: none. Every worker stood down.
 - Open escalations: four owner decisions taken this session, all resolved and recorded in `progress.json` under `owner_rulings` and `escalations`. Four **new** questions are open — see below.
 - Progress file: `progress.json` in this directory. It carries the re-planned waves, the halted set with per-task disposition, six `surfaced_pitfalls`, and the owner rulings.
 
@@ -25,13 +25,12 @@
 - Wave 2 done: `f77fd51b` (shipped-policy freshness check, M7) and `097b9f48` (parsed-declaration drift guard). Both failed `code-review` once and passed on rework.
 - Stories `25bdda50` and `6f8f02ba` completed with all gates.
 - Lead-direct fix (owner-directed): `install-jit.sh` no longer counts tracker-data churn as build dirt.
-- `65ff0f38` dispatched; submitted with strong evidence; **failed lead review** on one defect (below) and is in rework 1.
+- `65ff0f38` done after two rework rounds. Round 1 (lead review): a retired invocation rendered into `docs/reference/error-codes.md`'s header from a Rust string literal. Round 2 (`code-review`): the shipped-policy generator reported post-render failures as 2 while its seven siblings report 1; resolved by auditing all 18 failure sites (13 stay 2, 4 move to 1) with the boundary at "was the classification in hand".
 
 ## What to do next
 
-- [ ] Re-check `65ff0f38` rework. As of this handoff the worker went idle without committing the fix; `9ec56e65..HEAD` is empty and `crates/jit/src/output.rs:1020` still emits the retired invocation. Re-send the verdict (in its inbox) or dispatch a fresh agent into the existing worktree — see the trap about doing both at once.
-- [ ] On `65ff0f38` merge: `verify-commit-builds.sh`, then `./scripts/install-jit.sh` (branch touches `crates/jit/src`), then gates `cargo-ci`, `code-review`, `docs-mechanical`. Its `docs-mechanical` failure on-branch was environmental (stale binary), confirmed by isolation.
-- [ ] Put the four Open questions to the owner. Nothing else in the epic is executable until they are answered.
+- [ ] Put the four Open questions to the owner. **Nothing in this epic is executable until they are answered** — every unblocked issue is done.
+- [ ] Do not dispatch any halted `cc75b4e6` task. `progress.json.halted` records which are superseded and which survive retargeted.
 - [ ] Do not dispatch any halted `cc75b4e6` task. `progress.json.halted` records which are superseded and which survive retargeted.
 
 ## Traps — do not repeat these

@@ -1,7 +1,7 @@
 {
   "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
   "epic_short_id": "e204e63d",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -52,21 +52,21 @@
           "short_id": "f77fd51b",
           "title": "A mechanical freshness check for the generated shipped-policy regions",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "097b9f48",
           "short_id": "097b9f48",
           "title": "Fail the suite when the two plan-template declarations disagree",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "229e7389",
           "short_id": "229e7389",
           "title": "Validation stops loading a profile package unconditionally",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ],
       "note": "Re-planned after the owner's profile-extraction ruling. 3e340587 and 39c34568 moved out of this wave into the halted set."
@@ -79,7 +79,7 @@
           "short_id": "65ff0f38",
           "title": "Regenerating a checked-in generated artifact has one invocation form",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ],
       "note": "65ff0f38 only; the packaging tasks that were here are halted."
@@ -174,7 +174,12 @@
       "disposition": "Recorded in the plan's amendment section; no criterion depends on the count."
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "e1a18372": 1,
+    "097b9f48": 1,
+    "f77fd51b": 1,
+    "65ff0f38": 2
+  },
   "started_at": "2026-07-31",
   "owner_rulings": [
     {
@@ -224,5 +229,5 @@
       "REQ-06": "meaningless after extraction"
     }
   },
-  "blocked": "Epic e204e63d cannot reach Done on its current criteria: REQ-04 and REQ-06 lose their referent under the ruling. A re-plan with amended criteria goes to the owner after wave 2."
+  "blocked": "Epic e204e63d cannot reach Done on its current criteria: REQ-04 and REQ-06 name the binary and lose their referent under the owner's profile-extraction ruling. All executable work is complete: 14 issues done, 12 halted. Four owner decisions are open (see handoff.md 'Open questions'): amended REQ-04/REQ-06 text, the jit validate --fix re-resolution route, the @/charter/D-8 amendment, and the scope of extraction steps 2-5."
 }
