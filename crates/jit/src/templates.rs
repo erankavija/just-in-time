@@ -1106,9 +1106,9 @@ depends_on = ["a"]
         assert!(matches!(err, TemplateConfigError::CyclicDependsOn { .. }));
     }
 
-    // REGB-01: this repo's authored `.jit/templates.toml` round-trips through the
-    // loader. The path is resolved relative to the crate manifest so the test does
-    // not depend on the process working directory or on production issue state.
+    // REGB-01: this repo's `.jit/templates.toml` round-trips through the loader.
+    // The path is resolved relative to the crate manifest so the test does not
+    // depend on the process working directory or on production issue state.
 
     #[test]
     fn test_repo_plan_template_parses() {

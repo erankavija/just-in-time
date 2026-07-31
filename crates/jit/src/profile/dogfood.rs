@@ -127,6 +127,7 @@ mod tests {
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
     };
     use crate::storage::{IssueStore, JsonFileStorage};
+    use crate::templates::TemplateRegistry;
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
@@ -520,6 +521,94 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// This repository's committed template registry carries the packaged
+    /// declarations: its generated region equals the render, the render owns
+    /// that region and no byte outside it, the result loads, and rendering
+    /// again changes nothing.
+    ///
+    /// The assertion never writes. Generation is the
+    /// `render-template-region` example, invoked through the generator script
+    /// the failure message names, so an edit to either declaration alone fails
+    /// here instead of being repaired.
+    #[test]
+    fn test_committed_template_registry_carries_the_packaged_declarations() {
+        use crate::profile::template_region::{
+            outside_template_region, packaged_templates, render_template_block,
+            splice_template_region, TEMPLATE_REGION_GENERATOR,
+        };
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let existing = fs::read(root.join(".jit/templates.toml")).unwrap();
+        let block = render_template_block(&packaged_templates().unwrap()).unwrap();
+        let rendered = splice_template_region(&existing, &block).unwrap();
+
+        // The committed registry IS the render. On drift the generator, not
+        // this assertion, is what brings the two back into agreement.
+        assert_eq!(
+            String::from_utf8(rendered.clone()).unwrap(),
+            String::from_utf8(existing.clone()).unwrap(),
+            ".jit/templates.toml no longer carries the packaged template \
+             declarations. The block between the region delimiters is \
+             generated from profiles/jit-dogfood/manifest.toml: edit the \
+             packaged declaration, then regenerate with {TEMPLATE_REGION_GENERATOR}"
+        );
+
+        // Rendering owns the region and nothing else.
+        assert_eq!(
+            outside_template_region(&rendered).unwrap(),
+            outside_template_region(&existing).unwrap(),
+            "rendering changed registry bytes outside the region delimiters"
+        );
+
+        // Whatever the region happens to hold, the packaged block replaces it
+        // whole while the authored bytes around it survive: the region body is
+        // read from the package rather than carried over from the file.
+        let stale =
+            splice_template_region(&existing, "# a declaration the package does not make\n")
+                .unwrap();
+        assert_eq!(
+            outside_template_region(&stale).unwrap(),
+            outside_template_region(&existing).unwrap(),
+            "replacing the region changed registry bytes outside the delimiters"
+        );
+        assert_eq!(
+            splice_template_region(&stale, &block).unwrap(),
+            rendered,
+            "rendering over a diverged region did not restore the packaged block"
+        );
+
+        // The rendered registry loads, and every container type a declaration
+        // brackets is still bracketed by that declaration.
+        let unchecked_hierarchy: [&str; 0] = [];
+        let before = TemplateRegistry::from_toml_str(
+            std::str::from_utf8(&existing).unwrap(),
+            &unchecked_hierarchy,
+        )
+        .unwrap();
+        let after = TemplateRegistry::from_toml_str(
+            std::str::from_utf8(&rendered).unwrap(),
+            &unchecked_hierarchy,
+        )
+        .unwrap();
+        for template in &before.templates {
+            for container_type in &template.applies_to {
+                assert_eq!(
+                    after
+                        .template_for_container(container_type)
+                        .map(|applied| applied.name.as_str()),
+                    Some(template.name.as_str()),
+                    "the rendered registry stops bracketing container type '{container_type}'"
+                );
+            }
+        }
+
+        // A second rendering run finds nothing to change.
+        assert_eq!(
+            splice_template_region(&rendered, &block).unwrap(),
+            rendered,
+            "a second rendering run changed the registry"
+        );
     }
 
     #[test]
