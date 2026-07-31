@@ -993,7 +993,14 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
             &repo,
             &["issue", "update", &id, "--state", "rejected", "--json"],
         ));
-        fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        // Each variant is a complete configuration: the declared hierarchy that
+        // makes the rejected epic a container, plus the documentation-policy
+        // state under test.
+        fs::write(
+            repo.path().join(".jit/config.toml"),
+            format!("[type_hierarchy]\ntypes = {{ epic = 1, task = 2 }}\n\n{config}"),
+        )
+        .unwrap();
         let before = snapshot_tree(repo.path());
 
         let output = jit(&repo, &["archive", "candidates", "--json"]);

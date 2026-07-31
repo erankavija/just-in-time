@@ -1083,8 +1083,20 @@ mod tests {
     }
 
     fn test_memory_storage() -> InMemoryStorage {
+        use jit::storage::IssueStore;
+
         let storage = InMemoryStorage::new();
-        storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
+        // The taxonomy the taxonomy-serving routes answer with, declared by this
+        // repository. The config-reading routes resolve it through a
+        // `ConfigManager` rooted at the store, so it is written there as well as
+        // into the memory image.
+        let config = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            jit::commands::test_helpers::declared_test_taxonomy()
+        );
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), &config).unwrap();
+        storage.add_data_file("config.toml", &config);
         storage.add_data_file(
             "index.json",
             r#"{"schema_version":2,"all_ids":[],"deleted_ids":[]}"#,

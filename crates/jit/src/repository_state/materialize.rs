@@ -197,7 +197,8 @@ pub struct ValidationCaptureClosure {
 /// image-projected content: the engine registries (`config.toml`,
 /// `invariants.toml`, `rules.toml`, `gates.toml`, `templates.toml`), the
 /// repository index and event log, every ordinary issue record plus the complete
-/// `issues` listing, the schema files the effective rules reference, every declared
+/// `issues` listing, the schema files the effective rules reference and the ones
+/// the current configuration derives, every declared
 /// projection's documentation target and projected-kind sources, and every
 /// project-scope item-kind source the item-link pass indexes. The caller feeds
 /// [`paths`](ValidationCaptureClosure::paths) to
@@ -278,6 +279,12 @@ pub fn validate_capture_closure(
         for request in crate::declarations::rules::RuleSet::schema_requests(content)? {
             paths.push(VirtualPath::data(&request.reference)?);
         }
+    }
+    // Every schema the CURRENT configuration derives, whether or not the authored
+    // file references it yet: a newly-declared table adds a default rule whose
+    // projection must be publishable in the same pass that adds its row.
+    for schema in &serialized_default_ruleset(config).schema_files {
+        paths.push(VirtualPath::data(format!("schemas/{}", schema.name))?);
     }
     paths.sort();
     paths.dedup();
@@ -372,8 +379,8 @@ pub(crate) fn compose_configured_projections(
 /// Materialize the default-rule family (`rules.toml`) and its baked schema files
 /// from the captured registry, obeying the rules.toml ownership matrix.
 ///
-/// `rules.toml` is the authored file: the default-family membership (the
-/// `namespace-unique-*` rows the registry generates) and each default assertion
+/// `rules.toml` is the authored file: the default-family membership (the rows
+/// the registry generates) and each default assertion
 /// are spliced in place — via the span-level [`splice_default_membership`] and
 /// [`rewrite_default_assertions`] primitives — while the authored header, custom
 /// rows, comments, block order, and editable policy fields of default rules are

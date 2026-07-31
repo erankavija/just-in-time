@@ -7,7 +7,7 @@
 //! IN MEMORY when no `rules.toml` exists yet (no disk write on the read path),
 //! and that [`reconcile_default_rules_with_config`] reconciles a scaffolded
 //! file's default rules against the current registry at load — so a default
-//! rule's assertion and the `namespace-unique-*` membership follow `config.toml`,
+//! rule's assertion and the family's membership follow `config.toml`,
 //! never a stale `schemas/default-*.json` projection.
 //!
 //! After the backward-compat hard removal (issue d4188154), the default set no
@@ -344,34 +344,33 @@ pub fn reconcile_default_rules_with_config(
     RuleSet { rules }
 }
 
-/// Rule-name prefix marking the per-namespace uniqueness family
-/// (`namespace-unique-<ns>`) — the only default-rule family whose FILE
-/// MEMBERSHIP (not just its assertion) is write-through synced to
-/// `rules.toml` by [`default_rule_membership_diff`], because it is the only
-/// family whose existence (not merely its schema content) varies with the
-/// registry.
-const NAMESPACE_UNIQUE_PREFIX: &str = "namespace-unique-";
-
-/// The `namespace-unique-*` file-membership delta between the rules currently
+/// The default-family file-membership delta between the rules currently
 /// authored on disk (`loaded`, i.e. `.jit/rules.toml` as parsed by
 /// the production rules loader — NOT the
 /// in-memory-reconciled set [`reconcile_default_rules_with_config`] produces)
 /// and the CURRENT `namespaces` registry.
 ///
-/// Companion to [`reconcile_default_rules_with_config`], which folds this same
+/// Every default rule but the label grammar exists only for a declaration the
+/// registry carries, so file membership follows the whole family rather than one
+/// prefix of it: withdrawing `[namespaces]` drops the registry rule and its
+/// uniqueness rows, and withdrawing `[type_hierarchy]` drops the type
+/// enumeration and the two hierarchy graph warnings.
+///
+/// Companion to [`reconcile_default_rules_with_config`], which folds the same
 /// family into the in-memory effective ruleset at every load with no disk
 /// write — the validation authority stays there (out of scope for this diff,
 /// jit:d74a9ed1). This diff instead reports what a caller must WRITE to
 /// `rules.toml` so the registry-first `rule` item kind — which resolves
 /// `@/rule/<name>` straight from the file, not the reconciled ruleset — never
-/// dangles behind a registry edit the in-memory path already honors.
+/// dangles behind a registry edit the in-memory path already honors, and so a
+/// row keeps no reference to a schema projection the same edit withdrew.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DefaultRuleMembershipDiff {
-    /// `origin = "default"` rules, in [`default_ruleset`]'s emission order, for
-    /// a namespace the registry newly declares unique — absent from `loaded`.
+    /// `origin = "default"` rules, in [`default_ruleset`]'s emission order, that
+    /// the current registry generates and `loaded` lacks.
     pub to_add: Vec<Rule>,
-    /// Names of `loaded`'s `origin = "default"` `namespace-unique-<ns>` rows
-    /// whose namespace is no longer unique, or no longer declared at all.
+    /// Names of `loaded`'s `origin = "default"` rows the current registry no
+    /// longer generates, because the declaration each was derived from is gone.
     pub to_drop: Vec<String>,
 }
 
@@ -386,23 +385,21 @@ impl DefaultRuleMembershipDiff {
     }
 }
 
-/// Compute the `namespace-unique-*` [`DefaultRuleMembershipDiff`] between
-/// `loaded` (the rules as currently authored in `rules.toml`) and `namespaces`
-/// (the current registry).
+/// Compute the [`DefaultRuleMembershipDiff`] between `loaded` (the rules as
+/// currently authored in `rules.toml`) and `namespaces` (the current registry).
 ///
 /// Mirrors [`reconcile_default_rules_with_config`]'s opt-out and matching
-/// rules exactly, restricted to this one family:
+/// rules exactly:
 ///
 /// - `loaded` carrying NO `origin = "default"` rule at all has deliberately
 ///   opted out of the defaults; the diff is empty (nothing to add or drop).
-/// - Otherwise, a `namespace-unique-<ns>` rule [`default_ruleset`] would emit
-///   for `namespaces` that has no `origin = "default"` counterpart already in
-///   `loaded` is in `to_add`.
-/// - An `origin = "default"` `namespace-unique-<ns>` row in `loaded` that
-///   [`default_ruleset`] no longer emits for `namespaces` is in `to_drop`.
+/// - Otherwise, a rule [`default_ruleset`] would emit for `namespaces` that has
+///   no counterpart already in `loaded` is in `to_add`.
+/// - An `origin = "default"` row in `loaded` that [`default_ruleset`] no longer
+///   emits for `namespaces` is in `to_drop`.
 ///
-/// A rule sharing a `namespace-unique-<ns>` NAME but a different `origin`
-/// (a custom rule shadowing the default name) is never counted as "existing"
+/// A rule sharing a derived NAME but a different `origin` (a custom rule
+/// shadowing the default name) is never counted as "existing"
 /// here, never targeted for drop, and SUPPRESSES the append of the derived
 /// default row — the shadowing rule keeps the name, so the sync never writes a
 /// duplicate-name file that the production rules loader would reject. This matches how
@@ -491,9 +488,7 @@ pub(crate) fn default_rule_membership_diff_from_identities(
 
     let existing: HashSet<&str> = existing_rules
         .iter()
-        .filter(|(name, origin)| {
-            origin.as_deref() == Some(DEFAULT_ORIGIN) && name.starts_with(NAMESPACE_UNIQUE_PREFIX)
-        })
+        .filter(|(_, origin)| origin.as_deref() == Some(DEFAULT_ORIGIN))
         .map(|(name, _)| name.as_str())
         .collect();
     // EVERY existing rule name, regardless of origin: a custom rule shadowing a
@@ -506,15 +501,11 @@ pub(crate) fn default_rule_membership_diff_from_identities(
         .collect();
 
     let derived = default_ruleset(namespaces);
-    let desired: Vec<&Rule> = derived
+    let desired_names: HashSet<&str> = derived.rules.iter().map(|r| r.name.as_str()).collect();
+
+    let mut to_add: Vec<Rule> = derived
         .rules
         .iter()
-        .filter(|r| r.name.starts_with(NAMESPACE_UNIQUE_PREFIX))
-        .collect();
-    let desired_names: HashSet<&str> = desired.iter().map(|r| r.name.as_str()).collect();
-
-    let mut to_add: Vec<Rule> = desired
-        .into_iter()
         .filter(|r| !taken.contains(r.name.as_str()))
         .cloned()
         .collect();
@@ -1354,7 +1345,10 @@ mod tests {
             .push(custom_json_rule("namespace-unique-team"));
         let diff = default_rule_membership_diff(&loaded_with_default, &reg);
         assert!(
-            diff.to_add.is_empty(),
+            !diff
+                .to_add
+                .iter()
+                .any(|r| r.name == "namespace-unique-team"),
             "shadowed name must not be re-added: {:?}",
             diff.to_add.iter().map(|r| &r.name).collect::<Vec<_>>()
         );

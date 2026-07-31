@@ -108,9 +108,14 @@ fn test_init_idempotent_does_not_overwrite_config() {
     let out = jit_init(temp.path(), &[]);
     assert!(out.status.success());
 
-    // Modify config to a sentinel value
+    // Mark the scaffolded config with a sentinel, keeping its declarations: a
+    // second init must leave the whole authored file alone.
     let config = temp.path().join(".jit/config.toml");
-    fs::write(&config, "# CUSTOM SENTINEL\n").unwrap();
+    let authored = format!(
+        "# CUSTOM SENTINEL\n{}",
+        fs::read_to_string(&config).unwrap()
+    );
+    fs::write(&config, &authored).unwrap();
 
     // Second init — should succeed and leave config untouched
     let out = jit_init(temp.path(), &[]);
@@ -711,9 +716,10 @@ fn test_init_template_idempotent_does_not_overwrite() {
     let out = jit_init(temp.path(), &["--hierarchy-template", "agile"]);
     assert!(out.status.success());
 
-    // Modify config
+    // Mark the scaffolded config, keeping the declarations the first template wrote.
     let config = temp.path().join(".jit/config.toml");
-    fs::write(&config, "# AGILE CUSTOM\n").unwrap();
+    let authored = format!("# AGILE CUSTOM\n{}", fs::read_to_string(&config).unwrap());
+    fs::write(&config, &authored).unwrap();
 
     // Second init with a different template — config must not be overwritten
     let out = jit_init(temp.path(), &["--hierarchy-template", "minimal"]);
