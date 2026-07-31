@@ -7,12 +7,12 @@
 //! [`TEMPLATE_REGION_BEGIN`] / [`TEMPLATE_REGION_END`] and everything outside
 //! those delimiters is authored (`@/issue/e204e63d/decision/D-1`).
 //!
-//! Everything here is pure: the functions render bytes and read nothing from
-//! the filesystem. The two callers supply the I/O — the
-//! `render-template-region` example writes the registry file, and the dogfood
-//! module's drift assertion reads it — and the module compiles only for the
-//! crate's own tests and for the dev-dependency-active builds those two need,
-//! so an adopter build carries none of it.
+//! Everything here is pure: the functions render bytes, compare parsed
+//! declarations, and read nothing from the filesystem. The two callers supply
+//! the I/O — the `render-template-region` example writes the registry file, and
+//! the dogfood module's drift assertions read it — and the module compiles only
+//! for the crate's own tests and for the dev-dependency-active builds those two
+//! need, so an adopter build carries none of it.
 
 use crate::profile::{jit_dogfood_package, DogfoodProfileError};
 use crate::repository_state::{
@@ -29,6 +29,10 @@ pub const TEMPLATE_REGION_END: &str = "# jit:plan-template:end";
 /// Identity of the region claim, shared by every caller of the splice.
 const TEMPLATE_REGION_ID: &str = "plan-template";
 
+/// Root of the field paths the comparison reports, naming the declarations the
+/// way the registry file spells them (`[[template]]`).
+const TEMPLATE_ARRAY_PATH: &str = "template";
+
 /// The command that brings `.jit/templates.toml` back into agreement with the
 /// package, named in the registry file and in the drift assertion's message.
 pub const TEMPLATE_REGION_GENERATOR: &str = "./scripts/generate-template-region.sh";
@@ -42,6 +46,10 @@ pub enum TemplateRegionError {
     /// A packaged template contribution does not parse as a graph template.
     #[error("a packaged template contribution is not a graph template: {0}")]
     Contribution(#[from] serde_json::Error),
+    /// A parsed declaration does not serialize into the values the field-by-field
+    /// comparison walks.
+    #[error("a parsed template declaration does not serialize for comparison: {0}")]
+    Compare(#[source] serde_json::Error),
     /// The packaged declarations do not serialize as TOML.
     #[error("the packaged template declarations do not serialize as TOML: {0}")]
     Serialize(#[from] toml::ser::Error),
@@ -131,4 +139,119 @@ pub fn outside_template_region(registry: &[u8]) -> Result<(String, String), Temp
 /// block between them.
 pub fn render_template_registry(existing: &[u8]) -> Result<Vec<u8>, TemplateRegionError> {
     splice_template_region(existing, &render_template_block(&packaged_templates()?)?)
+}
+
+/// How the repository's parsed template declarations disagree with the packaged
+/// ones, or `None` when every field agrees.
+///
+/// The comparison walks the two sides as the values they parse into, so it
+/// holds no expectation of its own about what either declares and covers every
+/// field the model carries, description strings included. Each reported line
+/// names a field by its path through the declaration and shows both values, and
+/// the report closes with [`TEMPLATE_REGION_GENERATOR`], which renders the
+/// repository's region from the packaged declarations.
+///
+/// # Errors
+///
+/// [`TemplateRegionError::Compare`] when a parsed declaration does not
+/// serialize into the compared values.
+pub fn template_drift_report(
+    repository: &[GraphTemplate],
+    packaged: &[GraphTemplate],
+) -> Result<Option<String>, TemplateRegionError> {
+    let compared = |declarations: &[GraphTemplate]| {
+        serde_json::to_value(declarations).map_err(TemplateRegionError::Compare)
+    };
+    let differences = value_differences(
+        TEMPLATE_ARRAY_PATH,
+        &compared(repository)?,
+        &compared(packaged)?,
+    );
+    Ok((!differences.is_empty()).then(|| {
+        format!(
+            "the repository's template declarations disagree with the packaged ones:\n  {}\n\
+             the generated region of .jit/templates.toml holds the packaged declarations: \
+             regenerate it with {TEMPLATE_REGION_GENERATOR}",
+            differences.join("\n  ")
+        )
+    }))
+}
+
+/// Every field at which two compared values differ, each named by its path
+/// through the declaration and shown from both sides.
+///
+/// Objects are compared over the union of their keys and arrays position by
+/// position, so a field one side omits and a position one side does not reach
+/// are both reported where they belong rather than collapsing the whole
+/// declaration into one difference.
+fn value_differences(
+    path: &str,
+    repository: &serde_json::Value,
+    packaged: &serde_json::Value,
+) -> Vec<String> {
+    use serde_json::Value;
+    match (repository, packaged) {
+        (left, right) if left == right => Vec::new(),
+        (Value::Object(left), Value::Object(right)) => left
+            .keys()
+            .chain(right.keys())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .flat_map(|key| {
+                member_differences(&format!("{path}.{key}"), left.get(key), right.get(key))
+            })
+            .collect(),
+        (Value::Array(left), Value::Array(right)) => (0..left.len().max(right.len()))
+            .flat_map(|index| {
+                member_differences(
+                    &format!("{path}[{index}]"),
+                    left.get(index),
+                    right.get(index),
+                )
+            })
+            .collect(),
+        (left, right) => vec![format!(
+            "{path}: the repository declares {left}, the package declares {right}"
+        )],
+    }
+}
+
+/// The differences at one field path, where either side may be absent.
+fn member_differences(
+    path: &str,
+    repository: Option<&serde_json::Value>,
+    packaged: Option<&serde_json::Value>,
+) -> Vec<String> {
+    match (repository, packaged) {
+        (Some(left), Some(right)) => value_differences(path, left, right),
+        (Some(left), None) => vec![format!(
+            "{path}: the repository declares {left}, the package declares nothing"
+        )],
+        (None, Some(right)) => vec![format!(
+            "{path}: the repository declares nothing, the package declares {right}"
+        )],
+        (None, None) => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A declaration the repository carries and the package does not is
+    /// reported at its own position, naming the side that lacks it.
+    #[test]
+    fn test_template_drift_report_names_a_template_only_the_repository_declares() {
+        let packaged = packaged_templates().unwrap();
+        let repository = [packaged.clone(), packaged.clone()].concat();
+        let report = template_drift_report(&repository, &packaged)
+            .unwrap()
+            .expect("a repository declaring a template the package does not is drift");
+
+        assert!(
+            report.contains(&format!("template[{}]", packaged.len())),
+            "{report}"
+        );
+        assert!(report.contains("the package declares nothing"), "{report}");
+    }
 }
