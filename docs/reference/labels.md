@@ -183,7 +183,8 @@ reports any label whose namespace is undeclared.
 The registry drives default rules in `.jit/rules.toml`:
 `namespace-registry` (an undeclared namespace fails `jit validate`) and
 `namespace-unique-<ns>` (a unique namespace blocks a second label on
-write).
+write). Both are written only for a non-empty registry, so a repository that
+declares no namespace receives neither.
 
 Rule names are colon-free slugs. A rule's origin (`default` for the built-in
 rules, `bracket` for those a bracket criterion installs) is a separate
@@ -205,12 +206,13 @@ enforce several items.
 > namespace registry, per-namespace uniqueness, and the orphan-leaf /
 > strategic-consistency warnings are declarative rules there (scaffolded by `jit
 > init`). Those built-in rules are `origin = "default"`: they derive their
-> assertion — and the membership of the `namespace-unique-*` family — from the
+> assertion — and the family's membership — from the
 > `[namespaces]` / `[type_hierarchy]` registry in `config.toml` at load, so a
 > `[namespaces.<name>]` table's `unique` flag and its membership drive them
 > directly (declaring a namespace enforces it on the next command, no
 > regeneration; the next jit-driven config write also syncs the matching
-> `namespace-unique-*` row into `rules.toml` for addressability). To add constraints the defaults do not cover — allowed values,
+> rows into `rules.toml` for addressability), and a repository declaring neither
+> table receives `label-format` alone. To add constraints the defaults do not cover — allowed values,
 > value patterns, required namespaces — author a custom rule in `rules.toml`,
 > e.g.:
 

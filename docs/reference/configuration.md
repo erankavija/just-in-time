@@ -235,6 +235,11 @@ vocabulary. The `jit init` template uses the four types shown above. This
 repository's dogfood configuration additionally declares `bug` and
 `enhancement`; those are local choices, not shipped defaults.
 
+Omit the table and the repository has no hierarchy: no type name is known, the
+queries that resolve tiers resolve none, and neither the `type-hierarchy-known`
+rule nor the `orphan-leaf` / `strategic-consistency` warnings are written, so no
+rule or schema enumerates a type name the repository never declared.
+
 ### `[validation]`
 
 ```toml
@@ -268,16 +273,19 @@ proceeds and the bypass is logged, at every level.
 > validate` and write-validation enforce is declared there, scaffolded by `jit
 > init`: label/type format, the namespace registry, per-namespace uniqueness, the
 > orphan-leaf / strategic-consistency warnings, and any custom rules you author.
-> The built-in rules marked `origin = "default"` derive their assertion — and the
-> membership of the `namespace-unique-*` family — from the `[namespaces]` /
+> The built-in rules marked `origin = "default"` derive their assertion — and
+> the family's membership — from the `[namespaces]` /
 > `[type_hierarchy]` registry in `config.toml`, in memory at load; the
 > `schemas/default-*.json` files are regenerated projections, not the validation
 > authority. So you change what a default rule checks by editing that registry
 > (a hand-declared namespace takes effect on the next command, no regeneration;
 > the next jit-driven config write — `jit config set` or re-init — also writes
-> the matching `namespace-unique-*` row through to `rules.toml` so its
-> `@/rule/<name>` address resolves), and author new conventions as custom rules
+> the matching rows through to `rules.toml` so each `@/rule/<name>` address
+> resolves), and author new conventions as custom rules
 > in `rules.toml`. `strictness` tunes how all of these gate operations globally.
+>
+> Because every default rule but `label-format` is derived from one of those two
+> tables, a repository that declares neither receives `label-format` alone.
 
 ### `[namespaces.*]`
 
@@ -292,6 +300,9 @@ Declare label namespaces (taxonomy: `description`, `unique`, `examples`). The
 registry drives the `namespace-registry` and `namespace-unique-<ns>`
 rules. Allowed-value enums, value patterns, and required-ness are NOT configured
 here — author them as rules in `.jit/rules.toml`.
+
+Omit the table and the registry is empty: neither rule is written, so no rule or
+schema enumerates a namespace the repository never declared.
 
 Rule names are colon-free slugs (`namespace-registry`, `namespace-unique-team`,
 `label-format`, etc.). A rule's origin (`default` for the built-in rules,

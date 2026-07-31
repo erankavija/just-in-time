@@ -114,11 +114,13 @@ content_format = "markdown"
 # NOTE: individual label/type rules (format, namespace registry, per-namespace
 # uniqueness, and the orphan-leaf / strategic-consistency warnings) are defined
 # declaratively in `.jit/rules.toml`, scaffolded by `jit init`. Those built-in
-# `origin = "default"` rules derive their assertion — and the `namespace-unique-*`
-# membership — from the `[namespaces]` / `[type_hierarchy]` registry above, in
+# `origin = "default"` rules derive their assertion — and their membership — from
+# the `[namespaces]` / `[type_hierarchy]` registry above, in
 # memory at load; the `schemas/default-*.json` files are regenerated projections,
 # not the authority. jit-driven writes to this file (config set, re-init) also
-# sync the default `namespace-unique-*` rows in rules.toml to the registry. `strictness` above tunes how the rules gate operations
+# sync the default rows in rules.toml to the registry. Every default rule but the
+# label grammar comes from one of those two tables, so declaring neither leaves
+# `label-format` alone. `strictness` above tunes how the rules gate operations
 # globally.
 
 # =============================================================================
@@ -130,7 +132,8 @@ content_format = "markdown"
 #   examples    — documentation only, not enforced
 # Allowed-value enums, value patterns, and required-ness are NOT configured here:
 # author them as custom rules in `.jit/rules.toml`. (The built-in default rules
-# for the registry and uniqueness derive from this table at load.)
+# for the registry and uniqueness derive from this table at load, and are
+# written only while it declares something.)
 
 [namespaces.type]
 description = "Issue type taxonomy (hierarchical)"
