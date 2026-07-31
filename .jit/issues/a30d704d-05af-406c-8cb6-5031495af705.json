@@ -26,7 +26,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Stop supplying a taxonomy to a repository that declares none",
-  "updated_at": "2026-07-31T18:31:18.208246840Z"
+  "updated_at": "2026-07-31T18:41:08.647498888Z"
 }

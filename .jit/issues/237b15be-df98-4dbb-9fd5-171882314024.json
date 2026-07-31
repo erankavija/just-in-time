@@ -15,8 +15,8 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "failed",
-      "updated_at": "2026-07-31T18:30:06.235388613Z",
+      "status": "passed",
+      "updated_at": "2026-07-31T18:40:04.364267745Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -34,7 +34,7 @@
     "brackets:e204e63d"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: Derived profile assets and projected policy documentation",
-  "updated_at": "2026-07-31T18:30:06.235388613Z"
+  "updated_at": "2026-07-31T18:40:19.455760472Z"
 }

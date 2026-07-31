@@ -4,109 +4,55 @@
  "current_wave": 0,
  "waves": [
   {
-   "wave_number": 1,
-   "note": "Roots with no sibling dependencies. Manifest writers serialised: 9d451c98 is the only wave-1 writer of profiles/jit-dogfood/manifest.toml and assets/live/**.",
+   "wave_number": 0,
+   "note": "Roots. Available now; see handoff-2 traps before choosing concurrency.",
    "issues": [
     {
-     "id": "67da1d70",
-     "short_id": "67da1d70",
-     "title": "Render the shipped area classification into the adopter configuration reference",
-     "classification": "implementation",
-     "status": "done"
-    },
-    {
-     "id": "e1a18372",
-     "short_id": "e1a18372",
-     "title": "Generate the repository plan-template declaration from the packaged contribution",
-     "classification": "implementation",
-     "status": "done"
-    },
-    {
-     "id": "c7a548c3",
-     "short_id": "c7a548c3",
-     "title": "Seed the provenance fixture with the repository sources the package draws from",
-     "classification": "implementation",
-     "status": "done"
-    },
-    {
-     "id": "9943c488",
-     "short_id": "9943c488",
-     "title": "Give the executable-mode contract a guard of its own",
-     "classification": "implementation",
-     "status": "done"
-    },
-    {
-     "id": "9d451c98",
-     "short_id": "9d451c98",
-     "title": "Relocate the packaged gate machinery out of the script directory",
-     "classification": "implementation",
-     "status": "done"
-    }
-   ]
-  },
-  {
-   "wave_number": 2,
-   "issues": [
-    {
-     "id": "f77fd51b",
-     "short_id": "f77fd51b",
-     "title": "A mechanical freshness check for the generated shipped-policy regions",
-     "classification": "implementation",
-     "status": "done"
-    },
-    {
-     "id": "097b9f48",
-     "short_id": "097b9f48",
-     "title": "Fail the suite when the two plan-template declarations disagree",
-     "classification": "implementation",
-     "status": "done"
-    },
-    {
-     "id": "229e7389",
-     "short_id": "229e7389",
-     "title": "Validation stops loading a profile package unconditionally",
-     "classification": "implementation",
-     "status": "done"
-    }
-   ],
-   "note": "Re-planned after the owner's profile-extraction ruling. 3e340587 and 39c34568 moved out of this wave into the halted set."
-  },
-  {
-   "wave_number": 3,
-   "issues": [
-    {
-     "id": "65ff0f38",
-     "short_id": "65ff0f38",
-     "title": "Regenerating a checked-in generated artifact has one invocation form",
-     "classification": "implementation",
-     "status": "done"
-    }
-   ],
-   "note": "65ff0f38 only; the packaging tasks that were here are halted."
-  },
-  {
-   "wave_number": 6,
-   "note": "Story containers close once their impl interiors are done.",
-   "issues": [
-    {
-     "id": "25bdda50",
-     "short_id": "25bdda50",
-     "title": "The repository plan-template declaration is generated from the package",
-     "classification": "implementation",
+     "short_id": "a30d704d",
      "status": "pending"
     },
     {
-     "id": "6f8f02ba",
-     "short_id": "6f8f02ba",
-     "title": "The shipped area classification reaches adopter configuration by generation",
-     "classification": "implementation",
+     "short_id": "ae435979",
      "status": "pending"
     },
     {
-     "id": "cc75b4e6",
-     "short_id": "cc75b4e6",
-     "title": "The packaged asset tree is derived from the repository files it mirrors",
-     "classification": "implementation",
+     "short_id": "4c40e165",
+     "status": "pending"
+    },
+    {
+     "short_id": "5dd0df5b",
+     "status": "pending"
+    },
+    {
+     "short_id": "09aea8b3",
+     "status": "pending"
+    },
+    {
+     "short_id": "3e340587",
+     "status": "pending"
+    },
+    {
+     "short_id": "510297e4",
+     "status": "pending"
+    },
+    {
+     "short_id": "0439da41",
+     "status": "pending"
+    },
+    {
+     "short_id": "fdae1023",
+     "status": "pending"
+    },
+    {
+     "short_id": "9bdf8025",
+     "status": "pending"
+    },
+    {
+     "short_id": "f6c23c09",
+     "status": "pending"
+    },
+    {
+     "short_id": "28e1c647",
      "status": "pending"
     }
    ]
@@ -306,7 +252,7 @@
    "REQ-06": "meaningless after extraction"
   }
  },
- "blocked": "plan-review on 7eecace8 (round 5 dispatched, owner-granted past the rework limit). No implementation work is dispatched until plan-review, then coverage-preview and breakdown-review on 237b15be, all pass.",
+ "blocked": null,
  "session": 2,
  "open_findings": [
   {
@@ -379,26 +325,60 @@
    "verdict": "fail",
    "findings": 3,
    "summary": "Taxonomy fixture still 64 sites across 11 modules; integration split spans several target families; overlap table omitted production writers on commands/validate.rs."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 5,
+   "verdict": "pass",
+   "findings": 0,
+   "summary": "Fixture authored once and adopted by ten bounded families; integration split by Cargo target; overlap generator unfiltered."
+  },
+  {
+   "gate": "coverage-preview",
+   "issue": "237b15be",
+   "verdict": "pass"
+  },
+  {
+   "gate": "breakdown-review",
+   "issue": "237b15be",
+   "round": 1,
+   "verdict": "fail",
+   "findings": 4,
+   "summary": "Lead-side graph defects: 13 roots missing the bracket edge, two live issues depending on rejected ones, one incoherent Ready state."
+  },
+  {
+   "gate": "breakdown-review",
+   "issue": "237b15be",
+   "round": 2,
+   "verdict": "pass",
+   "findings": 0
   }
  ],
  "graph_state": {
-  "manifest_entries": 64,
-  "manifest_edges": 85,
+  "manifest_entries": 72,
+  "manifest_edges": 101,
   "issue_states": {
    "ready": 12,
-   "done": 13,
-   "backlog": 40,
-   "in_progress": 2
+   "done": 14,
+   "backlog": 48,
+   "in_progress": 1
   },
-  "reconciled": "Every manifest entry names its issue; zero edge and zero content differences as of 944522af.",
+  "reconciled": "Zero edge and zero content differences at 5e427854.",
   "rejected": [
    "1d2f454e",
    "ce0172c3",
    "779ea308",
    "8e7a82dc",
    "380a8e9e",
-   "e103d7a4"
+   "e103d7a4",
+   "45e250c6"
   ],
-  "note": "Rejected issues carry no membership labels, which leaves six advisory orphan-leaf warnings. jit validate passes."
+  "note": "Rejected issues carry no membership labels; the resulting orphan-leaf warnings are advisory and cannot be cleared by archiving."
+ },
+ "bracket": {
+  "planning": "7eecace8 done (plan-review passed round 5)",
+  "breakdown": "237b15be done (coverage-preview + breakdown-review passed)",
+  "note": "@/charter/D-3 satisfied; implementation may be dispatched."
  }
 }

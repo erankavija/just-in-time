@@ -24,7 +24,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Author a test fixture that declares its own taxonomy",
-  "updated_at": "2026-07-31T18:31:23.300980886Z"
+  "updated_at": "2026-07-31T18:41:13.740027783Z"
 }

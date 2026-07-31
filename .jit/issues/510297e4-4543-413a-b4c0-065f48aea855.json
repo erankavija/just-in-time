@@ -24,7 +24,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Read the bracket label from the template that declares it",
-  "updated_at": "2026-07-31T18:31:33.455594818Z"
+  "updated_at": "2026-07-31T18:40:53.370844622Z"
 }

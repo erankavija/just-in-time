@@ -24,7 +24,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Read a profile package from a directory on disk",
-  "updated_at": "2026-07-31T18:31:03.006161635Z"
+  "updated_at": "2026-07-31T18:40:30.725685829Z"
 }

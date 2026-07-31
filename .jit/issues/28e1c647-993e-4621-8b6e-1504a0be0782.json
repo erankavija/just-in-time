@@ -25,7 +25,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Delete the unreachable item-kind defaults",
-  "updated_at": "2026-07-31T18:31:28.385816689Z"
+  "updated_at": "2026-07-31T18:40:35.715886020Z"
 }

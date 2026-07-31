@@ -26,7 +26,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Declare one package's dependency on another",
-  "updated_at": "2026-07-31T18:31:08.059596918Z"
+  "updated_at": "2026-07-31T18:40:58.474630596Z"
 }

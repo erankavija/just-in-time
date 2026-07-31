@@ -24,7 +24,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Move the package-authored region source out of the derived prefix",
-  "updated_at": "2026-07-31T18:32:10.366792540Z"
+  "updated_at": "2026-07-31T18:40:40.806698613Z"
 }
