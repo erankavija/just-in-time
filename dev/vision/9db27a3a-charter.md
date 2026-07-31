@@ -26,7 +26,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-5: A milestone-tier steward skill sits above the epic-level execution lead
 - D-6: Each item kind declares its own source of truth (markdown-first or registry-first)
 - D-7: Charter decisions are project-addressable items over the vision charter
-- D-8: Ship an adoption-focused profile MVP in v1.0 and defer the complete profile lifecycle
+- D-8: Ship one offline profile discovered from a declared repository-local location in v1.0 and defer the complete profile lifecycle
 - D-9: Remove redundant release surfaces without removing product capabilities
 - D-10: Support one Docker topology that serves the API and web UI from a repository mount
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
@@ -138,18 +138,21 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 
 ### D-8: Adoption-focused profile MVP before the complete lifecycle
 
-- **Chosen:** v1.0 ships one embedded, offline `jit-dogfood` profile with safe
-  application to fresh and existing repositories. Multi-profile composition,
-  local packages, variables, reconfiguration, diff, upgrade, removal, and
+- **Chosen:** v1.0 ships one offline `jit-dogfood` profile, discovered from a
+  declared repository-local location, with safe application to fresh and
+  existing repositories. Multi-profile composition, local packages beyond that
+  one declared location, variables, reconfiguration, diff, upgrade, removal, and
   shared-ownership semantics move intact to a post-1.0 epic.
 - **Rejected:** Shipping the full profile package manager before v1.0, which
   makes a large new lifecycle subsystem the release critical path; and dropping
   profiles from v1.0 entirely, which leaves the strongest dogfooded workflow
   difficult for adopters to install.
-- **Reasoning:** The embedded profile solves the immediate adoption problem with
-  a bounded surface. Deferring lifecycle breadth reduces release risk without
-  discarding the design or any already-shipped product capability.
-- **Date:** 2026-07-14
+- **Reasoning:** One discovered offline profile solves the immediate adoption
+  problem with a bounded surface, and holds `@/inv/domain-agnostic` without a
+  sanctioned exception for binary-shipped workflow content. Deferring lifecycle
+  breadth reduces release risk without discarding the design or any
+  already-shipped product capability.
+- **Date:** 2026-07-14, amended 2026-07-31
 
 ### D-9: Cut redundant release surfaces, not product capabilities
 

@@ -1,233 +1,269 @@
 {
-  "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
-  "epic_short_id": "e204e63d",
-  "current_wave": 3,
-  "waves": [
+ "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
+ "epic_short_id": "e204e63d",
+ "current_wave": 4,
+ "waves": [
+  {
+   "wave_number": 1,
+   "note": "Roots with no sibling dependencies. Manifest writers serialised: 9d451c98 is the only wave-1 writer of profiles/jit-dogfood/manifest.toml and assets/live/**.",
+   "issues": [
     {
-      "wave_number": 1,
-      "note": "Roots with no sibling dependencies. Manifest writers serialised: 9d451c98 is the only wave-1 writer of profiles/jit-dogfood/manifest.toml and assets/live/**.",
-      "issues": [
-        {
-          "id": "67da1d70",
-          "short_id": "67da1d70",
-          "title": "Render the shipped area classification into the adopter configuration reference",
-          "classification": "implementation",
-          "status": "done"
-        },
-        {
-          "id": "e1a18372",
-          "short_id": "e1a18372",
-          "title": "Generate the repository plan-template declaration from the packaged contribution",
-          "classification": "implementation",
-          "status": "done"
-        },
-        {
-          "id": "c7a548c3",
-          "short_id": "c7a548c3",
-          "title": "Seed the provenance fixture with the repository sources the package draws from",
-          "classification": "implementation",
-          "status": "done"
-        },
-        {
-          "id": "9943c488",
-          "short_id": "9943c488",
-          "title": "Give the executable-mode contract a guard of its own",
-          "classification": "implementation",
-          "status": "done"
-        },
-        {
-          "id": "9d451c98",
-          "short_id": "9d451c98",
-          "title": "Relocate the packaged gate machinery out of the script directory",
-          "classification": "implementation",
-          "status": "done"
-        }
-      ]
+     "id": "67da1d70",
+     "short_id": "67da1d70",
+     "title": "Render the shipped area classification into the adopter configuration reference",
+     "classification": "implementation",
+     "status": "done"
     },
     {
-      "wave_number": 2,
-      "issues": [
-        {
-          "id": "f77fd51b",
-          "short_id": "f77fd51b",
-          "title": "A mechanical freshness check for the generated shipped-policy regions",
-          "classification": "implementation",
-          "status": "done"
-        },
-        {
-          "id": "097b9f48",
-          "short_id": "097b9f48",
-          "title": "Fail the suite when the two plan-template declarations disagree",
-          "classification": "implementation",
-          "status": "done"
-        },
-        {
-          "id": "229e7389",
-          "short_id": "229e7389",
-          "title": "Validation stops loading a profile package unconditionally",
-          "classification": "implementation",
-          "status": "done"
-        }
-      ],
-      "note": "Re-planned after the owner's profile-extraction ruling. 3e340587 and 39c34568 moved out of this wave into the halted set."
+     "id": "e1a18372",
+     "short_id": "e1a18372",
+     "title": "Generate the repository plan-template declaration from the packaged contribution",
+     "classification": "implementation",
+     "status": "done"
     },
     {
-      "wave_number": 3,
-      "issues": [
-        {
-          "id": "65ff0f38",
-          "short_id": "65ff0f38",
-          "title": "Regenerating a checked-in generated artifact has one invocation form",
-          "classification": "implementation",
-          "status": "done"
-        }
-      ],
-      "note": "65ff0f38 only; the packaging tasks that were here are halted."
+     "id": "c7a548c3",
+     "short_id": "c7a548c3",
+     "title": "Seed the provenance fixture with the repository sources the package draws from",
+     "classification": "implementation",
+     "status": "done"
     },
     {
-      "wave_number": 6,
-      "note": "Story containers close once their impl interiors are done.",
-      "issues": [
-        {
-          "id": "25bdda50",
-          "short_id": "25bdda50",
-          "title": "The repository plan-template declaration is generated from the package",
-          "classification": "implementation",
-          "status": "pending"
-        },
-        {
-          "id": "6f8f02ba",
-          "short_id": "6f8f02ba",
-          "title": "The shipped area classification reaches adopter configuration by generation",
-          "classification": "implementation",
-          "status": "pending"
-        },
-        {
-          "id": "cc75b4e6",
-          "short_id": "cc75b4e6",
-          "title": "The packaged asset tree is derived from the repository files it mirrors",
-          "classification": "implementation",
-          "status": "pending"
-        }
-      ]
+     "id": "9943c488",
+     "short_id": "9943c488",
+     "title": "Give the executable-mode contract a guard of its own",
+     "classification": "implementation",
+     "status": "done"
+    },
+    {
+     "id": "9d451c98",
+     "short_id": "9d451c98",
+     "title": "Relocate the packaged gate machinery out of the script directory",
+     "classification": "implementation",
+     "status": "done"
     }
-  ],
-  "created_during_execution": [
-    {
-      "short_id": "9d451c98",
-      "title": "Relocate the packaged gate machinery out of the script directory",
-      "reason": "Owner-approved (2026-07-31) escalation outcome. The script directory had 4 packaged files of 45 tracked, with no category separating packaged from unpackaged review prompts, so it could not carry a category-shaped exclusion list. Retiring it as a live-source root also collapses the byte-identical scripts/ai-review.sh + contrib/gates/ai-review.sh pair.",
-      "wired": "39c34568 depends on 9d451c98"
-    },
-    {
-      "short_id": "65ff0f38",
-      "title": "Regenerating a checked-in generated artifact has one invocation form",
-      "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that \u2014 six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) \u2014 so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
-      "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label \u2014 the work is cross-cutting)"
-    }
-  ],
-  "escalations": [
-    {
-      "at": "2026-07-31",
-      "category": "4 \u2014 issue scope change (criteria)",
-      "issue": "779ea308",
-      "situation": "The plan required ~60 hand-written path literals in the BINARY_BUILD_INPUTS constant plus a reconciliation test against the packaged targets. That is a hand-maintained copy held correct by an assertion \u2014 the defect class this container removes \u2014 and it ships ~60 of this repository's paths inside every adopter binary. dogfood::jit_dogfood_package() already exposes the parsed embedded manifest and dogfood.rs:386 already filters live assets by the assets/live/ prefix; every live asset's target IS its repository path; and the caller at commands/gate_check.rs:672 sits in a layer that can reach the package.",
-      "resolution": "Owner approved rewriting 779ea308 to derive the set from the packaged live-asset targets at the changed-path comparison boundary. REQ-02/REQ-05 (the literals + reconciliation test) replaced; domain-layer purity criterion retained and strengthened."
-    },
-    {
-      "at": "2026-07-31",
-      "category": "4 \u2014 issue scope change (criteria) + 1 \u2014 new work item",
-      "issue": "39c34568",
-      "situation": "D-6 requires glob-category exclusions rather than path literals. Measured at execution time: .agents/ is 55 packaged / 52 unpackaged with cleanly categorical exclusions; contrib/ is 1/4; .jit/reference/ is 1/0. But scripts/ is 4 packaged of 45 tracked and no category separates code-review-prompt.md and plan-review-prompt.md (packaged) from doc-review-prompt.md and holistic-review-prompt.md (not), so its exclusion list would be ~41 near-literals and every future unrelated script would fail the walk. Additionally scripts/ai-review.sh and contrib/gates/ai-review.sh are byte-identical and both packaged.",
-      "resolution": "Owner approved relocating the four packaged files under contrib/gates/, retiring scripts/ as a declared root, and collapsing the duplicate wrapper. New task 9d451c98 created and wired before 39c34568; 39c34568's REQ-05 no longer fixes a root count."
-    }
-  ],
-  "surfaced_pitfalls": [
-    {
-      "at": "2026-07-31",
-      "finding": "`.jit/config.toml:9-49` carries a third hand-maintained copy of the managed/permanent/issue-scoped area lists, asserting at :10-11 that it adopts the shipped classification verbatim with nothing binding it. Surfaced by the 67da1d70 worker.",
-      "disposition": "Out of scope by construction. The plan's 'A residual copy this container does not remove' entry and investigation \u00a74.3 both place it outside REQ-01: it is repository-local policy, not adopter documentation. Re-check at the epic gate against REQ-01's exact wording ('The adopter configuration reference and the copyable example configuration'), which names two documents and does not reach this one."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "CHANGELOG treatment diverged across wave-1 siblings: 67da1d70 added an Unreleased entry for its adopter-visible doc change; 9d451c98 deliberately added none for its adopter-visible packaged-target relocation, reasoning that later issues in this container re-derive the same tree and would rewrite it.",
-      "disposition": "Lead decision: leave both as landed and reconcile the container's CHANGELOG once at epic close, when the packaged tree has its final shape. Both workers' reasoning is defensible; churn now is the worse option. Revisit before the epic's holistic-review gate."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "Every worker running the full `cargo-ci` pipeline itself serialises the whole wave behind the host-wide `flock /tmp/jit-cargo-ci.lock`: four builds queued at once in wave 1, one of them verifying work already rejected in review.",
-      "disposition": "Dispatch-prompt defect on the lead's side. Waves 2-6 instruct workers to run only targeted checks (`cargo test -p jit --lib <module>`, `jit validate`, `docs-mechanical` where cheap); the lead runs the authoritative `cargo-ci` gate once per issue on main after merge."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "`crates/jit/tests/fast_docs_templates/ai_review_verdict_tests.rs:1` carries a `(REQ-11)` tag naming a requirement id local to a different epic (2e926e39). Pre-existing; surfaced by the 9d451c98 worker and left alone.",
-      "disposition": "Outside this container's criteria. Not fixed here; worth a standalone issue at epic close alongside the `jit issue create --description-file` gap."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat \u2026)\"` and survive shell quoting.",
-      "disposition": "Dogfooding friction. File as a separate issue at epic close; not in this epic's scope."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "The plan's counts of unpackaged files under the script and contributed-gate roots (35/36) measure 45 at execution time. D-6's preference for patterns over literals is strengthened, not reversed.",
-      "disposition": "Recorded in the plan's amendment section; no criterion depends on the count."
-    }
-  ],
-  "rework_counts": {
-    "e1a18372": 1,
-    "097b9f48": 1,
-    "f77fd51b": 1,
-    "65ff0f38": 2
+   ]
   },
-  "started_at": "2026-07-31",
-  "owner_rulings": [
+  {
+   "wave_number": 2,
+   "issues": [
     {
-      "at": "2026-07-31",
-      "ruling": "Domain agnosticism is the only durable long-term invariant. Tying specific profiles and workflows to the source is bad practice. Template system, for instance, belongs to source, but specific applications like the planning bracket do not.",
-      "effect": "jit's own workflow profile leaves the binary. @/invariant/domain-agnostic's sanctioned exception for the planning-bracket preset trio is removed. Investigation a62d444d (dev/active/a62d444d/findings.md) established mechanism, sequencing and consequences."
+     "id": "f77fd51b",
+     "short_id": "f77fd51b",
+     "title": "A mechanical freshness check for the generated shipped-policy regions",
+     "classification": "implementation",
+     "status": "done"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "No contributed profiles in .jit by default. Our repo shall contain the dogfooding profile, but it shall be disjoint from jit proper. It should be just like an externally contributed profile.",
-      "effect": "Rejects the investigation's recommended repository-local package location (.jit/profiles/packages/). profiles/jit-dogfood/ stays in this repository, outside crates/jit/, consumed as a third-party contribution would be. OPEN: how `jit validate --fix` re-resolves the package on a later run without package bytes in .jit/ \u2014 the provenance record at .jit/profiles/<id>.json could carry the source path. Must be settled before extraction step 2 builds the resolver. Step 1 (229e7389) REQ-04 fails loudly on an unresolvable package rather than degrading, keeping the decision open."
+     "id": "097b9f48",
+     "short_id": "097b9f48",
+     "title": "Fail the suite when the two plan-template declarations disagree",
+     "classification": "implementation",
+     "status": "done"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Convergence is mandatory within this epic. Invariant must hold.",
-      "effect": "65ff0f38 created inside this epic rather than excepted with a tracked follow-up."
-    },
-    {
-      "at": "2026-07-31",
-      "ruling": "Land step 1, then re-plan.",
-      "effect": "229e7389 dispatched in wave 2; a full re-plan goes to the owner for approval after this wave."
+     "id": "229e7389",
+     "short_id": "229e7389",
+     "title": "Validation stops loading a profile package unconditionally",
+     "classification": "implementation",
+     "status": "done"
     }
-  ],
-  "halted": {
-    "story": "cc75b4e6",
-    "reason": "Owner ruling: the profile leaves the binary, so deriving the packaged tree into it targets a structure being removed. Per investigation \u00a78, three tasks are superseded and seven survive retargeted from a build-output tree to a publishable distribution artefact.",
-    "superseded": [
-      "1d2f454e (the embed is deleted, not re-rooted)",
-      "ce0172c3 (retargets to the produced tree)",
-      "779ea308 (epic REQ-06 becomes meaningless)"
-    ],
-    "survive_retargeted": [
-      "7d038e97",
-      "26f503cc",
-      "0cf1f351",
-      "39c34568",
-      "4873b32f",
-      "0db28190",
-      "3e340587",
-      "380a8e9e",
-      "8e7a82dc"
-    ],
-    "epic_criteria": {
-      "REQ-03": "survives unchanged, gains value",
-      "REQ-04": "superseded \u2014 'embed' loses its referent",
-      "REQ-05": "survives unchanged, matters more",
-      "REQ-06": "meaningless after extraction"
-    }
+   ],
+   "note": "Re-planned after the owner's profile-extraction ruling. 3e340587 and 39c34568 moved out of this wave into the halted set."
   },
-  "blocked": "Epic e204e63d cannot reach Done on its current criteria: REQ-04 and REQ-06 name the binary and lose their referent under the owner's profile-extraction ruling. All executable work is complete: 14 issues done, 12 halted. Four owner decisions are open (see handoff.md 'Open questions'): amended REQ-04/REQ-06 text, the jit validate --fix re-resolution route, the @/charter/D-8 amendment, and the scope of extraction steps 2-5."
+  {
+   "wave_number": 3,
+   "issues": [
+    {
+     "id": "65ff0f38",
+     "short_id": "65ff0f38",
+     "title": "Regenerating a checked-in generated artifact has one invocation form",
+     "classification": "implementation",
+     "status": "done"
+    }
+   ],
+   "note": "65ff0f38 only; the packaging tasks that were here are halted."
+  },
+  {
+   "wave_number": 6,
+   "note": "Story containers close once their impl interiors are done.",
+   "issues": [
+    {
+     "id": "25bdda50",
+     "short_id": "25bdda50",
+     "title": "The repository plan-template declaration is generated from the package",
+     "classification": "implementation",
+     "status": "pending"
+    },
+    {
+     "id": "6f8f02ba",
+     "short_id": "6f8f02ba",
+     "title": "The shipped area classification reaches adopter configuration by generation",
+     "classification": "implementation",
+     "status": "pending"
+    },
+    {
+     "id": "cc75b4e6",
+     "short_id": "cc75b4e6",
+     "title": "The packaged asset tree is derived from the repository files it mirrors",
+     "classification": "implementation",
+     "status": "pending"
+    }
+   ]
+  }
+ ],
+ "created_during_execution": [
+  {
+   "short_id": "9d451c98",
+   "title": "Relocate the packaged gate machinery out of the script directory",
+   "reason": "Owner-approved (2026-07-31) escalation outcome. The script directory had 4 packaged files of 45 tracked, with no category separating packaged from unpackaged review prompts, so it could not carry a category-shaped exclusion list. Retiring it as a live-source root also collapses the byte-identical scripts/ai-review.sh + contrib/gates/ai-review.sh pair.",
+   "wired": "39c34568 depends on 9d451c98"
+  },
+  {
+   "short_id": "65ff0f38",
+   "title": "Regenerating a checked-in generated artifact has one invocation form",
+   "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that \u2014 six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) \u2014 so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
+   "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label \u2014 the work is cross-cutting)"
+  }
+ ],
+ "escalations": [
+  {
+   "at": "2026-07-31",
+   "category": "4 \u2014 issue scope change (criteria)",
+   "issue": "779ea308",
+   "situation": "The plan required ~60 hand-written path literals in the BINARY_BUILD_INPUTS constant plus a reconciliation test against the packaged targets. That is a hand-maintained copy held correct by an assertion \u2014 the defect class this container removes \u2014 and it ships ~60 of this repository's paths inside every adopter binary. dogfood::jit_dogfood_package() already exposes the parsed embedded manifest and dogfood.rs:386 already filters live assets by the assets/live/ prefix; every live asset's target IS its repository path; and the caller at commands/gate_check.rs:672 sits in a layer that can reach the package.",
+   "resolution": "Owner approved rewriting 779ea308 to derive the set from the packaged live-asset targets at the changed-path comparison boundary. REQ-02/REQ-05 (the literals + reconciliation test) replaced; domain-layer purity criterion retained and strengthened."
+  },
+  {
+   "at": "2026-07-31",
+   "category": "4 \u2014 issue scope change (criteria) + 1 \u2014 new work item",
+   "issue": "39c34568",
+   "situation": "D-6 requires glob-category exclusions rather than path literals. Measured at execution time: .agents/ is 55 packaged / 52 unpackaged with cleanly categorical exclusions; contrib/ is 1/4; .jit/reference/ is 1/0. But scripts/ is 4 packaged of 45 tracked and no category separates code-review-prompt.md and plan-review-prompt.md (packaged) from doc-review-prompt.md and holistic-review-prompt.md (not), so its exclusion list would be ~41 near-literals and every future unrelated script would fail the walk. Additionally scripts/ai-review.sh and contrib/gates/ai-review.sh are byte-identical and both packaged.",
+   "resolution": "Owner approved relocating the four packaged files under contrib/gates/, retiring scripts/ as a declared root, and collapsing the duplicate wrapper. New task 9d451c98 created and wired before 39c34568; 39c34568's REQ-05 no longer fixes a root count."
+  }
+ ],
+ "surfaced_pitfalls": [
+  {
+   "at": "2026-07-31",
+   "finding": "`.jit/config.toml:9-49` carries a third hand-maintained copy of the managed/permanent/issue-scoped area lists, asserting at :10-11 that it adopts the shipped classification verbatim with nothing binding it. Surfaced by the 67da1d70 worker.",
+   "disposition": "Out of scope by construction. The plan's 'A residual copy this container does not remove' entry and investigation \u00a74.3 both place it outside REQ-01: it is repository-local policy, not adopter documentation. Re-check at the epic gate against REQ-01's exact wording ('The adopter configuration reference and the copyable example configuration'), which names two documents and does not reach this one."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "CHANGELOG treatment diverged across wave-1 siblings: 67da1d70 added an Unreleased entry for its adopter-visible doc change; 9d451c98 deliberately added none for its adopter-visible packaged-target relocation, reasoning that later issues in this container re-derive the same tree and would rewrite it.",
+   "disposition": "Lead decision: leave both as landed and reconcile the container's CHANGELOG once at epic close, when the packaged tree has its final shape. Both workers' reasoning is defensible; churn now is the worse option. Revisit before the epic's holistic-review gate."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "Every worker running the full `cargo-ci` pipeline itself serialises the whole wave behind the host-wide `flock /tmp/jit-cargo-ci.lock`: four builds queued at once in wave 1, one of them verifying work already rejected in review.",
+   "disposition": "Dispatch-prompt defect on the lead's side. Waves 2-6 instruct workers to run only targeted checks (`cargo test -p jit --lib <module>`, `jit validate`, `docs-mechanical` where cheap); the lead runs the authoritative `cargo-ci` gate once per issue on main after merge."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "`crates/jit/tests/fast_docs_templates/ai_review_verdict_tests.rs:1` carries a `(REQ-11)` tag naming a requirement id local to a different epic (2e926e39). Pre-existing; surfaced by the 9d451c98 worker and left alone.",
+   "disposition": "Outside this container's criteria. Not fixed here; worth a standalone issue at epic close alongside the `jit issue create --description-file` gap."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat \u2026)\"` and survive shell quoting.",
+   "disposition": "Dogfooding friction. File as a separate issue at epic close; not in this epic's scope."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "The plan's counts of unpackaged files under the script and contributed-gate roots (35/36) measure 45 at execution time. D-6's preference for patterns over literals is strengthened, not reversed.",
+   "disposition": "Recorded in the plan's amendment section; no criterion depends on the count."
+  }
+ ],
+ "rework_counts": {
+  "e1a18372": 1,
+  "097b9f48": 1,
+  "f77fd51b": 1,
+  "65ff0f38": 2
+ },
+ "started_at": "2026-07-31",
+ "owner_rulings": [
+  {
+   "at": "2026-07-31",
+   "ruling": "Domain agnosticism is the only durable long-term invariant. Tying specific profiles and workflows to the source is bad practice. Template system, for instance, belongs to source, but specific applications like the planning bracket do not.",
+   "effect": "jit's own workflow profile leaves the binary. @/invariant/domain-agnostic's sanctioned exception for the planning-bracket preset trio is removed. Investigation a62d444d (dev/active/a62d444d/findings.md) established mechanism, sequencing and consequences."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "No contributed profiles in .jit by default. Our repo shall contain the dogfooding profile, but it shall be disjoint from jit proper. It should be just like an externally contributed profile.",
+   "effect": "Rejects the investigation's recommended repository-local package location (.jit/profiles/packages/). profiles/jit-dogfood/ stays in this repository, outside crates/jit/, consumed as a third-party contribution would be. OPEN: how `jit validate --fix` re-resolves the package on a later run without package bytes in .jit/ \u2014 the provenance record at .jit/profiles/<id>.json could carry the source path. Must be settled before extraction step 2 builds the resolver. Step 1 (229e7389) REQ-04 fails loudly on an unresolvable package rather than degrading, keeping the decision open."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Convergence is mandatory within this epic. Invariant must hold.",
+   "effect": "65ff0f38 created inside this epic rather than excepted with a tracked follow-up."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Land step 1, then re-plan.",
+   "effect": "229e7389 dispatched in wave 2; a full re-plan goes to the owner for approval after this wave."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Epic REQ-04 is restated over the produced package (identical package hash + identical provenance across two assemblies); REQ-06 is struck as covered by REQ-03.",
+   "effect": "Epic description amended. REQ-06's number is retired rather than reused, so findings.md \u00a78's per-criterion table keeps its referents. Recorded as @/issue/e204e63d/decision/D-7."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "`jit validate --fix` re-resolves the package from a source path carried in the provenance record at .jit/profiles/<id>.json; unresolvable is a hard error, never a degraded replay of the stored record.",
+   "effect": "Settles the OPEN item on the 'no contributed profiles in .jit' ruling. Binds extraction step 2's resolver. Epic REQ-10. Recorded as @/issue/e204e63d/decision/D-8."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Amend @/charter/D-8 narrowly to 'one offline profile discovered from a declared repository-local location'; the rest of the deferred lifecycle list stays deferred.",
+   "effect": "dev/vision/9db27a3a-charter.md D-8 summary row and detail entry amended; charter projection re-rendered into AGENTS.md. Recorded as @/issue/e204e63d/decision/D-9."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Extraction steps 2-5 and cc75b4e6's surviving retargeted interior are new tasks inside e204e63d, not a separate epic.",
+   "effect": "Epic gains REQ-07..REQ-10 covering the invariant amendment, discovery, distribution, and repair. Lead flagged that the epic then delivers work its original criteria did not describe; owner accepted and approved the four drafted criteria. Recorded as @/issue/e204e63d/decision/D-10."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "The release asset ships in the same release that removes the embed: publish is a hard predecessor of delete, with no checkout-only window.",
+   "effect": "Epic REQ-09; a hard dependency edge in the extraction interior. Recorded as @/issue/e204e63d/decision/D-11."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "DEFAULT_PLANNING_ROLE / DEFAULT_BREAKDOWN_ROLE / DEFAULT_CONTAINER_ANCHOR stay in the engine; the amended @/invariant/domain-agnostic admits mechanism-parameter defaults as engine vocabulary while excluding workflow shapes, presets and gate bundles.",
+   "effect": "Binds the invariant amendment's wording at extraction step 5. Answers findings.md \u00a711 question 5. Recorded as @/issue/e204e63d/decision/D-12."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Re-plan by amending the existing plan document; 7eecace8 and 237b15be reopen rather than a second bracket being applied.",
+   "effect": "e204e63d-plan.md gains an extraction section; plan-review re-runs over the whole document; the breakdown manifest gains the extraction interior."
+  }
+ ],
+ "halted": {
+  "story": "cc75b4e6",
+  "reason": "Owner ruling: the profile leaves the binary, so deriving the packaged tree into it targets a structure being removed. Per investigation \u00a78, three tasks are superseded and seven survive retargeted from a build-output tree to a publishable distribution artefact.",
+  "superseded": [
+   "1d2f454e (the embed is deleted, not re-rooted)",
+   "ce0172c3 (retargets to the produced tree)",
+   "779ea308 (epic REQ-06 becomes meaningless)"
+  ],
+  "survive_retargeted": [
+   "7d038e97",
+   "26f503cc",
+   "0cf1f351",
+   "39c34568",
+   "4873b32f",
+   "0db28190",
+   "3e340587",
+   "380a8e9e",
+   "8e7a82dc"
+  ],
+  "epic_criteria": {
+   "REQ-03": "survives unchanged, gains value",
+   "REQ-04": "superseded \u2014 'embed' loses its referent",
+   "REQ-05": "survives unchanged, matters more",
+   "REQ-06": "meaningless after extraction"
+  }
+ },
+ "blocked": null,
+ "session": 2
 }
