@@ -16,10 +16,7 @@
   "id": "1d2f454e-77e2-4808-a4ad-5a9a2b13caca",
   "labels": [
     "type:task",
-    "epic:derived-package-sources",
-    "milestone:v1.0",
     "component:core",
-    "story:package-derivation",
     "satisfies:REQ-03",
     "per:@/issue/e204e63d/decision/D-2",
     "enforces:@/invariant/canonical-cutover",
@@ -28,5 +25,5 @@
   "priority": "high",
   "state": "rejected",
   "title": "Re-root the embed on the assembled tree",
-  "updated_at": "2026-07-31T16:09:53.875326620Z"
+  "updated_at": "2026-07-31T17:42:45.858663320Z"
 }

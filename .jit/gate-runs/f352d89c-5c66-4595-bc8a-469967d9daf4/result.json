@@ -1,0 +1,128 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "985133b560a539d1d1f9b492aa9ab436c3e79bea",
+  "completed_at": "2026-07-31T17:40:56.353221320Z",
+  "duration_ms": 297672,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/e103d7a4-79ef-40cd-b075-b10e1bec11b9.json",
+        "id": "F1",
+        "line": 6,
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "The scoped stored graph retains rejected e103d7a4 although the authoritative manifest omits it; reconcile the graph and obsolete membership residue exactly to the manifest."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/item.rs",
+        "id": "F2",
+        "line": 55,
+        "references": [
+          "@/issue/e204e63d/decision/D-23",
+          "@/issue/e204e63d/decision/D-13",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "The plan and manifest omit settled D-23's required item-kind-default deletion, while code still defines and consumes those defaults; add an ordered, tested leaf."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F3",
+        "line": 1613,
+        "references": [
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "explicit-taxonomy-test-fixture has an unresolved six-call-site footprint, so its bounded consumer family and credible footprint are not established."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F4",
+        "line": 2469,
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "embedded-package-vocabulary-retirement leaves its generated bridge footprint unresolved and mixes API migration with documentation and bridge work."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F5",
+        "line": 1214,
+        "references": [
+          "@/issue/e204e63d/decision/D-8"
+        ],
+        "severity": "medium",
+        "summary": "profile-resolution-from-record combines command implementation with adopter CLI documentation and must be split into ordered focused leaves."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F6",
+        "line": 1717,
+        "references": [
+          "@/issue/e204e63d/decision/D-14"
+        ],
+        "severity": "medium",
+        "summary": "jit-dogfood-dependency-delta combines package migration, default-rule relocation, and documentation; split the independently testable deliverables."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F7",
+        "line": 1775,
+        "references": [
+          "@/issue/e204e63d/decision/D-16"
+        ],
+        "severity": "medium",
+        "summary": "package-in-release-archive combines release workflow work with documentation and must separate the focused release leaf from prose."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F8",
+        "line": 1833,
+        "references": [
+          "@/issue/e204e63d/decision/D-16"
+        ],
+        "severity": "medium",
+        "summary": "default-package-in-release-archive likewise mixes release workflow work with documentation and needs an ordered split."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F9",
+        "line": 2310,
+        "references": [
+          "@/issue/e204e63d/decision/D-21",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "projection-path-supply spans six independent projection-path migrations with no visible per-code sizing override; split by bounded family or provide concrete overrides."
+      }
+    ],
+    "summary": "The graph is not reconciled to the manifest, D-23 is omitted, and multiple terminal leaves remain unbounded or mixed-deliverable.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7eecace8-fae3-49f8-8907-2d6180ae40a3",
+  "message": null,
+  "run_id": "f352d89c-5c66-4595-bc8a-469967d9daf4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T17:35:58.680570119Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4820 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb93f-43bc-7df3-aed8-356312762e6d\n--------\nuser\n--- 4807 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. The stored container graph is not the manifest graph: rejected `e103d7a4` remains in the scoped export but is absent from the manifest. Reconcile it by either restoring its still-required relocation as a manifest leaf or removing it from container containment; also clear the five rejected obsolete build-chain memberships. `.jit/issues/e103d7a4-79ef-40cd-b075-b10e1bec11b9.json:6`\n\n2. Settled D-23 is unplanned. No manifest footprint touches `domain/item.rs`, despite D-13’s boundary and D-23 requiring removal of its item-kind defaults; the code still defines and consumes them. Add a sourced, ordered deletion leaf with focused tests. `crates/jit/src/domain/item.rs:55`\n\n3. `explicit-taxonomy-test-fixture` has an explicitly unresolved six-call-site footprint, so its consumer family and scope are not credible. Investigate the sites, then split by bounded fixture family or replace the uncertainty with exact disjoint edits. `dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json:1613`\n\n4. `embedded-package-vocabulary-retirement` leaves generated bridge files unknown while combining API renaming, documentation, and bridge coverage. Resolve the generated-file set and split the API migration from documentation/bridge work. `dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json:2469`\n\n5. `profile-resolution-from-record` combines command implementation across three commands with CLI-reference documentation. Split the documentation update from the resolver/command implementation, with an explicit dependency. `dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json:1214`\n\n6. `jit-dogfood-dependency-delta` combines package-content migration, default-rule relocation, and adopter documentation in one terminal. Split those independently testable deliverables and order them around the package delta. `dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json:1717`\n\n7. `package-in-release-archive` combines release-workflow implementation and release documentation. Keep the archive/smoke workflow as one release leaf and move prose to a dependent documentation leaf. `dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json:1775`\n\n8. `default-package-in-release-archive` repeats the same release-plus-documentation mixture. Make the second archive-member/smoke assertion a focused release leaf and consolidate the resulting documentation change separately. `dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json:1833`\n\n9. `projection-path-supply` launders six independent module/path migrations into one terminal without a visible per-code sizing override. Split by bounded projection family, or give each retained group a concrete override, footprint, and test boundary. `dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json:2310`\n\nTotal findings: 9\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The graph is not reconciled to the manifest, D-23 is omitted, and multiple terminal leaves remain unbounded or mixed-deliverable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"The scoped stored graph retains rejected e103d7a4 although the authoritative manifest omits it; reconcile the graph and obsolete membership residue exactly to the manifest.\",\"file\":\".jit/issues/e103d7a4-79ef-40cd-b075-b10e1bec11b9.json\",\"line\":6,\"references\":[\"@/invariant/canonical-cutover\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"The plan and manifest omit settled D-23's required item-kind-default deletion, while code still defines and consumes those defaults; add an ordered, tested leaf.\",\"file\":\"crates/jit/src/domain/item.rs\",\"line\":55,\"references\":[\"@/issue/e204e63d/decision/D-23\",\"@/issue/e204e63d/decision/D-13\",\"@/invariant/canonical-cutover\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"explicit-taxonomy-test-fixture has an unresolved six-call-site footprint, so its bounded consumer family and credible footprint are not established.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":1613,\"references\":[\"@/invariant/convention-convergence\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"embedded-package-vocabulary-retirement leaves its generated bridge footprint unresolved and mixes API migration with documentation and bridge work.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":2469,\"references\":[\"@/invariant/canonical-cutover\"]},{\"id\":\"F5\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"profile-resolution-from-record combines command implementation with adopter CLI documentation and must be split into ordered focused leaves.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":1214,\"references\":[\"@/issue/e204e63d/decision/D-8\"]},{\"id\":\"F6\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"jit-dogfood-dependency-delta combines package migration, default-rule relocation, and documentation; split the independently testable deliverables.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":1717,\"references\":[\"@/issue/e204e63d/decision/D-14\"]},{\"id\":\"F7\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"package-in-release-archive combines release workflow work with documentation and must separate the focused release leaf from prose.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":1775,\"references\":[\"@/issue/e204e63d/decision/D-16\"]},{\"id\":\"F8\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"default-package-in-release-archive likewise mixes release workflow work with documentation and needs an ordered split.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":1833,\"references\":[\"@/issue/e204e63d/decision/D-16\"]},{\"id\":\"F9\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"projection-path-supply spans six independent projection-path migrations with no visible per-code sizing override; split by bounded family or provide concrete overrides.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":2310,\"references\":[\"@/issue/e204e63d/decision/D-21\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

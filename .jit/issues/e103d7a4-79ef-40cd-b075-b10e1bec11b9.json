@@ -14,10 +14,7 @@
   "id": "e103d7a4-79ef-40cd-b075-b10e1bec11b9",
   "labels": [
     "type:task",
-    "epic:derived-package-sources",
-    "milestone:v1.0",
     "component:core",
-    "story:profile-extraction",
     "satisfies:REQ-07",
     "enforces:@/invariant/domain-agnostic",
     "resolution:obsolete"
@@ -25,5 +22,5 @@
   "priority": "normal",
   "state": "rejected",
   "title": "Move the coverage-preview rule transform out of the bracket module",
-  "updated_at": "2026-07-31T17:28:42.331647452Z"
+  "updated_at": "2026-07-31T17:41:50.187390897Z"
 }

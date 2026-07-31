@@ -15,10 +15,7 @@
   "id": "8e7a82dc-7dcc-4214-8805-431c0e854e9d",
   "labels": [
     "type:task",
-    "epic:derived-package-sources",
-    "milestone:v1.0",
     "component:core",
-    "story:package-derivation",
     "satisfies:REQ-03",
     "enforces:@/invariant/bounded-rust-build-footprint",
     "resolution:obsolete"
@@ -26,5 +23,5 @@
   "priority": "normal",
   "state": "rejected",
   "title": "Pin the assembly's freshness on a timestamp-only change",
-  "updated_at": "2026-07-31T16:10:28.677828408Z"
+  "updated_at": "2026-07-31T17:41:39.425935988Z"
 }
