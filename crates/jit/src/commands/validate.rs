@@ -203,6 +203,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             session,
             overrides,
             extra_paths,
+            &[],
             precheck_target,
             true,
             false,
@@ -217,12 +218,38 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             session,
             &std::collections::BTreeMap::new(),
             &[],
+            &[],
             None,
             false,
             true,
         )
     }
 
+    /// The whole-repository validation base plus a complete listing of each
+    /// path in `extra_listings`.
+    ///
+    /// Derived-state repair lists `.jit/profiles/` because the applied-profile
+    /// records it holds are the repository's own statement of which profile
+    /// packages, if any, repair needs; an exact-path closure cannot express a
+    /// question whose answer is the directory's occupants.
+    fn capture_proposed_base_with_listings(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        extra_paths: &[crate::repository_state::VirtualPath],
+        extra_listings: &[crate::repository_state::VirtualPath],
+    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+        self.capture_proposed_base_inner(
+            session,
+            &std::collections::BTreeMap::new(),
+            extra_paths,
+            extra_listings,
+            None,
+            true,
+            false,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn capture_proposed_base_inner(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -231,6 +258,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
+        extra_listings: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&str>,
         capture_documents: bool,
         archive_scan: bool,
@@ -373,6 +401,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             }
         }
         phase_three.discover_paths(extra_paths.iter().cloned())?;
+        for listing in extra_listings {
+            phase_three.discover_listing(listing.clone())?;
+        }
         for (revision, path) in pinned {
             phase_three.discover_pinned(revision, path)?;
         }
@@ -429,13 +460,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     )> {
         let layout = self.require_layout()?;
         let seed = repair_seed()?;
-        let package = crate::profile::jit_dogfood_package()?;
         with_mutation_session(
             self.storage(),
             &layout,
             "repository validation",
             |session| {
-                let Some(derived) = self.capture_repair_plan(session, &seed, &package)? else {
+                let Some(derived) = self.capture_repair_plan(session, &seed)? else {
                     return Ok(SessionStep::Retry);
                 };
                 let captured = match derived {
@@ -483,9 +513,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         let layout = self.require_layout()?;
         let seed = repair_seed()?;
-        let package = crate::profile::jit_dogfood_package()?;
         with_mutation_session(self.storage(), &layout, "derived-state repair", |session| {
-            let Some(derived) = self.capture_repair_plan(session, &seed, &package)? else {
+            let Some(derived) = self.capture_repair_plan(session, &seed)? else {
                 return Ok(SessionStep::Retry);
             };
             let mut captured = derived.map_err(|failure| {
@@ -527,15 +556,23 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
     /// Capture one complete validation closure and derive its exact repair plan.
     ///
-    /// The immutable embedded profile contributes repair claims only when its
-    /// captured applied-profile record exactly matches the package identity and
-    /// target hashes. The record is the existing provenance authority; no second
-    /// ownership inventory is inferred from filenames or occupants.
+    /// Which profile packages this repository needs, and whether it needs any,
+    /// is decided by its own applied-profile records: the `.jit/profiles/`
+    /// listing names them, so a repository that has applied nothing captures no
+    /// package target and resolves no package. A recorded profile contributes
+    /// repair claims only when its captured record exactly matches the resolved
+    /// package identity and target hashes. The record is the provenance
+    /// authority; no second ownership inventory is inferred from filenames or
+    /// occupants.
+    ///
+    /// A record whose package cannot be obtained fails the whole capture rather
+    /// than repairing the targets still accounted for: a repair that silently
+    /// narrows what it restores is a breach of
+    /// `@/invariant/derived-state-coherence`.
     fn capture_repair_plan(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         seed: &crate::repository_state::RepositorySeed,
-        package: &crate::profile::EmbeddedProfilePackage<'_>,
     ) -> Result<
         Option<
             std::result::Result<
@@ -545,77 +582,56 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         >,
     > {
         use crate::repository_state::{
-            derive_materialization, MaterializationRequest, RepositoryEntry, VirtualPath,
+            derive_materialization, MaterializationRequest, VirtualPath,
         };
 
-        let metadata = &package.manifest().profile;
-        let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
-        let layout = self.require_layout()?;
-        let mut profile_paths = package
-            .hashes()
-            .targets
-            .keys()
-            .map(|path| {
-                layout
-                    .classify_repository_relative(path)
-                    .map_err(Into::into)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        profile_paths.push(record_path.clone());
-
-        let Some(image) = self.capture_proposed_base(
-            session,
-            &std::collections::BTreeMap::new(),
-            &profile_paths,
-            None,
-        )?
+        let profiles_dir = VirtualPath::PROFILES;
+        let listings = std::slice::from_ref(&profiles_dir);
+        let Some(discovered) = self.capture_proposed_base_with_listings(session, &[], listings)?
         else {
             return Ok(None);
         };
-        let profiles = match image.entry(&record_path)? {
-            RepositoryEntry::Absent => Vec::new(),
-            RepositoryEntry::File { bytes, .. } => {
-                let actual: crate::repository_state::AppliedProfileRecord = match serde_json::from_slice(
-                    bytes,
+        let recorded = recorded_profile_ids(&discovered, &profiles_dir)?;
+        let packages = match resolve_recorded_packages(&recorded)? {
+            Ok(packages) => packages,
+            Err(failure) => return Ok(Some(Err(failure))),
+        };
+
+        let image = if packages.is_empty() {
+            discovered
+        } else {
+            let layout = self.require_layout()?;
+            let profile_paths = packages
+                .iter()
+                .flat_map(|(_, package)| package.hashes().targets.keys())
+                .map(|path| {
+                    layout
+                        .classify_repository_relative(path)
+                        .map_err(Into::into)
+                })
+                .chain(
+                    packages
+                        .iter()
+                        .map(|(record_path, _)| Ok(record_path.clone())),
                 )
-                .context("invalid applied profile provenance")
-                {
-                    Ok(actual) => actual,
-                    Err(error) => return Ok(Some(Err(
-                        crate::validation::repository::RepositoryValidationFailure::materialization(
-                            error,
-                        ),
-                    ))),
-                };
-                let expected = super::profile::expected_record(package);
-                if actual != expected {
-                    return Ok(Some(Err(
-                        crate::validation::repository::RepositoryValidationFailure::materialization(anyhow!(
-                            "applied profile provenance for '{}@{}' does not match the resolvable embedded package",
-                            metadata.id,
-                            metadata.version
-                        )),
-                    )));
-                }
-                match crate::profile::build_profile_repair_claims(package, image.layout()) {
-                    Ok(claims) => vec![claims],
-                    Err(error) => return Ok(Some(Err(
-                        crate::validation::repository::RepositoryValidationFailure::materialization(
-                            error.into(),
-                        ),
-                    ))),
-                }
+                .collect::<Result<Vec<_>>>()?;
+            let Some(image) =
+                self.capture_proposed_base_with_listings(session, &profile_paths, listings)?
+            else {
+                return Ok(None);
+            };
+            // The closure was planned from the record set the first capture saw;
+            // a concurrent application or removal restarts the attempt rather
+            // than deriving repair over a stale answer.
+            if recorded_profile_ids(&image, &profiles_dir)? != recorded {
+                return Ok(None);
             }
-            _ => {
-                return Ok(Some(Err(
-                    crate::validation::repository::RepositoryValidationFailure::materialization(
-                        anyhow!(
-                            "applied profile provenance path {:?} is not a regular file",
-                            record_path
-                        ),
-                    ),
-                )));
-            }
+            image
+        };
+        let profiles = match captured_profile_repair_claims(&image, &packages)? {
+            Some(Ok(profiles)) => profiles,
+            Some(Err(failure)) => return Ok(Some(Err(failure))),
+            None => return Ok(None),
         };
         let declarations = match crate::repository_state::validation_declarations_from_image(&image)
         {
@@ -654,6 +670,134 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             plan,
         })))
     }
+}
+
+/// Profile ids the repository's own applied-profile records name.
+///
+/// Application writes one record per applied profile at
+/// `.jit/profiles/<id>.json`, so the listing of that directory is where the
+/// repository states which packages it needs. A child whose name is not a
+/// record name is not a record.
+fn recorded_profile_ids(
+    image: &crate::repository_state::RepositoryImage,
+    profiles_dir: &crate::repository_state::VirtualPath,
+) -> Result<std::collections::BTreeSet<String>> {
+    Ok(image
+        .listing_fingerprints()
+        .get(profiles_dir)
+        .ok_or_else(|| anyhow!("capture did not list {profiles_dir:?}"))?
+        .children()
+        .keys()
+        .filter_map(|name| super::profile::record_name_profile_id(name))
+        .map(str::to_string)
+        .collect())
+}
+
+/// Resolve one package, and its record's canonical path, per recorded profile.
+///
+/// The first record whose package cannot be obtained is the whole answer:
+/// repairing the profiles that did resolve would narrow what repair restores
+/// without reporting it (`@/invariant/derived-state-coherence`).
+#[allow(clippy::type_complexity)]
+fn resolve_recorded_packages(
+    recorded: &std::collections::BTreeSet<String>,
+) -> Result<
+    std::result::Result<
+        Vec<(
+            crate::repository_state::VirtualPath,
+            crate::profile::EmbeddedProfilePackage<'static>,
+        )>,
+        crate::validation::repository::RepositoryValidationFailure,
+    >,
+> {
+    Ok(recorded
+        .iter()
+        .map(|id| {
+            let record_path = super::profile::applied_record_path(id)?;
+            Ok(super::profile::embedded_profile(id)
+                .map(|package| (record_path.clone(), package))
+                .map_err(|error| {
+                    crate::validation::repository::RepositoryValidationFailure::materialization(
+                        error.context(format!(
+                            "applied profile record '{}' names profile '{id}', whose package cannot be obtained",
+                            super::profile::repo_string(&record_path)
+                        )),
+                    )
+                }))
+        })
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .collect())
+}
+
+/// Repair claims for every recorded profile whose captured record proves it.
+///
+/// `Ok(None)` reports a listed record the capture no longer sees, which the
+/// caller retries rather than repairing without it.
+#[allow(clippy::type_complexity)]
+fn captured_profile_repair_claims(
+    image: &crate::repository_state::RepositoryImage,
+    packages: &[(
+        crate::repository_state::VirtualPath,
+        crate::profile::EmbeddedProfilePackage<'static>,
+    )],
+) -> Result<
+    Option<
+        std::result::Result<
+            Vec<crate::repository_state::ProfileClaims>,
+            crate::validation::repository::RepositoryValidationFailure,
+        >,
+    >,
+> {
+    use crate::repository_state::RepositoryEntry;
+    use crate::validation::repository::RepositoryValidationFailure;
+
+    let mut claims = Vec::with_capacity(packages.len());
+    for (record_path, package) in packages {
+        let metadata = &package.manifest().profile;
+        match image.entry(record_path)? {
+            RepositoryEntry::Absent => return Ok(None),
+            RepositoryEntry::File { bytes, .. } => {
+                let actual: crate::repository_state::AppliedProfileRecord =
+                    match serde_json::from_slice(bytes)
+                        .context("invalid applied profile provenance")
+                    {
+                        Ok(actual) => actual,
+                        Err(error) => {
+                            return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                                error,
+                            ))))
+                        }
+                    };
+                if actual != super::profile::expected_record(package) {
+                    return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                        anyhow!(
+                            "applied profile provenance for '{}@{}' does not match the resolvable embedded package",
+                            metadata.id,
+                            metadata.version
+                        ),
+                    ))));
+                }
+                match crate::profile::build_profile_repair_claims(package, image.layout()) {
+                    Ok(built) => claims.push(built),
+                    Err(error) => {
+                        return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                            error.into(),
+                        ))))
+                    }
+                }
+            }
+            _ => {
+                return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                    anyhow!(
+                        "applied profile provenance path {:?} is not a regular file",
+                        record_path
+                    ),
+                ))))
+            }
+        }
+    }
+    Ok(Some(Ok(claims)))
 }
 
 fn captured_divergences(
@@ -2549,7 +2693,9 @@ mod tests {
         (stale, repaired)
     }
 
-    fn profiled_memory_fixture() -> crate::storage::InMemoryStorage {
+    /// An in-memory repository seeded from a canonical file-backed `jit init`,
+    /// applying `profile` when one is named.
+    fn memory_fixture(profile: Option<&str>) -> crate::storage::InMemoryStorage {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
 
         fn seed_tree(
@@ -2578,11 +2724,7 @@ mod tests {
                 .unwrap();
         CommandExecutor::new(source_storage)
             .with_layout(source_layout)
-            .initialize_fresh_repository(
-                source.path(),
-                &HierarchyTemplate::default(),
-                Some("jit-dogfood"),
-            )
+            .initialize_fresh_repository(source.path(), &HierarchyTemplate::default(), profile)
             .unwrap();
 
         let storage = crate::storage::InMemoryStorage::new();
@@ -2814,7 +2956,7 @@ mod tests {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::storage::IssueStore;
 
-        let storage = profiled_memory_fixture();
+        let storage = memory_fixture(Some("jit-dogfood"));
         let mut executor = memory_executor(storage.clone());
         executor.validate_silent().unwrap();
 
@@ -2884,7 +3026,7 @@ mod tests {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::storage::IssueStore;
 
-        let storage = profiled_memory_fixture();
+        let storage = memory_fixture(Some("jit-dogfood"));
         let rules =
             drift_default_assertion(&storage.read_repo_file(".jit/rules.toml").unwrap().unwrap()).0;
         let agents = storage
@@ -2909,6 +3051,195 @@ mod tests {
         assert_eq!(
             storage.read_repo_file("AGENTS.md").unwrap().unwrap(),
             agents
+        );
+    }
+
+    /// A syntactically valid applied-profile provenance record naming `id`.
+    fn applied_record_json(id: &str) -> String {
+        serde_json::to_string_pretty(&crate::repository_state::AppliedProfileRecord::new(
+            id,
+            "1.0.0",
+            crate::profile::ProfileOrigin::Embedded,
+            "0".repeat(64),
+            std::collections::BTreeMap::new(),
+        ))
+        .unwrap()
+    }
+
+    /// REQ-06 case 1 / REQ-01: no applied-profile record. Validation and repair
+    /// settle without any profile package being loaded — a loaded package
+    /// contributes its targets to the closure, so a repair closure equal to the
+    /// plain validation closure is that absence, observed.
+    #[test]
+    fn test_capture_repair_plan_without_applied_record_loads_no_profile_package() {
+        use crate::commands::test_helpers::memory_executor;
+        use crate::storage::RepositoryStateStore;
+
+        let executor = memory_executor(memory_fixture(None));
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage().open_mutation_session(layout).unwrap();
+
+        let plain = executor
+            .capture_proposed_base(
+                session.as_mut(),
+                &std::collections::BTreeMap::new(),
+                &[],
+                None,
+            )
+            .unwrap()
+            .expect("a settled capture");
+        let captured = executor
+            .capture_repair_plan(session.as_mut(), &repair_seed().unwrap())
+            .unwrap()
+            .expect("a settled capture")
+            .expect("a repository that has applied no profile validates");
+
+        assert_eq!(
+            captured
+                .image
+                .capture_spec()
+                .paths()
+                .collect::<std::collections::BTreeSet<_>>(),
+            plain
+                .capture_spec()
+                .paths()
+                .collect::<std::collections::BTreeSet<_>>(),
+            "repair must read no path plain validation does not"
+        );
+        assert!(
+            captured.plan.is_some(),
+            "repair still derives a plan for the repository's own declarations"
+        );
+    }
+
+    /// REQ-06 case 2 / REQ-02: a record whose package resolves. The package's
+    /// targets enter the capture closure, and a drifted one is a repair action.
+    #[test]
+    fn test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets() {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        use crate::storage::RepositoryStateStore;
+
+        const ASSET: &str = ".agents/skills/jit-manage/SKILL.md";
+
+        let storage = memory_fixture(Some("jit-dogfood"));
+        seed_repo_file(&storage, ASSET, "STALE PROFILE ASSET\n");
+        let executor = memory_executor(storage);
+        let layout = executor.require_layout().unwrap();
+        let asset = layout.classify_repository_relative(ASSET).unwrap();
+        let mut session = executor
+            .storage()
+            .open_mutation_session(layout.clone())
+            .unwrap();
+
+        let captured = executor
+            .capture_repair_plan(session.as_mut(), &repair_seed().unwrap())
+            .unwrap()
+            .expect("a settled capture")
+            .expect("a record whose package resolves validates");
+
+        assert!(
+            captured.image.capture_spec().contains_path(&asset),
+            "a recorded profile's targets must be captured"
+        );
+        assert!(
+            captured
+                .plan
+                .expect("loadable declarations derive a plan")
+                .delta()
+                .actions()
+                .iter()
+                .any(|action| action.path() == &asset),
+            "the drifted profile-owned target must be a repair action"
+        );
+    }
+
+    /// REQ-05: repository validation with nothing to do with profiles is
+    /// unaffected by which profile case the repository is in. One repository,
+    /// one non-profile drift, the record present and then absent.
+    #[test]
+    fn test_validate_diagnoses_non_profile_drift_identically_across_record_states() {
+        let repo = tempfile::tempdir().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let layout =
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
+        let executor = CommandExecutor::new(storage).with_layout(layout);
+        executor
+            .initialize_fresh_repository(
+                repo.path(),
+                &HierarchyTemplate::default(),
+                Some("jit-dogfood"),
+            )
+            .unwrap();
+        let rules_path = repo.path().join(".jit/rules.toml");
+        let rules = std::fs::read_to_string(&rules_path).unwrap();
+        std::fs::write(&rules_path, drift_default_assertion(&rules).0).unwrap();
+
+        let with_record = format!("{:#}", executor.validate_silent().unwrap_err());
+        std::fs::remove_file(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap();
+        let without_record = format!("{:#}", executor.validate_silent().unwrap_err());
+
+        assert!(
+            with_record.contains("rules.toml"),
+            "the non-profile drift must be diagnosed: {with_record}"
+        );
+        assert_eq!(
+            with_record, without_record,
+            "the profile record must not change a non-profile diagnosis"
+        );
+
+        std::fs::write(
+            repo.path().join(".jit/profiles/absent-workflow.json"),
+            applied_record_json("absent-workflow"),
+        )
+        .unwrap();
+        let unobtainable = format!("{:#}", executor.validate_silent().unwrap_err());
+        assert!(
+            unobtainable.contains("absent-workflow"),
+            "an unobtainable recorded package is the reported failure: {unobtainable}"
+        );
+    }
+
+    /// REQ-04: a well-formed applied-profile record naming a profile whose
+    /// package cannot be obtained. Repair reports that condition and restores
+    /// nothing — narrowing `--fix` to the targets it can still account for
+    /// would weaken `@/invariant/derived-state-coherence` without saying so.
+    /// The control half proves the drift is one repair would otherwise fix.
+    #[test]
+    fn test_validate_fix_fails_when_a_recorded_profile_package_is_unobtainable() {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        use crate::storage::IssueStore;
+
+        let storage = memory_fixture(None);
+        let (stale_rules, repaired_rules) =
+            drift_default_assertion(&storage.read_repo_file(".jit/rules.toml").unwrap().unwrap());
+        seed_repo_file(&storage, ".jit/rules.toml", &stale_rules);
+        seed_repo_file(
+            &storage,
+            ".jit/profiles/absent-workflow.json",
+            &applied_record_json("absent-workflow"),
+        );
+
+        let mut executor = memory_executor(storage.clone());
+        let error = format!("{:#}", executor.validate_with_fix(true, false).unwrap_err());
+
+        assert!(
+            error.contains("absent-workflow") && error.contains("cannot be obtained"),
+            "the failure must name the record and its unobtainable package: {error}"
+        );
+        assert_eq!(
+            storage.read_repo_file(".jit/rules.toml").unwrap().unwrap(),
+            stale_rules,
+            "a repair that cannot account for a recorded profile must restore nothing"
+        );
+
+        let control = memory_fixture(None);
+        seed_repo_file(&control, ".jit/rules.toml", &stale_rules);
+        let mut control_executor = memory_executor(control.clone());
+        assert!(control_executor.validate_with_fix(true, false).unwrap().0 > 0);
+        assert_eq!(
+            control.read_repo_file(".jit/rules.toml").unwrap().unwrap(),
+            repaired_rules,
+            "the same drift without the record is repairable, so the assertion above has force"
         );
     }
 
