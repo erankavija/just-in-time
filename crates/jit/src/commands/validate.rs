@@ -2414,16 +2414,18 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 /// Find `container`'s bracket planning node `P`, if one has been applied.
 ///
-/// A breakable container is bracketed by a breakdown node `B` (carrying
-/// `brackets:<container-short-id>`) that depends on a planning node `P` of the
-/// template's planning type. This walks that relationship — the `brackets:` label
-/// on `B`, then `B`'s planning-typed dependency — and returns `P`, or `None` when
-/// no bracket has been applied (no matching `B`, or its planning dependency is
-/// absent). The lookup is over the WHOLE store (`by_id`) so it stays consistent
-/// when the caller's slice bounds out the bracket infrastructure.
+/// A breakable container is bracketed by a breakdown node `B` carrying the
+/// container-specific label declared by the template's breakdown node and
+/// depending on a planning node `P` of the template's planning type. This
+/// walks that relationship — the declared container label on `B`, then `B`'s
+/// planning-typed dependency — and returns `P`, or `None` when no bracket has
+/// been applied (no matching `B`, or its planning dependency is absent). The
+/// lookup is over the WHOLE store (`by_id`) so it stays consistent when the
+/// caller's slice bounds out the bracket infrastructure.
 ///
-/// Domain-agnostic: the planning type is read from the container's template
-/// (selected by the repository's planning-role binding), not hardcoded.
+/// Domain-agnostic: the planning type and container label are read from the
+/// container's template (selected by the repository's role bindings), not
+/// hardcoded.
 pub(crate) fn find_planning_node<'a>(
     container: &Issue,
     template: &crate::templates::GraphTemplate,
@@ -2431,11 +2433,13 @@ pub(crate) fn find_planning_node<'a>(
     by_id: &std::collections::HashMap<&str, &'a Issue>,
 ) -> Option<&'a Issue> {
     let planning_type = template.planning_type(roles)?;
-    let bracket_label = format!("brackets:{}", container.short_id());
+    let bracket_label =
+        crate::commands::template_expand::declared_container_label(template, roles, container)
+            .ok()?;
     let planning_type_label = label_utils::type_label(planning_type);
 
-    // The breakdown node carries the `brackets:<container>` label and depends on
-    // the planning node; find it, then return that planning dependency.
+    // The breakdown node carries the template-declared container label and
+    // depends on the planning node; find it, then return that dependency.
     by_id
         .values()
         .filter(|b| b.labels.contains(&bracket_label))
@@ -2738,6 +2742,53 @@ mod tests {
     // Note: validate_leases() and validate_branch_drift() require git repository setup
     // and are integration-tested through manual testing and real usage.
     // Unit tests focus on pure functions like format_duration().
+
+    #[test]
+    fn test_find_planning_node_resolves_template_declared_container_label() {
+        let template_toml = r#"
+[[template]]
+name = "custom-plan"
+applies_to = ["epic"]
+[[template.nodes]]
+role = "planning"
+type = "planning"
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+labels = ["scaffold:{container.short_id}"]
+depends_on = ["planning"]
+"#;
+        let registry =
+            crate::templates::TemplateRegistry::from_toml_str(template_toml, &[] as &[&str])
+                .unwrap();
+        let template = registry.get("custom-plan").unwrap();
+
+        let mut container =
+            crate::domain::types::fixture_issue("container".to_string(), String::new());
+        container.id = "container-12345678".to_string();
+
+        let mut planning =
+            crate::domain::types::fixture_issue("planning".to_string(), String::new());
+        planning.id = "planning-12345678".to_string();
+        planning.labels = vec!["type:planning".to_string()];
+
+        let mut breakdown =
+            crate::domain::types::fixture_issue("breakdown".to_string(), String::new());
+        breakdown.id = "breakdown-12345678".to_string();
+        breakdown.labels = vec![
+            "type:breakdown".to_string(),
+            format!("scaffold:{}", container.short_id()),
+        ];
+        breakdown.dependencies = vec![planning.id.clone()];
+
+        let by_id = std::collections::HashMap::from([
+            (planning.id.as_str(), &planning),
+            (breakdown.id.as_str(), &breakdown),
+        ]);
+        let resolved = find_planning_node(&container, template, &registry.roles, &by_id).unwrap();
+
+        assert_eq!(resolved.id, planning.id);
+    }
 
     #[test]
     fn test_validate_silent_file_backend_reports_missing_index_through_captured_image() {

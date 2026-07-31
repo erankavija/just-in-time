@@ -145,6 +145,7 @@ type = "planning"
 [[template.nodes]]
 role = "breakdown"
 type = "breakdown"
+labels = ["brackets:{container.short_id}"]
 depends_on = ["planning"]
 "#;
 
@@ -644,6 +645,7 @@ doc = "dev/active/{container.id}-plan.md"
 [[template.nodes]]
 role = "breakdown"
 type = "breakdown"
+labels = ["brackets:{container.short_id}"]
 depends_on = ["planning"]
 "#;
 
