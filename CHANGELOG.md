@@ -25,9 +25,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   entry resolving outside the package root — which is how a symbolic link out of
   the tree is caught before its content is used. Both are decided against the
   entry the walk opened rather than against its name, and every entry is opened
-  without following links against the directory handle that listed it, so a name
-  relinked out of the tree while the package is being read fails to open instead
-  of substituting content from outside it. A package directory that is
+  without following links, and without blocking, against the directory handle
+  that listed it: a name relinked out of the tree while the package is being
+  read fails to open instead of substituting content from outside it, and a name
+  replaced by a pipe or a device is refused by name instead of holding the read
+  open waiting for something to write to it. A package directory that is
   absent or unreadable reports that filesystem failure instead of an invalid
   package, so a location that does not exist is not diagnosed as bad content.
   Where a package directory comes from is decided elsewhere; this is the reader.
