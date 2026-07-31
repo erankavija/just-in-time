@@ -128,7 +128,7 @@ unique = true
 examples = ["brackets:2fbd2a82"]
 
 [namespaces.satisfies]
-description = "Coverage credit: on an impl child, names a container [hard] criterion id it satisfies (read by the label-coverage gate)"
+description = "Coverage credit: on an impl child, names a container [hard] criterion id this child CONTRIBUTES to. Several children may credit one id; the label denotes contribution, not sole delivery. Read by the label-coverage gate, which credits a criterion when any labelled child exists."
 unique = false
 examples = ["satisfies:REQ-01"]
 

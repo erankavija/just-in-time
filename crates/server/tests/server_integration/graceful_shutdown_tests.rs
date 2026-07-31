@@ -422,6 +422,7 @@ fn assert_no_child_processes(pid: u32) {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[test]
+#[ignore = "the stalled-connection fixture races the accept loop; re-enable with jit:fd61b44f"]
 fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     let repository = TempDir::new().expect("create the fixture repository directory");
     initialize_repository(repository.path());

@@ -12304,3 +12304,5 @@
 {"id":"02e20475-397a-4b30-9a88-5f72cf29485d","issue_id":"9bdf8025-3a36-4a5f-b48c-1d56ec1db664","timestamp":"2026-07-31T23:07:36.815028230Z","type":"issue_completed"}
 {"from":"in_progress","id":"69bf0750-9940-443d-8f96-30db81d4ba96","issue_id":"fdae1023-6a10-45da-a56e-54916409a331","timestamp":"2026-07-31T23:07:41.815380128Z","to":"done","type":"issue_state_changed"}
 {"id":"2186f9ed-44c2-48cf-8328-2793fc7f1611","issue_id":"fdae1023-6a10-45da-a56e-54916409a331","timestamp":"2026-07-31T23:07:41.815380128Z","type":"issue_completed"}
+{"id":"10f4dd68-73cf-4f56-97a2-f50f99a14d6f","issue_id":"fd61b44f-e208-4ff9-bc8b-262706782043","priority":"high","timestamp":"2026-07-31T23:07:58.116132681Z","title":"Observe the drain assertions the graceful-shutdown test makes","type":"issue_created"}
+{"fields":["dependencies"],"id":"6e4c02a4-9b85-4706-89df-d5175b7cafdc","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-07-31T23:08:09.221182422Z","type":"issue_updated","updated_by":"dependency-add"}
