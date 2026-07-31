@@ -535,19 +535,22 @@ mod tests {
     fn test_committed_template_registry_carries_the_packaged_declarations() {
         use crate::profile::template_region::{
             outside_template_region, packaged_templates, render_template_block,
-            splice_template_region, TEMPLATE_REGION_GENERATOR, TEMPLATE_REGISTRY_PATH,
+            render_template_registry, splice_template_region, TEMPLATE_REGION_GENERATOR,
+            TEMPLATE_REGISTRY_PATH,
         };
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let existing = fs::read(root.join(TEMPLATE_REGISTRY_PATH)).unwrap();
         let block = render_template_block(&packaged_templates().unwrap()).unwrap();
-        let rendered = splice_template_region(&existing, &block).unwrap();
+        // The render the generator publishes, so the two cannot disagree about
+        // what the registry should hold.
+        let rendered = render_template_registry(&existing).unwrap();
 
         // The committed registry IS the render. On drift the generator, not
         // this assertion, is what brings the two back into agreement.
         assert_eq!(
             String::from_utf8(rendered.clone()).unwrap(),
             String::from_utf8(existing.clone()).unwrap(),
-            ".jit/templates.toml no longer carries the packaged template \
+            "{TEMPLATE_REGISTRY_PATH} no longer carries the packaged template \
              declarations. The block between the region delimiters is \
              generated from profiles/jit-dogfood/manifest.toml: edit the \
              packaged declaration, then regenerate with {TEMPLATE_REGION_GENERATOR}"
