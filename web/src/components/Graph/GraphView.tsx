@@ -374,7 +374,7 @@ const getLayoutedElements = (
 
 interface GraphViewProps {
   onNodeClick?: (issueId: string) => void;
-  labelFilters?: string[]; // e.g., ["milestone:v1.0", "epic:*"]
+  labelFilters?: string[];
   layoutAlgorithm?: LayoutAlgorithm;
   onLayoutChange?: (algorithm: LayoutAlgorithm) => void;
   /** Node ID to focus on (centers viewport and expands parent clusters) */
@@ -569,18 +569,6 @@ export function GraphView({
         });
       } catch (err) {
         console.warn('Failed to fetch hierarchy config:', err);
-        // Fallback config - just use levels, icons optional
-        const fallback: HierarchyConfig = {
-          levels: {
-            milestone: 1,
-            epic: 2,
-            story: 3,
-            task: 4,
-            bug: 4,
-          },
-          icons: {}, // No icons in fallback - will just show #nodeId
-        };
-        setHierarchyConfig(fallback);
       }
     };
     fetchHierarchyConfig();

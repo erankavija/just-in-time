@@ -1,6 +1,8 @@
-import { describe, it, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, waitFor } from '@testing-library/react';
 import { GraphView } from '../GraphView';
+import { apiClient } from '../../../api/client';
+import { prepareClusteredGraphForReactFlow } from '../../../utils/clusteredGraphLayout';
 
 // Mock ReactFlow
 vi.mock('reactflow', () => ({
@@ -29,6 +31,17 @@ vi.mock('dagre', () => ({
     },
     layout: vi.fn(), // Mock the layout function
   },
+}));
+
+vi.mock('../../../utils/clusteredGraphLayout', () => ({
+  prepareClusteredGraphForReactFlow: vi.fn(() => ({
+    clusters: [],
+    crossClusterEdges: [],
+    visibleNodes: [],
+    visibleEdges: [],
+    virtualEdges: [],
+    orphanNodes: [],
+  })),
 }));
 
 // Mock API client
@@ -82,10 +95,24 @@ vi.mock('../../../api/client', () => ({
         { from: '2', to: '3' },
       ],
     })),
+    getHierarchy: vi.fn(() => Promise.resolve({
+      types: { defaultType: 1 },
+      strategic_types: ['defaultType'],
+      icons: {},
+    })),
   },
 }));
 
 describe('GraphView', () => {
+  beforeEach(() => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+    });
+  });
+
   it('should render without crashing', async () => {
     render(<GraphView />);
     // Wait for async state updates to complete
@@ -110,5 +137,21 @@ describe('GraphView', () => {
     render(<GraphView labelFilters={['milestone:*', 'epic:*']} />);
     await waitFor(() => {});
     // Component renders with multiple filters
+  });
+
+  it('test_graph_view_omits_clustering_when_hierarchy_fetch_fails', async () => {
+    vi.mocked(apiClient.getHierarchy).mockImplementation(
+      () => new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('configuration unavailable')), 25);
+      })
+    );
+    vi.mocked(prepareClusteredGraphForReactFlow).mockClear();
+    await act(async () => {
+      render(<GraphView layoutAlgorithm="compact" />);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(apiClient.getGraph).toHaveBeenCalled();
+
+    expect(prepareClusteredGraphForReactFlow).not.toHaveBeenCalled();
   });
 });
