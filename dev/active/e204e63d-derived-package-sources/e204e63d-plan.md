@@ -263,6 +263,23 @@ flowchart LR
 | **Glob matching has no incumbent** | The workspace has no glob dependency, and the entry that consumes pattern matching is not the one that can add it. The matcher is owned by the root declaration, which needs it first and for its own reason: rejecting a malformed pattern at parse time means compiling it there. The completeness walk then consumes the compiled patterns and adds no dependency of its own; the build script needs none at all. A dependency-free matcher crate confined to pattern matching is preferred over hand-rolling, and either choice must leave the build-footprint budget's dependency-policy assertions untouched. The workspace lock file is in the owning entry's footprint so the addition has a declared home. |
 | **One integration-test target slot remains** | Eleven of twelve are used (Q8). Every guard this plan adds lands in an existing suite or in the module that already hosts the packaging tests; no entry creates an integration-test target, and none should be added without spending the last slot deliberately. |
 
+## Owner-approved amendments during execution
+
+Two entries above were amended by the owner on 2026-07-31, on execution-lead
+escalation, before any of the fan-out was dispatched. Each amendment is
+recorded on the issue it changes; the generated overview above still describes
+the manifest as it was instantiated.
+
+| Amendment | What changed and why |
+|---|---|
+| **The build-input inventory is derived, not listed** | `build-input-inventory-binding` above specifies roughly sixty path literals added to the inventory constant, reconciled against the packaged targets by a test. That is a hand-maintained copy held correct by an assertion — the shape this container exists to remove — and it would carry sixty facts about this repository's checkout inside every adopter binary. The set is instead read from the packaged live-asset targets at the boundary that already assembles the changed-path comparison, one layer out from the predicate. The predicate layer is unchanged, so its purity argument still holds; the reconciliation test is no longer needed because there is nothing to reconcile. |
+| **The script directory stops being a live-source root** | `completeness-walk-rule` and D-6 above assume every root's unpackaged material is category-shaped. Measured at execution time it is not: the script directory has four packaged files of forty-five tracked, and no category separates `code-review-prompt.md` and `plan-review-prompt.md` (packaged) from `doc-review-prompt.md` and `holistic-review-prompt.md` (not). Its exclusion list would have been forty-one near-literals, and every later unrelated script would have failed the walk until excluded. A new terminal — `packaged-gate-machinery-relocation` (9d451c98) — moves the four assets into the contributed-gate directory and collapses the byte-identical `scripts/ai-review.sh` / `contrib/gates/ai-review.sh` pair to one, retiring the script root and one further duplicate. It precedes `live-source-root-declaration`, whose criterion no longer fixes a root count. D-6's reasoning is unchanged; only the root set it applies to is. |
+
+The plan's counts of unpackaged files under the script and contributed-gate
+roots (thirty-five, thirty-six) measure forty-five at execution time. The
+figures informed D-6's preference for patterns over literals, which the
+measurement strengthens rather than reverses.
+
 ## Investigation sources
 
 - [Investigation](investigation.md) —

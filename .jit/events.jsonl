@@ -11793,3 +11793,8 @@
 {"from":"in_progress","id":"a3541443-41fc-4de3-bc5d-59bfcef1b9a7","issue_id":"080e54c6-8b70-40c5-9bbe-6a9f720a09ce","timestamp":"2026-07-30T22:45:07.592354304Z","to":"done","type":"issue_state_changed"}
 {"id":"019ecf03-7fc5-47c7-a04f-5bb9fa9db37e","issue_id":"080e54c6-8b70-40c5-9bbe-6a9f720a09ce","timestamp":"2026-07-30T22:45:07.592354304Z","type":"issue_completed"}
 {"from":"backlog","id":"d719f3aa-5082-488b-984d-97c59ab8b4a6","issue_id":"bb03df0a-65c7-496a-bb09-2620eb253fd5","timestamp":"2026-07-30T22:45:14.341750816Z","to":"ready","type":"issue_state_changed"}
+{"fields":["description"],"id":"6d5f0b29-d234-49eb-af71-6631d73142ce","issue_id":"779ea308-b4b6-462f-a7cb-994f0258ffb9","timestamp":"2026-07-31T08:46:06.412063195Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["description"],"id":"cc3dcc36-4531-4a61-9141-8d89573c2e7e","issue_id":"39c34568-98ee-47d6-ba5f-875b06c59285","timestamp":"2026-07-31T08:46:11.217533989Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"35e2d35b-499c-4bbf-87f2-ecc2b3078781","issue_id":"9d451c98-d9b2-4bfb-937b-98831aaf37d0","priority":"normal","timestamp":"2026-07-31T08:46:22.095826876Z","title":"Relocate the packaged gate machinery out of the script directory","type":"issue_created"}
+{"from":"ready","id":"cdc052ae-4e1f-4dab-8b65-05ef3a84d9fa","issue_id":"39c34568-98ee-47d6-ba5f-875b06c59285","timestamp":"2026-07-31T08:46:33.417586336Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"baa2f81a-f7be-4b6d-b39f-51c17e355dc4","issue_id":"39c34568-98ee-47d6-ba5f-875b06c59285","timestamp":"2026-07-31T08:46:33.417586336Z","type":"issue_updated","updated_by":"dependency-add"}

@@ -1,0 +1,99 @@
+{
+  "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
+  "epic_short_id": "e204e63d",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "note": "Roots with no sibling dependencies. Manifest writers serialised: 9d451c98 is the only wave-1 writer of profiles/jit-dogfood/manifest.toml and assets/live/**.",
+      "issues": [
+        {"id": "67da1d70", "short_id": "67da1d70", "title": "Render the shipped area classification into the adopter configuration reference", "classification": "implementation", "status": "pending"},
+        {"id": "e1a18372", "short_id": "e1a18372", "title": "Generate the repository plan-template declaration from the packaged contribution", "classification": "implementation", "status": "pending"},
+        {"id": "c7a548c3", "short_id": "c7a548c3", "title": "Seed the provenance fixture with the repository sources the package draws from", "classification": "implementation", "status": "pending"},
+        {"id": "9943c488", "short_id": "9943c488", "title": "Give the executable-mode contract a guard of its own", "classification": "implementation", "status": "pending"},
+        {"id": "9d451c98", "short_id": "9d451c98", "title": "Relocate the packaged gate machinery out of the script directory", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "3e340587", "short_id": "3e340587", "title": "Move the package-authored region source out of the derived prefix", "classification": "implementation", "status": "pending"},
+        {"id": "39c34568", "short_id": "39c34568", "title": "Declare the repository roots the packaged live assets are drawn from", "classification": "implementation", "status": "pending"},
+        {"id": "f77fd51b", "short_id": "f77fd51b", "title": "A mechanical freshness check for the generated shipped-policy regions", "classification": "implementation", "status": "pending"},
+        {"id": "097b9f48", "short_id": "097b9f48", "title": "Fail the suite when the two plan-template declarations disagree", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "7d038e97", "short_id": "7d038e97", "title": "Assemble the packaged tree at build time", "classification": "implementation", "status": "pending"},
+        {"id": "4873b32f", "short_id": "4873b32f", "title": "Cover the declared roots on the agent-facing bridge", "classification": "implementation", "status": "pending"},
+        {"id": "0db28190", "short_id": "0db28190", "title": "State the root declaration in the adopter manifest reference", "classification": "documentation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "1d2f454e", "short_id": "1d2f454e", "title": "Re-root the embed on the assembled tree", "classification": "implementation", "status": "pending"},
+        {"id": "380a8e9e", "short_id": "380a8e9e", "title": "Pin the assembly's reconciliation of removed sources", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"id": "26f503cc", "short_id": "26f503cc", "title": "Adjust the citation checker's package exclusions", "classification": "implementation", "status": "pending"},
+        {"id": "ce0172c3", "short_id": "ce0172c3", "title": "Two builds report the same package hash", "classification": "implementation", "status": "pending"},
+        {"id": "0cf1f351", "short_id": "0cf1f351", "title": "Fail on a repository file under a declared root that no packaged asset claims", "classification": "implementation", "status": "pending"},
+        {"id": "779ea308", "short_id": "779ea308", "title": "Extend the binary build-input inventory to the packaged live sources", "classification": "implementation", "status": "pending"},
+        {"id": "8e7a82dc", "short_id": "8e7a82dc", "title": "Pin the assembly's freshness on a timestamp-only change", "classification": "implementation", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "note": "Story containers close once their impl interiors are done.",
+      "issues": [
+        {"id": "25bdda50", "short_id": "25bdda50", "title": "The repository plan-template declaration is generated from the package", "classification": "implementation", "status": "pending"},
+        {"id": "6f8f02ba", "short_id": "6f8f02ba", "title": "The shipped area classification reaches adopter configuration by generation", "classification": "implementation", "status": "pending"},
+        {"id": "cc75b4e6", "short_id": "cc75b4e6", "title": "The packaged asset tree is derived from the repository files it mirrors", "classification": "implementation", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [
+    {
+      "short_id": "9d451c98",
+      "title": "Relocate the packaged gate machinery out of the script directory",
+      "reason": "Owner-approved (2026-07-31) escalation outcome. The script directory had 4 packaged files of 45 tracked, with no category separating packaged from unpackaged review prompts, so it could not carry a category-shaped exclusion list. Retiring it as a live-source root also collapses the byte-identical scripts/ai-review.sh + contrib/gates/ai-review.sh pair.",
+      "wired": "39c34568 depends on 9d451c98"
+    }
+  ],
+  "escalations": [
+    {
+      "at": "2026-07-31",
+      "category": "4 — issue scope change (criteria)",
+      "issue": "779ea308",
+      "situation": "The plan required ~60 hand-written path literals in the BINARY_BUILD_INPUTS constant plus a reconciliation test against the packaged targets. That is a hand-maintained copy held correct by an assertion — the defect class this container removes — and it ships ~60 of this repository's paths inside every adopter binary. dogfood::jit_dogfood_package() already exposes the parsed embedded manifest and dogfood.rs:386 already filters live assets by the assets/live/ prefix; every live asset's target IS its repository path; and the caller at commands/gate_check.rs:672 sits in a layer that can reach the package.",
+      "resolution": "Owner approved rewriting 779ea308 to derive the set from the packaged live-asset targets at the changed-path comparison boundary. REQ-02/REQ-05 (the literals + reconciliation test) replaced; domain-layer purity criterion retained and strengthened."
+    },
+    {
+      "at": "2026-07-31",
+      "category": "4 — issue scope change (criteria) + 1 — new work item",
+      "issue": "39c34568",
+      "situation": "D-6 requires glob-category exclusions rather than path literals. Measured at execution time: .agents/ is 55 packaged / 52 unpackaged with cleanly categorical exclusions; contrib/ is 1/4; .jit/reference/ is 1/0. But scripts/ is 4 packaged of 45 tracked and no category separates code-review-prompt.md and plan-review-prompt.md (packaged) from doc-review-prompt.md and holistic-review-prompt.md (not), so its exclusion list would be ~41 near-literals and every future unrelated script would fail the walk. Additionally scripts/ai-review.sh and contrib/gates/ai-review.sh are byte-identical and both packaged.",
+      "resolution": "Owner approved relocating the four packaged files under contrib/gates/, retiring scripts/ as a declared root, and collapsing the duplicate wrapper. New task 9d451c98 created and wired before 39c34568; 39c34568's REQ-05 no longer fixes a root count."
+    }
+  ],
+  "surfaced_pitfalls": [
+    {
+      "at": "2026-07-31",
+      "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat …)\"` and survive shell quoting.",
+      "disposition": "Dogfooding friction. File as a separate issue at epic close; not in this epic's scope."
+    },
+    {
+      "at": "2026-07-31",
+      "finding": "The plan's counts of unpackaged files under the script and contributed-gate roots (35/36) measure 45 at execution time. D-6's preference for patterns over literals is strengthened, not reversed.",
+      "disposition": "Recorded in the plan's amendment section; no criterion depends on the count."
+    }
+  ],
+  "rework_counts": {},
+  "started_at": "2026-07-31"
+}
