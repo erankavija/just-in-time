@@ -2,6 +2,9 @@ use super::manifest::{
     is_lowercase_kebab, ProfileManifest, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
 };
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
+use cap_primitives::fs::FollowSymlinks;
+use cap_std::ambient_authority;
+use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry, OpenOptions as CapOpenOptions};
 use include_dir::Dir;
 use semver::{Version, VersionReq};
 use serde::Serialize;
@@ -9,6 +12,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::io::Read;
 use std::path::{Component, Path};
 
 const TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-target-v1\0";
@@ -253,51 +257,144 @@ fn embedded_files(directory: &Dir<'_>) -> BTreeMap<String, Vec<u8>> {
 
 /// Walk the package tree rooted at `root` into a package-relative byte map.
 ///
-/// `root` is resolved once, and every entry is required to resolve inside the
-/// result before its kind is examined, so an entry reached through a symbolic
-/// link out of the tree is reported as an escape rather than read as content.
-/// The pending list is explicit rather than recursive, and the budget is
-/// re-derived from each entry's declared size before its bytes are read, so
-/// neither the depth nor the size of an untrusted tree is taken on trust;
-/// [`validate_package_bounds`] stays the authority over what was read.
+/// Containment holds by construction rather than by inspection. Every entry is
+/// reached by a no-follow `openat` against the directory handle that listed it
+/// — the same capability-handle discipline the storage layer's tree walks use
+/// (`@/invariant/convention-convergence`) — so the bytes admitted to a package
+/// are the bytes of the entry the walk classified. There is no second lookup of
+/// the entry's name after its kind is decided, and therefore no interval in
+/// which replacing that name with a symbolic link could redirect the read: the
+/// open of a symbolic link fails outright, and the handle chain is anchored at
+/// `root`, so no ancestor can be redirected either.
+///
+/// The pending list is explicit rather than recursive, and the budget bounds
+/// the read twice — once from the opened file's own size, and again by reading
+/// at most one byte past what remains, so a file that grows after its size is
+/// taken cannot be read past the budget either. [`validate_package_bounds`]
+/// stays the authority over what was actually read.
 fn read_package_directory(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, ProfilePackageError> {
     let root = fs::canonicalize(root).map_err(|source| unreadable(root, source))?;
-    let mut pending = vec![root.clone()];
+    let handle = CapDir::open_ambient_dir(&root, ambient_authority())
+        .map_err(|source| unreadable(&root, source))?;
+    let mut pending = vec![(handle, String::new())];
     let mut files = BTreeMap::new();
     let mut byte_size = 0usize;
-    while let Some(directory) = pending.pop() {
-        for entry in fs::read_dir(&directory).map_err(|source| unreadable(&directory, source))? {
-            let path = entry
-                .map_err(|source| unreadable(&directory, source))?
-                .path();
-            let relative = match path.strip_prefix(&root) {
-                Ok(relative) => normalize_package_path(relative),
-                Err(_) => path.to_string_lossy().into_owned(),
-            };
-            if escapes_root(&root, &path) {
-                return Err(ProfilePackageError::EscapingEntry { path: relative });
-            }
-            let metadata =
-                fs::symlink_metadata(&path).map_err(|source| unreadable(&path, source))?;
-            if metadata.is_dir() {
-                pending.push(path);
-            } else if metadata.is_file() {
-                let declared = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
-                if let Some(error) = package_bounds_failure(
-                    files.len().saturating_add(1),
-                    byte_size.saturating_add(declared),
-                ) {
-                    return Err(error);
-                }
-                let bytes = fs::read(&path).map_err(|source| unreadable(&path, source))?;
+    while let Some((directory, prefix)) = pending.pop() {
+        let listing = directory
+            .entries()
+            .map_err(|source| unreadable(&root.join(&prefix), source))?;
+        for entry in listing {
+            let entry = entry.map_err(|source| unreadable(&root.join(&prefix), source))?;
+            let relative = package_child_path(&prefix, &entry.file_name());
+            let kind = entry
+                .file_type()
+                .map_err(|source| unreadable(&root.join(&relative), source))?;
+            if kind.is_dir() {
+                pending.push((open_child_directory(&entry, &root, &relative)?, relative));
+            } else if kind.is_file() {
+                let bytes = read_regular_entry(&entry, &root, &relative, files.len(), byte_size)?;
                 byte_size = byte_size.saturating_add(bytes.len());
                 files.insert(relative, bytes);
             } else {
-                return Err(ProfilePackageError::IrregularEntry { path: relative });
+                return Err(rejected_entry(&root, relative));
             }
         }
     }
     Ok(files)
+}
+
+/// Open one listed entry through a no-follow `openat` on the handle that listed
+/// it, so the object opened is the object listed or nothing at all.
+fn open_entry_nofollow(entry: &CapDirEntry, maybe_dir: bool) -> std::io::Result<cap_std::fs::File> {
+    let mut options = CapOpenOptions::new();
+    options.read(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    options._cap_fs_ext_maybe_dir(maybe_dir);
+    entry.open_with(&options)
+}
+
+/// Descend into a listed subdirectory, or report why it is not one.
+fn open_child_directory(
+    entry: &CapDirEntry,
+    root: &Path,
+    relative: &str,
+) -> Result<CapDir, ProfilePackageError> {
+    let opened = open_entry_nofollow(entry, true)
+        .map_err(|source| entry_open_failure(root, relative, source))?;
+    let is_dir = opened
+        .metadata()
+        .map_err(|source| unreadable(&root.join(relative), source))?
+        .is_dir();
+    if is_dir {
+        Ok(CapDir::from_std_file(opened.into_std()))
+    } else {
+        Err(rejected_entry(root, relative.to_string()))
+    }
+}
+
+/// Read one listed regular file, bounded by what the budget still admits.
+///
+/// The kind and the size both come from the opened handle rather than from the
+/// name, so they describe the object whose bytes this returns.
+fn read_regular_entry(
+    entry: &CapDirEntry,
+    root: &Path,
+    relative: &str,
+    file_count: usize,
+    byte_size: usize,
+) -> Result<Vec<u8>, ProfilePackageError> {
+    let opened = open_entry_nofollow(entry, false)
+        .map_err(|source| entry_open_failure(root, relative, source))?;
+    let metadata = opened
+        .metadata()
+        .map_err(|source| unreadable(&root.join(relative), source))?;
+    if !metadata.is_file() {
+        return Err(rejected_entry(root, relative.to_string()));
+    }
+    let admitted = file_count.saturating_add(1);
+    let declared = usize::try_from(metadata.len()).unwrap_or(usize::MAX);
+    if let Some(error) = package_bounds_failure(admitted, byte_size.saturating_add(declared)) {
+        return Err(error);
+    }
+    let headroom = MAX_PROFILE_PACKAGE_BYTES.saturating_sub(byte_size);
+    let mut bytes = Vec::new();
+    opened
+        .take(headroom as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|source| unreadable(&root.join(relative), source))?;
+    match package_bounds_failure(admitted, byte_size.saturating_add(bytes.len())) {
+        Some(error) => Err(error),
+        None => Ok(bytes),
+    }
+}
+
+/// Why an entry that is not a usable regular file or directory is refused.
+///
+/// Reporting only. Containment is established by the no-follow open, so a stale
+/// answer here cannot admit anything; it only decides which name the refusal
+/// carries.
+fn rejected_entry(root: &Path, relative: String) -> ProfilePackageError {
+    if escapes_root(root, &root.join(&relative)) {
+        ProfilePackageError::EscapingEntry { path: relative }
+    } else {
+        ProfilePackageError::IrregularEntry { path: relative }
+    }
+}
+
+/// A failed no-follow open: a refusal when the name is a link, I/O otherwise.
+///
+/// Refusing to follow reports `ELOOP` under POSIX and `EMLINK` on the BSDs;
+/// both mean the listed name is a symbolic link now, whatever the listing said.
+fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> ProfilePackageError {
+    let symlinked = matches!(
+        source.raw_os_error(),
+        Some(code) if code == nix::libc::ELOOP || code == nix::libc::EMLINK
+    );
+    if symlinked {
+        rejected_entry(root, relative.to_string())
+    } else {
+        unreadable(&root.join(relative), source)
+    }
 }
 
 /// Whether `path` resolves outside `root`.
@@ -312,6 +409,16 @@ fn unreadable(path: &Path, source: std::io::Error) -> ProfilePackageError {
     ProfilePackageError::UnreadableDirectory {
         path: path.display().to_string(),
         source,
+    }
+}
+
+/// The package-relative path of `name` inside the directory at `prefix`.
+fn package_child_path(prefix: &str, name: &std::ffi::OsStr) -> String {
+    let name = name.to_string_lossy();
+    if prefix.is_empty() {
+        name.into_owned()
+    } else {
+        format!("{prefix}/{name}")
     }
 }
 
@@ -1316,6 +1423,46 @@ value = "workspace/active"
             ProfilePackage::from_directory(&root),
             Err(ProfilePackageError::EscapingEntry { path }) if path == "escape"
         ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_regular_entry_refuses_a_name_relinked_outward_after_it_was_listed() {
+        let temp = TempDir::new().unwrap();
+        let root = std::fs::canonicalize(writable_package_tree(&temp)).unwrap();
+        std::fs::write(temp.path().join("outside.txt"), b"outside bytes").unwrap();
+
+        let assets = CapDir::open_ambient_dir(root.join("assets"), ambient_authority()).unwrap();
+        let entry = assets
+            .entries()
+            .unwrap()
+            .map(Result::unwrap)
+            .find(|entry| entry.file_name() == "workflow.txt")
+            .expect("the declared asset is listed");
+        assert!(
+            entry.file_type().unwrap().is_file(),
+            "the walk classifies this entry as a regular file"
+        );
+
+        // The state a concurrent rename produces between the classification
+        // above and the read below: same name, now a link out of the package.
+        std::fs::remove_file(root.join("assets/workflow.txt")).unwrap();
+        std::os::unix::fs::symlink(
+            temp.path().join("outside.txt"),
+            root.join("assets/workflow.txt"),
+        )
+        .unwrap();
+
+        let error = read_regular_entry(&entry, &root, "assets/workflow.txt", 0, 0)
+            .expect_err("bytes from outside the package root must not be admitted");
+        assert!(
+            matches!(&error, ProfilePackageError::EscapingEntry { path } if path == "assets/workflow.txt"),
+            "{error}"
+        );
+        assert!(
+            ProfilePackage::from_directory(&root).is_err(),
+            "a package whose entry resolves outside the root cannot be read at all"
+        );
     }
 
     #[test]
