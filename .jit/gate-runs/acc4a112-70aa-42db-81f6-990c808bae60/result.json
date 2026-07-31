@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d61408cdfcc84f6df2c5a52eaddcacfc72baae9b",
+  "completed_at": "2026-07-31T20:45:39.568108601Z",
+  "duration_ms": 518341,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "a30d704d-05af-406c-8cb6-5031495af705",
+  "message": null,
+  "run_id": "acc4a112-70aa-42db-81f6-990c808bae60",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T20:37:01.226182941Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest routes::tests::test_get_hierarchy ... FAILED\ntest result: FAILED. 102 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.00s\n---- routes::tests::test_get_hierarchy stdout ----\n\nthread 'routes::tests::test_get_hierarchy' (26824) panicked at crates/server/src/routes.rs:1508:9:\nassertion failed: data.icons.is_empty()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1543 bytes=27960657)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1407813336/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

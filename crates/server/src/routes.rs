@@ -1502,10 +1502,26 @@ mod tests {
         let response = server.get("/config/hierarchy").await;
         response.assert_status_ok();
         let data: HierarchyResponse = response.json();
-        // Should return hierarchy data (may be empty defaults)
-        assert!(data.types.is_empty() || !data.types.is_empty());
-        assert!(data.strategic_types.is_empty() || !data.strategic_types.is_empty());
-        assert!(data.icons.is_empty());
+        // REQ-05 (jit:0439da41): with the named bundles gone, a repository that
+        // declares no icons still receives the level-keyed defaults for every
+        // type it declared. Stated as the level-keying property rather than as
+        // an icon inventory, so the assertion holds for any taxonomy the fixture
+        // declares: one icon per declared type, and two types share an icon
+        // exactly when they share a level.
+        assert_eq!(
+            data.icons.keys().collect::<std::collections::BTreeSet<_>>(),
+            data.types.keys().collect::<std::collections::BTreeSet<_>>(),
+        );
+        for (left, left_level) in &data.types {
+            for (right, right_level) in &data.types {
+                assert_eq!(
+                    data.icons[left] == data.icons[right],
+                    left_level == right_level,
+                    "{left} (level {left_level}) and {right} (level {right_level}) \
+                     must share an icon exactly when they share a level",
+                );
+            }
+        }
     }
 
     #[tokio::test]

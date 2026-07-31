@@ -14,7 +14,13 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-31T20:45:39.593999502Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a30d704d-05af-406c-8cb6-5031495af705",
   "labels": [
     "type:task",
@@ -29,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Stop supplying a taxonomy to a repository that declares none",
-  "updated_at": "2026-07-31T19:25:51.619289475Z"
+  "updated_at": "2026-07-31T20:45:39.593999502Z"
 }
