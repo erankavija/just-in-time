@@ -24,7 +24,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Regenerating a checked-in generated artifact has one invocation form",
-  "updated_at": "2026-07-31T10:26:13.065487470Z"
+  "updated_at": "2026-07-31T11:32:56.661685499Z"
 }

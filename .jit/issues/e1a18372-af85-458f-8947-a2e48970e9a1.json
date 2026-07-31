@@ -8,6 +8,7 @@
   ],
   "description": "The planning-bracket template this repository declares becomes a generated region rendered from the packaged contribution that is its authority, so the repository copy is no longer hand-authored.\n\n## Background\n\nThe planning-bracket template is declared twice: once inline in the packaged workflow manifest as a semantic contribution, and once in this repository's own template registry. The two match on structure — roles, types, gates, document paths, labels, internal edges, anchor edges, and transforms are identical after parsing — and differ in three description strings.\n\nThe packaged declaration is the shipped artifact and the repository declaration is a local consumer of it, which fixes the direction: the packaged contribution is the authority and the repository copy becomes generated from it. The packaged contribution is already exposed whole through the package's machine-readable inspection output, so no new surface is needed to read it.\n\nTwo properties of the existing registry file constrain the change. Its seven-line header sits outside the template block and survives untouched. Inside the block, a six-line explanation records why the container anchor carries a whole-repository validation gate rather than the per-issue one, citing the criterion and invariant that motivated it; no round trip through a serializer preserves in-block commentary or the file's column alignment, so that rationale has to move outside the generated region to survive.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository plan-template declaration is a marked generated region whose body is rendered from the packaged planning-bracket contribution.\n- [hard] REQ-02: Rendering leaves every byte outside the markers unchanged, including the file header.\n- [hard] REQ-03: The rationale for the container anchor's whole-repository validation gate survives, stated outside the generated region.\n- [hard] REQ-04: The three description strings that differ today are equal afterwards, with the packaged text taken as authoritative.\n- [hard] REQ-05: The template registry loads the regenerated file, and the plan template still applies to the container type it applies to today.\n- [hard] REQ-06: A second rendering run immediately after the first finds nothing to change.\n\n## Notes\n\nTwo further plan-template declarations exist as adopter-facing illustrations of different rulesets. Both restate this declaration's top-level description string verbatim, and one also restates its planning-node description. They illustrate authoring forms rather than this repository's workflow and stay hand-authored; this work does not touch them.\n",
   "documents": [],
+  "done_at": "2026-07-31T11:32:46.885865696Z",
   "first_ready_at": "2026-07-28T12:17:11.984851016Z",
   "gates_required": [
     "cargo-ci",
@@ -18,6 +19,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-07-31T11:13:15.092842023Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T11:28:03.777275063Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
@@ -38,7 +44,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Generate the repository plan-template declaration from the packaged contribution",
-  "updated_at": "2026-07-31T11:13:18.043817552Z"
+  "updated_at": "2026-07-31T11:32:46.885865696Z"
 }

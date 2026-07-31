@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The packaged gate machinery this repository keeps under its script directory moves into the contributed-gate directory, and the two byte-identical copies of the review wrapper become one, so every declared live-source root is a directory where packaging is the rule rather than the exception.\n\n## Background\n\nFive live assets are drawn from the script directory: the AI-review wrapper and three review prompts. Forty-one other tracked files there are not packaged, and no category separates the two groups — `code-review-prompt.md` and `plan-review-prompt.md` are packaged while `doc-review-prompt.md` and `holistic-review-prompt.md`, files of exactly the same shape and purpose, are not.\n\nThat makes the script directory unusable as a completeness-checked root. Exclusions there could only be a list of forty-one near-literals, which is the hand-maintained inventory the completeness check exists to remove; and every script added later for unrelated reasons would fail the suite until someone added an entry for it. The other roots do not have this problem: the skill tree's unpackaged files are evaluation harnesses, fixtures, transcripts and trigger records, all of which a handful of category patterns cover.\n\nThe wrapper is also carried twice. `scripts/ai-review.sh` and `contrib/gates/ai-review.sh` are byte-identical, both declared as packaged assets with different targets, so an adopter installing the package receives two copies of one script. One test exercises both, and a prior container had to fix the same parser defect in each. This is a third duplicate pair of exactly the kind the container removes, sitting inside the inventory the container derives.\n\nMoving the four to the contributed-gate directory makes packaging the rule in every declared root and retires the script directory as one. The contributed-gate directory's own unpackaged material — the README and the example prompts beneath it — is a category a single pattern describes.\n\nThe move is a relocation, not a rewrite: the same scripts, the same prompt text, the same behaviour. What changes is where they live in this repository, where an adopter receives them, and the paths that name them.\n\n## Success Criteria\n\n- [hard] REQ-01: The AI-review wrapper and the three packaged review prompts live under the contributed-gate directory, and no packaged live asset is drawn from the script directory.\n- [hard] REQ-02: One copy of the AI-review wrapper remains in the repository and one packaged asset declares it; the retired copy is gone rather than left behind unreferenced.\n- [hard] REQ-03: Every gate in this repository's registry that invoked the wrapper or named one of the moved prompts resolves to the relocated path, and each such gate still evaluates.\n- [hard] REQ-04: The wrapper keeps its executable declaration and its executable mode, and the packaged content an adopter receives is unchanged apart from the retired duplicate and the moved paths.\n- [hard] REQ-05: Every test, script, and document naming a moved or retired path names its replacement, and the mechanical documentation checks pass over the result.\n- [hard] REQ-06: The wrapper's own adoption instructions describe where the package now installs it, rather than a location it no longer occupies.\n- [hard] REQ-07: The coverage that exercised the wrapper in both of its former locations exercises the single remaining one, with nothing lost from what it asserted.\n\n## Notes\n\nKnown consumers to start from, not an exhaustive list: this repository's gate registry, the packaged manifest's asset declarations and the mirrored copies beneath the package's live-asset prefix, the verdict-parser tests that iterate both wrapper copies, the derived-state repair fixture that uses the wrapper as its executable asset, the dogfood package assertions that name a script-directory target, and the code-review policy tests that read the prompt by path.\n\nOwner-approved addition (2026-07-31, execution-lead escalation). It precedes the root declaration so that the declared root set is final before anything walks it.",
   "documents": [],
+  "done_at": "2026-07-31T11:32:37.117114385Z",
   "first_ready_at": "2026-07-31T08:46:22.095826876Z",
   "gates_required": [
     "cargo-ci",
@@ -19,8 +20,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-31T11:21:01.235922398Z",
+      "status": "passed",
+      "updated_at": "2026-07-31T11:25:19.073162871Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -41,7 +42,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Relocate the packaged gate machinery out of the script directory",
-  "updated_at": "2026-07-31T11:21:01.235922398Z"
+  "updated_at": "2026-07-31T11:32:37.117114385Z"
 }

@@ -7,6 +7,7 @@
   ],
   "description": "A change to either plan-template declaration without the corresponding change to the other fails the test suite, compared as two parsed declarations rather than against a written-down expectation.\n\n## Background\n\nGeneration makes the two declarations equal at the moment it runs. It does not keep them equal: a hand edit to the repository copy, or a change to the packaged contribution without a regeneration, puts them back out of step, and nothing today reports that. The pair has drifted before precisely because nothing compared them — the byte-equality contract that covers the packaged file assets does not reach this one, because the packaged declaration is inline manifest data rather than an asset.\n\nThe comparison has to be between the two parsed values. A test carrying its own expectation of what the template contains would be a third copy of the same declaration, going stale on the next change to either — the defect this work exists to remove, reintroduced in the guard meant to prevent it. Both sides are already parseable by the crate: the registry loads the repository file, and the packaged contribution is a value inside the embedded package.\n\n## Success Criteria\n\n- [hard] REQ-01: A test parses the repository declaration and the packaged declaration and fails when any field differs, description strings included.\n- [hard] REQ-02: The comparison rests on the two parsed values, holding no expectation of its own about what either contains.\n- [hard] REQ-03: An edit to either declaration alone fails the suite, in whichever of the two it is made.\n- [hard] REQ-04: The failure names the field that differs, so the reader knows which declaration to regenerate.\n\n## Notes\n\nThe guard holds whether or not the region was regenerated, so it reports a hand edit to the generated region as readily as a change to the authority.\n",
   "documents": [],
+  "first_ready_at": "2026-07-31T11:32:51.786756823Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Fail the suite when the two plan-template declarations disagree",
-  "updated_at": "2026-07-28T12:17:11.984851016Z"
+  "updated_at": "2026-07-31T11:32:51.786756823Z"
 }

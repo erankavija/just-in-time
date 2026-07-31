@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "00da4a64599ffa2abba7645eb69c22d56e24bee1",
+  "completed_at": "2026-07-31T11:30:28.273200344Z",
+  "duration_ms": 140526,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable generator and marked documentation regions satisfy the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "67da1d70-224b-4a54-9c22-f4a5beb73e9a",
+  "message": null,
+  "run_id": "a571f62a-61c5-48e7-8b87-f76bdd3d33f6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T11:28:07.747024862Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8a8c9476, 3e9eff00 (jit:67da1d70)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-3 and D-4 (issue markdown-first Decisions); @/invariant/single-source-prose (.jit/invariants.toml registry-first)\nGate evidence: docs-mechanical passed (exit 0, 2026-07-31T09:39:35Z); doc-review pending; code-review pending\nTruncation recovery: reread generator, self-test, affected documentation, gate policy, item registry, and provenance code in bounded ranges\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable generator and marked documentation regions satisfy the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

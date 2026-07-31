@@ -8,6 +8,7 @@
   ],
   "description": "The executable declaration each packaged asset carries is checked against the actual mode of the repository file it is drawn from by an assertion that stands on its own, so the contract survives the removal of the comparison it currently shares a loop with.\n\n## Background\n\nEach packaged asset declares whether it should be published with the executable bit set; seven of the sixty-one do. One test checks that declaration against the real mode of the repository file the asset mirrors, in both directions, and it is the only place in the workspace that checks it at all. The embedding carries no mode metadata, so nothing else can recover the fact.\n\nThat check lives inside a loop whose other half compares the two copies of each asset byte for byte. The byte half is on its way out: once the packaged tree is produced by copying the repository files, comparing the copy to its source compares a thing to itself. When the byte half goes, an assertion that is merely a clause inside it goes with it, and the mode contract silently stops being checked.\n\nExtracting it first is what prevents that. While the byte comparison is still effective, the mode check becomes an assertion in its own right, reading the declarations and the repository modes directly. From then on the contract is guarded continuously — there is no revision in which one guard has been retired and its replacement has not yet landed. Doing it in the other order would leave exactly such a gap, and a permission change during that window would go unreported.\n\n## Success Criteria\n\n- [hard] REQ-01: A standalone assertion checks each declared live asset's executable declaration against the mode of the repository file it is drawn from.\n- [hard] REQ-02: The assertion is independent of the byte comparison it currently shares a loop with, so retiring that comparison leaves it intact.\n- [hard] REQ-03: A permission change on a live source alone fails the suite.\n- [hard] REQ-04: A declaration claiming an executable file that is not executable fails, and so does the reverse.\n- [hard] REQ-05: The assertion is effective from the revision it lands in, while the existing comparison is still effective, so the contract is never unguarded between the two.\n\n## Notes\n\nThe assertion is written against the declarations and the repository tree, not against a list of the seven assets that carry the flag today, so a newly declared executable asset is covered without an edit here.\n",
   "documents": [],
+  "done_at": "2026-07-31T11:32:17.510373461Z",
   "first_ready_at": "2026-07-28T12:17:11.984851016Z",
   "gates_required": [
     "cargo-ci",
@@ -35,7 +36,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Give the executable-mode contract a guard of its own",
-  "updated_at": "2026-07-31T11:15:26.299140386Z"
+  "updated_at": "2026-07-31T11:32:17.510373461Z"
 }

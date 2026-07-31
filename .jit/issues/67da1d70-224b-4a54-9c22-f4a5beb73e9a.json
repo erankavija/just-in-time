@@ -8,6 +8,7 @@
   ],
   "description": "The adopter configuration reference and the copyable example configuration obtain the managed, permanent, and issue-scoped area lists from the shipped classification by generation, so neither carries a hand-maintained second copy that can go stale.\n\n## Background\n\nThe shipped development-area classification is declared once in the engine, as the scaffolding constant that repository initialization renders into the configuration table a new repository receives. Two adopter-facing files restate parts of it by hand: the configuration reference carries a fenced block reproducing all three lists verbatim, and the copyable example carries a deliberately reduced illustrative subset that says so in a comment. Nothing binds either to the constant. Both went stale during earlier work and blocked two reviews before they were repaired.\n\nOnly one route to the shipped values respects the boundary between shipped behaviour and this repository's own configuration. Initializing a throwaway repository in a temporary directory produces the table the shipped constant renders; reading the configuration this repository runs under would report its local policy, which merely happens to agree today and is documented as a repository-local choice rather than a binding.\n\nThe example file keeps its hand-authored character everywhere else. Only its area-classification table becomes generated, and its illustrative subset gives way to the table a fresh repository actually receives, so a reader copying the file starts from the shipped classification.\n\nOne property of this route is load-bearing and easy to miss. Initialization runs from the installed binary, so the values the generator obtains are the classification compiled into the binary in use, not the declaration at the current revision. If a contributor edits the declaration and runs the generator without reinstalling, the regions are written from the older compiled copy: they are stale and internally consistent, so rerunning the generator changes nothing and the staleness survives. The repository already knows when an installed binary predates the sources it is judging, but that knowledge cannot help here — it identifies a repository by resolving a revision in it, and initialization runs in a temporary directory that has no repository at all, so nothing is reported. The generator therefore has to make the check itself, against the repository it is writing into.\n\nSilence is not evidence either way, which is why the check has to be positive rather than an absence of complaint. A binary built without injected provenance reports its build commit as unknown, and an unknown commit, an unresolvable head, or a commit outside the repository's history all resolve to the same not-applicable outcome as a binary that is genuinely current. A binary from an ordinary install is therefore indistinguishable from a fresh one unless currency is established rather than assumed.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository-local generator initializes a throwaway repository in a temporary directory and reads the area-classification table written there, leaving the working tree it runs in otherwise unchanged.\n- [hard] REQ-02: The generator writes that table into a marked region in the adopter configuration reference and into a marked region in the copyable example configuration.\n- [hard] REQ-03: Bytes outside the markers in both targets are preserved exactly, including surrounding prose, authored comments, and every other configuration table.\n- [hard] REQ-04: Neither target retains a hand-maintained restatement of the managed, permanent, or issue-scoped area lists.\n- [hard] REQ-05: A second generator run immediately after the first finds nothing to change.\n- [hard] REQ-06: The generator reads no configuration belonging to this repository, so the values it writes come only from what initialization produces.\n- [hard] REQ-07: The generator writes only once it has positively established, against the repository it writes into rather than against the throwaway directory, that the binary it reads the classification from carries provenance resolvable in that repository and does not predate that repository's sources. Provenance that is absent, unresolvable, or outside that repository's history is a refusal to write, never a pass.\n\n## Notes\n\nThe reference's surrounding prose already explains what the table is and where its authority lives; that prose stays hand-authored and only the values become generated.\n\nOne route to the currency check is available and one is a trap. The available one asks the binary itself: invoked from inside the repository with the marker that puts it in gate-child mode, it reports its own refusal status when it predates that repository, and existing coverage pins that behaviour. Reimplementing the check instead — reading the binary's reported build provenance, comparing it against the repository head, and re-deriving in shell which paths count as build inputs — would create a second copy of the very inventory this work exists to bind to one authority.\n",
   "documents": [],
+  "done_at": "2026-07-31T11:32:22.449614970Z",
   "first_ready_at": "2026-07-28T12:17:11.984851016Z",
   "gates_required": [
     "code-review",
@@ -15,6 +16,16 @@
     "doc-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T11:30:28.566024615Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T11:31:51.819267026Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-07-31T09:39:44.156936016Z",
@@ -34,7 +45,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Render the shipped area classification into the adopter configuration reference",
-  "updated_at": "2026-07-31T09:39:44.156936016Z"
+  "updated_at": "2026-07-31T11:32:22.449614970Z"
 }
