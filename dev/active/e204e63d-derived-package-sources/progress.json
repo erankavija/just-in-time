@@ -16,24 +16,30 @@
     },
     {
      "short_id": "ae435979",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "A",
-     "base": "56cc6c0f"
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Fixture declares objective/initiative/deliverable/action and its own namespaces — deliberately not a copy of any package's vocabulary — and returns TestTaxonomy so consumers assert against what they were given. Self-verifying test proves the built repository carries exactly the declaration. Binds the 11 wave-1 adoptions."
     },
     {
      "short_id": "4c40e165",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "B",
-     "base": "4abed8d8"
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "New Scalar contribution kind for the two documentation scalars and the two validation defaults; the three documentation lists join SetStringTarget. Conflict handling reuses equal_or_conflict, so no precedence is introduced."
     },
     {
      "short_id": "5dd0df5b",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "A",
-     "base": "56cc6c0f"
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "ProfileId is a proper semantic type shared by package id and dependency id. The pre-existing private is_lowercase_kebab in package.rs was moved to manifest.rs and shared rather than duplicated, satisfying convention-convergence. Self-reference is caught in validate_manifest, the only path a manifest reaches the system through."
     },
     {
      "short_id": "09aea8b3",
@@ -44,54 +50,69 @@
     },
     {
      "short_id": "3e340587",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "A",
-     "base": "56cc6c0f"
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Region source relocated to assets/regions/; live-prefix sources and files both drop 61->60 with total package assets unchanged at 64. REQ-04 is enforced jointly by package validation (no undeclared package file), the existing per-asset counterpart comparison, and the new region-source prefix assertion."
     },
     {
      "short_id": "510297e4",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "B",
-     "base": "4abed8d8"
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "Both call sites derive the container label from the breakdown node's declared labels; missing declaration is an error at apply. Doc comments naming the retired brackets: literal were swept in the same change."
     },
     {
      "short_id": "0439da41",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "B",
-     "base": "4abed8d8"
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "Icon presets deleted; deny_unknown_fields on the icons table reports a configuration still naming one. Swept: no residual icon-preset reference in crates/docs/web; the remaining 'preset' hits are gate presets and hierarchy-template names, a different concept."
     },
     {
      "short_id": "fdae1023",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "A",
-     "base": "56cc6c0f"
+     "base": "56cc6c0f",
+     "lead_review": "pass-after-rework",
+     "note": "Round 1 FAILED lead review: REQ-02 is universal over every shipped tool description but the guard checked three hand-listed keys. Rework replaced it with a scan over SERVER_INSTRUCTIONS, every CURATION.include entry and every generated tools/list description, deriving the kind vocabulary from the repository's own config rather than hardcoding it; the worker verified the guard fires when @/inv/dag-acyclic is reinjected. npm test 12/12 unsandboxed."
     },
     {
      "short_id": "9bdf8025",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "A",
-     "base": "56cc6c0f"
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Graph fallback hierarchy removed (renders without tiers on fetch failure); label colours derived from the API namespace registry with a muted fallback. All four LabelBadge call sites pass the registry; getNamespaces had no prior caller so no duplicate fetch. REQ-03 read as the graph half: a literal reading over colours would make REQ-02/03/04 jointly unsatisfiable."
     },
     {
      "short_id": "f6c23c09",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "B",
-     "base": "4abed8d8"
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "Four constants moved into cfg(any(test, feature=test-support)) pub(crate) mod test_support; renders and conformance assertions unchanged; both regeneration scripts still exit 0."
     },
     {
      "short_id": "28e1c647",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "B",
-     "base": "4abed8d8"
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "Three constants and their fallbacks gone; an incomplete kind declaration is reported rather than completed. The only surviving reference to the removed names is the dated audit findings record."
     }
-   ]
+   ],
+   "gate_run": "Serial gate pipeline for ten merged issues started 2026-07-31; strictly one jit gate evaluate at a time with an explicit cd to the main checkout."
   }
  ],
  "created_during_execution": [
@@ -160,6 +181,21 @@
    "at": "2026-07-31",
    "finding": "The plan's counts of unpackaged files under the script and contributed-gate roots (35/36) measure 45 at execution time. D-6's preference for patterns over literals is strengthened, not reversed.",
    "disposition": "Recorded in the plan's amendment section; no criterion depends on the count."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "codex-cli 0.146.0 forces .git read-only under -s workspace-write; neither sandbox_workspace_write.writable_roots nor --add-dir lifts it (reproduced on a throwaway repo in /tmp, so it is not a worktree artifact). Node's spawnSync additionally reports a spurious EPERM error even though the child runs and returns correct output, which makes mcp-server's suite unrunnable inside the sandbox.",
+   "disposition": "Lead-side dispatch design, not an issue defect. Codex worker briefs forbid git writes and the lead commits each worker's worktree diff onto its branch with the jit:<short-id> attribution the code-review gate reads. Node-heavy issues are verified by the lead running the suite unsandboxed, or dispatched to an unsandboxed Opus agent instead."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "A debug cargo test/clippy --all-targets build ran inside the parent checkout during wave 0 and left target/debug/incremental populated, which fails cargo-ci's incremental preflight in 247ms for every issue in the wave before any compilation is paid for.",
+   "disposition": "The gate pipeline now exports CARGO_INCREMENTAL=0 and clears target/*/incremental before evaluating. Both Opus workers were asked to confirm their working directory; the codex workers are sandboxed to their worktree and cannot have caused it."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md states the pre-change packaged-asset counts and names assets/live/regions/agents-jit-guidance.md as a present-tense fact; 3e340587 falsifies both.",
+   "disposition": "Not treated as a stale-narrative failure: an investigation is a dated finding record whose sections the plan cites by id, and its counts go stale on essentially every issue in this container. Re-check at the epic gate if the holistic reviewer reads it as living documentation."
   }
  ],
  "rework_counts": {
@@ -167,7 +203,8 @@
   "097b9f48": 1,
   "f77fd51b": 1,
   "65ff0f38": 2,
-  "7eecace8": 4
+  "7eecace8": 4,
+  "fdae1023": 1
  },
  "started_at": "2026-07-31",
  "owner_rulings": [
