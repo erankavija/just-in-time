@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "40bdeac353c71602338f3ca86c1d8ac362b6aa27",
+  "completed_at": "2026-07-31T19:59:31.953316845Z",
+  "duration_ms": 425042,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "3e340587-e295-4e75-ab0a-3745f896a676",
+  "message": null,
+  "run_id": "9d7dbe11-2047-4c4c-bbdd-2fcf922b11f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T19:52:26.911228955Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest command_exit_code_projection_tests::test_command_exit_codes_apply_prospective_cycle_emits_4 ... FAILED\ntest result: FAILED. 328 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 142.34s\n---- command_exit_code_projection_tests::test_command_exit_codes_apply_prospective_cycle_emits_4 stdout ----\n\nthread 'command_exit_code_projection_tests::test_command_exit_codes_apply_prospective_cycle_emits_4' (3860044) panicked at crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:170:5:\nassertion `left == right` failed: plain `apply` status must match its projected row; stderr: Error: template 'cyclic' breakdown node 'breakdown' declares no container label; bracket lookup cannot resolve the applied node\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1541 bytes=27909892)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1408304720/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
