@@ -22,19 +22,20 @@ set -euo pipefail
 #   cat                                    # dry-run (echoes the prompt)
 #
 # Setup:
-#   1. Copy this script into your repo (e.g. scripts/ai-review.sh)
-#   2. chmod +x scripts/ai-review.sh
-#   3. Define the gate:
+#   1. Applying the profile installs this script, executable, at
+#      contrib/gates/ai-review.sh. Working from a source checkout instead,
+#      copy it there yourself and `chmod +x contrib/gates/ai-review.sh`.
+#   2. Define the gate:
 #        jit gate define ai-review \
 #          --title "AI Code Review" \
 #          --description "AI-powered code review" \
 #          --mode auto --stage postcheck \
 #          --pass-context \
 #          --prompt "Review the implementation for correctness and style." \
-#          --checker-command "./scripts/ai-review.sh" \
+#          --checker-command "./contrib/gates/ai-review.sh" \
 #          --env REVIEWER_AGENT="your-reviewer-command" \
 #          --timeout 120
-#   4. Run: jit gate evaluate <issue> ai-review
+#   3. Run: jit gate evaluate <issue> ai-review
 
 if [ -z "${JIT_CONTEXT_FILE:-}" ]; then
   echo "ERROR: JIT_CONTEXT_FILE not set. This gate requires --pass-context." >&2
