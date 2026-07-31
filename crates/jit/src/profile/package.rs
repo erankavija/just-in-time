@@ -305,11 +305,19 @@ fn read_package_directory(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, Prof
 
 /// Open one listed entry through a no-follow `openat` on the handle that listed
 /// it, so the object opened is the object listed or nothing at all.
+///
+/// The open is non-blocking because opening is where an entry of the wrong kind
+/// gets to make a decision on the reader's behalf: a pipe or a device opened for
+/// reading waits for a peer, and a reader waiting forever rejects nothing. With
+/// `O_NONBLOCK` the open returns at once and the caller's handle-metadata check
+/// refuses the entry by name. The flag has no effect on the regular files a
+/// package is made of, whose reads are unaffected by it.
 fn open_entry_nofollow(entry: &CapDirEntry, maybe_dir: bool) -> std::io::Result<cap_std::fs::File> {
     let mut options = CapOpenOptions::new();
     options.read(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);
     options._cap_fs_ext_maybe_dir(maybe_dir);
+    options._cap_fs_ext_nonblock(true);
     entry.open_with(&options)
 }
 
@@ -381,16 +389,22 @@ fn rejected_entry(root: &Path, relative: String) -> ProfilePackageError {
     }
 }
 
-/// A failed no-follow open: a refusal when the name is a link, I/O otherwise.
+/// A failed open: a refusal when the name cannot be package content, I/O
+/// otherwise.
 ///
-/// Refusing to follow reports `ELOOP` under POSIX and `EMLINK` on the BSDs;
-/// both mean the listed name is a symbolic link now, whatever the listing said.
+/// Two errors say the listed name is not a regular file, whatever the listing
+/// said. Refusing to follow a symbolic link reports `ELOOP` under POSIX and
+/// `EMLINK` on the BSDs. Reading a socket, or a device with nothing behind it,
+/// reports `ENXIO` — the kinds that cannot be opened for reading at all, as
+/// distinct from the pipes and devices that open non-blockingly and are refused
+/// by their handle's metadata.
 fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> ProfilePackageError {
-    let symlinked = matches!(
+    let unopenable_kind = matches!(
         source.raw_os_error(),
-        Some(code) if code == nix::libc::ELOOP || code == nix::libc::EMLINK
+        Some(code)
+            if code == nix::libc::ELOOP || code == nix::libc::EMLINK || code == nix::libc::ENXIO
     );
-    if symlinked {
+    if unopenable_kind {
         rejected_entry(root, relative.to_string())
     } else {
         unreadable(&root.join(relative), source)
@@ -1462,6 +1476,117 @@ value = "workspace/active"
         assert!(
             ProfilePackage::from_directory(&root).is_err(),
             "a package whose entry resolves outside the root cannot be read at all"
+        );
+    }
+
+    /// Run one package read off-thread and report what it produced, or `None`
+    /// when it had not finished within `budget`.
+    ///
+    /// A read that waits for something is a defect these tests have to be able
+    /// to observe: on its own thread it becomes an assertable `None` instead of
+    /// a suite that never ends.
+    #[cfg(unix)]
+    fn read_within(
+        budget: std::time::Duration,
+        read: impl FnOnce() -> Result<Vec<u8>, ProfilePackageError> + Send + 'static,
+    ) -> Option<Result<Vec<u8>, String>> {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::spawn(move || sender.send(read().map_err(|error| error.to_string())));
+        receiver.recv_timeout(budget).ok()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_regular_entry_refuses_a_name_replaced_by_a_pipe_after_it_was_listed() {
+        let temp = TempDir::new().unwrap();
+        let root = std::fs::canonicalize(writable_package_tree(&temp)).unwrap();
+
+        let assets = CapDir::open_ambient_dir(root.join("assets"), ambient_authority()).unwrap();
+        let entry = assets
+            .entries()
+            .unwrap()
+            .map(Result::unwrap)
+            .find(|entry| entry.file_name() == "workflow.txt")
+            .expect("the declared asset is listed");
+        assert!(
+            entry.file_type().unwrap().is_file(),
+            "the walk classifies this entry as a regular file"
+        );
+
+        // The state a concurrent rename produces between the classification
+        // above and the read below: same name, now a pipe with no writer. An
+        // open that waits for a peer would never reject anything.
+        std::fs::remove_file(root.join("assets/workflow.txt")).unwrap();
+        nix::unistd::mkfifo(
+            &root.join("assets/workflow.txt"),
+            nix::sys::stat::Mode::S_IRWXU,
+        )
+        .unwrap();
+
+        let read_root = root.clone();
+        let outcome = read_within(std::time::Duration::from_secs(10), move || {
+            read_regular_entry(&entry, &read_root, "assets/workflow.txt", 0, 0)
+        })
+        .expect("reading an entry replaced by a pipe must return rather than wait for a writer");
+        let error = outcome.expect_err("a pipe is not package content");
+        assert!(
+            error.contains("assets/workflow.txt") && error.contains("not a regular file"),
+            "{error}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_regular_entry_returns_a_multi_megabyte_regular_file_whole() {
+        // The non-blocking open must be inert for the regular files a package
+        // is made of, at a size that takes more than one read to drain.
+        let temp = TempDir::new().unwrap();
+        let root = std::fs::canonicalize(writable_package_tree(&temp)).unwrap();
+        let content = (0..3 * 1024 * 1024u32)
+            .map(|index| index as u8)
+            .collect::<Vec<_>>();
+        std::fs::write(root.join("assets/large.bin"), &content).unwrap();
+
+        let assets = CapDir::open_ambient_dir(root.join("assets"), ambient_authority()).unwrap();
+        let entry = assets
+            .entries()
+            .unwrap()
+            .map(Result::unwrap)
+            .find(|entry| entry.file_name() == "large.bin")
+            .expect("the written file is listed");
+
+        let bytes = read_regular_entry(&entry, &root, "assets/large.bin", 0, 0).unwrap();
+        assert_eq!(bytes, content);
+        assert_eq!(bytes, std::fs::read(root.join("assets/large.bin")).unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_regular_entry_refuses_a_name_replaced_by_a_socket_after_it_was_listed() {
+        let temp = TempDir::new().unwrap();
+        let root = std::fs::canonicalize(writable_package_tree(&temp)).unwrap();
+
+        let assets = CapDir::open_ambient_dir(root.join("assets"), ambient_authority()).unwrap();
+        let entry = assets
+            .entries()
+            .unwrap()
+            .map(Result::unwrap)
+            .find(|entry| entry.file_name() == "workflow.txt")
+            .expect("the declared asset is listed");
+
+        std::fs::remove_file(root.join("assets/workflow.txt")).unwrap();
+        let _listener =
+            std::os::unix::net::UnixListener::bind(root.join("assets/workflow.txt")).unwrap();
+
+        let read_root = root.clone();
+        let outcome = read_within(std::time::Duration::from_secs(10), move || {
+            read_regular_entry(&entry, &read_root, "assets/workflow.txt", 0, 0)
+        })
+        .expect("reading an entry replaced by a socket must return");
+        let error = outcome.expect_err("a socket is not package content");
+        assert!(
+            error.contains("assets/workflow.txt") && error.contains("not a regular file"),
+            "{error}"
         );
     }
 
