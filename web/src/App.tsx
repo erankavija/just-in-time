@@ -9,7 +9,7 @@ import { useTheme } from './hooks/useTheme';
 import { useEventStream } from './hooks/useEventStream';
 import { useSearch } from './components/Search/useSearch';
 import { apiClient } from './api/client';
-import type { Issue } from './types/models';
+import type { Issue, NamespaceInfo } from './types/models';
 import './App.css';
 
 import type { LayoutAlgorithm } from './components/Graph/GraphView';
@@ -23,6 +23,7 @@ function App() {
   const [labelFilters, setLabelFilters] = useState<string[]>([]);
   const [isDetailPaneMinimized, setIsDetailPaneMinimized] = useState(false);
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [namespaces, setNamespaces] = useState<Record<string, NamespaceInfo>>({});
   const [documentViewerState, setDocumentViewerState] = useState<{
     path: string;
     searchQuery?: string;
@@ -76,6 +77,13 @@ function App() {
         document.title = `${health.project_name} — jit`;
       }
     }).catch((err) => console.warn('Failed to fetch health:', err));
+  }, []);
+
+  // Label presentation follows the repository's namespace registry.
+  useEffect(() => {
+    apiClient.getNamespaces()
+      .then((config) => setNamespaces(config.namespaces))
+      .catch((err) => console.warn('Failed to fetch namespace configuration:', err));
   }, []);
 
   // Load all issues for client-side search (re-fetch on version change)
@@ -208,6 +216,7 @@ function App() {
         labels={allLabels}
         selectedPatterns={labelFilters}
         onChange={setLabelFilters}
+        namespaces={namespaces}
       />
       
       <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -284,6 +293,7 @@ function App() {
               onNavigate={setSelectedIssueId}
               onFocusInGraph={setFocusIssueId}
               version={version}
+              namespaces={namespaces}
             />
           </div>
         </Split>

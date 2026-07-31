@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react';
 import { LabelBadge } from './LabelBadge';
+import type { NamespaceInfo } from '../../types/models';
 
 interface LabelFilterProps {
   labels: string[]; // All available labels in the graph
   selectedPatterns?: string[]; // Currently selected filter patterns
   onChange: (patterns: string[]) => void;
+  namespaces?: Record<string, NamespaceInfo>;
 }
 
-export function LabelFilter({ labels, selectedPatterns = [], onChange }: LabelFilterProps) {
+export function LabelFilter({ labels, selectedPatterns = [], onChange, namespaces }: LabelFilterProps) {
   const [inputValue, setInputValue] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -110,7 +112,7 @@ export function LabelFilter({ labels, selectedPatterns = [], onChange }: LabelFi
                 border: '1px solid var(--border)',
               }}
             >
-              <LabelBadge label={pattern} size="small" />
+              <LabelBadge label={pattern} size="small" namespaces={namespaces} />
               <button
                 onClick={() => handleRemovePattern(pattern)}
                 title={`Remove filter: ${pattern}`}
@@ -154,7 +156,7 @@ export function LabelFilter({ labels, selectedPatterns = [], onChange }: LabelFi
           onChange={(e) => setInputValue(e.target.value)}
           onFocus={() => setShowSuggestions(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Type to filter labels (e.g., milestone:*, epic:auth)"
+          placeholder="Type to filter labels (e.g., namespace:value)"
           style={{
             width: '100%',
             padding: '6px 8px',
@@ -216,7 +218,7 @@ export function LabelFilter({ labels, selectedPatterns = [], onChange }: LabelFi
                       e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
                     }}
                   >
-                    <LabelBadge label={pattern} size="small" />
+                    <LabelBadge label={pattern} size="small" namespaces={namespaces} />
                   </div>
                 ))}
                 <div
@@ -252,7 +254,7 @@ export function LabelFilter({ labels, selectedPatterns = [], onChange }: LabelFi
                   e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
                 }}
               >
-                <LabelBadge label={label} size="small" />
+                <LabelBadge label={label} size="small" namespaces={namespaces} />
               </div>
             ))}
           </div>
