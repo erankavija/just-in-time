@@ -8,13 +8,30 @@
   ],
   "description": "Whole-repository validation stops depending on one workflow's bytes, so a repository that has applied no profile validates and repairs without any profile package being loaded.\n\n## Background\n\nRepository validation and derived-state repair each load a profile package before doing anything else, unconditionally and by a compiled-in identity, and propagate the failure if that load does not succeed. Every repository pays this, including one that has never applied a profile and never will.\n\nThe dependency is invisible today because the package is compiled into the binary and therefore always loads. It stops being invisible the moment the package is no longer carried in the binary: validation would then fail in every repository, including repositories with no profile, and the gates that certify this project's own work run that same command. That makes this the one step whose ordering is not a preference — everything else in the profile extraction is blocked behind it.\n\nThe repository already records what it has applied. Applying a profile writes a provenance record under the tracker's own data root, named for the profile it records, and repair compares the repository's state against what that profile's package declares. So the question \"is a package needed here, and which one\" has an answer in the repository rather than in the binary, and reading it there is what removes the compiled-in dependency.\n\nTwo behaviours have to survive the change. A repository with an applied profile must still have its profile-owned targets repaired, which is the capability `@/invariant/derived-state-coherence` rests on. And a repository whose record names a profile whose package cannot be produced must say so rather than proceed: repairing only the targets it can still account for would silently narrow what repair means, which is the failure mode worth designing against now rather than discovering later.\n\nThis change removes an unconditional dependency. It does not add profile discovery, does not change where a package comes from, and does not remove the package from the binary — each of those is separate work that this unblocks.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository that has applied no profile completes whole-repository validation without any profile package being loaded, and completes derived-state repair the same way.\n- [hard] REQ-02: A repository that has applied a profile still has its profile-owned targets checked and repaired exactly as before, with no change to what repair reports or restores.\n- [hard] REQ-03: Whether a package is required, and which one, is decided from the repository's own applied-profile record rather than from an identity compiled into the binary.\n- [hard] REQ-04: A repository whose record names a profile whose package cannot be obtained reports that condition plainly and fails rather than repairing the subset it can still account for.\n- [hard] REQ-05: Repository validation that has nothing to do with profiles behaves identically in all three cases above.\n- [hard] REQ-06: Each of the three cases — no record, a record whose package resolves, a record whose package does not — is covered by a test that distinguishes it from the other two.\n\n## Non-goals\n\nAdding discovery of a package from disk. Changing where a package comes from. Removing the package from the binary. Touching the planning-bracket gate presets. Each is separate work that this issue unblocks and does not perform.\n\n## Notes\n\nThe two call sites are the repository-validation path and the derived-state-repair path in the validation command; both take the package before opening their mutation session.\n\nOwner-ruled context (2026-07-31): jit's own workflow profile is to leave the binary and be consumed the way an externally contributed profile is (`@/invariant/domain-agnostic`, whose sanctioned exception the ruling removes). This issue is the first step of that route and the only one with a strict ordering constraint: taken after the package leaves the binary instead of before, validation fails in every repository and the gates that would certify the change fail with it.",
   "documents": [],
+  "done_at": "2026-07-31T13:15:01.387550560Z",
   "first_ready_at": "2026-07-31T11:42:41.220339722Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T13:12:28.641843002Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T13:14:48.357883211Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-31T13:12:37.724180089Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "229e7389-31d3-41ce-b783-ef58a58b1699",
   "labels": [
     "epic:derived-package-sources",
@@ -25,7 +42,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Validation stops loading a profile package unconditionally",
-  "updated_at": "2026-07-31T11:44:01.228223341Z"
+  "updated_at": "2026-07-31T13:15:01.387550560Z"
 }
