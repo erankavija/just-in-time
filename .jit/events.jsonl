@@ -11894,3 +11894,11 @@
 {"id":"2ff21d2f-f6f4-4383-92df-c1c712731b1d","issue_id":"229e7389-31d3-41ce-b783-ef58a58b1699","timestamp":"2026-07-31T13:15:01.387550560Z","type":"issue_completed"}
 {"from":"ready","id":"2b386622-978f-4395-9fe1-e827609fb021","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T13:15:19.269353957Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"39332122-e463-47fc-a2fe-a5f3975366ed","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T13:15:19.269353957Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"14d0de0d-89d6-43fc-83f8-f625e3a4ffdd","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:08:41.686726211Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"b83000ec-0135-4f8d-851f-c2971e028d06","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:08:53.229872767Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"1207f25c-98ae-49df-83e5-5f1f641a4209","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:12:47.891641624Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"711a78a9-be56-44ec-80a0-ef42f6e2cb7c","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:18:17.455285578Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"588e3d74-e9f4-4db6-a2d0-77598d7ef9fa","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:21:26.214093602Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"51765a5f-3993-44a5-a265-b38367addef6","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:28:54.594925351Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"d5679785-5dc5-46c0-ae7b-d3dba3d452d2","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:29:05.918022574Z","to":"done","type":"issue_state_changed"}
+{"id":"f3538adf-053f-42be-8037-2cbe24e330c5","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T14:29:05.918022574Z","type":"issue_completed"}

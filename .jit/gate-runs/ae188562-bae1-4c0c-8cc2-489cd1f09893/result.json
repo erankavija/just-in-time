@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ebf2a8523bbe76e51eba7cddee48fc5af464a8cb",
+  "completed_at": "2026-07-31T14:21:25.916770353Z",
+  "duration_ms": 187557,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria and the prior blocking finding are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "65ff0f38-fe0e-40bf-8ac6-75e411758142",
+  "message": null,
+  "run_id": "ae188562-bae1-4c0c-8cc2-489cd1f09893",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T14:18:18.359655383Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: tagged commits c4e24dfd, 73cc00cb, 6f7faf0f, 21ca16bb, 9ec56e65, 3d35ae81, 83235b82, 8dcde09e, ebf2a852\nPolicy sources: AGENTS.md\nResolved items: @/invariant/convention-convergence, @/invariant/bounded-rust-build-footprint, @/invariant/single-source-prose, @/invariant/atomic-writes, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/cargo-ci, @/gate/docs-mechanical (.jit/gates.toml); @/issue/e204e63d/decision/D-1, @/issue/e204e63d/decision/D-4 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T13:59:07Z); docs-mechanical passed (exit 0, 2026-07-31T14:18:06Z)\nTruncation recovery: narrowed archive-inclusive searches and read affected paths and per-commit patches separately; combined merge diffs were empty\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria and the prior blocking finding are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

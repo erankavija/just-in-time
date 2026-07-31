@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "ebf2a8523bbe76e51eba7cddee48fc5af464a8cb",
+  "completed_at": "2026-07-31T14:18:17.447395005Z",
+  "duration_ms": 10855,
+  "exit_code": 0,
+  "gate_key": "docs-mechanical",
+  "issue_id": "65ff0f38-fe0e-40bf-8ac6-75e411758142",
+  "message": null,
+  "run_id": "f01ed240-7c0c-495b-8acc-5e736c60c4b9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T14:18:06.591499655Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n== M6 canonical homes ==\nOK: canonical homes resolve, and each fact is live and unique\n\n== M7 shipped policy ==\nOK: shipped-policy regions carry the shipped classification\n\n",
+  "tree_dirty": true
+}

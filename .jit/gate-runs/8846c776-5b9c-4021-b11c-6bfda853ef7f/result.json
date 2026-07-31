@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "83235b82900480e52493f67cfc9cf61095289f14",
+  "completed_at": "2026-07-31T14:12:47.598897473Z",
+  "duration_ms": 230409,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/generate-shipped-policy-regions.sh",
+        "id": "F1",
+        "line": 173,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "Publication failures in the shipped-policy generator exit 2 rather than the documented common exit 1."
+      }
+    ],
+    "summary": "The shipped-policy generator does not implement the unified publication-failure exit status.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "65ff0f38-fe0e-40bf-8ac6-75e411758142",
+  "message": null,
+  "run_id": "8846c776-5b9c-4021-b11c-6bfda853ef7f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T14:08:57.189137589Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6101 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb881-bc72-7802-9643-679cc2d9906e\n--------\nuser\n--- 6088 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: tagged commits c4e24dfd, 73cc00cb, 6f7faf0f, 21ca16bb, 9ec56e65, 3d35ae81, 83235b82\nPolicy sources: AGENTS.md\nResolved items: @/invariant/convention-convergence, @/invariant/bounded-rust-build-footprint, @/invariant/single-source-prose, @/invariant/atomic-writes, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/cargo-ci, @/gate/docs-mechanical, @/gate/jit-validate (.jit/gates.toml); @/issue/e204e63d/decision/D-1, @/issue/e204e63d/decision/D-4 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T13:59:07Z); docs-mechanical passed (exit 0, 2026-07-31T14:08:42Z); code-review pending\nTruncation recovery: narrowed the truncated archive-inclusive search to affected scripts, drift assertions, gate declarations, and build-budget policy; archived vendor output was outside the impact cone\n\n1. [blocking, issue-impact] `scripts/generate-shipped-policy-regions.sh:173` sends a publication failure through `die`, which always exits 2 (`:53-56`), instead of exit 1. This contradicts the unified 0/1/2 contract documented in `dev/index.md:88-92` and claimed for every generator in `CHANGELOG.md:182-187`; a render that succeeds but cannot publish is misreported as a refusal/environment failure. The issue therefore has not fully converged the regeneration convention required by REQ-01. References: `@/invariant/convention-convergence`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The shipped-policy generator does not implement the unified publication-failure exit status.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Publication failures in the shipped-policy generator exit 2 rather than the documented common exit 1.\",\"file\":\"scripts/generate-shipped-policy-regions.sh\",\"line\":173,\"references\":[\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
