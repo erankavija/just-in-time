@@ -43,10 +43,12 @@
     },
     {
      "short_id": "09aea8b3",
-     "status": "dispatched",
+     "status": "reviewed-integrating",
      "worker": "opus-agent",
      "batch": "A",
-     "base": "56cc6c0f"
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "One representation with two constructors (from_directory, from_embedded_dir) both routed through one from_files validation, so REQ-02's manifest/package-hash/target-digest equality is structural. Six new tests, one per criterion. Accepted the EmbeddedProfilePackage->ProfilePackage type rename as in-scope: d913a510 sequences the vocabulary retirement after the embed removal because 'the names still describe something that exists', which is true of the command entry points the worker left alone but false of the type once from_directory exists. d913a510 keeps the command-name and help-text half. Worker is merging main into its branch to integrate with 5dd0df5b and 4c40e165 on package.rs."
     },
     {
      "short_id": "3e340587",
@@ -59,12 +61,12 @@
     },
     {
      "short_id": "510297e4",
-     "status": "merged-awaiting-gates",
+     "status": "merged-rework-in-flight",
      "worker": "codex-luna",
      "batch": "B",
      "base": "4abed8d8",
-     "lead_review": "pass",
-     "note": "Both call sites derive the container label from the breakdown node's declared labels; missing declaration is an error at apply. Doc comments naming the retired brackets: literal were swept in the same change."
+     "lead_review": "fail-after-merge",
+     "note": "cargo-ci on merged main failed: test_command_exit_codes_apply_prospective_cycle_emits_4 (crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs) now hits the new 'declares no container label' error before reaching cycle detection, because the CYCLIC_APPLY_TEMPLATE fixture's breakdown node declares no labels. REQ-03 mandates that error, so the fixture is at fault, not the production change. Reworked in a fresh worktree off current main with an audit list of every breakdown-node declaration lacking a container label, since cargo test stops at the first failing target and may be hiding more."
     },
     {
      "short_id": "0439da41",
@@ -196,6 +198,16 @@
    "at": "2026-07-31",
    "finding": "dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md states the pre-change packaged-asset counts and names assets/live/regions/agents-jit-guidance.md as a present-tense fact; 3e340587 falsifies both.",
    "disposition": "Not treated as a stale-narrative failure: an investigation is a dated finding record whose sections the plan cites by id, and its counts go stale on essentially every issue in this container. Re-check at the epic gate if the holistic reviewer reads it as living documentation."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "The 09aea8b3 worker wrote its conflict resolution into the PARENT checkout's crates/jit/src/profile/package.rs instead of its worktree. Its shell commands were correctly prefixed with an absolute cd, but its file-editing tool resolves relative paths against the parent checkout, which the shell prefix does not affect.",
+   "disposition": "Detected by check-leak-into-main.sh, reverted with git restore, worker instructed to use the absolute worktree path in every file-editing call. Dispatch briefs should state the path rule for FILE-EDITING TOOLS specifically, not only for shell commands — the current wording only covers the shell."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "scripts/verify-commit-builds.sh reports a cold `cargo build --workspace` of a fresh git-archive extraction as passing in 24-30 seconds, with no sccache, no RUSTC_WRAPPER, no VERIFY_COMMIT_TARGET_DIR, and an empty cache directory. A genuine cold build of this workspace's 260 dependencies cannot complete in that time, so the merge-integrity guard may be reporting a vacuous PASS.",
+   "disposition": "Not investigated further inside this container: main's compile integrity is independently evidenced by cargo-ci, which runs `cargo test --workspace` per issue and demonstrably fails on real defects (it caught the 510297e4 regression). Worth a standalone issue at epic close — a guard that cannot fail is worse than no guard, because the protocol relies on it."
   }
  ],
  "rework_counts": {
@@ -204,7 +216,8 @@
   "f77fd51b": 1,
   "65ff0f38": 2,
   "7eecace8": 4,
-  "fdae1023": 1
+  "fdae1023": 1,
+  "510297e4": 1
  },
  "started_at": "2026-07-31",
  "owner_rulings": [
