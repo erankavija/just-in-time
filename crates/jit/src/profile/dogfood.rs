@@ -127,7 +127,7 @@ mod tests {
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
     };
     use crate::storage::{IssueStore, JsonFileStorage};
-    use crate::templates::TemplateRegistry;
+    use crate::templates::{GraphTemplate, TemplateRegistry};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
@@ -609,6 +609,117 @@ mod tests {
             rendered,
             "a second rendering run changed the registry"
         );
+    }
+
+    /// This repository's committed template registry.
+    fn committed_template_registry() -> Vec<u8> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        fs::read(root.join(".jit/templates.toml")).unwrap()
+    }
+
+    /// The declarations a template registry's text carries, as the registry
+    /// loader parses them. The type check is left to the repository's own
+    /// config load: what is compared here is the declaration, not the hierarchy
+    /// it names.
+    fn template_declarations_of(registry: &[u8]) -> Vec<GraphTemplate> {
+        let unchecked_hierarchy: [&str; 0] = [];
+        TemplateRegistry::from_toml_str(
+            std::str::from_utf8(registry).unwrap(),
+            &unchecked_hierarchy,
+        )
+        .unwrap()
+        .templates
+    }
+
+    /// The repository's committed declarations agree with the packaged ones
+    /// field for field, description strings included.
+    ///
+    /// Each side is compared as the value it parses into — the registry file
+    /// through the templates loader, the package through its manifest — so the
+    /// assertion carries no expectation of its own about what the bracket
+    /// declares, and it holds whether or not the region was regenerated: a hand
+    /// edit inside the generated region fails here as readily as a change to
+    /// the packaged authority.
+    #[test]
+    fn test_committed_template_declarations_agree_with_the_packaged_declarations() {
+        use crate::profile::template_region::{packaged_templates, template_drift_report};
+        let repository = template_declarations_of(&committed_template_registry());
+        let packaged = packaged_templates().unwrap();
+
+        if let Some(report) = template_drift_report(&repository, &packaged).unwrap() {
+            panic!("{report}");
+        }
+    }
+
+    /// A hand edit to the registry's generated region alone is reported, naming
+    /// the field it changed.
+    ///
+    /// The edit is made the way a hand would make it: the changed declaration
+    /// is written back into the committed registry's region, and the guard
+    /// reads its declarations out of that text.
+    #[test]
+    fn test_template_drift_report_names_the_field_an_edited_repository_declaration_changed() {
+        use crate::profile::template_region::{
+            packaged_templates, render_template_block, splice_template_region,
+            template_drift_report, TEMPLATE_REGION_GENERATOR,
+        };
+        let committed = committed_template_registry();
+        let mut edited = template_declarations_of(&committed);
+        let node = edited
+            .first_mut()
+            .and_then(|template| template.nodes.first_mut())
+            .expect("the repository declares a template node");
+        node.description = Some(format!(
+            "{} A sentence the package does not carry.",
+            node.description.as_deref().unwrap_or_default()
+        ));
+        let hand_edited =
+            splice_template_region(&committed, &render_template_block(&edited).unwrap()).unwrap();
+
+        let report = template_drift_report(
+            &template_declarations_of(&hand_edited),
+            &packaged_templates().unwrap(),
+        )
+        .unwrap()
+        .expect("an edited repository declaration is drift");
+
+        assert!(
+            report.contains("template[0].nodes[0].description"),
+            "{report}"
+        );
+        assert!(
+            report.contains("A sentence the package does not carry."),
+            "{report}"
+        );
+        assert!(report.contains(TEMPLATE_REGION_GENERATOR), "{report}");
+    }
+
+    /// An edit to the packaged declaration alone is reported, naming the field
+    /// it changed.
+    #[test]
+    fn test_template_drift_report_names_the_field_an_edited_packaged_declaration_changed() {
+        use crate::profile::template_region::{
+            packaged_templates, template_drift_report, TEMPLATE_REGION_GENERATOR,
+        };
+        let repository = template_declarations_of(&committed_template_registry());
+        let mut packaged = packaged_templates().unwrap();
+        let anchor = packaged
+            .first_mut()
+            .and_then(|template| template.anchors.first_mut())
+            .expect("the package declares a template anchor");
+        anchor.gates.push("a-gate-the-repository-omits".to_string());
+        let appended = anchor.gates.len() - 1;
+
+        let report = template_drift_report(&repository, &packaged)
+            .unwrap()
+            .expect("an edited packaged declaration is drift");
+
+        assert!(
+            report.contains(&format!("template[0].anchors[0].gates[{appended}]")),
+            "{report}"
+        );
+        assert!(report.contains("a-gate-the-repository-omits"), "{report}");
+        assert!(report.contains(TEMPLATE_REGION_GENERATOR), "{report}");
     }
 
     #[test]
