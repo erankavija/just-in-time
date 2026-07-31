@@ -3097,7 +3097,7 @@ assert = { require-section = { heading = "Summary" } }
         // Write a prompt file relative to repo root
         seed_repo_file(
             executor.storage(),
-            "scripts/code-review-prompt.md",
+            "contrib/gates/code-review-prompt.md",
             "You are a senior engineer. Review for security issues.",
         );
 
@@ -3119,7 +3119,7 @@ assert = { require-section = { heading = "Summary" } }
                     env: HashMap::new(),
                     pass_context: true,
                     prompt: Some("This should be overridden by prompt_file".to_string()),
-                    prompt_file: Some("./scripts/code-review-prompt.md".to_string()),
+                    prompt_file: Some("./contrib/gates/code-review-prompt.md".to_string()),
                 }),
                 priority: 100,
                 reserved: HashMap::new(),

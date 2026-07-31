@@ -176,7 +176,7 @@ jit gate define ai-review \
   --title "AI Review" \
   --description "AI-powered code review" \
   --mode auto \
-  --checker-command "./scripts/ai-review.sh" \
+  --checker-command "./contrib/gates/ai-review.sh" \
   --env REVIEWER_AGENT="your-reviewer-command"
 ```
 
@@ -298,8 +298,8 @@ jit gate status <ISSUE_ID> <GATE_KEY> --findings          # findings + verdict, 
 jit gate status <ISSUE_ID> <GATE_KEY> --findings --json   # structured JSON
 ```
 
-The bundled `scripts/ai-review.sh` is a conforming checker: it instructs the
-review agent to append this block after the human-readable findings list.
+The bundled `contrib/gates/ai-review.sh` is a conforming checker: it instructs
+the review agent to append this block after the human-readable findings list.
 
 ### Ground a Repository Review in Canonical Policy
 
@@ -421,7 +421,7 @@ jit gate define review \
   --mode auto \
   --pass-context \
   --prompt "Review the implementation for correctness and style." \
-  --checker-command "./scripts/ai-review.sh"
+  --checker-command "./contrib/gates/ai-review.sh"
 ```
 
 The checker receives a `JIT_CONTEXT_FILE` env var pointing to a JSON file:
@@ -460,7 +460,7 @@ jit gate define review \
   --mode auto \
   --pass-context \
   --prompt-file "docs/review-prompt.md" \
-  --checker-command "./scripts/ai-review.sh"
+  --checker-command "./contrib/gates/ai-review.sh"
 ```
 
 `--prompt-file` takes precedence over `--prompt`. The file is read at check time, so updates take effect without redefining the gate.
@@ -485,10 +485,11 @@ jit gate evaluate $ISSUE review
 
 A production-ready AI review script is provided in `contrib/gates/ai-review.sh`. It pipes the gate context into an AI agent CLI (set via `REVIEWER_AGENT`) and parses a `VERDICT: PASS` / `VERDICT: FAIL` from the output.
 
-```bash
-# Copy the script into your repo
-cp contrib/gates/ai-review.sh scripts/
+Applying a profile that packages it installs it at that path, executable. From
+a source checkout, copy it to `contrib/gates/ai-review.sh` in your own
+repository and make it executable.
 
+```bash
 # Define the gate with --env to set the reviewer agent
 jit gate define ai-review \
   --title "AI Code Review" \
@@ -496,7 +497,7 @@ jit gate define ai-review \
   --mode auto --stage postcheck \
   --pass-context \
   --prompt-file "contrib/gates/prompts/code-review.md" \
-  --checker-command "./scripts/ai-review.sh" \
+  --checker-command "./contrib/gates/ai-review.sh" \
   --env REVIEWER_AGENT="your-reviewer-command" \
   --timeout 120
 ```
@@ -521,7 +522,7 @@ jit gate define security-audit \
   --description "OWASP Top 10 security check" \
   --mode auto --pass-context \
   --prompt-file "contrib/gates/prompts/security-audit.md" \
-  --checker-command "./scripts/ai-review.sh" \
+  --checker-command "./contrib/gates/ai-review.sh" \
   --env REVIEWER_AGENT="your-reviewer-command"
 ```
 

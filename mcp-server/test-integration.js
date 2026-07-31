@@ -394,7 +394,7 @@ async function main() {
         });
         assert.strictEqual(preview.status, 'would_apply');
         assert.ok(preview.targets.some(target =>
-          target.path === 'scripts/ai-review.sh' && target.executable === true));
+          target.path === 'contrib/gates/ai-review.sh' && target.executable === true));
 
         const applied = await profileCall('jit_profile_apply', { id: 'jit-dogfood' });
         assert.strictEqual(applied.status, 'applied');

@@ -10,10 +10,10 @@ auto = true
 
 [gates.checker]
 type = "exec"
-command = "./scripts/ai-review.sh"
+command = "./contrib/gates/ai-review.sh"
 timeout_seconds = 1800
 pass_context = true
-prompt_file = "./scripts/breakdown-review-prompt.md"
+prompt_file = "./contrib/gates/breakdown-review-prompt.md"
 
 [gates.checker.env]
 REVIEWER_AGENT = 'codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"'
@@ -92,10 +92,10 @@ auto = true
 
 [gates.checker]
 type = "exec"
-command = "./scripts/ai-review.sh"
+command = "./contrib/gates/ai-review.sh"
 timeout_seconds = 1800
 pass_context = true
-prompt_file = "./scripts/code-review-prompt.md"
+prompt_file = "./contrib/gates/code-review-prompt.md"
 
 [gates.checker.env]
 REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-5.6-terra -c model_reasoning_effort="high"'
@@ -154,7 +154,7 @@ auto = true
 
 [gates.checker]
 type = "exec"
-command = "./scripts/ai-review.sh"
+command = "./contrib/gates/ai-review.sh"
 timeout_seconds = 1800
 pass_context = true
 prompt_file = "./scripts/doc-review-prompt.md"
@@ -220,7 +220,7 @@ auto = true
 
 [gates.checker]
 type = "exec"
-command = "./scripts/ai-review.sh"
+command = "./contrib/gates/ai-review.sh"
 timeout_seconds = 1800
 pass_context = true
 prompt_file = "./scripts/holistic-review-prompt.md"
@@ -302,10 +302,10 @@ auto = true
 
 [gates.checker]
 type = "exec"
-command = "./scripts/ai-review.sh"
+command = "./contrib/gates/ai-review.sh"
 timeout_seconds = 1800
 pass_context = true
-prompt_file = "./scripts/plan-review-prompt.md"
+prompt_file = "./contrib/gates/plan-review-prompt.md"
 
 [gates.checker.env]
 REVIEWER_AGENT = 'codex exec -m gpt-5.6-terra -c model_reasoning_effort="high"'

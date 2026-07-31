@@ -11,7 +11,7 @@ const RULE_ASSERTION: &str = "assert = { json-schema = \"schemas/default-label-f
 const STALE_RULE_ASSERTION: &str =
     "assert = { require-label = { label = \"authored:*\", min = 99 } }";
 const PROFILE_ASSET: &str = ".agents/skills/jit-manage/SKILL.md";
-const EXECUTABLE_ASSET: &str = "scripts/ai-review.sh";
+const EXECUTABLE_ASSET: &str = "contrib/gates/ai-review.sh";
 const PROFILE_RECORD: &str = ".jit/profiles/jit-dogfood.json";
 
 fn read(harness: &TestHarness, path: &str) -> String {

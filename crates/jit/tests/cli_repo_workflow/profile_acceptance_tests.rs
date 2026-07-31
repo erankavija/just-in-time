@@ -245,7 +245,10 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     );
     assert_eq!(preview["status"], "would_apply");
     assert!(!existing.path.join(".jit/profiles").exists());
-    assert_eq!(target(&preview, "scripts/ai-review.sh")["executable"], true);
+    assert_eq!(
+        target(&preview, "contrib/gates/ai-review.sh")["executable"],
+        true
+    );
 
     let applied = success_json(
         &existing.path,
@@ -257,7 +260,10 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
         &["profile", "apply", "jit-dogfood", "--dry-run", "--json"],
     );
     assert_eq!(no_op["status"], "unchanged");
-    assert_eq!(target(&no_op, "scripts/ai-review.sh")["executable"], true);
+    assert_eq!(
+        target(&no_op, "contrib/gates/ai-review.sh")["executable"],
+        true
+    );
 
     assert_eq!(snapshot_tree(&fresh.path), snapshot_tree(&existing.path));
     assert_eq!(
@@ -270,11 +276,11 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let script_mode = fs::metadata(existing.path.join("scripts/ai-review.sh"))
+        let script_mode = fs::metadata(existing.path.join("contrib/gates/ai-review.sh"))
             .unwrap()
             .permissions()
             .mode();
-        let prompt_mode = fs::metadata(existing.path.join("scripts/code-review-prompt.md"))
+        let prompt_mode = fs::metadata(existing.path.join("contrib/gates/code-review-prompt.md"))
             .unwrap()
             .permissions()
             .mode();
@@ -288,7 +294,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
 
     #[cfg(windows)]
     {
-        let permissions = fs::metadata(existing.path.join("scripts/ai-review.sh"))
+        let permissions = fs::metadata(existing.path.join("contrib/gates/ai-review.sh"))
             .unwrap()
             .permissions();
         assert!(

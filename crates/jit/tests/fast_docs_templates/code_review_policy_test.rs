@@ -10,7 +10,7 @@ fn repo_file(path: &str) -> String {
 
 #[test]
 fn test_code_review_prompt_defines_attribution_and_fallback_policy() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "jit:<short-id>",
@@ -30,7 +30,7 @@ fn test_code_review_prompt_defines_attribution_and_fallback_policy() {
 
 #[test]
 fn test_code_review_prompt_defines_current_evidence_and_debt_policy() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "latest recorded status and exit code",
@@ -51,7 +51,7 @@ fn test_code_review_prompt_defines_current_evidence_and_debt_policy() {
 
 #[test]
 fn test_code_review_prompt_rejects_blanket_public_api_examples() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
     let agents = repo_file("AGENTS.md");
 
     for required in [
@@ -86,7 +86,7 @@ fn test_code_review_prompt_rejects_blanket_public_api_examples() {
 
 #[test]
 fn test_code_review_prompt_does_not_treat_pending_peer_review_as_a_defect() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "Include every required gate's latest status in the evidence header",
@@ -111,7 +111,7 @@ fn test_code_review_prompt_does_not_treat_pending_peer_review_as_a_defect() {
 
 #[test]
 fn test_code_review_prompt_discovers_applicable_policy_in_precedence_order() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "complete prose baseline",
@@ -131,7 +131,7 @@ fn test_code_review_prompt_discovers_applicable_policy_in_precedence_order() {
 
 #[test]
 fn test_code_review_prompt_bounds_and_resolves_addressable_policy() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "applicable `AGENTS.md`",
@@ -155,7 +155,7 @@ fn test_code_review_prompt_bounds_and_resolves_addressable_policy() {
 
 #[test]
 fn test_code_review_prompt_checks_relationship_evidence_claims() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "`satisfies:`",
@@ -177,7 +177,7 @@ fn test_code_review_prompt_checks_relationship_evidence_claims() {
 
 #[test]
 fn test_code_review_prompt_requires_complete_evidence_header_and_empty_values() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for field in [
         "Attribution:",
@@ -197,7 +197,7 @@ fn test_code_review_prompt_requires_complete_evidence_header_and_empty_values() 
 
 #[test]
 fn test_code_review_prompt_uses_recorded_gates_and_structured_references() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "latest recorded",
@@ -222,7 +222,7 @@ fn test_code_review_prompt_uses_recorded_gates_and_structured_references() {
 
 #[test]
 fn test_code_review_prompt_is_procedure_not_a_registry_or_engineering_rubric() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     assert!(!prompt.contains("## Review rubric"));
     for copied_registry_statement in [
@@ -311,7 +311,7 @@ fn test_code_review_documentation_explains_policy_and_transport_ownership() {
 
 #[test]
 fn test_code_review_prompt_requires_read_only_bounded_inspection() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     for required in [
         "read-only",
@@ -333,7 +333,7 @@ fn test_code_review_prompt_requires_read_only_bounded_inspection() {
 
 #[test]
 fn test_code_review_prompt_does_not_duplicate_common_findings_contract() {
-    let prompt = repo_file("scripts/code-review-prompt.md");
+    let prompt = repo_file("contrib/gates/code-review-prompt.md");
 
     assert!(!prompt.contains("<<<JIT-FINDINGS-JSON"));
     assert!(!prompt.contains("Before the verdict line"));
