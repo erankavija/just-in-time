@@ -14,6 +14,7 @@
       "path": "dev/active/a62d444d/findings.md"
     }
   ],
+  "done_at": "2026-07-31T11:43:02.412401107Z",
   "first_ready_at": "2026-07-31T11:00:40.264467790Z",
   "gates_required": [],
   "gates_status": {},
@@ -27,7 +28,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "How jit's own workflow profile leaves the binary",
-  "updated_at": "2026-07-31T11:14:55.567096278Z"
+  "updated_at": "2026-07-31T11:43:02.412401107Z"
 }

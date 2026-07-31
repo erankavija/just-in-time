@@ -11848,3 +11848,9 @@
 {"id":"5bc44020-0030-46db-bd52-6cab4c74ad6b","issue_id":"e1a18372-af85-458f-8947-a2e48970e9a1","timestamp":"2026-07-31T11:32:46.885865696Z","type":"issue_completed"}
 {"from":"backlog","id":"edaef5b7-ffa4-461c-af85-662987ebaebe","issue_id":"097b9f48-d8b2-47ee-ad02-c524190fbeb2","timestamp":"2026-07-31T11:32:51.786756823Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"9deddeb3-76e3-4279-863d-87e9a6aac7a1","issue_id":"65ff0f38-fe0e-40bf-8ac6-75e411758142","timestamp":"2026-07-31T11:32:56.661685499Z","to":"ready","type":"issue_state_changed"}
+{"id":"07288767-9e96-4a7d-b0ae-03f77f8d3ed8","issue_id":"229e7389-31d3-41ce-b783-ef58a58b1699","priority":"high","timestamp":"2026-07-31T11:42:41.220339722Z","title":"Validation stops loading a profile package unconditionally","type":"issue_created"}
+{"from":"ready","id":"97d2c0d1-6770-4333-abc1-12f4deaf5943","issue_id":"229e7389-31d3-41ce-b783-ef58a58b1699","timestamp":"2026-07-31T11:42:54.368123731Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"164f7b3e-d38c-443c-ba70-e36eb4760c3f","issue_id":"229e7389-31d3-41ce-b783-ef58a58b1699","timestamp":"2026-07-31T11:42:54.368123731Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"in_progress","id":"d185cb67-19e5-460c-a256-d8e4f2e9a570","issue_id":"a62d444d-525a-44d7-97f8-b95ce05b0c4b","timestamp":"2026-07-31T11:43:02.412401107Z","to":"done","type":"issue_state_changed"}
+{"id":"5cf2e5b5-232a-4126-8e3f-a08ee02cdd2b","issue_id":"a62d444d-525a-44d7-97f8-b95ce05b0c4b","timestamp":"2026-07-31T11:43:02.412401107Z","type":"issue_completed"}
+{"from":"backlog","id":"61410a11-0cf7-4054-8d57-ca88418f3d0e","issue_id":"229e7389-31d3-41ce-b783-ef58a58b1699","timestamp":"2026-07-31T11:43:07.268731352Z","to":"ready","type":"issue_state_changed"}
