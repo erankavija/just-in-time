@@ -16,7 +16,7 @@
 
 # Report an environment or usage problem and stop, in the entry point's name.
 regenerate_die() {
-  echo "$(basename "$0"): $*" >&2
+  echo "${0##*/}: $*" >&2
   exit 2
 }
 

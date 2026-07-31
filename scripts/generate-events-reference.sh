@@ -22,6 +22,7 @@ set -euo pipefail
 #   1 — the render or the publication failed
 #   2 — a usage or environment error
 
+# shellcheck source=scripts/regenerate-lib.sh
 . "$(cd "$(dirname "$0")" && pwd)/regenerate-lib.sh"
 regenerate_require_no_arguments "$@"
 regenerate_artifact events-reference
