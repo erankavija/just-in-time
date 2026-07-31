@@ -9,8 +9,10 @@ set -uo pipefail
 #   (1) a run against a current tree changes nothing (idempotence);
 #   (2) a corrupted region is restored and every byte outside the markers
 #       survives, including authored text the harness adds;
-#   (3) a target whose markers are missing or malformed is an environment
-#       error, not a silent partial write;
+#   (3) a target whose markers are missing or malformed, and a publication the
+#       rename cannot complete, each stop the run without a partial write, and
+#       each reports a failure (1) rather than a refusal (2) — the exit-code
+#       boundary every entry point shares;
 #   (4) the generator refuses to write unless it has positively established
 #       that the binary it reads the classification from carries provenance
 #       resolvable in the repository being written to and does not predate that
@@ -172,13 +174,38 @@ git -C "$clone" diff --quiet
 assert_rc 0 $? "generator: restores both targets to their committed bytes"
 echo
 
-echo "== a target without usable markers is an environment error =="
+echo "== a target without usable markers fails the splice =="
 grep -vF -- "$md_begin" "$clone/$reference" >"$scratch/unmarked" && mv "$scratch/unmarked" "$clone/$reference"
 cp "$clone/$reference" "$scratch/unmarked.before"
 run_generator "$clone"
-assert_rc 2 $? "generator: a target missing its begin marker is an environment error"
+assert_rc 1 $? "generator: a target missing its begin marker fails the splice"
 assert_same_bytes "$scratch/unmarked.before" "$clone/$reference" \
   "generator: writes nothing into a target it cannot splice"
+git -C "$clone" checkout -q -- "$reference" || exit 2
+echo
+
+echo "== a publication the rename cannot complete fails rather than refuses =="
+# The splice has already produced complete bytes by the time the rename runs, so
+# this is the one failure that is unambiguously post-render. A stub `mv` earlier
+# on PATH isolates it: the generator's write path calls `mv` exactly once, to
+# publish. The harness's own `mv` calls run outside the stubbed environment.
+mv_stub="$scratch/mv-stub"
+mkdir -p "$mv_stub"
+cat >"$mv_stub/mv" <<'STUB'
+#!/usr/bin/env bash
+echo "stub mv: refusing to rename" >&2
+exit 1
+STUB
+chmod +x "$mv_stub/mv"
+
+corrupt_region "$clone/$reference" "$md_begin" "$md_end"
+cp "$clone/$reference" "$scratch/unpublished.before"
+(cd "$scratch" && PATH="$mv_stub:$PATH" "$clone/scripts/generate-shipped-policy-regions.sh" >/dev/null 2>&1)
+assert_rc 1 $? "generator: a publication the rename cannot complete is a failure, not a refusal"
+assert_same_bytes "$scratch/unpublished.before" "$clone/$reference" \
+  "generator: leaves the target as it found it when the publication fails"
+[ ! -e "$clone/$reference.jit-region" ]
+assert_rc 0 $? "generator: leaves no staged file behind when the publication fails"
 git -C "$clone" checkout -q -- "$reference" || exit 2
 echo
 

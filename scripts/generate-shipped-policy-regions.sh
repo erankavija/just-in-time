@@ -48,12 +48,29 @@ set -euo pipefail
 #
 # Exit codes:
 #   0 — both regions hold the shipped classification
+#   1 — the splice or the publication failed
 #   2 — refused to write, or an environment/usage error
+#
+# The boundary between the two failure codes is whether the classification was
+# in hand. Everything up to and including reading it out of the throwaway
+# repository decides whether this run is entitled and able to start at all, and
+# reports 2; from the splice onward the values exist and the only question is
+# whether a target can be brought to hold them, which reports 1. The sibling
+# entry points draw it in the same place.
 
 me=${0##*/}
+
+# Refuse, before anything has been produced.
 die() {
   echo "$me: $*" >&2
   exit 2
+}
+
+# Fail with the classification already in hand: a target could not be spliced
+# or the result could not be published.
+fail() {
+  echo "$me: $*" >&2
+  exit 1
 }
 
 [ "$#" -eq 0 ] || die "takes no arguments (got: $*)"
@@ -134,13 +151,17 @@ changed=0
 
 # Replace the bytes between the markers, preserving every other byte. A target
 # whose markers are absent, duplicated, or out of order is left untouched.
+#
+# Every failure here reports 1: the classification is already in hand, so what
+# fails is producing the target's new bytes or publishing them, never the
+# entitlement to run.
 splice() {
   local target="$1" begin="$2" end="$3" payload="$4"
   local path="$root/$target" staged="$root/$target.jit-region"
 
-  [ -f "$path" ] || die "$target does not exist"
+  [ -f "$path" ] || fail "$target does not exist"
 
-  cp -p "$path" "$staged" || die "could not stage $target"
+  cp -p "$path" "$staged" || fail "could not stage $target"
   if ! awk -v begin="$begin" -v end="$end" -v payload="$payload" '
     $0 == begin {
       begins++
@@ -163,14 +184,15 @@ splice() {
     END { if (begins != 1 || ends != 1 || state != 0 || bad) { exit 3 } }
   ' "$path" >"$staged"; then
     rm -f "$staged"
-    die "$target does not carry exactly one well-formed '$begin' … '$end' region"
+    fail "$target does not carry exactly one well-formed '$begin' … '$end' region"
   fi
 
   if cmp -s "$staged" "$path"; then
     rm -f "$staged"
     return 0
   fi
-  mv -f "$staged" "$path" || die "could not publish $target"
+  mv -f "$staged" "$path" ||
+    fail "could not publish $target: the spliced bytes were complete and the rename to $target failed"
   echo "updated: $target"
   changed=1
 }
