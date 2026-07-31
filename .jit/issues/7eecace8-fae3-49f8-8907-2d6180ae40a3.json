@@ -6,31 +6,6 @@
   "description": "Planning node for Derived profile assets and projected policy documentation (e204e63d). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at dev/active/e204e63d-derived-package-sources/e204e63d-plan.md and link it to this node once written.",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "6dd55e7c1dd27e81b5a43cf2e233b5a4ff7e858227fdb600e8e334d5baf88253",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/e204e63d-derived-package-sources/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "eae1fea2e20524c3a4e219ce4c24cf92863b116f66d55bc3701ccbc567e24a36",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/e204e63d-derived-package-sources/investigation.md"
-        }
-      ],
-      "commit": null,
-      "doc_type": null,
-      "format": "markdown",
-      "label": null,
-      "path": "dev/active/e204e63d-derived-package-sources/e204e63d-plan.md"
-    },
-    {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
@@ -43,6 +18,39 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "94193a2b957dde91653d3db4e0d6762604f09ee9998e826e09bdf583be82eaae",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../a62d444d/findings.md",
+          "resolved_path": "dev/active/a62d444d/findings.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "33147310421d826578acde7f3d35f1830493a0608a5b434cc854a8e80679f08e",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "e204e63d-breakdown.json",
+          "resolved_path": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "e7caa9f78f3761048fbd84338f05744792fc2332148cd63c4244a67d12777bb9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "e204e63d-investigation.md",
+          "resolved_path": "dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Plan",
+      "path": "dev/active/e204e63d-derived-package-sources/e204e63d-plan.md"
     }
   ],
   "done_at": "2026-07-28T12:16:47.105776898Z",
@@ -67,5 +75,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "planning: Derived profile assets and projected policy documentation",
-  "updated_at": "2026-07-31T14:57:13.261190294Z"
+  "updated_at": "2026-07-31T16:01:56.427904103Z"
 }

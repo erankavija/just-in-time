@@ -20,10 +20,11 @@
     "component:core",
     "story:package-derivation",
     "satisfies:REQ-03",
-    "enforces:@/invariant/bounded-rust-build-footprint"
+    "enforces:@/invariant/bounded-rust-build-footprint",
+    "resolution:obsolete"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Pin the assembly's freshness on a timestamp-only change",
-  "updated_at": "2026-07-28T12:17:11.984851016Z"
+  "updated_at": "2026-07-31T16:10:28.677828408Z"
 }

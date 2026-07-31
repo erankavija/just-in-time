@@ -7,6 +7,7 @@
   ],
   "description": "The staleness report covers the repository files the packaged tree is assembled from, so editing a live consumer alone reports the binary as stale — and it learns which files those are from the packaged declarations rather than from a second list.\n\n## Background\n\nThe staleness report is driven by a positive inventory of paths that are inputs to the binary. It covers the workspace manifests, the crate sources, the build script, the package directory, and the two hook files the binary embeds. It does not cover the agent skill tree, the tracker's reference directory, the contributed-gate directory, or the packaged files under the script directory.\n\nWhile the packaged tree is a checked-in copy, that is correct: editing a live consumer does not change the binary. Once the packaged tree is assembled from those repository files, it does — and the staleness report stays silent, so a contributor keeps running a binary that no longer matches the workflow package it would install.\n\nThe set of newly-covered paths is already stated, exactly once, in the packaged manifest: every live asset's target is the repository path it is drawn from, and the embedded package is parsed from the binary's own bytes. Restating that set as a second list of roughly sixty path literals would reproduce the defect this container exists to remove — a hand-maintained copy held correct by an assertion — and would carry sixty repository-shaped facts about this project's checkout inside every adopter binary. The set is therefore read from the packaged declarations at the boundary that already performs the comparison.\n\nTwo properties constrain where that read happens. The inventory predicate lives in a layer that must stay free of input and output, and it stays there unchanged: parsing the embedded package is not filesystem access, but the layer also must not depend on the package model. The comparison against changed repository paths already happens one layer out, where the package is reachable, so that is where the two sources of build-input truth combine.\n\n## Success Criteria\n\n- [hard] REQ-01: Editing a packaged live source and nothing else reports a binary installed before that edit as stale.\n- [hard] REQ-02: The newly covered paths are obtained from the packaged live-asset declarations rather than from a list restating them, so a newly packaged source is covered with no edit here.\n- [hard] REQ-03: Editing a repository file that no packaged asset is drawn from does not report the binary as stale.\n- [hard] REQ-04: The existing inventory predicate stays a pure path predicate in its present layer, introducing no filesystem access and no dependency on the package model there.\n- [hard] REQ-05: A packaged live source that the existing inventory predicate already covers is reported once, not twice, and neither source of truth masks a failure in the other.\n- [hard] REQ-06: A package that cannot be parsed leaves the report at its documented silent outcome rather than reporting a false freshness.\n\n## Notes\n\nThe combination happens where the changed-path comparison is already assembled, so the layer that owns the inventory keeps its inbound-only dependency direction.\n\nOwner-approved amendment (2026-07-31, execution-lead escalation): this issue previously required roughly sixty path literals added to the inventory constant plus a test reconciling them against the packaged targets. Both were replaced by deriving the set from those targets directly, which meets the container's REQ-06 without adding a hand-maintained copy.\n",
   "documents": [],
+  "first_ready_at": "2026-07-31T16:10:08.772577844Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,10 +21,11 @@
     "component:core",
     "story:package-derivation",
     "satisfies:REQ-06",
-    "enforces:@/invariant/architecture-dependency-direction"
+    "enforces:@/invariant/architecture-dependency-direction",
+    "resolution:obsolete"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "rejected",
   "title": "Extend the binary build-input inventory to the packaged live sources",
-  "updated_at": "2026-07-31T08:46:06.412063195Z"
+  "updated_at": "2026-07-31T16:10:23.670799770Z"
 }
