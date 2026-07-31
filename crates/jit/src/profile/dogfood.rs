@@ -762,6 +762,18 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    #[should_panic(expected = "failed to stat")]
+    fn test_executable_mode_mismatches_panics_when_a_declared_target_is_absent() {
+        let package = jit_dogfood_package().unwrap();
+        let declarations = live_asset_executable_declarations(&package);
+        let empty = TempDir::new().unwrap();
+        // No declared target exists under an empty root, so a declaration that
+        // cannot be compared against a file is reported rather than skipped.
+        let _ = executable_mode_mismatches(empty.path(), declarations);
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn test_executable_mode_mismatches_reports_a_permission_change_on_a_live_source() {
         use std::os::unix::fs::PermissionsExt;
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
