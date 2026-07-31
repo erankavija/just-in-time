@@ -617,6 +617,40 @@ impl InterpolationContext {
     }
 }
 
+/// Resolve the breakdown node's declared container label for `container`.
+///
+/// The label declaration is the source of truth for the namespace that ties a
+/// breakdown node to its container. A declaration is eligible when it
+/// interpolates either supported container identifier token; the resulting
+/// label is what bracket lookup must use.
+pub(super) fn declared_container_label(
+    template: &GraphTemplate,
+    roles: &crate::templates::RoleBindings,
+    container: &Issue,
+) -> Result<String> {
+    let node = template.breakdown_node(roles).ok_or_else(|| {
+        anyhow!(
+            "template '{}' declares no '{}' node; bracket lookup needs a breakdown node label",
+            template.name,
+            roles.breakdown_role()
+        )
+    })?;
+    let context = InterpolationContext::for_container(container);
+    node.labels
+        .iter()
+        .find(|label| {
+            label.contains("{container.short_id}") || label.contains("{container.id}")
+        })
+        .map(|label| context.interpolate(label))
+        .ok_or_else(|| {
+            anyhow!(
+                "template '{}' breakdown node '{}' declares no container label; bracket lookup cannot resolve the applied node",
+                template.name,
+                node.role
+            )
+        })
+}
+
 /// Extract the container's `[hard]` success criteria as a newline-joined block
 /// for the `{container.hard_criteria}` token (PURE: line scan, no parser).
 ///
@@ -698,8 +732,8 @@ pub(crate) mod test_declarations {
     /// description is exactly its interpolated document path, so a delta reports
     /// the path the declaration produces ([`planned_document`]).
     ///
-    /// The breakdown node carries the `brackets:` label that locates an applied
-    /// bracket, so the same template drives a fresh apply and a refresh.
+    /// The breakdown node carries its declared container label, which locates an
+    /// applied bracket, so the same template drives a fresh apply and a refresh.
     pub(crate) fn document_template(doc: &str, doc_area: Option<&str>) -> GraphTemplate {
         let toml = r#"
 [[template]]
@@ -886,6 +920,35 @@ applies_to = ["epic"]
             .add_edges
             .iter()
             .any(|e| e.dependent == DeltaEndpoint::CreatedRole("planning".to_string())));
+    }
+
+    #[test]
+    fn test_expand_template_uses_declared_breakdown_label_namespace() {
+        let mut template = plan_template();
+        template
+            .nodes
+            .iter_mut()
+            .find(|node| node.role == "breakdown")
+            .expect("plan template declares a breakdown node")
+            .labels = vec!["custom-anchor:{container.short_id}".to_string()];
+
+        let container = container("abcdef123456");
+        let delta = expand(
+            &template,
+            &container,
+            &bindings(&container.id),
+            &snapshots(&[]),
+        )
+        .unwrap();
+        let breakdown = delta
+            .creates
+            .iter()
+            .find(|node| node.role == "breakdown")
+            .expect("plan template creates a breakdown node");
+
+        assert!(breakdown
+            .labels
+            .contains(&format!("custom-anchor:{}", container.short_id())));
     }
 
     #[test]

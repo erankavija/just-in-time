@@ -12,8 +12,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::template_expand::{
-    expand_template, located_document_area_error, node_description, node_document_path,
-    validate_delta_acyclic, DeltaEndpoint, InterpolationContext, PlannedNode, TemplateDelta,
+    declared_container_label, expand_template, located_document_area_error, node_description,
+    node_document_path, validate_delta_acyclic, DeltaEndpoint, InterpolationContext, PlannedNode,
+    TemplateDelta,
 };
 use super::*;
 use crate::repository_state::{
@@ -506,7 +507,7 @@ fn template_operation_capture_paths(
     .map(|document| VirtualPath::worktree(document).map_err(Into::into))
     .collect::<Result<Vec<_>>>()?;
     let already_applied =
-        find_captured_breakdown(&template, &config.templates.roles, container, &issues).is_some();
+        find_captured_breakdown(&template, &config.templates.roles, container, &issues)?.is_some();
     if !already_applied {
         paths.extend(
             (0..template.nodes.len())
@@ -826,7 +827,7 @@ fn derive_template_apply(
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
 
-    let existing_breakdown = find_captured_breakdown(template, roles, &container, issues);
+    let existing_breakdown = find_captured_breakdown(template, roles, &container, issues)?;
     if existing_breakdown.is_some() && !force {
         return Err(anyhow!(
             "container {full_container_id} already has template '{}' applied; pass --force to refresh the existing nodes in place",
@@ -994,16 +995,18 @@ fn find_captured_breakdown(
     roles: &RoleBindings,
     container: &Issue,
     issues: &[Issue],
-) -> Option<String> {
-    let breakdown = template.breakdown_node(roles)?;
-    let bracket = format!("brackets:{}", container.short_id());
-    issues
+) -> Result<Option<String>> {
+    let Some(breakdown) = template.breakdown_node(roles) else {
+        return Ok(None);
+    };
+    let bracket = declared_container_label(template, roles, container)?;
+    Ok(issues
         .iter()
         .find(|issue| {
             label_utils::type_label_value(&issue.labels) == Some(breakdown.type_name.as_str())
                 && issue.labels.contains(&bracket)
         })
-        .map(|issue| issue.id.clone())
+        .map(|issue| issue.id.clone()))
 }
 
 fn prevalidate_captured_delta(
@@ -1702,6 +1705,59 @@ mod tests {
         let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         issue.labels = vec!["type:epic".to_string(), "area:auth".to_string()];
         assert_eq!(label_utils::type_label_value(&issue.labels), Some("epic"));
+    }
+
+    #[test]
+    fn test_find_captured_breakdown_uses_declared_label_namespace() {
+        let container = declared::container("abcdef123456");
+        let mut template = declared::document_template("dev/active/{container.id}-plan.md", None);
+        let breakdown_node = template
+            .nodes
+            .iter_mut()
+            .find(|node| node.role == RoleBindings::default().breakdown_role())
+            .expect("shared template declares a breakdown node");
+        breakdown_node.labels = vec!["custom-anchor:{container.short_id}".to_string()];
+
+        let mut breakdown =
+            crate::domain::types::fixture_issue("breakdown".to_string(), String::new());
+        breakdown.labels = vec![
+            "type:breakdown".to_string(),
+            format!("custom-anchor:{}", container.short_id()),
+        ];
+
+        let found = find_captured_breakdown(
+            &template,
+            &RoleBindings::default(),
+            &container,
+            &[container.clone(), breakdown.clone()],
+        )
+        .expect("declared container label should be resolvable")
+        .expect("matching breakdown should be found");
+
+        assert_eq!(found, breakdown.id);
+    }
+
+    #[test]
+    fn test_find_captured_breakdown_reports_missing_declared_label() {
+        let container = declared::container("abcdef123456");
+        let mut template = declared::document_template("dev/active/{container.id}-plan.md", None);
+        let breakdown_node = template
+            .nodes
+            .iter_mut()
+            .find(|node| node.role == RoleBindings::default().breakdown_role())
+            .expect("shared template declares a breakdown node");
+        breakdown_node.labels.clear();
+
+        let error = find_captured_breakdown(
+            &template,
+            &RoleBindings::default(),
+            &container,
+            std::slice::from_ref(&container),
+        )
+        .expect_err("missing declared container label must fail bracket lookup");
+
+        assert!(error.to_string().contains("breakdown"), "{error}");
+        assert!(error.to_string().contains("label"), "{error}");
     }
 
     #[test]
