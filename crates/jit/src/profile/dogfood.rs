@@ -127,6 +127,7 @@ mod tests {
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
     };
     use crate::storage::{IssueStore, JsonFileStorage};
+    use crate::templates::{GraphTemplate, TemplateRegistry};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
@@ -519,6 +520,161 @@ mod tests {
                     region.target
                 );
             }
+        }
+    }
+
+    /// Delimiters of the generated template region in this repository's
+    /// `.jit/templates.toml`, written in TOML's own comment syntax.
+    const TEMPLATE_REGION_BEGIN: &str = "# jit:plan-template:begin";
+    const TEMPLATE_REGION_END: &str = "# jit:plan-template:end";
+
+    /// The packaged template contributions, typed as the model the repository's
+    /// template registry parses its declarations into.
+    fn packaged_templates() -> Vec<GraphTemplate> {
+        let package = jit_dogfood_package().unwrap();
+        package
+            .manifest()
+            .contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                Contribution::KeyedArray {
+                    target: KeyedArrayTarget::Templates,
+                    value,
+                    ..
+                } => Some(value.clone()),
+                _ => None,
+            })
+            .map(|value| {
+                serde_json::from_value(value)
+                    .expect("a packaged template contribution parses as a graph template")
+            })
+            .collect()
+    }
+
+    /// The packaged declarations serialized as a registry-file template block.
+    fn render_template_block(templates: &[GraphTemplate]) -> String {
+        #[derive(serde::Serialize)]
+        struct TemplateBlock<'a> {
+            template: &'a [GraphTemplate],
+        }
+        toml::to_string(&TemplateBlock {
+            template: templates,
+        })
+        .expect("the packaged templates serialize as TOML")
+    }
+
+    /// Splice `block` into the registry's generated region, preserving every
+    /// byte outside the delimiters.
+    fn splice_template_region(existing: &[u8], block: &str) -> Vec<u8> {
+        use crate::repository_state::{
+            render_managed_document, ManagedDocumentClaim, RegionPlacement,
+        };
+        render_managed_document(
+            existing,
+            &[ManagedDocumentClaim::Region {
+                owner: "jit-dogfood".into(),
+                region_id: "plan-template".into(),
+                begin: TEMPLATE_REGION_BEGIN.as_bytes().to_vec(),
+                end: TEMPLATE_REGION_END.as_bytes().to_vec(),
+                content: block.as_bytes().to_vec(),
+                placement: RegionPlacement::RequireExisting,
+            }],
+        )
+        .expect("the registry declares the generated template region")
+    }
+
+    /// The registry bytes outside the generated region: everything through the
+    /// begin delimiter, and everything from the end delimiter onward.
+    fn outside_template_region(registry: &[u8]) -> (String, String) {
+        let text = std::str::from_utf8(registry).expect("the registry is UTF-8");
+        let begin = text
+            .find(TEMPLATE_REGION_BEGIN)
+            .expect("the registry declares a region begin delimiter")
+            + TEMPLATE_REGION_BEGIN.len();
+        let end = text
+            .find(TEMPLATE_REGION_END)
+            .expect("the registry declares a region end delimiter");
+        (text[..begin].to_string(), text[end..].to_string())
+    }
+
+    /// Generates this repository's template declaration from the packaged
+    /// contribution that is its authority, writing `.jit/templates.toml` only
+    /// when the rendered bytes differ from the file on disk.
+    ///
+    /// Running this test IS the rendering run: the packaged declaration is the
+    /// single source of the block between the region delimiters, and the
+    /// authored header, commentary and any declaration outside them survive
+    /// byte for byte.
+    #[test]
+    fn test_repository_template_registry_region_renders_from_packaged_contributions() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let path = root.join(".jit/templates.toml");
+        let existing = fs::read(&path).unwrap();
+        let block = render_template_block(&packaged_templates());
+        let rendered = splice_template_region(&existing, &block);
+
+        // Rendering owns the region and nothing else.
+        assert_eq!(
+            outside_template_region(&rendered),
+            outside_template_region(&existing),
+            "rendering changed registry bytes outside the region delimiters"
+        );
+
+        // Whatever the region happens to hold, the packaged block replaces it
+        // whole while the authored bytes around it survive: the region body is
+        // read from the package rather than carried over from the file.
+        let stale =
+            splice_template_region(&existing, "# a declaration the package does not make\n");
+        assert_eq!(
+            outside_template_region(&stale),
+            outside_template_region(&existing),
+            "replacing the region changed registry bytes outside the delimiters"
+        );
+        assert_eq!(
+            splice_template_region(&stale, &block),
+            rendered,
+            "rendering over a diverged region did not restore the packaged block"
+        );
+
+        // The rendered registry loads, and every container type a declaration
+        // brackets is still bracketed by that declaration.
+        let unchecked_hierarchy: [&str; 0] = [];
+        let before = TemplateRegistry::from_toml_str(
+            std::str::from_utf8(&existing).unwrap(),
+            &unchecked_hierarchy,
+        )
+        .unwrap();
+        let after = TemplateRegistry::from_toml_str(
+            std::str::from_utf8(&rendered).unwrap(),
+            &unchecked_hierarchy,
+        )
+        .unwrap();
+        for template in &before.templates {
+            for container_type in &template.applies_to {
+                assert_eq!(
+                    after
+                        .template_for_container(container_type)
+                        .map(|applied| applied.name.as_str()),
+                    Some(template.name.as_str()),
+                    "the rendered registry stops bracketing container type '{container_type}'"
+                );
+            }
+        }
+
+        // A second rendering run finds nothing to change.
+        assert_eq!(
+            splice_template_region(&rendered, &block),
+            rendered,
+            "a second rendering run changed the registry"
+        );
+
+        // Publish, on a byte difference alone so an unchanged registry keeps its
+        // timestamp, through a staged file and one rename so a reader that loads
+        // the registry concurrently sees one whole version or the other.
+        if rendered != existing {
+            let staged = tempfile::NamedTempFile::new_in(path.parent().unwrap()).unwrap();
+            fs::write(staged.path(), &rendered).unwrap();
+            staged.persist(&path).unwrap();
         }
     }
 

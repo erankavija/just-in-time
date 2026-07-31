@@ -6,43 +6,52 @@
 # roles unique; depends_on/anchor_edges/transforms reference declared
 # roles/anchors; node `type`s exist in [type_hierarchy]; internal edges acyclic.
 
+# The block between the delimiters below is GENERATED from the template
+# contributions of the packaged jit-dogfood profile, which are their authority:
+# edit profiles/jit-dogfood/manifest.toml, then re-render with
+# `cargo test -p jit --lib profile::dogfood`. Everything outside the delimiters
+# is authored here and survives rendering byte for byte.
+#
+# Why the container anchor carries `repo-validate` (REQ-13 of issue 552ff75c):
+# it is the whole-repo integrity gate on the breakable container.
+# `repo-validate` is a CONFIG-DECLARED gate in .jit/gates.toml whose checker
+# runs `jit validate` with NO issue id (whole-repo run_rules(None)), distinct
+# from the per-issue `jit-validate` gate (`jit validate "$JIT_ISSUE_ID"`). By
+# @/invariant/gate-semantics the bound container cannot reach Done until
+# whole-repo validation passes.
+# jit:plan-template:begin
 [[template]]
-name        = "plan"
-description = "Plan-before-fan-out bracket: planning node P and breakdown node B."
-applies_to  = ["epic"]           # container types this template may be applied to
+name = "plan"
+description = "Plan-before-fan-out bracket with planning and breakdown review."
+applies_to = ["epic"]
 
-  [[template.anchors]]
-  name  = "container"            # bound at apply time to the target issue
-  # REQ-13 (issue 552ff75c): whole-repo integrity gate on the breakable
-  # container. `repo-validate` is a CONFIG-DECLARED gate in .jit/gates.toml whose
-  # checker runs `jit validate` with NO issue id (whole-repo run_rules(None)),
-  # distinct from the per-issue `jit-validate` gate (`jit validate
-  # "$JIT_ISSUE_ID"`). By @/invariant/gate-semantics the bound container cannot reach
-  # Done until whole-repo validation passes.
-  gates = ["repo-validate"]      # gate name: a preset OR a gates.toml registry key
+[[template.anchors]]
+name = "container"
+gates = ["repo-validate"]
 
-  [[template.nodes]]
-  role        = "planning"
-  type        = "planning"       # must exist in [type_hierarchy]
-  gates       = ["plan-review"]  # gate-preset names (apply_gate_preset)
-  doc_area    = "dev/active"     # issue-scoped area {container.dir} resolves in
-  doc         = "{container.dir}/plan.md"
-  description = "Planning node for {container.title} ({container.short_id}). Produce the plan that decomposes this container before fan-out: address its [hard] success criteria and make it concrete enough to break into well-ordered work. Author the plan at {doc} and link it to this node once written."
+[[template.nodes]]
+role = "planning"
+type = "planning"
+gates = ["plan-review"]
+doc = "{container.dir}/plan.md"
+doc_area = "dev/active"
+description = "Plan {container.title} ({container.short_id}) against every hard success criterion, write the concise design at {doc} and its authoritative sibling breakdown manifest, and link both to this planning issue."
+labels = []
+depends_on = []
 
-  [[template.nodes]]
-  role        = "breakdown"
-  type        = "breakdown"
-  gates       = ["coverage-preview", "breakdown-review"]
-  labels      = ["brackets:{container.short_id}"]
-  description = "Breakdown node bracketing {container.title} ({container.short_id}). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria."
-  depends_on  = ["planning"]     # internal edge: B → P
+[[template.nodes]]
+role = "breakdown"
+type = "breakdown"
+gates = ["coverage-preview", "breakdown-review"]
+description = "After the plan-review checkpoint passes, decompose the plan for {container.title} ({container.short_id}) into well-ordered implementation issues."
+labels = ["brackets:{container.short_id}"]
+depends_on = ["planning"]
 
-  # Edge to an anchor: container depends on the breakdown node (C → B)
-  [[template.anchor_edges]]
-  from = "container"             # anchor role
-  to   = "breakdown"            # node role
-  # direction is "anchor depends on node"
+[[template.anchor_edges]]
+from = "container"
+to = "breakdown"
 
-  [[template.transforms]]
-  kind = "move-upstream-to-role"
-  role = "planning"             # move container's pre-existing upstream deps onto P
+[[template.transforms]]
+kind = "move-upstream-to-role"
+role = "planning"
+# jit:plan-template:end
