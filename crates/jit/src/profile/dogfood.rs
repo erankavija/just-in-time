@@ -408,6 +408,17 @@ mod tests {
     }
 
     #[test]
+    fn test_managed_region_sources_stay_outside_live_asset_prefix() {
+        let package = jit_dogfood_package().unwrap();
+        assert!(!package.manifest().regions.is_empty());
+        assert!(package
+            .manifest()
+            .regions
+            .iter()
+            .all(|region| !region.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX)));
+    }
+
+    #[test]
     fn test_all_package_gate_values_deserialize_as_runtime_gates() {
         for key in [
             "plan-review",
