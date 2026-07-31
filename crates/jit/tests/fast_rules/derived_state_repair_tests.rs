@@ -102,10 +102,12 @@ fn repo_relative(path: &VirtualPath) -> String {
 
 /// Capture the complete image `repair_target_paths` needs from a jit-dogfood
 /// repository: the engine registries, the validation-derived
-/// projection/schema/kind closure those registries imply, and the profile's own
-/// target paths plus its applied-profile record. This is the exact closure
-/// production repair itself captures (`CommandExecutor::capture_repair_plan`),
-/// assembled here from public `repository_state` producers only.
+/// projection/schema/kind closure those registries imply, and — because this
+/// repository's applied-profile record names the profile — that profile's own
+/// target paths plus the record itself. This is the exact closure production
+/// repair captures for a repository carrying that record
+/// (`CommandExecutor::capture_repair_plan`), assembled here from public
+/// `repository_state` producers only.
 fn repository_image(
     storage: &impl RepositoryStateStore,
     layout: &RepositoryLayout,
