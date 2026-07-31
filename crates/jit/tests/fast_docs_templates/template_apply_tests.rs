@@ -716,6 +716,7 @@ applies_to  = ["epic"]
   role        = "breakdown"
   type        = "breakdown"
   gates       = ["deploy-check"]
+  labels      = ["brackets:{container.short_id}"]
   description = "Break down {container.title}."
   [[template.anchor_edges]]
   from = "container"
@@ -767,6 +768,7 @@ applies_to  = ["epic"]
   [[template.nodes]]
   role        = "breakdown"
   type        = "breakdown"
+  labels      = ["brackets:{container.short_id}"]
   description = "Break down {container.title}."
   [[template.anchor_edges]]
   from = "container"
@@ -811,6 +813,7 @@ applies_to  = ["epic"]
   [[template.nodes]]
   role        = "breakdown"
   type        = "breakdown"
+  labels      = ["brackets:{container.short_id}"]
   description = "Break down {container.title}."
   [[template.anchor_edges]]
   from = "container"
@@ -916,6 +919,7 @@ applies_to  = ["epic"]
   [[template.nodes]]
   role        = "breakdown"
   type        = "breakdown"
+  labels      = ["brackets:{container.short_id}"]
   description = "Break down {container.title}."
   [[template.anchor_edges]]
   from = "container"
@@ -1027,7 +1031,7 @@ applies_to  = ["epic"]
   role        = "breakdown"
   type        = "breakdown"
   description = "Break down {container.title}."
-  labels      = ["not a valid label"]
+  labels      = ["brackets:{container.short_id}", "not a valid label"]
 "#;
     let template = TemplateRegistry::from_toml_str(toml, &HIERARCHY)
         .unwrap()

@@ -98,6 +98,7 @@ applies_to  = ["epic"]
   role        = "breakdown"
   type        = "breakdown"
   description = "Break down {container.title}."
+  labels      = ["brackets:{container.short_id}"]
   depends_on  = ["planning"]
   [[template.anchor_edges]]
   from = "upstream"
