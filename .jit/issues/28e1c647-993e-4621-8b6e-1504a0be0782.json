@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T22:44:14.905682916Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T22:47:41.005644747Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "28e1c647-993e-4621-8b6e-1504a0be0782",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Delete the unreachable item-kind defaults",
-  "updated_at": "2026-07-31T19:32:07.508582513Z"
+  "updated_at": "2026-07-31T22:47:41.005644747Z"
 }

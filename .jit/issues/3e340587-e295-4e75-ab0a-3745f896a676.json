@@ -15,8 +15,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-31T20:32:53.811589311Z",
+      "status": "passed",
+      "updated_at": "2026-07-31T21:46:04.137618583Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T21:47:52.551442806Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Move the package-authored region source out of the derived prefix",
-  "updated_at": "2026-07-31T20:32:53.811589311Z"
+  "updated_at": "2026-07-31T21:47:52.551442806Z"
 }

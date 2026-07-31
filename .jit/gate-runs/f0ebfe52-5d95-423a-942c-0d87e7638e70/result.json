@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T22:16:20.725580479Z",
+  "duration_ms": 153004,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 2434,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/issue/e204e63d/decision/D-13"
+        ],
+        "severity": "high",
+        "summary": "Validation-time planning-node lookup still hardcodes the brackets namespace, so custom declared container labels are not resolved."
+      }
+    ],
+    "summary": "Custom template container-label namespaces remain unsupported by validation-time planning-node resolution.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "510297e4-4543-413a-b4c0-065f48aea855",
+  "message": null,
+  "run_id": "f0ebfe52-5d95-423a-942c-0d87e7638e70",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T22:13:47.720729975Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2476 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fba3d-9edb-7dd1-95c1-c2204112fa56\n--------\nuser\n--- 2463 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 87d44fab, 798bd0d0, 105bd208, b10ae493 (`jit:510297e4`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T22:06:48Z); code-review pending\nTruncation recovery: none\n\n1. **[blocking][issue-impact]** [`crates/jit/src/commands/validate.rs:2434`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:2434) still reconstructs `brackets:<short-id>`. The shared lookup is used to capture and project plan content, so a template using the newly supported custom container-label namespace fails to locate its planning node and silently skips plan-document validation. This leaves REQ-02 incomplete. References: @/invariant/domain-agnostic, @/issue/e204e63d/decision/D-13.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Custom template container-label namespaces remain unsupported by validation-time planning-node resolution.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Validation-time planning-node lookup still hardcodes the brackets namespace, so custom declared container labels are not resolved.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":2434,\"references\":[\"@/invariant/domain-agnostic\",\"@/issue/e204e63d/decision/D-13\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -14,7 +14,23 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T22:03:37.959883123Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-31T22:06:44.573942625Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T22:06:47.758778491Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55",
   "labels": [
     "type:task",
@@ -29,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Declare one package's dependency on another",
-  "updated_at": "2026-07-31T19:26:12.225990118Z"
+  "updated_at": "2026-07-31T22:06:47.758778491Z"
 }

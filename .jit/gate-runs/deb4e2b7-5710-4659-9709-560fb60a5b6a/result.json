@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T21:29:48.443419166Z",
+  "duration_ms": 202472,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are implemented and covered by attributable tests; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a30d704d-05af-406c-8cb6-5031495af705",
+  "message": null,
+  "run_id": "deb4e2b7-5710-4659-9709-560fb60a5b6a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T21:26:25.971174613Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 07dba57f, 69fe7b28, cbb6b8b2, c89a2249, 5140ff76 (`jit:a30d704d`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 and D-17 (issue description); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci=passed (exit 0, 2026-07-31T21:19:15Z); code-review=pending; jit-validate=pending\nTruncation recovery: per-path reads of core rule/config/materialization/domain patches, command callers, tests, documentation, and merge first-parent patch; unrelated merge-parent delta excluded\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are implemented and covered by attributable tests; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

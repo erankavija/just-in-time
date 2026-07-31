@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T23:02:31.173658675Z",
+  "duration_ms": 141823,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard requirements are met; the prior REQ-03 finding is superseded by the committed owner ruling.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9bdf8025-3a36-4a5f-b48c-1d56ec1db664",
+  "message": null,
+  "run_id": "fa83eea1-1130-4d27-932c-06a2b0dd6c54",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T23:00:09.349977595Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 56df70b6, f9505b77, 66ebf4e2\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: npm-ci passed (exit 0, 2026-07-31T22:59:53Z); prior code-review failed (exit 1), but its colour-stability finding is superseded by the committed REQ-03 owner ruling\nTruncation recovery: reread affected current files, item sources, and the first-parent merge patch in bounded calls; ignored gate-run enumeration outside the web impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard requirements are met; the prior REQ-03 finding is superseded by the committed owner ruling.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

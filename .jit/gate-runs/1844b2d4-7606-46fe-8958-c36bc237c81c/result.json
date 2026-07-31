@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T22:26:30.461586402Z",
+  "duration_ms": 199590,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed change satisfies all four hard requirements with no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f6c23c09-6f3e-471b-aaad-c487b294af26",
+  "message": null,
+  "run_id": "1844b2d4-7606-46fe-8958-c36bc237c81c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T22:23:10.871331706Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fc77436e, 5b49bc15 (same three-file change verified against first parent)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-21 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/domain-agnostic, @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T22:16:22Z)\nTruncation recovery: narrowed configuration, source-policy, script, symbol, declaration, and merge-parent reads; abandoned unrelated gate-run filename listing outside the impact cone\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed change satisfies all four hard requirements with no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

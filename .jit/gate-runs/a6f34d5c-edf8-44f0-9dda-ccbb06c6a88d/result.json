@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T22:37:17.271647558Z",
+  "duration_ms": 228858,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-attributable changes satisfy the reviewed hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4c40e165-3af5-46a2-93f0-383ec9109e30",
+  "message": null,
+  "run_id": "a6f34d5c-edf8-44f0-9dda-ccbb06c6a88d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T22:33:28.413506701Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2490d6a6, c4d76fb7, fb968a9b (literal `jit:4c40e165` merge reference)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 and REQ-08 (issue markdown-first); @/invariant/domain-agnostic, architecture-dependency-direction, canonical-cutover, semantic-test-assertions, shared-test-contracts, gate-semantics (.jit/invariants.toml registry-first); @/charter/D-1, D-3, D-4, D-8, D-13 (dev/vision/9db27a3a-charter.md markdown-first); @/gate/jit-validate (.jit/gates.toml registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T22:26:31Z); code-review pending\nTruncation recovery: bounded re-reads of individual feature/merge patches, current merge paths, target mappings, tests, profile-show serialization, and policy sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-attributable changes satisfy the reviewed hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

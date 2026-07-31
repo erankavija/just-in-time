@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T22:59:52.411934576Z",
+  "duration_ms": 313485,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/package.rs",
+        "id": "F1",
+        "line": 292,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/09aea8b3/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "A file can be swapped for an outward symlink after containment validation and before fs::read, allowing external bytes to be accepted instead of returning EscapingEntry."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/gate-runs/8b4c9877-7888-4fec-bbd9-e73d10d29f1d/result.json",
+        "id": "F2",
+        "line": 7,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci"
+        ],
+        "severity": "high",
+        "summary": "The only cargo-ci run predates the implementation, failed in an unrelated server test, and no newer successful run verifies the directory-reader hard requirements."
+      }
+    ],
+    "summary": "The directory reader has a symlink-swap containment bypass, and no current-head cargo-ci pass verifies the hard requirements.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "09aea8b3-cc68-465a-8c9c-f7f4976f9e35",
+  "message": null,
+  "run_id": "9b16b737-6849-47d1-b26a-05258cd25715",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T22:54:38.925982816Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10892 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fba63-0573-7ea1-bed6-ef5b0b458a97\n--------\nuser\n--- 10879 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d6f51157, da92de63, fb968a9b, 3cab7a72 (`jit:09aea8b3`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/09aea8b3/requirement/REQ-04 (.jit/issues/09aea8b3-cc68-465a-8c9c-f7f4976f9e35.json); @/issue/e204e63d/requirement/REQ-08 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/domain-agnostic, @/invariant/architecture-dependency-direction, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-07-31T22:47:42Z); its recorded failure is an unrelated server shutdown test and predates the implementation commit\nTruncation recovery: narrowed package/test and item-source reads, per-commit patches, and first-parent merge diffs; `--remerge-diff` was unavailable because it attempted a temporary write\n\n1. **High — blocking, issue-impact:** [`crates/jit/src/profile/package.rs:292`](crates/jit/src/profile/package.rs:292) reopens a checked file by pathname after containment and file-kind checks at lines 277–281. An attacker can replace that regular file with an outward symlink between those operations; `fs::read` follows it and accepts external bytes under the declared source instead of returning `EscapingEntry`. Read through a no-follow handle (or verify the opened object’s identity/containment) and add coverage for the swap. References: `@/issue/09aea8b3/requirement/REQ-04`.\n\n2. **High — blocking, issue-impact:** The only required [`cargo-ci` projection](.jit/gate-runs/8b4c9877-7888-4fec-bbd9-e73d10d29f1d/result.json:7) started at 22:47, before `d6f51157` at 22:55 and the landing merge. It failed in an unrelated server test, and no newer successful run verifies compilation or the new directory-reader tests. The hard requirements therefore remain materially unverified; run `cargo-ci` on the landed head and resolve its failure. References: `@/gate/cargo-ci`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The directory reader has a symlink-swap containment bypass, and no current-head cargo-ci pass verifies the hard requirements.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A file can be swapped for an outward symlink after containment validation and before fs::read, allowing external bytes to be accepted instead of returning EscapingEntry.\",\"file\":\"crates/jit/src/profile/package.rs\",\"line\":292,\"references\":[\"@/issue/09aea8b3/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The only cargo-ci run predates the implementation, failed in an unrelated server test, and no newer successful run verifies the directory-reader hard requirements.\",\"file\":\".jit/gate-runs/8b4c9877-7888-4fec-bbd9-e73d10d29f1d/result.json\",\"line\":7,\"references\":[\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

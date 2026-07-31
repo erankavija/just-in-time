@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T22:13:46.692477430Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-31T22:16:21.024619111Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "510297e4-4543-413a-b4c0-065f48aea855",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Read the bracket label from the template that declares it",
-  "updated_at": "2026-07-31T19:31:51.875234573Z"
+  "updated_at": "2026-07-31T22:16:21.024619111Z"
 }

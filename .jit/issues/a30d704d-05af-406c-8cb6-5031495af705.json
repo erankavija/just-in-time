@@ -16,8 +16,18 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-07-31T20:56:54.645413368Z",
+      "status": "passed",
+      "updated_at": "2026-07-31T21:26:24.904346196Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T21:29:48.734706955Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-31T21:29:52.134781777Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Stop supplying a taxonomy to a repository that declares none",
-  "updated_at": "2026-07-31T20:56:54.645413368Z"
+  "updated_at": "2026-07-31T21:29:52.134781777Z"
 }

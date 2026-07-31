@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T22:33:27.427162794Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T22:37:17.564462869Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4c40e165-3af5-46a2-93f0-383ec9109e30",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Give the contribution vocabulary the tables the scaffold writes",
-  "updated_at": "2026-07-31T19:31:46.643528094Z"
+  "updated_at": "2026-07-31T22:37:17.564462869Z"
 }

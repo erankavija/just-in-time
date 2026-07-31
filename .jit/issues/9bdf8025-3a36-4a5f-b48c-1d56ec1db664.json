@@ -15,13 +15,13 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-31T20:09:40.133747104Z",
+      "status": "passed",
+      "updated_at": "2026-07-31T23:02:31.480117948Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
       "status": "passed",
-      "updated_at": "2026-07-31T20:06:38.702422372Z",
+      "updated_at": "2026-07-31T23:00:08.366719432Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Render the web view without a built-in taxonomy",
-  "updated_at": "2026-07-31T20:20:12.126140173Z"
+  "updated_at": "2026-07-31T23:02:31.480117948Z"
 }

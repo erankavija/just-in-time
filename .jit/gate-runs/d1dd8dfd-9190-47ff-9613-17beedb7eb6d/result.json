@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T21:39:18.721476498Z",
+  "duration_ms": 150178,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; no unresolved issue-impact defects were found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0439da41-0a91-43b1-b080-026730fb4231",
+  "message": null,
+  "run_id": "d1dd8dfd-9190-47ff-9613-17beedb7eb6d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T21:36:48.543032312Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7610ea1b, 4f620580, 0a9f8bae (`jit:0439da41`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-22 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/domain-agnostic, @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T21:29:52.902875863Z)\nTruncation recovery: Narrowed the truncated repository-wide text searches to the icon implementation, configuration, endpoint, and documentation paths; inspected each tagged patch separately, including the merge’s parent diff.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; no unresolved issue-impact defects were found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

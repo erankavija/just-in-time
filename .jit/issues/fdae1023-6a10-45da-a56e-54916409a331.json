@@ -14,9 +14,14 @@
     "code-review"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T23:05:25.436164579Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-31T20:06:41.816841074Z",
+      "updated_at": "2026-07-31T23:02:34.816312517Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Take this repository's vocabulary out of the bridge's instructions",
-  "updated_at": "2026-07-31T20:06:41.816841074Z"
+  "updated_at": "2026-07-31T23:05:25.436164579Z"
 }

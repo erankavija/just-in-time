@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T22:06:44.268684494Z",
+  "duration_ms": 185325,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json",
+        "id": "F1",
+        "line": 31,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/requirement/REQ-08",
+          "@/issue/e204e63d/decision/D-14"
+        ],
+        "severity": "high",
+        "summary": "The satisfies:REQ-08 label claims dependency discovery and application, but this issue deliberately implements only declaration parsing and reporting."
+      }
+    ],
+    "summary": "The issue's REQ-08 coverage claim is unsupported by its intentionally declaration-only implementation.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55",
+  "message": null,
+  "run_id": "df6f5d41-36d5-4491-9871-7d75e641497a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T22:03:38.943083456Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15094 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fba34-54dc-7773-92b8-52fca4e87bf9\n--------\nuser\n--- 15081 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cfe36aa7, f950f3f2, fb968a9b\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-08 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/issue/e204e63d/decision/D-14 (same); @/invariant/semantic-types (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending; mcp-ci pending\nTruncation recovery: narrowed per-commit patches and line-ranged source/policy reads; excluded unrelated broad .jit search results\n\n1. **F1 — blocking, issue-impact:** The `satisfies:REQ-08` claim is unsupported. REQ-08 requires discovery and application of declared dependency packages without a source checkout, while this issue explicitly defers resolution/application and the implementation only parses, reports, and rejects self-dependencies. Remove or correct the coverage claim before completion. [.jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json:31] References: @/issue/e204e63d/requirement/REQ-08, @/issue/e204e63d/decision/D-14.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue's REQ-08 coverage claim is unsupported by its intentionally declaration-only implementation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The satisfies:REQ-08 label claims dependency discovery and application, but this issue deliberately implements only declaration parsing and reporting.\",\"file\":\".jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json\",\"line\":31,\"references\":[\"@/issue/e204e63d/requirement/REQ-08\",\"@/issue/e204e63d/decision/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

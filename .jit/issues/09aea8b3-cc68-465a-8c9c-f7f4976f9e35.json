@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-07-31T22:54:37.912319034Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-31T22:59:52.704037976Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "09aea8b3-cc68-465a-8c9c-f7f4976f9e35",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Read a profile package from a directory on disk",
-  "updated_at": "2026-07-31T19:25:56.772034638Z"
+  "updated_at": "2026-07-31T22:59:52.704037976Z"
 }

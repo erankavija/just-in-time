@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T21:54:41.186000361Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-07-31T21:56:52.118553764Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ae435979-9d43-4efc-ba05-7f7c6164af84",
   "labels": [
     "epic:derived-package-sources",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Author a test fixture that declares its own taxonomy",
-  "updated_at": "2026-07-31T19:26:01.918062489Z"
+  "updated_at": "2026-07-31T21:56:52.118553764Z"
 }

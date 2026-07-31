@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0222a12e887ac34d3d76466b4fddadf2aba79d63",
+  "completed_at": "2026-07-31T23:05:25.145257071Z",
+  "duration_ms": 169364,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met by the attributable current MCP bridge changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fdae1023-6a10-45da-a56e-54916409a331",
+  "message": null,
+  "run_id": "2ca13838-b3c0-4d80-a25e-2e663863486c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T23:02:35.781088670Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 42cecdb3 (`feat(jit:fdae1023)`) and 42f82488 (`merge(jit:fdae1023)`); merge first-parent patch matches the same three-file change\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, markdown-first); @/invariant/domain-agnostic (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: mcp-ci passed, exit 0 (2026-07-31T23:02:32Z); code-review pending, no run\nTruncation recovery: narrowed the truncated parent-issue read to D-13 and directly read its configured source plus the invariant registry; unrelated parent dependency history was outside the three-file MCP impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met by the attributable current MCP bridge changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
