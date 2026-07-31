@@ -35,7 +35,20 @@ fi
 
 git_hash="$(git -C "$repo_root" rev-parse HEAD)"
 git_short_hash="$(git -C "$repo_root" rev-parse --short=8 HEAD)"
-if [ -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal)" ]; then
+# The dirty flag makes the resulting binary report itself stale for its whole
+# life (`assess_binary_provenance`, crates/jit/src/domain/build_provenance.rs),
+# so it must mean "sources the binary is built from are uncommitted" and
+# nothing wider. The tracker's own data root is excluded because it is the
+# binary's output rather than its input: issue records, the event log and gate
+# results are written by running jit, and they cannot change what a rebuild
+# produces. Without this, evaluating a gate immediately before installing
+# yields a binary that refuses every subsequent gate run.
+#
+# Only this one directory is excluded, and by that argument alone. The
+# authoritative statement of what does feed the binary is BINARY_BUILD_INPUTS
+# in the module above; it is deliberately not restated here, since a second
+# copy in shell would go stale against it (@/invariant/single-source-prose).
+if [ -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal -- . ':(exclude).jit')" ]; then
   git_dirty=true
 else
   git_dirty=false
