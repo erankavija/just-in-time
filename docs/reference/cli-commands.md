@@ -1403,7 +1403,7 @@ jit gate define review \
   --mode auto \
   --pass-context \
   --prompt-file "docs/review-prompt.md" \
-  --checker-command "./scripts/ai-review.sh" \
+  --checker-command "./contrib/gates/ai-review.sh" \
   --env REVIEWER_AGENT="your-reviewer-command"
 
 # Usage error: explicit manual mode conflicts with a checker command

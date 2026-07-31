@@ -463,7 +463,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   emits no block, or a malformed block, yields no `findings` field and no error,
   leaving existing plain-text behaviour unchanged. Documented in
   [custom-gates.md](docs/how-to/custom-gates.md#structured-findings-machine-readable-output);
-  the bundled `scripts/ai-review.sh` is the first conforming checker.
+  the bundled `contrib/gates/ai-review.sh` is the first conforming checker.
 
 - **`jit issue children <id>` — a container's direct children at a glance.**
   Lists the container's immediate dependencies (depth 1), each rendered exactly
