@@ -93,7 +93,7 @@ impl Repo {
     ) -> jit::domain::artifact_classifier::ArtifactClassificationInventory {
         let inventory = inventory_explicit_roots(
             &[],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ExplicitRootTarget::Document(root),
             &PinnedRootEvidenceMap::new(),
         )
@@ -686,7 +686,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
         &issues,
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Container("history"),
         &pin_evidence(true),
     )
@@ -711,7 +711,7 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
         &issues,
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Container("history"),
         &pin_evidence(false),
     )

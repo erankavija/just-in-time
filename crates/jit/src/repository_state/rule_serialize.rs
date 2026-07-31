@@ -86,23 +86,18 @@ pub fn serialize_ruleset(set: &RuleSet) -> SerializedRuleSet {
 /// between rules) — the single-rule analogue used to append one
 /// newly-derived default rule without re-serializing the rest of the file.
 ///
-/// `rule.assert` must not be an [`Assertion::JsonSchema`] variant: that kind
-/// needs a companion `schemas/<name>.json` file, and this function renders
-/// text only (no I/O) so it has no way to persist one. Every
-/// `namespace-unique-<ns>` default rule — the only family this is used for —
-/// asserts [`Assertion::RequireLabel`], never `JsonSchema`, so callers
-/// restricted to that family are safe. Debug-asserts the invariant so a future
-/// misuse fails loudly instead of silently dropping a schema.
+/// Renders text only (no I/O). An [`Assertion::JsonSchema`] rule renders the
+/// `json-schema = "schemas/<stem>.json"` reference [`serialize_ruleset`] would
+/// give it — the stem derives from the rule's own `origin`/`name`, and default
+/// rule names sanitize to distinct stems, so a block rendered alone references
+/// the same file the whole-set serialization does. Persisting that file is the
+/// caller's: the default-rule materialization writes every schema the current
+/// configuration derives in the same pass that splices the referencing row in.
 pub fn render_rule_block(rule: &Rule) -> String {
     let mut out = String::new();
     let mut schema_files: Vec<SchemaFile> = Vec::new();
     let mut used_stems: HashSet<String> = HashSet::new();
     render_rule(rule, &mut out, &mut schema_files, &mut used_stems);
-    debug_assert!(
-        schema_files.is_empty(),
-        "render_rule_block renders text only; rule '{}' needs a schema file it cannot persist",
-        rule.name
-    );
     out.push('\n');
     out
 }
@@ -553,7 +548,8 @@ mod tests {
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             ("milestone", LabelNamespace::new("Release", false)),
-        ]);
+        ])
+        .declaring_test_hierarchy();
         let set = default_ruleset(&reg);
         // Sanity: the set covers json-schema, shorthand, and graph kinds.
         assert!(set

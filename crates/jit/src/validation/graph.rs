@@ -226,7 +226,7 @@ pub enum ChildLink {
 /// let findings: Vec<GraphFinding> = evaluate_graph(
 ///     &rules,
 ///     &[task],
-///     &HierarchyConfig::default(),
+///     &HierarchyConfig::empty(),
 ///     ContentFormat::Markdown,
 ///     chrono::Utc::now(),
 ///     &std::collections::HashMap::new(),
@@ -336,7 +336,7 @@ impl ChildLink {
 /// let findings = evaluate_graph(
 ///     &rules,
 ///     &[task],
-///     &HierarchyConfig::default(),
+///     &HierarchyConfig::empty(),
 ///     jit::domain::ContentFormat::Markdown,
 ///     chrono::Utc::now(),
 ///     &std::collections::HashMap::new(),
@@ -1914,7 +1914,7 @@ source-of-truth = "markdown-first"
             evaluate_graph(
                 &[rule],
                 &issues,
-                &HierarchyConfig::default(),
+                &HierarchyConfig::test_vocabulary(),
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
@@ -1932,7 +1932,7 @@ source-of-truth = "markdown-first"
             evaluate_graph(
                 &[rule],
                 &issues2,
-                &HierarchyConfig::default(),
+                &HierarchyConfig::test_vocabulary(),
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
@@ -2001,7 +2001,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &[&rule],
             &[container, impl_node],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2025,7 +2025,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2049,7 +2049,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2075,7 +2075,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2100,7 +2100,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2124,7 +2124,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2146,7 +2146,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2175,7 +2175,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2204,7 +2204,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2220,7 +2220,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2256,7 +2256,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, sink, deep],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2281,7 +2281,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, sink, deep],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2309,7 +2309,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, a, b],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2341,7 +2341,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, impl_node, breakdown, plan],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2370,7 +2370,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, impl_node, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2389,7 +2389,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2426,7 +2426,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2458,7 +2458,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2493,7 +2493,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2518,7 +2518,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2559,7 +2559,7 @@ source-of-truth = "markdown-first"
             &rules,
             &slice,
             &full,
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2590,7 +2590,7 @@ source-of-truth = "markdown-first"
             &rules,
             &slice,
             &full,
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2628,7 +2628,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2666,7 +2666,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2701,7 +2701,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[a, b, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2743,7 +2743,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[a, b, breakdown],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2774,7 +2774,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[source, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2791,7 +2791,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[source, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2811,7 +2811,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[declarer, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2825,7 +2825,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[declarer, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2840,7 +2840,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[issue("x", &["satisfies:REQ-01"])],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2869,7 +2869,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[design, task],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2886,7 +2886,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[design, task],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2910,7 +2910,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[design.clone(), mid.clone(), task.clone()],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2922,7 +2922,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[design, mid, task],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2940,7 +2940,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[issue("task", &["type:task"])],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2986,7 +2986,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3004,7 +3004,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3029,7 +3029,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3052,7 +3052,7 @@ source-of-truth = "markdown-first"
         let mut findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3078,7 +3078,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3099,7 +3099,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3120,7 +3120,7 @@ source-of-truth = "markdown-first"
         let a = evaluate_graph(
             &rules,
             std::slice::from_ref(&i),
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3128,7 +3128,7 @@ source-of-truth = "markdown-first"
         let b = evaluate_graph(
             &rules,
             std::slice::from_ref(&i),
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3148,7 +3148,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3170,7 +3170,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3191,7 +3191,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3212,7 +3212,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3235,7 +3235,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3263,7 +3263,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[issue("task", &["type:task"])],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3307,7 +3307,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3328,7 +3328,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3351,7 +3351,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3373,7 +3373,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3396,7 +3396,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3431,7 +3431,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3462,7 +3462,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3488,7 +3488,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3542,7 +3542,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3570,7 +3570,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             std::slice::from_ref(&task),
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3617,7 +3617,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic.clone()],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3664,7 +3664,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3687,7 +3687,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3720,7 +3720,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3745,7 +3745,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3769,7 +3769,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3800,7 +3800,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, child],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3838,7 +3838,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic_a, epic_b],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3866,7 +3866,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic_a, epic_b],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3894,7 +3894,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic, task],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3920,7 +3920,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[epic_a.clone(), epic_b.clone()],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3986,7 +3986,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &issues,
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -4054,7 +4054,7 @@ source-of-truth = "markdown-first"
             evaluate_graph(
                 &[rule],
                 issues,
-                &HierarchyConfig::default(),
+                &HierarchyConfig::test_vocabulary(),
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
@@ -4253,7 +4253,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &[&rule],
             &[epic],
-            &HierarchyConfig::default(),
+            &HierarchyConfig::test_vocabulary(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),

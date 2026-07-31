@@ -39,11 +39,12 @@
 //! Container-ness comes from the configured [type hierarchy
 //! levels](crate::domain::type_taxonomy::HierarchyConfig), never from label namespaces
 //! (@/inv/domain-agnostic). A type is a **container** iff its level is strictly
-//! less than the deepest (leaf) configured level. With the default
+//! less than the deepest (leaf) configured level. Under a declared
 //! `milestone=1, epic=2, story=3, task=4`, the leaf level is `4`, so
 //! `milestone`, `epic`, and `story` are containers and `task` is a leaf. Nodes
 //! whose type is unknown to the config (or that carry no `type:` label) have no
-//! level and are treated as leaves.
+//! level and are treated as leaves, so a repository declaring no hierarchy
+//! resolves every node as a leaf with no container.
 //!
 //! # Resolution rules
 //!
@@ -119,7 +120,16 @@
 //! milestone.dependencies = vec![epic.id.clone()];
 //! epic.dependencies = vec![task.id.clone()];
 //!
-//! let config = HierarchyConfig::default();
+//! // Whatever `[type_hierarchy]` declares; here three levels.
+//! let config = HierarchyConfig::new(
+//!     std::collections::HashMap::from([
+//!         ("milestone".to_string(), 1),
+//!         ("epic".to_string(), 2),
+//!         ("task".to_string(), 3),
+//!     ]),
+//!     std::collections::HashMap::new(),
+//! )
+//! .unwrap();
 //! let nodes = [&milestone, &epic, &task];
 //! let resolution = resolve_hierarchy(&nodes, &config);
 //!
@@ -328,7 +338,12 @@ impl HierarchyResolution {
 /// e1.dependencies = vec![task.id.clone()];
 /// e2.dependencies = vec![task.id.clone()];
 ///
-/// let r = resolve_hierarchy(&[&e1, &e2, &task], &HierarchyConfig::default());
+/// let config = HierarchyConfig::new(
+///     std::collections::HashMap::from([("epic".to_string(), 1), ("task".to_string(), 2)]),
+///     std::collections::HashMap::new(),
+/// )
+/// .unwrap();
+/// let r = resolve_hierarchy(&[&e1, &e2, &task], &config);
 /// // Same level and hop count → smallest container id wins the tie.
 /// assert_eq!(r.parent(&task.id), Some("aaaa"));
 /// assert_eq!(r.children("aaaa"), [task.id.clone()]);
@@ -590,7 +605,12 @@ pub struct MembershipDivergence {
 /// use jit::graph::hierarchy::detect_membership_divergences;
 /// use jit::domain::type_taxonomy::HierarchyConfig;
 ///
-/// let config = HierarchyConfig::default();
+/// // `epic` sits above `task` and carries an `epic:*` membership namespace.
+/// let config = HierarchyConfig::new(
+///     std::collections::HashMap::from([("epic".to_string(), 1), ("task".to_string(), 2)]),
+///     std::collections::HashMap::from([("epic".to_string(), "epic".to_string())]),
+/// )
+/// .unwrap();
 ///
 /// // The epic "auth" contains `inside` via the DAG but not `outside`.
 /// let mut epic = Issue::draft("Auth".into(), String::new());
@@ -750,7 +770,7 @@ mod tests {
     }
 
     fn default_config() -> HierarchyConfig {
-        HierarchyConfig::default()
+        HierarchyConfig::test_vocabulary()
     }
 
     #[test]
@@ -1162,7 +1182,7 @@ mod proptests {
         /// equals the independently-computed longest path.
         #[test]
         fn prop_resolution_invariants(spec in arbitrary_dag()) {
-            let config = HierarchyConfig::default();
+            let config = HierarchyConfig::test_vocabulary();
             let nodes = build(&spec);
             let refs: Vec<&PropNode> = nodes.iter().collect();
             let resolution = resolve_hierarchy(&refs, &config);
@@ -1220,7 +1240,7 @@ mod proptests {
         /// property — resolution is defined on the transitive reduction.
         #[test]
         fn prop_resolution_ignores_redundant_edges(spec in arbitrary_dag(), mask in any::<u64>()) {
-            let config = HierarchyConfig::default();
+            let config = HierarchyConfig::test_vocabulary();
             let base = build(&spec);
             let base_refs: Vec<&PropNode> = base.iter().collect();
             let baseline = resolve_hierarchy(&base_refs, &config);
@@ -1271,7 +1291,7 @@ mod proptests {
         /// facts for every node.
         #[test]
         fn prop_resolution_is_order_invariant(spec in arbitrary_dag()) {
-            let config = HierarchyConfig::default();
+            let config = HierarchyConfig::test_vocabulary();
             let nodes = build(&spec);
             let refs: Vec<&PropNode> = nodes.iter().collect();
             let forward = resolve_hierarchy(&refs, &config);

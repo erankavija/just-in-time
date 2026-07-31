@@ -200,7 +200,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
     let findings = evaluate_graph(
         &rules,
         &[html_epic],
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ContentFormat::Markdown,
         chrono::Utc::now(),
         &std::collections::HashMap::new(),

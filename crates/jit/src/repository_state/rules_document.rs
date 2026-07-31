@@ -6,7 +6,8 @@
 //! generated rules. These primitives edit ONLY the generated spans and preserve
 //! every other byte: [`rewrite_default_assertions`] replaces assertion values in
 //! proven `origin = "default"` blocks, and [`splice_default_membership`] appends
-//! newly generated `namespace-unique-*` blocks and drops obsolete default ones.
+//! newly generated default blocks and drops the ones the registry no longer
+//! generates.
 //! Both are pure `&str -> String` transforms consumed directly by the mutation
 //! derive pipeline.
 
@@ -177,7 +178,7 @@ pub(super) fn rewrite_default_assertions(content: &str, expected: &str) -> Resul
     Ok(doc.to_string())
 }
 
-/// Apply a `namespace-unique-*` DEFAULT-rule membership delta to `content`:
+/// Apply a DEFAULT-rule membership delta to `content`:
 /// append each pre-rendered `[[rules]]` block in `to_add` at the END, and remove
 /// the `origin = "default"` block for each name in `to_drop`.
 ///

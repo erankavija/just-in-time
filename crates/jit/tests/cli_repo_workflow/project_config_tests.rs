@@ -21,6 +21,20 @@ fn jit_init(dir: &std::path::Path) -> std::process::Output {
         .expect("failed to run jit init")
 }
 
+/// Replace `[project] name` in a scaffolded config, leaving every other
+/// declaration in place so the rules and schemas derived from them stay current.
+fn rewrite_project_name(config_path: &std::path::Path, name: &str) {
+    let content = fs::read_to_string(config_path).unwrap();
+    let parsed: toml::Value = toml::from_str(&content).unwrap();
+    let current = parsed["project"]["name"].as_str().unwrap();
+    let rewritten = content.replacen(
+        &format!("name = \"{current}\""),
+        &format!("name = \"{name}\""),
+        1,
+    );
+    fs::write(config_path, rewritten).unwrap();
+}
+
 // ---------------------------------------------------------------------------
 // REQ-01: `jit init` seeds `[project] name` from the directory basename.
 // ---------------------------------------------------------------------------
@@ -98,7 +112,7 @@ fn test_init_second_run_preserves_existing_project_name() {
     assert!(out.status.success());
 
     let config_path = temp.path().join(".jit/config.toml");
-    fs::write(&config_path, "[project]\nname = \"existing-name\"\n").unwrap();
+    rewrite_project_name(&config_path, "existing-name");
 
     let out = jit_init(temp.path());
     assert!(out.status.success(), "second jit init failed");

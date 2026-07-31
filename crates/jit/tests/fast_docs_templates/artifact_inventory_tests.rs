@@ -71,7 +71,7 @@ fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() 
     let issues = vec![sequenced_elsewhere, local, other, selected];
     let inventory = inventory_explicit_roots(
         &issues,
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Container("z-selected"),
         &FakePinnedResolver::default(),
     )
@@ -80,7 +80,7 @@ fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() 
     reversed.reverse();
     let reordered = inventory_explicit_roots(
         &reversed,
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Container("z-selected"),
         &FakePinnedResolver::default(),
     )
@@ -114,7 +114,7 @@ fn test_container_inventory_includes_opaque_roots_without_adapters() {
 
     let inventory = inventory_explicit_roots(
         &[epic, task],
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Container("epic"),
         &FakePinnedResolver::default(),
     )
@@ -138,7 +138,7 @@ fn test_container_inventory_includes_opaque_roots_without_adapters() {
 fn test_document_inventory_normalizes_zero_owner_opaque_root() {
     let inventory = inventory_explicit_roots(
         &[],
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Document("./exports/../figures//chart.svg"),
         &FakePinnedResolver::default(),
     )
@@ -174,7 +174,7 @@ fn test_mixed_pinned_and_unpinned_owners_group_by_canonical_version() {
 
     let inventory = inventory_explicit_roots(
         &[z_owner, a_owner],
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Document("docs/report.csv"),
         &resolver,
     )
@@ -213,7 +213,7 @@ fn test_pinned_resolution_or_read_failure_blocks_without_working_tree_owner_fall
 
     let inventory = inventory_explicit_roots(
         &[issue],
-        &HierarchyConfig::default(),
+        &HierarchyConfig::test_vocabulary(),
         ExplicitRootTarget::Document("docs/history.md"),
         &resolver,
     )
@@ -246,7 +246,7 @@ fn test_pinned_root_requests_are_target_relevant_and_deduplicated() {
     outside.documents = vec![document("docs/outside.md", Some("other"))];
     let issues = [outside, child, epic];
     let requests = |target| {
-        pinned_root_requests(&issues, &HierarchyConfig::default(), target)
+        pinned_root_requests(&issues, &HierarchyConfig::test_vocabulary(), target)
             .unwrap()
             .into_iter()
             .collect::<Vec<_>>()

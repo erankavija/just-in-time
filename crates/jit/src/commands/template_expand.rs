@@ -159,7 +159,7 @@ pub struct TemplateDelta {
 ///     &bindings,
 ///     &snapshots,
 ///     &DocumentationConfig::default(),
-///     &HierarchyConfig::default(),
+///     &HierarchyConfig::empty(),
 /// )
 /// .unwrap();
 /// assert_eq!(delta.creates.len(), 1);

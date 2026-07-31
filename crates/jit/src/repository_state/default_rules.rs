@@ -7,7 +7,7 @@
 //! IN MEMORY when no `rules.toml` exists yet (no disk write on the read path),
 //! and that [`reconcile_default_rules_with_config`] reconciles a scaffolded
 //! file's default rules against the current registry at load — so a default
-//! rule's assertion and the `namespace-unique-*` membership follow `config.toml`,
+//! rule's assertion and the family's membership follow `config.toml`,
 //! never a stale `schemas/default-*.json` projection.
 //!
 //! After the backward-compat hard removal (issue d4188154), the default set no
@@ -28,18 +28,22 @@
 //! 2. `namespace-registry` — `severity = error`, `enforce = false`, when
 //!    the namespace registry is NON-EMPTY. An unknown namespace fails
 //!    `jit validate` but never blocks a write.
-//! 3. `type-hierarchy-known` — `severity = error`, `enforce = false`,
-//!    ALWAYS. A `type:<value>` outside the configured hierarchy fails
-//!    `jit validate` but never blocks a write.
+//! 3. `type-hierarchy-known` — `severity = error`, `enforce = false`, when the
+//!    declared type hierarchy is NON-EMPTY. A `type:<value>` outside the
+//!    configured hierarchy fails `jit validate` but never blocks a write.
 //! 4. `namespace-unique-<ns>` — `severity = error`, `enforce = true`, per
 //!    UNIQUE namespace (sorted). At most one label per unique namespace; blocks
 //!    the write and fails `jit validate`.
 //! 5. `orphan-leaf` + `strategic-consistency` — `severity = warn`,
-//!    `enforce = false`, UNCONDITIONAL. Built-in [`RuleScope::Graph`] rules whose
-//!    evaluation REUSES the existing
+//!    `enforce = false`, when the declared type hierarchy is NON-EMPTY. Built-in
+//!    [`RuleScope::Graph`] rules whose evaluation REUSES the existing
 //!    [`type_taxonomy::validate_orphans`](crate::domain::type_taxonomy::validate_orphans)
 //!    / [`validate_strategic_labels`](crate::domain::type_taxonomy::validate_strategic_labels)
 //!    domain functions.
+//!
+//! Every member is therefore derived from a declaration: a repository whose
+//! `config.toml` declares neither `[namespaces]` nor `[type_hierarchy]` receives
+//! the label grammar alone.
 //!
 //! DROPPED (no longer config-derivable): `require-type-label`,
 //! `label-format-custom`, and the per-namespace `values`/`pattern`/`required`
@@ -149,19 +153,22 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // (3) Unknown type label: a `type:<value>` outside the configured hierarchy.
     // Modeled as an allowed-VALUES rule over the `type` namespace, the allowed set
     // being the hierarchy `types` keys. `severity = error` / `enforce = false`.
-    // The hierarchy is always present (a repo with no `[type_hierarchy]` falls
-    // back to the default 4-level set via `get_type_hierarchy`), so this rule is
-    // always emitted.
-    rules.push(json_schema_rule(
-        "type-hierarchy-known",
-        "Every `type:<value>` label must name a type declared in the \
-         configured type hierarchy. An unknown type fails validation but never \
-         blocks a write.",
-        Selector::default(),
-        Severity::Error,
-        false,
-        type_hierarchy_known_schema(namespaces),
-    ));
+    // Emitted only for a NON-EMPTY declared hierarchy: with none declared the
+    // enum would be empty, and a repository that declared no type names receives
+    // no rule enumerating them.
+    let declares_hierarchy = !namespaces.declared_type_hierarchy().is_empty();
+    if declares_hierarchy {
+        rules.push(json_schema_rule(
+            "type-hierarchy-known",
+            "Every `type:<value>` label must name a type declared in the \
+             configured type hierarchy. An unknown type fails validation but never \
+             blocks a write.",
+            Selector::default(),
+            Severity::Error,
+            false,
+            type_hierarchy_known_schema(namespaces),
+        ));
+    }
 
     // (4) Per-namespace UNIQUENESS: at most one label per unique namespace.
     // `severity = error` / `enforce = true` (blocks the write and fails
@@ -193,31 +200,35 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
     // Built-in GRAPH rules whose evaluation REUSES the existing
     // `type_taxonomy::validate_orphans` / `validate_strategic_labels` domain
     // functions (see `validation::graph`). Each is `severity = warn` /
-    // `enforce = false` and UNCONDITIONAL (the former `warn_*` toggles defaulted
-    // true, so unconditional preserves behavior). The repo `HierarchyConfig` is
-    // injected by the graph evaluator at evaluation time.
-    rules.push(graph_rule(
-        "orphan-leaf",
-        "Warn when a leaf-level-typed issue (a type at the deepest hierarchy \
-         level, e.g. task) carries no parent-membership label (e.g. `epic:*`), \
-         leaving it unattached to any strategic container. Advisory: never \
-         blocks a write.",
-        Severity::Warn,
-        Assertion::TypeHierarchy {
-            kind: TypeHierarchyKind::OrphanLeaf,
-        },
-    ));
-    rules.push(graph_rule(
-        "strategic-consistency",
-        "Warn when a strategic-typed issue (a type with a membership namespace, \
-         e.g. epic/milestone) lacks its own identifying membership label, such \
-         as a `type:epic` issue that has no `epic:*` label. Advisory: never \
-         blocks a write.",
-        Severity::Warn,
-        Assertion::TypeHierarchy {
-            kind: TypeHierarchyKind::StrategicConsistency,
-        },
-    ));
+    // `enforce = false`, and both are emitted for a NON-EMPTY declared hierarchy:
+    // each reads the levels and membership associations `[type_hierarchy]`
+    // declares, so a repository declaring none has nothing for them to evaluate.
+    // The repo `HierarchyConfig` is injected by the graph evaluator at evaluation
+    // time.
+    if declares_hierarchy {
+        rules.push(graph_rule(
+            "orphan-leaf",
+            "Warn when a leaf-level-typed issue (a type at the deepest hierarchy \
+             level, e.g. task) carries no parent-membership label (e.g. `epic:*`), \
+             leaving it unattached to any strategic container. Advisory: never \
+             blocks a write.",
+            Severity::Warn,
+            Assertion::TypeHierarchy {
+                kind: TypeHierarchyKind::OrphanLeaf,
+            },
+        ));
+        rules.push(graph_rule(
+            "strategic-consistency",
+            "Warn when a strategic-typed issue (a type with a membership namespace, \
+             e.g. epic/milestone) lacks its own identifying membership label, such \
+             as a `type:epic` issue that has no `epic:*` label. Advisory: never \
+             blocks a write.",
+            Severity::Warn,
+            Assertion::TypeHierarchy {
+                kind: TypeHierarchyKind::StrategicConsistency,
+            },
+        ));
+    }
 
     RuleSet { rules }
 }
@@ -333,34 +344,33 @@ pub fn reconcile_default_rules_with_config(
     RuleSet { rules }
 }
 
-/// Rule-name prefix marking the per-namespace uniqueness family
-/// (`namespace-unique-<ns>`) — the only default-rule family whose FILE
-/// MEMBERSHIP (not just its assertion) is write-through synced to
-/// `rules.toml` by [`default_rule_membership_diff`], because it is the only
-/// family whose existence (not merely its schema content) varies with the
-/// registry.
-const NAMESPACE_UNIQUE_PREFIX: &str = "namespace-unique-";
-
-/// The `namespace-unique-*` file-membership delta between the rules currently
+/// The default-family file-membership delta between the rules currently
 /// authored on disk (`loaded`, i.e. `.jit/rules.toml` as parsed by
 /// the production rules loader — NOT the
 /// in-memory-reconciled set [`reconcile_default_rules_with_config`] produces)
 /// and the CURRENT `namespaces` registry.
 ///
-/// Companion to [`reconcile_default_rules_with_config`], which folds this same
+/// Every default rule but the label grammar exists only for a declaration the
+/// registry carries, so file membership follows the whole family rather than one
+/// prefix of it: withdrawing `[namespaces]` drops the registry rule and its
+/// uniqueness rows, and withdrawing `[type_hierarchy]` drops the type
+/// enumeration and the two hierarchy graph warnings.
+///
+/// Companion to [`reconcile_default_rules_with_config`], which folds the same
 /// family into the in-memory effective ruleset at every load with no disk
 /// write — the validation authority stays there (out of scope for this diff,
 /// jit:d74a9ed1). This diff instead reports what a caller must WRITE to
 /// `rules.toml` so the registry-first `rule` item kind — which resolves
 /// `@/rule/<name>` straight from the file, not the reconciled ruleset — never
-/// dangles behind a registry edit the in-memory path already honors.
+/// dangles behind a registry edit the in-memory path already honors, and so a
+/// row keeps no reference to a schema projection the same edit withdrew.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DefaultRuleMembershipDiff {
-    /// `origin = "default"` rules, in [`default_ruleset`]'s emission order, for
-    /// a namespace the registry newly declares unique — absent from `loaded`.
+    /// `origin = "default"` rules, in [`default_ruleset`]'s emission order, that
+    /// the current registry generates and `loaded` lacks.
     pub to_add: Vec<Rule>,
-    /// Names of `loaded`'s `origin = "default"` `namespace-unique-<ns>` rows
-    /// whose namespace is no longer unique, or no longer declared at all.
+    /// Names of `loaded`'s `origin = "default"` rows the current registry no
+    /// longer generates, because the declaration each was derived from is gone.
     pub to_drop: Vec<String>,
 }
 
@@ -375,23 +385,21 @@ impl DefaultRuleMembershipDiff {
     }
 }
 
-/// Compute the `namespace-unique-*` [`DefaultRuleMembershipDiff`] between
-/// `loaded` (the rules as currently authored in `rules.toml`) and `namespaces`
-/// (the current registry).
+/// Compute the [`DefaultRuleMembershipDiff`] between `loaded` (the rules as
+/// currently authored in `rules.toml`) and `namespaces` (the current registry).
 ///
 /// Mirrors [`reconcile_default_rules_with_config`]'s opt-out and matching
-/// rules exactly, restricted to this one family:
+/// rules exactly:
 ///
 /// - `loaded` carrying NO `origin = "default"` rule at all has deliberately
 ///   opted out of the defaults; the diff is empty (nothing to add or drop).
-/// - Otherwise, a `namespace-unique-<ns>` rule [`default_ruleset`] would emit
-///   for `namespaces` that has no `origin = "default"` counterpart already in
-///   `loaded` is in `to_add`.
-/// - An `origin = "default"` `namespace-unique-<ns>` row in `loaded` that
-///   [`default_ruleset`] no longer emits for `namespaces` is in `to_drop`.
+/// - Otherwise, a rule [`default_ruleset`] would emit for `namespaces` that has
+///   no counterpart already in `loaded` is in `to_add`.
+/// - An `origin = "default"` row in `loaded` that [`default_ruleset`] no longer
+///   emits for `namespaces` is in `to_drop`.
 ///
-/// A rule sharing a `namespace-unique-<ns>` NAME but a different `origin`
-/// (a custom rule shadowing the default name) is never counted as "existing"
+/// A rule sharing a derived NAME but a different `origin` (a custom rule
+/// shadowing the default name) is never counted as "existing"
 /// here, never targeted for drop, and SUPPRESSES the append of the derived
 /// default row — the shadowing rule keeps the name, so the sync never writes a
 /// duplicate-name file that the production rules loader would reject. This matches how
@@ -480,9 +488,7 @@ pub(crate) fn default_rule_membership_diff_from_identities(
 
     let existing: HashSet<&str> = existing_rules
         .iter()
-        .filter(|(name, origin)| {
-            origin.as_deref() == Some(DEFAULT_ORIGIN) && name.starts_with(NAMESPACE_UNIQUE_PREFIX)
-        })
+        .filter(|(_, origin)| origin.as_deref() == Some(DEFAULT_ORIGIN))
         .map(|(name, _)| name.as_str())
         .collect();
     // EVERY existing rule name, regardless of origin: a custom rule shadowing a
@@ -495,15 +501,11 @@ pub(crate) fn default_rule_membership_diff_from_identities(
         .collect();
 
     let derived = default_ruleset(namespaces);
-    let desired: Vec<&Rule> = derived
+    let desired_names: HashSet<&str> = derived.rules.iter().map(|r| r.name.as_str()).collect();
+
+    let mut to_add: Vec<Rule> = derived
         .rules
         .iter()
-        .filter(|r| r.name.starts_with(NAMESPACE_UNIQUE_PREFIX))
-        .collect();
-    let desired_names: HashSet<&str> = desired.iter().map(|r| r.name.as_str()).collect();
-
-    let mut to_add: Vec<Rule> = desired
-        .into_iter()
         .filter(|r| !taken.contains(r.name.as_str()))
         .cloned()
         .collect();
@@ -539,35 +541,29 @@ pub const TYPE_HIERARCHY_SCHEMA_FILE: &str = "default-type-hierarchy-known.json"
 /// from the schema validation actually uses (one source, not two). Pure: no I/O,
 /// deterministic.
 pub fn type_hierarchy_known_schema(namespaces: &LabelNamespaces) -> serde_json::Value {
-    let mut hierarchy_types: Vec<String> = namespaces.get_type_hierarchy().into_keys().collect();
+    let mut hierarchy_types: Vec<String> =
+        namespaces.declared_type_hierarchy().into_keys().collect();
     hierarchy_types.sort(); // deterministic schema enum order
     namespace_values_schema(crate::labels::TYPE_NAMESPACE, &hierarchy_types)
 }
 
 /// Build the repo's [`HierarchyConfig`] from its label-namespace registry.
 ///
-/// Mirrors the legacy `check_warnings` path EXACTLY: that path built the config
-/// from `config.toml`'s `[type_hierarchy]` when present (taking its `types` and
-/// `label_associations.unwrap_or_default()`), and otherwise fell back to the
-/// FULL [`HierarchyConfig::default`] (which includes the default membership
-/// associations). The discriminator is whether an explicit `type_hierarchy` was
-/// configured — carried through to [`LabelNamespaces::type_hierarchy`]. On the
-/// impossible case of a malformed hierarchy (empty type name / level 0), it falls
-/// back to the default rather than panicking, keeping this total.
+/// The config carries exactly the `types` and `label_associations` that
+/// `config.toml`'s `[type_hierarchy]` declared, both empty for a repository
+/// declaring none. On the impossible case of a malformed hierarchy (empty type
+/// name / level 0) it yields [`HierarchyConfig::empty`] rather than panicking,
+/// keeping this total.
 ///
-/// Exposed `pub(crate)` so the graph-rule evaluation call site
+/// Exposed so the graph-rule evaluation call site
 /// (`CommandExecutor::evaluate_graph_rules`) can build the same repo
 /// [`HierarchyConfig`] to inject into `type-hierarchy` rules (D1).
 pub fn hierarchy_config(namespaces: &LabelNamespaces) -> HierarchyConfig {
-    match &namespaces.type_hierarchy {
-        // Explicit hierarchy: use its types + associations (legacy `Some` branch).
-        Some(types) => {
-            let label_associations = namespaces.label_associations.clone().unwrap_or_default();
-            HierarchyConfig::new(types.clone(), label_associations).unwrap_or_default()
-        }
-        // No explicit hierarchy: the legacy default (with default associations).
-        None => HierarchyConfig::default(),
-    }
+    HierarchyConfig::new(
+        namespaces.declared_type_hierarchy(),
+        namespaces.label_associations.clone().unwrap_or_default(),
+    )
+    .unwrap_or_else(|_| HierarchyConfig::empty())
 }
 
 /// Construct a local-scope rule with a shorthand or raw assertion already built.
@@ -752,21 +748,13 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_registry_emits_exactly_the_unconditional_rules() {
-        // With NO namespace registry, the fixed default emits exactly:
-        // label-format, type-hierarchy-known, orphan-leaf, strategic-consistency.
-        // No registry rule (registry empty), no uniqueness rules (no namespaces).
+    fn test_declaring_nothing_emits_the_label_grammar_alone() {
+        // A registry declaring no namespace and no type hierarchy leaves only the
+        // rule that needs no declaration: every other default member is keyed on
+        // one of the two tables.
         let rules = default_ruleset(&registry(vec![]));
         let names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
-        assert_eq!(
-            names,
-            vec![
-                "label-format",
-                "type-hierarchy-known",
-                "orphan-leaf",
-                "strategic-consistency",
-            ]
-        );
+        assert_eq!(names, vec!["label-format"]);
         // Every emitted rule carries the FIXED default's origin marker.
         assert!(rules
             .rules
@@ -775,14 +763,35 @@ mod tests {
     }
 
     #[test]
+    fn test_declaring_namespaces_without_a_hierarchy_emits_no_hierarchy_rule() {
+        // The namespace family is keyed on the registry and the hierarchy family
+        // on `[type_hierarchy]`; declaring one supplies neither the other's
+        // assertion nor its membership.
+        let rules = default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
+        let names: Vec<&str> = rules.rules.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec![
+                "label-format",
+                "namespace-registry",
+                "namespace-unique-type"
+            ]
+        );
+    }
+
+    #[test]
     fn test_fixed_default_contract_mf1() {
         // The EXACT MF1 contract: name -> (severity, enforce), in emission order,
-        // for a registry with two unique + one non-unique namespace.
-        let rules = default_ruleset(&registry(vec![
-            ("type", LabelNamespace::new("Type", true)),
-            ("team", LabelNamespace::new("Team", true)),
-            ("component", LabelNamespace::new("Component", false)),
-        ]));
+        // for a registry with two unique + one non-unique namespace and a
+        // declared type hierarchy.
+        let rules = default_ruleset(
+            &registry(vec![
+                ("type", LabelNamespace::new("Type", true)),
+                ("team", LabelNamespace::new("Team", true)),
+                ("component", LabelNamespace::new("Component", false)),
+            ])
+            .declaring_test_hierarchy(),
+        );
         let got: Vec<(&str, Severity, bool)> = rules
             .rules
             .iter()
@@ -929,9 +938,11 @@ mod tests {
 
     #[test]
     fn test_type_hierarchy_known_errors_but_does_not_block() {
-        // A type value outside the (default) hierarchy errors in validate but does
+        // A type value outside the declared hierarchy errors in validate but does
         // not block a write.
-        let rules = default_ruleset(&registry(vec![("type", LabelNamespace::new("Type", true))]));
+        let rules = default_ruleset(
+            &registry(vec![("type", LabelNamespace::new("Type", true))]).declaring_test_hierarchy(),
+        );
         let bad = evaluate_local(
             &issue_with(&["type:nonsense"]),
             &rules,
@@ -1334,7 +1345,10 @@ mod tests {
             .push(custom_json_rule("namespace-unique-team"));
         let diff = default_rule_membership_diff(&loaded_with_default, &reg);
         assert!(
-            diff.to_add.is_empty(),
+            !diff
+                .to_add
+                .iter()
+                .any(|r| r.name == "namespace-unique-team"),
             "shadowed name must not be re-added: {:?}",
             diff.to_add.iter().map(|r| &r.name).collect::<Vec<_>>()
         );

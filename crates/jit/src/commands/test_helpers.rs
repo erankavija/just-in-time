@@ -12,6 +12,38 @@ use std::sync::{
     Arc, Mutex,
 };
 
+/// A `.jit/config.toml` fragment declaring the vocabulary the command suites
+/// assert on: the type hierarchy of
+/// [`HierarchyConfig::test_vocabulary`](crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary),
+/// its membership associations, and a unique `type` namespace.
+///
+/// Rendered from that one declaration, so the vocabulary a fixture configures
+/// and the vocabulary its assertions read cannot drift. Append it to a fragment
+/// that opens no table of its own after it.
+pub fn declared_test_taxonomy() -> String {
+    let vocabulary = crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary();
+    let render = |mut pairs: Vec<String>| {
+        pairs.sort();
+        pairs.join(", ")
+    };
+    format!(
+        "[type_hierarchy]\ntypes = {{ {} }}\nlabel_associations = {{ {} }}\n\n\
+         [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
+        render(
+            vocabulary
+                .types()
+                .map(|(name, level)| format!("{name} = {level}"))
+                .collect()
+        ),
+        render(
+            vocabulary
+                .membership_namespaces()
+                .map(|(type_name, namespace)| format!("{type_name} = \"{namespace}\""))
+                .collect()
+        ),
+    )
+}
+
 /// Seed one exact repository-file precondition in the aggregate memory image.
 pub(crate) fn seed_repo_file(storage: &InMemoryStorage, path: &str, content: &str) {
     let layout = storage.repository_layout();

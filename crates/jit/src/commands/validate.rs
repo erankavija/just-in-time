@@ -809,12 +809,10 @@ fn captured_divergences(
 
     let issues = captured_active_issues(image)?;
     let namespaces = crate::config_manager::namespaces_from_config(config);
-    let hierarchy = match namespaces.type_hierarchy {
-        Some(types) => {
-            HierarchyConfig::new(types, namespaces.label_associations.unwrap_or_default())?
-        }
-        None => HierarchyConfig::default(),
-    };
+    let hierarchy = HierarchyConfig::new(
+        namespaces.declared_type_hierarchy(),
+        namespaces.label_associations.unwrap_or_default(),
+    )?;
     let issue_refs = issues.iter().collect::<Vec<_>>();
     let divergences =
         crate::graph::hierarchy::detect_membership_divergences(&issue_refs, &hierarchy);
@@ -3249,12 +3247,15 @@ mod tests {
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
-        storage.add_data_file(
-            "config.toml",
-            "[worktree]\nenforce_leases = \"off\"\n\
+        let config = "[worktree]\nenforce_leases = \"off\"\n\
              [type_hierarchy.types]\ntask = 4\n\
-             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        );
+             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n";
+        storage.add_data_file("config.toml", config);
+        // The type-repair path reads the declared hierarchy through a
+        // `ConfigManager` rooted at the store, so the fixture declares it there
+        // as well as in the memory image.
+        std::fs::create_dir_all(storage.root()).unwrap();
+        std::fs::write(storage.root().join("config.toml"), config).unwrap();
         let mut executor = memory_executor(storage.clone());
         let id = executor
             .create_issue(

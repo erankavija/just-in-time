@@ -1047,6 +1047,14 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let storage = InMemoryStorage::new();
+        // `type` is unique only because this repository declares it so.
+        storage.add_data_file(
+            "config.toml",
+            &format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                crate::commands::test_helpers::declared_test_taxonomy()
+            ),
+        );
 
         // Issue already has type:task label
         crate::commands::test_helpers::seed_issue(

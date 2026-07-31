@@ -42,7 +42,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
 fn executor(strictness: Option<&str>, rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
     let defaults = jit::repository_state::serialize_ruleset(
-        &jit::repository_state::default_ruleset(&jit::domain::LabelNamespaces::default()),
+        &jit::repository_state::default_ruleset(&jit::domain::LabelNamespaces::empty(2)),
     );
     let validation = match strictness {
         Some(level) => format!("[validation]\nstrictness = \"{level}\"\n"),

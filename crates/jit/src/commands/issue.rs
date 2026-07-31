@@ -840,12 +840,14 @@ mod tests {
     fn setup() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
 
-        // Create config with enforcement off for test backward compatibility
-        let config_toml = r#"
-[worktree]
-enforce_leases = "off"
-"#;
-        storage.add_data_file("config.toml", config_toml);
+        // Enforcement off, plus the type vocabulary these tests assert on: an
+        // explicit `--type` is accepted or rejected against what this
+        // configuration declares.
+        let config_toml = format!(
+            "[worktree]\nenforce_leases = \"off\"\n\n{}",
+            crate::commands::test_helpers::declared_test_taxonomy()
+        );
+        storage.add_data_file("config.toml", &config_toml);
 
         let mut registry = storage.load_gate_registry().unwrap();
         for key in ["tests", "code-review"] {

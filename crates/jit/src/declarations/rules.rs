@@ -763,7 +763,7 @@ impl Assertion {
 
 /// The provenance marker the FIXED built-in default rule set carries in
 /// [`Rule::origin`]. Default-origin rules are a config projection: their
-/// assertion (and `namespace-unique-*` membership) is reconciled from the
+/// assertion (and the family's membership) is reconciled from the
 /// declared registry at load, so their on-disk schema files are never the
 /// validation authority.
 pub(crate) const DEFAULT_ORIGIN: &str = "default";

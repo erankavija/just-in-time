@@ -129,8 +129,8 @@ default_type = "task"
 # NOTE: label/type validation (format, namespace registry, per-namespace
 # uniqueness, orphan-leaf / strategic-consistency warnings) is defined as
 # `origin = "default"` rules in `.jit/rules.toml`, which `jit init` scaffolds.
-# Those default rules derive their assertion — and the `namespace-unique-*`
-# membership — from the `[namespaces]` / `[type_hierarchy]` tables in THIS file
+# Those default rules derive their assertion — and their membership — from the
+# `[namespaces]` / `[type_hierarchy]` tables in THIS file
 # at load, so edit the registry here to change what they check. Author any other
 # constraint (allowed values, patterns, required namespaces) as a custom rule in
 # `.jit/rules.toml`.
@@ -145,7 +145,8 @@ default_type = "task"
 #
 # Allowed-value enums, value patterns, and required-ness are NOT configured here:
 # author them as custom rules in `.jit/rules.toml`. The built-in registry and
-# `namespace-unique-*` rules derive from this table at load.
+# `namespace-unique-*` rules derive from this table at load, and are emitted
+# only while it declares something.
 
 [namespaces.type]
 description = "Issue type (hierarchical). At most one per issue."

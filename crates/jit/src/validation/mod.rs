@@ -7,7 +7,7 @@
 //! [`effective_rules`](crate::commands::CommandExecutor) builds the same defaults
 //! IN MEMORY when the file is absent (no write on the read path). A scaffolded
 //! file's `origin = "default"` rules are reconciled against the `config.toml`
-//! registry at load, so their assertion and `namespace-unique-*` membership never
+//! registry at load, so their assertion and the family's membership never
 //! lag a hand edit of the registry.
 //!
 //! Rule declarations and parsing live in crate-root [`crate::declarations`]; the
