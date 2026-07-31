@@ -987,6 +987,11 @@ impl ErrorCode {
 /// Repo-relative path of the committed adopter reference for [`ErrorCode`].
 pub const ERROR_CODE_REFERENCE_PATH: &str = "docs/reference/error-codes.md";
 
+/// The command that renders [`ERROR_CODE_REFERENCE_PATH`] from [`ErrorCode`],
+/// named in the conformance test's message so a stale reference carries its own
+/// repair.
+pub const ERROR_CODE_REFERENCE_GENERATOR: &str = "./scripts/generate-error-code-reference.sh";
+
 /// Render the complete machine-readable error-code vocabulary as adopter
 /// documentation.
 ///
@@ -3572,23 +3577,8 @@ mod tests {
             committed,
             render_error_code_reference(),
             "{ERROR_CODE_REFERENCE_PATH} is stale — regenerate it from `jit::output::ErrorCode` \
-             (run: cargo test -p jit output::tests::test_regenerate_error_code_reference \
-             -- --ignored)"
+             (run: {ERROR_CODE_REFERENCE_GENERATOR})"
         );
-    }
-
-    /// Regenerate the committed error-code reference from [`ErrorCode`].
-    ///
-    /// Run explicitly after changing the vocabulary:
-    /// `cargo test -p jit output::tests::test_regenerate_error_code_reference -- --ignored`.
-    #[test]
-    #[ignore = "writes the committed error-code reference; run explicitly to regenerate"]
-    fn test_regenerate_error_code_reference() {
-        let path = error_code_reference_path();
-        let tmp = path.with_extension("md.tmp");
-        std::fs::write(&tmp, render_error_code_reference())
-            .expect("should write the error-code reference temp file");
-        std::fs::rename(&tmp, &path).expect("should atomically replace the error-code reference");
     }
 
     fn emitted_text_error_codes() -> BTreeSet<&'static str> {

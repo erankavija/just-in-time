@@ -31,19 +31,8 @@ set -euo pipefail
 # Exit codes:
 #   0 — the region holds the packaged declarations
 #   1 — the render or the publication failed
-#   2 — an environment or usage error
+#   2 — a usage or environment error
 
-me=$(basename "$0")
-die() {
-  echo "$me: $*" >&2
-  exit 2
-}
-
-[ "$#" -eq 0 ] || die "takes no arguments (got: $*)"
-command -v cargo >/dev/null 2>&1 || die "'cargo' not found on PATH"
-
-here=$(cd "$(dirname "$0")" && pwd)
-root=$(cd "$here/.." && pwd)
-
-exec cargo run --quiet --manifest-path "$root/Cargo.toml" \
-  --package jit --example render-template-region
+. "$(cd "$(dirname "$0")" && pwd)/regenerate-lib.sh"
+regenerate_require_no_arguments "$@"
+regenerate_artifact template-region

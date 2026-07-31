@@ -43,6 +43,10 @@ use std::path::Path;
 /// Repo-relative path of the committed reference this module projects.
 pub const REFERENCE_PATH: &str = "docs/reference/storage-records.md";
 
+/// The command that renders [`REFERENCE_PATH`] from these definitions, named in
+/// the conformance test's message so a stale reference carries its own repair.
+pub const REFERENCE_GENERATOR: &str = "./scripts/generate-storage-records-reference.sh";
+
 /// The page states that a short id is always long enough to hand back as an id
 /// prefix. That holds only while the short id is at least as wide as the
 /// resolvable minimum, so the claim is checked at compile time against the two
@@ -774,26 +778,7 @@ mod tests {
             committed,
             render_reference_markdown().expect("the reference renders"),
             "{REFERENCE_PATH} is stale — regenerate it from `crate::storage::reference` \
-             (run: cargo test -p jit storage::reference -- --ignored regenerate)"
+             (run: {REFERENCE_GENERATOR})"
         );
-    }
-
-    /// Regenerate the committed reference. Ignored by default; run explicitly
-    /// after changing the record layout:
-    ///   cargo test -p jit storage::reference -- --ignored regenerate
-    ///
-    /// Writes via the temp-file + atomic-rename pattern (`@/inv/atomic-writes`).
-    #[test]
-    #[ignore = "writes the committed reference; run explicitly to regenerate"]
-    fn test_regenerate_reference_writes_committed_doc() {
-        let path = reference_path();
-        let tmp = path.with_extension("md.tmp");
-        std::fs::write(
-            &tmp,
-            render_reference_markdown().expect("the reference renders"),
-        )
-        .expect("should write the storage-records temp file");
-        std::fs::rename(&tmp, &path)
-            .expect("should atomically replace the storage-records reference");
     }
 }

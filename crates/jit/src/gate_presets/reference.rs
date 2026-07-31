@@ -22,6 +22,11 @@ use anyhow::Result;
 /// presets.
 pub const REFERENCE_PATH: &str = "docs/reference/gate-presets.md";
 
+/// The command that renders [`REFERENCE_PATH`] from the built-in presets, named
+/// in the conformance test's message so a stale reference carries its own
+/// repair.
+pub const REFERENCE_GENERATOR: &str = "./scripts/generate-gate-presets-reference.sh";
+
 /// Canonical `.jit/gates.toml` syntax for every native checker type.
 const PORTABLE_CHECKER_REGISTRY_EXAMPLES: &str = r#"[[gates]]
 version = 1
@@ -332,7 +337,7 @@ mod tests {
             committed,
             render_reference_markdown().unwrap(),
             "{REFERENCE_PATH} is stale — regenerate it from the built-in presets \
-             (run: cargo test -p jit gate_presets::reference -- --ignored regenerate)"
+             (run: {REFERENCE_GENERATOR})"
         );
     }
 
@@ -365,21 +370,6 @@ mod tests {
             registry.gates["external-review"].checker.as_ref(),
             Some(GateChecker::ReviewPlaceholder)
         ));
-    }
-
-    /// Regenerate the committed reference from the built-in presets. Ignored by
-    /// default; run explicitly after changing a preset:
-    ///   cargo test -p jit gate_presets::reference -- --ignored regenerate
-    ///
-    /// Writes via the temp-file + atomic-rename pattern (`@/inv/atomic-writes`).
-    #[test]
-    #[ignore = "writes the committed reference; run explicitly to regenerate"]
-    fn test_regenerate_reference_writes_committed_doc() {
-        let path = reference_path();
-        let tmp = path.with_extension("md.tmp");
-        std::fs::write(&tmp, render_reference_markdown().unwrap())
-            .expect("should write the gate-presets temp file");
-        std::fs::rename(&tmp, &path).expect("should atomically replace the gate-presets reference");
     }
 
     /// The projection covers every shipped preset, and every gate of each one,

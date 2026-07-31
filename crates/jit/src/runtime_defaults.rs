@@ -37,6 +37,10 @@ pub const CLAIM_TTL_SECS: u64 = 600;
 /// Repo-relative path of the committed reference that projects these defaults.
 pub const REFERENCE_PATH: &str = "docs/reference/runtime-defaults.md";
 
+/// The command that renders [`REFERENCE_PATH`] from these constants, named in
+/// the conformance test's message so a stale reference carries its own repair.
+pub const REFERENCE_GENERATOR: &str = "./scripts/generate-runtime-defaults-reference.sh";
+
 /// Render the runtime coordination defaults as the committed markdown reference.
 ///
 /// The returned string is the full contents of
@@ -114,24 +118,8 @@ mod tests {
             committed,
             render_reference_markdown(),
             "{REFERENCE_PATH} is stale — regenerate it from `crate::runtime_defaults` \
-             (run: cargo test -p jit runtime_defaults -- --ignored regenerate)"
+             (run: {REFERENCE_GENERATOR})"
         );
-    }
-
-    /// Regenerate the committed reference from the constants. Ignored by default;
-    /// run explicitly after changing a default:
-    ///   cargo test -p jit runtime_defaults -- --ignored regenerate
-    ///
-    /// Writes via the temp-file + atomic-rename pattern (`@/inv/atomic-writes`).
-    #[test]
-    #[ignore = "writes the committed reference; run explicitly to regenerate"]
-    fn test_regenerate_reference_writes_committed_doc() {
-        let path = reference_path();
-        let tmp = path.with_extension("md.tmp");
-        std::fs::write(&tmp, render_reference_markdown())
-            .expect("should write the runtime-defaults temp file");
-        std::fs::rename(&tmp, &path)
-            .expect("should atomically replace the runtime-defaults reference");
     }
 
     #[test]

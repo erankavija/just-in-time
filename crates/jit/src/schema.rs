@@ -1060,7 +1060,15 @@ impl CommandSchema {
     }
 }
 
-/// Render the exit-code reference page (`docs/reference/exit-codes.md`).
+/// Repo-relative path of the committed reference this module projects.
+pub const EXIT_CODE_REFERENCE_PATH: &str = "docs/reference/exit-codes.md";
+
+/// The command that renders [`EXIT_CODE_REFERENCE_PATH`] from the taxonomy,
+/// named in the conformance test's message so a stale reference carries its own
+/// repair.
+pub const EXIT_CODE_REFERENCE_GENERATOR: &str = "./scripts/generate-exit-code-reference.sh";
+
+/// Render the exit-code reference page ([`EXIT_CODE_REFERENCE_PATH`]).
 ///
 /// The page projects the global taxonomy ([`CommandSchema::exit_codes`]) and the
 /// per-command mappings ([`CommandSchema::command_exit_codes`]) into markdown, so
@@ -1581,24 +1589,19 @@ mod tests {
     }
 
     /// The committed reference page is a projection: it must equal the rendered
-    /// output exactly. Regenerate with `UPDATE_EXIT_CODE_DOC=1` when the
-    /// projection changes.
+    /// output exactly. The assertion never writes; the generator it names is
+    /// what brings the committed page back into agreement.
     #[test]
     fn test_exit_code_reference_doc_is_current() {
-        let rendered = render_exit_code_reference();
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../docs/reference/exit-codes.md"
-        );
-        if std::env::var_os("UPDATE_EXIT_CODE_DOC").is_some() {
-            std::fs::write(path, &rendered).expect("write exit-codes.md");
-            return;
-        }
-        let committed = std::fs::read_to_string(path).expect("read docs/reference/exit-codes.md");
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(EXIT_CODE_REFERENCE_PATH);
+        let committed = std::fs::read_to_string(path).expect("read the exit-code reference");
         assert_eq!(
-            committed, rendered,
-            "docs/reference/exit-codes.md is stale; regenerate with \
-             UPDATE_EXIT_CODE_DOC=1 cargo test test_exit_code_reference_doc_is_current"
+            committed,
+            render_exit_code_reference(),
+            "{EXIT_CODE_REFERENCE_PATH} is stale — regenerate it from `jit::schema` \
+             (run: {EXIT_CODE_REFERENCE_GENERATOR})"
         );
     }
 

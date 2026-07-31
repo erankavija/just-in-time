@@ -10,8 +10,9 @@ mod dogfood;
 mod manifest;
 mod package;
 // Repository-local generator seam: the render of this repository's generated
-// template region has two consumers, the `render-template-region` example and
-// the dogfood module's drift assertion, and no production caller. Both build
+// template region has two consumers, the artifact registry the `regenerate`
+// example publishes through and the dogfood module's drift assertion, and no
+// production caller. Both build
 // with dev-dependencies active, which turns on `test-support` through the
 // crate's own self-edge, so gating the module on that pair keeps it out of an
 // adopter build entirely rather than shipping it as unreachable surface.
