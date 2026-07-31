@@ -1327,7 +1327,8 @@
    "code-review"
   ],
   "depends_on": [
-   "profile-resolution-from-record"
+   "profile-resolution-from-record",
+   "conditional-package-load"
   ],
   "planning": {
    "outcome": "Repair recomputes a recorded profile's expected targets by re-reading its package from the recorded location.",
@@ -1655,8 +1656,8 @@
  },
  {
   "key": "explicit-taxonomy-test-fixture",
-  "title": "Give the crate's own tests a fixture that declares its taxonomy",
-  "description": "The crate's in-module tests build their repository from a fixture that declares a taxonomy explicitly, so none of them depends on the binary supplying one.\n\n## Background\n\nSixty-four call sites across the workspace construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy. They stop holding when it does not, and the change that removes it would otherwise carry a workspace-wide fixture rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nThis covers the crate's in-module tests, where the shared test-utility module already lives, so the fixture is authored here and the other suites adopt it. The call sites are enumerated rather than counted: the archive, initialization, validation, gate-check, profile, graph and config command modules, the JSON storage module, the repository validation module, and the dogfood module. The template module's own call sites are deliberately excluded \u2014 they test the type that is being deleted and go with it.\n\nAfterwards each test states the taxonomy it needs, which is also what it should have been doing: a test asserting that a strategic type resolves is testing the mechanism, not the vocabulary.\n\n## Success Criteria\n\n- [hard] REQ-01: One fixture in the shared test-utility module builds a repository whose configuration declares a type hierarchy and the namespaces its consumers assert on.\n- [hard] REQ-02: Every in-module test in the enumerated modules that asserts on a type name or a namespace builds its repository through that fixture.\n- [hard] REQ-03: An in-module test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-04: The fixture declares its vocabulary in the test rather than reading it from any shipped default, so it holds whether or not the binary supplies one.\n- [hard] REQ-05: The suite passes unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThe fixture's vocabulary is the suite's own, chosen for the assertions that read it, and deliberately not a copy of what any package declares.\n",
+  "title": "Author a test fixture that declares its own taxonomy",
+  "description": "One shared fixture builds a repository whose configuration declares a type hierarchy and the namespaces tests assert on, so no test has to depend on the binary supplying either.\n\n## Background\n\nSixty-four call sites across the workspace construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold only because the binary supplies a taxonomy, and it is about to stop.\n\nOne fixture replaces that dependency, and it is authored once. The shared test-utility module is where the crate's suites already reach for repository setup, so it goes there and every other suite consumes it \u2014 a fixture per module family would satisfy the sizing of the adoptions while producing the near-duplicate setup the shared-contract rule exists to prevent.\n\nIts vocabulary is the suite's own, chosen for the assertions that read it, and deliberately not a copy of what any package declares: a test asserting that a strategic type resolves is testing the mechanism, not the vocabulary.\n\n## Success Criteria\n\n- [hard] REQ-01: One fixture in the shared test-utility module builds a repository whose configuration declares a type hierarchy, its label associations, and the namespaces its consumers assert on.\n- [hard] REQ-02: The fixture declares that vocabulary in the test rather than reading it from any shipped default, so it holds whether or not the binary supplies one.\n- [hard] REQ-03: The fixture exposes the vocabulary it declared, so a consumer asserts against what it was given rather than against a literal it repeats.\n- [hard] REQ-04: Its own assertions establish that a repository built through it carries exactly the declared hierarchy and namespaces.\n- [hard] REQ-05: No existing test changes here; adoption is separate work.\n\n## Notes\n\nEvery adoption entry consumes this fixture as authored. If one needs a different vocabulary, it declares that beside its own assertions rather than adding a second fixture.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1673,7 +1674,7 @@
   ],
   "depends_on": [],
   "planning": {
-   "outcome": "The crate's in-module tests build their repository from a fixture that declares the taxonomy.",
+   "outcome": "One shared fixture builds a repository whose configuration declares the taxonomy tests assert on.",
    "contract_refs": [
     "scaffold-minimum"
    ],
@@ -1685,31 +1686,21 @@
    ],
    "landing_group": "taxonomy-defaults",
    "terminal": {
-    "consumer_family": "the crate's in-module test fixtures",
-    "test_boundary": "the crate's own library suite",
-    "worker_sized_reason": "One fixture is authored beside the helpers those modules already share, and replaces one constructor call in each.",
+    "consumer_family": "the shared test-utility module",
+    "test_boundary": "the fixture's own assertions over the repository it builds",
+    "worker_sized_reason": "One fixture in the module the crate's suites already share, with no consumer changed by it.",
     "footprint": {
      "touches": [
-      "crates/jit/src/test_utils.rs",
-      "crates/jit/src/commands/archive.rs",
-      "crates/jit/src/commands/init.rs",
-      "crates/jit/src/commands/validate.rs",
-      "crates/jit/src/commands/gate_check.rs",
-      "crates/jit/src/commands/profile.rs",
-      "crates/jit/src/commands/graph.rs",
-      "crates/jit/src/commands/config.rs",
-      "crates/jit/src/storage/json.rs",
-      "crates/jit/src/validation/repository.rs",
-      "crates/jit/src/profile/dogfood.rs"
+      "crates/jit/src/test_utils.rs"
      ]
     }
    }
   }
  },
  {
-  "key": "taxonomy-fixture-integration-suites",
-  "title": "Adopt the taxonomy fixture in the crate's integration suites",
-  "description": "The crate's integration suites build their repository from the shared taxonomy fixture, so no suite outside the library depends on the binary supplying a vocabulary.\n\n## Background\n\nThe integration suites construct repositories the same way the in-module tests did, through the scaffold's default hierarchy template, and several assert on the type names it wrote. The fixture that replaces it is authored by the work this depends on; adopting it here is the same mechanical substitution over a different suite family, under a different build target.\n\nThe suites are enumerated rather than counted: the rules suites covering config loading, default-rule derivation, label-membership validation, schema regeneration and CLI warnings; the documents-and-templates suites covering template apply atomicity and the document event log; the derived-state repair suite; and the item-validation, query-graph and repository-workflow suites.\n\n## Success Criteria\n\n- [hard] REQ-01: Every integration test that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: An integration test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No suite constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: The suites pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThe fixture is consumed, not redefined; a suite needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n",
+  "key": "taxonomy-fixture-archive-commands",
+  "title": "Adopt the taxonomy fixture in the archive command tests",
+  "description": "The archive command module's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: every one of them drives the archive planner over a repository it seeds through the command harness, so they share one setup and one assertion shape. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nFourteen call sites in one module, the largest single concentration in the crate.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1728,21 +1719,207 @@
    "explicit-taxonomy-test-fixture"
   ],
   "planning": {
-   "outcome": "The crate's integration suites build their repository from the shared taxonomy fixture.",
+   "outcome": "The archive command module's tests build their repository from the shared taxonomy fixture.",
    "contract_refs": [
     "scaffold-minimum"
    ],
    "source_refs": [
-    "issue:45e250c6",
+    "issue:889a939a",
     "D-13",
     "A4.3",
     "A8.2"
    ],
    "landing_group": "taxonomy-defaults",
    "terminal": {
-    "consumer_family": "the crate's integration-test suites",
-    "test_boundary": "the crate's integration-test targets",
-    "worker_sized_reason": "One substitution repeated across suites that already share their repository setup helpers.",
+    "consumer_family": "the archive command module's tests",
+    "test_boundary": "the archive command module's own tests",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/commands/archive.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-initialization-commands",
+  "title": "Adopt the taxonomy fixture in the initialization command tests",
+  "description": "The initialization command module's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: every one of them exercises repository creation itself, so each already states what the created repository should contain and the fixture makes that statement explicit rather than inherited. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nNine call sites in one module, the module whose subject the scaffold removal also changes.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The initialization command module's tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:ffe6de33",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the initialization command module's tests",
+    "test_boundary": "the initialization command module's own tests",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/commands/init.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-inspection-commands",
+  "title": "Adopt the taxonomy fixture in the repository-inspection command tests",
+  "description": "The repository-inspection command modules' tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: each seeds a repository through the command harness and then runs a whole-repository read over it \u2014 validation, gate checking, profile inspection, graph queries, configuration reporting \u2014 so the taxonomy is an input to the thing under test rather than the thing itself. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nTen call sites across five modules of one command layer.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The repository-inspection command modules' tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:be918f22",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the repository-inspection command modules' tests",
+    "test_boundary": "the inspection command modules' own tests",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/commands/validate.rs",
+      "crates/jit/src/commands/gate_check.rs",
+      "crates/jit/src/commands/profile.rs",
+      "crates/jit/src/commands/graph.rs",
+      "crates/jit/src/commands/config.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-direct-seed-modules",
+  "title": "Adopt the taxonomy fixture in the modules that seed a repository directly",
+  "description": "The library modules that seed a repository directly build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: none of them goes through the command harness at all \u2014 each calls repository creation itself to obtain a checkout to read, which is the property that puts them outside the command families and makes their setup identical to each other's. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nFour call sites across three modules, one per layer.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The library modules that seed a repository directly build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:76b16af0",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the library modules that seed a repository directly",
+    "test_boundary": "those modules' own tests",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/json.rs",
+      "crates/jit/src/validation/repository.rs",
+      "crates/jit/src/profile/dogfood.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-fast-rules-target",
+  "title": "Adopt the taxonomy fixture in the rules integration target",
+  "description": "The fast_rules integration target's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: they are the modules of one Cargo integration target, compiled and run as a single test executable, so they share a build target and a harness rather than a naming convention. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nSix file(s) of the fast_rules target, which the target's own entry point already declares as its modules.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The fast_rules integration target's tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:1aa2b486",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the fast_rules integration target's tests",
+    "test_boundary": "the fast_rules integration target",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
     "footprint": {
      "touches": [
       "crates/jit/tests/fast_rules/config_loading_tests.rs",
@@ -1750,13 +1927,189 @@
       "crates/jit/tests/fast_rules/label_membership_validation_tests.rs",
       "crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs",
       "crates/jit/tests/fast_rules/cli_warnings_integration_tests.rs",
-      "crates/jit/tests/fast_rules/derived_state_repair_tests.rs",
+      "crates/jit/tests/fast_rules/derived_state_repair_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-docs-templates-target",
+  "title": "Adopt the taxonomy fixture in the documents-and-templates integration target",
+  "description": "The fast_docs_templates integration target's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: they are the modules of one Cargo integration target, compiled and run as a single test executable, so they share a build target and a harness rather than a naming convention. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nTwo file(s) of the fast_docs_templates target, which the target's own entry point already declares as its modules.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The fast_docs_templates integration target's tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:1cfb66ff",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the fast_docs_templates integration target's tests",
+    "test_boundary": "the fast_docs_templates integration target",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
       "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
-      "crates/jit/tests/fast_docs_templates/document_event_log_tests.rs",
+      "crates/jit/tests/fast_docs_templates/document_event_log_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-item-validate-target",
+  "title": "Adopt the taxonomy fixture in the item-validation integration target",
+  "description": "The cli_item_validate integration target's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: they are the modules of one Cargo integration target, compiled and run as a single test executable, so they share a build target and a harness rather than a naming convention. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThree file(s) of the cli_item_validate target, which the target's own entry point already declares as its modules.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The cli_item_validate integration target's tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:a4f03da3",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the cli_item_validate integration target's tests",
+    "test_boundary": "the cli_item_validate integration target",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
       "crates/jit/tests/cli_item_validate/decision_kind_tests.rs",
       "crates/jit/tests/cli_item_validate/decision_risk_story_tests.rs",
-      "crates/jit/tests/cli_item_validate/risk_kind_tests.rs",
-      "crates/jit/tests/cli_query_graph/scope_validation_tests.rs",
+      "crates/jit/tests/cli_item_validate/risk_kind_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-query-graph-target",
+  "title": "Adopt the taxonomy fixture in the query-and-graph integration target",
+  "description": "The cli_query_graph integration target's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: they are the modules of one Cargo integration target, compiled and run as a single test executable, so they share a build target and a harness rather than a naming convention. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nOne file(s) of the cli_query_graph target, which the target's own entry point already declares as its modules.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The cli_query_graph integration target's tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:a603f02d",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the cli_query_graph integration target's tests",
+    "test_boundary": "the cli_query_graph integration target",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
+      "crates/jit/tests/cli_query_graph/scope_validation_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "taxonomy-fixture-repo-workflow-target",
+  "title": "Adopt the taxonomy fixture in the repository-workflow integration target",
+  "description": "The cli_repo_workflow integration target's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: they are the modules of one Cargo integration target, compiled and run as a single test executable, so they share a build target and a harness rather than a naming convention. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nOne file(s) of the cli_repo_workflow target, which the target's own entry point already declares as its modules.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:derived-package-sources",
+   "milestone:v1.0",
+   "component:core",
+   "story:default-vocabulary",
+   "per:@/issue/e204e63d/decision/D-13",
+   "enforces:@/invariant/shared-test-contracts"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "explicit-taxonomy-test-fixture"
+  ],
+  "planning": {
+   "outcome": "The cli_repo_workflow integration target's tests build their repository from the shared taxonomy fixture.",
+   "contract_refs": [
+    "scaffold-minimum"
+   ],
+   "source_refs": [
+    "issue:60c211d6",
+    "D-13",
+    "A4.3",
+    "A8.2"
+   ],
+   "landing_group": "taxonomy-defaults",
+   "terminal": {
+    "consumer_family": "the cli_repo_workflow integration target's tests",
+    "test_boundary": "the cli_repo_workflow integration target",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
+    "footprint": {
+     "touches": [
       "crates/jit/tests/cli_repo_workflow/doc_show_tests.rs"
      ]
     }
@@ -1766,7 +2119,7 @@
  {
   "key": "taxonomy-fixture-server-crate",
   "title": "Adopt the taxonomy fixture in the server crate",
-  "description": "The server crate's tests build their repository from a fixture that declares a taxonomy, so the HTTP surface's tests do not depend on the binary supplying one.\n\n## Background\n\nThe server crate builds test repositories the same way, and one of its route tests asserts on the taxonomy the endpoint answers with. It is a separate crate with its own test target and its own fixture module, so adopting the shared fixture there is separate work from adopting it inside the library.\n\n## Success Criteria\n\n- [hard] REQ-01: The server crate's test repositories are built from a fixture that declares a type hierarchy explicitly.\n- [hard] REQ-02: The route test that asserts on the hierarchy the endpoint answers with reads its expectation from that fixture rather than from a shipped default.\n- [hard] REQ-03: No server test constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: The server suites pass unchanged.\n\n## Notes\n\nThe server crate consumes the library's fixture rather than declaring a second one, so one vocabulary serves both crates' assertions.\n",
+  "description": "The server crate's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion \u2014 two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: they are a separate crate with its own test targets and its own fixture module, so the substitution is one crate's setup rather than a slice of another's. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThree call sites in one crate, consuming a fixture the library authored.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1797,9 +2150,9 @@
    ],
    "landing_group": "taxonomy-defaults",
    "terminal": {
-    "consumer_family": "the server crate's test fixtures",
+    "consumer_family": "the server crate's tests",
     "test_boundary": "the server crate's test targets",
-    "worker_sized_reason": "Three call sites in one crate, consuming a fixture another entry authored.",
+    "worker_sized_reason": "One substitution against one setup shape, in tests that already share it.",
     "footprint": {
      "touches": [
       "crates/server/src/lib.rs",
@@ -2187,7 +2540,15 @@
   ],
   "depends_on": [
    "compiled-taxonomy-defaults-removal",
-   "taxonomy-fixture-integration-suites",
+   "taxonomy-fixture-archive-commands",
+   "taxonomy-fixture-initialization-commands",
+   "taxonomy-fixture-inspection-commands",
+   "taxonomy-fixture-direct-seed-modules",
+   "taxonomy-fixture-fast-rules-target",
+   "taxonomy-fixture-docs-templates-target",
+   "taxonomy-fixture-item-validate-target",
+   "taxonomy-fixture-query-graph-target",
+   "taxonomy-fixture-repo-workflow-target",
    "taxonomy-fixture-server-crate",
    "scaffolded-rule-set-documentation",
    "release-archive-documentation"
@@ -2294,7 +2655,6 @@
    "docs-mechanical"
   ],
   "depends_on": [
-   "conditional-package-load",
    "repository-package-locator",
    "package-in-release-archive",
    "composed-application-ordering"

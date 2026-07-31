@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T18:13:11.257184315Z",
+  "dependencies": [
+    "ae435979-9d43-4efc-ba05-7f7c6164af84"
+  ],
+  "description": "The initialization command module's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion — two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: every one of them exercises repository creation itself, so each already states what the created repository should contain and the fixture makes that statement explicit rather than inherited. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nNine call sites in one module, the module whose subject the scaffold removal also changes.\n",
+  "documents": [],
+  "first_ready_at": "2026-07-31T18:13:11.257184315Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ffe6de33-3d1e-4c2d-865a-af68462e194e",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:default-vocabulary",
+    "per:@/issue/e204e63d/decision/D-13",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Adopt the taxonomy fixture in the initialization command tests",
+  "updated_at": "2026-07-31T18:13:26.507707198Z"
+}
