@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
-  "dependencies": [],
+  "dependencies": [
+    "237b15be-df98-4dbb-9fd5-171882314024"
+  ],
   "description": "The agent-facing bridge describes what gates and items are without naming this repository's own gate keys and item ids as the vocabulary.\n\n## Background\n\nThe bridge sends a block of instructions to every connected client. One line names four gate keys — this repository's own — as though they were the vocabulary, while the line beside it already states the correct rule for labels: that they come from the repository's own registry. The two contradict each other, and the first is what an adopter reads.\n\nThree curated tool descriptions have the same shape, naming item kinds and one of this repository's own item ids in text every adopter sees.\n\nNothing about the bridge's mechanism changes. The tool surface is generated at every process start from the CLI's own schema, and the curation covers jit's commands rather than any adopter's configuration; only the descriptions that name a particular repository's content are reworded.\n\n## Success Criteria\n\n- [hard] REQ-01: The instruction block describes gates without naming any particular repository's gate keys, in the same form its label line already uses.\n- [hard] REQ-02: No shipped tool description names an item id or presents one repository's item kinds as the vocabulary.\n- [hard] REQ-03: The described mechanism is unchanged: the tool surface is still generated from the CLI schema at process start.\n- [hard] REQ-04: The bridge's own coverage still passes, and no tool changes name, arguments, or behaviour.\n\n## Notes\n\nThis is adopter-facing text in a shipped artefact, not documentation about it.\n",
   "documents": [],
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
@@ -22,7 +24,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Take this repository's vocabulary out of the bridge's instructions",
-  "updated_at": "2026-07-31T17:28:56.596684919Z"
+  "updated_at": "2026-07-31T18:31:43.618775084Z"
 }

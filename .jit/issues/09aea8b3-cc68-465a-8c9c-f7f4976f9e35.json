@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
-  "dependencies": [],
+  "dependencies": [
+    "237b15be-df98-4dbb-9fd5-171882314024"
+  ],
   "description": "A profile package is constructed from a directory tree, owning the bytes it validates, so a package that is not compiled into the binary can exist at all.\n\n## Background\n\nThe package model was written as if its bytes were untrusted external data, and almost all of it already holds for a package of unknown provenance: it takes a path-to-bytes map, bounds file count and total size, rejects absolute, traversal, Windows-prefix, control-character and backslash paths, rejects a declared source that is absent and a package file no declaration claims, rejects duplicate sources and duplicate targets, and content-addresses the manifest and every path.\n\nTwo things stand in the way. The only constructor that exists walks a directory compiled in at build time. And the type borrows the byte slices it validates, which a disk read cannot supply without leaking them. A directory walk producing a path-to-bytes map, over a representation that can own its bytes, is therefore the entire new reader.\n\nWhat the reader must not do is relax any defence. A package read from a working tree is exactly the untrusted input those bounds were written for, and a directory entry that is not a regular file, or a path that escapes the package root, has to be rejected where the package is read rather than where its content is used.\n\n## Success Criteria\n\n- [hard] REQ-01: A profile package is constructed from a directory path, owning the bytes it validates.\n- [hard] REQ-02: For the same content, a directory-read package and a compile-time package are equal in manifest, package hash, and per-target digests.\n- [hard] REQ-03: Every existing package defence applies to a directory-read package: the file-count and total-size bounds, the rejected path shapes, the absent declared source, and the undeclared package file.\n- [hard] REQ-04: A directory entry that is not a regular file, and any path escaping the package root, is rejected with a message naming it.\n- [hard] REQ-05: A directory that is absent or unreadable is reported as such rather than as an invalid package.\n\n## Notes\n\nWhere a package directory comes from is decided elsewhere. This is the reader alone.\n",
   "documents": [],
   "first_ready_at": "2026-07-31T16:28:27.583411185Z",
@@ -22,7 +24,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Read a profile package from a directory on disk",
-  "updated_at": "2026-07-31T16:28:27.583411185Z"
+  "updated_at": "2026-07-31T18:31:03.006161635Z"
 }

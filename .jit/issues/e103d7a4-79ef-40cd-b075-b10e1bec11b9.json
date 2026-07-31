@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
-  "dependencies": [],
+  "dependencies": [
+    "237b15be-df98-4dbb-9fd5-171882314024"
+  ],
   "description": "The pure rule transform that derives a preview coverage rule sits with the engine's rule constructors, so it does not depend on a module that is about to be removed.\n\n## Background\n\nThe transform takes a closure coverage rule and a breakdown type name and returns the preview form of that rule, with the child-state condition omitted so drafted children count at plan time. It is parameterized by the type name its caller supplies, names no workflow type of its own, and its own tests exercise a type name that is not this repository's. By the criterion separating engine capability from a specific application, it is engine capability.\n\nIt lives in a module whose other contents are one workflow's gate presets, and that module is being emptied. Leaving the transform there would leave engine capability inside a module named for the workflow that left, which is the shape the cutover rule exists to prevent; removing it with the presets would delete capability that the criterion keeps.\n\nMoving it first means the removal that follows takes only what the criterion excludes.\n\n## Success Criteria\n\n- [hard] REQ-01: The transform that derives a preview coverage rule from a closure rule lives with the engine's rule declarations.\n- [hard] REQ-02: It stays parameterized by the breakdown type its caller supplies, and names no workflow type of its own.\n- [hard] REQ-03: Its tests move with it and still exercise a type name that is not this repository's.\n- [hard] REQ-04: No module named for the planning bracket exports it, and its published path is the new one.\n\n## Notes\n\nThe move is a relocation, not a rewrite: its behaviour, its signature, and the error it reports for a rule of the wrong shape are unchanged.\n",
   "documents": [],
   "first_ready_at": "2026-07-31T16:28:27.583411185Z",
@@ -22,5 +24,5 @@
   "priority": "normal",
   "state": "rejected",
   "title": "Move the coverage-preview rule transform out of the bracket module",
-  "updated_at": "2026-07-31T17:41:50.187390897Z"
+  "updated_at": "2026-07-31T18:32:50.672057964Z"
 }

@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
-  "dependencies": [],
+  "dependencies": [
+    "237b15be-df98-4dbb-9fd5-171882314024"
+  ],
   "description": "One shared fixture builds a repository whose configuration declares a type hierarchy and the namespaces tests assert on, so no test has to depend on the binary supplying either.\n\n## Background\n\nSixty-four call sites across the workspace construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold only because the binary supplies a taxonomy, and it is about to stop.\n\nOne fixture replaces that dependency, and it is authored once. The shared test-utility module is where the crate's suites already reach for repository setup, so it goes there and every other suite consumes it — a fixture per module family would satisfy the sizing of the adoptions while producing the near-duplicate setup the shared-contract rule exists to prevent.\n\nIts vocabulary is the suite's own, chosen for the assertions that read it, and deliberately not a copy of what any package declares: a test asserting that a strategic type resolves is testing the mechanism, not the vocabulary.\n\n## Success Criteria\n\n- [hard] REQ-01: One fixture in the shared test-utility module builds a repository whose configuration declares a type hierarchy, its label associations, and the namespaces its consumers assert on.\n- [hard] REQ-02: The fixture declares that vocabulary in the test rather than reading it from any shipped default, so it holds whether or not the binary supplies one.\n- [hard] REQ-03: The fixture exposes the vocabulary it declared, so a consumer asserts against what it was given rather than against a literal it repeats.\n- [hard] REQ-04: Its own assertions establish that a repository built through it carries exactly the declared hierarchy and namespaces.\n- [hard] REQ-05: No existing test changes here; adoption is separate work.\n\n## Notes\n\nEvery adoption entry consumes this fixture as authored. If one needs a different vocabulary, it declares that beside its own assertions rather than adding a second fixture.\n",
   "documents": [],
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
@@ -22,7 +24,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Author a test fixture that declares its own taxonomy",
-  "updated_at": "2026-07-31T18:16:03.042802374Z"
+  "updated_at": "2026-07-31T18:31:23.300980886Z"
 }

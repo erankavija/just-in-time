@@ -1,0 +1,72 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b3b95ab945c3e22afbb4cc3a345b75bc761f73cf",
+  "completed_at": "2026-07-31T18:30:05.939055336Z",
+  "duration_ms": 571554,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-3"
+        ],
+        "severity": "high",
+        "summary": "Thirteen manifest sources lack their required dependency on breakdown node 237b15be."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/93fef456-ac33-4525-bbe4-3a170de0b253.json",
+        "id": "F2",
+        "line": 9,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "medium",
+        "summary": "Default-vocabulary story 93fef456 retains a superseded dependency on rejected aggregate 45e250c6."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/ff1bbada-b22a-432a-a75a-8506743e90f9.json",
+        "id": "F3",
+        "line": 9,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "medium",
+        "summary": "Embed deletion issue ff1bbada retains a superseded dependency on rejected issue e103d7a4."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/3e340587-e295-4e75-ab0a-3745f896a676.json",
+        "id": "F4",
+        "line": 27,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Issue 3e340587 is stored as Ready while breakdown dependency 237b15be is unmet."
+      }
+    ],
+    "summary": "The 72-entry manifest and terminal sizing pass, but bracket wiring, two superseded edges, and one incoherent Ready state require graph reconciliation.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "237b15be-df98-4dbb-9fd5-171882314024",
+  "message": null,
+  "run_id": "40448820-6424-4dde-bd27-6ac82e0ed8be",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T18:20:34.384388290Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15160 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb968-17d0-7c73-9bb7-33215c8666f5\n--------\nuser\n--- 15147 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Required checks: manifest validation passed with no sizing warnings, renderer `--check` passed, and native dry-run validated 72 issues and 101 intra-manifest edges. All 72 keys map uniquely to stored issues; non-edge fields match and no `planning` metadata leaked. `jit validate` failed on stored-state coherence.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| `shipped-policy-region-generator` / `67da1d70` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `shipped-policy-freshness-checker` / `f77fd51b` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `plan-template-generated-region` / `e1a18372` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `plan-template-drift-guard` / `097b9f48` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `provenance-fixture-live-inputs` / `c7a548c3` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `executable-mode-contract-guard` / `9943c488` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profile-extraction-investigation` / `a62d444d` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `conditional-package-load` / `229e7389` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `packaged-gate-machinery-relocation` / `9d451c98` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `regeneration-form-convergence` / `65ff0f38` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `declarative-configuration-audit` / `7cbefe7c` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `region-source-relocation` / `3e340587` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `live-source-root-declaration` / `39c34568` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `package-assembly-mechanism` / `7d038e97` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `package-assembly-reproducibility` / `ebbb254f` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `packaged-copy-retirement` / `d94f6849` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `citation-check-package-exclusions` / `26f503cc` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `live-source-completeness-guard` / `0cf1f351` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `live-source-declaration-bridge-coverage` / `4873b32f` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profiles-reference-manifest-contents` / `0db28190` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profile-package-directory-reader` / `09aea8b3` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profile-source-provenance` / `6c47b99a` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profile-resolution-from-record` / `5d12a79f` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profile-location-flag-reference` / `2ce8ce1b` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `validate-fix-package-reresolution` / `8371bd46` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `package-dependency-declaration` / `5dd0df5b` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `scaffold-contribution-targets` / `4c40e165` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `composed-application-ordering` / `7835fdc0` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `contribution-conflict-names-package` / `d54f8f83` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `compiled-taxonomy-defaults-removal` / `a30d704d` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `explicit-taxonomy-test-fixture` / `ae435979` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-archive-commands` / `889a939a` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-initialization-commands` / `ffe6de33` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-inspection-commands` / `be918f22` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-direct-seed-modules` / `76b16af0` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-fast-rules-target` / `1aa2b486` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-docs-templates-target` / `1cfb66ff` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-item-validate-target` / `a4f03da3` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-query-graph-target` / `a603f02d` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-repo-workflow-target` / `60c211d6` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `taxonomy-fixture-server-crate` / `a53a6f09` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `jit-default-package` / `c7058cac` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `jit-dogfood-dependency-delta` / `e4ba28c5` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `workflow-rules-relocation` / `590ff4db` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `scaffolded-rule-set-documentation` / `59f12ba7` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `package-in-release-archive` / `9de22aa7` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `default-package-in-release-archive` / `6013cd81` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `release-archive-documentation` / `25a33a83` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `repository-package-locator` / `959274b6` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `embed-and-preset-deletion` / `ff1bbada` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `scaffold-template-removal` / `daddfc0b` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `item-kind-defaults-removal` / `28e1c647` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `bracket-label-from-template` / `510297e4` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `icon-preset-removal` / `0439da41` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `bridge-instruction-vocabulary` / `fdae1023` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `web-hierarchy-fallback-removal` / `9bdf8025` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `projection-path-supply` / `f6c23c09` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `projection-path-supply-domain-storage` / `f9cab4c2` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `projection-path-supply-defaults-gates` / `5de2c401` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `domain-agnostic-amendment` / `aa258222` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `build-input-surface-retirement` / `6fef2d7c` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `embedded-package-vocabulary-retirement` / `d913a510` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profile-command-reference-rename` / `62ef09b6` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `profile-bridge-vocabulary-rename` / `d198030e` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n| `adopter-profile-documentation` / `8d534ee7` | Pass | Pass | Pass | Pass | Pass | Pass | Pass | Pass |\n\n1. Thirteen of the manifest’s eighteen sources lack the mandatory source→breakdown edge to `237b15be`: `a62d444d`, `9d451c98`, `09aea8b3`, `5dd0df5b`, `4c40e165`, `a30d704d`, `ae435979`, `28e1c647`, `510297e4`, `0439da41`, `fdae1023`, `9bdf8025`, and `f6c23c09`. This allows amended roots to become Ready without the current breakdown review. Manifest correction: none. Graph reconciliation: add exactly `source → 237b15be` for those thirteen issues; no plan-review rerun is needed because no shared contract changes.\n\n2. `default-vocabulary-package` (`93fef456`) retains an extra dependency on rejected superseded aggregate `45e250c6`, in addition to the ten replacement fixture-family issues present in the manifest. Manifest correction: none. Graph reconciliation: remove only `93fef456 → 45e250c6`; retain the thirteen manifest-declared dependencies.\n\n3. `embed-and-preset-deletion` (`ff1bbada`) retains an extra dependency on rejected superseded issue `e103d7a4`. Manifest correction: none. Graph reconciliation: remove only `ff1bbada → e103d7a4`; retain dependencies on `7835fdc0`, `959274b6`, and `9de22aa7`.\n\n4. `3e340587` is stored as Ready while its correctly recorded dependency on in-progress breakdown node `237b15be` is unmet, causing whole-repository `jit validate` to exit 4. Manifest correction: none. State reconciliation: demote `3e340587` to Backlog until `237b15be` becomes terminal, then let normal readiness advancement promote it.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The 72-entry manifest and terminal sizing pass, but bracket wiring, two superseded edges, and one incoherent Ready state require graph reconciliation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Thirteen manifest sources lack their required dependency on breakdown node 237b15be.\",\"references\":[\"@/charter/D-3\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Default-vocabulary story 93fef456 retains a superseded dependency on rejected aggregate 45e250c6.\",\"file\":\".jit/issues/93fef456-ac33-4525-bbe4-3a170de0b253.json\",\"line\":9,\"references\":[\"@/invariant/canonical-cutover\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Embed deletion issue ff1bbada retains a superseded dependency on rejected issue e103d7a4.\",\"file\":\".jit/issues/ff1bbada-b22a-432a-a75a-8506743e90f9.json\",\"line\":9,\"references\":[\"@/invariant/canonical-cutover\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Issue 3e340587 is stored as Ready while breakdown dependency 237b15be is unmet.\",\"file\":\".jit/issues/3e340587-e295-4e75-ab0a-3745f896a676.json\",\"line\":27,\"references\":[\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

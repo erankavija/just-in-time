@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
-  "dependencies": [],
+  "dependencies": [
+    "237b15be-df98-4dbb-9fd5-171882314024"
+  ],
   "description": "A package manifest states the packages it depends on, so a package can carry a delta over another rather than a copy of it.\n\n## Background\n\nThe manifest rejects unknown keys, with the explicit comment that future composition syntax cannot silently enter the v1 contract. A dependency declaration is therefore a deliberate change to that contract rather than an additive field that slips in, and it carries a schema regeneration: the manifest schema is public through the package's machine-readable inspection output and through the agent-facing bridge over it.\n\nThe declaration is what makes two packages legitimate. Without it, a package needing another's vocabulary has to restate it, and the two copies are held equal by an assertion — the shape this container exists to remove.\n\nThis states the dependency. Resolving and applying one is separate work, so a manifest declaring a dependency parses and reports it here, and acquires its meaning when the resolution that reads it lands.\n\n## Success Criteria\n\n- [hard] REQ-01: A package manifest declares the package ids it depends on, and a manifest declaring none parses exactly as it does today.\n- [hard] REQ-02: A malformed or self-referential dependency declaration is rejected where the manifest is parsed, naming the offending entry.\n- [hard] REQ-03: The declaration is carried in the value the package's machine-readable inspection output reports, and the published manifest schema is regenerated from the changed type.\n- [hard] REQ-04: A dependency id is a constrained identifier of the same shape as a package id, rejected at parse time when malformed.\n\n## Notes\n\nNothing here resolves a dependency or changes what application does; a package that declares one behaves exactly as it does today until the resolution work lands.\n",
   "documents": [],
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
@@ -24,7 +26,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Declare one package's dependency on another",
-  "updated_at": "2026-07-31T17:28:56.596684919Z"
+  "updated_at": "2026-07-31T18:31:08.059596918Z"
 }

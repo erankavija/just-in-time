@@ -6,7 +6,6 @@
     "1aa2b486-a96a-47a6-bd68-6163eb62f24f",
     "1cfb66ff-daa4-427e-8b92-fd75cc6081f0",
     "25a33a83-145e-4b1e-bd6f-cbd20251d08d",
-    "45e250c6-82e8-4f35-97ae-9b28ea0eb455",
     "59f12ba7-1e5d-40b2-bdcf-f03bf17be9d0",
     "60c211d6-e86d-4749-9502-b633d064f86a",
     "76b16af0-4a66-45cf-96ea-e8eaf76996ef",
@@ -43,5 +42,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "The generic domain vocabulary reaches a repository as a package",
-  "updated_at": "2026-07-31T18:15:30.538880734Z"
+  "updated_at": "2026-07-31T18:30:42.847263153Z"
 }
