@@ -7,14 +7,8 @@ set -uo pipefail
 #
 # Runs the committed documentation mechanical checkers and aggregates their
 # exit status. Mirrors the cargo-ci.sh convention of one gate script fanning
-# out to several independent steps.
-#
-#   M2  scripts/docs-check-links.sh          link + heading-anchor resolver
-#   M3  scripts/docs-check-citations.sh      source-path + @/… citation existence
-#   M5  scripts/docs-check-projections.sh    projection-freshness diff
-#   M6  scripts/docs-check-canonical.sh      canonical-home / command-snippet /
-#                                            support-matrix binding
-#   M7  scripts/docs-check-shipped-policy.sh shipped-policy region freshness
+# out to several independent steps. The `run` lines at the foot of this file
+# are the member list, and each member's own header states what it checks.
 #
 # Footprint resolution (passed to the footprint-taking checkers; the checkers
 # whose targets are configured take none):
