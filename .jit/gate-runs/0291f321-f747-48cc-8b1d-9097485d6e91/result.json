@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a9ef076036e6b1599c2fc8f8aec8be1b4145b58c",
+  "completed_at": "2026-07-31T12:57:23.920638004Z",
+  "duration_ms": 167635,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The package-authoritative generated template region and its parsed drift guard satisfy all issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "25bdda50-640b-44d4-80cc-da4f872de058",
+  "message": null,
+  "run_id": "0291f321-f747-48cc-8b1d-9097485d6e91",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T12:54:36.285603195Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback — no reachable commit contains `jit:25bdda50`\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/issue/e204e63d/decision/D-1 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/gate/jit-validate (.jit/gates.toml); @/invariant/gate-semantics (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T12:46:54Z); jit-validate passed (exit 0, 2026-07-31T12:54:11Z); code-review pending\nTruncation recovery: narrowed reads of the manifest contribution, generated registry, renderer, drift tests, gate registry, and resolved-item sources\n\n1. None. The generated region, parsed bidirectional drift guard, preserved commentary, registry-load/application, and idempotence checks satisfy REQ-01 through REQ-05.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The package-authoritative generated template region and its parsed drift guard satisfy all issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

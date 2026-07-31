@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a9ef076036e6b1599c2fc8f8aec8be1b4145b58c",
+  "completed_at": "2026-07-31T13:01:39.454562851Z",
+  "duration_ms": 123563,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Generated shipped-policy documentation and its freshness-check documentation are accurate, discoverable, and current.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "6f8f02ba-8cb3-4aea-b0f6-868deeec6a83",
+  "message": null,
+  "run_id": "a58b9826-a527-49ae-82de-d39acb040a84",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T12:59:35.891414068Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: container `6f8f02ba` has no tagged commit; its delivered DAG children `67da1d70` and `f77fd51b` supplied the reviewed patches. Current generated regions, links, citations, and projections all verify cleanly.\n\nDocumentation impact is complete: the configuration reference and copyable example reflect the shipped classification, and the repo-local gate reference accurately describes the extensible mechanical-check fan-out.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Generated shipped-policy documentation and its freshness-check documentation are accurate, discoverable, and current.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

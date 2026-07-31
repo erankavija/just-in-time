@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a9ef076036e6b1599c2fc8f8aec8be1b4145b58c",
+  "completed_at": "2026-07-31T12:59:31.785151859Z",
+  "duration_ms": 126340,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact defects found; the generated regions and deterministic freshness check satisfy the story’s hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6f8f02ba-8cb3-4aea-b0f6-868deeec6a83",
+  "message": null,
+  "run_id": "dc5f0f66-c40b-486b-ac7d-7703fb616de8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T12:57:25.444174146Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback — no reachable commit contains `jit:6f8f02ba`\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; issue e204e63d description\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/issue/e204e63d/decision/D-4 (issue description)\nGate evidence: docs-mechanical passed (exit 0); doc-review pending\nTruncation recovery: narrowed the initial cross-tree search to the generator, checker, self-tests, shipped constant, and two target regions\n\n1. None. Fallback inspection confirms the generator derives the table through throwaway `jit init` and splices the marked regions only; the checker regenerates in a scratch fixture and reports drift. The current targets match the shipped policy, and the recorded M7 mechanical check passed.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found; the generated regions and deterministic freshness check satisfy the story’s hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
