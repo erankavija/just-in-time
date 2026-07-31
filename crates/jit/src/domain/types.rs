@@ -2832,9 +2832,11 @@ impl LabelNamespaces {
     /// A registry declaring nothing: no namespace, no type hierarchy, no
     /// membership association and no strategic type.
     ///
-    /// This is what a repository whose `config.toml` declares no `[namespaces]`
-    /// and no `[type_hierarchy]` holds, and the rules derived from it are
-    /// exactly the ones that need no declaration.
+    /// Equivalent to what
+    /// [`namespaces_from_config`](crate::config_manager::namespaces_from_config)
+    /// builds for a `config.toml` that declares neither `[namespaces]` nor
+    /// `[type_hierarchy]`, so the rules derived from it are exactly the ones
+    /// that need no declaration.
     pub fn empty(schema_version: u32) -> Self {
         Self {
             schema_version,
@@ -2895,8 +2897,8 @@ impl LabelNamespaces {
     /// The type hierarchy this registry declares, as a type-name to level map.
     ///
     /// Empty when the repository declared no `[type_hierarchy]`, which is what
-    /// makes the rules keyed on it — the `type:` value enumeration and the two
-    /// hierarchy graph warnings — produce nothing for such a repository.
+    /// keeps the rules keyed on it — the `type:` value enumeration and the two
+    /// hierarchy graph warnings — out of such a repository's rule set.
     pub fn declared_type_hierarchy(&self) -> HashMap<String, u8> {
         self.type_hierarchy.clone().unwrap_or_default()
     }
