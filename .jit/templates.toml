@@ -9,8 +9,9 @@
 # The block between the delimiters below is GENERATED from the template
 # contributions of the packaged jit-dogfood profile, which are their authority:
 # edit profiles/jit-dogfood/manifest.toml, then re-render with
-# `cargo test -p jit --lib profile::dogfood`. Everything outside the delimiters
-# is authored here and survives rendering byte for byte.
+# `./scripts/generate-template-region.sh`. Everything outside the delimiters is
+# authored here and survives rendering byte for byte. An edit to either
+# declaration alone fails the test suite.
 #
 # Why the container anchor carries `repo-validate` (REQ-13 of issue 552ff75c):
 # it is the whole-repo integrity gate on the breakable container.

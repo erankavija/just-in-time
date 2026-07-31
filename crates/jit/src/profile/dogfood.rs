@@ -127,7 +127,7 @@ mod tests {
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
     };
     use crate::storage::{IssueStore, JsonFileStorage};
-    use crate::templates::{GraphTemplate, TemplateRegistry};
+    use crate::templates::TemplateRegistry;
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
@@ -523,100 +523,41 @@ mod tests {
         }
     }
 
-    /// Delimiters of the generated template region in this repository's
-    /// `.jit/templates.toml`, written in TOML's own comment syntax.
-    const TEMPLATE_REGION_BEGIN: &str = "# jit:plan-template:begin";
-    const TEMPLATE_REGION_END: &str = "# jit:plan-template:end";
-
-    /// The packaged template contributions, typed as the model the repository's
-    /// template registry parses its declarations into.
-    fn packaged_templates() -> Vec<GraphTemplate> {
-        let package = jit_dogfood_package().unwrap();
-        package
-            .manifest()
-            .contributions
-            .iter()
-            .filter_map(|contribution| match contribution {
-                Contribution::KeyedArray {
-                    target: KeyedArrayTarget::Templates,
-                    value,
-                    ..
-                } => Some(value.clone()),
-                _ => None,
-            })
-            .map(|value| {
-                serde_json::from_value(value)
-                    .expect("a packaged template contribution parses as a graph template")
-            })
-            .collect()
-    }
-
-    /// The packaged declarations serialized as a registry-file template block.
-    fn render_template_block(templates: &[GraphTemplate]) -> String {
-        #[derive(serde::Serialize)]
-        struct TemplateBlock<'a> {
-            template: &'a [GraphTemplate],
-        }
-        toml::to_string(&TemplateBlock {
-            template: templates,
-        })
-        .expect("the packaged templates serialize as TOML")
-    }
-
-    /// Splice `block` into the registry's generated region, preserving every
-    /// byte outside the delimiters.
-    fn splice_template_region(existing: &[u8], block: &str) -> Vec<u8> {
-        use crate::repository_state::{
-            render_managed_document, ManagedDocumentClaim, RegionPlacement,
-        };
-        render_managed_document(
-            existing,
-            &[ManagedDocumentClaim::Region {
-                owner: "jit-dogfood".into(),
-                region_id: "plan-template".into(),
-                begin: TEMPLATE_REGION_BEGIN.as_bytes().to_vec(),
-                end: TEMPLATE_REGION_END.as_bytes().to_vec(),
-                content: block.as_bytes().to_vec(),
-                placement: RegionPlacement::RequireExisting,
-            }],
-        )
-        .expect("the registry declares the generated template region")
-    }
-
-    /// The registry bytes outside the generated region: everything through the
-    /// begin delimiter, and everything from the end delimiter onward.
-    fn outside_template_region(registry: &[u8]) -> (String, String) {
-        let text = std::str::from_utf8(registry).expect("the registry is UTF-8");
-        let begin = text
-            .find(TEMPLATE_REGION_BEGIN)
-            .expect("the registry declares a region begin delimiter")
-            + TEMPLATE_REGION_BEGIN.len();
-        let end = text
-            .find(TEMPLATE_REGION_END)
-            .expect("the registry declares a region end delimiter");
-        (text[..begin].to_string(), text[end..].to_string())
-    }
-
-    /// Generates this repository's template declaration from the packaged
-    /// contribution that is its authority, writing `.jit/templates.toml` only
-    /// when the rendered bytes differ from the file on disk.
+    /// This repository's committed template registry carries the packaged
+    /// declarations: its generated region equals the render, the render owns
+    /// that region and no byte outside it, the result loads, and rendering
+    /// again changes nothing.
     ///
-    /// Running this test IS the rendering run: the packaged declaration is the
-    /// single source of the block between the region delimiters, and the
-    /// authored header, commentary and any declaration outside them survive
-    /// byte for byte.
+    /// The assertion never writes. Generation is the
+    /// `render-template-region` example, invoked through the generator script
+    /// the failure message names, so an edit to either declaration alone fails
+    /// here instead of being repaired.
     #[test]
-    fn test_repository_template_registry_region_renders_from_packaged_contributions() {
+    fn test_committed_template_registry_carries_the_packaged_declarations() {
+        use crate::profile::template_region::{
+            outside_template_region, packaged_templates, render_template_block,
+            splice_template_region, TEMPLATE_REGION_GENERATOR,
+        };
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let path = root.join(".jit/templates.toml");
-        let existing = fs::read(&path).unwrap();
-        let block = render_template_block(&packaged_templates());
-        let rendered = splice_template_region(&existing, &block);
+        let existing = fs::read(root.join(".jit/templates.toml")).unwrap();
+        let block = render_template_block(&packaged_templates().unwrap()).unwrap();
+        let rendered = splice_template_region(&existing, &block).unwrap();
+
+        // The committed registry IS the render. On drift the generator, not
+        // this assertion, is what brings the two back into agreement.
+        assert_eq!(
+            String::from_utf8(rendered.clone()).unwrap(),
+            String::from_utf8(existing.clone()).unwrap(),
+            ".jit/templates.toml no longer carries the packaged template \
+             declarations. The block between the region delimiters is \
+             generated from profiles/jit-dogfood/manifest.toml: edit the \
+             packaged declaration, then regenerate with {TEMPLATE_REGION_GENERATOR}"
+        );
 
         // Rendering owns the region and nothing else.
         assert_eq!(
-            outside_template_region(&rendered),
-            outside_template_region(&existing),
+            outside_template_region(&rendered).unwrap(),
+            outside_template_region(&existing).unwrap(),
             "rendering changed registry bytes outside the region delimiters"
         );
 
@@ -624,14 +565,15 @@ mod tests {
         // whole while the authored bytes around it survive: the region body is
         // read from the package rather than carried over from the file.
         let stale =
-            splice_template_region(&existing, "# a declaration the package does not make\n");
+            splice_template_region(&existing, "# a declaration the package does not make\n")
+                .unwrap();
         assert_eq!(
-            outside_template_region(&stale),
-            outside_template_region(&existing),
+            outside_template_region(&stale).unwrap(),
+            outside_template_region(&existing).unwrap(),
             "replacing the region changed registry bytes outside the delimiters"
         );
         assert_eq!(
-            splice_template_region(&stale, &block),
+            splice_template_region(&stale, &block).unwrap(),
             rendered,
             "rendering over a diverged region did not restore the packaged block"
         );
@@ -663,19 +605,10 @@ mod tests {
 
         // A second rendering run finds nothing to change.
         assert_eq!(
-            splice_template_region(&rendered, &block),
+            splice_template_region(&rendered, &block).unwrap(),
             rendered,
             "a second rendering run changed the registry"
         );
-
-        // Publish, on a byte difference alone so an unchanged registry keeps its
-        // timestamp, through a staged file and one rename so a reader that loads
-        // the registry concurrently sees one whole version or the other.
-        if rendered != existing {
-            let staged = tempfile::NamedTempFile::new_in(path.parent().unwrap()).unwrap();
-            fs::write(staged.path(), &rendered).unwrap();
-            staged.persist(&path).unwrap();
-        }
     }
 
     #[test]
