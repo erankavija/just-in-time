@@ -1,7 +1,7 @@
 use super::manifest::{
     is_lowercase_kebab, ProfileManifest, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
 };
-use crate::repository_state::{Contribution, MapEntryTarget};
+use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use include_dir::Dir;
 use semver::{Version, VersionReq};
 use serde::Serialize;
@@ -342,6 +342,19 @@ fn validate_contribution(
 ) -> Result<(), ProfilePackageError> {
     let invalid = |message: String| ProfilePackageError::InvalidContribution { index, message };
     match contribution {
+        Contribution::Scalar { target, value } => {
+            if value.trim().is_empty() {
+                return Err(invalid("scalar value must not be empty".to_string()));
+            }
+            if *target == ScalarTarget::ValidationStrictness {
+                value
+                    .parse::<crate::validation::Strictness>()
+                    .map_err(|error| {
+                        invalid(format!("validation strictness is invalid: {error}"))
+                    })?;
+            }
+            Ok(())
+        }
         Contribution::MapEntry {
             target,
             identity,
@@ -429,6 +442,7 @@ fn validate_relative_path(field: &'static str, path: &str) -> Result<(), Profile
 
 fn contribution_identity(contribution: &Contribution) -> String {
     let semantic = match contribution {
+        Contribution::Scalar { target, .. } => format!("scalar:{target:?}"),
         Contribution::MapEntry {
             target, identity, ..
         } => format!("map-entry:{target:?}:{identity}"),
@@ -556,7 +570,9 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 mod tests {
     use super::*;
     use crate::profile::{profile_manifest_schema, ProfileId};
-    use crate::repository_state::{Contribution, KeyedArrayTarget, MapEntryTarget};
+    use crate::repository_state::{
+        Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
+    };
     use include_dir::{include_dir, Dir};
 
     static VALID_PACKAGE: Dir<'_> =
@@ -671,6 +687,67 @@ mod tests {
             .validate(&instance)
             .expect("manifest with dependency must satisfy generated schema");
         assert_eq!(instance["dependencies"][0], "jit-default");
+    }
+
+    #[test]
+    fn test_manifest_inspection_carries_scalar_and_set_configuration_contributions() {
+        let manifest: ProfileManifest = toml::from_str(
+            r#"
+[profile]
+manifest-version = 1
+id = "configuration"
+version = "1.0.0"
+jit = ">=1.0.0"
+
+[[contribution]]
+kind = "scalar"
+target = "documentation-development-root"
+value = "workspace"
+
+[[contribution]]
+kind = "scalar"
+target = "validation-default-type"
+value = "work-item"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "workspace/active"
+"#,
+        )
+        .expect("configuration contribution vocabulary parses");
+
+        assert!(matches!(
+            manifest.contributions.first(),
+            Some(Contribution::Scalar {
+                target: ScalarTarget::DocumentationDevelopmentRoot,
+                value
+            }) if value == "workspace"
+        ));
+        assert!(matches!(
+            manifest.contributions.get(1),
+            Some(Contribution::Scalar {
+                target: ScalarTarget::ValidationDefaultType,
+                value
+            }) if value == "work-item"
+        ));
+        assert!(matches!(
+            manifest.contributions.get(2),
+            Some(Contribution::SetString {
+                target: SetStringTarget::DocumentationManagedPaths,
+                value
+            }) if value == "workspace/active"
+        ));
+
+        let inspection = serde_json::to_value(&manifest).unwrap();
+        assert_eq!(
+            inspection["contribution"][0]["target"],
+            "documentation-development-root"
+        );
+        assert_eq!(
+            inspection["contribution"][2]["target"],
+            "documentation-managed-paths"
+        );
     }
 
     #[test]
