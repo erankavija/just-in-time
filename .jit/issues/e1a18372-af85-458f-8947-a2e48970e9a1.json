@@ -14,7 +14,18 @@
     "code-review",
     "jit-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T11:13:15.092842023Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-07-31T11:13:18.043817552Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e1a18372-af85-458f-8947-a2e48970e9a1",
   "labels": [
     "type:task",
@@ -29,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Generate the repository plan-template declaration from the packaged contribution",
-  "updated_at": "2026-07-31T08:48:23.860270494Z"
+  "updated_at": "2026-07-31T11:13:18.043817552Z"
 }

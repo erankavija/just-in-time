@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "170436cd85def3c41fbe1ac65419e2650e8e818d",
+  "completed_at": "2026-07-31T11:18:02.191219347Z",
+  "duration_ms": 151221,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed fixture filter derives and admits only packaged live tracker-data sources while preserving all required exclusions and recorded CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7a548c3-38a3-443b-bc02-8766b3801676",
+  "message": null,
+  "run_id": "faac794a-ec5e-4003-8fe0-c1828765b961",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T11:15:30.969628862Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b85888ff, e6ca70a9 (`jit:c7a548c3`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T09:49:52Z); code-review pending (no prior run)\nTruncation recovery: narrowed reads of the package manifest, profile declarations, gate/invariant sources, and affected current files after an overbroad search truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed fixture filter derives and admits only packaged live tracker-data sources while preserving all required exclusions and recorded CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c3f7cb2933b13be00e11e66e1bb087970d379f8b",
+  "completed_at": "2026-07-31T11:21:00.933054680Z",
+  "duration_ms": 174876,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md",
+        "id": "F1",
+        "line": 37,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "medium",
+        "summary": "Active investigation still lists retired scripts/ai-review.sh as a live executable asset, leaving the relocation cutover incomplete."
+      }
+    ],
+    "summary": "An active investigation document still declares the retired scripts/ai-review.sh as a live packaged executable.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9d451c98-d9b2-4bfb-937b-98831aaf37d0",
+  "message": null,
+  "run_id": "4e25652f-ebb2-42c8-9ccf-d353160a0ec5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T11:18:06.056943788Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5812 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb7e5-4ed4-7182-8daa-0f725008d227\n--------\nuser\n--- 5799 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c13e430c, 37075ac4, 444b11e3, 8f8401ed, 508dad23, fe6bd02f (jit:9d451c98)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-6 (issue record); @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T10:26:45Z); docs-mechanical passed (exit 0, 2026-07-31T09:39:44Z)\nTruncation recovery: Narrowed the initially truncated reference searches to live consumers; archived and historical gate-run records were outside the shipping impact cone.\n\n1. **[blocking][issue-impact] F1 (medium):** The active investigation still declares seven executable live assets, including the retired `scripts/ai-review.sh`, at `dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md:37`. The current manifest has only the relocated `contrib/gates/ai-review.sh` wrapper asset, so this active source is stale and violates REQ-05’s required path cutover. References: `@/invariant/canonical-cutover`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"An active investigation document still declares the retired scripts/ai-review.sh as a live packaged executable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Active investigation still lists retired scripts/ai-review.sh as a live executable asset, leaving the relocation cutover incomplete.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md\",\"line\":37,\"references\":[\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

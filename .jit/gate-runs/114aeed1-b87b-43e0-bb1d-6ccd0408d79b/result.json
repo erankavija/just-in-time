@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "170436cd85def3c41fbe1ac65419e2650e8e818d",
+  "completed_at": "2026-07-31T11:15:26.013240556Z",
+  "duration_ms": 124577,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The standalone Unix executable-mode guard derives all live declarations, checks repository modes independently of the retained byte comparison, and has targeted negative coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9943c488-9689-4b58-a1a3-e0571db52cf3",
+  "message": null,
+  "run_id": "114aeed1-b87b-43e0-bb1d-6ccd0408d79b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T11:13:21.435691351Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f9b85933, 93ab31f2, ff3337ed\nPolicy sources: AGENTS.md\nResolved items: @/issue/9943c488/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T09:40:18Z)\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The standalone Unix executable-mode guard derives all live declarations, checks repository modes independently of the retained byte comparison, and has targeted negative coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

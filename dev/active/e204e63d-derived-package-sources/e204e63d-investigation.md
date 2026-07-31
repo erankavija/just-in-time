@@ -30,11 +30,11 @@ Line numbers reflect the tree at the time of writing (branch `main`, HEAD `e48d3
   `render_managed_document` with a placeholder invariants claim (`dogfood.rs:492-513`)
   before comparing. Executable mode is not checked for the region. So the region pair is
   guarded on *prose inside the region, modulo the nested invariants sub-region*, not on bytes.
-- Seven live assets are declared `executable = true`
+- Six live assets are declared `executable = true`
   (`.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh`,
   `.../dispatch-worker-worktree.sh`, `.agents/skills/jit-planning-lead/scripts/breakdown_manifest.py`,
   `.agents/skills/jit-project-lead/scripts/standards-fix.sh`, `.../standards-scan.sh`,
-  `scripts/ai-review.sh`, `contrib/gates/ai-review.sh`).
+  `contrib/gates/ai-review.sh`).
 
 ### C2 — the test walks declared→live only
 

@@ -18,6 +18,11 @@
       "updated_at": "2026-07-31T10:33:44.794137627Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-31T11:21:01.235922398Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-07-31T09:39:53.969641577Z",
@@ -38,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Relocate the packaged gate machinery out of the script directory",
-  "updated_at": "2026-07-31T10:33:44.794137627Z"
+  "updated_at": "2026-07-31T11:21:01.235922398Z"
 }

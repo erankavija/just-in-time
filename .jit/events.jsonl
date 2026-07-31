@@ -11828,3 +11828,5 @@
 {"gate_key":"jit-validate","id":"d8b404cf-c944-4750-b4e1-03d98f42edc6","issue_id":"e1a18372-af85-458f-8947-a2e48970e9a1","timestamp":"2026-07-31T11:13:18.043817552Z","type":"gate_passed","updated_by":"auto:executor"}
 {"fields":["documents"],"id":"80dc832a-19f7-4f48-bbbe-2d396527db76","issue_id":"a62d444d-525a-44d7-97f8-b95ce05b0c4b","timestamp":"2026-07-31T11:14:55.567096278Z","type":"issue_updated","updated_by":"doc-add"}
 {"gate_key":"code-review","id":"22ee6548-0031-47d9-99c2-0ef7fc55a772","issue_id":"9943c488-9689-4b58-a1a3-e0571db52cf3","timestamp":"2026-07-31T11:15:26.299140386Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"d103d6e4-0d0f-446e-8217-606b9c49f0de","issue_id":"c7a548c3-38a3-443b-bc02-8766b3801676","timestamp":"2026-07-31T11:18:02.479546031Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"c56289c2-24e4-4329-8157-df3a8a7ab04d","issue_id":"9d451c98-d9b2-4bfb-937b-98831aaf37d0","timestamp":"2026-07-31T11:21:01.235922398Z","type":"gate_failed","updated_by":"auto:executor"}
