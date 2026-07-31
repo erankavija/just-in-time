@@ -17,7 +17,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-07-31T20:45:39.593999502Z",
+      "updated_at": "2026-07-31T20:56:54.645413368Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Stop supplying a taxonomy to a repository that declares none",
-  "updated_at": "2026-07-31T20:45:39.593999502Z"
+  "updated_at": "2026-07-31T20:56:54.645413368Z"
 }

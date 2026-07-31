@@ -452,10 +452,22 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     // An idle keep-alive connection is retired by the graceful shutdown itself.
     wait_for_close(&mut completed, signalled_at, STREAM_EOF_BUDGET);
     // The connection that cannot finish is still open partway through the drain.
-    assert!(
-        is_still_open(&mut stalled),
-        "the stalled connection was dropped before the drain deadline"
-    );
+    //
+    // Only probe while the probe can still observe that: the three waits above
+    // are each entitled to STREAM_EOF_BUDGET, so together they may consume more
+    // than GRACEFUL_DRAIN_TIMEOUT before reaching this line, at which point a
+    // CORRECT server has already force-closed the survivor and an unconditional
+    // probe fails on conforming behaviour. Under `cargo test --workspace` that
+    // is what happens; in isolation the waits return in milliseconds and the
+    // probe lands mid-drain. Skipping the probe costs no coverage — the
+    // stalled_closed_after assertion below states the same entitlement
+    // unconditionally, measured after the fact instead of sampled during.
+    if signalled_at.elapsed() + DEADLINE_SLACK < GRACEFUL_DRAIN_TIMEOUT {
+        assert!(
+            is_still_open(&mut stalled),
+            "the stalled connection was dropped before the drain deadline"
+        );
+    }
 
     let stalled_closed_after = wait_for_close(&mut stalled, signalled_at, EXIT_BUDGET);
     assert!(

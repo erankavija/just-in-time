@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d9acc6234a71a74af11b592413b48e7da52b9475",
+  "completed_at": "2026-07-31T20:56:54.636711224Z",
+  "duration_ms": 437912,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "a30d704d-05af-406c-8cb6-5031495af705",
+  "message": null,
+  "run_id": "245167c1-0da3-4689-9350-268b3496f728",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T20:49:36.724626382Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest graceful_shutdown_tests::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero ... FAILED\ntest result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.00s\n---- graceful_shutdown_tests::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero stdout ----\n\nthread 'graceful_shutdown_tests::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero' (92126) panicked at crates/server/tests/server_integration/graceful_shutdown_tests.rs:455:5:\nthe stalled connection was dropped before the drain deadline\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1543 bytes=27965787)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1407985848/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}
