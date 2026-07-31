@@ -300,6 +300,45 @@
    "REQ-06": "meaningless after extraction"
   }
  },
- "blocked": "Fan-out on the widened scope blocks on audit 7cbefe7c (@/issue/e204e63d/decision/D-18). Epic criteria REQ-07..REQ-10 have no coverage until the extraction interior is instantiated; the plan amendment in 7eecace8 supplies it.",
- "session": 2
+ "blocked": "plan-review on 7eecace8 cannot pass until audit 7cbefe7c lands and the plan is re-planned to decompose D-13/D-14 (finding F2). F1 is resolved; F3 and F4 are for the re-plan.",
+ "session": 2,
+ "open_findings": [
+  {
+   "at": "2026-07-31",
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "verdict": "fail",
+   "round": 2,
+   "findings": [
+    {
+     "id": "F1",
+     "severity": "high",
+     "status": "resolved",
+     "text": "The manifest specifies repository-time assembly but the graph retained the build-time assembly task and obsolete build-chain work.",
+     "resolution": "Lead reconciled the graph to the manifest: eight surviving issues retargeted to their manifest title, description, type, priority, labels and gates; 7d038e97 gained docs-mechanical. Zero title mismatches remain."
+    },
+    {
+     "id": "F2",
+     "severity": "high",
+     "status": "open-by-sequence",
+     "text": "The plan omits implementation of settled D-13 and D-14 while citing them.",
+     "resolution": "Not a plan defect to fix in place. D-18 sequences that work behind audit 7cbefe7c, and the owner's chosen order is amendment, then audit, then one re-plan covering everything. The gate cannot pass until the audit lands and the plan decomposes D-13/D-14. Lead ran plan-review before that point."
+    },
+    {
+     "id": "F3",
+     "severity": "medium",
+     "status": "open",
+     "text": "Two 'Superseded:' design rows and two 'Open:' correction rows read as accumulation rather than a concise current design (plan.md:413).",
+     "resolution": "For the re-plan: fold the load-bearing substance into the decision rows it justifies and delete the historical framing."
+    },
+    {
+     "id": "F4",
+     "severity": "medium",
+     "status": "open",
+     "text": "Manifest entries have unordered overlapping footprints despite the plan claiming shared writers are ordered (breakdown.json:845).",
+     "resolution": "For the re-plan: add edges, or state a credible disjoint-edit contract per overlapping pair."
+    }
+   ]
+  }
+ ]
 }

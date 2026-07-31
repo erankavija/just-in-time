@@ -15,16 +15,16 @@
   "gates_status": {},
   "id": "3e340587-e295-4e75-ab0a-3745f896a676",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
     "story:package-derivation",
     "satisfies:REQ-03",
-    "enforces:@/invariant/canonical-cutover"
+    "enforces:@/invariant/canonical-cutover",
+    "type:task"
   ],
   "priority": "high",
   "state": "ready",
   "title": "Move the package-authored region source out of the derived prefix",
-  "updated_at": "2026-07-28T12:26:18.373570042Z"
+  "updated_at": "2026-07-31T16:38:57.836384396Z"
 }

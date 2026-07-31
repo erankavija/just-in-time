@@ -15,15 +15,15 @@
   "gates_status": {},
   "id": "26f503cc-07a9-4f39-ae86-2453f5a916d6",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
     "story:package-derivation",
-    "satisfies:REQ-03"
+    "satisfies:REQ-03",
+    "type:task"
   ],
   "priority": "normal",
   "state": "backlog",
   "title": "Adjust the citation checker's package exclusions",
-  "updated_at": "2026-07-31T16:31:10.693819063Z"
+  "updated_at": "2026-07-31T16:39:13.631314985Z"
 }

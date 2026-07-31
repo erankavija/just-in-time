@@ -15,17 +15,17 @@
   "gates_status": {},
   "id": "0cf1f351-ee24-4b2f-a38c-f9c318a569f9",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
     "story:package-derivation",
     "satisfies:REQ-05",
     "per:@/issue/e204e63d/decision/D-6",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "type:task"
   ],
   "priority": "normal",
   "state": "backlog",
   "title": "Fail on a repository file under a declared root that no packaged asset claims",
-  "updated_at": "2026-07-31T16:31:05.568370904Z"
+  "updated_at": "2026-07-31T16:39:18.767530001Z"
 }

@@ -14,15 +14,15 @@
   "gates_status": {},
   "id": "4873b32f-8d16-4120-9fb3-987b818361a2",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
     "story:package-derivation",
-    "satisfies:REQ-05"
+    "satisfies:REQ-05",
+    "type:task"
   ],
   "priority": "normal",
   "state": "backlog",
   "title": "Cover the declared roots on the agent-facing bridge",
-  "updated_at": "2026-07-28T12:17:11.984851016Z"
+  "updated_at": "2026-07-31T16:39:23.907339213Z"
 }

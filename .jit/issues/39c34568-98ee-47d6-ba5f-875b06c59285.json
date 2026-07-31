@@ -16,7 +16,6 @@
   "gates_status": {},
   "id": "39c34568-98ee-47d6-ba5f-875b06c59285",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
@@ -24,10 +23,11 @@
     "satisfies:REQ-05",
     "per:@/issue/e204e63d/decision/D-2",
     "per:@/issue/e204e63d/decision/D-6",
-    "enforces:@/invariant/semantic-types"
+    "enforces:@/invariant/semantic-types",
+    "type:task"
   ],
   "priority": "high",
   "state": "ready",
   "title": "Declare the repository roots the packaged live assets are drawn from",
-  "updated_at": "2026-07-31T16:10:51.641698724Z"
+  "updated_at": "2026-07-31T16:39:02.998929114Z"
 }

@@ -61,7 +61,7 @@
   "gates_status": {
     "plan-review": {
       "status": "failed",
-      "updated_at": "2026-07-31T16:16:20.152095544Z",
+      "updated_at": "2026-07-31T16:37:50.338256050Z",
       "updated_by": "auto:executor"
     }
   },
@@ -75,5 +75,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "planning: Derived profile assets and projected policy documentation",
-  "updated_at": "2026-07-31T16:16:20.152095544Z"
+  "updated_at": "2026-07-31T16:37:50.338256050Z"
 }

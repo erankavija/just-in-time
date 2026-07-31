@@ -15,16 +15,16 @@
   "gates_status": {},
   "id": "0db28190-29bf-4a52-8c47-804f7842a815",
   "labels": [
-    "type:task",
     "epic:derived-package-sources",
     "milestone:v1.0",
     "component:core",
     "story:package-derivation",
     "satisfies:REQ-05",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "type:task"
   ],
   "priority": "normal",
   "state": "backlog",
   "title": "State the root declaration in the adopter manifest reference",
-  "updated_at": "2026-07-28T12:17:11.984851016Z"
+  "updated_at": "2026-07-31T16:39:29.036810398Z"
 }

@@ -1,0 +1,67 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4d6afc13092758dacbafe1a3f8d2f464aeca7c42",
+  "completed_at": "2026-07-31T16:37:49.989699019Z",
+  "duration_ms": 238953,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F1",
+        "line": 642,
+        "references": [
+          "@/invariant/canonical-cutover",
+          "@/issue/e204e63d/decision/D-7"
+        ],
+        "severity": "high",
+        "summary": "The authoritative manifest specifies repository-time assembly, but the current graph retains a build-time assembly task and obsolete build-chain work; reconcile the graph exactly to the manifest."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-plan.md",
+        "id": "F2",
+        "line": 32,
+        "references": [
+          "@/issue/e204e63d/decision/D-13",
+          "@/issue/e204e63d/decision/D-14",
+          "@/issue/e204e63d/decision/D-18"
+        ],
+        "severity": "high",
+        "summary": "The plan deliberately omits implementation of settled D-13 and D-14 while citing them; complete the required audit and replace the manifest with its ordered implementation branches."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-plan.md",
+        "id": "F3",
+        "line": 413,
+        "severity": "medium",
+        "summary": "The plan retains superseded historical designs and open correction notes, creating blocking accumulation rather than a concise current design."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json",
+        "id": "F4",
+        "line": 845,
+        "severity": "medium",
+        "summary": "Manifest entries have unordered overlapping footprints despite the plan claiming shared writers are ordered; add edges or explicit credible disjoint-edit contracts."
+      }
+    ],
+    "summary": "The manifest does not match the created graph, omits settled container decisions, accumulates superseded plan prose, and leaves footprint overlaps unresolved.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7eecace8-fae3-49f8-8907-2d6180ae40a3",
+  "message": null,
+  "run_id": "9d15d5f0-987d-4be9-89d9-49af9cddda2e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T16:33:51.035989155Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5125 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb906-63c8-7f11-a896-3f7fef26a189\n--------\nuser\n--- 5112 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **Authoritative manifest and current graph diverge.** The manifest specifies repository-time assembly, while the created task still requires build-time assembly (`e204e63d-breakdown.json:642`; `.jit/issues/7d038e97-87e8-4d02-9101-6ffef1e8bdc0.json:9`). The graph also retains obsolete build-chain entries, including retired REQ-06 work. The validator, renderer, and dry-run pass only for the new manifest; they do not validate the already-created stale graph. Reconcile the graph to this manifest, replacing/removing obsolete nodes and edges before approval.\n\n2. **The plan explicitly omits settled D-13/D-14 work.** It says remaining embedded declarative configuration will not be decomposed (`e204e63d-plan.md:32`), despite citing the settled requirements that no declarative configuration remains in the binary and that `jit-default` plus composition ship (`e204e63d-plan.md:403`, `:407`, `:409`). The sole audit leaf only reports future sequencing. Complete the audit first, then replace this plan and manifest with the audit-informed implementation branches and D-18 ordering; do not approve a partial manifest as implementing those decisions.\n\n3. **The plan has blocking accumulation.** The material-risk table retains superseded historical design narratives and open correction notes (`e204e63d-plan.md:413-425`), contrary to the concise-plan requirement. Consolidate these into the current shared contracts and material risks; move historical rationale and exhaustive investigation details to the linked investigation.\n\n4. **Footprint-overlap planning is incomplete.** `region-source-relocation` and `live-source-root-declaration` both touch `profiles/jit-dogfood/manifest.toml` without an ordering edge; `package-assembly-mechanism` and `live-source-completeness-guard` both touch `crates/jit/src/profile/dogfood.rs` without one (`e204e63d-breakdown.json:642`, `:845`). The plan’s claim that shared writers are ordered is therefore incomplete (`e204e63d-plan.md:417`). Add dependency edges or explicit, credible disjoint-edit contracts and regenerate the overview.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest does not match the created graph, omits settled container decisions, accumulates superseded plan prose, and leaves footprint overlaps unresolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"The authoritative manifest specifies repository-time assembly, but the current graph retains a build-time assembly task and obsolete build-chain work; reconcile the graph exactly to the manifest.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":642,\"references\":[\"@/invariant/canonical-cutover\",\"@/issue/e204e63d/decision/D-7\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"summary\":\"The plan deliberately omits implementation of settled D-13 and D-14 while citing them; complete the required audit and replace the manifest with its ordered implementation branches.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-plan.md\",\"line\":32,\"references\":[\"@/issue/e204e63d/decision/D-13\",\"@/issue/e204e63d/decision/D-14\",\"@/issue/e204e63d/decision/D-18\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"The plan retains superseded historical designs and open correction notes, creating blocking accumulation rather than a concise current design.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-plan.md\",\"line\":413},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"summary\":\"Manifest entries have unordered overlapping footprints despite the plan claiming shared writers are ordered; add edges or explicit credible disjoint-edit contracts.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-breakdown.json\",\"line\":845}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
