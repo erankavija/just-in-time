@@ -9,10 +9,13 @@
    "issues": [
     {
      "short_id": "a30d704d",
-     "status": "dispatched",
+     "status": "merged-awaiting-gates",
      "worker": "opus-agent",
      "batch": "A",
-     "base": "56cc6c0f"
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Four commits. Both taxonomy-supplying Default impls (HierarchyConfig, LabelNamespaces) and the unwrap_or_default fallback branches are gone; no impl Default for remains in domain/types.rs, config.rs, config_manager.rs or graph/hierarchy.rs. A 290-line fast_rules suite proves a repository declaring neither table receives an empty registry, no enumerating rule and no schema, and still validates. Its own follow-up commit 69fe7b28 is the substantive catch: file membership followed only the namespace-unique-* prefix, so withdrawing [type_hierarchy] would have left the type-enumeration rule and both hierarchy warnings behind. Docs swept in present tense (configuration.md, example-config.toml, labels.md). Merged into main with no conflicts despite three changed-in-both files; fast_rules passes 178/178 post-merge.",
+     "gate_decision": "docs-mechanical deliberately NOT added despite three docs/reference edits: the plan's gate assignment passed breakdown-review, story 93fef456 above it already carries docs-mechanical and doc-review, and the edits are the convention-required stale-text sweep rather than a deliverable. Changing a reviewed gate assignment mid-wave is scope drift."
     },
     {
      "short_id": "ae435979",
@@ -61,11 +64,11 @@
     },
     {
      "short_id": "510297e4",
-     "status": "merged-rework-in-flight",
+     "status": "merged-awaiting-gates",
      "worker": "codex-luna",
      "batch": "B",
      "base": "4abed8d8",
-     "lead_review": "fail-after-merge",
+     "lead_review": "pass-after-rework",
      "note": "cargo-ci on merged main failed: test_command_exit_codes_apply_prospective_cycle_emits_4 (crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs) now hits the new 'declares no container label' error before reaching cycle detection, because the CYCLIC_APPLY_TEMPLATE fixture's breakdown node declares no labels. REQ-03 mandates that error, so the fixture is at fault, not the production change. Reworked in a fresh worktree off current main with an audit list of every breakdown-node declaration lacking a container label, since cargo test stops at the first failing target and may be hiding more."
     },
     {
@@ -114,7 +117,7 @@
      "note": "Three constants and their fallbacks gone; an incomplete kind declaration is reported rather than completed. The only surviving reference to the removed names is the dated audit findings record."
     }
    ],
-   "gate_run": "Serial gate pipeline for ten merged issues started 2026-07-31; strictly one jit gate evaluate at a time with an explicit cd to the main checkout."
+   "gate_run": "All twelve merged. Gate pipeline restarted 2026-07-31 20:36Z over the complete set on an idle host, after the first pass produced only a load-induced cargo-ci failure. Merges and gate runs are serialised against each other: merging 09aea8b3 mid-run moved HEAD under a live code-review and the stale-binary guard refused it with exit 10."
   }
  ],
  "created_during_execution": [
