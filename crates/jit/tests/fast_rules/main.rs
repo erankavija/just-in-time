@@ -19,6 +19,7 @@ mod project_render_harness_tests;
 mod type_hierarchy_schema_regen_tests;
 mod type_taxonomy_custom_strategic_tests;
 mod type_taxonomy_warnings_tests;
+mod undeclared_taxonomy_tests;
 mod validate_rule_runner_tests;
 mod validation_tests;
 

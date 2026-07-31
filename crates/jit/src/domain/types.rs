@@ -2815,7 +2815,7 @@ pub struct LabelNamespaces {
     pub schema_version: u32,
     /// Map of namespace name to configuration
     pub namespaces: HashMap<String, LabelNamespace>,
-    /// Type hierarchy configuration (optional, defaults to standard hierarchy)
+    /// Type hierarchy the repository declared, absent when it declared none
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub type_hierarchy: Option<HashMap<String, u8>>,
     /// Label associations for membership namespaces (type_name -> namespace)
@@ -2829,10 +2829,15 @@ pub struct LabelNamespaces {
 }
 
 impl LabelNamespaces {
-    /// Create empty namespace registry
-    pub fn new() -> Self {
+    /// A registry declaring nothing: no namespace, no type hierarchy, no
+    /// membership association and no strategic type.
+    ///
+    /// This is what a repository whose `config.toml` declares no `[namespaces]`
+    /// and no `[type_hierarchy]` holds, and the rules derived from it are
+    /// exactly the ones that need no declaration.
+    pub fn empty(schema_version: u32) -> Self {
         Self {
-            schema_version: 1,
+            schema_version,
             namespaces: HashMap::new(),
             type_hierarchy: None,
             label_associations: None,
@@ -2859,66 +2864,41 @@ impl LabelNamespaces {
         }
     }
 
-    /// Create registry with standard namespaces and default type hierarchy
-    pub fn with_defaults() -> Self {
-        let mut namespaces = HashMap::new();
-
-        // Core system namespaces (not derived from hierarchy)
-        namespaces.insert(
-            "component".to_string(),
-            LabelNamespace::new("Technical component or subsystem", false),
-        );
-
-        namespaces.insert(
-            "type".to_string(),
-            LabelNamespace::new("Issue type (bug, feature, task, etc.)", true),
-        );
-
-        namespaces.insert("team".to_string(), LabelNamespace::new("Owning team", true));
-
-        // Default type hierarchy
-        let mut type_hierarchy = HashMap::new();
-        type_hierarchy.insert("milestone".to_string(), 1);
-        type_hierarchy.insert("epic".to_string(), 2);
-        type_hierarchy.insert("story".to_string(), 3);
-        type_hierarchy.insert("task".to_string(), 4);
-
-        // Default label associations
-        let mut label_associations = HashMap::new();
-        label_associations.insert("milestone".to_string(), "milestone".to_string());
-        label_associations.insert("epic".to_string(), "epic".to_string());
-        label_associations.insert("story".to_string(), "story".to_string());
-
-        // Default strategic types (levels 1-2: milestone, epic)
-        let strategic_types = vec!["milestone".to_string(), "epic".to_string()];
-
-        let mut config = Self {
-            schema_version: 2,
-            namespaces,
-            type_hierarchy: Some(type_hierarchy),
-            label_associations: Some(label_associations),
-            strategic_types: Some(strategic_types),
-        };
-
-        // Dynamically create membership namespaces from label_associations
-        config.sync_membership_namespaces();
-
-        config
+    /// `self` with the type hierarchy and membership associations of
+    /// [`HierarchyConfig::test_vocabulary`](crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary)
+    /// declared, for the suites whose subject is a rule keyed on a declared
+    /// hierarchy.
+    ///
+    /// Derived from that one declaration rather than restating it, and reachable
+    /// only under `cfg(test)` or `feature = "test-support"`, so no adopter build
+    /// compiles the vocabulary and no repository can receive it.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn declaring_test_hierarchy(self) -> Self {
+        let vocabulary = crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary();
+        Self {
+            type_hierarchy: Some(
+                vocabulary
+                    .types()
+                    .map(|(name, level)| (name.clone(), *level))
+                    .collect(),
+            ),
+            label_associations: Some(
+                vocabulary
+                    .membership_namespaces()
+                    .map(|(type_name, namespace)| (type_name.clone(), namespace.clone()))
+                    .collect(),
+            ),
+            ..self
+        }
     }
 
-    /// Get the type hierarchy, or default if not specified
-    pub fn get_type_hierarchy(&self) -> HashMap<String, u8> {
-        if let Some(ref hierarchy) = self.type_hierarchy {
-            hierarchy.clone()
-        } else {
-            // Fallback to default hierarchy
-            let mut hierarchy = HashMap::new();
-            hierarchy.insert("milestone".to_string(), 1);
-            hierarchy.insert("epic".to_string(), 2);
-            hierarchy.insert("story".to_string(), 3);
-            hierarchy.insert("task".to_string(), 4);
-            hierarchy
-        }
+    /// The type hierarchy this registry declares, as a type-name to level map.
+    ///
+    /// Empty when the repository declared no `[type_hierarchy]`, which is what
+    /// makes the rules keyed on it — the `type:` value enumeration and the two
+    /// hierarchy graph warnings — produce nothing for such a repository.
+    pub fn declared_type_hierarchy(&self) -> HashMap<String, u8> {
+        self.type_hierarchy.clone().unwrap_or_default()
     }
 
     /// Add or update a namespace
@@ -2935,11 +2915,5 @@ impl LabelNamespaces {
     #[allow(dead_code)] // May be used in future
     pub fn contains(&self, name: &str) -> bool {
         self.namespaces.contains_key(name)
-    }
-}
-
-impl Default for LabelNamespaces {
-    fn default() -> Self {
-        Self::with_defaults()
     }
 }

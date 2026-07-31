@@ -62,7 +62,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             types.clone()
         } else {
             // Fallback: use hierarchy levels 1-2
-            let type_hierarchy = namespaces.get_type_hierarchy();
+            let type_hierarchy = namespaces.declared_type_hierarchy();
             type_hierarchy
                 .iter()
                 .filter(|(_, &level)| level <= 2)

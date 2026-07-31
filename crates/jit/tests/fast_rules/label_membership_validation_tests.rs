@@ -48,7 +48,7 @@ fn publish_issue(executor: &CommandExecutor<JsonFileStorage>, issue: &mut jit::d
 #[test]
 fn test_valid_epic_membership() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Create an epic
     let mut epic = crate::fixture_issue("Authentication System".to_string(), String::new());
@@ -74,7 +74,7 @@ fn test_valid_epic_membership() {
 #[test]
 fn test_invalid_epic_reference_not_found() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Create a task that references a non-existent epic
     let mut task = crate::fixture_issue("Implement login".to_string(), String::new());
@@ -113,7 +113,7 @@ fn test_invalid_epic_reference_not_found() {
 #[test]
 fn test_invalid_epic_reference_wrong_type() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Create an issue with type:task but epic:backend label
     let mut backend = crate::fixture_issue("Backend Service".to_string(), String::new());
@@ -145,7 +145,7 @@ fn test_invalid_epic_reference_wrong_type() {
 #[test]
 fn test_valid_milestone_membership() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Create milestone
     let mut milestone = crate::fixture_issue("v1.0 Release".to_string(), String::new());
@@ -166,7 +166,7 @@ fn test_valid_milestone_membership() {
 #[test]
 fn test_multiple_membership_labels() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Create milestone and epic
     let mut milestone = crate::fixture_issue("v1.0".to_string(), String::new());
@@ -202,7 +202,7 @@ fn test_multiple_membership_labels() {
 #[test]
 fn test_no_membership_labels_is_ok() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Task with no membership labels (orphan)
     let mut task = crate::fixture_issue("Standalone task".to_string(), String::new());
@@ -221,7 +221,7 @@ fn test_no_membership_labels_is_ok() {
 #[test]
 fn test_epic_referencing_itself() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Epic that references itself (valid but maybe weird)
     let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
@@ -241,7 +241,7 @@ fn test_epic_referencing_itself() {
 #[test]
 fn test_mixed_valid_and_invalid_references() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::default();
+    let config = HierarchyConfig::test_vocabulary();
 
     // Create one valid epic
     let mut epic = crate::fixture_issue("Auth".to_string(), String::new());

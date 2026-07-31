@@ -4,7 +4,7 @@ use jit::domain::type_taxonomy::{HierarchyConfig, ValidationWarning};
 
 /// Helper to create a test hierarchy config
 fn test_config() -> HierarchyConfig {
-    HierarchyConfig::default()
+    HierarchyConfig::test_vocabulary()
 }
 
 #[test]

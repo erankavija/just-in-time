@@ -6305,7 +6305,7 @@ fn run() -> Result<()> {
                 use jit::config_manager::ConfigManager;
                 let config_mgr = ConfigManager::new(&jit_dir);
                 let namespaces = config_mgr.get_namespaces()?;
-                let hierarchy = namespaces.get_type_hierarchy();
+                let hierarchy = namespaces.declared_type_hierarchy();
 
                 if json {
                     use jit::output::JsonOutput;

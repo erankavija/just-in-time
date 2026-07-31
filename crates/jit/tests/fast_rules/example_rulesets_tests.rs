@@ -72,7 +72,7 @@ fn issue_graph_findings_at(
     let findings = evaluate_graph(
         rules,
         issues,
-        &jit::domain::type_taxonomy::HierarchyConfig::default(),
+        &jit::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
         ContentFormat::Markdown,
         now,
         &std::collections::HashMap::new(),

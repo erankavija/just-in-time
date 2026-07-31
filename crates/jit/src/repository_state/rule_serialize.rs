@@ -553,7 +553,8 @@ mod tests {
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             ("milestone", LabelNamespace::new("Release", false)),
-        ]);
+        ])
+        .declaring_test_hierarchy();
         let set = default_ruleset(&reg);
         // Sanity: the set covers json-schema, shorthand, and graph kinds.
         assert!(set

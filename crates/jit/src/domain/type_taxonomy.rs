@@ -38,14 +38,23 @@
 //!
 //! ```
 //! use jit::domain::type_taxonomy::{extract_type, HierarchyConfig};
+//! use std::collections::HashMap;
 //!
-//! let config = HierarchyConfig::default();
+//! // The hierarchy carries whatever `[type_hierarchy]` declared.
+//! let config = HierarchyConfig::new(
+//!     HashMap::from([("task".to_string(), 2), ("epic".to_string(), 1)]),
+//!     HashMap::from([("epic".to_string(), "epic".to_string())]),
+//! )
+//! .unwrap();
 //!
 //! // Extract and validate type labels
 //! assert_eq!(extract_type("type:task"), Ok("task".to_string()));
 //! assert_eq!(extract_type("type:epic"), Ok("epic".to_string()));
 //! assert!(config.contains_type("task"));
 //! assert!(!config.contains_type("unknown"));
+//!
+//! // A repository that declared no hierarchy knows no type.
+//! assert!(!HierarchyConfig::empty().contains_type("task"));
 //! ```
 
 use crate::labels::{is_type_label, type_label, type_value_of};
@@ -139,32 +148,50 @@ pub struct HierarchyConfig {
     label_associations: HashMap<String, String>,
 }
 
-impl Default for HierarchyConfig {
-    /// Creates the default 4-level hierarchy:
-    /// 1. milestone (strategic, highest) - uses milestone:* labels
-    /// 2. epic (strategic, feature-level) - uses epic:* labels
-    /// 3. story (tactical, user story) - uses story:* labels
-    /// 4. task (tactical, implementation detail) - no membership labels
-    fn default() -> Self {
-        let mut types = HashMap::new();
-        types.insert("milestone".to_string(), 1);
-        types.insert("epic".to_string(), 2);
-        types.insert("story".to_string(), 3);
-        types.insert("task".to_string(), 4);
-
-        let mut label_associations = HashMap::new();
-        label_associations.insert("milestone".to_string(), "milestone".to_string());
-        label_associations.insert("epic".to_string(), "epic".to_string());
-        label_associations.insert("story".to_string(), "story".to_string());
-
+impl HierarchyConfig {
+    /// A hierarchy with no types and no membership associations, held by a
+    /// repository whose `config.toml` declares no `[type_hierarchy]`.
+    ///
+    /// Every query over it resolves nothing: no type is known, no level is
+    /// deepest, and no type is strategic, so the validations keyed on the
+    /// hierarchy report nothing.
+    pub fn empty() -> Self {
         Self {
-            types,
-            label_associations,
+            types: HashMap::new(),
+            label_associations: HashMap::new(),
         }
     }
-}
 
-impl HierarchyConfig {
+    /// The four-level hierarchy the crate's own suites declare to exercise
+    /// hierarchy-dependent behaviour, with the membership associations their
+    /// assertions read.
+    ///
+    /// This vocabulary belongs to the tests, not to the engine: it exists only
+    /// under `cfg(test)` or `feature = "test-support"`, so no adopter build
+    /// compiles it and no repository can receive it. A test asserting that a
+    /// strategic type resolves is exercising the mechanism, and this is the
+    /// declaration it exercises it against.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn test_vocabulary() -> Self {
+        Self {
+            types: [
+                ("milestone".to_string(), 1),
+                ("epic".to_string(), 2),
+                ("story".to_string(), 3),
+                ("task".to_string(), 4),
+            ]
+            .into_iter()
+            .collect(),
+            label_associations: [
+                ("milestone".to_string(), "milestone".to_string()),
+                ("epic".to_string(), "epic".to_string()),
+                ("story".to_string(), "story".to_string()),
+            ]
+            .into_iter()
+            .collect(),
+        }
+    }
+
     /// Creates a new hierarchy configuration from a map of type names to levels.
     ///
     /// # Arguments
@@ -610,7 +637,7 @@ mod tests {
 
     #[test]
     fn test_default_config() {
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
 
         assert_eq!(config.get_level("milestone"), Some(1));
         assert_eq!(config.get_level("epic"), Some(2));
@@ -672,7 +699,7 @@ mod tests {
 
     #[test]
     fn test_config_contains_type() {
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
 
         assert!(config.contains_type("task"));
         assert!(config.contains_type("epic"));
@@ -681,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_config_types_iterator() {
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
 
         let types: HashMap<String, u8> = config.types().map(|(k, v)| (k.clone(), *v)).collect();
 
@@ -710,7 +737,7 @@ mod tests {
     fn test_suggest_type_fix_close_match() {
         use super::suggest_type_fix;
 
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
 
         // Single character typos
         assert_eq!(suggest_type_fix(&config, "taks"), Some("task".to_string()));
@@ -726,7 +753,7 @@ mod tests {
     fn test_suggest_type_fix_no_match() {
         use super::suggest_type_fix;
 
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
 
         // Too different - no reasonable match
         assert_eq!(suggest_type_fix(&config, "unknown"), None);
@@ -738,7 +765,7 @@ mod tests {
     fn test_suggest_type_fix_exact_match() {
         use super::suggest_type_fix;
 
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
 
         // Even exact matches should be found
         assert_eq!(suggest_type_fix(&config, "task"), Some("task".to_string()));
@@ -749,7 +776,7 @@ mod tests {
     fn test_detect_unknown_type() {
         use super::{detect_validation_issues, ValidationIssue};
 
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
         let labels = vec!["type:taks".to_string()]; // typo
 
         let issues = detect_validation_issues(&config, "01ABC", &labels);
@@ -773,7 +800,7 @@ mod tests {
     fn test_detect_no_issues_for_valid_type() {
         use super::detect_validation_issues;
 
-        let config = HierarchyConfig::default();
+        let config = HierarchyConfig::test_vocabulary();
         let labels = vec!["type:task".to_string()];
 
         let issues = detect_validation_issues(&config, "01ABC", &labels);

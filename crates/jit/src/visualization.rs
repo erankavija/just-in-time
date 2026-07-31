@@ -300,7 +300,12 @@ pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
 ///
 /// let issues = vec![&epic, &task];
 /// let graph = DependencyGraph::new(&issues);
-/// let resolution = resolve_hierarchy(&issues, &HierarchyConfig::default());
+/// let hierarchy = HierarchyConfig::new(
+///     std::collections::HashMap::from([("epic".to_string(), 1), ("task".to_string(), 2)]),
+///     std::collections::HashMap::new(),
+/// )
+/// .unwrap();
+/// let resolution = resolve_hierarchy(&issues, &hierarchy);
 /// let json = visualization::export_json_full(&graph, &resolution);
 /// assert!(json.contains("\"description\""));
 /// assert!(json.contains("\"parent\""));
@@ -490,7 +495,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
         );
         let doc: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
@@ -519,7 +524,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
         );
 
         let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
@@ -544,7 +549,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
         );
 
         let full: serde_json::Value =
@@ -594,7 +599,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::default(),
+            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
         );
         let facts = resolution.get(&task.id).cloned().unwrap_or_default();
 

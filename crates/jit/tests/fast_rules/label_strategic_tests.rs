@@ -1,12 +1,29 @@
 //! Tests for strategic queries (Phase 3)
 
+use jit::commands::test_helpers::declared_test_taxonomy;
+use jit::commands::CommandExecutor;
 use jit::domain::Priority;
-use jit::storage::InMemoryStorage;
+use jit::storage::{InMemoryStorage, IssueStore};
+
+/// An executor over a repository that declares the type hierarchy these tests
+/// classify against. `query_strategic` reads that declaration through a
+/// `ConfigManager` rooted at the store, so the fixture writes it there as well
+/// as into the memory image.
+fn strategic_executor() -> CommandExecutor<InMemoryStorage> {
+    let storage = InMemoryStorage::new();
+    let config = format!(
+        "[worktree]\nenforce_leases = \"off\"\n\n{}",
+        declared_test_taxonomy()
+    );
+    std::fs::create_dir_all(storage.root()).unwrap();
+    std::fs::write(storage.root().join("config.toml"), &config).unwrap();
+    storage.add_data_file("config.toml", &config);
+    crate::memory_executor(storage)
+}
 
 #[test]
 fn test_query_strategic_returns_milestone_issues() {
-    let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = strategic_executor();
 
     // Create issues with strategic types
     let (milestone_id, _) = executor
@@ -44,8 +61,7 @@ fn test_query_strategic_returns_milestone_issues() {
 
 #[test]
 fn test_query_strategic_returns_epic_issues() {
-    let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = strategic_executor();
 
     let (epic_id, _) = executor
         .create_issue(
@@ -68,8 +84,7 @@ fn test_query_strategic_returns_epic_issues() {
 
 #[test]
 fn test_query_strategic_returns_both_milestone_and_epic() {
-    let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = strategic_executor();
 
     let (milestone_id, _) = executor
         .create_issue(
@@ -120,8 +135,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
 
 #[test]
 fn test_query_strategic_excludes_tactical_only() {
-    let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = strategic_executor();
 
     // Create only tactical issues
     executor
@@ -157,8 +171,7 @@ fn test_query_strategic_excludes_tactical_only() {
 
 #[test]
 fn test_query_strategic_includes_mixed_labels() {
-    let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = strategic_executor();
 
     // Issue with both strategic type and tactical labels
     let (mixed_id, _) = executor
@@ -186,8 +199,7 @@ fn test_query_strategic_includes_mixed_labels() {
 
 #[test]
 fn test_query_strategic_with_custom_strategic_namespace() {
-    let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = strategic_executor();
 
     // Strategic classification is type-based, not namespace-based
     // No need to add custom namespace - config handles this
@@ -232,8 +244,7 @@ fn test_query_strategic_with_custom_strategic_namespace() {
 
 #[test]
 fn test_query_strategic_empty_repo() {
-    let storage = InMemoryStorage::new();
-    let executor = crate::memory_executor(storage);
+    let executor = strategic_executor();
 
     let strategic = executor.query_strategic().unwrap();
 

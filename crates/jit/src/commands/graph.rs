@@ -456,12 +456,17 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     /// use jit::commands::CommandExecutor;
     /// use jit::domain::Priority;
-    /// use jit::storage::InMemoryStorage;
+    /// use jit::hierarchy_templates::HierarchyTemplate;
+    /// use jit::storage::{discover_repository_layout, JsonFileStorage};
+    /// use tempfile::TempDir;
     ///
-    /// let storage = InMemoryStorage::new();
-    /// storage.add_data_file("config.toml", "");
-    /// let layout = storage.repository_layout();
+    /// // Resolution reads the hierarchy the repository's `config.toml` declares.
+    /// let repo = TempDir::new().unwrap();
+    /// let storage = JsonFileStorage::new(repo.path().join(".jit"));
+    /// let layout = discover_repository_layout(repo.path(), repo.path().join(".jit")).unwrap();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
+    /// executor.initialize_fresh_repository(
+    ///     repo.path(), &HierarchyTemplate::default(), None).unwrap();
     /// let new = |title: &str, labels: Vec<String>| {
     ///     executor
     ///         .create_issue(title.into(), String::new(), Priority::Normal,

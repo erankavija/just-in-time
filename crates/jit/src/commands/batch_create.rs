@@ -572,6 +572,13 @@ mod tests {
     fn executor() -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
+        storage.add_data_file(
+            "config.toml",
+            &format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                crate::commands::test_helpers::declared_test_taxonomy()
+            ),
+        );
         crate::commands::test_helpers::memory_executor(storage)
     }
 

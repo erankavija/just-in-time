@@ -45,8 +45,8 @@ impl ConfigManager {
 
     /// Get the namespace registry from configuration.
     ///
-    /// Builds LabelNamespaces from config.toml, providing default namespaces
-    /// if none are configured. This replaces the legacy labels.json file.
+    /// Builds [`LabelNamespaces`] from `config.toml`, carrying exactly the
+    /// namespaces and type hierarchy it declares.
     ///
     /// # Errors
     ///
@@ -167,27 +167,30 @@ impl ConfigManager {
 ///
 /// The single pure `config -> LabelNamespaces` conversion shared by the config
 /// manager's cached-config read path and the mutation derive pipeline, which
-/// derives the default rule family from this same registry. Configured namespaces
-/// build the registry; an absent `[namespaces]` table yields the defaults.
+/// derives the default rule family from this same registry. The registry carries
+/// exactly what the configuration declares: an absent `[namespaces]` table
+/// yields no namespace, and an absent `[type_hierarchy]` table yields no
+/// hierarchy.
 pub fn namespaces_from_config(config: &JitConfig) -> LabelNamespaces {
-    match config.namespaces.as_ref() {
-        Some(namespaces_config) => build_namespaces_from_config(config, namespaces_config.clone()),
-        None => LabelNamespaces::default(),
-    }
+    build_namespaces_from_config(config, config.namespaces.clone().unwrap_or_default())
 }
 
 fn build_namespaces_from_config(
     config: &JitConfig,
     namespaces_config: HashMap<String, NamespaceConfig>,
 ) -> LabelNamespaces {
-    let mut namespaces = HashMap::new();
-    for (name, ns_config) in namespaces_config {
+    let namespaces = namespaces_config
+        .into_iter()
         // Only the taxonomy (description/unique) crosses into the domain
         // registry; per-namespace constraints (values/pattern/required) were
         // removed when validation became rule-driven.
-        let ns = LabelNamespace::new(ns_config.description, ns_config.unique);
-        namespaces.insert(name, ns);
-    }
+        .map(|(name, ns_config)| {
+            (
+                name,
+                LabelNamespace::new(ns_config.description, ns_config.unique),
+            )
+        })
+        .collect();
 
     let mut result = LabelNamespaces {
         schema_version: config.version.as_ref().map(|v| v.schema).unwrap_or(2),
@@ -214,27 +217,25 @@ fn build_namespaces_from_config(
 /// Reads `[type_hierarchy]` and its label associations through a
 /// [`ConfigManager`] rooted at the store, and returns them as a
 /// [`HierarchyConfig`](crate::domain::type_taxonomy::HierarchyConfig). A
-/// repository that declares no `[type_hierarchy]` yields the default taxonomy.
+/// repository that declares no `[type_hierarchy]` yields a hierarchy with no
+/// types, so every query that resolves tiers resolves none.
+///
+/// # Errors
+///
+/// Returns an error if `config.toml` cannot be parsed, or if the declared
+/// hierarchy is malformed (an empty type name or a level of 0).
 pub fn get_hierarchy_config<S: crate::storage::IssueStore>(
     storage: &S,
 ) -> Result<crate::domain::type_taxonomy::HierarchyConfig> {
-    let config_mgr = ConfigManager::new(storage.root());
-    let namespaces = config_mgr.get_namespaces()?;
+    let namespaces = ConfigManager::new(storage.root()).get_namespaces()?;
 
-    if let Some(type_hierarchy) = namespaces.type_hierarchy {
-        // Load label_associations or use empty map
-        let label_associations = namespaces.label_associations.unwrap_or_default();
-
-        // Convert to HierarchyConfig
-        crate::domain::type_taxonomy::HierarchyConfig::new(type_hierarchy, label_associations)
-            .map_err(|e| {
-                crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}"))
-                    .into()
-            })
-    } else {
-        // Return default config
-        Ok(crate::domain::type_taxonomy::HierarchyConfig::default())
-    }
+    crate::domain::type_taxonomy::HierarchyConfig::new(
+        namespaces.declared_type_hierarchy(),
+        namespaces.label_associations.unwrap_or_default(),
+    )
+    .map_err(|e| {
+        crate::errors::InvalidArgumentError::new(format!("Invalid hierarchy config: {e}")).into()
+    })
 }
 
 #[cfg(test)]
@@ -334,7 +335,7 @@ milestone = "milestone"
     }
 
     #[test]
-    fn test_get_namespaces_defaults() {
+    fn test_get_namespaces_without_declarations_yields_an_empty_registry() {
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
@@ -342,9 +343,27 @@ milestone = "milestone"
         let config_mgr = ConfigManager::new(&jit_dir);
         let namespaces = config_mgr.get_namespaces().unwrap();
 
-        // Should return defaults
-        assert!(namespaces.namespaces.contains_key("type"));
-        assert!(namespaces.namespaces.contains_key("epic"));
+        // A repository declaring nothing receives nothing.
+        assert!(namespaces.namespaces.is_empty());
+        assert!(namespaces.type_hierarchy.is_none());
+        assert!(namespaces.label_associations.is_none());
+        assert!(namespaces.strategic_types.is_none());
+    }
+
+    #[test]
+    fn test_get_hierarchy_config_without_declared_hierarchy_is_empty() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+        let storage = crate::storage::JsonFileStorage::new(&jit_dir);
+
+        let hierarchy = get_hierarchy_config(&storage).unwrap();
+
+        assert_eq!(
+            hierarchy,
+            crate::domain::type_taxonomy::HierarchyConfig::empty(),
+        );
+        assert_eq!(hierarchy.types().count(), 0);
     }
 
     #[test]
