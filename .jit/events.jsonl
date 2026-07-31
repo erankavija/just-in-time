@@ -12243,3 +12243,4 @@
 {"gate_key":"npm-ci","id":"74d1be23-d3c4-44ff-afd3-a8feed763a7d","issue_id":"9bdf8025-3a36-4a5f-b48c-1d56ec1db664","timestamp":"2026-07-31T20:06:38.702422372Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"mcp-ci","id":"dc2934f8-4deb-446e-b6a7-681269ec2895","issue_id":"fdae1023-6a10-45da-a56e-54916409a331","timestamp":"2026-07-31T20:06:41.816841074Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"992773c8-35ac-477f-8bba-fcf41ed6608a","issue_id":"9bdf8025-3a36-4a5f-b48c-1d56ec1db664","timestamp":"2026-07-31T20:09:40.133747104Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["description"],"id":"f4b91443-1f6d-4ab4-b041-152f93c63f41","issue_id":"9bdf8025-3a36-4a5f-b48c-1d56ec1db664","timestamp":"2026-07-31T20:20:12.126140173Z","type":"issue_updated","updated_by":"issue-update"}
