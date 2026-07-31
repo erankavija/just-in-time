@@ -16,12 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-31T22:13:46.692477430Z",
+      "updated_at": "2026-07-31T23:32:53.097859179Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-07-31T22:16:21.024619111Z",
+      "status": "passed",
+      "updated_at": "2026-07-31T23:35:21.577129300Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Read the bracket label from the template that declares it",
-  "updated_at": "2026-07-31T22:16:21.024619111Z"
+  "updated_at": "2026-07-31T23:35:21.577129300Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1020eb0c174cda0c855083490ab1f7d53c8045ee",
+  "completed_at": "2026-07-31T23:35:21.280075952Z",
+  "duration_ms": 147130,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met: declared container labels drive creation, bracket lookup, and validation-time scope resolution; the prior blocking finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "510297e4-4543-413a-b4c0-065f48aea855",
+  "message": null,
+  "run_id": "f78c30c1-9586-4335-afbc-25a74e3984fe",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T23:32:54.150043052Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 87d44fab, 798bd0d0, 105bd208, b10ae493, bc7d9c68, 1020eb0c (jit:510297e4)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic (.jit/invariants.toml); @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T23:22:48Z); code-review failed (exit 1, prior finding F1 addressed by bc7d9c68)\nTruncation recovery: individually read b10ae493’s atomicity patch; verified merge patches equal their tagged worker patches; narrowed resolver, call-site, policy, and test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met: declared container labels drive creation, bracket lookup, and validation-time scope resolution; the prior blocking finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

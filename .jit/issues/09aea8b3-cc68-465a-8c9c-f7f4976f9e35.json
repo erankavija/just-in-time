@@ -16,12 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-07-31T22:54:37.912319034Z",
+      "updated_at": "2026-07-31T23:18:17.077055599Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-31T22:59:52.704037976Z",
+      "updated_at": "2026-07-31T23:22:47.907865483Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Read a profile package from a directory on disk",
-  "updated_at": "2026-07-31T22:59:52.704037976Z"
+  "updated_at": "2026-07-31T23:22:47.907865483Z"
 }

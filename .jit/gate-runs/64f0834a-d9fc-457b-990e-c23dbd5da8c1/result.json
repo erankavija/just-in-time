@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1020eb0c174cda0c855083490ab1f7d53c8045ee",
+  "completed_at": "2026-07-31T23:45:07.860101789Z",
+  "duration_ms": 162616,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json",
+        "id": "F1",
+        "line": 41,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/requirement/REQ-08",
+          "@/issue/e204e63d/decision/D-14"
+        ],
+        "severity": "high",
+        "summary": "The satisfies:REQ-08 label claims discovery and application, but the implementation only parses, reports, and self-validates dependency declarations."
+      }
+    ],
+    "summary": "The issue retains an unsupported satisfies:REQ-08 claim; implementation only parses and reports dependency declarations.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55",
+  "message": null,
+  "run_id": "64f0834a-d9fc-457b-990e-c23dbd5da8c1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T23:42:25.243924657Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4836 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fba8e-c229-75f0-a29a-41241881eb24\n--------\nuser\n--- 4823 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cfe36aa7, f950f3f2, fb968a9b (literal `jit:5dd0df5b` tag; uncommitted changes excluded)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-08 and @/issue/e204e63d/decision/D-14 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/semantic-types (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T23:35:22Z); mcp-ci passed (exit 0, 2026-07-31T22:06:45Z); prior code-review failed (exit 1) with F1\nTruncation recovery: narrowed the truncated project search to direct dependency uses, inspection construction, manifest/schema tests, and canonical-source ranges\n\n1. **F1 — blocking, issue-impact (high):** The `satisfies:REQ-08` label remains at [.jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json:41](/home/vkaskivuo/Projects/just-in-time/.jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json:41), but REQ-08 requires declared dependencies to be discovered from repository-local locations and applied. The current code only returns one package’s manifest during inspection ([profile.rs:76](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/profile.rs:76)) and uses `dependencies` only to reject self-dependency ([package.rs:464](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/profile/package.rs:464)). This confirms the prior blocking finding remains unresolved: the declaration-only implementation does not support the satisfaction claim.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue retains an unsupported satisfies:REQ-08 claim; implementation only parses and reports dependency declarations.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The satisfies:REQ-08 label claims discovery and application, but the implementation only parses, reports, and self-validates dependency declarations.\",\"file\":\".jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json\",\"line\":41,\"references\":[\"@/issue/e204e63d/requirement/REQ-08\",\"@/issue/e204e63d/decision/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

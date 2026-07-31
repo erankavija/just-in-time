@@ -17,17 +17,17 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-07-31T22:03:37.959883123Z",
+      "updated_at": "2026-07-31T23:42:24.314182070Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-31T22:06:44.573942625Z",
+      "updated_at": "2026-07-31T23:45:08.156075775Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-07-31T22:06:47.758778491Z",
+      "updated_at": "2026-07-31T23:45:11.376827008Z",
       "updated_by": "auto:executor"
     }
   },
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Declare one package's dependency on another",
-  "updated_at": "2026-07-31T22:06:47.758778491Z"
+  "updated_at": "2026-07-31T23:45:11.376827008Z"
 }
