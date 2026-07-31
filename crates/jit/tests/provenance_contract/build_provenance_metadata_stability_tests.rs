@@ -21,17 +21,9 @@
 //! which bounds the fixture to this workspace's repository-input inventory
 //! (jit:83efbcb4) rather than walking the whole working tree.
 
-use crate::repository_inventory::seed_isolated_repository;
-use std::path::{Path, PathBuf};
+use crate::repository_inventory::{seed_isolated_repository, workspace_root};
+use std::path::Path;
 use std::process::Command;
-
-fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("workspace root is two levels above the jit crate manifest")
-        .to_path_buf()
-}
 
 /// Seed `dest` as an isolated Git repository built from this workspace's
 /// repository-input inventory (see `repository_inventory` module docs; that
