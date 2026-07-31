@@ -4,7 +4,7 @@
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
     "229e7389-31d3-41ce-b783-ef58a58b1699",
-    "8371bd46-5db6-4e96-8a36-82b07fcbd33b",
+    "7835fdc0-bd54-473c-a6fc-bd8c55dc390b",
     "959274b6-c255-47e2-8b0a-34478a7ee95a",
     "9de22aa7-9ba3-4567-84b0-8e7dc66c7684",
     "e103d7a4-79ef-40cd-b075-b10e1bec11b9"
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Take the workflow profile and its presets out of the binary",
-  "updated_at": "2026-07-31T16:29:10.750382785Z"
+  "updated_at": "2026-07-31T17:31:04.581304288Z"
 }

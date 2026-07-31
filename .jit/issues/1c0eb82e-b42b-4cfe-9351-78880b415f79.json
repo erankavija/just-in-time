@@ -3,7 +3,7 @@
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
-    "8371bd46-5db6-4e96-8a36-82b07fcbd33b"
+    "d54f8f83-ff93-4c00-b4a5-03b67d9f5942"
   ],
   "description": "The engine reads, verifies, applies, and repairs a profile package that lives in a repository directory, so a profile no longer has to be compiled in to exist.\n\n## Background\n\nA profile can presently exist only as bytes compiled into the binary: one constructor walks a compiled-in directory, one resolver compares a requested id against one compiled-in package, and the applied-profile record's origin has a single value meaning exactly that. Everything else about the package model already treats its bytes as untrusted external data.\n\nWhat is missing is a reader, somewhere to record where a package came from, and a resolver that uses it. Together they make a package on disk a first-class one, and they leave repair working: the record names the location, and repair reads the package there rather than trusting what it stored.\n\nOne thing deliberately stays missing. A package declares which jit versions it is written for, and that declaration is parsed and not matched against the running binary; a package built for a later binary applies cleanly and fails wherever the shape later differs. Matching it belongs to the profile lifecycle the charter defers (`@/issue/e204e63d/decision/D-19`).\n\n## Success Criteria\n\n- [hard] REQ-01: A profile package is constructed from a repository directory, with every existing package defence applying to it.\n- [hard] REQ-02: The applied-profile record carries the worktree-relative location the package was read from.\n- [hard] REQ-03: Profile inspection, application, and initialization read their package from a given location or from the recorded one.\n- [hard] REQ-04: Derived-state repair recomputes expected targets from the package read at the recorded location, and fails loudly when it cannot.\n\n## Notes\n\nNothing here removes the compiled-in package; it becomes the last resort behind two better answers, and leaves when the work that puts the package in the release archive has landed.\n",
   "documents": [],
@@ -28,5 +28,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "A profile package is read from disk rather than from the binary",
-  "updated_at": "2026-07-31T16:28:27.583411185Z"
+  "updated_at": "2026-07-31T17:30:54.305358391Z"
 }

@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-07-31T17:28:56.596684919Z",
+  "dependencies": [
+    "5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55",
+    "8371bd46-5db6-4e96-8a36-82b07fcbd33b"
+  ],
+  "description": "Applying a package resolves and applies the packages it declares a dependency on first, so a package carrying a delta over another produces the same repository as one carrying both.\n\n## Background\n\nA dependency declaration means nothing until something reads it. Applying a package that depends on another must resolve the dependency from the same routes the package itself came from, apply it first, and only then apply the dependant — otherwise the dependant's declarations land against a repository missing the vocabulary they extend.\n\nMost of what this needs already exists. Provenance is one record per package id, and validation already lists that directory, derives the recorded ids, and resolves every one of them, so repair over several applied packages needs no change. Contribution merge is idempotent for identical restatements and a hard error otherwise, so two packages compose without a new merge rule. What is missing is the ordering itself, a cycle rejection, and the diagnosis when one package of a set cannot be resolved.\n\nThat last one is the sharp edge. A repository that applied a workflow package and then deleted the package it depends on fails validation naming a package the adopter never asked for by name. The error has to explain the relationship, or an adopter is left diagnosing something they never installed.\n\n## Success Criteria\n\n- [hard] REQ-01: Applying a package resolves every package it declares a dependency on, transitively, and applies each before the package that declares it.\n- [hard] REQ-02: A dependency cycle is rejected before anything is applied, naming the cycle.\n- [hard] REQ-03: Each applied package writes its own provenance record carrying its own hashes, and an application event is appended per package.\n- [hard] REQ-04: A dependency that cannot be resolved fails the application before anything is written, naming the package that declared the dependency alongside the one that could not be resolved.\n- [hard] REQ-05: Validation reporting an unresolvable recorded package states which recorded package declared it, where one did.\n- [hard] REQ-06: Applying a package whose dependencies are already applied and unchanged reports no work.\n\n## Notes\n\nOrdering is a topological sort over declared dependencies. The graph layer already owns that shape; what is new is a caller for it in the profile layer.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7835fdc0-bd54-473c-a6fc-bd8c55dc390b",
+  "labels": [
+    "type:task",
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:profile-discovery",
+    "satisfies:REQ-08",
+    "per:@/issue/e204e63d/decision/D-14",
+    "enforces:@/invariant/derived-state-coherence"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Apply a package together with the packages it depends on",
+  "updated_at": "2026-07-31T17:29:02.382092920Z"
+}

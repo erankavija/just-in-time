@@ -19,10 +19,11 @@
     "component:core",
     "story:profile-extraction",
     "satisfies:REQ-07",
-    "enforces:@/invariant/domain-agnostic"
+    "enforces:@/invariant/domain-agnostic",
+    "resolution:obsolete"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "rejected",
   "title": "Move the coverage-preview rule transform out of the bracket module",
-  "updated_at": "2026-07-31T16:28:27.583411185Z"
+  "updated_at": "2026-07-31T17:28:42.331647452Z"
 }
