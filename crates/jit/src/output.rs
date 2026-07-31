@@ -1016,8 +1016,7 @@ pub fn render_error_code_reference() -> String {
 
     format!(
         "<!-- Generated from `ErrorCode::ALL`, `as_str`, `description`, and `exit_code` in \
-         `jit::output` — do not edit by hand. Regenerate with: `cargo test -p jit \
-         output::tests::test_regenerate_error_code_reference -- --ignored`. -->\n\
+         `jit::output` — do not edit by hand. -->\n\
          \n\
          # Machine-readable Error Codes\n\
          \n\
