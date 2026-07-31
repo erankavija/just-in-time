@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-31T12:15:52.333458796Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-07-31T12:19:05.800107056Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "097b9f48-d8b2-47ee-ad02-c524190fbeb2",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Fail the suite when the two plan-template declarations disagree",
-  "updated_at": "2026-07-31T11:44:11.187362518Z"
+  "updated_at": "2026-07-31T12:19:05.800107056Z"
 }

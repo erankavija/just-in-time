@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2e6aa3b85a1170b597dc76dafe065125a18b7876",
+  "completed_at": "2026-07-31T12:19:05.510518120Z",
+  "duration_ms": 189295,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/dogfood.rs",
+        "id": "F1",
+        "line": 646,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-1"
+        ],
+        "severity": "medium",
+        "summary": "The whole registry is compared to packaged templates, so a valid authored template outside the generated region falsely fails as drift."
+      }
+    ],
+    "summary": "The drift guard compares the entire template registry rather than only the generated plan declaration.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "097b9f48-d8b2-47ee-ad02-c524190fbeb2",
+  "message": null,
+  "run_id": "b5831828-3791-448c-9fa6-05d66255f52c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T12:15:56.214565432Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5758 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fb81a-449f-7e92-bfdb-ab99d50f323a\n--------\nuser\n--- 5745 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b7ac878e, 2e6aa3b8\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; .jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json\nResolved items: @/issue/e204e63d/decision/D-1; @/invariant/single-source-prose; @/invariant/semantic-test-assertions; @/invariant/shared-test-contracts; @/invariant/bounded-rust-build-footprint; @/gate/cargo-ci; @/gate/code-review\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T12:15:52Z); code-review pending\nTruncation recovery: Re-read individual affected-file patches, complete AGENTS.md, and focused current source ranges after combined-output truncation.\n\n1. **[blocking][issue-impact]** `template_declarations_of` returns every `[[template]]` in `.jit/templates.toml`, and the guard compares that whole vector to the package’s contributions. The rendered region’s contract explicitly preserves authored content outside its delimiters; therefore, adding a valid authored template outside the generated `plan` region causes this test to fail as package drift and incorrectly recommends regeneration. Limit the comparison to declarations inside the generated region (or otherwise select only its managed templates). References: `@/issue/e204e63d/decision/D-1`. (`crates/jit/src/profile/dogfood.rs:646`)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The drift guard compares the entire template registry rather than only the generated plan declaration.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The whole registry is compared to packaged templates, so a valid authored template outside the generated region falsely fails as drift.\",\"file\":\"crates/jit/src/profile/dogfood.rs\",\"line\":646,\"references\":[\"@/issue/e204e63d/decision/D-1\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
