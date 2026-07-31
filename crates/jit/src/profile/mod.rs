@@ -31,8 +31,8 @@ pub use dogfood::{
     JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
 };
 pub use manifest::{
-    profile_manifest_schema, AssetDeclaration, ProfileManifest, ProfileMetadata, RegionDeclaration,
-    RegionPlacement, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
+    profile_manifest_schema, AssetDeclaration, ProfileId, ProfileManifest, ProfileMetadata,
+    RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
 };
 pub use package::{
     EmbeddedProfilePackage, PackageHash, ProfilePackageError, ProfilePackageHashes,

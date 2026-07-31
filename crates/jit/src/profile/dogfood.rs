@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn test_jit_dogfood_package_validates_and_has_expected_workflow_inventory() {
         let package = jit_dogfood_package().unwrap();
-        assert_eq!(package.manifest().profile.id, "jit-dogfood");
+        assert_eq!(package.manifest().profile.id.as_str(), "jit-dogfood");
         assert!(package.file_count() <= super::super::MAX_EMBEDDED_PROFILE_FILES);
         assert!(package.byte_size() <= super::super::MAX_EMBEDDED_PROFILE_BYTES);
 

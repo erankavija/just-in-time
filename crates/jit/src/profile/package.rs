@@ -1,4 +1,6 @@
-use super::manifest::{ProfileManifest, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION};
+use super::manifest::{
+    is_lowercase_kebab, ProfileManifest, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
+};
 use crate::repository_state::{Contribution, MapEntryTarget};
 use include_dir::Dir;
 use semver::{Version, VersionReq};
@@ -114,9 +116,14 @@ pub enum ProfilePackageError {
         /// Supported version.
         expected: u32,
     },
-    /// Invalid stable package ID.
-    #[error("invalid profile id '{0}'; expected lowercase-kebab")]
-    InvalidProfileId(String),
+    /// A package declares itself as a dependency.
+    #[error("profile '{package}' cannot depend on itself ('{dependency}')")]
+    SelfDependency {
+        /// Package that owns the manifest.
+        package: String,
+        /// Offending dependency entry.
+        dependency: String,
+    },
     /// Invalid semantic package version.
     #[error("invalid profile version '{value}': {source}")]
     InvalidVersion {
@@ -239,10 +246,15 @@ fn validate_manifest(
             expected: PROFILE_MANIFEST_VERSION,
         });
     }
-    if !is_lowercase_kebab(&manifest.profile.id) {
-        return Err(ProfilePackageError::InvalidProfileId(
-            manifest.profile.id.clone(),
-        ));
+    if let Some(dependency) = manifest
+        .dependencies
+        .iter()
+        .find(|dependency| *dependency == &manifest.profile.id)
+    {
+        return Err(ProfilePackageError::SelfDependency {
+            package: manifest.profile.id.to_string(),
+            dependency: dependency.to_string(),
+        });
     }
     Version::parse(&manifest.profile.version).map_err(|source| {
         ProfilePackageError::InvalidVersion {
@@ -433,22 +445,6 @@ fn contribution_identity(contribution: &Contribution) -> String {
     format!("{}:{semantic}", contribution.registry_path())
 }
 
-fn is_lowercase_kebab(value: &str) -> bool {
-    let mut segments = value.split('-');
-    segments.next().is_some_and(|first| {
-        !first.is_empty()
-            && first.starts_with(|character: char| character.is_ascii_lowercase())
-            && first
-                .chars()
-                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
-    }) && segments.all(|segment| {
-        !segment.is_empty()
-            && segment
-                .chars()
-                .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit())
-    })
-}
-
 fn compute_hashes(
     manifest: &ProfileManifest,
     files: &BTreeMap<String, &[u8]>,
@@ -559,7 +555,7 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::profile_manifest_schema;
+    use crate::profile::{profile_manifest_schema, ProfileId};
     use crate::repository_state::{Contribution, KeyedArrayTarget, MapEntryTarget};
     use include_dir::{include_dir, Dir};
 
@@ -607,7 +603,7 @@ mod tests {
         assert_eq!(package.file_count(), 4);
         assert!(package.file_count() <= MAX_EMBEDDED_PROFILE_FILES);
         assert!(package.byte_size() <= MAX_EMBEDDED_PROFILE_BYTES);
-        assert_eq!(package.manifest().profile.id, "synthetic-workflow");
+        assert_eq!(package.manifest().profile.id.as_str(), "synthetic-workflow");
         assert_eq!(package.manifest().contributions.len(), 10);
         assert!(matches!(
             package.manifest().contributions.first(),
@@ -634,6 +630,7 @@ mod tests {
             Some(b"#!/bin/sh\nexit 0\n".as_slice())
         );
         assert!(package.manifest().assets[1].executable);
+        assert!(package.manifest().dependencies.is_empty());
     }
 
     #[test]
@@ -650,8 +647,30 @@ mod tests {
         assert!(schema_text.contains("manifest-version"));
         assert!(schema_text.contains("projection"));
         assert!(!schema_has_property(&schema, "hook"));
-        assert!(!schema_has_property(&schema, "dependencies"));
+        assert!(schema_has_property(&schema, "dependencies"));
         assert!(!schema_has_property(&schema, "variables"));
+    }
+
+    #[test]
+    fn test_manifest_dependency_is_reported_in_runtime_inspection_and_schema() {
+        let manifest =
+            manifest_text().replace("[profile]", "dependencies = [\"jit-default\"]\n\n[profile]");
+        let mut files = package().files.clone();
+        files.insert(MANIFEST_FILE_NAME.to_string(), manifest.leak().as_bytes());
+
+        let package = EmbeddedProfilePackage::from_files(files).unwrap();
+        assert_eq!(
+            package.manifest().dependencies,
+            vec![ProfileId::try_from("jit-default").unwrap()]
+        );
+
+        let schema = serde_json::to_value(profile_manifest_schema()).unwrap();
+        let instance = serde_json::to_value(package.manifest()).unwrap();
+        jsonschema::validator_for(&schema)
+            .unwrap()
+            .validate(&instance)
+            .expect("manifest with dependency must satisfy generated schema");
+        assert_eq!(instance["dependencies"][0], "jit-default");
     }
 
     #[test]
@@ -661,7 +680,7 @@ mod tests {
         assert_eq!(first.hashes(), second.hashes());
         assert_eq!(
             first.hashes().package,
-            "d9e124a8b3b87533e53639f16ace39dac3a8b765f7dce648d246dd7410ae0982"
+            "40a33c9798b0523436977f492bef09a4deddc9da7293fede33623c101b34a417"
         );
         assert_eq!(first.hashes().targets.len(), 7);
         assert_eq!(
@@ -727,6 +746,31 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert!(incomplete.contains("missing field `style`"), "{incomplete}");
+    }
+
+    #[test]
+    fn test_manifest_rejects_malformed_dependency_id_during_parse() {
+        let error = parse_modified("[profile]", "dependencies = [\"Jit Default\"]\n\n[profile]")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("Jit Default"), "{error}");
+        assert!(error.contains("lowercase-kebab"), "{error}");
+    }
+
+    #[test]
+    fn test_validation_rejects_self_referential_dependency_by_id() {
+        let manifest = manifest_text().replace(
+            "[profile]",
+            "dependencies = [\"synthetic-workflow\"]\n\n[profile]",
+        );
+        let mut files = package().files.clone();
+        files.insert(MANIFEST_FILE_NAME.to_string(), manifest.leak().as_bytes());
+
+        let error = EmbeddedProfilePackage::from_files(files)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("synthetic-workflow"), "{error}");
+        assert!(error.contains("cannot depend on itself"), "{error}");
     }
 
     #[test]
