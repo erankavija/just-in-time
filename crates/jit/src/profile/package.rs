@@ -1035,7 +1035,7 @@ mod tests {
         let manifest = format!("{}\n{declaration}", manifest_text());
         let mut files = package().files.clone();
         files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
-        ProfilePackage::from_files(files)
+        validated_package(files)
     }
 
     #[test]
