@@ -8,8 +8,10 @@
 //! - a `config.toml` fragment for a suite that writes its own configuration file
 //!   and appends its own `[item_kinds.*]`, `[gates]` or `[rules]` tables to it
 //!   ([`TestTaxonomy::config_fragment`]);
-//! - a whole repository built from that fragment
-//!   ([`crate::test_utils::setup_test_repo_with_taxonomy`]).
+//! - a whole repository, built by [`crate::test_utils::setup_test_repo_with_taxonomy`]
+//!   from that fragment plus the initialization preset
+//!   ([`TestTaxonomy::hierarchy_template`]) the initializer derives the
+//!   repository's coupled rules and schemas from.
 //!
 //! This module reaches for nothing but the pure hierarchy types it renders into,
 //! so a domain or graph unit test reads the declaration without linking the
