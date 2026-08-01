@@ -6,6 +6,11 @@
 use crate::declarations::GateStage;
 use crate::domain::gate_findings::GateFindings;
 use crate::errors::InvalidArgumentError;
+// `repository_state::path` is a self-contained identity vocabulary: it imports
+// nothing from this crate and performs no I/O, so naming its root-relative path
+// identity here keeps the domain layer pure while leaving one canonical type
+// for a normalized repository-root-relative path.
+use crate::repository_state::RootRelativePath;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
@@ -999,11 +1004,27 @@ pub enum GateRunStatus {
 }
 
 /// Origin vocabulary persisted for an installed profile package.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+///
+/// The location a package was read from is carried by the variant that has
+/// one, so a persisted origin can neither name a repository location without
+/// saying which, nor attach one to bytes that were compiled in. The payload is
+/// [`RootRelativePath`], the repository's own normalized root-relative path
+/// identity, whose parse and deserialization reject an absolute, traversing,
+/// or otherwise non-canonical spelling; a location is relative to the worktree
+/// root, so a stored record stays readable wherever the repository is checked
+/// out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(
+    tag = "source",
+    content = "location",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum ProfileOrigin {
     /// Package bytes were compiled into the running JIT binary.
     Embedded,
+    /// Package bytes were read from this worktree-relative directory.
+    Directory(RootRelativePath),
 }
 
 /// System event types for audit log
