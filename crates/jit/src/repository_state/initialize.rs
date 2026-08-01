@@ -693,7 +693,7 @@ fn profile_event_action(
     let event = profile_applied_event(
         profile.id.clone(),
         profile.version.clone(),
-        profile.origin,
+        profile.origin.clone(),
         profile.package_hash.clone(),
         profile.target_hashes.clone(),
     );
@@ -842,7 +842,7 @@ pub(super) fn derive_profile_application(
         let event = profile_applied_event(
             profile.id.clone(),
             profile.version.clone(),
-            profile.origin,
+            profile.origin.clone(),
             profile.package_hash.clone(),
             profile.target_hashes.clone(),
         );

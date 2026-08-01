@@ -100,6 +100,23 @@ impl<'de> Deserialize<'de> for RootRelativePath {
     }
 }
 
+/// The published shape matches the wire form the hand-written [`Serialize`] and
+/// [`Deserialize`] pair above produce and accept: a string. It is inlined
+/// rather than referenced so a schema carrying one reads as the string it is.
+impl schemars::JsonSchema for RootRelativePath {
+    fn schema_name() -> String {
+        "RootRelativePath".to_string()
+    }
+
+    fn is_referenceable() -> bool {
+        false
+    }
+
+    fn json_schema(generator: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        String::json_schema(generator)
+    }
+}
+
 /// Selected repository root class for a canonical virtual path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

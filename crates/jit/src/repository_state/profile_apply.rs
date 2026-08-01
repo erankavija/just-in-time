@@ -262,7 +262,7 @@ impl ProfileApplicationInput {
         AppliedProfileRecord::new(
             self.id.clone(),
             self.version.clone(),
-            self.origin,
+            self.origin.clone(),
             self.package_hash.clone(),
             self.target_hashes.clone(),
         )

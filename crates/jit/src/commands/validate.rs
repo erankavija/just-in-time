@@ -769,7 +769,7 @@ fn captured_profile_repair_claims(
                             ))))
                         }
                     };
-                if actual != super::profile::expected_record(package) {
+                if actual != super::profile::expected_record(package, image.layout())? {
                     return Ok(Some(Err(RepositoryValidationFailure::materialization(
                         anyhow!(
                             "applied profile provenance for '{}@{}' does not match the resolvable embedded package",
@@ -3246,6 +3246,54 @@ depends_on = ["planning"]
             unobtainable.contains("absent-workflow"),
             "an unobtainable recorded package is the reported failure: {unobtainable}"
         );
+    }
+
+    /// A stored record whose origin names a directory it cannot address is a
+    /// validation failure rather than a field validation reads past: the
+    /// location is how a later run finds the package again, so validation that
+    /// ignored an absent or malformed one would report a repository as coherent
+    /// while its record addressed nothing.
+    #[test]
+    fn test_validate_fails_on_an_applied_record_whose_directory_location_is_absent_or_malformed() {
+        use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+
+        /// The `jit-dogfood` record with `origin` replaced, as stored text.
+        fn stored_record(origin: serde_json::Value) -> String {
+            let mut record: serde_json::Value =
+                serde_json::from_str(&applied_record_json("jit-dogfood")).unwrap();
+            record["origin"] = origin;
+            serde_json::to_string_pretty(&record).unwrap()
+        }
+
+        fn diagnosis(record: &str) -> String {
+            let storage = memory_fixture(None);
+            seed_repo_file(&storage, ".jit/profiles/jit-dogfood.json", record);
+            format!(
+                "{:#}",
+                memory_executor(storage).validate_silent().unwrap_err()
+            )
+        }
+
+        // The control is the same record with an origin that does address its
+        // bytes: its package resolves, so validation gets past provenance and
+        // fails on the hash mismatch this synthetic record carries instead.
+        let control = diagnosis(&stored_record(serde_json::json!({ "source": "embedded" })));
+        assert!(
+            !control.contains("invalid applied profile provenance"),
+            "the control record must read as valid provenance: {control}"
+        );
+
+        for origin in [
+            serde_json::json!({ "source": "directory" }),
+            serde_json::json!({ "source": "directory", "location": "../outside" }),
+            serde_json::json!({ "source": "directory", "location": "/absolute" }),
+        ] {
+            let error = diagnosis(&stored_record(origin.clone()));
+            assert!(
+                error.contains("invalid applied profile provenance"),
+                "{origin} must fail validation: {error}"
+            );
+        }
     }
 
     /// REQ-04: a well-formed applied-profile record naming a profile whose

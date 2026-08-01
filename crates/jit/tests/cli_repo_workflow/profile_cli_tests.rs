@@ -36,7 +36,7 @@ fn test_profile_list_and_show_work_without_repository() {
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
     assert_eq!(show["manifest"]["profile"]["id"], "jit-dogfood");
-    assert_eq!(show["origin"], "embedded");
+    assert_eq!(show["origin"], serde_json::json!({ "source": "embedded" }));
     assert!(show["package_hash"].as_str().unwrap().len() >= 64);
     assert!(!repo.path().join(".jit").exists());
 }

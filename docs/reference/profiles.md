@@ -143,8 +143,17 @@ application.
 Successful application writes a minimal provenance record at
 `.jit/profiles/<profile-id>.json` (therefore the `jit-dogfood` ID selects the
 matching filename) and appends the repository-scoped `profile_applied` audit
-event. The record stores the profile ID, version, embedded origin, package hash,
-and per-target hashes used to recognize an exact reapplication.
+event. The record stores the profile ID, version, origin, package hash, and
+per-target hashes used to recognize an exact reapplication.
+
+The origin says where the applied bytes came from: either compiled into the
+binary, or read from a repository directory, in which case it carries that
+directory as a worktree-relative location. The record is the one place a
+repository states where its package is, so a later run reads the same package
+from the same location. That location is confined to the worktree — a package
+read from outside it, including from under `.jit/`, is refused by name rather
+than recorded — so re-reading a repository's package never depends on machine
+state.
 
 These repository-state guarantees do not change Git requirements. Core commands,
 including init, profile application, project rendering, and validation, work

@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Read;
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 const TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-target-v1\0";
 const PACKAGE_HASH_DOMAIN: &[u8] = b"jit-profile-package-v1\0";
@@ -37,6 +37,19 @@ pub struct ProfilePackageHashes {
     pub targets: BTreeMap<String, PackageHash>,
 }
 
+/// Where a validated package's bytes came from.
+///
+/// Minted only by the two constructors of [`ProfilePackage`], each from the
+/// route it took, so the source a package reports is the source its own bytes
+/// were read through rather than a claim made about them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProfilePackageSource {
+    /// Bytes compiled into the running binary.
+    Embedded,
+    /// Bytes read from this absolute, symlink-resolved directory.
+    Directory(PathBuf),
+}
+
 /// A validated immutable package owning the bytes it validated.
 ///
 /// A package comes either from a directory tree on disk
@@ -44,12 +57,14 @@ pub struct ProfilePackageHashes {
 /// compile time ([`from_embedded_dir`](Self::from_embedded_dir)). Both routes
 /// own their bytes and run one validation over one path-to-bytes map, so
 /// packages built from identical content are indistinguishable in manifest,
-/// package hash, and target digests.
+/// package hash, and target digests. They differ in exactly one observable:
+/// the [`source`](Self::source) each records for the bytes it admitted.
 #[derive(Debug, Clone)]
 pub struct ProfilePackage {
     manifest: ProfileManifest,
     files: BTreeMap<String, Vec<u8>>,
     hashes: ProfilePackageHashes,
+    source: ProfilePackageSource,
 }
 
 impl ProfilePackage {
@@ -64,16 +79,25 @@ impl ProfilePackage {
     /// A directory that is absent or cannot be read is
     /// [`UnreadableDirectory`](ProfilePackageError::UnreadableDirectory), which
     /// no invalid package produces.
+    ///
+    /// The recorded [`source`](Self::source) is the resolved root the walk
+    /// anchored its handle chain at, not the argument: `directory` may be
+    /// relative and may traverse symbolic links, and the bytes admitted are the
+    /// bytes below the root those resolve to.
     pub fn from_directory(directory: &Path) -> Result<Self, ProfilePackageError> {
-        Self::from_files(read_package_directory(directory)?)
+        let (root, files) = read_package_directory(directory)?;
+        Self::from_files(files, ProfilePackageSource::Directory(root))
     }
 
     /// Parse and validate a recursively embedded directory.
     pub fn from_embedded_dir(directory: &Dir<'_>) -> Result<Self, ProfilePackageError> {
-        Self::from_files(embedded_files(directory))
+        Self::from_files(embedded_files(directory), ProfilePackageSource::Embedded)
     }
 
-    fn from_files(files: BTreeMap<String, Vec<u8>>) -> Result<Self, ProfilePackageError> {
+    fn from_files(
+        files: BTreeMap<String, Vec<u8>>,
+        source: ProfilePackageSource,
+    ) -> Result<Self, ProfilePackageError> {
         validate_package_bounds(&files)?;
         let manifest_bytes = files
             .get(MANIFEST_FILE_NAME)
@@ -90,12 +114,18 @@ impl ProfilePackage {
             manifest,
             files,
             hashes,
+            source,
         })
     }
 
     /// Parsed runtime manifest.
     pub fn manifest(&self) -> &ProfileManifest {
         &self.manifest
+    }
+
+    /// Where this package's validated bytes were read from.
+    pub fn source(&self) -> &ProfilePackageSource {
+        &self.source
     }
 
     /// Owned bytes for a declared package-relative source.
@@ -268,7 +298,11 @@ fn embedded_files(directory: &Dir<'_>) -> BTreeMap<String, Vec<u8>> {
     files
 }
 
-/// Walk the package tree rooted at `root` into a package-relative byte map.
+/// Walk the package tree rooted at `root` into its resolved root and a
+/// package-relative byte map.
+///
+/// The returned root is the resolved path the handle chain is anchored at, so
+/// it names the directory the returned bytes actually came from.
 ///
 /// Containment holds by construction rather than by inspection. Every entry is
 /// reached by a no-follow `openat` against the directory handle that listed it
@@ -285,7 +319,9 @@ fn embedded_files(directory: &Dir<'_>) -> BTreeMap<String, Vec<u8>> {
 /// at most one byte past what remains, so a file that grows after its size is
 /// taken cannot be read past the budget either. [`validate_package_bounds`]
 /// stays the authority over what was actually read.
-fn read_package_directory(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, ProfilePackageError> {
+fn read_package_directory(
+    root: &Path,
+) -> Result<(PathBuf, BTreeMap<String, Vec<u8>>), ProfilePackageError> {
     let root = fs::canonicalize(root).map_err(|source| unreadable(root, source))?;
     let handle = CapDir::open_ambient_dir(&root, ambient_authority())
         .map_err(|source| unreadable(&root, source))?;
@@ -313,7 +349,7 @@ fn read_package_directory(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, Prof
             }
         }
     }
-    Ok(files)
+    Ok((root, files))
 }
 
 /// Open one listed entry through a no-follow `openat` on the handle that listed
@@ -844,6 +880,17 @@ mod tests {
         ProfilePackage::from_embedded_dir(&VALID_PACKAGE).expect("valid synthetic package")
     }
 
+    /// Run the shared package validation over a synthetic path-to-bytes map.
+    ///
+    /// The map is authored here rather than read from anywhere, so it enters
+    /// through the compiled-in source; every caller asserts about validation
+    /// outcomes, which the two routes share.
+    fn validated_package(
+        files: BTreeMap<String, Vec<u8>>,
+    ) -> Result<ProfilePackage, ProfilePackageError> {
+        ProfilePackage::from_files(files, ProfilePackageSource::Embedded)
+    }
+
     /// The checked-in tree the compile-time fixture embeds.
     fn fixture_tree() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -856,20 +903,12 @@ mod tests {
     /// checkout, so both construction routes read one authored source
     /// (`@/invariant/shared-test-contracts`).
     fn writable_package_tree(temp: &TempDir) -> PathBuf {
-        fn write(directory: &Dir<'_>, root: &Path) {
-            directory.files().for_each(|file| {
-                let path = root.join(file.path());
-                std::fs::create_dir_all(path.parent().expect("package file has a parent"))
-                    .expect("create package parent directory");
-                std::fs::write(path, file.contents()).expect("write package file");
-            });
-            directory.dirs().for_each(|child| write(child, root));
-        }
+        writable_package_tree_at(&temp.path().join("package"))
+    }
 
-        let root = temp.path().join("package");
-        std::fs::create_dir_all(&root).expect("create package root");
-        write(&VALID_PACKAGE, &root);
-        root
+    /// A writable copy of the fixture tree at the given root, created.
+    fn writable_package_tree_at(root: &Path) -> PathBuf {
+        crate::test_utils::write_package_tree(&VALID_PACKAGE, root)
     }
 
     /// Replace the package manifest under `root` with `manifest_text()` mutated.
@@ -973,7 +1012,7 @@ mod tests {
         let mut files = package().files.clone();
         files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
 
-        let package = ProfilePackage::from_files(files).unwrap();
+        let package = validated_package(files).unwrap();
         assert_eq!(
             package.manifest().dependencies,
             vec![ProfileId::try_from("jit-default").unwrap()]
@@ -1176,7 +1215,7 @@ value = "workspace/active"
             "nested/scripts/check.sh".to_string(),
             b"#!/bin/sh\nexit 1\n".to_vec(),
         );
-        let changed = ProfilePackage::from_files(changed).unwrap();
+        let changed = validated_package(changed).unwrap();
         assert_ne!(first.hashes().package, changed.hashes().package);
         assert_ne!(
             first.hashes().targets["bin/check.sh"],
@@ -1197,7 +1236,7 @@ value = "workspace/active"
             MANIFEST_FILE_NAME.to_string(),
             reordered_manifest.into_bytes(),
         );
-        let reordered = ProfilePackage::from_files(reordered).unwrap();
+        let reordered = validated_package(reordered).unwrap();
         assert_ne!(
             first.hashes().targets[".jit/config.toml"],
             reordered.hashes().targets[".jit/config.toml"]
@@ -1246,7 +1285,7 @@ value = "workspace/active"
         let mut files = package().files.clone();
         files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
 
-        let error = ProfilePackage::from_files(files).unwrap_err().to_string();
+        let error = validated_package(files).unwrap_err().to_string();
         assert!(error.contains("synthetic-workflow"), "{error}");
         assert!(error.contains("cannot depend on itself"), "{error}");
     }
@@ -1260,7 +1299,7 @@ value = "workspace/active"
         );
         files.insert(MANIFEST_FILE_NAME.to_string(), unsafe_manifest.into_bytes());
         assert!(matches!(
-            ProfilePackage::from_files(files),
+            validated_package(files),
             Err(ProfilePackageError::UnsafePath { .. })
         ));
 
@@ -1274,7 +1313,7 @@ value = "workspace/active"
             windows_absolute.into_bytes(),
         );
         assert!(matches!(
-            ProfilePackage::from_files(files),
+            validated_package(files),
             Err(ProfilePackageError::UnsafePath { .. })
         ));
 
@@ -1326,7 +1365,7 @@ value = "workspace/active"
             let manifest = manifest_text().replace(old, new);
             let mut files = package.files.clone();
             files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
-            let error = ProfilePackage::from_files(files).unwrap_err().to_string();
+            let error = validated_package(files).unwrap_err().to_string();
             assert!(error.contains(expected), "{error}");
         }
     }
@@ -1338,14 +1377,14 @@ value = "workspace/active"
         let mut missing = package.files.clone();
         missing.remove("assets/workflow.txt");
         assert!(matches!(
-            ProfilePackage::from_files(missing),
+            validated_package(missing),
             Err(ProfilePackageError::MissingContent(path)) if path == "assets/workflow.txt"
         ));
 
         let mut extra = package.files.clone();
         extra.insert("assets/undeclared.txt".to_string(), b"extra".to_vec());
         assert!(matches!(
-            ProfilePackage::from_files(extra),
+            validated_package(extra),
             Err(ProfilePackageError::ExtraContent(path)) if path == "assets/undeclared.txt"
         ));
 
@@ -1359,7 +1398,7 @@ value = "workspace/active"
             duplicate_manifest.into_bytes(),
         );
         assert!(matches!(
-            ProfilePackage::from_files(duplicate),
+            validated_package(duplicate),
             Err(ProfilePackageError::DuplicateSource(path)) if path == "assets/workflow.txt"
         ));
 
@@ -1373,7 +1412,7 @@ value = "workspace/active"
             reserved_manifest.into_bytes(),
         );
         assert!(matches!(
-            ProfilePackage::from_files(reserved),
+            validated_package(reserved),
             Err(ProfilePackageError::DuplicateSource(path)) if path == "manifest.toml"
         ));
 
@@ -1387,7 +1426,7 @@ value = "workspace/active"
             duplicate_contribution.into_bytes(),
         );
         assert!(matches!(
-            ProfilePackage::from_files(duplicate),
+            validated_package(duplicate),
             Err(ProfilePackageError::DuplicateContribution(identity))
                 if identity.contains("invariants")
         ));
@@ -1402,7 +1441,7 @@ value = "workspace/active"
             too_many.insert(format!("undeclared/{index}.txt"), b"x".to_vec());
         }
         assert!(matches!(
-            ProfilePackage::from_files(too_many),
+            validated_package(too_many),
             Err(ProfilePackageError::PackageBounds {
                 file_count,
                 ..
@@ -1415,7 +1454,7 @@ value = "workspace/active"
             vec![b'x'; MAX_PROFILE_PACKAGE_BYTES],
         );
         assert!(matches!(
-            ProfilePackage::from_files(too_large),
+            validated_package(too_large),
             Err(ProfilePackageError::PackageBounds {
                 byte_size,
                 ..
@@ -1469,6 +1508,53 @@ value = "workspace/active"
                 .all(|asset| owned.source_bytes(&asset.source)
                     == embedded.source_bytes(&asset.source))
         );
+    }
+
+    #[test]
+    fn test_from_directory_records_the_resolved_root_its_bytes_were_read_from() {
+        // Two copies of one authored tree differ only in where they sit, so the
+        // recorded source follows the directory each package was read through
+        // rather than anything about the bytes, which are identical.
+        let temp = TempDir::new().unwrap();
+        let first = writable_package_tree(&temp);
+        let second = writable_package_tree_at(&temp.path().join("elsewhere/package"));
+
+        let first_package = ProfilePackage::from_directory(&first).expect("valid package tree");
+        let second_package = ProfilePackage::from_directory(&second).expect("valid package tree");
+
+        assert_eq!(first_package.hashes(), second_package.hashes());
+        assert_eq!(
+            first_package.source(),
+            &ProfilePackageSource::Directory(fs::canonicalize(&first).unwrap())
+        );
+        assert_eq!(
+            second_package.source(),
+            &ProfilePackageSource::Directory(fs::canonicalize(&second).unwrap())
+        );
+        assert_ne!(first_package.source(), second_package.source());
+    }
+
+    #[test]
+    fn test_from_directory_records_the_root_a_relative_argument_resolves_to() {
+        // The recorded source has to name the directory the walk anchored at,
+        // so a package read through a relative or link-traversing argument
+        // still reports where its bytes came from.
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        let resolved = fs::canonicalize(&root).unwrap();
+        let indirect = root.join("..").join(root.file_name().unwrap());
+
+        assert_eq!(
+            ProfilePackage::from_directory(&indirect)
+                .expect("valid package tree")
+                .source(),
+            &ProfilePackageSource::Directory(resolved)
+        );
+    }
+
+    #[test]
+    fn test_from_embedded_dir_records_a_compiled_in_source() {
+        assert_eq!(package().source(), &ProfilePackageSource::Embedded);
     }
 
     #[test]

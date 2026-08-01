@@ -153,17 +153,30 @@ pub struct ProfilePlanResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::RootRelativePath;
+
+    fn record(origin: ProfileOrigin) -> AppliedProfileRecord {
+        AppliedProfileRecord::new(
+            "example",
+            "1.0.0",
+            origin,
+            "package",
+            BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
+        )
+    }
+
+    /// A record whose `origin` is replaced by `origin`, as stored bytes.
+    fn stored_with_origin(origin: serde_json::Value) -> Vec<u8> {
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&record(ProfileOrigin::Embedded).to_bytes().unwrap()).unwrap();
+        value["origin"] = origin;
+        serde_json::to_vec(&value).unwrap()
+    }
 
     #[test]
     fn test_installed_record_is_minimal_stable_json() {
-        let record = AppliedProfileRecord::new(
-            "example",
-            "1.0.0",
-            ProfileOrigin::Embedded,
-            "package",
-            BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
-        );
-        let value: serde_json::Value = serde_json::from_slice(&record.to_bytes().unwrap()).unwrap();
+        let value: serde_json::Value =
+            serde_json::from_slice(&record(ProfileOrigin::Embedded).to_bytes().unwrap()).unwrap();
         assert_eq!(
             value
                 .as_object()
@@ -173,5 +186,49 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["id", "origin", "package_hash", "target_hashes", "version"]
         );
+    }
+
+    #[test]
+    fn test_installed_record_round_trips_the_location_a_directory_origin_names() {
+        // The location survives the round trip through stored bytes, which is
+        // what a later run reads to find the package again, and the two origins
+        // are distinguishable in the stored image.
+        let location = RootRelativePath::parse("profiles/example").unwrap();
+        let stored = record(ProfileOrigin::Directory(location.clone()))
+            .to_bytes()
+            .unwrap();
+
+        let read: AppliedProfileRecord = serde_json::from_slice(&stored).unwrap();
+        assert_eq!(read.origin, ProfileOrigin::Directory(location));
+        assert_ne!(read.origin, ProfileOrigin::Embedded);
+        assert_ne!(
+            stored,
+            record(ProfileOrigin::Embedded).to_bytes().unwrap(),
+            "the two origins must not store the same image"
+        );
+    }
+
+    #[test]
+    fn test_installed_record_rejects_an_absent_or_malformed_directory_location() {
+        // Every one of these is a stored record a repository could hold, and
+        // each must fail the read rather than resolve to a package the record
+        // does not actually name.
+        for origin in [
+            serde_json::json!({ "source": "directory" }),
+            serde_json::json!({ "source": "directory", "location": "../outside" }),
+            serde_json::json!({ "source": "directory", "location": "/absolute" }),
+            serde_json::json!({ "source": "directory", "location": "a/./b" }),
+            serde_json::json!({ "source": "directory", "location": 7 }),
+            // A location attached to bytes that were compiled in names a
+            // package nothing read, so it is refused rather than ignored.
+            serde_json::json!({ "source": "embedded", "location": "profiles/example" }),
+            serde_json::json!({ "source": "unknown", "location": "profiles/example" }),
+        ] {
+            let stored = stored_with_origin(origin.clone());
+            assert!(
+                serde_json::from_slice::<AppliedProfileRecord>(&stored).is_err(),
+                "{origin} must not read as a valid record"
+            );
+        }
     }
 }

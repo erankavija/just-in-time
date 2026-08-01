@@ -11,6 +11,7 @@ use crate::storage::{discover_repository_layout, JsonFileStorage};
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use anyhow::Result;
 use std::fs;
+use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 /// Standard test repository setup with .jit and .git directories
@@ -63,6 +64,28 @@ pub fn setup_test_repo_with_taxonomy() -> Result<(TempDir, JsonFileStorage, Test
     fs::create_dir(temp.path().join(".git"))?;
 
     Ok((temp, storage, taxonomy))
+}
+
+/// Write a compile-time-embedded profile package tree to `root`, creating it
+/// and every declared parent, and return `root`.
+///
+/// One writer serves every test that needs a profile package on disk, so the
+/// directory route reads back exactly the authored fixture the compile-time
+/// route embeds instead of a per-module copy of it.
+pub fn write_package_tree(package: &include_dir::Dir<'_>, root: &Path) -> PathBuf {
+    fn write(directory: &include_dir::Dir<'_>, root: &Path) {
+        directory.files().for_each(|file| {
+            let path = root.join(file.path());
+            fs::create_dir_all(path.parent().expect("package file has a parent"))
+                .expect("create package parent directory");
+            fs::write(path, file.contents()).expect("write package file");
+        });
+        directory.dirs().for_each(|child| write(child, root));
+    }
+
+    fs::create_dir_all(root).expect("create package root");
+    write(package, root);
+    root.to_path_buf()
 }
 
 /// Create test WorktreePaths from a TempDir
