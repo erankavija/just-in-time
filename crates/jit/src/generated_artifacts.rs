@@ -89,10 +89,10 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     },
     GeneratedArtifact {
         name: "events-reference",
-        generator: crate::domain::event_catalog::REFERENCE_GENERATOR,
+        generator: crate::domain::event_catalog::test_support::REFERENCE_GENERATOR,
         holds: "the event catalog declared in `jit::domain::event_catalog`",
         render: ArtifactRender::InCrate {
-            target: crate::domain::event_catalog::REFERENCE_PATH,
+            target: crate::domain::event_catalog::test_support::REFERENCE_PATH,
             render: render_events_reference,
         },
     },
@@ -136,10 +136,10 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     },
     GeneratedArtifact {
         name: "storage-records-reference",
-        generator: crate::storage::reference::REFERENCE_GENERATOR,
+        generator: crate::storage::reference::test_support::REFERENCE_GENERATOR,
         holds: "the record layout declared in `jit::storage::reference`",
         render: ArtifactRender::InCrate {
-            target: crate::storage::reference::REFERENCE_PATH,
+            target: crate::storage::reference::test_support::REFERENCE_PATH,
             render: render_storage_records_reference,
         },
     },

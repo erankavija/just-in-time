@@ -3,8 +3,8 @@
 //! Three storage facts an adopter has to know are defined in code, not in prose:
 //! the shape of an issue identifier, the serialization of the event log, and the
 //! layout of a recorded gate run. [`render_reference_markdown`] projects them
-//! into [`REFERENCE_PATH`], so the page is generated from the same definitions
-//! the binary writes with (`@/inv/single-source-prose`).
+//! into that page, so it is generated from the same definitions the binary
+//! writes with (`@/inv/single-source-prose`).
 //!
 //! Every claim on the page is derived rather than restated:
 //!
@@ -40,12 +40,15 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::path::Path;
 
-/// Repo-relative path of the committed reference this module projects.
-pub const REFERENCE_PATH: &str = "docs/reference/storage-records.md";
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) mod test_support {
+    /// Repo-relative path of the committed reference this module projects.
+    pub const REFERENCE_PATH: &str = "docs/reference/storage-records.md";
 
-/// The command that renders [`REFERENCE_PATH`] from these definitions, named in
-/// the conformance test's message so a stale reference carries its own repair.
-pub const REFERENCE_GENERATOR: &str = "./scripts/generate-storage-records-reference.sh";
+    /// The command that renders [`REFERENCE_PATH`] from these definitions, named in
+    /// the conformance test's message so a stale reference carries its own repair.
+    pub const REFERENCE_GENERATOR: &str = "./scripts/generate-storage-records-reference.sh";
+}
 
 /// The page states that a short id is always long enough to hand back as an id
 /// prefix. That holds only while the short id is at least as wide as the
@@ -380,7 +383,7 @@ fn cell(text: &str) -> String {
     text.replace('|', "\\|")
 }
 
-/// Render the storage-record reference ([`REFERENCE_PATH`]).
+/// Render the storage-record reference.
 ///
 /// The returned string is the page's full contents. The identifier widths come
 /// from the constants that enforce them, the event-log block from
@@ -524,7 +527,7 @@ mod tests {
     fn reference_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
-            .join(REFERENCE_PATH)
+            .join(test_support::REFERENCE_PATH)
     }
 
     fn seed_issue_preimage(storage: &InMemoryStorage, issue: &Issue) {
@@ -777,8 +780,9 @@ mod tests {
         assert_eq!(
             committed,
             render_reference_markdown().expect("the reference renders"),
-            "{REFERENCE_PATH} is stale — regenerate it from `crate::storage::reference` \
-             (run: {REFERENCE_GENERATOR})"
+            "{} is stale — regenerate it from `crate::storage::reference` (run: {})",
+            test_support::REFERENCE_PATH,
+            test_support::REFERENCE_GENERATOR,
         );
     }
 }

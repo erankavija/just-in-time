@@ -44,10 +44,7 @@ pub use types::*;
 pub use gate_findings::{parse_gate_findings, GateFinding, GateFindings};
 
 // Re-export the event-tag catalog and its projection.
-pub use event_catalog::{
-    event_catalog, render_event_reference, EventScope, EventTag, EventTagDoc,
-    REFERENCE_PATH as EVENT_REFERENCE_PATH,
-};
+pub use event_catalog::{event_catalog, render_event_reference, EventScope, EventTag, EventTagDoc};
 pub use event_log::{parse_known_events, EventLogError};
 
 // Re-export the projection layer for `use jit::domain::*` ergonomics.
