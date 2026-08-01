@@ -32,6 +32,13 @@ git2 = "0.21"
 which = "6.0"
 similar = "2.6"
 regex = "1.12.2"
+# Shell-style pattern matching for the exclusion patterns a profile manifest's
+# live-source roots declare. Chosen over hand-rolling because the manifest
+# compiles a pattern where it parses it, so pattern validity and pattern
+# matching are one implementation. The crate has no dependencies of its own, so
+# it adds one compilation unit and no transitive graph
+# (`@/invariant/bounded-rust-build-footprint`).
+glob = "0.3"
 # Local-only JSON Schema validation: repository schemas use same-document
 # fragment refs (`#/types/...`), which the core validator resolves without any
 # external retriever. Default features pull remote-resolution infrastructure
