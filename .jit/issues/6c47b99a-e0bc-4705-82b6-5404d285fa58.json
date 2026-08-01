@@ -11,9 +11,16 @@
   "first_ready_at": "2026-08-01T20:29:24.306373691Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "mcp-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-01T21:49:31.643184498Z",
+      "updated_by": null
+    }
+  },
   "id": "6c47b99a-e0bc-4705-82b6-5404d285fa58",
   "labels": [
     "type:task",
@@ -28,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record where an applied package came from",
-  "updated_at": "2026-08-01T20:38:28.438942856Z"
+  "updated_at": "2026-08-01T21:49:31.643184498Z"
 }

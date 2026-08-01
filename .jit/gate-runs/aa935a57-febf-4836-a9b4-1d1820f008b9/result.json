@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "300a1bc7ae432b16e4804979ab34efc653ede200",
+  "completed_at": "2026-08-01T21:49:10.226057041Z",
+  "duration_ms": 173063,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied; no unresolved issue-impact defects were found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f9cab4c2-8079-4011-adf1-20a7c47c445f",
+  "message": null,
+  "run_id": "aa935a57-febf-4836-a9b4-1d1820f008b9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-01T21:46:17.162363306Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `862ff295` and merge `db7e5c86` (`jit:f9cab4c2`); only their five-file first-parent patch is attributable  \nPolicy sources: `AGENTS.md`  \nResolved items: REQ-01–04 (`.jit/issues/f9cab4c2-8079-4011-adf1-20a7c47c445f.json`); D-21 (`.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json`); `@/invariant/domain-agnostic`, `@/invariant/architecture-dependency-direction`, `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/gate/cargo-ci` (`.jit/gates.toml`)  \nGate evidence: cargo-ci passed (exit 0, 2026-08-01T21:36:22.790116099+00:00)  \nTruncation recovery: narrowed the initially broad search to item sources, affected declarations, conformance assertions, generated-artifact records, scripts, and per-commit patches  \n\n1. No findings. The path and generator constants are test-support-only, the default library excludes both that module and generated artifacts, conformance comparisons remain intact, and the artifact declarations retain the same targets and entry points.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied; no unresolved issue-impact defects were found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

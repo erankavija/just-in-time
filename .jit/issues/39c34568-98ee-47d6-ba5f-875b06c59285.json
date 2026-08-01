@@ -12,9 +12,16 @@
   "first_ready_at": "2026-07-28T12:17:11.984851016Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "mcp-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-01T21:49:31.969189083Z",
+      "updated_by": null
+    }
+  },
   "id": "39c34568-98ee-47d6-ba5f-875b06c59285",
   "labels": [
     "epic:derived-package-sources",
@@ -30,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Declare the repository roots the packaged live assets are drawn from",
-  "updated_at": "2026-08-01T20:38:13.088912203Z"
+  "updated_at": "2026-08-01T21:49:31.969189083Z"
 }
