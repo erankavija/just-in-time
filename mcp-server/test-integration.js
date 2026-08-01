@@ -453,7 +453,7 @@ async function main() {
 
         const shown = await profileCall('jit_profile_show', { id: 'jit-dogfood' });
         assert.strictEqual(shown.manifest.profile.id, 'jit-dogfood');
-        assert.strictEqual(shown.origin, 'embedded');
+        assert.deepStrictEqual(shown.origin, { source: 'embedded' });
 
         const preview = await profileCall('jit_profile_apply', {
           id: 'jit-dogfood',
