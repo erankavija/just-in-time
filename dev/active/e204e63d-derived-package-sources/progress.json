@@ -130,13 +130,13 @@
     },
     {
       "wave_number": 1,
-      "note": "Dispatched 2026-08-01 session 5, all fourteen at once on base da174a6b. The ten taxonomy-fixture adoptions are disjoint by construction (one test target or crate each) and went to codex gpt-5.6-luna at high effort; the four leaves carrying design judgement went to Opus agents. fd61b44f (the graceful-shutdown drain test) is held back deliberately: it edits crates/server/tests/server_integration/graceful_shutdown_tests.rs, which is one of a53a6f09's three call sites.",
+      "note": "Dispatched 2026-08-01 session 5, all fourteen at once on base da174a6b. The ten taxonomy-fixture adoptions are disjoint by construction (one test target or crate each) and went to codex gpt-5.6-luna at high effort; the four leaves carrying design judgement went to Opus agents. fd61b44f (the graceful-shutdown drain test) is held back deliberately: it edits crates/server/tests/server_integration/graceful_shutdown_tests.rs, which is one of a53a6f09's three call sites. Mid-wave: the ten adoptions were rewired behind new task 06b736c7 and will be reworked once it lands; see the owner ruling of the same date.",
       "issues": [
         {
           "short_id": "1aa2b486",
           "title": "Adopt the taxonomy fixture in the rules integration target",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -144,7 +144,7 @@
           "short_id": "1cfb66ff",
           "title": "Adopt the taxonomy fixture in the documents-and-templates integration target",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -152,7 +152,7 @@
           "short_id": "60c211d6",
           "title": "Adopt the taxonomy fixture in the repository-workflow integration target",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -160,7 +160,7 @@
           "short_id": "76b16af0",
           "title": "Adopt the taxonomy fixture in the modules that seed a repository directly",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -168,7 +168,7 @@
           "short_id": "889a939a",
           "title": "Adopt the taxonomy fixture in the archive command tests",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -176,7 +176,7 @@
           "short_id": "a4f03da3",
           "title": "Adopt the taxonomy fixture in the item-validation integration target",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -184,7 +184,7 @@
           "short_id": "a53a6f09",
           "title": "Adopt the taxonomy fixture in the server crate",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -192,7 +192,7 @@
           "short_id": "a603f02d",
           "title": "Adopt the taxonomy fixture in the query-and-graph integration target",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -200,7 +200,7 @@
           "short_id": "be918f22",
           "title": "Adopt the taxonomy fixture in the repository-inspection command tests",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -208,7 +208,7 @@
           "short_id": "ffe6de33",
           "title": "Adopt the taxonomy fixture in the initialization command tests",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -243,6 +243,14 @@
           "status": "dispatched",
           "worker": "opus-agent",
           "base": "da174a6b"
+        },
+        {
+          "short_id": "06b736c7",
+          "title": "One declared vocabulary serves every shared test fixture",
+          "classification": "implementation",
+          "status": "dispatched",
+          "worker": "opus-agent",
+          "base": "73172f44"
         }
       ]
     }
@@ -364,6 +372,11 @@
       "at": "2026-08-01",
       "finding": "The dogfood-guidance region has two carriers with nothing binding them: profiles/jit-dogfood/assets/regions/agents-jit-guidance.md (the package's authority) and the rendered region in AGENTS.md. `jit project render` does not touch it (only the charter, invariants and rules-and-gates projections are declared), and `jit profile apply` would materialise it from the compiled-in embed rather than the working file, so a source edit reaches AGENTS.md only by hand or by a rebuild-plus-apply. This repository has no .jit/profiles/ record at all, so nothing validates the pair.",
       "disposition": "Both carriers edited together at c250dbcf. Not a criterion violation as written: no [hard] criterion names the region pair. Recheck at epic close against REQ-03 — 'the packaged live-asset tree is derived from the repository files it mirrors' — since assets/regions/ sits outside assets/live/ and may fall outside that criterion's reach by construction."
+    },
+    {
+      "at": "2026-08-01",
+      "finding": "The ten taxonomy adoptions are contracted to consume ae435979's fixture 'as authored', but setup_test_repo_with_taxonomy() writes the whole .jit/config.toml from its own vocabulary and TestTaxonomy::config_toml() is private, so a suite that must declare item kinds, gates or rules in the same file cannot use it. Measured: cli_item_validate (3 sites), cli_query_graph/scope_validation_tests.rs and fast_docs_templates/template_apply_atomicity_tests.rs write extra tables; the remaining sites do not. Both workers back before the finding reached for declared_test_taxonomy() instead — the parallel helper the session-3 handoff had already flagged.",
+      "disposition": "Root cause on the lead's side: session 3's handoff named this trap and required a53a6f09 and 76b16af0 to be briefed to delete the parallel helpers; the wave-1 briefs did not carry it. Resolved structurally by 06b736c7 rather than per issue. Brief-composition step must read the prior handoff's trap list against the dispatch set, not only the issue descriptions."
     }
   ],
   "rework_counts": {
@@ -487,6 +500,11 @@
       "at": "2026-08-01",
       "ruling": "Resolve 5dd0df5b's repeated code-review finding by citing the namespace declaration as a label's authority in AGENTS.md, rather than dropping the label, re-labelling REQ-08's contributors, or overriding the verdict.",
       "effect": "profiles/jit-dogfood/assets/regions/agents-jit-guidance.md and the AGENTS.md region it feeds gained one bullet: a label means what its [namespaces.<ns>] declaration says. A citation rather than a copy, so it adds no hand-maintained duplicate. Fixes the class for every partial contributor to REQ-01/03/05/07/08 still to come. Commit c250dbcf."
+    },
+    {
+      "at": "2026-08-01",
+      "ruling": "Converge the two shared test vocabularies first, then rework the adoptions onto the single fixture. Rejected: closing the adoptions as landed and converging afterwards, which closes issues whose REQ-01/REQ-04 are unmet at the moment of closing; amending the ten adoptions' criteria to name a fixture family; killing the wave outright.",
+      "effect": "Task 06b736c7 created inside the epic and wired between ae435979 and all ten adoptions (dep add --reduce dropped the now-redundant ae435979 and story edges). One declaration reachable from the pure domain and graph suites, rendered into a whole-repository fixture and into a composable configuration fragment; the second declaration (HierarchyConfig::test_vocabulary, 118 call sites) and the second renderer (declared_test_taxonomy) are retired, rewriting ~160 literal type-name assertions onto the surviving vocabulary."
     }
   ],
   "halted": {
