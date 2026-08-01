@@ -63,7 +63,7 @@ pub use git_revision::{
 pub use json::{JsonFileStorage, RetainedMutationSessionGuard, RetainedSessionSuspendedError};
 pub use lock::FileLocker;
 pub use path_errors::{validate_repo_relative_path, PathReadError};
-pub use reference::{render_reference_markdown, GateRunField, REFERENCE_PATH};
+pub use reference::{render_reference_markdown, GateRunField};
 pub use repo_lock::{RepoWriteGuard, RepoWriteLock};
 pub use repository_state_store::{
     discover_repository_layout, RecoveryDispatchReport, RepositoryApplyOutcome,

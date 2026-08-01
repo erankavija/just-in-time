@@ -4,7 +4,7 @@
 //! declaration tags every record with a snake-case `type` field. This module
 //! projects that vocabulary into a machine-consumable catalog ([`event_catalog`],
 //! carried by `jit --schema` as its `events` array) and into the committed
-//! markdown reference [`REFERENCE_PATH`] ([`render_event_reference`]).
+//! markdown reference rendered by [`render_event_reference`].
 //!
 //! The catalog is derived from the type, never restated:
 //!
@@ -31,13 +31,16 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{Assignee, Event, Priority, State};
 
-/// Path of the committed markdown reference this module projects, relative to
-/// the repository root.
-pub const REFERENCE_PATH: &str = "docs/reference/events.md";
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) mod test_support {
+    /// Path of the committed markdown reference this module projects, relative to
+    /// the repository root.
+    pub const REFERENCE_PATH: &str = "docs/reference/events.md";
 
-/// The command that renders [`REFERENCE_PATH`] from this catalog, named in the
-/// conformance test's message so a stale reference carries its own repair.
-pub const REFERENCE_GENERATOR: &str = "./scripts/generate-events-reference.sh";
+    /// The command that renders [`REFERENCE_PATH`] from this catalog, named in the
+    /// conformance test's message so a stale reference carries its own repair.
+    pub const REFERENCE_GENERATOR: &str = "./scripts/generate-events-reference.sh";
+}
 
 /// What an event is about: the state it records a change to.
 ///
@@ -473,8 +476,8 @@ pub struct EventTagDoc {
 
 /// Project the event-tag catalog: one row per [`Event`] variant.
 ///
-/// Carried by `jit --schema` as its `events` array and rendered into
-/// [`REFERENCE_PATH`] by [`render_event_reference`]. Every row is derived:
+/// Carried by `jit --schema` as its `events` array and rendered into the
+/// committed reference by [`render_event_reference`]. Every row is derived:
 /// [`EventTag::as_str`] supplies the tag serde writes, [`EventTag::scope`] the
 /// association scope, and the `issue_id` presence is read off the sample record's
 /// serialized JSON object — the encoding the event log stores.
@@ -490,7 +493,7 @@ pub fn event_catalog() -> Vec<EventTagDoc> {
         .collect()
 }
 
-/// Render the event-log reference page ([`REFERENCE_PATH`]).
+/// Render the event-log reference page.
 ///
 /// The page projects [`event_catalog`] into markdown, so the committed doc is
 /// generated rather than hand-copied. A conformance test asserts the committed
@@ -559,7 +562,7 @@ mod tests {
     fn reference_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
-            .join(REFERENCE_PATH)
+            .join(test_support::REFERENCE_PATH)
     }
 
     /// Every string the derived schema of a fieldless enum admits: schemars
@@ -777,8 +780,9 @@ mod tests {
         assert_eq!(
             committed,
             render_event_reference(),
-            "{REFERENCE_PATH} is stale — regenerate it from `jit::domain::event_catalog` \
-             (run: {REFERENCE_GENERATOR})"
+            "{} is stale — regenerate it from `jit::domain::event_catalog` (run: {})",
+            test_support::REFERENCE_PATH,
+            test_support::REFERENCE_GENERATOR,
         );
     }
 
