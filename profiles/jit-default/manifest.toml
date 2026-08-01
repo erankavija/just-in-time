@@ -194,11 +194,10 @@ value = { description = "Enforcement link: names an invariant, rule, or gate ite
 # A project-scope kind also needs `source`: a markdown file path, or a toml
 # descriptor { toml, table, id-field, text-field } for a registry-first kind.
 #
-# The kinds below name only sources a repository already carries: the two
-# issue-scope registries need none, and the rule and gate registries are
-# written by initialization. A kind whose source arrives with another package
-# is declared by that package, so no declaration here points at a file this
-# package does not account for.
+# The kinds below name only sources a repository already carries: the
+# issue-scope kinds need none, and the invariant, rule, and gate registries are
+# all written by initialization, so every declaration resolves in a freshly
+# initialized repository before any package is applied.
 
 [[contribution]]
 kind = "map-entry"
@@ -238,6 +237,23 @@ markers = []
 link-namespaces = ["mitigates", "resolves"]
 scope = "issue"
 source-of-truth = "markdown-first"
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "invariant"
+
+[contribution.value]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+# Shorthand for space-constrained citations: `@/inv/<self-id>` resolves the same
+# item as `@/invariant/<self-id>`.
+aliases = ["inv"]
 
 # Rules are colon-free-named entries in `.jit/rules.toml`; the rule kind
 # projects each entry's `name` as its self-id and its optional `description` as

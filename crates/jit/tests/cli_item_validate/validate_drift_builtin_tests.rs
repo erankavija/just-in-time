@@ -1,11 +1,11 @@
 //! Integration tests: `jit validate` reports enforcement drift as a BUILT-IN
 //! pass — with NO opt-in `.jit/rules.toml` rule (REQ-01/REQ-02).
 //!
-//! These prove the reviewer's named gap is closed: a repository that simply
-//! declares `.jit/invariants.toml` gets the declared-but-unenforced drift finding
-//! from a plain `jit validate` (an unclaimed rule/gate is not drift, REQ-05),
-//! while a repository with NO invariants registry sees zero new drift findings
-//! (the live repo stays clean — graceful degradation).
+//! These prove the reviewer's named gap is closed: a repository that declares an
+//! invariant in `.jit/invariants.toml` gets the declared-but-unenforced drift
+//! finding from a plain `jit validate` (an unclaimed rule/gate is not drift,
+//! REQ-05), while a repository declaring no invariant sees zero new drift
+//! findings (a freshly initialized repository stays clean).
 
 use serde_json::Value;
 use std::process::Command;
@@ -158,12 +158,13 @@ fn test_validate_reports_unloadable_target_drift_not_parse_error() {
 }
 
 #[test]
-fn test_validate_clean_when_no_invariants_registry() {
+fn test_validate_clean_when_no_invariant_is_declared() {
     let temp = setup_test_repo();
-    // No .jit/invariants.toml at all -> the drift pass is dormant. `jit validate`
-    // must report ZERO enforcement-drift findings (proves the live repo, which has
-    // no invariants registry, is unaffected).
-    assert!(!temp.path().join(".jit/invariants.toml").exists());
+    // Initialization leaves the registry present and empty, so nothing is
+    // declared and the drift pass is dormant. `jit validate` must report ZERO
+    // enforcement-drift findings.
+    let registry = std::fs::read_to_string(temp.path().join(".jit/invariants.toml")).unwrap();
+    assert!(!registry.contains("[[invariants]]"));
 
     let (code, json) = run_validate(&temp);
     let messages = finding_messages(&json);

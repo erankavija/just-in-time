@@ -33,10 +33,11 @@ where each comes up.
 └── schemas/          # JSON Schema files referenced by rules.toml
 ```
 
-`templates.toml` and `invariants.toml` are authored per project; `jit init`
-does not scaffold either one. `config.toml`, the empty `gates.toml`, and
+`templates.toml` is authored per project; `jit init` does not scaffold it.
+`config.toml`, the empty `gates.toml`, the empty `invariants.toml`, and
 `rules.toml` (with a default ruleset and its `schemas/` files) are scaffolded
-by `jit init`.
+by `jit init`, so the `gate`, `invariant`, and `rule` item kinds each resolve
+against a registry that exists before anything is authored into it.
 
 A live repository also carries gitignored, machine-local files directly under
 `.jit/`: `worktree.json`, `server.log`, `server.pid.json`, a fixed set of lock

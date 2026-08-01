@@ -290,8 +290,8 @@ impl CommandExecutor<JsonFileStorage> {
 
 /// Project the stable public init report from the exact finalized plan.
 ///
-/// The response intentionally reports only the five user-facing scaffold files
-/// plus the worktree `.gitattributes` claim. Derived schemas, projections, and
+/// The response intentionally reports only the user-facing scaffold files plus
+/// the worktree `.gitattributes` claim. Derived schemas, projections, and
 /// other materialization refreshes remain internal transaction details. Every
 /// reported creation or modification is nevertheless proven by the finalized
 /// action's expected preimage; no ambient filesystem probe participates.
@@ -302,6 +302,7 @@ fn init_response_paths(
     let mut created = [
         (".jit/index.json", "index.json"),
         (".jit/gates.toml", "gates.toml"),
+        (".jit/invariants.toml", "invariants.toml"),
         (".jit/events.jsonl", "events.jsonl"),
         (".jit/config.toml", "config.toml"),
         (".jit/rules.toml", "rules.toml"),
@@ -546,6 +547,7 @@ mod tests {
         for path in [
             "index.json",
             "gates.toml",
+            "invariants.toml",
             "events.jsonl",
             "config.toml",
             "rules.toml",
@@ -556,6 +558,72 @@ mod tests {
             );
         }
         assert!(repo.path().join(".jit/issues").is_dir());
+        assert_repo_valid(repo.path());
+    }
+
+    #[test]
+    fn test_fresh_init_creates_the_invariant_registry_present_and_empty() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let executor = executor_with_layout(&storage, repo.path());
+
+        let result = executor
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+
+        // Present and empty, like the gate registry beside it: the file exists,
+        // parses, and declares nothing.
+        let registry = fs::read_to_string(repo.path().join(".jit/invariants.toml")).unwrap();
+        assert!(
+            crate::declarations::invariants::InvariantRegistry::from_toml_str(&registry)
+                .unwrap()
+                .invariants
+                .is_empty()
+        );
+        assert!(!registry.is_empty());
+        assert!(result
+            .created_paths
+            .contains(&".jit/invariants.toml".to_string()));
+        // The kind resolves against that registry with nothing declared in it and
+        // no package applied.
+        assert!(executor
+            .list_items(Some("invariant"))
+            .unwrap()
+            .items
+            .is_empty());
+        assert_repo_valid(repo.path());
+    }
+
+    #[test]
+    fn test_fresh_init_registry_resolves_an_authored_invariant_without_a_package() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let executor = executor_with_layout(&storage, repo.path());
+        executor
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .unwrap();
+
+        // The adopter authors into the registry initialization gave them; nothing
+        // else is installed first.
+        let authored = crate::declarations::invariants::InvariantRegistry {
+            invariants: vec![crate::declarations::invariants::Invariant {
+                id: "authored-here".to_string(),
+                statement: "Authored straight into the scaffolded registry.".to_string(),
+                kind: crate::declarations::invariants::InvariantKind::Advisory,
+                enforced_by: None,
+            }],
+        };
+        fs::write(
+            repo.path().join(".jit/invariants.toml"),
+            crate::declarations::invariants::serialize_invariant_registry(&authored).unwrap(),
+        )
+        .unwrap();
+
+        let resolved = executor_with_layout(&storage, repo.path())
+            .show_item("@/invariant/authored-here")
+            .unwrap();
+        assert_eq!(resolved.item.self_id, "authored-here");
+        assert!(resolved.issue_full_id.is_none());
         assert_repo_valid(repo.path());
     }
 

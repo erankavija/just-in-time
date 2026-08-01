@@ -316,11 +316,10 @@ kind = "projection"
 name = "rules-and-gates"
 value = { kind = ["rule", "gate"], mode = "separate-file", target = ".jit/reference/rules-and-gates.md", style = "full" }
 
-# Install-only adopter state.
-[[asset]]
-source = "assets/install/.jit/invariants.toml"
-target = ".jit/invariants.toml"
-
+# Install-only adopter state. The invariant registry is not among it: this
+# package declares no invariant, and initialization creates that registry, so
+# publishing a file over it would meet an occupied destination. A package
+# invariant would be contributed into the registry instead.
 [[asset]]
 source = "assets/install/.jit/schemas/jit-content-standards.json"
 target = ".jit/schemas/jit-content-standards.json"

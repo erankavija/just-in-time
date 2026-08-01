@@ -321,28 +321,9 @@ mod tests {
                 }
             }
         }
-        let invariants: toml::Value = toml::from_str(
-            std::str::from_utf8(
-                package
-                    .source_bytes("assets/install/.jit/invariants.toml")
-                    .unwrap(),
-            )
-            .unwrap(),
-        )
-        .unwrap();
-        for invariant in invariants
-            .get("invariants")
-            .and_then(toml::Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            if let Some(id) = invariant.get("id").and_then(toml::Value::as_str) {
-                known
-                    .entry("invariant".to_string())
-                    .or_default()
-                    .insert(id.to_string());
-            }
-        }
+        // The invariant registry is initialization's, not this package's: the
+        // package declares no invariant, so a packaged citation to one resolves
+        // against nothing and is a defect this walk reports.
         let citation =
             regex::Regex::new(r"@/([a-z][a-z0-9-]*)/([A-Za-z0-9][A-Za-z0-9-]*)").unwrap();
 
@@ -789,6 +770,8 @@ mod tests {
             .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
             .unwrap();
         fs::write(temp.path().join("AGENTS.md"), b"# Existing guidance\n").unwrap();
+        let invariants_path = temp.path().join(".jit/invariants.toml");
+        let scaffolded_invariants = fs::read(&invariants_path).unwrap();
 
         let layout =
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
@@ -803,7 +786,15 @@ mod tests {
             .path()
             .join(".agents/skills/jit-manage/SKILL.md")
             .is_file());
-        assert!(temp.path().join(".jit/invariants.toml").is_file());
+        // The invariant registry belongs to the repository, which already carried
+        // one: the application declares no invariant and claims no target here, so
+        // it neither replaces the file nor depends on its absence.
+        assert!(!package
+            .manifest()
+            .assets
+            .iter()
+            .any(|asset| asset.target == ".jit/invariants.toml"));
+        assert_eq!(fs::read(&invariants_path).unwrap(), scaffolded_invariants);
         assert!(temp
             .path()
             .join(".jit/reference/content-standards.md")

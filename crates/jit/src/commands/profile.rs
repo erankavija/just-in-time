@@ -639,7 +639,7 @@ mod tests {
     }
 
     #[test]
-    fn test_jit_default_declares_no_item_kind_whose_source_it_does_not_provide() {
+    fn test_jit_default_declares_every_kind_an_initialized_repository_can_carry() {
         let (temp, _storage, _executor, _fixture_package) = fixture();
         let package = jit_default_package();
         let kinds = declared_item_kinds(&package);
@@ -652,8 +652,8 @@ mod tests {
             let Some(source) = item_kind_source(declaration) else {
                 continue;
             };
-            // The package publishes no file at all, so a source it names has to
-            // be one an initialized repository already carries.
+            // The package publishes no file at all, so every source it names is
+            // one initialization already wrote.
             assert!(
                 package
                     .manifest()
@@ -664,7 +664,24 @@ mod tests {
             );
             assert!(
                 temp.path().join(source).is_file(),
-                "kind '{name}' names source '{source}', which a scaffolded repository does not carry"
+                "kind '{name}' names source '{source}', which an initialized repository does not carry"
+            );
+        }
+
+        // Nothing is left out: every registry initialization writes and can hold
+        // addressable items is claimed by one of these kinds.
+        let declared_sources: BTreeSet<&str> = kinds
+            .values()
+            .filter_map(|kind| item_kind_source(kind))
+            .collect();
+        for registry in [".jit/invariants.toml", ".jit/rules.toml", ".jit/gates.toml"] {
+            assert!(
+                temp.path().join(registry).is_file(),
+                "initialization must carry {registry}"
+            );
+            assert!(
+                declared_sources.contains(registry),
+                "no declared kind reads {registry}"
             );
         }
     }
@@ -703,41 +720,11 @@ mod tests {
                 .collect::<BTreeSet<String>>()
         };
 
-        // Neither less nor more than the scaffold declares.
+        // Neither less nor more than the scaffold declares, table for table.
         assert_eq!(table_names(&produced), table_names(&scaffold));
-        for table in table_names(&scaffold)
-            .iter()
-            .filter(|name| *name != "item_kinds")
-        {
+        for table in table_names(&scaffold).iter() {
             assert_eq!(produced[table], scaffold[table], "table [{table}]");
         }
-
-        // Item kinds are the one place the two differ, and they differ by the
-        // rule the package is authored to: it names no source file it does not
-        // provide, and it provides none, so it declares exactly the scaffold's
-        // kinds whose source an initialized repository already carries.
-        let scaffold_kinds = scaffold["item_kinds"].as_object().unwrap();
-        let produced_kinds = produced["item_kinds"].as_object().unwrap();
-        for (name, declaration) in scaffold_kinds {
-            let carried = item_kind_source(declaration)
-                .is_none_or(|source| temp.path().join(source).is_file());
-            if carried {
-                assert_eq!(
-                    produced_kinds.get(name),
-                    Some(declaration),
-                    "kind '{name}' is declared by the package"
-                );
-            } else {
-                assert!(
-                    !produced_kinds.contains_key(name),
-                    "kind '{name}' names a source no repository carries yet"
-                );
-            }
-        }
-        assert!(
-            produced_kinds.len() < scaffold_kinds.len(),
-            "the split is vacuous unless the scaffold declares a kind the package leaves out"
-        );
     }
 
     #[test]

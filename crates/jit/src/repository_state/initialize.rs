@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 
 use crate::config::ProjectName;
 use crate::config_manager::namespaces_from_config;
+use crate::declarations::invariants::{serialize_invariant_registry, InvariantRegistry};
 use crate::declarations::{serialize_gate_registry, GateRegistry};
 
 use super::default_rules::default_ruleset;
@@ -175,6 +176,7 @@ pub struct InitializationScaffold {
     config: Vec<u8>,
     index: Vec<u8>,
     gates: Vec<u8>,
+    invariants: Vec<u8>,
     rules: Vec<u8>,
     schemas: Vec<(String, Vec<u8>)>,
     profile: Option<ProfileApplicationInput>,
@@ -210,8 +212,7 @@ impl InitializationScaffold {
     ) -> Result<Self, InitializationError> {
         let parsed = crate::declarations::parse_configuration(config.as_bytes())
             .map_err(|error| InitializationError::Config(error.to_string()))?;
-        let parsed = parsed
-            .materialization_config(crate::declarations::invariants::InvariantRegistry::empty());
+        let parsed = parsed.materialization_config(InvariantRegistry::empty());
         let namespaces = namespaces_from_config(&parsed);
         let serialized = serialize_ruleset(&default_ruleset(&namespaces));
         let schemas = serialized
@@ -224,6 +225,8 @@ impl InitializationScaffold {
             index: fresh_index_bytes()
                 .map_err(|error| InitializationError::Config(error.to_string()))?,
             gates: serialize_gate_registry(&GateRegistry::default())
+                .map_err(|error| InitializationError::Config(error.to_string()))?,
+            invariants: serialize_invariant_registry(&InvariantRegistry::empty())
                 .map_err(|error| InitializationError::Config(error.to_string()))?,
             rules: serialized.rules_toml.into_bytes(),
             schemas,
@@ -271,6 +274,7 @@ impl InitializationScaffold {
             (".jit/config.toml".to_string(), self.config.clone()),
             (".jit/index.json".to_string(), self.index.clone()),
             (".jit/gates.toml".to_string(), self.gates.clone()),
+            (".jit/invariants.toml".to_string(), self.invariants.clone()),
             (".jit/rules.toml".to_string(), self.rules.clone()),
         ];
         files.extend(
@@ -306,6 +310,13 @@ impl InitializationScaffold {
             DesiredFile {
                 path: VirtualPath::GATES,
                 bytes: self.gates.clone(),
+                mode: FileMode::Regular,
+                policy: WritePolicy::IfAbsent,
+                owner: SCAFFOLD_OWNER,
+            },
+            DesiredFile {
+                path: VirtualPath::INVARIANTS,
+                bytes: self.invariants.clone(),
                 mode: FileMode::Regular,
                 policy: WritePolicy::IfAbsent,
                 owner: SCAFFOLD_OWNER,

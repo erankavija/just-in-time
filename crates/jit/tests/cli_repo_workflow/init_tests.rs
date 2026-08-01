@@ -300,6 +300,7 @@ fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
             "created_paths": [
                 ".jit/index.json",
                 ".jit/gates.toml",
+                ".jit/invariants.toml",
                 ".jit/events.jsonl",
                 ".jit/config.toml",
                 ".jit/rules.toml"
@@ -662,6 +663,7 @@ fn test_init_json_disjoint_data_root_reports_canonical_plan_paths() {
         serde_json::json!([
             ".jit/index.json",
             ".jit/gates.toml",
+            ".jit/invariants.toml",
             ".jit/events.jsonl",
             ".jit/config.toml",
             ".jit/rules.toml"

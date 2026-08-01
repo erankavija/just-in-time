@@ -233,10 +233,18 @@ fn repair_target_path_strings() -> Vec<String> {
 /// target).
 fn repair_paths() -> Vec<String> {
     let mut paths = repair_target_path_strings();
+    // Beyond the profile-owned targets, the harness repository needs the state
+    // initialization owns and the profile never claims: the index, the event log,
+    // and the invariant registry the configured `invariant` kind reads.
     paths.extend(
-        [PROFILE_RECORD, ".jit/index.json", ".jit/events.jsonl"]
-            .into_iter()
-            .map(str::to_string),
+        [
+            PROFILE_RECORD,
+            ".jit/index.json",
+            ".jit/events.jsonl",
+            ".jit/invariants.toml",
+        ]
+        .into_iter()
+        .map(str::to_string),
     );
     paths.sort();
     paths.dedup();
