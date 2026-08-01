@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-01T20:37:52.603883606Z",
   "context": {},
   "created_at": "2026-07-31T17:55:01.855466366Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the server crate",
-  "updated_at": "2026-07-31T23:06:49.266623830Z"
+  "updated_at": "2026-08-01T20:37:52.603883606Z"
 }

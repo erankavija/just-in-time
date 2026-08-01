@@ -22,7 +22,7 @@
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-07-31T23:45:08.156075775Z",
+      "updated_at": "2026-08-01T20:32:41.522520456Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Declare one package's dependency on another",
-  "updated_at": "2026-07-31T23:45:11.376827008Z"
+  "updated_at": "2026-08-01T20:32:41.522520456Z"
 }

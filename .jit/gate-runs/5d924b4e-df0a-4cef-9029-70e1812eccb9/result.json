@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3d17f6515514e2f8b0dff573e8b977ac3f7352a0",
+  "completed_at": "2026-08-01T20:32:41.224042785Z",
+  "duration_ms": 142790,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json",
+        "id": "F1",
+        "line": 41,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/requirement/REQ-08",
+          "@/issue/e204e63d/decision/D-14"
+        ],
+        "severity": "high",
+        "summary": "The unchanged satisfies:REQ-08 label claims credit for discovery and application, but this issue only parses, validates, serializes, and reports dependency declarations; resolution/application is explicitly deferred."
+      }
+    ],
+    "summary": "The issue retains an unsupported satisfies:REQ-08 claim; its implementation only declares, validates, and reports dependencies.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55",
+  "message": null,
+  "run_id": "5d924b4e-df0a-4cef-9029-70e1812eccb9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-01T20:30:18.433902790Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12096 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fbf05-47df-7453-8816-a5bdf5ff949d\n--------\nuser\n--- 12083 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cfe36aa7, f950f3f2, fb968a9b\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-08 and @/issue/e204e63d/decision/D-14 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/semantic-types (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); mcp-ci passed (0); prior code-review failed (1)\nTruncation recovery: per-parent merge file lists and focused patches/current-file reads recovered after broad outputs truncated\n\n1. [blocking][issue-impact] **F1 (high):** The unchanged `satisfies:REQ-08` label still claims credit for discovery and application, while this issue’s implementation only parses, validates, serializes, and reports dependency declarations; the issue itself explicitly defers resolution/application. [`.jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json:41`](/home/vkaskivuo/Projects/just-in-time/.jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json:41)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue retains an unsupported satisfies:REQ-08 claim; its implementation only declares, validates, and reports dependencies.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The unchanged satisfies:REQ-08 label claims credit for discovery and application, but this issue only parses, validates, serializes, and reports dependency declarations; resolution/application is explicitly deferred.\",\"file\":\".jit/issues/5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55.json\",\"line\":41,\"references\":[\"@/issue/e204e63d/requirement/REQ-08\",\"@/issue/e204e63d/decision/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
