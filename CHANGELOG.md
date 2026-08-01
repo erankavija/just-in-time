@@ -8,6 +8,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **A profile package declares the repository roots its live assets are drawn
+  from.** Some of a package's assets are drawn from repository files the same
+  repository also consumes at their working paths, and which directories those
+  are was stated nowhere: the root set existed only implicitly, in the shape of
+  the declared asset paths, so anything needing it — a step deciding which
+  directories to watch, a check asking whether every live consumer was packaged
+  — had to infer it or restate it. A manifest now carries one `[[live-source]]`
+  entry per root, each with its own `exclude` list. Exclusions are shell-style
+  patterns describing categories of repository material the package
+  deliberately does not carry, because a literal list of those files would
+  itself be a hand-maintained inventory: `*` stays inside one path segment and
+  `**` spans segments, both matched against a path relative to the root that
+  declared them. A root and an exclusion pattern are constrained types rather
+  than free strings — a root that is not a relative path of ordinary segments,
+  and a pattern that does not compile, are rejected where the manifest is
+  parsed rather than by whichever consumer matches first — and a manifest
+  declaring two roots that overlap is rejected as an invalid package, since a
+  path beneath both would have two exclusion lists and no rule for choosing
+  between them. The declaration is additive: a manifest carrying none parses
+  unchanged and no existing key changes meaning. `jit profile show --json`
+  reports it beside the assets it bounds, and the shipped `jit-dogfood` package
+  declares the three roots its live assets come from.
+
 - **A profile package is read from a directory on disk.** The package model was
   already written for untrusted external data — bounded file count and total
   size, rejected absolute, traversal, platform-prefix, control-character and
