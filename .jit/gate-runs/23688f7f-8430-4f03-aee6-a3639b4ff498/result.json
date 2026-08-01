@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "da44fe5fc43306abd1783bf4e76c8389ada77a49",
+  "completed_at": "2026-07-31T23:59:53.016620161Z",
+  "duration_ms": 244802,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met; the prior FIFO race is fixed and cargo-ci now passes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "09aea8b3-cc68-465a-8c9c-f7f4976f9e35",
+  "message": null,
+  "run_id": "23688f7f-8430-4f03-aee6-a3639b4ff498",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-07-31T23:55:48.214067385Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d6f51157, da92de63, fb968a9b, 3cab7a72, ae4f407b, 3c17f436, 47005773, da44fe5f\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-08 (issue description); @/invariant/domain-agnostic, @/invariant/convention-convergence, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-07-31T23:47:07.597588605+00:00)\nTruncation recovery: reread bounded current-source/test ranges and individual initial/follow-up patches; merge-only JIT metadata and unrelated subsystem changes were outside the profile-reader impact cone\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met; the prior FIFO race is fixed and cargo-ci now passes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -8,6 +8,7 @@
   ],
   "description": "The label that ties a breakdown node to its container is read from the template's own declaration rather than rebuilt from a literal namespace in the engine.\n\n## Background\n\nTwo places in the engine build that label by formatting a hardcoded namespace into a string, independently of each other. The namespace is a label namespace, which the boundary names, and the value is already declared: the template's breakdown node declares the label it wants, with the container's identifier interpolated. The engine reconstructs by literal what the template already states.\n\nReading it from the declaration removes the literal and makes the behaviour follow the adopter's template rather than the engine's assumption — a repository whose template declares a different namespace gets what it declared, which is not true today.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither call site formats a label namespace from a literal; both derive the label from the breakdown node's declared labels.\n- [hard] REQ-02: A template declaring a different namespace for that label produces that namespace end to end, in creation and in the scope resolution that reads it back.\n- [hard] REQ-03: A template whose breakdown node declares no such label is reported where the bracket is applied, rather than silently producing nothing to resolve against.\n- [hard] REQ-04: The repository's own bracket behaviour is unchanged, because its template declares the namespace the literals named.\n\n## Notes\n\nThe two sites are one property reached from two callers, so they move together.\n",
   "documents": [],
+  "done_at": "2026-08-01T20:29:29.331478978Z",
   "first_ready_at": "2026-07-31T17:28:56.596684919Z",
   "gates_required": [
     "cargo-ci",
@@ -36,7 +37,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Read the bracket label from the template that declares it",
-  "updated_at": "2026-07-31T23:35:21.577129300Z"
+  "updated_at": "2026-08-01T20:29:29.331478978Z"
 }
