@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-01T20:55:13.599635694Z",
+  "dependencies": [
+    "ae435979-9d43-4efc-ba05-7f7c6164af84"
+  ],
+  "description": "One vocabulary declaration serves every shared test fixture, in whichever form a suite needs, so no suite depends on a second declaration or on the binary supplying either.\n\n## Background\n\nTwo shared taxonomy declarations stand side by side in the crate's test surface, and they name different types for the same job. One is a repository fixture: it declares a vocabulary and builds a whole repository from it, owning the configuration file it writes. The other is a bare hierarchy value used by the pure unit suites, together with a renderer that turns it into a configuration fragment a suite can place beside its own tables.\n\nNeither form is redundant. A suite that needs nothing but a repository wants the first; a suite that must declare item kinds, gates or rules in the same configuration file cannot use a fixture that owns that file, and wants the second. What is redundant is that each form declares its own vocabulary, so which type names a given assertion is written against depends on which helper its setup happened to reach for, and the shared-fixture rule that motivated the first declaration is defeated by the existence of the second.\n\nThe surviving vocabulary is the repository fixture's, which was chosen to name no type any package declares. A test asserting that a strategic type resolves then demonstrates the mechanism over a vocabulary the test itself supplied, rather than passing because its names happen to match something shipped.\n\nConsumers of the retired declaration assert on its type names directly in many places, so retiring it rewrites those literals. That rewrite is the point: an assertion naming a type the test declared is evidence, and an assertion naming a type that used to arrive compiled in is not.\n\n## Success Criteria\n\n- [hard] REQ-01: One vocabulary declaration exists in the workspace's test surface, and every shared fixture that supplies a type hierarchy to a test renders that declaration.\n- [hard] REQ-02: The declaration is reachable from the pure domain and graph suites without those suites depending on repository construction, and the repository fixture builds on it rather than declaring its own.\n- [hard] REQ-03: A suite that needs a whole repository obtains one built from the declaration; a suite that writes its own configuration obtains a fragment rendered from the same declaration, and a suite appending its own tables after that fragment parses.\n- [hard] REQ-04: The vocabulary a fixture configures is the vocabulary its consumers read from it, so a consumer asserts against what it was given rather than against a repeated literal.\n- [hard] REQ-05: No second vocabulary declaration and no second fragment renderer remains, and every consumer of a retired one reads the surviving declaration.\n- [hard] REQ-06: Every suite that consumed a retired declaration passes, asserting on the surviving vocabulary's type names.\n\n## Notes\n\nNothing about production behaviour changes here; the whole footprint is test declarations and the assertions that read them.",
+  "documents": [],
+  "first_ready_at": "2026-08-01T20:55:13.599635694Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "06b736c7-1ed9-43f2-853e-84d69b0dfc79",
+  "labels": [
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:default-vocabulary",
+    "per:@/issue/e204e63d/decision/D-13",
+    "enforces:@/invariant/shared-test-contracts",
+    "enforces:@/invariant/convention-convergence",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "One declared vocabulary serves every shared test fixture",
+  "updated_at": "2026-08-01T20:55:31.905429164Z"
+}
