@@ -407,6 +407,131 @@ mod tests {
         assert!(!live.contains(".jit/reference/rules-and-gates.md"));
     }
 
+    /// Every live asset's repository-relative target.
+    fn live_asset_targets(package: &ProfilePackage) -> Vec<&str> {
+        package
+            .manifest()
+            .assets
+            .iter()
+            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+            .map(|asset| asset.target.as_str())
+            .collect()
+    }
+
+    /// Every package-relative source the package authors itself: the
+    /// install-only assets and the managed-region sources, which have no
+    /// repository counterpart the assembly could draw them from.
+    fn package_authored_sources(package: &ProfilePackage) -> Vec<&str> {
+        package
+            .manifest()
+            .assets
+            .iter()
+            .filter(|asset| !asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+            .map(|asset| asset.source.as_str())
+            .chain(
+                package
+                    .manifest()
+                    .regions
+                    .iter()
+                    .map(|region| region.source.as_str()),
+            )
+            .collect()
+    }
+
+    /// The declared roots are exactly the repository domain the live assets are
+    /// drawn from: each target falls under one of them, no target falls under
+    /// two, and no root is declared that nothing is drawn from.
+    #[test]
+    fn test_declared_live_source_roots_claim_every_live_asset_target_exactly_once() {
+        let package = jit_dogfood_package().unwrap();
+        let roots = &package.manifest().live_sources;
+        assert!(
+            !roots.is_empty(),
+            "the package declares its live-source roots"
+        );
+
+        let targets = live_asset_targets(&package);
+        assert!(!targets.is_empty(), "the package declares live assets");
+        let unclaimed: Vec<(&str, usize)> = targets
+            .iter()
+            .map(|target| {
+                (
+                    *target,
+                    roots
+                        .iter()
+                        .filter(|declaration| declaration.root.relative_path(target).is_some())
+                        .count(),
+                )
+            })
+            .filter(|(_, claiming)| *claiming != 1)
+            .collect();
+        assert_eq!(
+            unclaimed,
+            Vec::<(&str, usize)>::new(),
+            "each entry names a live asset target and the number of declared roots claiming it"
+        );
+
+        let empty: Vec<&str> = roots
+            .iter()
+            .filter(|declaration| {
+                !targets
+                    .iter()
+                    .any(|target| declaration.root.relative_path(target).is_some())
+            })
+            .map(|declaration| declaration.root.as_str())
+            .collect();
+        assert_eq!(
+            empty,
+            Vec::<&str>::new(),
+            "each entry names a declared root no live asset is drawn from"
+        );
+    }
+
+    /// No declared root claims a file the package authors itself.
+    ///
+    /// The rule is about sources rather than targets, and this package shows
+    /// why the distinction is load-bearing: an install-only asset writes into a
+    /// declared root, so a rule stated over targets would either forbid that
+    /// asset or admit a package-authored source as a live consumer.
+    #[test]
+    fn test_declared_live_source_roots_claim_no_package_authored_source() {
+        let package = jit_dogfood_package().unwrap();
+        let roots = &package.manifest().live_sources;
+        let authored = package_authored_sources(&package);
+        assert!(
+            !authored.is_empty(),
+            "the package authors install-only and region sources"
+        );
+
+        let claimed: Vec<&str> = authored
+            .iter()
+            .copied()
+            .filter(|source| {
+                roots
+                    .iter()
+                    .any(|declaration| declaration.root.relative_path(source).is_some())
+            })
+            .collect();
+        assert_eq!(
+            claimed,
+            Vec::<&str>::new(),
+            "each entry names a package-authored source a declared root claims as a live consumer"
+        );
+
+        assert!(
+            package
+                .manifest()
+                .assets
+                .iter()
+                .filter(|asset| !asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+                .any(|asset| roots
+                    .iter()
+                    .any(|declaration| declaration.root.relative_path(&asset.target).is_some())),
+            "an install-only asset writes into a declared root, which is what makes \
+             the source-side rule distinct from a target-side one"
+        );
+    }
+
     #[test]
     fn test_managed_region_sources_stay_outside_live_asset_prefix() {
         let package = jit_dogfood_package().unwrap();
