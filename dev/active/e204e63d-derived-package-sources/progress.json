@@ -136,7 +136,7 @@
           "short_id": "1aa2b486",
           "title": "Adopt the taxonomy fixture in the rules integration target",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -144,7 +144,7 @@
           "short_id": "1cfb66ff",
           "title": "Adopt the taxonomy fixture in the documents-and-templates integration target",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -152,7 +152,7 @@
           "short_id": "60c211d6",
           "title": "Adopt the taxonomy fixture in the repository-workflow integration target",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -160,7 +160,7 @@
           "short_id": "76b16af0",
           "title": "Adopt the taxonomy fixture in the modules that seed a repository directly",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -168,7 +168,7 @@
           "short_id": "889a939a",
           "title": "Adopt the taxonomy fixture in the archive command tests",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -176,7 +176,7 @@
           "short_id": "a4f03da3",
           "title": "Adopt the taxonomy fixture in the item-validation integration target",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -184,7 +184,7 @@
           "short_id": "a53a6f09",
           "title": "Adopt the taxonomy fixture in the server crate",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -192,7 +192,7 @@
           "short_id": "a603f02d",
           "title": "Adopt the taxonomy fixture in the query-and-graph integration target",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -200,7 +200,7 @@
           "short_id": "be918f22",
           "title": "Adopt the taxonomy fixture in the repository-inspection command tests",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -208,7 +208,7 @@
           "short_id": "ffe6de33",
           "title": "Adopt the taxonomy fixture in the initialization command tests",
           "classification": "implementation",
-          "status": "dispatched-then-blocked; reworks after 06b736c7 lands",
+          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
           "worker": "codex-luna",
           "base": "da174a6b"
         },
@@ -216,7 +216,7 @@
           "short_id": "39c34568",
           "title": "Declare the repository roots the packaged live assets are drawn from",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "merged; gates re-running after the lead fixed a cross-branch compile break in its test helper",
           "worker": "opus-agent",
           "base": "da174a6b"
         },
@@ -224,7 +224,7 @@
           "short_id": "c7058cac",
           "title": "Assemble the default vocabulary as a package",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "reviewed PASS on all seven criteria after the invariant-kind rework; NOT merged. Add docs-mechanical before gating.",
           "worker": "opus-agent",
           "base": "da174a6b"
         },
@@ -232,7 +232,7 @@
           "short_id": "f9cab4c2",
           "title": "Stop naming this checkout's paths in the domain and storage layers",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "done — cargo-ci and code-review passed on merged main",
           "worker": "opus-agent",
           "base": "da174a6b"
         },
@@ -240,7 +240,7 @@
           "short_id": "6c47b99a",
           "title": "Record where an applied package came from",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "merged; gates re-running after the lead fixed the bridge assertion its tagged origin encoding broke",
           "worker": "opus-agent",
           "base": "da174a6b"
         },
@@ -248,9 +248,16 @@
           "short_id": "06b736c7",
           "title": "One declared vocabulary serves every shared test fixture",
           "classification": "implementation",
-          "status": "dispatched",
+          "status": "merged; gates re-running",
           "worker": "opus-agent",
           "base": "73172f44"
+        },
+        {
+          "short_id": "fd61b44f",
+          "title": "Observe the drain assertions the graceful-shutdown test makes",
+          "classification": "implementation",
+          "status": "ready, deliberately undispatched — conflicts with a53a6f09's footprint and its REQ-03 evidence needs a quiet host",
+          "worker": null
         }
       ]
     }
@@ -384,6 +391,11 @@
       "at": "2026-08-01",
       "finding": "The ten taxonomy adoptions are contracted to consume ae435979's fixture 'as authored', but setup_test_repo_with_taxonomy() writes the whole .jit/config.toml from its own vocabulary and TestTaxonomy::config_toml() is private, so a suite that must declare item kinds, gates or rules in the same file cannot use it. Measured: cli_item_validate (3 sites), cli_query_graph/scope_validation_tests.rs and fast_docs_templates/template_apply_atomicity_tests.rs write extra tables; the remaining sites do not. Both workers back before the finding reached for declared_test_taxonomy() instead — the parallel helper the session-3 handoff had already flagged.",
       "disposition": "Root cause on the lead's side: session 3's handoff named this trap and required a53a6f09 and 76b16af0 to be briefed to delete the parallel helpers; the wave-1 briefs did not carry it. Resolved structurally by 06b736c7 rather than per issue. Brief-composition step must read the prior handoff's trap list against the dispatch set, not only the issue descriptions."
+    },
+    {
+      "at": "2026-08-02",
+      "finding": "Merging 39c34568, 06b736c7 and 6c47b99a produced a tree that does not compile: 6c47b99a gave ProfilePackage::from_files a second `source` argument while 39c34568 added a test helper calling the one-argument form. The edits do not overlap textually, so git merged all three cleanly. scripts/verify-commit-builds.sh reported the merge commit as building and was right to: its contract is `cargo build --workspace`, which never compiles #[cfg(test)] code, and the broken call site is inside a `mod tests`. cargo-ci caught it one gate cycle later. Separately, 6c47b99a's tagged ProfileOrigin encoding broke mcp-server/test-integration.js:456, which asserted the bare string; the mcp-ci gate the lead added to that issue caught it.",
+      "disposition": "Both fixed lead-direct on main with per-issue attribution (a89586ec, b558fa4f) so each lands in its own issue's review footprint. The verify-commit-builds gap is real and unfiled: a merge that breaks only test targets passes the guard. `cargo test --workspace --no-run` would close it. The session-3 handoff's stronger claim — that the guard is vacuous because a cold build cannot finish in 24-30s — is NOT what this incident shows and remains unverified."
     }
   ],
   "rework_counts": {
@@ -394,7 +406,8 @@
     "7eecace8": 4,
     "fdae1023": 1,
     "510297e4": 2,
-    "09aea8b3": 1
+    "09aea8b3": 1,
+    "c7058cac": 1
   },
   "started_at": "2026-07-31",
   "owner_rulings": [
@@ -684,6 +697,11 @@
       "at": "2026-08-01",
       "session": 5,
       "note": "Session 4 ended without a handoff. Reconstructed from git log, .jit state and the gate-run records: it merged and gated the wave-0 tail (a30d704d, then reworks for 09aea8b3 and 510297e4), fixed the graceful-shutdown drain test twice, marked it #[ignore]d against the new issue fd61b44f, and amended [namespaces.satisfies]. Wave 0 closed in session 5 with 09aea8b3 and 510297e4; 5dd0df5b is the only wave-0 issue still open."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 5,
+      "note": "Handoff written at the invoker's request while the 39c34568/06b736c7/6c47b99a gate batch was still running. handoff-4.md carries the full state."
     }
   ]
 }
