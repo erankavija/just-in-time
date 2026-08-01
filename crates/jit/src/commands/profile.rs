@@ -1,8 +1,8 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
     build_profile_claims, jit_dogfood_package, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePlanResult, ProfilePlanStatus,
-    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageSource, ProfilePlanResult,
+    ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -49,6 +49,12 @@ pub enum ProfileApplyError {
         /// Conflicting repository-relative package target.
         path: String,
     },
+    /// A package's bytes were read from outside the repository worktree.
+    #[error("profile package directory '{path}' is not inside the repository worktree")]
+    PackageOutsideWorktree {
+        /// Resolved package directory the bytes were read from.
+        path: String,
+    },
 }
 
 impl CommandExecutor<JsonFileStorage> {
@@ -56,13 +62,15 @@ impl CommandExecutor<JsonFileStorage> {
     pub fn list_embedded_profiles(&self) -> Result<ProfileListResult> {
         let package = jit_dogfood_package()?;
         let metadata = &package.manifest().profile;
+        let layout = self.require_layout()?;
+        let expected = expected_record(&package, &layout)?;
         let applied = self
             .read_installed_record(&package)?
-            .is_some_and(|record| record == expected_record(&package));
+            .is_some_and(|record| record == expected);
         let profiles = vec![ProfileSummary {
             id: metadata.id.to_string(),
             version: metadata.version.clone(),
-            origin: ProfileOrigin::Embedded,
+            origin: package_origin(&package, &layout)?,
             jit: metadata.jit.clone(),
             applied,
         }];
@@ -75,9 +83,10 @@ impl CommandExecutor<JsonFileStorage> {
     /// Inspect one immutable embedded profile package.
     pub fn show_embedded_profile(&self, id: &str) -> Result<ProfileShowResult> {
         let package = embedded_profile(id)?;
+        let layout = self.require_layout()?;
         Ok(ProfileShowResult {
             manifest: package.manifest().clone(),
-            origin: ProfileOrigin::Embedded,
+            origin: package_origin(&package, &layout)?,
             package_hash: package.hashes().package.clone(),
             target_hashes: package.hashes().targets.clone(),
             file_count: package.file_count(),
@@ -345,16 +354,49 @@ pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
     name.strip_suffix(".json").filter(|id| !id.is_empty())
 }
 
-/// The expected provenance record for an embedded package.
-pub(super) fn expected_record(package: &ProfilePackage) -> AppliedProfileRecord {
+/// The provenance origin a package's own bytes came through.
+///
+/// The location is taken from the source the package recorded while reading
+/// itself, never from a path supplied beside it, so a record names the
+/// directory whose bytes it addresses. A directory that resolves outside the
+/// worktree is refused rather than recorded: the record is worktree-relative
+/// repository state, so a location it cannot express would make re-reading the
+/// package depend on machine state. The selected data root is not a worktree
+/// location even when it nests inside one, so a package placed under it is
+/// refused by the same rule.
+pub(super) fn package_origin(
+    package: &ProfilePackage,
+    layout: &crate::repository_state::RepositoryLayout,
+) -> Result<ProfileOrigin> {
+    let ProfilePackageSource::Directory(directory) = package.source() else {
+        return Ok(ProfileOrigin::Embedded);
+    };
+    layout
+        .classify_and_canonicalize(directory)
+        .ok()
+        .filter(|path| path.root_class() == RepositoryRootClass::Worktree)
+        .map(|path| ProfileOrigin::Directory(path.relative().clone()))
+        .ok_or_else(|| {
+            ProfileApplyError::PackageOutsideWorktree {
+                path: directory.display().to_string(),
+            }
+            .into()
+        })
+}
+
+/// The expected provenance record for a package read through this repository.
+pub(super) fn expected_record(
+    package: &ProfilePackage,
+    layout: &crate::repository_state::RepositoryLayout,
+) -> Result<AppliedProfileRecord> {
     let metadata = &package.manifest().profile;
-    AppliedProfileRecord::new(
+    Ok(AppliedProfileRecord::new(
         metadata.id.to_string(),
         metadata.version.clone(),
-        ProfileOrigin::Embedded,
+        package_origin(package, layout)?,
         package.hashes().package.clone(),
         package.hashes().targets.clone(),
-    )
+    ))
 }
 
 /// Convert an immutable package into neutral claims plus provenance metadata.
@@ -369,7 +411,7 @@ fn profile_application_input(
         version: metadata.version.clone(),
         package_hash: package.hashes().package.clone(),
         target_hashes: package.hashes().targets.clone(),
-        origin: ProfileOrigin::Embedded,
+        origin: package_origin(package, layout)?,
         claims: build_profile_claims(package, layout)?,
         record_path,
     })
@@ -449,12 +491,14 @@ mod tests {
     use super::*;
     use crate::domain::Event;
     use crate::hierarchy_templates::HierarchyTemplate;
+    use crate::repository_state::RootRelativePath;
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
     use include_dir::{include_dir, Dir};
     use std::collections::BTreeMap;
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
 
     struct RecaptureRaceSession {
@@ -559,6 +603,109 @@ mod tests {
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
         let package = ProfilePackage::from_embedded_dir(&PACKAGE).unwrap();
         (temp, storage, executor, package)
+    }
+
+    /// The fixture package, written into the repository at `relative` and read
+    /// back from there.
+    fn package_read_from(temp: &TempDir, relative: &str) -> ProfilePackage {
+        let root = crate::test_utils::write_package_tree(&PACKAGE, &temp.path().join(relative));
+        ProfilePackage::from_directory(&root).expect("a valid package tree")
+    }
+
+    /// The provenance record a repository stores for the fixture package.
+    fn stored_record(temp: &TempDir) -> AppliedProfileRecord {
+        serde_json::from_slice(
+            &fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_apply_embedded_profile_records_the_worktree_location_it_read_the_package_from() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let package = package_read_from(&temp, "vendor/profiles/planner");
+
+        executor.apply_embedded_profile(&package).unwrap();
+
+        // The stored location resolves, from the worktree root alone, back to
+        // the directory whose bytes were applied — which is the whole point of
+        // recording it.
+        let ProfileOrigin::Directory(location) = stored_record(&temp).origin else {
+            panic!("a package read from a directory must record that directory");
+        };
+        assert_eq!(
+            ProfilePackage::from_directory(&temp.path().join(location.as_path()))
+                .expect("the recorded location names a readable package")
+                .hashes(),
+            package.hashes()
+        );
+    }
+
+    #[test]
+    fn test_apply_embedded_profile_records_the_directory_read_rather_than_a_peer_copy() {
+        // Two directories inside the worktree hold byte-identical packages.
+        // Nothing but the directory a package was read through distinguishes
+        // them, so the recorded location must follow that and only that.
+        let (first_temp, _first_storage, first_executor, _embedded) = fixture();
+        let (second_temp, _second_storage, second_executor, _embedded) = fixture();
+        let first = package_read_from(&first_temp, "vendor/first");
+        let second = package_read_from(&second_temp, "packages/second/tree");
+        assert_eq!(first.hashes(), second.hashes());
+
+        first_executor.apply_embedded_profile(&first).unwrap();
+        second_executor.apply_embedded_profile(&second).unwrap();
+
+        assert_eq!(
+            stored_record(&first_temp).origin,
+            ProfileOrigin::Directory(RootRelativePath::parse("vendor/first").unwrap())
+        );
+        assert_eq!(
+            stored_record(&second_temp).origin,
+            ProfileOrigin::Directory(RootRelativePath::parse("packages/second/tree").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_apply_embedded_profile_refuses_a_package_read_from_outside_the_worktree() {
+        let (temp, storage, executor, _embedded) = fixture();
+        let elsewhere = TempDir::new().unwrap();
+        let root = crate::test_utils::write_package_tree(&PACKAGE, &elsewhere.path().join("pkg"));
+        let package = ProfilePackage::from_directory(&root).expect("a valid package tree");
+
+        let error = executor.apply_embedded_profile(&package).unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileApplyError>(),
+                Some(ProfileApplyError::PackageOutsideWorktree { path })
+                    if Path::new(path) == fs::canonicalize(&root).unwrap()
+            ),
+            "the refusal must name the package directory: {error:#}"
+        );
+        assert!(!temp.path().join("docs/profile.txt").exists());
+        assert!(!temp.path().join(".jit/profiles").exists());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_embedded_profile_refuses_a_package_read_from_the_data_root() {
+        // The selected data root is not a worktree location, so a package
+        // placed under it has no worktree-relative location to record.
+        let (temp, storage, executor, _embedded) = fixture();
+        let package = package_read_from(&temp, ".jit/vendored");
+
+        let error = executor.apply_embedded_profile(&package).unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileApplyError>(),
+                Some(ProfileApplyError::PackageOutsideWorktree { path })
+                    if Path::new(path) == temp.path().join(".jit/vendored")
+            ),
+            "the refusal must name the package directory: {error:#}"
+        );
+        assert!(!temp.path().join(".jit/profiles").exists());
+        assert!(storage.read_events().unwrap().is_empty());
     }
 
     #[test]

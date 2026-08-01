@@ -281,7 +281,7 @@ impl CommandExecutor<JsonFileStorage> {
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
             target_hashes: package.hashes().targets.clone(),
-            origin: crate::domain::ProfileOrigin::Embedded,
+            origin: super::profile::package_origin(package, &layout)?,
             claims: build_profile_claims(package, &layout)?,
             record_path,
         })

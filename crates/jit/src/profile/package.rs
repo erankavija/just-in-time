@@ -875,19 +875,7 @@ mod tests {
 
     /// A writable copy of the fixture tree at the given root, created.
     fn writable_package_tree_at(root: &Path) -> PathBuf {
-        fn write(directory: &Dir<'_>, root: &Path) {
-            directory.files().for_each(|file| {
-                let path = root.join(file.path());
-                std::fs::create_dir_all(path.parent().expect("package file has a parent"))
-                    .expect("create package parent directory");
-                std::fs::write(path, file.contents()).expect("write package file");
-            });
-            directory.dirs().for_each(|child| write(child, root));
-        }
-
-        std::fs::create_dir_all(root).expect("create package root");
-        write(&VALID_PACKAGE, root);
-        root.to_path_buf()
+        crate::test_utils::write_package_tree(&VALID_PACKAGE, root)
     }
 
     /// Replace the package manifest under `root` with `manifest_text()` mutated.

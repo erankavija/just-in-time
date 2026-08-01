@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **A repository records where an applied profile package came from.** The
+  record beside an applied profile carried an origin with one value, meaning the
+  bytes were compiled into the binary — a vocabulary shaped for a second one but
+  never given it — so a repository that applied a package read from a directory
+  had nowhere to say so, and nothing that ran later had anywhere to look for the
+  bytes. The origin now distinguishes the two cases, and the directory case
+  carries the location the bytes were read from, as a path relative to the
+  worktree root. That location lives in the record and nowhere else: it is
+  repository-local state versioned with the repository that applied the profile,
+  and a configuration key carrying it as well would be a second carrier of one
+  fact plus a precedence question between them. The recorded location is the one
+  the package's own reader anchored its walk at, never a path supplied beside the
+  bytes, so a package read through a relative or link-traversing argument records
+  the directory those resolve to and the record addresses the bytes it describes.
+  Where the location may point is part of the contract: a package whose bytes
+  resolve outside the worktree, including under the tracker's data root, is
+  refused by name rather than recorded, because a location outside the worktree
+  makes a repository's derived-state repair depend on machine state. A stored
+  record whose location is absent, malformed, or attached to bytes that were
+  compiled in fails the read rather than being ignored, so a repository never
+  resolves a package its record does not actually name.
+
 - **A profile package is read from a directory on disk.** The package model was
   already written for untrusted external data — bounded file count and total
   size, rejected absolute, traversal, platform-prefix, control-character and

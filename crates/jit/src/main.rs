@@ -867,6 +867,17 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
     jit::errors::InvalidArgumentError::new(message).into()
 }
 
+/// Render a package origin for human output, naming the directory a package
+/// read from the repository came from.
+fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
+    match origin {
+        jit::profile::ProfileOrigin::Embedded => "embedded".to_string(),
+        jit::profile::ProfileOrigin::Directory(location) => {
+            format!("directory {}", location.as_path().display())
+        }
+    }
+}
+
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
     use jit::repository_state::{InitializationError, ProducerError, RepositoryStateError};
@@ -2232,9 +2243,10 @@ fn run() -> Result<()> {
                     } else {
                         for profile in result.profiles {
                             println!(
-                                "{} {} embedded{}",
+                                "{} {} {}{}",
                                 profile.id,
                                 profile.version,
+                                profile_origin_label(&profile.origin),
                                 if profile.applied { " (applied)" } else { "" }
                             );
                         }
@@ -2256,7 +2268,7 @@ fn run() -> Result<()> {
                         let profile = &result.manifest.profile;
                         println!("Profile: {}", profile.id);
                         println!("Version: {}", profile.version);
-                        println!("Origin: embedded");
+                        println!("Origin: {}", profile_origin_label(&result.origin));
                         println!("Compatible JIT: {}", profile.jit);
                         println!("Package hash: {}", result.package_hash);
                         println!("Files: {} ({} bytes)", result.file_count, result.byte_size);

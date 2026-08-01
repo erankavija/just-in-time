@@ -619,8 +619,8 @@ List the immutable profiles embedded in the running binary:
 jit profile list [--json]
 ```
 
-Human output shows each profile's ID, version, compatible JIT range, embedded
-origin, and whether a matching stored provenance record exists. This record
+Human output shows each profile's ID, version, compatible JIT range, origin, and
+whether a matching stored provenance record exists. This record
 check does not read every installed target. JSON uses the standard list envelope
 `{"count": N, "profiles": [...]}`. Each profile entry carries `id`, `version`,
 `origin`, `jit`, and `applied`.
