@@ -162,36 +162,6 @@ impl HierarchyConfig {
         }
     }
 
-    /// The four-level hierarchy the crate's own suites declare to exercise
-    /// hierarchy-dependent behaviour, with the membership associations their
-    /// assertions read.
-    ///
-    /// This vocabulary belongs to the tests, not to the engine: it exists only
-    /// under `cfg(test)` or `feature = "test-support"`, so no adopter build
-    /// compiles it and no repository can receive it. A test asserting that a
-    /// strategic type resolves is exercising the mechanism, and this is the
-    /// declaration it exercises it against.
-    #[cfg(any(test, feature = "test-support"))]
-    pub fn test_vocabulary() -> Self {
-        Self {
-            types: [
-                ("milestone".to_string(), 1),
-                ("epic".to_string(), 2),
-                ("story".to_string(), 3),
-                ("task".to_string(), 4),
-            ]
-            .into_iter()
-            .collect(),
-            label_associations: [
-                ("milestone".to_string(), "milestone".to_string()),
-                ("epic".to_string(), "epic".to_string()),
-                ("story".to_string(), "story".to_string()),
-            ]
-            .into_iter()
-            .collect(),
-        }
-    }
-
     /// Creates a new hierarchy configuration from a map of type names to levels.
     ///
     /// # Arguments
@@ -637,12 +607,12 @@ mod tests {
 
     #[test]
     fn test_default_config() {
-        let config = HierarchyConfig::test_vocabulary();
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
 
-        assert_eq!(config.get_level("milestone"), Some(1));
-        assert_eq!(config.get_level("epic"), Some(2));
-        assert_eq!(config.get_level("story"), Some(3));
-        assert_eq!(config.get_level("task"), Some(4));
+        assert_eq!(config.get_level("objective"), Some(1));
+        assert_eq!(config.get_level("initiative"), Some(2));
+        assert_eq!(config.get_level("deliverable"), Some(3));
+        assert_eq!(config.get_level("action"), Some(4));
         assert_eq!(config.get_level("unknown"), None);
     }
 
@@ -659,7 +629,7 @@ mod tests {
     #[test]
     fn test_config_validation_invalid_level() {
         let mut types = HashMap::new();
-        types.insert("task".to_string(), 0);
+        types.insert("action".to_string(), 0);
         let label_associations = HashMap::new();
 
         let result = HierarchyConfig::new(types, label_associations);
@@ -668,15 +638,18 @@ mod tests {
 
     #[test]
     fn test_extract_type_valid() {
-        assert_eq!(extract_type("type:task"), Ok("task".to_string()));
-        assert_eq!(extract_type("type:epic"), Ok("epic".to_string()));
-        assert_eq!(extract_type("type:Task"), Ok("task".to_string())); // normalized to lowercase
+        assert_eq!(extract_type("type:action"), Ok("action".to_string()));
+        assert_eq!(
+            extract_type("type:initiative"),
+            Ok("initiative".to_string())
+        );
+        assert_eq!(extract_type("type:Action"), Ok("action".to_string())); // normalized to lowercase
     }
 
     #[test]
     fn test_extract_type_invalid_format() {
         assert!(matches!(
-            extract_type("milestone:v1.0"),
+            extract_type("objective:v1.0"),
             Err(HierarchyError::InvalidLabel(_))
         ));
 
@@ -699,36 +672,36 @@ mod tests {
 
     #[test]
     fn test_config_contains_type() {
-        let config = HierarchyConfig::test_vocabulary();
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
 
-        assert!(config.contains_type("task"));
-        assert!(config.contains_type("epic"));
+        assert!(config.contains_type("action"));
+        assert!(config.contains_type("initiative"));
         assert!(!config.contains_type("unknown"));
     }
 
     #[test]
     fn test_config_types_iterator() {
-        let config = HierarchyConfig::test_vocabulary();
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
 
         let types: HashMap<String, u8> = config.types().map(|(k, v)| (k.clone(), *v)).collect();
 
         assert_eq!(types.len(), 4);
-        assert_eq!(types.get("milestone"), Some(&1));
-        assert_eq!(types.get("epic"), Some(&2));
-        assert_eq!(types.get("story"), Some(&3));
-        assert_eq!(types.get("task"), Some(&4));
+        assert_eq!(types.get("objective"), Some(&1));
+        assert_eq!(types.get("initiative"), Some(&2));
+        assert_eq!(types.get("deliverable"), Some(&3));
+        assert_eq!(types.get("action"), Some(&4));
     }
 
     #[test]
     fn test_levenshtein_distance() {
         use super::levenshtein_distance;
 
-        assert_eq!(levenshtein_distance("task", "task"), 0);
-        assert_eq!(levenshtein_distance("task", "taks"), 2); // swap is 2 operations
-        assert_eq!(levenshtein_distance("epic", "epik"), 1);
-        assert_eq!(levenshtein_distance("story", "storry"), 1);
-        assert_eq!(levenshtein_distance("milestone", "mileston"), 1);
-        assert_eq!(levenshtein_distance("task", "epic"), 4);
+        assert_eq!(levenshtein_distance("action", "action"), 0);
+        assert_eq!(levenshtein_distance("action", "actoin"), 2); // swap is 2 operations
+        assert_eq!(levenshtein_distance("initiative", "initative"), 1);
+        assert_eq!(levenshtein_distance("deliverable", "delivrable"), 1);
+        assert_eq!(levenshtein_distance("objective", "objectiv"), 1);
+        assert_eq!(levenshtein_distance("action", "objective"), 6);
         assert_eq!(levenshtein_distance("", "abc"), 3);
         assert_eq!(levenshtein_distance("abc", ""), 3);
     }
@@ -737,15 +710,24 @@ mod tests {
     fn test_suggest_type_fix_close_match() {
         use super::suggest_type_fix;
 
-        let config = HierarchyConfig::test_vocabulary();
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
 
         // Single character typos
-        assert_eq!(suggest_type_fix(&config, "taks"), Some("task".to_string()));
-        assert_eq!(suggest_type_fix(&config, "taak"), Some("task".to_string()));
-        assert_eq!(suggest_type_fix(&config, "epik"), Some("epic".to_string()));
         assert_eq!(
-            suggest_type_fix(&config, "storey"),
-            Some("story".to_string())
+            suggest_type_fix(&config, "acton"),
+            Some("action".to_string())
+        );
+        assert_eq!(
+            suggest_type_fix(&config, "actoin"),
+            Some("action".to_string())
+        );
+        assert_eq!(
+            suggest_type_fix(&config, "initative"),
+            Some("initiative".to_string())
+        );
+        assert_eq!(
+            suggest_type_fix(&config, "delivrable"),
+            Some("deliverable".to_string())
         );
     }
 
@@ -753,7 +735,7 @@ mod tests {
     fn test_suggest_type_fix_no_match() {
         use super::suggest_type_fix;
 
-        let config = HierarchyConfig::test_vocabulary();
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
 
         // Too different - no reasonable match
         assert_eq!(suggest_type_fix(&config, "unknown"), None);
@@ -765,19 +747,25 @@ mod tests {
     fn test_suggest_type_fix_exact_match() {
         use super::suggest_type_fix;
 
-        let config = HierarchyConfig::test_vocabulary();
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
 
         // Even exact matches should be found
-        assert_eq!(suggest_type_fix(&config, "task"), Some("task".to_string()));
-        assert_eq!(suggest_type_fix(&config, "epic"), Some("epic".to_string()));
+        assert_eq!(
+            suggest_type_fix(&config, "action"),
+            Some("action".to_string())
+        );
+        assert_eq!(
+            suggest_type_fix(&config, "initiative"),
+            Some("initiative".to_string())
+        );
     }
 
     #[test]
     fn test_detect_unknown_type() {
         use super::{detect_validation_issues, ValidationIssue};
 
-        let config = HierarchyConfig::test_vocabulary();
-        let labels = vec!["type:taks".to_string()]; // typo
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
+        let labels = vec!["type:acton".to_string()]; // typo
 
         let issues = detect_validation_issues(&config, "01ABC", &labels);
 
@@ -789,8 +777,8 @@ mod tests {
                 suggested_fix,
             } => {
                 assert_eq!(issue_id, "01ABC");
-                assert_eq!(unknown_type, "taks");
-                assert_eq!(suggested_fix, &Some("task".to_string()));
+                assert_eq!(unknown_type, "acton");
+                assert_eq!(suggested_fix, &Some("action".to_string()));
             }
             _ => panic!("Expected UnknownType issue"),
         }
@@ -800,8 +788,8 @@ mod tests {
     fn test_detect_no_issues_for_valid_type() {
         use super::detect_validation_issues;
 
-        let config = HierarchyConfig::test_vocabulary();
-        let labels = vec!["type:task".to_string()];
+        let config = crate::test_taxonomy::test_taxonomy().hierarchy_config();
+        let labels = vec!["type:action".to_string()];
 
         let issues = detect_validation_issues(&config, "01ABC", &labels);
         assert!(issues.is_empty());
@@ -816,8 +804,8 @@ mod tests {
 
         let issues = vec![ValidationIssue::UnknownType {
             issue_id: "01ABC".to_string(),
-            unknown_type: "taks".to_string(),
-            suggested_fix: Some("task".to_string()),
+            unknown_type: "acton".to_string(),
+            suggested_fix: Some("action".to_string()),
         }];
 
         let fixes = generate_fixes(&issues);
@@ -827,8 +815,8 @@ mod tests {
             fixes[0],
             ValidationFix::ReplaceType {
                 issue_id: "01ABC".to_string(),
-                old_type: "taks".to_string(),
-                new_type: "task".to_string(),
+                old_type: "acton".to_string(),
+                new_type: "action".to_string(),
             }
         );
     }

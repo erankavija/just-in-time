@@ -953,7 +953,7 @@ mod tests {
         assert!(bad.findings().iter().any(|f| f.severity == Severity::Error));
 
         let good = evaluate_local(
-            &issue_with(&["type:task"]),
+            &issue_with(&["type:action"]),
             &rules,
             crate::domain::ContentFormat::Markdown,
         )

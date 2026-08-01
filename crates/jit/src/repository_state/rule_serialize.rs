@@ -547,7 +547,10 @@ mod tests {
         // graph) the fixed default emits.
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
-            ("milestone", LabelNamespace::new("Release", false)),
+            (
+                "objective",
+                LabelNamespace::new("Objective membership", false),
+            ),
         ])
         .declaring_test_hierarchy();
         let set = default_ruleset(&reg);

@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn test_export_dot_with_different_states() {
         let mut issue1 =
-            crate::domain::types::fixture_issue("Done Task".to_string(), "Completed".to_string());
+            crate::domain::types::fixture_issue("Done Action".to_string(), "Completed".to_string());
         issue1.state = State::Done;
 
         let mut issue2 = crate::domain::types::fixture_issue(
@@ -495,7 +495,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
         );
         let doc: serde_json::Value =
             serde_json::from_str(&export_json_full(&graph, &resolution)).unwrap();
@@ -524,7 +524,7 @@ mod tests {
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
         );
 
         let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
@@ -539,17 +539,18 @@ mod tests {
     /// summary node never does.
     #[test]
     fn test_export_json_full_carries_resolved_hierarchy_fields() {
-        let mut epic = crate::domain::types::fixture_issue("Epic".to_string(), String::new());
-        epic.labels = vec!["type:epic".to_string()];
-        let mut task = crate::domain::types::fixture_issue("Task".to_string(), String::new());
-        task.labels = vec!["type:task".to_string()];
-        epic.dependencies.push(task.id.clone());
+        let mut initiative =
+            crate::domain::types::fixture_issue("Initiative".to_string(), String::new());
+        initiative.labels = vec!["type:initiative".to_string()];
+        let mut action = crate::domain::types::fixture_issue("Action".to_string(), String::new());
+        action.labels = vec!["type:action".to_string()];
+        initiative.dependencies.push(action.id.clone());
 
-        let issues = vec![&epic, &task];
+        let issues = vec![&initiative, &action];
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
         );
 
         let full: serde_json::Value =
@@ -564,17 +565,17 @@ mod tests {
                 .clone()
         };
 
-        let task_node = node_by_id(&task.id);
-        assert_eq!(task_node["parent"], epic.id);
-        // The epic is a root container, so the whole subtree clusters to it.
-        assert_eq!(task_node["cluster"], epic.id);
-        assert_eq!(task_node["children"], serde_json::json!([]));
-        assert_eq!(task_node["rank"], 0);
+        let action_node = node_by_id(&action.id);
+        assert_eq!(action_node["parent"], initiative.id);
+        // The initiative is a root container, so the whole subtree clusters to it.
+        assert_eq!(action_node["cluster"], initiative.id);
+        assert_eq!(action_node["children"], serde_json::json!([]));
+        assert_eq!(action_node["rank"], 0);
 
-        let epic_node = node_by_id(&epic.id);
-        assert_eq!(epic_node["parent"], serde_json::Value::Null);
-        assert_eq!(epic_node["children"], serde_json::json!([task.id]));
-        assert_eq!(epic_node["rank"], 1);
+        let initiative_node = node_by_id(&initiative.id);
+        assert_eq!(initiative_node["parent"], serde_json::Value::Null);
+        assert_eq!(initiative_node["children"], serde_json::json!([action.id]));
+        assert_eq!(initiative_node["rank"], 1);
 
         // The summary shape stays free of the hierarchy fields.
         let summary: serde_json::Value = serde_json::from_str(&export_json(&graph)).unwrap();
@@ -589,26 +590,27 @@ mod tests {
     fn test_export_json_full_hierarchy_keys_match_tree_view() {
         use crate::output::HierarchyNodeView;
 
-        let mut epic = crate::domain::types::fixture_issue("Epic".to_string(), String::new());
-        epic.labels = vec!["type:epic".to_string()];
-        let mut task = crate::domain::types::fixture_issue("Task".to_string(), String::new());
-        task.labels = vec!["type:task".to_string()];
-        epic.dependencies.push(task.id.clone());
+        let mut initiative =
+            crate::domain::types::fixture_issue("Initiative".to_string(), String::new());
+        initiative.labels = vec!["type:initiative".to_string()];
+        let mut action = crate::domain::types::fixture_issue("Action".to_string(), String::new());
+        action.labels = vec!["type:action".to_string()];
+        initiative.dependencies.push(action.id.clone());
 
-        let issues = vec![&epic, &task];
+        let issues = vec![&initiative, &action];
         let graph = DependencyGraph::new(&issues);
         let resolution = crate::graph::hierarchy::resolve_hierarchy(
             &issues,
-            &crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
         );
-        let facts = resolution.get(&task.id).cloned().unwrap_or_default();
+        let facts = resolution.get(&action.id).cloned().unwrap_or_default();
 
         // The keys a `graph tree` node contributes beyond its identity fields.
         let tree_node = serde_json::to_value(HierarchyNodeView {
-            id: task.id.clone(),
-            short_id: task.short_id(),
-            title: task.title.clone(),
-            type_name: Some("task".to_string()),
+            id: action.id.clone(),
+            short_id: action.short_id(),
+            title: action.title.clone(),
+            type_name: Some("action".to_string()),
             hierarchy: facts,
         })
         .unwrap();
@@ -629,9 +631,9 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .find(|n| n["id"] == serde_json::Value::String(task.id.clone()))
+            .find(|n| n["id"] == serde_json::Value::String(action.id.clone()))
             .unwrap();
-        let record_keys: std::collections::BTreeSet<String> = serde_json::to_value(&task)
+        let record_keys: std::collections::BTreeSet<String> = serde_json::to_value(&action)
             .unwrap()
             .as_object()
             .unwrap()

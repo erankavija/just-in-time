@@ -1854,12 +1854,12 @@ mod tests {
 
     fn coverage_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"coverage\"\nwhen = {{ type = \"epic\" }}\n\
+            "[[rules]]\nname = \"coverage\"\nwhen = {{ type = \"initiative\" }}\n\
              severity = \"error\"\nassert = {{ label-coverage = {{ {extra} }} }}\n"
         ))
     }
 
-    fn epic_with_criteria(ids: &[&str]) -> Issue {
+    fn initiative_with_criteria(ids: &[&str]) -> Issue {
         let body = format!(
             "## Success Criteria\n\n{}\n",
             ids.iter()
@@ -1867,9 +1867,9 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body);
-        epic.labels = vec!["type:epic".to_string()];
-        epic
+        let mut initiative = crate::domain::types::fixture_issue("initiative".to_string(), body);
+        initiative.labels = vec!["type:initiative".to_string()];
+        initiative
     }
 
     /// Load a single rule from `rule_toml` against a config that declares a
@@ -1897,24 +1897,24 @@ source-of-truth = "markdown-first"
         // REQ-02: a `kind = "requirement"` rule produces IDENTICAL findings to the
         // equivalent inline-triple rule across both covered and uncovered cases.
         let kind_rule = rule_from_repo(
-            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
+            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"initiative\" }\n\
              severity = \"error\"\nassert = { label-coverage = { \
              kind = \"requirement\", child-state = \"done\" } }\n",
         );
         let inline_rule = coverage_rule("child-state = \"done\"");
 
         // Covered case: a done child satisfies the criterion.
-        let epic = epic_with_criteria(&["REQ-01"]);
+        let initiative = initiative_with_criteria(&["REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
-        let issues = [epic, child];
+        let issues = [initiative, child];
 
         let eval = |rule: &Rule| {
             evaluate_graph(
                 &[rule],
                 &issues,
-                &HierarchyConfig::test_vocabulary(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
@@ -1925,14 +1925,14 @@ source-of-truth = "markdown-first"
         assert!(kind_findings.is_empty(), "covered: {kind_findings:?}");
         assert_eq!(kind_findings.len(), inline_findings.len());
 
-        // Uncovered case: no satisfying child -> both fire one finding on the epic.
-        let epic2 = epic_with_criteria(&["REQ-09"]);
+        // Uncovered case: no satisfying child -> both fire one finding on the initiative.
+        let epic2 = initiative_with_criteria(&["REQ-09"]);
         let issues2 = [epic2];
         let eval2 = |rule: &Rule| {
             evaluate_graph(
                 &[rule],
                 &issues2,
-                &HierarchyConfig::test_vocabulary(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
@@ -1953,20 +1953,20 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_coverage_cross_scope_same_self_id_credits_container_bare_label() {
-        // REQ-06: a container `<C>/REQ-01` and a task-scope `<T>/REQ-01` share the
+        // REQ-06: a container `<C>/REQ-01` and an action-scope `<T>/REQ-01` share the
         // self-id REQ-01 but resolve to DISTINCT qualified ids (different scope
         // prefixes); the bracket coverage gate still credits the container's BARE
         // `satisfies:REQ-01` label against the container's criterion, so the
-        // same-named task-scope id neither shadows it nor alters coverage.
+        // same-named action-scope id neither shadows it nor alters coverage.
         let rule = coverage_rule("child-link = \"dependencies\"");
-        let mut container = epic_with_criteria(&["REQ-01"]);
-        // The impl task ALSO has a REQ-01 in its OWN description (task scope) and
+        let mut container = initiative_with_criteria(&["REQ-01"]);
+        // The impl action ALSO has a REQ-01 in its OWN description (action scope) and
         // credits the container's criterion with a BARE satisfies label.
         let mut impl_node = crate::domain::types::fixture_issue(
             "impl".to_string(),
-            "## Success Criteria\n\n- [hard] REQ-01: the task's own criterion\n".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: the action's own criterion\n".to_string(),
         );
-        impl_node.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        impl_node.labels = vec!["type:action".to_string(), "satisfies:REQ-01".to_string()];
         container.dependencies = vec![impl_node.id.clone()];
 
         // The two qualified ids are distinct by scope even though the self-id is
@@ -1989,11 +1989,11 @@ source-of-truth = "markdown-first"
         .unwrap()];
         let container_items =
             crate::domain::item::index_items(&container, &kinds, &parser).unwrap();
-        let task_items = crate::domain::item::index_items(&impl_node, &kinds, &parser).unwrap();
+        let action_items = crate::domain::item::index_items(&impl_node, &kinds, &parser).unwrap();
         assert_eq!(container_items.len(), 1);
-        assert_eq!(task_items.len(), 1);
+        assert_eq!(action_items.len(), 1);
         assert_ne!(
-            container_items[0].qualified_id, task_items[0].qualified_id,
+            container_items[0].qualified_id, action_items[0].qualified_id,
             "same self-id under different scopes must be distinct qualified ids"
         );
 
@@ -2001,7 +2001,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &[&rule],
             &[container, impl_node],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2009,23 +2009,23 @@ source-of-truth = "markdown-first"
         assert!(
             findings.is_empty(),
             "bare satisfies:REQ-01 must still credit the container criterion despite a \
-             same-named task-scope id: {findings:?}"
+             same-named action-scope id: {findings:?}"
         );
     }
 
     #[test]
     fn test_label_coverage_satisfied_by_child() {
         let rule = coverage_rule("child-state = \"done\"");
-        let epic = epic_with_criteria(&["REQ-01"]);
+        let initiative = initiative_with_criteria(&["REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2039,17 +2039,17 @@ source-of-truth = "markdown-first"
         // credits criterion REQ-01 just like the unqualified form, so the engine
         // (not only the command helper) honors qualified link references.
         let rule = coverage_rule("child-state = \"done\"");
-        let epic = epic_with_criteria(&["REQ-01"]);
-        let qualified = format!("satisfies:{}/REQ-01", epic.short_id());
+        let initiative = initiative_with_criteria(&["REQ-01"]);
+        let qualified = format!("satisfies:{}/REQ-01", initiative.short_id());
         let mut child = issue("child", &[&qualified]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2065,17 +2065,17 @@ source-of-truth = "markdown-first"
         // A qualified label whose scope does NOT match the criteria-owning
         // container must not spuriously credit coverage.
         let rule = coverage_rule("child-state = \"done\"");
-        let epic = epic_with_criteria(&["REQ-01"]);
-        // The address scope points at an unrelated issue id, not this epic.
+        let initiative = initiative_with_criteria(&["REQ-01"]);
+        // The address scope points at an unrelated issue id, not this initiative.
         let mut child = issue("child", &["satisfies:deadbeef/REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2091,16 +2091,16 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_coverage_unsatisfied_reports_finding() {
         let rule = coverage_rule("child-state = \"done\"");
-        let epic = epic_with_criteria(&["REQ-01", "REQ-02"]);
+        let initiative = initiative_with_criteria(&["REQ-01", "REQ-02"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2115,16 +2115,16 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_coverage_wrong_state_is_uncovered() {
         let rule = coverage_rule("child-state = \"done\"");
-        let epic = epic_with_criteria(&["REQ-01"]);
+        let initiative = initiative_with_criteria(&["REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
         child.state = State::InProgress; // not done
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2137,16 +2137,17 @@ source-of-truth = "markdown-first"
         // Only [hard] criteria are required; an [aspirational] one is ignored.
         let rule = coverage_rule("marker = \"[hard]\"");
         let body = "## Success Criteria\n\n- [hard] REQ-01: must\n- [aspirational] REQ-99: nice\n";
-        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
-        epic.labels = vec!["type:epic".to_string()];
+        let mut initiative =
+            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
+        initiative.labels = vec!["type:initiative".to_string()];
         let mut child = issue("child", &["satisfies:REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2167,15 +2168,16 @@ source-of-truth = "markdown-first"
         let body = "## Success Criteria\n\n\
             - [ ] [hard] REQ-01: unchecked, uncovered\n\
             - [x] [hard] REQ-02: checked, uncovered\n";
-        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
-        epic.labels = vec!["type:epic".to_string()];
+        let mut initiative =
+            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
+        initiative.labels = vec!["type:initiative".to_string()];
         // No satisfying children: both criteria must be reported as uncovered.
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2196,15 +2198,15 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_coverage_any_link_ignores_dependency_edges() {
         let rule = coverage_rule("child-link = \"any\"");
-        let epic = epic_with_criteria(&["REQ-01"]);
-        // Child has NO dependency edge to the epic, but child-link=any.
+        let initiative = initiative_with_criteria(&["REQ-01"]);
+        // Child has NO dependency edge to the initiative, but child-link=any.
         let child = issue("child", &["satisfies:REQ-01"]);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2215,12 +2217,12 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_coverage_malformed_config_is_config_error() {
         let rule = coverage_rule("child-link = \"bogus\"");
-        let epic = epic_with_criteria(&["REQ-01"]);
+        let initiative = initiative_with_criteria(&["REQ-01"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2232,31 +2234,31 @@ source-of-truth = "markdown-first"
 
     // --- label-coverage: transitive closure (T3) ---------------------------
 
-    /// Build a `type:epic` issue with `[hard]` criteria but no other labels, so
+    /// Build a `type:initiative` issue with `[hard]` criteria but no other labels, so
     /// callers can chain a `dependencies` spine of arbitrary depth beneath it.
-    fn epic_chain_head(ids: &[&str]) -> Issue {
-        epic_with_criteria(ids)
+    fn initiative_chain_head(ids: &[&str]) -> Issue {
+        initiative_with_criteria(ids)
     }
 
     #[test]
     fn test_label_coverage_credits_non_sink_via_transitive_walk() {
-        // Spine: epic ──dep→ sink ──dep→ deep. Under transitive reduction the
-        // epic links only to `sink`; the criterion is satisfied by `deep` (a
+        // Spine: initiative ──dep→ sink ──dep→ deep. Under transitive reduction the
+        // initiative links only to `sink`; the criterion is satisfied by `deep` (a
         // non-sink, deeper in the subtree). Direct-adjacency coverage would miss
         // it; the transitive walk must credit it.
         let rule = coverage_rule("child-link = \"dependencies\"");
-        let mut epic = epic_chain_head(&["REQ-01"]);
-        let mut sink = issue("sink", &["type:task"]);
-        let deep = issue("deep", &["type:task", "satisfies:REQ-01"]);
-        // epic depends on sink; sink depends on deep.
-        epic.dependencies = vec![sink.id.clone()];
+        let mut initiative = initiative_chain_head(&["REQ-01"]);
+        let mut sink = issue("sink", &["type:action"]);
+        let deep = issue("deep", &["type:action", "satisfies:REQ-01"]);
+        // initiative depends on sink; sink depends on deep.
+        initiative.dependencies = vec![sink.id.clone()];
         sink.dependencies = vec![deep.id.clone()];
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, sink, deep],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, sink, deep],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2271,17 +2273,17 @@ source-of-truth = "markdown-first"
     fn test_label_coverage_transitive_uncovered_still_reports() {
         // Same chain shape, but nobody satisfies REQ-01 — must still report.
         let rule = coverage_rule("child-link = \"dependencies\"");
-        let mut epic = epic_chain_head(&["REQ-01"]);
-        let mut sink = issue("sink", &["type:task"]);
-        let deep = issue("deep", &["type:task"]); // no satisfies label
-        epic.dependencies = vec![sink.id.clone()];
+        let mut initiative = initiative_chain_head(&["REQ-01"]);
+        let mut sink = issue("sink", &["type:action"]);
+        let deep = issue("deep", &["type:action"]); // no satisfies label
+        initiative.dependencies = vec![sink.id.clone()];
         sink.dependencies = vec![deep.id.clone()];
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, sink, deep],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, sink, deep],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2296,20 +2298,20 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_coverage_dependents_walk_is_transitive() {
-        // The default `dependents` link also becomes transitive: epic <-dep- a
+        // The default `dependents` link also becomes transitive: initiative <-dep- a
         // <-dep- b, with b (a transitive dependent) satisfying the criterion.
         let rule = coverage_rule(""); // default child-link = dependents
-        let epic = epic_chain_head(&["REQ-01"]);
-        let mut a = issue("a", &["type:task"]);
-        let mut b = issue("b", &["type:task", "satisfies:REQ-01"]);
-        a.dependencies = vec![epic.id.clone()]; // a depends on epic
-        b.dependencies = vec![a.id.clone()]; // b depends on a (so transitively on epic)
+        let initiative = initiative_chain_head(&["REQ-01"]);
+        let mut a = issue("a", &["type:action"]);
+        let mut b = issue("b", &["type:action", "satisfies:REQ-01"]);
+        a.dependencies = vec![initiative.id.clone()]; // a depends on initiative
+        b.dependencies = vec![a.id.clone()]; // b depends on a (so transitively on initiative)
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, a, b],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, a, b],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2324,24 +2326,24 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_child_type_exclude_drops_candidate_and_halts_walk() {
-        // Bracket spine: epic ──dep→ impl ──dep→ B(type:breakdown) ──dep→ P.
+        // Bracket spine: initiative ──dep→ impl ──dep→ B(type:breakdown) ──dep→ P.
         // P (beyond the boundary) satisfies REQ-01, but B is excluded, so the
         // walk must halt at B and never reach P -> uncovered.
         let rule =
             coverage_rule("child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]");
-        let mut epic = epic_chain_head(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:task"]);
+        let mut initiative = initiative_chain_head(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:action"]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         let plan = issue("P", &["type:planning", "satisfies:REQ-01"]);
-        epic.dependencies = vec![impl_node.id.clone()];
+        initiative.dependencies = vec![impl_node.id.clone()];
         impl_node.dependencies = vec![breakdown.id.clone()];
         breakdown.dependencies = vec![plan.id.clone()];
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, impl_node, breakdown, plan],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, impl_node, breakdown, plan],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2360,17 +2362,17 @@ source-of-truth = "markdown-first"
         // Excluding `breakdown` must NOT drop the impl node -> covered.
         let rule =
             coverage_rule("child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]");
-        let mut epic = epic_chain_head(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:task", "satisfies:REQ-01"]);
+        let mut initiative = initiative_chain_head(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:action", "satisfies:REQ-01"]);
         let breakdown = issue("B", &["type:breakdown"]);
-        epic.dependencies = vec![impl_node.id.clone()];
+        initiative.dependencies = vec![impl_node.id.clone()];
         impl_node.dependencies = vec![breakdown.id.clone()];
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, impl_node, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, impl_node, breakdown],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2384,12 +2386,12 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_child_type_exclude_must_be_array_of_strings() {
         let rule = coverage_rule("child-type-exclude = \"breakdown\"");
-        let epic = epic_chain_head(&["REQ-01"]);
+        let initiative = initiative_chain_head(&["REQ-01"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2411,8 +2413,8 @@ source-of-truth = "markdown-first"
              severity = \"error\"\nassert = { label-coverage = { \
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
-        let mut container = epic_with_criteria(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:task", "satisfies:REQ-01"]);
+        let mut container = initiative_with_criteria(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:action", "satisfies:REQ-01"]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         // Container depends on impl (its subtree); B brackets the container.
         container.dependencies = vec![impl_node.id.clone()];
@@ -2426,7 +2428,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2446,8 +2448,8 @@ source-of-truth = "markdown-first"
              severity = \"error\"\nassert = { label-coverage = { \
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
-        let mut container = epic_with_criteria(&["REQ-01"]);
-        let impl_node = issue("impl", &["type:task"]); // does NOT satisfy
+        let mut container = initiative_with_criteria(&["REQ-01"]);
+        let impl_node = issue("impl", &["type:action"]); // does NOT satisfy
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
         breakdown
@@ -2458,7 +2460,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2480,8 +2482,8 @@ source-of-truth = "markdown-first"
              severity = \"error\"\nassert = { label-coverage = { \
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
-        let mut container = epic_with_criteria(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:task", "satisfies:REQ-01"]);
+        let mut container = initiative_with_criteria(&["REQ-01"]);
+        let mut impl_node = issue("impl", &["type:action", "satisfies:REQ-01"]);
         impl_node.state = State::Backlog; // drafted, not done
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
@@ -2493,7 +2495,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2518,7 +2520,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2544,7 +2546,7 @@ source-of-truth = "markdown-first"
         );
         // The container carries an UNCOVERED criterion: were it evaluated it would
         // fire a finding, so a clean result proves the coverage was skipped.
-        let container = epic_with_criteria(&["REQ-01"]);
+        let container = initiative_with_criteria(&["REQ-01"]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         breakdown
             .labels
@@ -2559,7 +2561,7 @@ source-of-truth = "markdown-first"
             &rules,
             &slice,
             &full,
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2590,7 +2592,7 @@ source-of-truth = "markdown-first"
             &rules,
             &slice,
             &full,
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2615,8 +2617,8 @@ source-of-truth = "markdown-first"
              severity = \"error\"\nassert = { label-coverage = { \
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
-        let mut container = epic_with_criteria(&["REQ-01"]);
-        let impl_node = issue("impl", &["type:task"]); // does NOT satisfy REQ-01
+        let mut container = initiative_with_criteria(&["REQ-01"]);
+        let impl_node = issue("impl", &["type:action"]); // does NOT satisfy REQ-01
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
         // SHORT id, per project convention -- not the full UUID.
@@ -2628,7 +2630,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2656,8 +2658,8 @@ source-of-truth = "markdown-first"
              severity = \"error\"\nassert = { label-coverage = { \
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
-        let mut container = epic_with_criteria(&["REQ-01"]);
-        let impl_node = issue("impl", &["type:task"]);
+        let mut container = initiative_with_criteria(&["REQ-01"]);
+        let impl_node = issue("impl", &["type:action"]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
         breakdown.labels.push(format!("brackets:{}", container.id));
@@ -2666,7 +2668,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[container, impl_node, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2688,8 +2690,8 @@ source-of-truth = "markdown-first"
              severity = \"error\"\nassert = { label-coverage = { \
              container-from-label = \"brackets\" } }\n",
         );
-        let mut a = epic_with_criteria(&["REQ-01"]);
-        let mut b = epic_with_criteria(&["REQ-02"]);
+        let mut a = initiative_with_criteria(&["REQ-01"]);
+        let mut b = initiative_with_criteria(&["REQ-02"]);
         // Force two ids sharing a common prefix that is neither a full nor a short
         // id of either issue (so only the prefix branch matches, and matches both).
         a.id = "abcd1111-0000-0000-0000-000000000000".to_string();
@@ -2701,7 +2703,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[a, b, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2726,8 +2728,8 @@ source-of-truth = "markdown-first"
              severity = \"error\"\nassert = { label-coverage = { \
              container-from-label = \"brackets\" } }\n",
         );
-        let mut a = epic_with_criteria(&["REQ-01"]);
-        let mut b = epic_with_criteria(&["REQ-02"]);
+        let mut a = initiative_with_criteria(&["REQ-01"]);
+        let mut b = initiative_with_criteria(&["REQ-02"]);
         // Identical first 8 chars (the short id) but distinct full ids.
         a.id = "abcd1234-1111-0000-0000-000000000000".to_string();
         b.id = "abcd1234-2222-0000-0000-000000000000".to_string();
@@ -2743,7 +2745,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[a, b, breakdown],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2768,13 +2770,13 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_reference_resolves() {
         let rule = reference_rule("from = \"satisfies\", to = \"req\"");
-        let source = issue("epic", &["req:REQ-01"]);
+        let source = issue("initiative", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
             &[source, child],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2785,13 +2787,13 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_reference_dangles() {
         let rule = reference_rule("from = \"satisfies\", to = \"req\"");
-        let source = issue("epic", &["req:REQ-01"]);
+        let source = issue("initiative", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-99"]); // no req:REQ-99 anywhere
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
             &[source, child],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2805,13 +2807,13 @@ source-of-truth = "markdown-first"
     fn test_label_reference_linked_scope_requires_edge() {
         let rule = reference_rule("from = \"satisfies\", to = \"req\", scope = \"linked\"");
         // Declaring issue exists globally but is NOT linked to the child.
-        let declarer = issue("epic", &["req:REQ-01"]);
+        let declarer = issue("initiative", &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]); // no dependency edge
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
             &[declarer, child],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2819,13 +2821,13 @@ source-of-truth = "markdown-first"
         assert_eq!(findings.len(), 1, "linked scope: unlinked source dangles");
 
         // Now add the edge: the reference resolves.
-        let declarer = issue("epic", &["req:REQ-01"]);
+        let declarer = issue("initiative", &["req:REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
         child.dependencies = vec![declarer.id.clone()];
         let findings = evaluate_graph(
             &rules,
             &[declarer, child],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2840,7 +2842,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[issue("x", &["satisfies:REQ-01"])],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2854,7 +2856,7 @@ source-of-truth = "markdown-first"
 
     fn shape_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"shape\"\nwhen = {{ type = \"task\" }}\nseverity = \"error\"\n\
+            "[[rules]]\nname = \"shape\"\nwhen = {{ type = \"action\" }}\nseverity = \"error\"\n\
              assert = {{ dependency-shape = {{ {extra} }} }}\n"
         ))
     }
@@ -2863,30 +2865,33 @@ source-of-truth = "markdown-first"
     fn test_dependency_shape_satisfied() {
         let rule = shape_rule("target = { type = \"design\" }");
         let design = issue("design", &["type:design"]);
-        let mut task = issue("task", &["type:task"]);
-        task.dependencies = vec![design.id.clone()];
+        let mut action = issue("action", &["type:action"]);
+        action.dependencies = vec![design.id.clone()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[design, task],
-            &HierarchyConfig::test_vocabulary(),
+            &[design, action],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
         );
-        assert!(findings.is_empty(), "task depends on design: {findings:?}");
+        assert!(
+            findings.is_empty(),
+            "action depends on design: {findings:?}"
+        );
     }
 
     #[test]
     fn test_dependency_shape_violated() {
         let rule = shape_rule("target = { type = \"design\" }");
         let design = issue("design", &["type:design"]);
-        let task = issue("task", &["type:task"]); // no dependency
+        let action = issue("action", &["type:action"]); // no dependency
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[design, task],
-            &HierarchyConfig::test_vocabulary(),
+            &[design, action],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2898,19 +2903,19 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_dependency_shape_transitive() {
-        // task -> mid -> design; only satisfied when transitive = true.
+        // action -> mid -> design; only satisfied when transitive = true.
         let design = issue("design", &["type:design"]);
         let mut mid = issue("mid", &["type:other"]);
         mid.dependencies = vec![design.id.clone()];
-        let mut task = issue("task", &["type:task"]);
-        task.dependencies = vec![mid.id.clone()];
+        let mut action = issue("action", &["type:action"]);
+        action.dependencies = vec![mid.id.clone()];
 
         let direct = shape_rule("target = { type = \"design\" }");
         let rules = vec![&direct];
         let findings = evaluate_graph(
             &rules,
-            &[design.clone(), mid.clone(), task.clone()],
-            &HierarchyConfig::test_vocabulary(),
+            &[design.clone(), mid.clone(), action.clone()],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2921,8 +2926,8 @@ source-of-truth = "markdown-first"
         let rules = vec![&trans];
         let findings = evaluate_graph(
             &rules,
-            &[design, mid, task],
-            &HierarchyConfig::test_vocabulary(),
+            &[design, mid, action],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2939,8 +2944,8 @@ source-of-truth = "markdown-first"
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[issue("task", &["type:task"])],
-            &HierarchyConfig::test_vocabulary(),
+            &[issue("action", &["type:action"])],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -2986,7 +2991,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3004,7 +3009,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3029,7 +3034,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3052,7 +3057,7 @@ source-of-truth = "markdown-first"
         let mut findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3078,7 +3083,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3099,7 +3104,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3120,7 +3125,7 @@ source-of-truth = "markdown-first"
         let a = evaluate_graph(
             &rules,
             std::slice::from_ref(&i),
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3128,7 +3133,7 @@ source-of-truth = "markdown-first"
         let b = evaluate_graph(
             &rules,
             std::slice::from_ref(&i),
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3148,7 +3153,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3170,7 +3175,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3191,7 +3196,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3212,7 +3217,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3235,7 +3240,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &[i],
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3262,8 +3267,8 @@ source-of-truth = "markdown-first"
         let rules = vec![&local, &off];
         let findings = evaluate_graph(
             &rules,
-            &[issue("task", &["type:task"])],
-            &HierarchyConfig::test_vocabulary(),
+            &[issue("action", &["type:action"])],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3277,13 +3282,13 @@ source-of-truth = "markdown-first"
 
     fn ctc_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"ctc\"\nwhen = {{ type = \"epic\" }}\n\
+            "[[rules]]\nname = \"ctc\"\nwhen = {{ type = \"initiative\" }}\n\
              severity = \"error\"\nassert = {{ criteria-to-check = {{ {extra} }} }}\n"
         ))
     }
 
-    /// Epic with a Success Criteria section carrying the given criterion lines.
-    fn epic_with_sc(items: &[&str]) -> Issue {
+    /// Initiative with a Success Criteria section carrying the given criterion lines.
+    fn initiative_with_sc(items: &[&str]) -> Issue {
         let body = format!(
             "## Success Criteria\n\n{}\n",
             items
@@ -3292,22 +3297,22 @@ source-of-truth = "markdown-first"
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body);
-        epic.labels = vec!["type:epic".to_string()];
-        epic
+        let mut initiative = crate::domain::types::fixture_issue("initiative".to_string(), body);
+        initiative.labels = vec!["type:initiative".to_string()];
+        initiative
     }
 
     #[test]
     fn test_criteria_to_check_gate_mapped_id_passes() {
         // A criterion satisfied via a gates_required entry must produce no finding.
         let rule = ctc_rule("gate-prefix = \"verify:\"");
-        let mut epic = epic_with_sc(&["[hard] REQ-01: do the thing"]);
-        epic.gates_required = vec!["verify:REQ-01".to_string()];
+        let mut initiative = initiative_with_sc(&["[hard] REQ-01: do the thing"]);
+        initiative.gates_required = vec!["verify:REQ-01".to_string()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3322,13 +3327,13 @@ source-of-truth = "markdown-first"
     fn test_criteria_to_check_label_mapped_id_passes() {
         // A criterion satisfied via a label must produce no finding.
         let rule = ctc_rule("check-namespace = \"checks\"");
-        let mut epic = epic_with_sc(&["REQ-01: do the thing"]);
-        epic.labels.push("checks:REQ-01".to_string());
+        let mut initiative = initiative_with_sc(&["REQ-01: do the thing"]);
+        initiative.labels.push("checks:REQ-01".to_string());
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3344,14 +3349,14 @@ source-of-truth = "markdown-first"
         // REQ-05: a QUALIFIED `<ns>:<own-short-id>/REQ-01` label on the issue that
         // owns the criterion credits it, alongside the unqualified form.
         let rule = ctc_rule("check-namespace = \"checks\"");
-        let mut epic = epic_with_sc(&["REQ-01: do the thing"]);
-        let qualified = format!("checks:{}/REQ-01", epic.short_id());
-        epic.labels.push(qualified);
+        let mut initiative = initiative_with_sc(&["REQ-01: do the thing"]);
+        let qualified = format!("checks:{}/REQ-01", initiative.short_id());
+        initiative.labels.push(qualified);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3367,13 +3372,13 @@ source-of-truth = "markdown-first"
         // A qualified check label scoped to a DIFFERENT issue must not credit the
         // criterion on this issue (no spurious pass).
         let rule = ctc_rule("check-namespace = \"checks\"");
-        let mut epic = epic_with_sc(&["REQ-01: do the thing"]);
-        epic.labels.push("checks:deadbeef/REQ-01".to_string());
+        let mut initiative = initiative_with_sc(&["REQ-01: do the thing"]);
+        initiative.labels.push("checks:deadbeef/REQ-01".to_string());
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3390,13 +3395,13 @@ source-of-truth = "markdown-first"
     fn test_criteria_to_check_unmapped_id_reports_finding() {
         // An unmapped criterion must be reported with its id in the message.
         let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
-        let epic = epic_with_sc(&["REQ-01: do the thing"]);
-        let id = epic.id.clone();
+        let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
+        let id = initiative.id.clone();
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3422,7 +3427,7 @@ source-of-truth = "markdown-first"
     fn test_criteria_to_check_marker_filtering() {
         // Only [hard] items are required when marker = "[hard]".
         let rule = ctc_rule("marker = \"[hard]\", gate-prefix = \"verify:\"");
-        let epic = epic_with_sc(&[
+        let initiative = initiative_with_sc(&[
             "[hard] REQ-01: must do",
             "[aspirational] REQ-02: nice to have",
         ]);
@@ -3430,8 +3435,8 @@ source-of-truth = "markdown-first"
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3457,12 +3462,12 @@ source-of-truth = "markdown-first"
     fn test_criteria_to_check_only_gate_mechanism_message() {
         // When only gate-prefix is configured the finding names only the gate.
         let rule = ctc_rule("gate-prefix = \"verify:\"");
-        let epic = epic_with_sc(&["REQ-01: do the thing"]);
+        let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3483,12 +3488,12 @@ source-of-truth = "markdown-first"
     fn test_criteria_to_check_only_label_mechanism_message() {
         // When only check-namespace is configured the finding names only the label.
         let rule = ctc_rule("check-namespace = \"checks\"");
-        let epic = epic_with_sc(&["REQ-01: do the thing"]);
+        let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3530,19 +3535,19 @@ source-of-truth = "markdown-first"
         // must NOT traverse children. A child carrying the mapping does not
         // satisfy the parent's criterion -> the parent still reports.
         let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
-        let epic = epic_with_sc(&["REQ-01: do the thing"]);
+        let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         // A dependent child carries the would-be mapping; per-issue semantics
-        // mean this is irrelevant to the epic.
-        let mut child = issue("child", &["type:task", "checks:REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        // mean this is irrelevant to the initiative.
+        let mut child = issue("child", &["type:action", "checks:REQ-01"]);
+        child.dependencies = vec![initiative.id.clone()];
         child.gates_required = vec!["verify:REQ-01".to_string()];
-        let epic_id = epic.id.clone();
+        let initiative_id = initiative.id.clone();
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3552,32 +3557,35 @@ source-of-truth = "markdown-first"
             1,
             "criteria-to-check is per-issue; a child mapping must not cover: {findings:?}"
         );
-        assert_eq!(findings[0].issue_id.as_deref(), Some(epic_id.as_str()));
+        assert_eq!(
+            findings[0].issue_id.as_deref(),
+            Some(initiative_id.as_str())
+        );
         assert!(findings[0].finding.message.contains("REQ-01"));
     }
 
     #[test]
     fn test_type_hierarchy_orphan_leaf_fires_with_injected_config() {
         // A `type-hierarchy` rule authored in TOML carries only its kind; the
-        // HierarchyConfig is injected by `evaluate_graph`. A leaf task with no
+        // HierarchyConfig is injected by `evaluate_graph`. A leaf action with no
         // parent association label is flagged as an orphan.
         let rule = rule_from(
             "[[rules]]\nname = \"orphan-leaf-fixture\"\nseverity = \"warn\"\n\
              assert = { type-hierarchy = { kind = \"orphan-leaf\" } }\n",
         );
         let rules = vec![&rule];
-        let task = issue("task", &["type:task"]);
+        let action = issue("action", &["type:action"]);
         let findings = evaluate_graph(
             &rules,
-            std::slice::from_ref(&task),
-            &HierarchyConfig::test_vocabulary(),
+            std::slice::from_ref(&action),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
         );
         assert_eq!(findings.len(), 1, "orphan leaf must fire: {findings:?}");
         assert_eq!(findings[0].finding.rule, "orphan-leaf-fixture");
-        assert_eq!(findings[0].issue_id.as_deref(), Some(task.id.as_str()));
+        assert_eq!(findings[0].issue_id.as_deref(), Some(action.id.as_str()));
         assert_eq!(findings[0].finding.severity, Severity::Warn);
     }
 
@@ -3585,13 +3593,13 @@ source-of-truth = "markdown-first"
 
     fn clm_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"clm\"\nwhen = {{ type = \"epic\" }}\n\
+            "[[rules]]\nname = \"clm\"\nwhen = {{ type = \"initiative\" }}\n\
              severity = \"error\"\nassert = {{ criteria-label-match = {{ {extra} }} }}\n"
         ))
     }
 
-    /// An epic with `## Success Criteria` items shaped `[hard] <id>: text`.
-    fn epic_with_clm_criteria(ids: &[&str]) -> Issue {
+    /// An initiative with `## Success Criteria` items shaped `[hard] <id>: text`.
+    fn initiative_with_clm_criteria(ids: &[&str]) -> Issue {
         let body = format!(
             "## Success Criteria\n\n{}\n",
             ids.iter()
@@ -3599,25 +3607,25 @@ source-of-truth = "markdown-first"
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body);
-        epic.labels = vec!["type:epic".to_string()];
-        epic
+        let mut initiative = crate::domain::types::fixture_issue("initiative".to_string(), body);
+        initiative.labels = vec!["type:initiative".to_string()];
+        initiative
     }
 
     #[test]
     fn test_criteria_label_match_stray_label_yields_finding() {
-        // A `req:REQ-77` label on an epic whose Success Criteria has only REQ-01
+        // A `req:REQ-77` label on an initiative whose Success Criteria has only REQ-01
         // is stray: no matching criterion id -> finding with the stray message.
         let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
-        let mut epic = epic_with_clm_criteria(&["REQ-01"]);
-        epic.labels.push("req:REQ-77".to_string()); // stray
-        epic.labels.push("req:REQ-01".to_string()); // matches criterion
+        let mut initiative = initiative_with_clm_criteria(&["REQ-01"]);
+        initiative.labels.push("req:REQ-77".to_string()); // stray
+        initiative.labels.push("req:REQ-01".to_string()); // matches criterion
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic.clone()],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative.clone()],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3648,23 +3656,23 @@ source-of-truth = "markdown-first"
         assert_eq!(findings[0].finding.severity, Severity::Error);
         assert_eq!(
             findings[0].issue_id.as_deref(),
-            Some(epic.id.as_str()),
-            "finding must be attributed to the epic"
+            Some(initiative.id.as_str()),
+            "finding must be attributed to the initiative"
         );
     }
 
     #[test]
     fn test_criteria_label_match_matched_label_produces_no_finding() {
-        // A `req:REQ-01` on an epic whose criteria contain REQ-01 is fine.
+        // A `req:REQ-01` on an initiative whose criteria contain REQ-01 is fine.
         let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
-        let mut epic = epic_with_clm_criteria(&["REQ-01"]);
-        epic.labels.push("req:REQ-01".to_string());
+        let mut initiative = initiative_with_clm_criteria(&["REQ-01"]);
+        initiative.labels.push("req:REQ-01".to_string());
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3680,14 +3688,14 @@ source-of-truth = "markdown-first"
         // Exact string comparison: criterion text `REQ-03` vs label `req:REQ-3`
         // are NOT equal, so `req:REQ-3` is a stray (no normalization).
         let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
-        let mut epic = epic_with_clm_criteria(&["REQ-03"]);
-        epic.labels.push("req:REQ-3".to_string()); // differs by leading zero
+        let mut initiative = initiative_with_clm_criteria(&["REQ-03"]);
+        initiative.labels.push("req:REQ-3".to_string()); // differs by leading zero
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3709,9 +3717,10 @@ source-of-truth = "markdown-first"
         let body = "## Success Criteria\n\n\
                     - [hard] REQ-01: required\n\
                     - [aspirational] REQ-99: nice-to-have\n";
-        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
-        epic.labels = vec![
-            "type:epic".to_string(),
+        let mut initiative =
+            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
+        initiative.labels = vec![
+            "type:initiative".to_string(),
             "req:REQ-01".to_string(), // matches [hard] criterion -> not stray
             "req:REQ-99".to_string(), // only on [aspirational] item -> stray under marker filter
         ];
@@ -3719,8 +3728,8 @@ source-of-truth = "markdown-first"
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3738,14 +3747,15 @@ source-of-truth = "markdown-first"
         // A non-default criteria-section name is reflected in the finding text.
         let rule = clm_rule(r#"namespace = "req", criteria-section = "hard_requirements""#);
         let body = "## Hard Requirements\n\n- REQ-01: do it\n";
-        let mut epic = crate::domain::types::fixture_issue("epic".to_string(), body.to_string());
-        epic.labels = vec!["type:epic".to_string(), "req:REQ-77".to_string()]; // stray
+        let mut initiative =
+            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
+        initiative.labels = vec!["type:initiative".to_string(), "req:REQ-77".to_string()]; // stray
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3763,13 +3773,13 @@ source-of-truth = "markdown-first"
     fn test_criteria_label_match_no_namespace_labels_produces_no_finding() {
         // An issue with no `req:*` labels at all has nothing to check.
         let rule = clm_rule(r#"namespace = "req""#);
-        let epic = epic_with_clm_criteria(&["REQ-01"]); // labels: just type:epic
+        let initiative = initiative_with_clm_criteria(&["REQ-01"]); // labels: just type:initiative
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3784,23 +3794,23 @@ source-of-truth = "markdown-first"
     fn test_criteria_label_match_stays_per_issue_ignores_children() {
         // criteria-label-match does same-issue stray-label detection. A child's
         // labels must not influence the parent's evaluation: a stray label on the
-        // epic still fires, and a child carrying the criterion id does not make
+        // initiative still fires, and a child carrying the criterion id does not make
         // the parent's matching label "non-stray" via traversal (there is no
-        // traversal). Here the stray is on the epic itself.
+        // traversal). Here the stray is on the initiative itself.
         let rule = clm_rule(r#"namespace = "req", marker = "[hard]""#);
-        let mut epic = epic_with_clm_criteria(&["REQ-01"]);
-        epic.labels.push("req:REQ-77".to_string()); // stray on the epic
-        let epic_id = epic.id.clone();
-        // A child that happens to carry req:REQ-77 must NOT silence the epic's
+        let mut initiative = initiative_with_clm_criteria(&["REQ-01"]);
+        initiative.labels.push("req:REQ-77".to_string()); // stray on the initiative
+        let initiative_id = initiative.id.clone();
+        // A child that happens to carry req:REQ-77 must NOT silence the initiative's
         // stray finding (per-issue: the child is never consulted).
-        let mut child = issue("child", &["type:task", "req:REQ-77"]);
-        child.dependencies = vec![epic.id.clone()];
+        let mut child = issue("child", &["type:action", "req:REQ-77"]);
+        child.dependencies = vec![initiative.id.clone()];
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, child],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, child],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3810,7 +3820,10 @@ source-of-truth = "markdown-first"
             1,
             "criteria-label-match is per-issue; a child must not affect it: {findings:?}"
         );
-        assert_eq!(findings[0].issue_id.as_deref(), Some(epic_id.as_str()));
+        assert_eq!(
+            findings[0].issue_id.as_deref(),
+            Some(initiative_id.as_str())
+        );
         assert!(findings[0].finding.message.contains("req:REQ-77"));
     }
 
@@ -3823,22 +3836,22 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_uniqueness_collision_across_two_unlinked_issues() {
-        // Two unlinked epics both declaring req:REQ-01 — one finding naming the
+        // Two unlinked initiatives both declaring req:REQ-01 — one finding naming the
         // value and both short-ids.
         let rule = uniqueness_rule("req");
-        let mut epic_a = issue("epic-a", &["type:epic", "req:REQ-01"]);
-        let epic_b = issue("epic-b", &["type:epic", "req:REQ-01"]);
+        let mut initiative_a = issue("initiative-a", &["type:initiative", "req:REQ-01"]);
+        let initiative_b = issue("initiative-b", &["type:initiative", "req:REQ-01"]);
         // Deliberately no dependency edge between them.
-        let id_a = epic_a.short_id().to_string();
-        let id_b = epic_b.short_id().to_string();
+        let id_a = initiative_a.short_id().to_string();
+        let id_b = initiative_b.short_id().to_string();
         // Set distinct short ids so the message is testable.
-        epic_a.id = format!("aaa-{}", epic_a.id);
+        initiative_a.id = format!("aaa-{}", initiative_a.id);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic_a, epic_b],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative_a, initiative_b],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3857,16 +3870,16 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_uniqueness_no_finding_for_unique_values() {
-        // Two epics each declaring a distinct req — no collision.
+        // Two initiatives each declaring a distinct req — no collision.
         let rule = uniqueness_rule("req");
-        let epic_a = issue("epic-a", &["type:epic", "req:REQ-01"]);
-        let epic_b = issue("epic-b", &["type:epic", "req:REQ-02"]);
+        let initiative_a = issue("initiative-a", &["type:initiative", "req:REQ-01"]);
+        let initiative_b = issue("initiative-b", &["type:initiative", "req:REQ-02"]);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic_a, epic_b],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative_a, initiative_b],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3879,29 +3892,29 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_uniqueness_when_selector_filters_issues() {
-        // The rule has `when = { type = "epic" }` via `rule_from`.
-        // A task also carrying req:REQ-01 is NOT included because it fails the
+        // The rule has `when = { type = "initiative" }` via `rule_from`.
+        // An action also carrying req:REQ-01 is NOT included because it fails the
         // `when` selector — only matching issues are checked for uniqueness.
         let rule = rule_from(
-            "[[rules]]\nname = \"uniqueness\"\nwhen = { type = \"epic\" }\n\
+            "[[rules]]\nname = \"uniqueness\"\nwhen = { type = \"initiative\" }\n\
              severity = \"error\"\n\
              assert = { label-uniqueness = { namespace = \"req\", scope = \"all\" } }\n",
         );
-        let epic = issue("epic", &["type:epic", "req:REQ-01"]);
-        let task = issue("task", &["type:task", "req:REQ-01"]); // not matched
+        let initiative = issue("initiative", &["type:initiative", "req:REQ-01"]);
+        let action = issue("action", &["type:action", "req:REQ-01"]); // not matched
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic, task],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative, action],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
         );
         assert!(
             findings.is_empty(),
-            "a task not matching the when-selector must not trigger uniqueness: {findings:?}"
+            "an action not matching the when-selector must not trigger uniqueness: {findings:?}"
         );
     }
 
@@ -3910,17 +3923,17 @@ source-of-truth = "markdown-first"
         // Verify the finding message format precisely: names the value and both
         // short-ids so actionable remediation is possible.
         let rule = uniqueness_rule("req");
-        let mut epic_a = issue("epic-a", &["req:REQ-42"]);
-        let mut epic_b = issue("epic-b", &["req:REQ-42"]);
+        let mut initiative_a = issue("initiative-a", &["req:REQ-42"]);
+        let mut initiative_b = issue("initiative-b", &["req:REQ-42"]);
         // Use deterministic prefixes so we can assert them in the message.
-        epic_a.id = "aaaa0000-0000-0000-0000-000000000000".to_string();
-        epic_b.id = "bbbb0000-0000-0000-0000-000000000000".to_string();
+        initiative_a.id = "aaaa0000-0000-0000-0000-000000000000".to_string();
+        initiative_b.id = "bbbb0000-0000-0000-0000-000000000000".to_string();
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[epic_a.clone(), epic_b.clone()],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative_a.clone(), initiative_b.clone()],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -3932,11 +3945,11 @@ source-of-truth = "markdown-first"
             "message must name the value: {msg}"
         );
         assert!(
-            msg.contains(&epic_a.short_id()),
+            msg.contains(&initiative_a.short_id()),
             "message must contain short-id of first issue: {msg}"
         );
         assert!(
-            msg.contains(&epic_b.short_id()),
+            msg.contains(&initiative_b.short_id()),
             "message must contain short-id of second issue: {msg}"
         );
     }
@@ -3986,7 +3999,7 @@ source-of-truth = "markdown-first"
         let findings = evaluate_graph(
             &rules,
             &issues,
-            &HierarchyConfig::test_vocabulary(),
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),
@@ -4041,7 +4054,7 @@ source-of-truth = "markdown-first"
         // the WHOLE finding vectors (issue_id, rule, severity, message) are
         // compared, in BOTH the covered (empty) and uncovered cases.
         let kind_rule = rule_from_repo(
-            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
+            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"initiative\" }\n\
              severity = \"error\"\nassert = { label-coverage = { \
              kind = \"requirement\", child-state = \"done\" } }\n",
         );
@@ -4054,7 +4067,7 @@ source-of-truth = "markdown-first"
             evaluate_graph(
                 &[rule],
                 issues,
-                &HierarchyConfig::test_vocabulary(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
                 ContentFormat::Markdown,
                 fixed_now(),
                 &HashMap::new(),
@@ -4062,11 +4075,11 @@ source-of-truth = "markdown-first"
         };
 
         // Covered: a done child credits REQ-01 → no findings from either rule.
-        let epic = epic_with_criteria(&["REQ-01"]);
+        let initiative = initiative_with_criteria(&["REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
-        child.dependencies = vec![epic.id.clone()];
+        child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
-        let covered = [epic, child];
+        let covered = [initiative, child];
         let kind_covered = eval(&kind_rule, &covered);
         let inline_covered = eval(&inline_rule, &covered);
         assert!(
@@ -4081,7 +4094,7 @@ source-of-truth = "markdown-first"
 
         // Uncovered: no satisfying child → one finding from each rule. Compare the
         // full GraphFinding vectors (issue_id, rule, severity, message).
-        let epic2 = epic_with_criteria(&["REQ-09"]);
+        let epic2 = initiative_with_criteria(&["REQ-09"]);
         let uncovered = [epic2];
         let kind_uncovered = eval(&kind_rule, &uncovered);
         let inline_uncovered = eval(&inline_rule, &uncovered);
@@ -4249,11 +4262,11 @@ source-of-truth = "markdown-first"
     fn test_config_error_constructor_sets_typed_field() {
         // A coverage rule with an unrecognized `child-link` forces `config_error()`.
         let rule = coverage_rule("child-link = \"bogus\"");
-        let epic = epic_with_criteria(&["REQ-01"]);
+        let initiative = initiative_with_criteria(&["REQ-01"]);
         let findings = evaluate_graph(
             &[&rule],
-            &[epic],
-            &HierarchyConfig::test_vocabulary(),
+            &[initiative],
+            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
             &HashMap::new(),

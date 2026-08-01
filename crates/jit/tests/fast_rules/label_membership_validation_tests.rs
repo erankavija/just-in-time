@@ -1,6 +1,6 @@
 //! Integration tests for label-based membership validation
 //!
-//! These tests validate that organizational membership labels (epic:*, milestone:*)
+//! These tests validate that organizational membership labels (initiative:*, objective:*)
 //! reference actual issues with matching types.
 
 use jit::commands::CommandExecutor;
@@ -46,46 +46,53 @@ fn publish_issue(executor: &CommandExecutor<JsonFileStorage>, issue: &mut jit::d
 }
 
 #[test]
-fn test_valid_epic_membership() {
+fn test_valid_initiative_membership() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Create an epic
-    let mut epic = crate::fixture_issue("Authentication System".to_string(), String::new());
-    epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    publish_issue(&executor, &mut epic);
+    // Create an initiative
+    let mut initiative = crate::fixture_issue("Authentication System".to_string(), String::new());
+    initiative.labels = vec!["type:initiative".to_string(), "initiative:auth".to_string()];
+    publish_issue(&executor, &mut initiative);
 
-    // Create a task that references the epic
-    let mut task = crate::fixture_issue("Implement login".to_string(), String::new());
-    task.labels = vec!["type:task".to_string(), "epic:auth".to_string()];
-    publish_issue(&executor, &mut task);
+    // Create an action that references the initiative
+    let mut action = crate::fixture_issue("Implement login".to_string(), String::new());
+    action.labels = vec!["type:action".to_string(), "initiative:auth".to_string()];
+    publish_issue(&executor, &mut action);
 
     // Load all issues for validation
     let all_issues = executor.storage().list_issues().unwrap();
 
-    // Validate the task - should have no issues
-    let issues = detect_membership_issues(&config, &task, &all_issues);
+    // Validate the action - should have no issues
+    let issues = detect_membership_issues(&config, &action, &all_issues);
     assert!(
         issues.is_empty(),
-        "Valid epic reference should not produce validation issues"
+        "Valid initiative reference should not produce validation issues"
     );
 }
 
 #[test]
-fn test_invalid_epic_reference_not_found() {
+fn test_invalid_initiative_reference_not_found() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Create a task that references a non-existent epic
-    let mut task = crate::fixture_issue("Implement login".to_string(), String::new());
-    task.labels = vec!["type:task".to_string(), "epic:nonexistent".to_string()];
-    publish_issue(&executor, &mut task);
+    // Create an action that references a non-existent initiative
+    let mut action = crate::fixture_issue("Implement login".to_string(), String::new());
+    action.labels = vec![
+        "type:action".to_string(),
+        "initiative:nonexistent".to_string(),
+    ];
+    publish_issue(&executor, &mut action);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
     // Validate - should find the invalid reference
-    let issues = detect_membership_issues(&config, &task, &all_issues);
-    assert_eq!(issues.len(), 1, "Should detect invalid epic reference");
+    let issues = detect_membership_issues(&config, &action, &all_issues);
+    assert_eq!(
+        issues.len(),
+        1,
+        "Should detect invalid initiative reference"
+    );
 
     match &issues[0] {
         ValidationIssue::InvalidMembershipReference {
@@ -96,9 +103,9 @@ fn test_invalid_epic_reference_not_found() {
             reason,
         } => {
             eprintln!("DEBUG: reason = '{}'", reason);
-            assert_eq!(issue_id, &task.id);
-            assert_eq!(label, "epic:nonexistent");
-            assert_eq!(namespace, "epic");
+            assert_eq!(issue_id, &action.id);
+            assert_eq!(label, "initiative:nonexistent");
+            assert_eq!(namespace, "initiative");
             assert_eq!(value, "nonexistent");
             assert!(
                 reason.contains("No issue found"),
@@ -111,30 +118,30 @@ fn test_invalid_epic_reference_not_found() {
 }
 
 #[test]
-fn test_invalid_epic_reference_wrong_type() {
+fn test_invalid_initiative_reference_wrong_type() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Create an issue with type:task but epic:backend label
+    // Create an issue with type:action but initiative:backend label
     let mut backend = crate::fixture_issue("Backend Service".to_string(), String::new());
-    backend.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
+    backend.labels = vec!["type:action".to_string(), "initiative:backend".to_string()];
     publish_issue(&executor, &mut backend);
 
-    // Create a task that references it as an epic (wrong!)
-    let mut task = crate::fixture_issue("Add endpoint".to_string(), String::new());
-    task.labels = vec!["type:task".to_string(), "epic:backend".to_string()];
-    publish_issue(&executor, &mut task);
+    // Create an action that references it as an initiative (wrong!)
+    let mut action = crate::fixture_issue("Add endpoint".to_string(), String::new());
+    action.labels = vec!["type:action".to_string(), "initiative:backend".to_string()];
+    publish_issue(&executor, &mut action);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
     // Validate - should detect type mismatch
-    let issues = detect_membership_issues(&config, &task, &all_issues);
+    let issues = detect_membership_issues(&config, &action, &all_issues);
     assert_eq!(issues.len(), 1, "Should detect type mismatch");
 
     match &issues[0] {
         ValidationIssue::InvalidMembershipReference { reason, .. } => {
             assert!(
-                reason.contains("type:epic") && reason.contains("type:task"),
+                reason.contains("type:initiative") && reason.contains("type:action"),
                 "Should explain type mismatch"
             );
         }
@@ -143,56 +150,56 @@ fn test_invalid_epic_reference_wrong_type() {
 }
 
 #[test]
-fn test_valid_milestone_membership() {
+fn test_valid_objective_membership() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Create milestone
-    let mut milestone = crate::fixture_issue("v1.0 Release".to_string(), String::new());
-    milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
-    publish_issue(&executor, &mut milestone);
+    // Create objective
+    let mut objective = crate::fixture_issue("v1.0 Release".to_string(), String::new());
+    objective.labels = vec!["type:objective".to_string(), "objective:v1.0".to_string()];
+    publish_issue(&executor, &mut objective);
 
-    // Create task under milestone
-    let mut task = crate::fixture_issue("Fix critical bug".to_string(), String::new());
-    task.labels = vec!["type:task".to_string(), "milestone:v1.0".to_string()];
-    publish_issue(&executor, &mut task);
+    // Create action under objective
+    let mut action = crate::fixture_issue("Fix critical bug".to_string(), String::new());
+    action.labels = vec!["type:action".to_string(), "objective:v1.0".to_string()];
+    publish_issue(&executor, &mut action);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
-    let issues = detect_membership_issues(&config, &task, &all_issues);
-    assert!(issues.is_empty(), "Valid milestone reference should be OK");
+    let issues = detect_membership_issues(&config, &action, &all_issues);
+    assert!(issues.is_empty(), "Valid objective reference should be OK");
 }
 
 #[test]
 fn test_multiple_membership_labels() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Create milestone and epic
-    let mut milestone = crate::fixture_issue("v1.0".to_string(), String::new());
-    milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
-    publish_issue(&executor, &mut milestone);
+    // Create objective and initiative
+    let mut objective = crate::fixture_issue("v1.0".to_string(), String::new());
+    objective.labels = vec!["type:objective".to_string(), "objective:v1.0".to_string()];
+    publish_issue(&executor, &mut objective);
 
-    let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
-    epic.labels = vec![
-        "type:epic".to_string(),
-        "epic:auth".to_string(),
-        "milestone:v1.0".to_string(), // Epic belongs to milestone
+    let mut initiative = crate::fixture_issue("Auth".to_string(), String::new());
+    initiative.labels = vec![
+        "type:initiative".to_string(),
+        "initiative:auth".to_string(),
+        "objective:v1.0".to_string(), // Initiative belongs to objective
     ];
-    publish_issue(&executor, &mut epic);
+    publish_issue(&executor, &mut initiative);
 
-    // Task belongs to both
-    let mut task = crate::fixture_issue("Login".to_string(), String::new());
-    task.labels = vec![
-        "type:task".to_string(),
-        "epic:auth".to_string(),
-        "milestone:v1.0".to_string(),
+    // Action belongs to both
+    let mut action = crate::fixture_issue("Login".to_string(), String::new());
+    action.labels = vec![
+        "type:action".to_string(),
+        "initiative:auth".to_string(),
+        "objective:v1.0".to_string(),
     ];
-    publish_issue(&executor, &mut task);
+    publish_issue(&executor, &mut action);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
-    let issues = detect_membership_issues(&config, &task, &all_issues);
+    let issues = detect_membership_issues(&config, &action, &all_issues);
     assert!(
         issues.is_empty(),
         "Valid multiple membership references should be OK"
@@ -202,16 +209,16 @@ fn test_multiple_membership_labels() {
 #[test]
 fn test_no_membership_labels_is_ok() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Task with no membership labels (orphan)
-    let mut task = crate::fixture_issue("Standalone task".to_string(), String::new());
-    task.labels = vec!["type:task".to_string()];
-    publish_issue(&executor, &mut task);
+    // Action with no membership labels (orphan)
+    let mut action = crate::fixture_issue("Standalone action".to_string(), String::new());
+    action.labels = vec!["type:action".to_string()];
+    publish_issue(&executor, &mut action);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
-    let issues = detect_membership_issues(&config, &task, &all_issues);
+    let issues = detect_membership_issues(&config, &action, &all_issues);
     assert!(
         issues.is_empty(),
         "No membership labels should not be an error"
@@ -219,52 +226,52 @@ fn test_no_membership_labels_is_ok() {
 }
 
 #[test]
-fn test_epic_referencing_itself() {
+fn test_initiative_referencing_itself() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Epic that references itself (valid but maybe weird)
-    let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
-    epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    publish_issue(&executor, &mut epic);
+    // Initiative that references itself (valid but maybe weird)
+    let mut initiative = crate::fixture_issue("Auth".to_string(), String::new());
+    initiative.labels = vec!["type:initiative".to_string(), "initiative:auth".to_string()];
+    publish_issue(&executor, &mut initiative);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
-    let issues = detect_membership_issues(&config, &epic, &all_issues);
+    let issues = detect_membership_issues(&config, &initiative, &all_issues);
     // Self-reference should be OK (it's identifying itself)
     assert!(
         issues.is_empty(),
-        "Epic with matching label should be OK (self-identification)"
+        "Initiative with matching label should be OK (self-identification)"
     );
 }
 
 #[test]
 fn test_mixed_valid_and_invalid_references() {
     let (_temp, executor) = setup_test_repo();
-    let config = HierarchyConfig::test_vocabulary();
+    let config = jit::test_taxonomy::test_taxonomy().hierarchy_config();
 
-    // Create one valid epic
-    let mut epic = crate::fixture_issue("Auth".to_string(), String::new());
-    epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-    publish_issue(&executor, &mut epic);
+    // Create one valid initiative
+    let mut initiative = crate::fixture_issue("Auth".to_string(), String::new());
+    initiative.labels = vec!["type:initiative".to_string(), "initiative:auth".to_string()];
+    publish_issue(&executor, &mut initiative);
 
-    // Task references one valid, one invalid
-    let mut task = crate::fixture_issue("Login".to_string(), String::new());
-    task.labels = vec![
-        "type:task".to_string(),
-        "epic:auth".to_string(),      // Valid
-        "milestone:v2.0".to_string(), // Invalid - doesn't exist
+    // Action references one valid, one invalid
+    let mut action = crate::fixture_issue("Login".to_string(), String::new());
+    action.labels = vec![
+        "type:action".to_string(),
+        "initiative:auth".to_string(), // Valid
+        "objective:v2.0".to_string(),  // Invalid - doesn't exist
     ];
-    publish_issue(&executor, &mut task);
+    publish_issue(&executor, &mut action);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
-    let issues = detect_membership_issues(&config, &task, &all_issues);
+    let issues = detect_membership_issues(&config, &action, &all_issues);
     assert_eq!(issues.len(), 1, "Should detect only the invalid reference");
 
     match &issues[0] {
         ValidationIssue::InvalidMembershipReference { label, .. } => {
-            assert_eq!(label, "milestone:v2.0");
+            assert_eq!(label, "objective:v2.0");
         }
         _ => panic!("Expected InvalidMembershipReference"),
     }
@@ -309,34 +316,34 @@ fn test_custom_type_names_and_namespaces() {
 fn test_type_alias_same_namespace() {
     let (_temp, executor) = setup_test_repo();
 
-    // Create config where both "milestone" and "release" use "milestone" namespace
+    // Create config where both "objective" and "release" use "objective" namespace
     let mut types = HashMap::new();
-    types.insert("milestone".to_string(), 1);
+    types.insert("objective".to_string(), 1);
     types.insert("release".to_string(), 1); // Same level
-    types.insert("task".to_string(), 2);
+    types.insert("action".to_string(), 2);
 
     let mut label_associations = HashMap::new();
-    label_associations.insert("milestone".to_string(), "milestone".to_string());
-    label_associations.insert("release".to_string(), "milestone".to_string()); // Alias!
+    label_associations.insert("objective".to_string(), "objective".to_string());
+    label_associations.insert("release".to_string(), "objective".to_string()); // Alias!
 
     let config = HierarchyConfig::new(types, label_associations).unwrap();
 
-    // Create a release (uses milestone namespace)
+    // Create a release (uses objective namespace)
     let mut release = crate::fixture_issue("v2.0".to_string(), String::new());
-    release.labels = vec!["type:release".to_string(), "milestone:v2.0".to_string()];
+    release.labels = vec!["type:release".to_string(), "objective:v2.0".to_string()];
     publish_issue(&executor, &mut release);
 
-    // Task references it via milestone:v2.0 label
-    let mut task = crate::fixture_issue("Prepare release notes".to_string(), String::new());
-    task.labels = vec!["type:task".to_string(), "milestone:v2.0".to_string()];
-    publish_issue(&executor, &mut task);
+    // Action references it via objective:v2.0 label
+    let mut action = crate::fixture_issue("Prepare release notes".to_string(), String::new());
+    action.labels = vec!["type:action".to_string(), "objective:v2.0".to_string()];
+    publish_issue(&executor, &mut action);
 
     let all_issues = executor.storage().list_issues().unwrap();
 
-    // Should validate successfully - release has type:release but milestone namespace
-    let issues = detect_membership_issues(&config, &task, &all_issues);
+    // Should validate successfully - release has type:release but objective namespace
+    let issues = detect_membership_issues(&config, &action, &all_issues);
     assert!(
         issues.is_empty(),
-        "Type alias (release -> milestone namespace) should work"
+        "Type alias (release -> objective namespace) should work"
     );
 }
