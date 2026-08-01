@@ -289,6 +289,13 @@
       "issue": "39c34568",
       "situation": "D-6 requires glob-category exclusions rather than path literals. Measured at execution time: .agents/ is 55 packaged / 52 unpackaged with cleanly categorical exclusions; contrib/ is 1/4; .jit/reference/ is 1/0. But scripts/ is 4 packaged of 45 tracked and no category separates code-review-prompt.md and plan-review-prompt.md (packaged) from doc-review-prompt.md and holistic-review-prompt.md (not), so its exclusion list would be ~41 near-literals and every future unrelated script would fail the walk. Additionally scripts/ai-review.sh and contrib/gates/ai-review.sh are byte-identical and both packaged.",
       "resolution": "Owner approved relocating the four packaged files under contrib/gates/, retiring scripts/ as a declared root, and collapsing the duplicate wrapper. New task 9d451c98 created and wired before 39c34568; 39c34568's REQ-05 no longer fixes a root count."
+    },
+    {
+      "at": "2026-08-02",
+      "category": "3 — epic criteria/decision change + 4 — issue scope change",
+      "issue": "c7058cac",
+      "situation": "REQ-02 (old D-20) required omitting the invariant kind because only jit-dogfood ships .jit/invariants.toml; REQ-04 required the applied configuration to equal the scaffold's apart from one named exception, and the scaffold declares six kinds. The worker delivered the D-20-correct five-kind package and asserted the second difference explicitly rather than hiding it.",
+      "resolution": "Owner ruled the exclusion was about the scaffolder rather than the kind, and chose to expand c7058cac now over a follow-up task or deferral. Rework dispatched to the same agent with the amended contract."
     }
   ],
   "surfaced_pitfalls": [
@@ -505,6 +512,11 @@
       "at": "2026-08-01",
       "ruling": "Converge the two shared test vocabularies first, then rework the adoptions onto the single fixture. Rejected: closing the adoptions as landed and converging afterwards, which closes issues whose REQ-01/REQ-04 are unmet at the moment of closing; amending the ten adoptions' criteria to name a fixture family; killing the wave outright.",
       "effect": "Task 06b736c7 created inside the epic and wired between ae435979 and all ten adoptions (dep add --reduce dropped the now-redundant ae435979 and story edges). One declaration reachable from the pure domain and graph suites, rendered into a whole-repository fixture and into a composable configuration fragment; the second declaration (HierarchyConfig::test_vocabulary, 118 call sites) and the second renderer (declared_test_taxonomy) are retired, rewriting ~160 literal type-name assertions onto the surviving vocabulary."
+    },
+    {
+      "at": "2026-08-02",
+      "ruling": "The invariant kind is default vocabulary. Initialization creates the invariant registry the way it creates the gate registry (present and empty), jit-default declares all six kinds, and jit-dogfood contributes its invariant entries instead of publishing the registry file. Delivered by expanding c7058cac rather than by a follow-up task.",
+      "effect": "D-20 amended on the epic. c7058cac gains REQ-06 (initialization creates the registry) and REQ-07 (the workflow package contributes rather than publishes); REQ-02 restated to 'every item kind a freshly initialized repository can carry'. REQ-04 becomes literally satisfiable. The trigger was c7058cac's own delivery: REQ-02 and REQ-04 could not both hold, because the scaffold writes six kinds and the old D-20 permitted five. Commit 8289cdfc."
     }
   ],
   "halted": {
