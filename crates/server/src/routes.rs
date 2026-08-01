@@ -1325,8 +1325,13 @@ mod tests {
                 .unwrap()
                 .0
         };
-        let container = new("Initiative", vec!["type:initiative".to_string()]);
-        let leaf = new("Action", vec!["type:action".to_string()]);
+        // The container and leaf kinds this repository declares, read from the
+        // declaration its configuration was rendered from.
+        let taxonomy = jit::test_taxonomy::test_taxonomy();
+        let container_type = taxonomy.type_at_level(2);
+        let leaf_type = taxonomy.type_at_level(4);
+        let container = new("Container", vec![format!("type:{container_type}")]);
+        let leaf = new("Leaf", vec![format!("type:{leaf_type}")]);
         executor.add_dependency(&container, &leaf).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
@@ -1352,14 +1357,14 @@ mod tests {
         };
 
         let leaf_node = node(&leaf);
-        assert_eq!(leaf_node["type"], "action");
+        assert_eq!(leaf_node["type"], leaf_type);
         assert_eq!(leaf_node["parent"], container);
         assert_eq!(leaf_node["cluster"], container);
         assert_eq!(leaf_node["children"], serde_json::json!([]));
         assert_eq!(leaf_node["rank"], 0);
 
         let container_node = node(&container);
-        assert_eq!(container_node["type"], "initiative");
+        assert_eq!(container_node["type"], container_type);
         assert_eq!(container_node["parent"], serde_json::Value::Null);
         assert_eq!(container_node["cluster"], container);
         assert_eq!(container_node["children"], serde_json::json!([leaf]));

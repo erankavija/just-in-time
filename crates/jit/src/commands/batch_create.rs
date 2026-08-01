@@ -654,9 +654,12 @@ mod tests {
         // write-time-only violation that previously slipped past the batch's
         // validation report.
         let exec = executor();
+        // Two distinct kinds the fixture repository declares, read from the
+        // declaration it was configured from.
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         let mut d = def("bad", &[]);
-        d.r#type = Some("action".to_string());
-        d.labels = vec!["type:deliverable".to_string()];
+        d.r#type = Some(taxonomy.type_at_level(4).to_string());
+        d.labels = vec![format!("type:{}", taxonomy.type_at_level(3))];
         let problems = exec.collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::WriteValidation { key, .. } if key == "bad")

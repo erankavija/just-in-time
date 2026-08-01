@@ -1048,18 +1048,23 @@ mod tests {
 
         let storage = InMemoryStorage::new();
         // `type` is unique only because this repository declares it so.
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         storage.add_data_file(
             "config.toml",
             &format!(
                 "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                crate::test_taxonomy::test_taxonomy().config_fragment()
+                taxonomy.config_fragment()
             ),
         );
 
-        // Issue already has a type label from the declared vocabulary.
+        // Issue already carries the leaf kind that configuration declares.
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec!["type:action"]),
+            create_test_issue(
+                "1",
+                State::Ready,
+                vec![&format!("type:{}", taxonomy.type_at_level(4))],
+            ),
         );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1067,7 +1072,7 @@ mod tests {
         // Try to add another type:* label (violates uniqueness)
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
-            add_labels: vec!["type:initiative".to_string()],
+            add_labels: vec![format!("type:{}", taxonomy.type_at_level(2))],
             ..Default::default()
         };
 

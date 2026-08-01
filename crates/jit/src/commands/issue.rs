@@ -2468,6 +2468,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_create_explicit_declared_type_accepted_via_rule_engine() {
         let executor = setup();
+        // The kind the fixture repository declares at the leaf level, read from
+        // the declaration it was configured from.
+        let declared = crate::test_taxonomy::test_taxonomy()
+            .type_at_level(4)
+            .to_string();
         let (id, _warnings) = executor
             .create_issue(
                 "Declared type".to_string(),
@@ -2476,13 +2481,16 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 vec![],
                 vec![],
                 None,
-                Some("action".to_string()),
+                Some(declared.clone()),
                 false,
             )
             .expect("a declared --type kind must be accepted");
         let issue = executor.storage.load_issue(&id).unwrap();
         assert!(
-            issue.labels.iter().any(|l| l == "type:action"),
+            issue
+                .labels
+                .iter()
+                .any(|l| l == &format!("type:{declared}")),
             "declared --type must write the canonical label, got: {:?}",
             issue.labels
         );
@@ -2525,6 +2533,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     #[test]
     fn test_update_explicit_declared_type_accepted_via_rule_engine() {
         let executor = setup();
+        let declared = crate::test_taxonomy::test_taxonomy()
+            .type_at_level(3)
+            .to_string();
         let issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
@@ -2539,7 +2550,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 vec![],
                 vec![],
                 None,
-                Some("deliverable".to_string()),
+                Some(declared.clone()),
                 false,
             )
             .expect("a declared --type update must be accepted");
@@ -2552,7 +2563,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .collect();
         assert_eq!(
             type_labels,
-            vec!["type:deliverable"],
+            vec![format!("type:{declared}")],
             "update --type must leave exactly one canonical type label"
         );
     }
