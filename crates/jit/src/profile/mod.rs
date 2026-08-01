@@ -35,6 +35,6 @@ pub use manifest::{
     RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
 };
 pub use package::{
-    PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes,
+    PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
