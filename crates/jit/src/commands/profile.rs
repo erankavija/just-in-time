@@ -453,7 +453,7 @@ mod tests {
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
     use include_dir::{include_dir, Dir};
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use tempfile::TempDir;
 
@@ -559,6 +559,205 @@ mod tests {
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
         let package = ProfilePackage::from_embedded_dir(&PACKAGE).unwrap();
         (temp, storage, executor, package)
+    }
+
+    /// The directory holding this repository's checked-in generic vocabulary
+    /// package. Nothing embeds it, so every reader reaches it as bytes on disk.
+    fn jit_default_directory() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-default")
+    }
+
+    fn jit_default_package() -> ProfilePackage {
+        ProfilePackage::from_directory(&jit_default_directory())
+            .expect("the checked-in jit-default package validates")
+    }
+
+    /// The repository-relative file a project-scope item-kind declaration reads
+    /// its items from, or `None` for a kind that needs no source.
+    fn item_kind_source(declaration: &serde_json::Value) -> Option<&str> {
+        let source = declaration.get("source")?;
+        source
+            .get("toml")
+            .and_then(serde_json::Value::as_str)
+            .or_else(|| source.as_str())
+    }
+
+    /// The item-kind declarations one package contributes, by kind name.
+    fn declared_item_kinds(package: &ProfilePackage) -> BTreeMap<&str, &serde_json::Value> {
+        package
+            .manifest()
+            .contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                crate::repository_state::Contribution::MapEntry {
+                    target: crate::repository_state::MapEntryTarget::ItemKinds,
+                    identity,
+                    value,
+                } => Some((identity.as_str(), value)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_from_directory_reads_jit_default_with_a_stable_content_address() {
+        let package = jit_default_package();
+
+        // The address is over content: re-reading the same directory reproduces
+        // it, and the workflow package next to it does not share it.
+        assert_eq!(package.hashes(), jit_default_package().hashes());
+        assert_ne!(
+            package.hashes().package,
+            jit_dogfood_package().unwrap().hashes().package
+        );
+        assert!(!package.hashes().package.is_empty());
+        // One repository target, because every declaration writes the
+        // configuration registry and the package publishes no file.
+        assert_eq!(
+            package.hashes().targets.keys().collect::<Vec<_>>(),
+            vec![&".jit/config.toml".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_jit_default_carries_no_asset_and_no_workflow_registry_content() {
+        let package = jit_default_package();
+        let manifest = package.manifest();
+
+        // The manifest is the whole package: no file is published with it, so
+        // no gate prompt, checker, or template body arrives either.
+        assert_eq!(package.file_count(), 1);
+        assert!(manifest.assets.is_empty());
+        assert!(manifest.regions.is_empty());
+        // Gates, rules, and templates are the registries a sequencing opinion
+        // reaches a repository through; every declaration here writes the
+        // configuration registry instead.
+        assert!(manifest
+            .contributions
+            .iter()
+            .all(|contribution| contribution.registry_path() == ".jit/config.toml"));
+    }
+
+    #[test]
+    fn test_jit_default_declares_no_item_kind_whose_source_it_does_not_provide() {
+        let (temp, _storage, _executor, _fixture_package) = fixture();
+        let package = jit_default_package();
+        let kinds = declared_item_kinds(&package);
+
+        assert!(
+            kinds.values().any(|kind| item_kind_source(kind).is_some()),
+            "the rule is vacuous unless some declared kind names a source"
+        );
+        for (name, declaration) in &kinds {
+            let Some(source) = item_kind_source(declaration) else {
+                continue;
+            };
+            // The package publishes no file at all, so a source it names has to
+            // be one an initialized repository already carries.
+            assert!(
+                package
+                    .manifest()
+                    .assets
+                    .iter()
+                    .all(|asset| asset.target != source),
+                "package cannot provide '{source}' for kind '{name}'"
+            );
+            assert!(
+                temp.path().join(source).is_file(),
+                "kind '{name}' names source '{source}', which a scaffolded repository does not carry"
+            );
+        }
+    }
+
+    #[test]
+    fn test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration() {
+        let (temp, storage, _executor, _fixture_package) = fixture();
+        let config_path = temp.path().join(".jit/config.toml");
+        let scaffolded = fs::read_to_string(&config_path).unwrap();
+
+        // Reduce the repository to the configuration an initialization derives
+        // from the repository itself — the schema version and the project name.
+        // What comes back afterwards is what the package declares, and nothing
+        // that survived the reduction.
+        let mut bare = scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
+        bare.as_table_mut()
+            .retain(|key, _| matches!(key, "version" | "project"));
+        fs::write(&config_path, bare.to_string()).unwrap();
+
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+        let applied = executor
+            .apply_embedded_profile(&jit_default_package())
+            .unwrap();
+        assert_eq!(applied.status, ProfileApplicationStatus::Applied);
+
+        let produced: serde_json::Value =
+            toml_edit::de::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        let scaffold: serde_json::Value = toml_edit::de::from_str(&scaffolded).unwrap();
+        let table_names = |config: &serde_json::Value| {
+            config
+                .as_object()
+                .expect("configuration is a table")
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<String>>()
+        };
+
+        // Neither less nor more than the scaffold declares.
+        assert_eq!(table_names(&produced), table_names(&scaffold));
+        for table in table_names(&scaffold)
+            .iter()
+            .filter(|name| *name != "item_kinds")
+        {
+            assert_eq!(produced[table], scaffold[table], "table [{table}]");
+        }
+
+        // Item kinds are the one place the two differ, and they differ by the
+        // rule the package is authored to: it names no source file it does not
+        // provide, and it provides none, so it declares exactly the scaffold's
+        // kinds whose source an initialized repository already carries.
+        let scaffold_kinds = scaffold["item_kinds"].as_object().unwrap();
+        let produced_kinds = produced["item_kinds"].as_object().unwrap();
+        for (name, declaration) in scaffold_kinds {
+            let carried = item_kind_source(declaration)
+                .is_none_or(|source| temp.path().join(source).is_file());
+            if carried {
+                assert_eq!(
+                    produced_kinds.get(name),
+                    Some(declaration),
+                    "kind '{name}' is declared by the package"
+                );
+            } else {
+                assert!(
+                    !produced_kinds.contains_key(name),
+                    "kind '{name}' names a source no repository carries yet"
+                );
+            }
+        }
+        assert!(
+            produced_kinds.len() < scaffold_kinds.len(),
+            "the split is vacuous unless the scaffold declares a kind the package leaves out"
+        );
+    }
+
+    #[test]
+    fn test_jit_default_states_the_coordination_guidance_without_its_engine_defaults() {
+        let manifest = fs::read_to_string(jit_default_directory().join("manifest.toml")).unwrap();
+
+        // The scaffold renders two engine constants into its coordination
+        // guidance. A package is bytes and projects nothing, so the packaged
+        // guidance names those keys and leaves their values to the reference
+        // that does project them.
+        for key in ["default_ttl_secs", "stale_threshold_secs"] {
+            let stated: Vec<&str> = manifest.lines().filter(|line| line.contains(key)).collect();
+            assert!(!stated.is_empty(), "packaged guidance must name '{key}'");
+            assert!(
+                stated
+                    .iter()
+                    .all(|line| !line.contains(|character: char| character.is_ascii_digit())),
+                "packaged guidance restates '{key}' with a value: {stated:?}"
+            );
+        }
     }
 
     #[test]
