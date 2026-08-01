@@ -588,7 +588,14 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
     );
     assert_eq!(
         property_keys(show_schema, "ProfileManifest"),
-        expected_keys(&["asset", "contribution", "dependencies", "profile", "region"])
+        expected_keys(&[
+            "asset",
+            "contribution",
+            "dependencies",
+            "live-source",
+            "profile",
+            "region",
+        ])
     );
     assert_eq!(
         property_keys(show_schema, "ProfileMetadata"),

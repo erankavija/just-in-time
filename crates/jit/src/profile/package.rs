@@ -1,5 +1,6 @@
 use super::manifest::{
-    is_lowercase_kebab, ProfileManifest, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
+    is_lowercase_kebab, is_safe_relative_path, ProfileManifest, MANIFEST_FILE_NAME,
+    PROFILE_MANIFEST_VERSION,
 };
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use cap_primitives::fs::FollowSymlinks;
@@ -219,6 +220,18 @@ pub enum ProfilePackageError {
     /// Invalid region marker identity.
     #[error("invalid region id '{0}'; expected lowercase-kebab")]
     InvalidRegionId(String),
+    /// A live-source root is declared more than once.
+    #[error("live-source root '{0}' is declared more than once")]
+    DuplicateLiveSourceRoot(String),
+    /// One live-source root lies beneath another, so a repository file under it
+    /// would fall under two roots with two exclusion lists.
+    #[error("live-source root '{inner}' lies beneath declared root '{outer}'")]
+    NestedLiveSourceRoot {
+        /// Root containing the other.
+        outer: String,
+        /// Root declared beneath it.
+        inner: String,
+    },
     /// Canonical serialization unexpectedly failed.
     #[error("failed to serialize canonical profile data: {0}")]
     CanonicalSerialization(#[source] serde_json::Error),
@@ -535,6 +548,8 @@ fn validate_manifest(
         }
     }
 
+    validate_live_source_roots(manifest)?;
+
     for source in &declared_sources {
         if !files.contains_key(source) {
             return Err(ProfilePackageError::MissingContent(source.clone()));
@@ -549,6 +564,41 @@ fn validate_manifest(
         }
     }
     Ok(())
+}
+
+/// Reject a declared live-source root that overlaps another.
+///
+/// Roots partition the repository material a package draws from, so a path
+/// beneath one of them falls under exactly one. A repeated root, or a root
+/// beneath another, would give one path two exclusion lists and no rule for
+/// choosing between them.
+fn validate_live_source_roots(manifest: &ProfileManifest) -> Result<(), ProfilePackageError> {
+    let mut declared = BTreeSet::new();
+    for declaration in &manifest.live_sources {
+        let root = declaration.root.as_str();
+        if !declared.insert(root) {
+            return Err(ProfilePackageError::DuplicateLiveSourceRoot(
+                root.to_string(),
+            ));
+        }
+    }
+    manifest
+        .live_sources
+        .iter()
+        .flat_map(|outer| {
+            manifest
+                .live_sources
+                .iter()
+                .filter(move |inner| outer.root.relative_path(inner.root.as_str()).is_some())
+                .map(move |inner| (outer, inner))
+        })
+        .next()
+        .map_or(Ok(()), |(outer, inner)| {
+            Err(ProfilePackageError::NestedLiveSourceRoot {
+                outer: outer.root.to_string(),
+                inner: inner.root.to_string(),
+            })
+        })
 }
 
 fn insert_unique_source(
@@ -642,24 +692,7 @@ fn validate_contribution(
 }
 
 fn validate_relative_path(field: &'static str, path: &str) -> Result<(), ProfilePackageError> {
-    let parsed = Path::new(path);
-    let has_windows_prefix = path.as_bytes().get(1) == Some(&b':')
-        && path.as_bytes().first().is_some_and(u8::is_ascii_alphabetic);
-    let has_noncanonical_segment = path
-        .split('/')
-        .any(|segment| segment.is_empty() || matches!(segment, "." | ".."));
-    let safe = !path.is_empty()
-        && !path.contains('\\')
-        && !path.contains(':')
-        && !path.chars().any(char::is_control)
-        && !has_windows_prefix
-        && !has_noncanonical_segment
-        && !parsed.is_absolute()
-        && parsed.components().all(|component| match component {
-            Component::Normal(value) => value != "." && value != "..",
-            _ => false,
-        });
-    if safe {
+    if is_safe_relative_path(path) {
         Ok(())
     } else {
         Err(ProfilePackageError::UnsafePath {
@@ -955,6 +988,110 @@ mod tests {
         assert_eq!(instance["dependencies"][0], "jit-default");
     }
 
+    /// A package built from the synthetic fixture with `declaration` appended
+    /// to its manifest.
+    fn package_with_manifest_suffix(
+        declaration: &str,
+    ) -> Result<ProfilePackage, ProfilePackageError> {
+        let manifest = format!("{}\n{declaration}", manifest_text());
+        let mut files = package().files.clone();
+        files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
+        ProfilePackage::from_files(files)
+    }
+
+    #[test]
+    fn test_manifest_live_source_declaration_is_reported_in_runtime_inspection_and_schema() {
+        let package = package_with_manifest_suffix(
+            "[[live-source]]\n\
+             root = \"docs\"\n\
+             exclude = [\"**/drafts/**\"]\n\
+             \n\
+             [[live-source]]\n\
+             root = \"bin\"\n\
+             exclude = []\n",
+        )
+        .unwrap();
+
+        let declared = &package.manifest().live_sources;
+        assert_eq!(
+            declared
+                .iter()
+                .map(|declaration| declaration.root.as_str())
+                .collect::<Vec<_>>(),
+            ["docs", "bin"]
+        );
+        assert!(declared[0].excludes("guide/drafts/next.md"));
+        assert!(declared[1].exclude.is_empty());
+
+        let schema = serde_json::to_value(profile_manifest_schema()).unwrap();
+        let instance = serde_json::to_value(package.manifest()).unwrap();
+        jsonschema::validator_for(&schema)
+            .unwrap()
+            .validate(&instance)
+            .expect("manifest with live-source roots must satisfy generated schema");
+        assert!(schema_has_property(&schema, "live-source"));
+        assert_eq!(instance["live-source"][0]["root"], "docs");
+        assert_eq!(instance["live-source"][0]["exclude"][0], "**/drafts/**");
+    }
+
+    #[test]
+    fn test_from_files_rejects_a_live_source_root_declared_twice() {
+        let error = package_with_manifest_suffix(
+            "[[live-source]]\n\
+             root = \"docs\"\n\
+             exclude = [\"**/drafts/**\"]\n\
+             \n\
+             [[live-source]]\n\
+             root = \"docs\"\n\
+             exclude = []\n",
+        )
+        .expect_err("a repeated root gives one path two exclusion lists");
+
+        assert!(
+            matches!(&error, ProfilePackageError::DuplicateLiveSourceRoot(root) if root == "docs"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_from_files_rejects_a_live_source_root_beneath_another() {
+        let error = package_with_manifest_suffix(
+            "[[live-source]]\n\
+             root = \"docs\"\n\
+             exclude = []\n\
+             \n\
+             [[live-source]]\n\
+             root = \"docs/guide\"\n\
+             exclude = []\n",
+        )
+        .expect_err("a nested root gives one path two exclusion lists");
+
+        assert!(
+            matches!(
+                &error,
+                ProfilePackageError::NestedLiveSourceRoot { outer, inner }
+                    if outer == "docs" && inner == "docs/guide"
+            ),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn test_from_files_accepts_live_source_roots_that_merely_share_a_name_prefix() {
+        let package = package_with_manifest_suffix(
+            "[[live-source]]\n\
+             root = \"docs\"\n\
+             exclude = []\n\
+             \n\
+             [[live-source]]\n\
+             root = \"docsite\"\n\
+             exclude = []\n",
+        )
+        .expect("siblings sharing a name prefix are separate roots");
+
+        assert_eq!(package.manifest().live_sources.len(), 2);
+    }
+
     #[test]
     fn test_manifest_inspection_carries_scalar_and_set_configuration_contributions() {
         let manifest: ProfileManifest = toml::from_str(
@@ -1023,7 +1160,7 @@ value = "workspace/active"
         assert_eq!(first.hashes(), second.hashes());
         assert_eq!(
             first.hashes().package,
-            "40a33c9798b0523436977f492bef09a4deddc9da7293fede33623c101b34a417"
+            "db44b3f03667064918f8dd2c95460443f0a9e4c1063461ceb166fff64add76b9"
         );
         assert_eq!(first.hashes().targets.len(), 7);
         assert_eq!(

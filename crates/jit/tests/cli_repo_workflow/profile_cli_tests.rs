@@ -41,6 +41,78 @@ fn test_profile_list_and_show_work_without_repository() {
     assert!(!repo.path().join(".jit").exists());
 }
 
+/// The inspection output carries the roots the package's live assets are drawn
+/// from, and carries them usably: the declaration and the assets it bounds are
+/// read out of the same document, so a consumer needs nothing else to tell
+/// which root any packaged live asset came from.
+#[test]
+fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
+    let repo = TempDir::new().unwrap();
+
+    let show = jit(repo.path(), &["profile", "show", "jit-dogfood", "--json"]);
+    assert!(show.status.success(), "{show:?}");
+    let show = json(&show);
+
+    let roots: Vec<&str> = show["manifest"]["live-source"]
+        .as_array()
+        .expect("the reported manifest declares its live-source roots")
+        .iter()
+        .map(|declaration| {
+            assert!(
+                declaration["exclude"].is_array(),
+                "each declared root carries its own exclusion list: {declaration}"
+            );
+            declaration["root"]
+                .as_str()
+                .unwrap_or_else(|| panic!("a declared root is a path string: {declaration}"))
+        })
+        .collect();
+    assert!(!roots.is_empty(), "the package declares at least one root");
+
+    let live_targets: Vec<&str> = show["manifest"]["asset"]
+        .as_array()
+        .expect("the reported manifest declares assets")
+        .iter()
+        .filter(|asset| {
+            asset["source"]
+                .as_str()
+                .is_some_and(|source| source.starts_with("assets/live/"))
+        })
+        .map(|asset| {
+            asset["target"]
+                .as_str()
+                .expect("an asset target is a string")
+        })
+        .collect();
+    assert!(
+        !live_targets.is_empty(),
+        "the package declares live assets for the roots to bound"
+    );
+
+    let unclaimed: Vec<(&str, usize)> = live_targets
+        .iter()
+        .map(|target| {
+            (
+                *target,
+                roots
+                    .iter()
+                    .filter(|root| {
+                        target
+                            .strip_prefix(*root)
+                            .is_some_and(|remainder| remainder.starts_with('/'))
+                    })
+                    .count(),
+            )
+        })
+        .filter(|(_, claiming)| *claiming != 1)
+        .collect();
+    assert_eq!(
+        unclaimed,
+        Vec::new(),
+        "each entry names a reported live asset target and the number of reported roots claiming it"
+    );
+}
+
 #[test]
 fn test_profile_unknown_id_has_typed_json_error_without_mutation() {
     let repo = TempDir::new().unwrap();
