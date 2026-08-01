@@ -845,7 +845,7 @@ mod tests {
         // configuration declares.
         let config_toml = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
-            crate::commands::test_helpers::declared_test_taxonomy()
+            crate::test_taxonomy::test_taxonomy().config_fragment()
         );
         storage.add_data_file("config.toml", &config_toml);
 
@@ -2476,13 +2476,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 vec![],
                 vec![],
                 None,
-                Some("task".to_string()),
+                Some("action".to_string()),
                 false,
             )
             .expect("a declared --type kind must be accepted");
         let issue = executor.storage.load_issue(&id).unwrap();
         assert!(
-            issue.labels.iter().any(|l| l == "type:task"),
+            issue.labels.iter().any(|l| l == "type:action"),
             "declared --type must write the canonical label, got: {:?}",
             issue.labels
         );
@@ -2539,7 +2539,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 vec![],
                 vec![],
                 None,
-                Some("story".to_string()),
+                Some("deliverable".to_string()),
                 false,
             )
             .expect("a declared --type update must be accepted");
@@ -2552,7 +2552,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             .collect();
         assert_eq!(
             type_labels,
-            vec!["type:story"],
+            vec!["type:deliverable"],
             "update --type must leave exactly one canonical type label"
         );
     }

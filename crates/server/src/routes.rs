@@ -1092,7 +1092,7 @@ mod tests {
         // into the memory image.
         let config = format!(
             "[worktree]\nenforce_leases = \"off\"\n\n{}",
-            jit::commands::test_helpers::declared_test_taxonomy()
+            jit::test_taxonomy::test_taxonomy().config_fragment()
         );
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), &config).unwrap();
@@ -1325,9 +1325,9 @@ mod tests {
                 .unwrap()
                 .0
         };
-        let epic = new("Epic", vec!["type:epic".to_string()]);
-        let task = new("Task", vec!["type:task".to_string()]);
-        executor.add_dependency(&epic, &task).unwrap();
+        let container = new("Initiative", vec!["type:initiative".to_string()]);
+        let leaf = new("Action", vec!["type:action".to_string()]);
+        executor.add_dependency(&container, &leaf).unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {
@@ -1351,39 +1351,32 @@ mod tests {
                 .clone()
         };
 
-        let task_node = node(&task);
-        assert_eq!(task_node["type"], "task");
-        assert_eq!(task_node["parent"], epic);
-        assert_eq!(task_node["cluster"], epic);
-        assert_eq!(task_node["children"], serde_json::json!([]));
-        assert_eq!(task_node["rank"], 0);
+        let leaf_node = node(&leaf);
+        assert_eq!(leaf_node["type"], "action");
+        assert_eq!(leaf_node["parent"], container);
+        assert_eq!(leaf_node["cluster"], container);
+        assert_eq!(leaf_node["children"], serde_json::json!([]));
+        assert_eq!(leaf_node["rank"], 0);
 
-        let epic_node = node(&epic);
-        assert_eq!(epic_node["type"], "epic");
-        assert_eq!(epic_node["parent"], serde_json::Value::Null);
-        assert_eq!(epic_node["cluster"], epic);
-        assert_eq!(epic_node["children"], serde_json::json!([task]));
-        assert_eq!(epic_node["rank"], 1);
+        let container_node = node(&container);
+        assert_eq!(container_node["type"], "initiative");
+        assert_eq!(container_node["parent"], serde_json::Value::Null);
+        assert_eq!(container_node["cluster"], container);
+        assert_eq!(container_node["children"], serde_json::json!([leaf]));
+        assert_eq!(container_node["rank"], 1);
     }
 
     /// A node with no `type:` label reports a null type and an orphan resolution.
     #[tokio::test]
     async fn test_get_graph_untyped_node_has_null_type() {
         let storage = test_memory_storage();
+        // The repository declares a default type, so an issue reaches the store
+        // without a `type:` label only when it is seeded rather than created.
+        let mut untyped = jit::domain::Issue::draft("Untyped".to_string(), String::new());
+        untyped.id = "untyped-node".to_string();
+        storage.seed_issue_fixture(&untyped);
 
         let executor = test_executor(storage);
-        executor
-            .create_issue(
-                "Untyped".to_string(),
-                String::new(),
-                Priority::Normal,
-                vec![],
-                vec![],
-                None,
-                None,
-                false,
-            )
-            .unwrap();
 
         let tracker = Arc::new(ChangeTracker::new(16));
         let state = AppState {

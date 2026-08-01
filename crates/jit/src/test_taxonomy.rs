@@ -63,6 +63,28 @@ impl TestTaxonomy {
             .expect("the declared test vocabulary is a valid hierarchy")
     }
 
+    /// The type this vocabulary declares at `level`, for a consumer that reads
+    /// the name it was given rather than repeating a literal.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the vocabulary declares no type at `level`, or more than one.
+    pub fn type_at_level(&self, level: u8) -> &str {
+        let mut at_level = self
+            .hierarchy
+            .iter()
+            .filter(|(_, declared)| **declared == level)
+            .map(|(name, _)| name.as_str());
+        let name = at_level
+            .next()
+            .unwrap_or_else(|| panic!("the declared test vocabulary has a type at level {level}"));
+        assert!(
+            at_level.next().is_none(),
+            "the declared test vocabulary has one type at level {level}"
+        );
+        name
+    }
+
     /// The initialization preset carrying this vocabulary, for the fixture that
     /// derives a repository's coupled rules and schemas from it.
     pub fn hierarchy_template(&self) -> HierarchyTemplate {

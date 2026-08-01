@@ -2866,9 +2866,9 @@ impl LabelNamespaces {
         }
     }
 
-    /// `self` with the type hierarchy and membership associations of
-    /// [`HierarchyConfig::test_vocabulary`](crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary)
-    /// declared, for the suites whose subject is a rule keyed on a declared
+    /// `self` with the type hierarchy and membership associations of the
+    /// declared test vocabulary ([`test_taxonomy`](crate::test_taxonomy::test_taxonomy))
+    /// added, for the suites whose subject is a rule keyed on a declared
     /// hierarchy.
     ///
     /// Derived from that one declaration rather than restating it, and reachable
@@ -2876,7 +2876,7 @@ impl LabelNamespaces {
     /// compiles the vocabulary and no repository can receive it.
     #[cfg(any(test, feature = "test-support"))]
     pub fn declaring_test_hierarchy(self) -> Self {
-        let vocabulary = crate::domain::type_taxonomy::HierarchyConfig::test_vocabulary();
+        let vocabulary = crate::test_taxonomy::test_taxonomy().hierarchy_config();
         Self {
             type_hierarchy: Some(
                 vocabulary

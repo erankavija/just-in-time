@@ -4,16 +4,19 @@ use jit::domain::type_taxonomy::{HierarchyConfig, ValidationWarning};
 
 /// Helper to create a test hierarchy config
 fn test_config() -> HierarchyConfig {
-    HierarchyConfig::test_vocabulary()
+    jit::test_taxonomy::test_taxonomy().hierarchy_config()
 }
 
 #[test]
-fn test_epic_without_epic_label_warns() {
+fn test_initiative_without_initiative_label_warns() {
     let config = test_config();
-    let mut epic = crate::fixture_issue("Auth System".to_string(), "Epic description".to_string());
-    epic.labels = vec!["type:epic".to_string()];
+    let mut initiative = crate::fixture_issue(
+        "Auth System".to_string(),
+        "Initiative description".to_string(),
+    );
+    initiative.labels = vec!["type:initiative".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &epic);
+    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &initiative);
 
     assert_eq!(warnings.len(), 1);
     match &warnings[0] {
@@ -22,23 +25,23 @@ fn test_epic_without_epic_label_warns() {
             expected_namespace,
             ..
         } => {
-            assert_eq!(type_name, "epic");
-            assert_eq!(expected_namespace, "epic");
+            assert_eq!(type_name, "initiative");
+            assert_eq!(expected_namespace, "initiative");
         }
         _ => panic!("Expected MissingStrategicLabel warning"),
     }
 }
 
 #[test]
-fn test_milestone_without_milestone_label_warns() {
+fn test_objective_without_objective_label_warns() {
     let config = test_config();
-    let mut milestone = crate::fixture_issue(
+    let mut objective = crate::fixture_issue(
         "v1.0 Release".to_string(),
-        "Milestone description".to_string(),
+        "Objective description".to_string(),
     );
-    milestone.labels = vec!["type:milestone".to_string()];
+    objective.labels = vec!["type:objective".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &milestone);
+    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &objective);
 
     assert_eq!(warnings.len(), 1);
     match &warnings[0] {
@@ -47,110 +50,121 @@ fn test_milestone_without_milestone_label_warns() {
             expected_namespace,
             ..
         } => {
-            assert_eq!(type_name, "milestone");
-            assert_eq!(expected_namespace, "milestone");
+            assert_eq!(type_name, "objective");
+            assert_eq!(expected_namespace, "objective");
         }
         _ => panic!("Expected MissingStrategicLabel warning"),
     }
 }
 
 #[test]
-fn test_task_non_strategic_no_warning() {
+fn test_action_non_strategic_no_warning() {
     let config = test_config();
-    let mut task = crate::fixture_issue("Login API".to_string(), "Task description".to_string());
-    task.labels = vec!["type:task".to_string()];
+    let mut action =
+        crate::fixture_issue("Login API".to_string(), "Action description".to_string());
+    action.labels = vec!["type:action".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &task);
+    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &action);
 
     assert_eq!(warnings.len(), 0);
 }
 
 #[test]
-fn test_epic_with_epic_label_no_warning() {
+fn test_initiative_with_initiative_label_no_warning() {
     let config = test_config();
-    let mut epic = crate::fixture_issue("Auth System".to_string(), "Epic description".to_string());
-    epic.labels = vec!["type:epic".to_string(), "epic:auth".to_string()];
-
-    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &epic);
-
-    assert_eq!(warnings.len(), 0);
-}
-
-#[test]
-fn test_milestone_with_milestone_label_no_warning() {
-    let config = test_config();
-    let mut milestone = crate::fixture_issue(
-        "v1.0 Release".to_string(),
-        "Milestone description".to_string(),
+    let mut initiative = crate::fixture_issue(
+        "Auth System".to_string(),
+        "Initiative description".to_string(),
     );
-    milestone.labels = vec!["type:milestone".to_string(), "milestone:v1.0".to_string()];
+    initiative.labels = vec!["type:initiative".to_string(), "initiative:auth".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &milestone);
+    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &initiative);
 
     assert_eq!(warnings.len(), 0);
 }
 
 #[test]
-fn test_task_without_parent_labels_warns() {
+fn test_objective_with_objective_label_no_warning() {
     let config = test_config();
-    let mut task = crate::fixture_issue("Login API".to_string(), "Task description".to_string());
-    task.labels = vec!["type:task".to_string()];
+    let mut objective = crate::fixture_issue(
+        "v1.0 Release".to_string(),
+        "Objective description".to_string(),
+    );
+    objective.labels = vec!["type:objective".to_string(), "objective:v1.0".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &task);
+    let warnings = jit::domain::type_taxonomy::validate_strategic_labels(&config, &objective);
+
+    assert_eq!(warnings.len(), 0);
+}
+
+#[test]
+fn test_action_without_parent_labels_warns() {
+    let config = test_config();
+    let mut action =
+        crate::fixture_issue("Login API".to_string(), "Action description".to_string());
+    action.labels = vec!["type:action".to_string()];
+
+    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &action);
 
     assert_eq!(warnings.len(), 1);
     match &warnings[0] {
         ValidationWarning::OrphanedLeaf { type_name, .. } => {
-            assert_eq!(type_name, "task");
+            assert_eq!(type_name, "action");
         }
         _ => panic!("Expected OrphanedLeaf warning"),
     }
 }
 
 #[test]
-fn test_task_with_epic_label_no_warning() {
+fn test_action_with_initiative_label_no_warning() {
     let config = test_config();
-    let mut task = crate::fixture_issue("Login API".to_string(), "Task description".to_string());
-    task.labels = vec!["type:task".to_string(), "epic:auth".to_string()];
+    let mut action =
+        crate::fixture_issue("Login API".to_string(), "Action description".to_string());
+    action.labels = vec!["type:action".to_string(), "initiative:auth".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &task);
+    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &action);
 
     assert_eq!(warnings.len(), 0);
 }
 
 #[test]
-fn test_task_with_milestone_label_no_warning() {
+fn test_action_with_objective_label_no_warning() {
     let config = test_config();
-    let mut task = crate::fixture_issue("Login API".to_string(), "Task description".to_string());
-    task.labels = vec!["type:task".to_string(), "milestone:v1.0".to_string()];
+    let mut action =
+        crate::fixture_issue("Login API".to_string(), "Action description".to_string());
+    action.labels = vec!["type:action".to_string(), "objective:v1.0".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &task);
+    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &action);
 
     assert_eq!(warnings.len(), 0);
 }
 
 #[test]
-fn test_epic_non_leaf_no_warning() {
+fn test_initiative_non_leaf_no_warning() {
     let config = test_config();
-    let mut epic = crate::fixture_issue("Auth System".to_string(), "Epic description".to_string());
-    epic.labels = vec!["type:epic".to_string()];
+    let mut initiative = crate::fixture_issue(
+        "Auth System".to_string(),
+        "Initiative description".to_string(),
+    );
+    initiative.labels = vec!["type:initiative".to_string()];
 
-    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &epic);
+    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &initiative);
 
     assert_eq!(warnings.len(), 0);
 }
 
 #[test]
-fn test_task_with_multiple_parent_labels_no_warning() {
+fn test_action_with_multiple_parent_labels_no_warning() {
     let config = test_config();
-    let mut task = crate::fixture_issue("Login API".to_string(), "Task description".to_string());
-    task.labels = vec![
-        "type:task".to_string(),
-        "epic:auth".to_string(),
-        "milestone:v1.0".to_string(),
+    let mut action =
+        crate::fixture_issue("Login API".to_string(), "Action description".to_string());
+    action.labels = vec![
+        "type:action".to_string(),
+        "initiative:auth".to_string(),
+        "objective:v1.0".to_string(),
     ];
 
-    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &task);
+    let warnings = jit::domain::type_taxonomy::validate_orphans(&config, &action);
 
     assert_eq!(warnings.len(), 0);
 }

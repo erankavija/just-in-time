@@ -576,7 +576,7 @@ mod tests {
             "config.toml",
             &format!(
                 "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                crate::commands::test_helpers::declared_test_taxonomy()
+                crate::test_taxonomy::test_taxonomy().config_fragment()
             ),
         );
         crate::commands::test_helpers::memory_executor(storage)
@@ -655,8 +655,8 @@ mod tests {
         // validation report.
         let exec = executor();
         let mut d = def("bad", &[]);
-        d.r#type = Some("task".to_string());
-        d.labels = vec!["type:story".to_string()];
+        d.r#type = Some("action".to_string());
+        d.labels = vec!["type:deliverable".to_string()];
         let problems = exec.collect_batch_problems(&[d]).unwrap();
         assert!(problems.iter().any(
             |p| matches!(p, BatchValidationProblem::WriteValidation { key, .. } if key == "bad")
@@ -687,12 +687,9 @@ mod tests {
 
     #[test]
     fn test_collect_problems_unknown_type_with_hierarchy() {
+        // The fixture repository declares a type hierarchy, so type validity
+        // is enforced against it.
         let exec = executor();
-        // Configure a type hierarchy so type validity is enforced.
-        exec.storage().add_data_file(
-            "config.toml",
-            "[type_hierarchy]\ntypes = { epic = 2, task = 4 }\n",
-        );
         let mut d = def("a", &[]);
         d.r#type = Some("widget".to_string());
         let problems = exec.collect_batch_problems(&[d]).unwrap();

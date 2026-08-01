@@ -27,7 +27,7 @@ use jit::validation::local::evaluate_local;
 #[cfg(any(not(feature = "html"), not(feature = "xml")))]
 use jit::validation::local::LocalEvalError;
 
-/// A `require-section` rule (enforce/error) keyed on epics: the issue MUST have a
+/// A `require-section` rule (enforce/error) keyed on initiatives: the issue MUST have a
 /// parsed `Success Criteria` section. Whether the section is found depends ENTIRELY
 /// on which parser ran over the body, which is exactly the dispatch we want to
 /// observe.
@@ -35,8 +35,8 @@ fn require_criteria_rule() -> RuleSet {
     RuleSet::parse(
         r#"
 [[rules]]
-name = "epic-needs-criteria"
-when = { type = "epic" }
+name = "initiative-needs-criteria"
+when = { type = "initiative" }
 severity = "error"
 enforce = true
 assert = { require-section = { heading = "Success Criteria" } }
@@ -47,9 +47,9 @@ assert = { require-section = { heading = "Success Criteria" } }
     .unwrap()
 }
 
-fn epic(body: &str, format: Option<ContentFormat>) -> Issue {
-    let mut issue = crate::fixture_issue("An epic".to_string(), body.to_string());
-    issue.labels = vec!["type:epic".to_string()];
+fn initiative(body: &str, format: Option<ContentFormat>) -> Issue {
+    let mut issue = crate::fixture_issue("An initiative".to_string(), body.to_string());
+    issue.labels = vec!["type:initiative".to_string()];
     issue.content_format = format;
     issue
 }
@@ -68,7 +68,7 @@ const XML_BODY: &str = "<document>\n  <section>\n    <heading level=\"2\">Succes
 #[test]
 fn test_absent_format_falls_back_to_markdown_repo_default() {
     let rules = require_criteria_rule();
-    let issue = epic(MARKDOWN_BODY, None);
+    let issue = initiative(MARKDOWN_BODY, None);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
         !eval.is_blocking(),
@@ -85,7 +85,7 @@ fn test_absent_format_falls_back_to_markdown_repo_default() {
 #[test]
 fn test_html_body_under_markdown_default_is_not_parsed_as_sections() {
     let rules = require_criteria_rule();
-    let issue = epic(HTML_BODY, None);
+    let issue = initiative(HTML_BODY, None);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
@@ -100,7 +100,7 @@ fn test_html_body_under_markdown_default_is_not_parsed_as_sections() {
 #[test]
 fn test_html_selected_without_feature_errors_not_silent_fallback() {
     let rules = require_criteria_rule();
-    let issue = epic(HTML_BODY, Some(ContentFormat::Html));
+    let issue = initiative(HTML_BODY, Some(ContentFormat::Html));
     let err = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap_err();
     assert!(
         matches!(err, LocalEvalError::ContentParser(_)),
@@ -117,7 +117,7 @@ fn test_html_selected_without_feature_errors_not_silent_fallback() {
 #[test]
 fn test_xml_selected_without_feature_errors_not_silent_fallback() {
     let rules = require_criteria_rule();
-    let issue = epic(XML_BODY, Some(ContentFormat::Xml));
+    let issue = initiative(XML_BODY, Some(ContentFormat::Xml));
     let err = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap_err();
     assert!(
         matches!(err, LocalEvalError::ContentParser(_)),
@@ -143,7 +143,7 @@ fn test_xml_selected_without_feature_errors_not_silent_fallback() {
 #[test]
 fn test_html_per_issue_override_uses_html_parser_in_production() {
     let rules = require_criteria_rule();
-    let issue = epic(HTML_BODY, Some(ContentFormat::Html));
+    let issue = initiative(HTML_BODY, Some(ContentFormat::Html));
     // Repo default is Markdown; only the per-issue override selects HTML.
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
@@ -159,7 +159,7 @@ fn test_html_per_issue_override_uses_html_parser_in_production() {
 #[test]
 fn test_html_repo_default_uses_html_parser_in_production() {
     let rules = require_criteria_rule();
-    let issue = epic(HTML_BODY, None);
+    let issue = initiative(HTML_BODY, None);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Html).unwrap();
     assert!(
         !eval.is_blocking(),
@@ -168,7 +168,7 @@ fn test_html_repo_default_uses_html_parser_in_production() {
     );
 }
 
-/// The graph path dispatches per-issue too: an epic with HTML success criteria
+/// The graph path dispatches per-issue too: an initiative with HTML success criteria
 /// and an UNCOVERED criterion produces a label-coverage finding ONLY because the
 /// HTML parser extracted the criterion id from the `<h2>` section. Under Markdown
 /// the section is opaque, no criteria are found, and the rule is vacuously
@@ -180,7 +180,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
     use jit::validation::graph::evaluate_graph;
 
     let rule = RuleSet::parse(
-        "[[rules]]\nname = \"coverage\"\nwhen = { type = \"epic\" }\n\
+        "[[rules]]\nname = \"coverage\"\nwhen = { type = \"initiative\" }\n\
          severity = \"error\"\nassert = { label-coverage = { child-state = \"done\" } }\n",
         None,
         [],
@@ -191,16 +191,16 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
     .next()
     .unwrap();
 
-    // Epic with an HTML success-criteria section declaring REQ-01, no covering child.
-    let mut html_epic = crate::fixture_issue("epic".to_string(), HTML_BODY.to_string());
-    html_epic.labels = vec!["type:epic".to_string()];
-    html_epic.content_format = Some(ContentFormat::Html);
+    // Initiative with an HTML success-criteria section declaring REQ-01, no covering child.
+    let mut html_initiative = crate::fixture_issue("initiative".to_string(), HTML_BODY.to_string());
+    html_initiative.labels = vec!["type:initiative".to_string()];
+    html_initiative.content_format = Some(ContentFormat::Html);
 
     let rules = vec![&rule];
     let findings = evaluate_graph(
         &rules,
-        &[html_epic],
-        &HierarchyConfig::test_vocabulary(),
+        &[html_initiative],
+        &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
         ContentFormat::Markdown,
         chrono::Utc::now(),
         &std::collections::HashMap::new(),
@@ -224,7 +224,7 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
 #[test]
 fn test_xml_per_issue_override_uses_xml_parser_in_production() {
     let rules = require_criteria_rule();
-    let issue = epic(XML_BODY, Some(ContentFormat::Xml));
+    let issue = initiative(XML_BODY, Some(ContentFormat::Xml));
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
         !eval.is_blocking(),
@@ -239,7 +239,7 @@ fn test_xml_per_issue_override_uses_xml_parser_in_production() {
 #[test]
 fn test_xml_repo_default_uses_xml_parser_in_production() {
     let rules = require_criteria_rule();
-    let issue = epic(XML_BODY, None);
+    let issue = initiative(XML_BODY, None);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Xml).unwrap();
     assert!(
         !eval.is_blocking(),

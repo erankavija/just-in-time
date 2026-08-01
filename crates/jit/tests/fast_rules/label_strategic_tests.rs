@@ -1,38 +1,55 @@
 //! Tests for strategic queries (Phase 3)
 
-use jit::commands::test_helpers::declared_test_taxonomy;
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::{InMemoryStorage, IssueStore};
+use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
 
 /// An executor over a repository that declares the type hierarchy these tests
-/// classify against. `query_strategic` reads that declaration through a
-/// `ConfigManager` rooted at the store, so the fixture writes it there as well
-/// as into the memory image.
-fn strategic_executor() -> CommandExecutor<InMemoryStorage> {
+/// classify against, together with the declaration it was configured from:
+/// every type name below is read from that value rather than repeated.
+/// `query_strategic` reads the declaration through a `ConfigManager` rooted at
+/// the store, so the fixture writes it there as well as into the memory image.
+fn strategic_executor() -> (CommandExecutor<InMemoryStorage>, TestTaxonomy) {
+    let taxonomy = test_taxonomy();
     let storage = InMemoryStorage::new();
     let config = format!(
         "[worktree]\nenforce_leases = \"off\"\n\n{}",
-        declared_test_taxonomy()
+        taxonomy.config_fragment()
     );
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("config.toml"), &config).unwrap();
     storage.add_data_file("config.toml", &config);
-    crate::memory_executor(storage)
+    (crate::memory_executor(storage), taxonomy)
+}
+
+/// The `type:<name>` label for a declared type.
+fn type_label(name: &str) -> String {
+    format!("type:{name}")
+}
+
+/// The membership label a declared type's own namespace carries.
+fn membership_label(taxonomy: &TestTaxonomy, type_name: &str, value: &str) -> String {
+    let namespace = taxonomy
+        .label_associations
+        .get(type_name)
+        .expect("the declared vocabulary associates a membership namespace with this type");
+    format!("{namespace}:{value}")
 }
 
 #[test]
-fn test_query_strategic_returns_milestone_issues() {
-    let executor = strategic_executor();
+fn test_query_strategic_returns_top_level_issues() {
+    let (executor, taxonomy) = strategic_executor();
+    let top = taxonomy.type_at_level(1);
 
     // Create issues with strategic types
-    let (milestone_id, _) = executor
+    let (top_id, _) = executor
         .create_issue(
             "Release v1.0".to_string(),
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["type:milestone".to_string(), "milestone:v1.0".to_string()],
+            vec![type_label(top), membership_label(&taxonomy, top, "v1.0")],
             None,
             None,
             false,
@@ -45,7 +62,7 @@ fn test_query_strategic_returns_milestone_issues() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["type:bug".to_string()],
+            vec![type_label(taxonomy.type_at_level(4))],
             None,
             None,
             false,
@@ -56,20 +73,24 @@ fn test_query_strategic_returns_milestone_issues() {
     let strategic = executor.query_strategic().unwrap();
 
     assert_eq!(strategic.len(), 1);
-    assert_eq!(strategic[0].id, milestone_id);
+    assert_eq!(strategic[0].id, top_id);
 }
 
 #[test]
-fn test_query_strategic_returns_epic_issues() {
-    let executor = strategic_executor();
+fn test_query_strategic_returns_second_level_issues() {
+    let (executor, taxonomy) = strategic_executor();
+    let container = taxonomy.type_at_level(2);
 
-    let (epic_id, _) = executor
+    let (container_id, _) = executor
         .create_issue(
             "Auth System".to_string(),
             "".to_string(),
             Priority::High,
             vec![],
-            vec!["type:epic".to_string(), "epic:auth".to_string()],
+            vec![
+                type_label(container),
+                membership_label(&taxonomy, container, "auth"),
+            ],
             None,
             None,
             false,
@@ -79,38 +100,35 @@ fn test_query_strategic_returns_epic_issues() {
     let strategic = executor.query_strategic().unwrap();
 
     assert_eq!(strategic.len(), 1);
-    assert_eq!(strategic[0].id, epic_id);
+    assert_eq!(strategic[0].id, container_id);
 }
 
 #[test]
-fn test_query_strategic_returns_both_milestone_and_epic() {
-    let executor = strategic_executor();
+fn test_query_strategic_returns_every_declared_strategic_type() {
+    let (executor, taxonomy) = strategic_executor();
 
-    let (milestone_id, _) = executor
-        .create_issue(
-            "Release v1.0".to_string(),
-            "".to_string(),
-            Priority::High,
-            vec![],
-            vec!["type:milestone".to_string(), "milestone:v1.0".to_string()],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
-
-    let (epic_id, _) = executor
-        .create_issue(
-            "Auth System".to_string(),
-            "".to_string(),
-            Priority::High,
-            vec![],
-            vec!["type:epic".to_string(), "epic:auth".to_string()],
-            None,
-            None,
-            false,
-        )
-        .unwrap();
+    let strategic_ids: Vec<String> = taxonomy
+        .strategic_types
+        .iter()
+        .map(|type_name| {
+            let (id, _) = executor
+                .create_issue(
+                    format!("A {type_name}"),
+                    "".to_string(),
+                    Priority::High,
+                    vec![],
+                    vec![
+                        type_label(type_name),
+                        membership_label(&taxonomy, type_name, "scope"),
+                    ],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap();
+            id
+        })
+        .collect();
 
     let (_tactical_id, _) = executor
         .create_issue(
@@ -118,7 +136,7 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
             "".to_string(),
             Priority::Low,
             vec![],
-            vec!["type:bug".to_string()],
+            vec![type_label(taxonomy.type_at_level(4))],
             None,
             None,
             false,
@@ -127,15 +145,14 @@ fn test_query_strategic_returns_both_milestone_and_epic() {
 
     let strategic = executor.query_strategic().unwrap();
 
-    assert_eq!(strategic.len(), 2);
+    assert_eq!(strategic.len(), taxonomy.strategic_types.len());
     let ids: Vec<String> = strategic.iter().map(|i| i.id.clone()).collect();
-    assert!(ids.contains(&milestone_id));
-    assert!(ids.contains(&epic_id));
+    assert!(strategic_ids.iter().all(|id| ids.contains(id)));
 }
 
 #[test]
 fn test_query_strategic_excludes_tactical_only() {
-    let executor = strategic_executor();
+    let (executor, taxonomy) = strategic_executor();
 
     // Create only tactical issues
     executor
@@ -144,7 +161,7 @@ fn test_query_strategic_excludes_tactical_only() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["type:task".to_string()],
+            vec![type_label(taxonomy.type_at_level(4))],
             None,
             None,
             false,
@@ -157,7 +174,7 @@ fn test_query_strategic_excludes_tactical_only() {
             "".to_string(),
             Priority::Normal,
             vec![],
-            vec!["component:backend".to_string()],
+            vec!["area:backend".to_string()],
             None,
             None,
             false,
@@ -171,19 +188,20 @@ fn test_query_strategic_excludes_tactical_only() {
 
 #[test]
 fn test_query_strategic_includes_mixed_labels() {
-    let executor = strategic_executor();
+    let (executor, taxonomy) = strategic_executor();
+    let top = taxonomy.type_at_level(1);
 
     // Issue with both strategic type and tactical labels
     let (mixed_id, _) = executor
         .create_issue(
-            "Auth milestone".to_string(),
+            "Auth release".to_string(),
             "".to_string(),
             Priority::High,
             vec![],
             vec![
-                "type:milestone".to_string(),
-                "milestone:v1.0".to_string(),
-                "component:auth".to_string(),
+                type_label(top),
+                membership_label(&taxonomy, top, "v1.0"),
+                "area:auth".to_string(),
             ],
             None,
             None,
@@ -198,22 +216,22 @@ fn test_query_strategic_includes_mixed_labels() {
 }
 
 #[test]
-fn test_query_strategic_with_custom_strategic_namespace() {
-    let executor = strategic_executor();
+fn test_query_strategic_ignores_membership_label_without_strategic_type() {
+    let (executor, taxonomy) = strategic_executor();
+    let top = taxonomy.type_at_level(1);
+    let container = taxonomy.type_at_level(2);
 
-    // Strategic classification is type-based, not namespace-based
-    // No need to add custom namespace - config handles this
-
-    // Create issue with initiative label but no strategic type
-    let (_initiative_id, _) = executor
+    // Strategic classification is type-based, not namespace-based: a container's
+    // membership label on a leaf-typed issue does not make it strategic.
+    let (_member_id, _) = executor
         .create_issue(
             "Digital transformation".to_string(),
             "".to_string(),
             Priority::Critical,
             vec![],
             vec![
-                "initiative:cloud-migration".to_string(),
-                "type:task".to_string(),
+                membership_label(&taxonomy, container, "cloud-migration"),
+                type_label(taxonomy.type_at_level(4)),
             ],
             None,
             None,
@@ -222,13 +240,13 @@ fn test_query_strategic_with_custom_strategic_namespace() {
         .unwrap();
 
     // Create issue with strategic type
-    let (milestone_id, _) = executor
+    let (top_id, _) = executor
         .create_issue(
             "Launch".to_string(),
             "".to_string(),
             Priority::Critical,
             vec![],
-            vec!["type:milestone".to_string()],
+            vec![type_label(top)],
             None,
             None,
             false,
@@ -237,14 +255,14 @@ fn test_query_strategic_with_custom_strategic_namespace() {
 
     let strategic = executor.query_strategic().unwrap();
 
-    // Only the milestone should be returned (strategic query is type-based)
+    // Only the strategically typed issue is returned.
     assert_eq!(strategic.len(), 1);
-    assert_eq!(strategic[0].id, milestone_id);
+    assert_eq!(strategic[0].id, top_id);
 }
 
 #[test]
 fn test_query_strategic_empty_repo() {
-    let executor = strategic_executor();
+    let (executor, _taxonomy) = strategic_executor();
 
     let strategic = executor.query_strategic().unwrap();
 

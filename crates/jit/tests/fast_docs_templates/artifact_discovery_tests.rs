@@ -7,7 +7,6 @@ use jit::domain::artifact_inventory::{
     inventory_explicit_roots, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
 };
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode};
-use jit::domain::type_taxonomy::HierarchyConfig;
 use jit::domain::{DocumentReference, Issue, State};
 use jit::storage::{
     discover_archive_artifacts, discover_repository_layout, IssueStore, JsonFileStorage,
@@ -93,7 +92,7 @@ impl Repo {
     ) -> jit::domain::artifact_classifier::ArtifactClassificationInventory {
         let inventory = inventory_explicit_roots(
             &[],
-            &HierarchyConfig::test_vocabulary(),
+            &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
             ExplicitRootTarget::Document(root),
             &PinnedRootEvidenceMap::new(),
         )
@@ -671,7 +670,7 @@ fn pinned_issue() -> Issue {
     let mut issue = crate::fixture_issue("history".to_string(), String::new());
     issue.id = "history".to_string();
     issue.state = State::Done;
-    issue.labels = vec!["type:epic".to_string()];
+    issue.labels = vec!["type:initiative".to_string()];
     let mut document = DocumentReference::new("docs/history.html".to_string());
     document.commit = Some("release-v1".to_string());
     issue.documents = vec![document];
@@ -686,7 +685,7 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
         &issues,
-        &HierarchyConfig::test_vocabulary(),
+        &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
         ExplicitRootTarget::Container("history"),
         &pin_evidence(true),
     )
@@ -711,7 +710,7 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     let issues = [pinned_issue()];
     let inventory = inventory_explicit_roots(
         &issues,
-        &HierarchyConfig::test_vocabulary(),
+        &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
         ExplicitRootTarget::Container("history"),
         &pin_evidence(false),
     )

@@ -1052,14 +1052,14 @@ mod tests {
             "config.toml",
             &format!(
                 "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                crate::commands::test_helpers::declared_test_taxonomy()
+                crate::test_taxonomy::test_taxonomy().config_fragment()
             ),
         );
 
-        // Issue already has type:task label
+        // Issue already has a type label from the declared vocabulary.
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec!["type:task"]),
+            create_test_issue("1", State::Ready, vec!["type:action"]),
         );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1067,7 +1067,7 @@ mod tests {
         // Try to add another type:* label (violates uniqueness)
         let filter = QueryFilter::parse("state:ready").unwrap();
         let ops = UpdateOperations {
-            add_labels: vec!["type:epic".to_string()],
+            add_labels: vec!["type:initiative".to_string()],
             ..Default::default()
         };
 
