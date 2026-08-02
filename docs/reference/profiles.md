@@ -56,7 +56,10 @@ The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
 run `jit profile show jit-dogfood --json` for the exact version, contributions,
 assets, managed regions, hashes, and executable declarations carried by the
-running binary.
+running binary. It also declares the repository roots from which packaged live
+assets are drawn, so any repository file under a declared root that is neither
+claimed by a packaged asset nor matched by a declared exclusion is caught
+rather than silently left out of the package.
 
 The package installs:
 
