@@ -527,6 +527,31 @@
    "at": "2026-08-02",
    "session": 7,
    "text": "A worker can hand-roll around a shared primitive it never found. 7d038e97 wrote check-then-rename publication when crates/jit/src/storage/external_publish.rs already exposed publish_external_directory_noreplace over renameat2/RENAME_NOREPLACE. The brief named the invariant but not the primitive; naming the invariant is not enough, because the worker satisfied its own reading of it. Name the function."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "A worker citing CODE PATHS is not evidence for a criterion about an OUTCOME. d35cc3f2 cited init.rs:93-97 as satisfying 'initialization succeeds'; building the binary and running the command showed it failing and applying half the configuration. When a criterion names an outcome, require the command and its observed result."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "A test edited to supply what the default path lacks is masking a regression, and the tell is in the diff. e4ba28c5 changed four `location: None` call sites to a supplied location; its tests passed while `jit init --profile jit-dogfood` stayed broken for adopters. The lead read those edits as scope creep, verified they were inside mod tests, and moved on. `-location: None` / `+location: Some(...)` is a question, not a detail."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "setsid nohup codex workers notify nothing \u2014 no idle ping, no exit notification. Two ran unwatched this session and one failed instantly against a nonexistent worktree without anyone noticing. Attach a completion watcher at dispatch time."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "dispatch-worker-worktree.sh correctly refused a dirty tree and the lead's filtering grep discarded the error, so the codex dispatch that followed died against a nonexistent directory. Never pipe that script through a filter."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "A latent defect can pass every gate because nothing reaches it. initialize_fresh_repository captured the layout before publishing and applied the rest of the closure against the stale capture; unreachable until a package declared a dependency, so 7835fdc0's gates were all green over it. Fixed in d35cc3f2 by rebinding the tracked layout after publication, only when the roots match, so the reentry guard still rejects a genuinely different selection."
   }
  ],
  "rework_counts": {
@@ -714,6 +739,20 @@
    "ruling": "Restate REQ-04 as a zero-kind guard rather than retiring it.",
    "applied": "REQ-04 now reads 'It declares no item kind; every kind an initialized repository can carry is declared by the default package (@/issue/e204e63d/decision/D-20).' Committed as chore(jit:e4ba28c5).",
    "rationale": "Keeps a testable criterion instead of deleting one, and states the property D-20's amendment actually established."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "question": "e4ba28c5's reduction makes the embedded jit-dogfood unusable: the binary embeds only profiles/jit-dogfood, so once that package declares dependencies=[\"jit-default\"], `jit init --profile jit-dogfood` fails. Verified against a built binary.",
+   "ruling": "Embed jit-default too, so an embedded package's declared dependency resolves by the same route the package itself came from. Rejected: re-sequencing e4ba28c5 to layer 6; accepting the break transitionally.",
+   "applied": "Filed d35cc3f2 as a predecessor of e4ba28c5 rather than amending e4ba28c5's criteria. Both embeds are removed together by ff1bbada."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "question": "7d038e97 hit MAX_REWORK_ATTEMPTS (2) and MAX_SAME_FINDING_REPEATS (3) on one false claim that turned out to live in four files.",
+   "ruling": "One more attempt carrying the fully swept site list; counter reset.",
+   "outcome": "Closed on that attempt. The repeated rounds were the lead relaying one site per round instead of sweeping, not worker incapacity."
   }
  ],
  "halted": {
@@ -945,6 +984,26 @@
    "at": "2026-08-02",
    "session": 7,
    "note": "Reclaimed 25 merged worktrees before dispatch, freeing 68 GB (91% -> 84% on /). Only unmerged worker branches keep their worktrees. Session tooling (merge-and-gate.sh, dispatch-codex.sh, mkbrief.py, briefs/) was recovered from session 6's scratchpad and lives in this session's scratchpad; it is not committed."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "note": "Eight issues closed (42 -> 49 of 78; d35cc3f2 filed mid-session). Wave 2's last two, d35cc3f2 and e4ba28c5, were merged and verified by the lead with gates still running at session end \u2014 see handoff-6.md. The resequencing pattern (land the issue that makes a reviewer's claim true, then re-review) was used five times and worked every time: 39c34568 and 6c47b99a in earlier sessions, then 5d12a79f, 7835fdc0 and d35cc3f2 here."
+  }
+ ],
+ "handoff": "handoff-6.md",
+ "owner_preferences": [
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "preference": "Gate one issue at a time and report per issue.",
+   "note": "Costs nothing: verdict reuse means the expensive part is merging several issues before any gating, not gating them separately. Batching merges is still fine when stated explicitly, with per-issue verdicts reported."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "preference": "Choose the worker model case by case, not by rule.",
+   "note": "Explicitly corrected the lead's over-generalisation of 'use Opus for reworks' into a blanket policy. Codex gpt-5.6-luna for first attempts on clearly-specified work and for reworks whose sites and correct end state are both named; Opus when the work needs diagnosis, generalising past the named instance, or establishing an outcome. State which and why at each dispatch."
   }
  ]
 }
