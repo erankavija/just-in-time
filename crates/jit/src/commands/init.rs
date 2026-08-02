@@ -2,8 +2,8 @@ use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
-    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfilePackage,
+    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfilePackage,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
@@ -669,6 +669,92 @@ mod tests {
         assert_eq!(resolved.item.self_id, "authored-here");
         assert!(resolved.issue_full_id.is_none());
         assert_repo_valid(repo.path());
+    }
+
+    static COMPOSITION_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
+        "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
+    );
+
+    #[test]
+    fn test_fresh_profile_init_applies_the_packages_the_named_one_depends_on() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        // Two packages beside each other inside the worktree the repository is
+        // created in, which is where an adopter puts an obtained set.
+        crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &repo.path().join("packages/base"),
+            "base",
+            &[],
+        );
+        crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &repo.path().join("packages/workflow"),
+            "workflow",
+            &["base"],
+        );
+
+        let result = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                ProfileSelection {
+                    id: "workflow",
+                    location: Some(&repo.path().join("packages/workflow")),
+                },
+            )
+            .unwrap();
+
+        // One initialization, both packages, the dependency first.
+        let profile = result
+            .profile
+            .expect("a profiled initialization reports it");
+        assert_eq!(
+            profile
+                .profiles
+                .iter()
+                .map(|applied| (applied.id.as_str(), applied.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("base", ProfileApplicationStatus::Applied),
+                ("workflow", ProfileApplicationStatus::Applied),
+            ]
+        );
+        assert!(repo.path().join("docs/base.txt").is_file());
+        assert!(repo.path().join("docs/workflow.txt").is_file());
+        assert!(repo.path().join(".jit/profiles/base.json").is_file());
+        assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+    }
+
+    #[test]
+    fn test_fresh_profile_init_creates_no_repository_when_a_dependency_cannot_be_resolved() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &repo.path().join("packages/workflow"),
+            "workflow",
+            &["absent-base"],
+        );
+
+        let error = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                ProfileSelection {
+                    id: "workflow",
+                    location: Some(&repo.path().join("packages/workflow")),
+                },
+            )
+            .unwrap_err();
+
+        let message = format!("{error:#}");
+        assert!(message.contains("workflow"), "{message}");
+        assert!(message.contains("absent-base"), "{message}");
+        assert!(
+            !repo.path().join(".jit").exists(),
+            "the closure is resolved before a repository is created"
+        );
     }
 
     #[test]

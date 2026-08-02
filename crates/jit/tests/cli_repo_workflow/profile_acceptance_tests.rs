@@ -1,3 +1,4 @@
+use super::profile_cli_tests::{applied_ids, requested_profile};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -236,7 +237,10 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     assert!(!existing.path.join(".git").exists());
 
     let fresh_init = success_json(&fresh.path, &["init", "--profile", "jit-dogfood", "--json"]);
-    assert_eq!(fresh_init["profile"]["status"], "applied");
+    assert_eq!(
+        requested_profile(&fresh_init["profile"])["status"],
+        "applied"
+    );
 
     success_json(&existing.path, &["init", "--json"]);
     let preview = success_json(
@@ -254,7 +258,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
         &existing.path,
         &["profile", "apply", "jit-dogfood", "--json"],
     );
-    assert_eq!(applied["status"], "applied");
+    assert_eq!(requested_profile(&applied)["status"], "applied");
     let no_op = success_json(
         &existing.path,
         &["profile", "apply", "jit-dogfood", "--dry-run", "--json"],
@@ -304,13 +308,119 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     }
 }
 
+static COMPOSITION_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
+    "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
+);
+
+#[test]
+fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
+    let repo = TestRepo::new();
+    success_json(&repo.path, &["init", "--json"]);
+    // An obtained set of packages, side by side inside the worktree.
+    jit::test_utils::write_package_declaring(
+        &COMPOSITION_PACKAGE,
+        &repo.path.join("packages/base"),
+        "base",
+        &[],
+    );
+    jit::test_utils::write_package_declaring(
+        &COMPOSITION_PACKAGE,
+        &repo.path.join("packages/workflow"),
+        "workflow",
+        &["base"],
+    );
+
+    let applied = success_json(
+        &repo.path,
+        &[
+            "profile",
+            "apply",
+            "workflow",
+            "--from",
+            "packages/workflow",
+            "--json",
+        ],
+    );
+
+    // One result per applied package, the dependency first, under the standard
+    // count-wrapped shape.
+    assert_eq!(applied_ids(&applied), vec!["base", "workflow"]);
+    assert_eq!(applied["count"], 2);
+    assert_eq!(requested_profile(&applied)["status"], "applied");
+    // Each package's own provenance record and its own audit event.
+    assert!(repo.path.join(".jit/profiles/base.json").is_file());
+    assert!(repo.path.join(".jit/profiles/workflow.json").is_file());
+    assert_eq!(
+        normalized_events(&repo.path)
+            .iter()
+            .filter_map(|event| event["profile_id"].as_str().map(str::to_string))
+            .collect::<Vec<_>>(),
+        vec!["base".to_string(), "workflow".to_string()]
+    );
+
+    // Re-applying an applied set is no work anywhere in it.
+    let reapplied = success_json(
+        &repo.path,
+        &[
+            "profile",
+            "apply",
+            "workflow",
+            "--from",
+            "packages/workflow",
+            "--json",
+        ],
+    );
+    assert_eq!(applied_ids(&reapplied), vec!["base", "workflow"]);
+    assert!(reapplied["profiles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|profile| profile["status"] == "unchanged"));
+}
+
+#[test]
+fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
+    let repo = TestRepo::new();
+    success_json(&repo.path, &["init", "--json"]);
+    jit::test_utils::write_package_declaring(
+        &COMPOSITION_PACKAGE,
+        &repo.path.join("packages/workflow"),
+        "workflow",
+        &["absent-base"],
+    );
+
+    let failure = failed_json_with_path(
+        &repo.path,
+        &[
+            "profile",
+            "apply",
+            "workflow",
+            "--from",
+            "packages/workflow",
+            "--json",
+        ],
+        1,
+        None,
+    );
+
+    // Both packages are named: the one the adopter asked for, and the one it
+    // declared that could not be found.
+    let message = failure["error"]["message"]
+        .as_str()
+        .unwrap_or_else(|| panic!("a failure carries a message: {failure}"));
+    assert!(message.contains("workflow"), "{message}");
+    assert!(message.contains("absent-base"), "{message}");
+    assert!(!repo.path.join(".jit/profiles").exists());
+    assert!(normalized_events(&repo.path).is_empty());
+}
+
 #[test]
 fn test_profile_application_contributes_workflow_invariants_to_scaffolded_registry() {
     let repo = TestRepo::new();
 
     success_json(&repo.path, &["init", "--json"]);
     let applied = success_json(&repo.path, &["profile", "apply", "jit-dogfood", "--json"]);
-    assert_eq!(applied["status"], "applied");
+    assert_eq!(requested_profile(&applied)["status"], "applied");
     assert_eq!(
         success_json(&repo.path, &["validate", "--json"])["valid"],
         true
@@ -649,12 +759,16 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         .map(|schema| (schema["title"].as_str().unwrap(), schema))
         .collect::<BTreeMap<_, _>>();
     assert_eq!(
-        by_title["ProfileApplyResult"]["properties"]
+        by_title["ProfileComposedApplyResult"]["properties"]
             .as_object()
             .unwrap()
             .keys()
             .cloned()
             .collect::<BTreeSet<_>>(),
+        expected_keys(&["count", "profiles"])
+    );
+    assert_eq!(
+        property_keys(by_title["ProfileComposedApplyResult"], "ProfileApplyResult"),
         expected_keys(&[
             "id",
             "plan_hash",
@@ -674,7 +788,10 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         expected_keys(&["id", "plan_hash", "status", "targets", "version"])
     );
     assert_eq!(
-        variant_property_keys(by_title["ProfileApplyResult"], "ProfileApplicationWarning"),
+        variant_property_keys(
+            by_title["ProfileComposedApplyResult"],
+            "ProfileApplicationWarning"
+        ),
         expected_keys(&["kind", "reason", "transaction_id"])
     );
     assert_eq!(

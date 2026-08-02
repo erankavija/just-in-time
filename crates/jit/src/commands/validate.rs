@@ -694,19 +694,46 @@ fn resolve_recorded_packages(
         crate::validation::repository::RepositoryValidationFailure,
     >,
 > {
-    let attempted = recorded
-        .iter()
-        .map(|id| {
-            Ok((
-                id.clone(),
-                super::profile::applied_record_path(id)?,
-                super::profile::embedded_profile(id),
-            ))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let declared_by = declaring_records(&attempted);
+    Ok(compose_recorded_resolution(
+        recorded
+            .iter()
+            .map(|id| {
+                Ok((
+                    id.clone(),
+                    super::profile::applied_record_path(id)?,
+                    super::profile::embedded_profile(id),
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?,
+    ))
+}
 
-    Ok(attempted
+/// One recorded profile's id, its record's canonical path, and the outcome of
+/// obtaining its package.
+type AttemptedRecordedPackage = (
+    String,
+    crate::repository_state::VirtualPath,
+    Result<crate::profile::ProfilePackage>,
+);
+
+/// Turn the per-record attempts into the resolved set, or the failure the first
+/// unresolvable record carries.
+///
+/// The failure states the relationship where the records prove one: a package
+/// applied as another package's dependency was never named by the adopter, so
+/// naming only the package that cannot be obtained would leave them diagnosing
+/// something they never installed.
+fn compose_recorded_resolution(
+    attempted: Vec<AttemptedRecordedPackage>,
+) -> std::result::Result<
+    Vec<(
+        crate::repository_state::VirtualPath,
+        crate::profile::ProfilePackage,
+    )>,
+    crate::validation::repository::RepositoryValidationFailure,
+> {
+    let declared_by = declaring_records(&attempted);
+    attempted
         .into_iter()
         .map(|(id, record_path, package)| {
             package.map(|package| (record_path.clone(), package)).map_err(|error| {
@@ -721,7 +748,7 @@ fn resolve_recorded_packages(
                 )
             })
         })
-        .collect())
+        .collect()
 }
 
 /// Which recorded profile declares a dependency on each profile, over the
@@ -729,14 +756,10 @@ fn resolve_recorded_packages(
 ///
 /// A record whose package cannot be obtained declares nothing readable, so only
 /// the resolved ones answer. Where two of them declare the same dependency, the
-/// last in recorded order is reported: the records are enumerated in a stable
+/// last in recorded order answers: the records are enumerated in a stable
 /// order, so the answer is stable too.
 fn declaring_records(
-    attempted: &[(
-        String,
-        crate::repository_state::VirtualPath,
-        Result<crate::profile::ProfilePackage>,
-    )],
+    attempted: &[AttemptedRecordedPackage],
 ) -> std::collections::BTreeMap<String, String> {
     attempted
         .iter()
@@ -3982,5 +4005,117 @@ description = \"Full Rust CI pipeline must pass.\"
 
         assert_eq!(by_short.issue_id, by_full.issue_id);
         assert_eq!(by_short.outcomes.len(), by_full.outcomes.len());
+    }
+
+    static COMPOSITION_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
+        "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
+    );
+
+    /// One attempted resolution of a recorded profile: the record's own id and
+    /// canonical path, and the package it resolved to or the failure obtaining
+    /// it.
+    fn attempted_record(
+        id: &str,
+        package: Result<crate::profile::ProfilePackage>,
+    ) -> AttemptedRecordedPackage {
+        (
+            id.to_string(),
+            super::profile::applied_record_path(id).expect("a canonical record path"),
+            package,
+        )
+    }
+
+    /// The failure obtaining a package no route answers for.
+    fn unobtainable(id: &str) -> Result<crate::profile::ProfilePackage> {
+        Err(crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
+    }
+
+    #[test]
+    fn test_compose_recorded_resolution_names_the_record_that_declared_an_unresolvable_one() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let dependant = crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &temp.path().join("workflow"),
+            "workflow",
+            &["base"],
+        );
+
+        let failure = compose_recorded_resolution(vec![
+            attempted_record("base", unobtainable("base")),
+            attempted_record("workflow", Ok(dependant)),
+        ])
+        .expect_err("a record whose package cannot be obtained fails the resolution");
+
+        // An adopter who applied `workflow` never named `base`, so the failure
+        // states the relationship rather than leaving them to find it.
+        let message = failure.to_string();
+        assert!(message.contains(".jit/profiles/base.json"), "{message}");
+        assert!(message.contains("'workflow'"), "{message}");
+        assert!(message.contains("declares a dependency on it"), "{message}");
+    }
+
+    #[test]
+    fn test_compose_recorded_resolution_reports_an_unresolvable_record_nothing_declared() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let unrelated = crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &temp.path().join("workflow"),
+            "workflow",
+            &[],
+        );
+
+        let failure = compose_recorded_resolution(vec![
+            attempted_record("base", unobtainable("base")),
+            attempted_record("workflow", Ok(unrelated)),
+        ])
+        .expect_err("a record whose package cannot be obtained fails the resolution");
+
+        // Nothing declared it, so nothing is claimed about why it is recorded.
+        let message = failure.to_string();
+        assert!(message.contains(".jit/profiles/base.json"), "{message}");
+        assert!(!message.contains("declares a dependency"), "{message}");
+    }
+
+    #[test]
+    fn test_compose_recorded_resolution_returns_every_record_that_resolved() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let base = crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &temp.path().join("base"),
+            "base",
+            &[],
+        );
+        let workflow = crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &temp.path().join("workflow"),
+            "workflow",
+            &["base"],
+        );
+
+        let resolved = compose_recorded_resolution(vec![
+            attempted_record("base", Ok(base.clone())),
+            attempted_record("workflow", Ok(workflow.clone())),
+        ])
+        .expect("every record resolved");
+
+        assert_eq!(
+            resolved
+                .iter()
+                .map(|(path, package)| (
+                    super::profile::repo_string(path),
+                    package.hashes().package.clone()
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    ".jit/profiles/base.json".to_string(),
+                    base.hashes().package.clone()
+                ),
+                (
+                    ".jit/profiles/workflow.json".to_string(),
+                    workflow.hashes().package.clone()
+                ),
+            ]
+        );
     }
 }

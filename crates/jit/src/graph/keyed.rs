@@ -210,7 +210,10 @@ mod tests {
     fn assert_targets_precede_sources<'k>(graph: &[(&'k str, Vec<&'k str>)], order: &[&'k str]) {
         let keys: std::collections::BTreeSet<&str> = graph.iter().map(|(key, _)| *key).collect();
         assert_eq!(
-            order.iter().copied().collect::<std::collections::BTreeSet<_>>(),
+            order
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>(),
             keys,
             "the order must hold every key and nothing else"
         );

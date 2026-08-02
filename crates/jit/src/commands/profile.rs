@@ -1045,28 +1045,12 @@ mod tests {
         id: &str,
         dependencies: &[&str],
     ) -> ProfilePackage {
-        let root = crate::test_utils::write_package_tree(&PACKAGE, &temp.path().join(relative));
-        let declared = dependencies
-            .iter()
-            .map(|dependency| format!("\"{dependency}\""))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let manifest = fs::read_to_string(root.join("manifest.toml"))
-            .unwrap()
-            .replace(
-                &format!("id = \"{}\"", fixture_id()),
-                &format!("id = \"{id}\""),
-            )
-            .replace(
-                "target = \"docs/profile.txt\"",
-                &format!("target = \"docs/{id}.txt\""),
-            )
-            .replace(
-                "[profile]",
-                &format!("dependencies = [{declared}]\n\n[profile]"),
-            );
-        fs::write(root.join("manifest.toml"), manifest).unwrap();
-        ProfilePackage::from_directory(&root).expect("a valid package tree")
+        crate::test_utils::write_package_declaring(
+            &PACKAGE,
+            &temp.path().join(relative),
+            id,
+            dependencies,
+        )
     }
 
     /// The profile ids this repository's audit log records as applied, in the
@@ -1085,8 +1069,10 @@ mod tests {
 
     /// The provenance record this repository stores for `id`.
     fn record_for(temp: &TempDir, id: &str) -> AppliedProfileRecord {
-        serde_json::from_slice(&fs::read(temp.path().join(format!(".jit/profiles/{id}.json"))).unwrap())
-            .unwrap()
+        serde_json::from_slice(
+            &fs::read(temp.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
+        )
+        .unwrap()
     }
 
     /// Store `record` as this repository's applied-profile record for its id.
@@ -1876,7 +1862,10 @@ mod tests {
         assert!(temp.path().join("docs/workflow.txt").is_file());
         assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
         // One record per package, each addressing its own package's bytes.
-        assert_eq!(record_for(&temp, "base").package_hash, dependency.hashes().package);
+        assert_eq!(
+            record_for(&temp, "base").package_hash,
+            dependency.hashes().package
+        );
         assert_eq!(
             record_for(&temp, "workflow").package_hash,
             dependant.hashes().package
@@ -1938,7 +1927,10 @@ mod tests {
         assert!(position("left") < position("workflow"));
         assert!(position("right") < position("workflow"));
         assert_eq!(
-            applied_event_ids(&storage).iter().filter(|id| *id == "shared").count(),
+            applied_event_ids(&storage)
+                .iter()
+                .filter(|id| *id == "shared")
+                .count(),
             1
         );
     }
@@ -2025,7 +2017,10 @@ mod tests {
             events
         );
         assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
-        assert_eq!(["base", "workflow"].map(|id| record_for(&temp, id)), records);
+        assert_eq!(
+            ["base", "workflow"].map(|id| record_for(&temp, id)),
+            records
+        );
     }
 
     #[test]
@@ -2051,7 +2046,10 @@ mod tests {
                 ("workflow", ProfileApplicationStatus::Applied),
             ]
         );
-        assert_eq!(record_for(&temp, "base").package_hash, dependency.hashes().package);
+        assert_eq!(
+            record_for(&temp, "base").package_hash,
+            dependency.hashes().package
+        );
     }
 
     #[test]
@@ -2085,7 +2083,11 @@ mod tests {
         // readable package: passing over it would answer with bytes the adopter
         // did not put there.
         fs::create_dir_all(temp.path().join("vendor/base")).unwrap();
-        fs::write(temp.path().join("vendor/base/manifest.toml"), b"not = [valid").unwrap();
+        fs::write(
+            temp.path().join("vendor/base/manifest.toml"),
+            b"not = [valid",
+        )
+        .unwrap();
 
         let error = executor.resolve_profile_closure(&dependant).unwrap_err();
 

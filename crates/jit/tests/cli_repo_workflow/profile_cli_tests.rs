@@ -15,6 +15,30 @@ fn jit(dir: &std::path::Path, args: &[&str]) -> Output {
 /// The id the checked-in fixture package declares.
 const FIXTURE_PROFILE: &str = "planner-asset-only";
 
+/// The result for the package an application named, which an application
+/// applies after everything that package depends on.
+pub(super) fn requested_profile(applied: &Value) -> &Value {
+    applied["profiles"]
+        .as_array()
+        .expect("an application reports one result per applied package")
+        .last()
+        .expect("an application applies at least the package it named")
+}
+
+/// The ids an application reports, in the order it applied them.
+pub(super) fn applied_ids(applied: &Value) -> Vec<&str> {
+    applied["profiles"]
+        .as_array()
+        .expect("an application reports one result per applied package")
+        .iter()
+        .map(|profile| {
+            profile["id"]
+                .as_str()
+                .expect("each result names its package")
+        })
+        .collect()
+}
+
 /// Copy the fixture package tree into `repo` at the repository-relative
 /// `location`, and return that location.
 ///
@@ -199,7 +223,7 @@ fn test_profile_apply_from_a_supplied_location_is_re_read_from_the_record() {
         ],
     );
     assert!(applied.status.success(), "{applied:?}");
-    assert_eq!(json(&applied)["status"], "applied");
+    assert_eq!(requested_profile(&json(&applied))["status"], "applied");
     assert_eq!(
         stored_record(repo.path())["origin"],
         serde_json::json!({ "source": "directory", "location": location })
@@ -213,7 +237,7 @@ fn test_profile_apply_from_a_supplied_location_is_re_read_from_the_record() {
         &["profile", "apply", FIXTURE_PROFILE, "--json"],
     );
     assert!(reapplied.status.success(), "{reapplied:?}");
-    assert_eq!(json(&reapplied)["status"], "unchanged");
+    assert_eq!(requested_profile(&json(&reapplied))["status"], "unchanged");
 
     let listed = jit(repo.path(), &["profile", "list", "--json"]);
     assert!(listed.status.success(), "{listed:?}");
@@ -353,7 +377,10 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
     );
 
     assert!(init.status.success(), "{init:?}");
-    assert_eq!(json(&init)["profile"]["status"], "applied");
+    assert_eq!(
+        requested_profile(&json(&init)["profile"])["status"],
+        "applied"
+    );
     assert!(repo.path().join("docs/profile.txt").is_file());
     assert_eq!(
         stored_record(repo.path())["origin"],
@@ -367,7 +394,7 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
         &["profile", "apply", FIXTURE_PROFILE, "--json"],
     );
     assert!(reapplied.status.success(), "{reapplied:?}");
-    assert_eq!(json(&reapplied)["status"], "unchanged");
+    assert_eq!(requested_profile(&json(&reapplied))["status"], "unchanged");
 }
 
 #[test]
@@ -477,7 +504,7 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
         String::from_utf8_lossy(&init.stderr)
     );
     let init = json(&init);
-    assert_eq!(init["profile"]["status"], "applied");
+    assert_eq!(requested_profile(&init["profile"])["status"], "applied");
     assert!(repo.path().join(".jit/profiles/jit-dogfood.json").is_file());
     assert!(repo
         .path()
@@ -552,12 +579,12 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
 
     let applied = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(applied.status.success(), "{applied:?}");
-    assert_eq!(json(&applied)["status"], "applied");
+    assert_eq!(requested_profile(&json(&applied))["status"], "applied");
     let events_after = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
     let unchanged = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(unchanged.status.success(), "{unchanged:?}");
-    assert_eq!(json(&unchanged)["status"], "unchanged");
+    assert_eq!(requested_profile(&json(&unchanged))["status"], "unchanged");
     assert_eq!(
         fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
         events_after
@@ -592,13 +619,19 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
 
     let repaired_missing = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(repaired_missing.status.success(), "{repaired_missing:?}");
-    assert_eq!(json(&repaired_missing)["status"], "applied");
+    assert_eq!(
+        requested_profile(&json(&repaired_missing))["status"],
+        "applied"
+    );
     assert_eq!(fs::read(&namespace_schema).unwrap(), expected_namespace);
 
     fs::write(&type_schema, b"stale\n").unwrap();
     let repaired_stale = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(repaired_stale.status.success(), "{repaired_stale:?}");
-    assert_eq!(json(&repaired_stale)["status"], "applied");
+    assert_eq!(
+        requested_profile(&json(&repaired_stale))["status"],
+        "applied"
+    );
     assert_eq!(fs::read(&type_schema).unwrap(), expected_types);
 
     let events_after_repairs = fs::read(&events_path).unwrap();
@@ -611,7 +644,7 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
     );
     let unchanged = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(unchanged.status.success(), "{unchanged:?}");
-    assert_eq!(json(&unchanged)["status"], "unchanged");
+    assert_eq!(requested_profile(&json(&unchanged))["status"], "unchanged");
     assert_eq!(fs::read(events_path).unwrap(), events_after_repairs);
 }
 
