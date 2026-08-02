@@ -313,10 +313,12 @@ async function main() {
           .filter(tool => tool.name.startsWith('jit_profile_'))
           .map(tool => [tool.name, Object.keys(tool.inputSchema.properties).sort()])
       );
+      // `from` names the repository directory holding the package; enumeration
+      // takes none, because it follows the repository's own records.
       assert.deepStrictEqual(profileInputKeys, {
-        jit_profile_apply: ['dry-run', 'id', 'json'],
+        jit_profile_apply: ['dry-run', 'from', 'id', 'json'],
         jit_profile_list: ['json'],
-        jit_profile_show: ['id', 'json'],
+        jit_profile_show: ['from', 'id', 'json'],
       });
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.required,
