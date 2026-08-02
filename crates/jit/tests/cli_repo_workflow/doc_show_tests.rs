@@ -170,16 +170,43 @@ pub(crate) fn jit(repo: &Path, args: &[&str]) -> Output {
         .unwrap()
 }
 
-/// An initialized repository with no Git history. `doc dir` derives a path from
-/// configuration and the issue record alone, so Git has nothing to contribute.
+/// A repository initialized from the shared taxonomy fixture, with no Git
+/// history. `doc dir` derives a path from configuration and the issue record
+/// alone, so Git has nothing to contribute.
 pub(crate) fn initialized_repo() -> TempDir {
+    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    temp
+}
+
+/// A taxonomy-backed repository whose documentation registry is explicitly
+/// authored because one test rewrites that table and checks the resulting
+/// configuration, rather than relying on the policy fallback.
+fn initialized_repo_with_documentation_registry() -> TempDir {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let temp = TempDir::new().unwrap();
-    let init = jit(temp.path(), &["init"]);
-    assert!(
-        init.status.success(),
-        "jit init: {}",
-        String::from_utf8_lossy(&init.stderr)
+    let jit_root = temp.path().join(".jit");
+    fs::create_dir_all(&jit_root).unwrap();
+
+    let issue_scoped_areas = jit::config::SHIPPED_DOCUMENTATION_POLICY
+        .issue_scoped_areas
+        .iter()
+        .map(|area| format!("\"{area}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let config = format!(
+        "{}\n[documentation]\nissue_scoped_areas = [{issue_scoped_areas}]\n",
+        taxonomy.config_fragment()
     );
+    fs::write(jit_root.join("config.toml"), config).unwrap();
+
+    let storage = jit::storage::JsonFileStorage::new(&jit_root);
+    let layout = jit::storage::discover_repository_layout(temp.path(), &jit_root).unwrap();
+    jit::commands::CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
+        .unwrap();
+    fs::create_dir(temp.path().join(".git")).unwrap();
+
     temp
 }
 
@@ -205,9 +232,9 @@ pub(crate) fn create_issue(repo: &Path, title: &str, labels: &[String]) -> Creat
     }
 }
 
-/// An area a fresh repository declares issue-scoped. `jit init` scaffolds the
-/// shipped policy into `.jit/config.toml`, so reading the policy states which
-/// areas that repository declares without restating the registry here.
+/// An issue-scoped area from the shipped documentation policy. Reading the
+/// policy states which area the repository declares without restating the
+/// registry here.
 pub(crate) fn declared_area() -> &'static str {
     jit::config::SHIPPED_DOCUMENTATION_POLICY
         .issue_scoped_areas
@@ -232,11 +259,11 @@ pub(crate) fn undeclared_area() -> &'static str {
         .expect("the shipped policy manages an area outside the convention")
 }
 
-/// A type the scaffolded hierarchy maps to a membership namespace, with that
-/// namespace. `jit init` applies this template, so an issue carrying
-/// `type:<type>` and `<namespace>:<value>` names a single membership value.
+/// A type the shared taxonomy maps to a membership namespace, with that
+/// namespace. An issue carrying `type:<type>` and `<namespace>:<value>` names
+/// a single membership value.
 pub(crate) fn membership_type_and_namespace() -> (String, String) {
-    let mut associations = jit::hierarchy_templates::HierarchyTemplate::default()
+    let mut associations = jit::test_taxonomy::test_taxonomy()
         .label_associations
         .into_iter()
         .collect::<Vec<_>>();
@@ -244,7 +271,7 @@ pub(crate) fn membership_type_and_namespace() -> (String, String) {
     associations
         .into_iter()
         .next()
-        .expect("the scaffolded hierarchy maps a type to a membership namespace")
+        .expect("the shared taxonomy maps a type to a membership namespace")
 }
 
 /// Every string leaf in `payload`, so a rejection can be asserted to carry a
@@ -417,8 +444,8 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
 
 #[test]
 fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
-    let repo = initialized_repo();
-    let scaffolded = declared_area();
+    let repo = initialized_repo_with_documentation_registry();
+    let declared = declared_area();
     let authored = undeclared_area();
     let issue = create_issue(repo.path(), "Configured registry", &[]);
 
@@ -429,8 +456,8 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
     };
 
     assert!(
-        accepts(scaffolded) && !accepts(authored),
-        "the scaffolded registry declares {scaffolded} and not {authored}"
+        accepts(declared) && !accepts(authored),
+        "the configured registry declares {declared} and not {authored}"
     );
 
     // Replace the declared registry with one naming the other area. Nothing but
@@ -441,7 +468,7 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
     let declaration = "issue_scoped_areas = [";
     let start = config
         .find(declaration)
-        .expect("the scaffolded configuration declares the registry");
+        .expect("the authored configuration declares the registry");
     let end = start
         + config[start..]
             .find(']')
@@ -458,8 +485,8 @@ fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
     .unwrap();
 
     assert!(
-        accepts(authored) && !accepts(scaffolded),
-        "an authored registry replaces the scaffolded one"
+        accepts(authored) && !accepts(declared),
+        "an authored registry replaces the configured one"
     );
     assert!(
         resolve_directory(repo.path(), &issue.short_id, authored)
