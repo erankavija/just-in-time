@@ -32,6 +32,8 @@ use super::{
     ProfileManifest, ProfilePackage, ProfilePackageError, JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
     MANIFEST_FILE_NAME,
 };
+use crate::errors::AlreadyExistsError;
+use crate::storage::external_publish::publish_staged_directory_noreplace;
 use std::fs;
 use std::path::Path;
 
@@ -98,6 +100,24 @@ pub enum PackageAssemblyError {
         /// Underlying filesystem error.
         source: std::io::Error,
     },
+    /// The destination was occupied at the moment of publication, so the staged
+    /// tree was refused rather than written over what was there.
+    #[error(
+        "the destination '{path}' was occupied when the assembled tree was \
+         published, so nothing was overwritten"
+    )]
+    DestinationOccupied {
+        /// Path the publication refused.
+        path: String,
+    },
+    /// Publishing the staged tree onto the destination failed.
+    #[error("cannot publish the assembled package tree at '{path}': {message}")]
+    PublicationRefused {
+        /// Path the publication named.
+        path: String,
+        /// What the publisher reported, rendered with its causes.
+        message: String,
+    },
     /// The staged tree is not a valid package, so it was not published.
     #[error("the staged package tree is not a valid package: {0}")]
     StagedPackage(#[source] ProfilePackageError),
@@ -126,10 +146,11 @@ struct AssembledFile {
 /// Returns the published tree read back through the package model, so a caller
 /// reports what was produced rather than what was intended.
 ///
-/// The destination is taken over: an occupied one is retired before the staged
-/// tree is published into the free name, and the retired tree is removed with
-/// the staging workspace. Publication is therefore never a write over live
-/// content, and a destination that survives a run holds one whole tree
+/// A previous run's tree is retired into the staging workspace and removed with
+/// it, so the destination is taken over rather than merged into. The
+/// publication itself is the storage layer's atomic no-replace rename, so a
+/// tree that appears between the retire and the publication is reported instead
+/// of overwritten, and a destination that survives a run holds one whole tree
 /// (`@/invariant/atomic-writes`).
 ///
 /// # Errors
@@ -140,7 +161,9 @@ struct AssembledFile {
 /// authors itself is absent; [`PackageAssemblyError::InvalidManifest`] when the
 /// checked-in manifest does not parse or declares something invalid;
 /// [`PackageAssemblyError::StagedPackage`] when the assembled tree does not
-/// validate as a package, in which case nothing is published.
+/// validate as a package, in which case nothing is published;
+/// [`PackageAssemblyError::DestinationOccupied`] when the destination is
+/// occupied at the moment of publication, which leaves the occupant as it was.
 pub fn assemble_package_tree(
     package_source: &Path,
     repository_root: &Path,
@@ -262,6 +285,10 @@ fn publish_tree(
     // here is what makes the publication safe rather than hopeful.
     ProfilePackage::from_directory(&staged).map_err(PackageAssemblyError::StagedPackage)?;
 
+    // A previous run's tree is retired into the staging workspace first, so the
+    // publication below sees a free name. It is the publication, not this
+    // retire, that decides what happens to an occupant: a tree that appears
+    // between the two is reported rather than overwritten.
     if fs::symlink_metadata(destination).is_ok() {
         rename(
             "retire the occupied destination",
@@ -269,13 +296,35 @@ fn publish_tree(
             &workspace.path().join("retired"),
         )?;
     }
-    rename("publish the staged package tree at", &staged, destination)?;
+    publish_into_free_name(&staged, destination)?;
     drop(workspace);
 
     ProfilePackage::from_directory(destination).map_err(|source| {
         PackageAssemblyError::PublishedPackage {
             path: destination.display().to_string(),
             source,
+        }
+    })
+}
+
+/// Publish the staged tree onto a destination the caller expects to be free.
+///
+/// The rename is the storage layer's atomic no-replace publication
+/// ([`publish_staged_directory_noreplace`]), which is where this repository's
+/// one `renameat2(RENAME_NOREPLACE)` lives, so an occupied destination is
+/// reported rather than overwritten (`@/invariant/atomic-writes`). A tree that
+/// appeared after the caller retired an occupant therefore survives, and the
+/// staged tree stays where it was staged.
+fn publish_into_free_name(staged: &Path, destination: &Path) -> Result<(), PackageAssemblyError> {
+    publish_staged_directory_noreplace(staged, destination).map_err(|error| {
+        let path = destination.display().to_string();
+        if error.downcast_ref::<AlreadyExistsError>().is_some() {
+            PackageAssemblyError::DestinationOccupied { path }
+        } else {
+            PackageAssemblyError::PublicationRefused {
+                path,
+                message: format!("{error:#}"),
+            }
         }
     })
 }
@@ -747,6 +796,42 @@ target = "docs/guide.md"
         assert!(
             declared.iter().all(|source| produced.contains_key(*source)),
             "the produced tree is missing a declared source"
+        );
+    }
+
+    /// The publication step refuses an occupied destination rather than
+    /// overwriting it, and leaves the staged tree where it was staged.
+    ///
+    /// This is the state a run reaches when a tree appears between retiring an
+    /// occupant and publishing into the freed name: the publication runs
+    /// against a destination that is occupied after all. Driving that step
+    /// directly observes the refusal without a race to lose.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_publish_into_free_name_refuses_a_destination_occupied_after_the_retire() {
+        let temp = TempDir::new().unwrap();
+        let staged = temp.path().join("workspace/staged");
+        write_file(&staged.join("manifest.toml"), b"staged tree\n", false);
+        let destination = temp.path().join("out/synthetic");
+        write_file(&destination.join("manifest.toml"), b"the occupant\n", false);
+
+        let error = publish_into_free_name(&staged, &destination)
+            .expect_err("an occupied destination is refused");
+
+        assert!(
+            matches!(&error, PackageAssemblyError::DestinationOccupied { path }
+                if path.ends_with("out/synthetic")),
+            "{error}"
+        );
+        assert_eq!(
+            fs::read(destination.join("manifest.toml")).unwrap(),
+            b"the occupant\n",
+            "the occupant was overwritten"
+        );
+        assert_eq!(
+            fs::read(staged.join("manifest.toml")).unwrap(),
+            b"staged tree\n",
+            "the staged tree was lost"
         );
     }
 
