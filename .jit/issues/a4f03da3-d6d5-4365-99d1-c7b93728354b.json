@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:54:58.541753336Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:57:40.885499729Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a4f03da3-d6d5-4365-99d1-c7b93728354b",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the item-validation integration target",
-  "updated_at": "2026-08-01T20:57:54.480890424Z"
+  "updated_at": "2026-08-02T12:57:40.885499729Z"
 }

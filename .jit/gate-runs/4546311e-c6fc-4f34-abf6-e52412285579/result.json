@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:57:40.587554400Z",
+  "duration_ms": 161314,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The three attributable test modules consistently consume the shared taxonomy fixture; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a4f03da3-d6d5-4365-99d1-c7b93728354b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4546311e-c6fc-4f34-abf6-e52412285579",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:54:59.272762102Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 34511df8, 163e0810, ea4054bf (merge repeats 163e0810)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-08-02T12:54:58Z)\nTruncation recovery: per-commit, per-file patch and current-line reads after combined-output truncation\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The three attributable test modules consistently consume the shared taxonomy fixture; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:54:57.523542137Z",
+  "duration_ms": 167228,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are satisfied; archive tests use the shared taxonomy declaration and recorded Rust CI passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "889a939a-70ef-4cc9-91c8-37ef82d955f3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c1a25215-bb25-4577-a3ff-5b3e2dae232e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:52:10.294888152Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a9605739 and merge 4b7b9c8d (both `jit:889a939a`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/e204e63d/decision/D-13 (issue markdown); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit code none, 2026-08-02T12:52:09.558220517+00:00\nTruncation recovery: recovered the initially truncated multi-commit patch with bounded zero-context reads for a9605739 and 4b7b9c8d\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are satisfied; archive tests use the shared taxonomy declaration and recorded Rust CI passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

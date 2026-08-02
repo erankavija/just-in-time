@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T13:05:31.295222620Z",
+  "duration_ms": 170040,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/init.rs",
+        "id": "F1",
+        "line": 545,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ffe6de33/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Repository-only tests now use the taxonomy fixture, violating hard REQ-02."
+      }
+    ],
+    "summary": "Repository-only initialization tests were unnecessarily converted to the taxonomy fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ffe6de33-3d1e-4c2d-865a-af68462e194e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4c23611e-9bf1-4667-a44e-ca36c35ae344",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T13:02:41.255147891Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7850 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc291-c720-76c3-8301-a38e15673fad\n--------\nuser\n--- 7837 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 51b6600c; 911c3d72 (same first-parent patch; `crates/jit/src/commands/init.rs`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/ffe6de33/requirement/REQ-01–REQ-05 (issue Markdown); @/issue/e204e63d/decision/D-13 (issue Markdown); @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed at 2026-08-02T13:02:40Z (reused; exit code none); no prior code-review run\nTruncation recovery: reread merge first-parent patch, init.rs lines 536–900, and test_taxonomy.rs lines 1–232; excluded the merge’s second-parent-only unrelated files\n\n1. F1 — blocking, issue-impact (high): Fixture-independent tests were changed despite making no type-name or namespace assertion. For example, `test_fresh_init_publishes_complete_valid_repo_without_git` only verifies initialized paths and repository validity, yet now injects the taxonomy template at `crates/jit/src/commands/init.rs:545`; the same occurs in the invariant-registry tests at lines 577 and 613. This violates hard REQ-02’s requirement to leave repository-only tests alone. References: @/issue/ffe6de33/requirement/REQ-02.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Repository-only initialization tests were unnecessarily converted to the taxonomy fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repository-only tests now use the taxonomy fixture, violating hard REQ-02.\",\"file\":\"crates/jit/src/commands/init.rs\",\"line\":545,\"references\":[\"@/issue/ffe6de33/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

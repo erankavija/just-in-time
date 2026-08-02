@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:45:01.616488080Z",
+  "duration_ms": 222697,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable test-only changes consistently use the shared taxonomy fixture and satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "be918f22-79f2-4cf8-897b-acbd2c9f02a7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ce831824-2a9c-46ca-acb2-339e9c2c5387",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:41:18.918580587Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `c30fe354`, `57c79497` (`jit:be918f22`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/e204e63d/decision/D-13` (issue Markdown); `@/invariant/shared-test-contracts` (`.jit/invariants.toml`); `@/gate/cargo-ci` (`.jit/gates.toml`)\nGate evidence: `cargo-ci` passed (latest reused projection; matching input digest); `code-review` pending\nTruncation recovery: narrowed commit patches, merge conflict diff, gate record, current fixture callers, and policy sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable test-only changes consistently use the shared taxonomy fixture and satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

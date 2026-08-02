@@ -16,12 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T10:48:12.246429711Z",
+      "updated_at": "2026-08-02T12:27:16.262355851Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-02T10:52:24.950391193Z",
+      "updated_at": "2026-08-02T12:30:12.903128583Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One declared vocabulary serves every shared test fixture",
-  "updated_at": "2026-08-02T10:52:24.950391193Z"
+  "updated_at": "2026-08-02T12:30:12.903128583Z"
 }

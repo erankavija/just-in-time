@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:32:42.449115041Z",
+  "duration_ms": 147566,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 717,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-8",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Repair resolves every applied profile through embedded_profile by ID and rejects a valid directory-origin record rather than re-reading its recorded worktree location."
+      }
+    ],
+    "summary": "Directory-origin provenance is recorded but cannot be re-resolved during repair.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6c47b99a-e0bc-4705-82b6-5404d285fa58",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0fada297-a27d-4dad-a9c1-fb55cacb57d9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:30:14.882700119Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3663 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc274-1444-7e51-a7b1-700cc664aac8\n--------\nuser\n--- 3650 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 99091eab, 9ee75f2a, 05d3f92d, 92b478a8, b558fa4f\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-8 (markdown-first issue description); @/invariant/derived-state-coherence (.jit/invariants.toml registry); @/gate/jit-validate (.jit/gates.toml registry)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-08-02T12:30:13Z); mcp-ci passed (exit 0, 2026-08-02T09:32:26Z)\nTruncation recovery: narrowed reads of validate.rs:675-790 and profile.rs:345-425; individual tagged patches and merge-parent changed-file lists inspected separately\n\n1. **F1 — high, blocking, issue-impact:** Directory-origin provenance cannot be used for repair. `resolve_recorded_packages` selects every record by ID through `embedded_profile` at [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:717), before deserializing its origin; a valid `directory` record is consequently compared with an embedded expected record at [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:772) and fails instead of re-reading its recorded worktree location. This leaves the prior structured finding F2 unresolved and violates the claimed repair behavior. References: @/issue/e204e63d/decision/D-8, @/invariant/derived-state-coherence.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Directory-origin provenance is recorded but cannot be re-resolved during repair.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repair resolves every applied profile through embedded_profile by ID and rejects a valid directory-origin record rather than re-reading its recorded worktree location.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":717,\"references\":[\"@/issue/e204e63d/decision/D-8\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

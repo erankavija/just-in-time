@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T13:00:09.817056888Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T13:02:39.814040442Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a603f02d-5cc4-421a-ae81-3b0bdf3f5031",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the query-and-graph integration target",
-  "updated_at": "2026-08-01T20:58:05.166889801Z"
+  "updated_at": "2026-08-02T13:02:39.814040442Z"
 }

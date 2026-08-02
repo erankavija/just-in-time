@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:48:39.751039739Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T12:52:08.841132502Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1cfb66ff-daa4-427e-8b92-fd75cc6081f0",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the documents-and-templates integration target",
-  "updated_at": "2026-08-01T20:57:29.359925976Z"
+  "updated_at": "2026-08-02T12:52:08.841132502Z"
 }

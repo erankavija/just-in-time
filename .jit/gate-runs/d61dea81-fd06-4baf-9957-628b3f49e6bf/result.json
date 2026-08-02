@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:41:17.159475276Z",
+  "duration_ms": 191609,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable direct-seed tests consume the shared taxonomy declaration; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "76b16af0-4a66-45cf-96ea-e8eaf76996ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d61dea81-fd06-4baf-9957-628b3f49e6bf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:38:05.549537914Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:76b16af0 commits 5e75325b, 5de1a70e, 76e9a916, 289ad30a, ee99c17b\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json\nResolved items: @/issue/e204e63d/decision/D-13; @/invariant/shared-test-contracts; @/invariant/convention-convergence; @/gate/cargo-ci\nGate evidence: cargo-ci passed 2026-08-02T12:38:04Z (exit code none); code-review pending\nTruncation recovery: Narrowed reads of each patch, current direct-seed call site, and shared taxonomy fixture after a broad search truncated\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable direct-seed tests consume the shared taxonomy declaration; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:57:41.608685253Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T13:00:09.104282021Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a53a6f09-6369-4f94-8dc7-9b4d8bbd406f",
   "labels": [
     "epic:derived-package-sources",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the server crate",
-  "updated_at": "2026-08-01T20:57:59.765646059Z"
+  "updated_at": "2026-08-02T13:00:09.104282021Z"
 }

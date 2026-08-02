@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:41:18.185231267Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:45:01.913772999Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "be918f22-79f2-4cf8-897b-acbd2c9f02a7",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the repository-inspection command tests",
-  "updated_at": "2026-08-01T20:58:16.318917488Z"
+  "updated_at": "2026-08-02T12:45:01.913772999Z"
 }

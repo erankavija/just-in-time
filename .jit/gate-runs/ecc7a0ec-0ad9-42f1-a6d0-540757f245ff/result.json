@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:38:03.591862014Z",
+  "duration_ms": 168633,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are satisfied by the attributed taxonomy-fixture adoption; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "60c211d6-e86d-4749-9502-b633d064f86a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ecc7a0ec-0ad9-42f1-a6d0-540757f245ff",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:35:14.958755308Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 75dfe4a4, 07b23864, 19f6480f, ba50adff (`jit:60c211d6`)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, markdown-first); @/invariant/shared-test-contracts (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed at 2026-08-02T12:35:14Z (reused; exit code none)\nTruncation recovery: Narrowed reads for each attributed patch, first-parent merge diffs, current test helpers/callers, and fixture sources\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are satisfied by the attributed taxonomy-fixture adoption; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

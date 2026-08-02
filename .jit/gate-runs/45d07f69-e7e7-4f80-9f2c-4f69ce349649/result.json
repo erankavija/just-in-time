@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:48:38.738178719Z",
+  "duration_ms": 215374,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The six attributed fast_rules modules consistently consume the shared test taxonomy without introducing a second taxonomy fixture.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1aa2b486-a96a-47a6-bd68-6163eb62f24f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "45d07f69-e7e7-4f80-9f2c-4f69ce349649",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:45:03.363363521Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 384e3b0b, 96874878 (six-file fast_rules patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (.jit issue decision, markdown-first); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint, @/invariant/convention-convergence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed at 2026-08-02T12:45:02Z (reused, no exit code/stdout); code-review pending\nTruncation recovery: per-file re-reads of the 384e3b0b patch and narrow policy/gate source reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The six attributed fast_rules modules consistently consume the shared test taxonomy without introducing a second taxonomy fixture.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

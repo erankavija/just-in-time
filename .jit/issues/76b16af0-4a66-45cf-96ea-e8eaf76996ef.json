@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:38:04.718785227Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:41:17.459545319Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "76b16af0-4a66-45cf-96ea-e8eaf76996ef",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the modules that seed a repository directly",
-  "updated_at": "2026-08-01T20:57:43.959728552Z"
+  "updated_at": "2026-08-02T12:41:17.459545319Z"
 }

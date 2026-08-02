@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T13:02:40.536564584Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T13:05:31.591629617Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ffe6de33-3d1e-4c2d-865a-af68462e194e",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Adopt the taxonomy fixture in the initialization command tests",
-  "updated_at": "2026-08-01T20:58:23.658689531Z"
+  "updated_at": "2026-08-02T13:05:31.591629617Z"
 }

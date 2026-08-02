@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:27:00.575611046Z",
+  "duration_ms": 180253,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/gate_execution.rs",
+        "id": "F1",
+        "line": 456,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Ignored files beneath declared roots are excluded from the digest without requiring a declared exclusion, enabling unsound verdict reuse."
+      }
+    ],
+    "summary": "Declared-input digests omit ignored files and can unsafely reuse a verdict after one changes.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "32779829-319f-40b0-bd41-fe213f4885fc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "44971619-2997-46c5-b599-c4dd1eeea92a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:24:00.321995900Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 29388 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc26e-6028-7e93-ad15-41cb2294df29\n--------\nuser\n--- 29375 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0d0c65d4, 5f807562, 86223f24, bccf0483, 3edcbdfd, a39e357d, f2aa0b37, 9bf34bc0\nPolicy sources: AGENTS.md\nResolved items: @/invariant/convention-convergence (.jit/invariants.toml); @/invariant/semantic-types (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T12:17:08Z); mcp-ci pending; docs-mechanical pending\nTruncation recovery: file-bounded per-commit patches and focused current-source reads\n\n1. **Blocking, issue-impact:** The digest omits ignored files even when they are under a declared root and match no declared exclusion. `git ls-files --exclude-standard` filters them out, and the added test explicitly asserts that behavior. An ignored source/config file can therefore change a checker’s result while retaining the prior digest and reusing its verdict, violating REQ-02’s “every file beneath a declared root that no declared exclusion matches” requirement. [crates/jit/src/gate_execution.rs:456](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/gate_execution.rs:456>)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Declared-input digests omit ignored files and can unsafely reuse a verdict after one changes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Ignored files beneath declared roots are excluded from the digest without requiring a declared exclusion, enabling unsound verdict reuse.\",\"file\":\"crates/jit/src/gate_execution.rs\",\"line\":456,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

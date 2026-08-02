@@ -13,7 +13,28 @@
     "mcp-ci",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:23:59.224503494Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T12:27:00.870188470Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:27:15.487616165Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T12:27:04.203817345Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "32779829-319f-40b0-bd41-fe213f4885fc",
   "labels": [
     "epic:derived-package-sources",
@@ -26,5 +47,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "A gate verdict is reused when its declared inputs are unchanged",
-  "updated_at": "2026-08-02T10:54:19.579801929Z"
+  "updated_at": "2026-08-02T12:27:15.487616165Z"
 }

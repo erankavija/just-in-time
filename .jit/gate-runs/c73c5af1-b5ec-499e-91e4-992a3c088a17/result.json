@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:52:08.526100955Z",
+  "duration_ms": 208050,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_docs_templates/document_event_log_tests.rs",
+        "id": "F1",
+        "line": 286,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1cfb66ff/requirement/REQ-02",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "Repository-only document tests now construct the taxonomy despite asserting no type or namespace, violating REQ-02."
+      }
+    ],
+    "summary": "Two vocabulary-independent document tests were unnecessarily changed to use the taxonomy fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1cfb66ff-daa4-427e-8b92-fd75cc6081f0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c73c5af1-b5ec-499e-91e4-992a3c088a17",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:48:40.475704015Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8197 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc284-f2d8-7d20-abd2-0d1496bb0393\n--------\nuser\n--- 8184 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cf771403 and merge 07e1a40c (two-file, 148-insertion/79-deletion footprint)\nPolicy sources: AGENTS.md\nResolved items: @/issue/1cfb66ff/requirement/REQ-02 and @/issue/e204e63d/decision/D-13 (issue descriptions, markdown-first); @/invariant/shared-test-contracts, @/invariant/canonical-cutover, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci=passed (exit code: none; 2026-08-02T12:48:39Z)\nTruncation recovery: recovered merge first-parent patch with -m and reread individual patches/current files in path and line ranges\n\n1. **F1 — blocking, issue-impact:** [document_event_log_tests.rs](crates/jit/tests/fast_docs_templates/document_event_log_tests.rs:286) changes the pinned-document test to construct the taxonomy, and the malformed-UTF-8 test similarly adopts the taxonomy fixture at line 355. Neither asserts a type name or namespace; they test pinned asset bytes and UTF-8 failure behavior only. This violates hard REQ-02’s requirement to leave repository-only, vocabulary-independent tests alone. References: @/issue/1cfb66ff/requirement/REQ-02, @/invariant/shared-test-contracts.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two vocabulary-independent document tests were unnecessarily changed to use the taxonomy fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repository-only document tests now construct the taxonomy despite asserting no type or namespace, violating REQ-02.\",\"file\":\"crates/jit/tests/fast_docs_templates/document_event_log_tests.rs\",\"line\":286,\"references\":[\"@/issue/1cfb66ff/requirement/REQ-02\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

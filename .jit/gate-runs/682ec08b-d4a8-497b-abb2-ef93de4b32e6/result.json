@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T13:02:39.515479541Z",
+  "duration_ms": 148980,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_query_graph/scope_validation_tests.rs",
+        "id": "F1",
+        "line": 1100,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13",
+          "@/invariant/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "setup_spine invokes bare jit init and relies on scaffold type vocabulary, violating REQ-03."
+      }
+    ],
+    "summary": "One scope-validation helper still relies on bare-init taxonomy instead of the shared fixture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a603f02d-5cc4-421a-ae81-3b0bdf3f5031",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "682ec08b-d4a8-497b-abb2-ef93de4b32e6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T13:00:10.535370994Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3987 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc28f-7a62-73e0-9daf-eae484fbb144\n--------\nuser\n--- 3974 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4d51fe84, 661baef6, c6ace10a\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed, 2026-08-02T13:00:09Z, exit code none (reused run; stdout unavailable)\nTruncation recovery: narrowed the truncated target-wide search to setup, initializer, and taxonomy patterns\n\n1. **[blocking][issue-impact] F1** — `setup_spine` still invokes bare `jit init` and then relies on `type:breakdown`, `type:task`, and `type:epic`. This constructs the scaffold taxonomy rather than consuming the shared fixture, violating REQ-03 and leaving these tests incompatible with D-13’s structural-only bare initialization. [crates/jit/tests/cli_query_graph/scope_validation_tests.rs:1100](@/crates/jit/tests/cli_query_graph/scope_validation_tests.rs:1100) References: @/issue/e204e63d/decision/D-13, @/invariant/shared-test-contracts.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One scope-validation helper still relies on bare-init taxonomy instead of the shared fixture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"setup_spine invokes bare jit init and relies on scaffold type vocabulary, violating REQ-03.\",\"file\":\"crates/jit/tests/cli_query_graph/scope_validation_tests.rs\",\"line\":1100,\"references\":[\"@/issue/e204e63d/decision/D-13\",\"@/invariant/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

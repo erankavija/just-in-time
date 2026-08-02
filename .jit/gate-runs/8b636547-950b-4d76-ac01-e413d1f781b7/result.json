@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:30:12.610295752Z",
+  "duration_ms": 175340,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/fast_docs_templates/artifact_inventory_tests.rs",
+        "id": "F1",
+        "line": 57,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/shared-test-contracts",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "artifact_inventory_tests and content_format_dispatch duplicate shared taxonomy names while separately using its rendered hierarchy, leaving REQ-04 and REQ-05 unmet."
+      }
+    ],
+    "summary": "Two attributed integration suites still hard-code shared taxonomy names instead of reading TestTaxonomy.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "06b736c7-1ed9-43f2-853e-84d69b0dfc79",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8b636547-950b-4d76-ac01-e413d1f781b7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:27:17.269727723Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9895 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc271-5e77-7b83-b9d4-f6e88a59cb7b\n--------\nuser\n--- 9882 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 528cc692, 790b23d9, 439750fe, 801da18a, de7836e0, 2447b327, 555e6cb6 (all `jit:06b736c7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (.jit issue markdown); @/invariant/shared-test-contracts and @/invariant/convention-convergence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-08-02; exit code not recorded); prior code-review failed (2026-08-02; exit 1)\nTruncation recovery: narrowed reads of current taxonomy, fixture, and cited suites; checked follow-up patch paths; merge remerge-diff was unavailable because it requires a temporary write in this read-only run\n\n1. **[blocking][issue-impact][high]** `crates/jit/tests/fast_docs_templates/artifact_inventory_tests.rs:57` still supplies `\"initiative\"` and `\"action\"` literals while separately passing `test_taxonomy().hierarchy_config()`; `crates/jit/tests/fast_docs_templates/content_format_dispatch.rs:39` and `:52` similarly hard-code `\"initiative\"`. Neither consumer reads its configured vocabulary from `TestTaxonomy`, and the follow-up commit did not modify either file. The prior blocking finding is therefore unresolved: REQ-04 and REQ-05 remain unmet. References: @/invariant/shared-test-contracts, @/invariant/convention-convergence.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two attributed integration suites still hard-code shared taxonomy names instead of reading TestTaxonomy.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"artifact_inventory_tests and content_format_dispatch duplicate shared taxonomy names while separately using its rendered hierarchy, leaving REQ-04 and REQ-05 unmet.\",\"file\":\"crates/jit/tests/fast_docs_templates/artifact_inventory_tests.rs\",\"line\":57,\"references\":[\"@/invariant/shared-test-contracts\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

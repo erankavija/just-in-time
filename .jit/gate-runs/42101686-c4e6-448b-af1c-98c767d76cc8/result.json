@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9bf34bc0b96d3abcdeb617e4ffe20355761e445e",
+  "completed_at": "2026-08-02T12:35:12.892836884Z",
+  "duration_ms": 147665,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "profiles/jit-dogfood/manifest.toml",
+        "id": "F1",
+        "line": 319,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-20"
+        ],
+        "severity": "high",
+        "summary": "jit-dogfood declares no invariants and preserves the empty scaffolded registry, failing REQ-07."
+      }
+    ],
+    "summary": "The workflow package does not contribute its invariant entries into the scaffolded invariant registry.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7058cac-cd23-4692-9b4b-01059cdedf8b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "42101686-c4e6-448b-af1c-98c767d76cc8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T12:32:45.226885932Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15167 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc276-5f8c-7221-9f7c-eb961eb3504f\n--------\nuser\n--- 15154 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: aaff9cf9, 3e8d072b, bd59b0bf, bc10c084, 79451c42, ae22659c (all `jit:c7058cac`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-08 and decisions/D-13,D-20 (issue Markdown); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-08-02T12:32:44Z); docs-mechanical pending\nTruncation recovery: narrowed the truncated merge output to combined and first-parent diffs for bc10c084 and ae22659c\n\n1. [blocking, issue-impact] `profiles/jit-dogfood/manifest.toml:319` explicitly says the workflow package “declares no invariant,” and the application test preserves the initialized empty registry unchanged at `crates/jit/src/profile/dogfood.rs:1260-1268`. A freshly initialized repository that receives `jit-dogfood` therefore receives none of this project’s invariant entries, rather than contributions into `.jit/invariants.toml`, failing hard REQ-07 and contradicting D-20. References: @/issue/e204e63d/decision/D-20.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The workflow package does not contribute its invariant entries into the scaffolded invariant registry.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"jit-dogfood declares no invariants and preserves the empty scaffolded registry, failing REQ-07.\",\"file\":\"profiles/jit-dogfood/manifest.toml\",\"line\":319,\"references\":[\"@/issue/e204e63d/decision/D-20\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
