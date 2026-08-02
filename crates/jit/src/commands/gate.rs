@@ -635,6 +635,7 @@ fn updated_gate_definition(current: GateDefinition, update: GateUpdate) -> Resul
         stage: update.stage.unwrap_or(current.stage),
         mode: final_mode,
         checker: final_checker,
+        inputs: current.inputs,
         priority: update.priority.unwrap_or(current.priority),
         reserved: current.reserved,
         auto: final_mode == GateMode::Auto,
@@ -860,8 +861,15 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Check if gate is automated - if so, run the checker instead
         if gate.mode == GateMode::Auto {
-            // Smart behavior: auto-run the checker
-            let result = self.check_gate(&full_id, &gate_key)?;
+            // Smart behavior: auto-run the checker. `force` is the explicit
+            // re-run request, so it also refuses a verdict recorded by an
+            // earlier run over the same declared inputs.
+            let source = if force {
+                crate::commands::VerdictSource::Execute
+            } else {
+                crate::commands::VerdictSource::ReuseUnchangedInputs
+            };
+            let result = self.check_gate_with(&full_id, &gate_key, source)?;
             if result.status != GateRunStatus::Passed {
                 return Err(GatePassFailed {
                     issue_id: full_id,
@@ -1154,6 +1162,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     GateMode::Manual
                 },
                 checker: None,
+                inputs: None,
                 priority: 100,
                 reserved: std::collections::HashMap::new(),
                 auto,
@@ -1212,6 +1221,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 stage,
                 mode,
                 checker: final_checker,
+                inputs: None,
                 priority,
                 reserved: std::collections::HashMap::new(),
                 auto: mode == crate::declarations::GateMode::Auto,
@@ -1566,6 +1576,7 @@ enforce_leases = "off"
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -1612,6 +1623,7 @@ enforce_leases = "off"
                 stage: GateStage::Postcheck,
                 mode: GateMode::Manual,
                 checker: None,
+                inputs: None,
                 priority: 100,
                 reserved: HashMap::new(),
                 auto: false,
@@ -1697,6 +1709,7 @@ enforce_leases = "off"
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -1746,6 +1759,7 @@ enforce_leases = "off"
                 stage: GateStage::Postcheck,
                 mode: GateMode::Manual,
                 checker: None,
+                inputs: None,
                 priority: 100,
                 reserved: HashMap::new(),
                 auto: false,
@@ -2152,6 +2166,7 @@ style = "full"
             reserved: HashMap::new(),
             auto: false,
             example_integration: None,
+            inputs: None,
         });
         let context = MutationContext::deterministic(
             [72; 32],
@@ -2213,6 +2228,7 @@ style = "full"
                 stage: GateStage::Postcheck,
                 mode: GateMode::Manual,
                 checker: None,
+                inputs: None,
                 priority: 100,
                 reserved: HashMap::new(),
                 auto: false,

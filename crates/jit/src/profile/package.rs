@@ -1,7 +1,7 @@
 use super::manifest::{
-    is_lowercase_kebab, is_safe_relative_path, ProfileManifest, MANIFEST_FILE_NAME,
-    PROFILE_MANIFEST_VERSION,
+    is_lowercase_kebab, ProfileManifest, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
 };
+use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::ambient_authority;

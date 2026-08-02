@@ -78,6 +78,7 @@ pub use gate::{
     FieldEdit, GateNotRequiredError, GatePassAllEntry, GatePassFailed, GatePassOutcome, GateUpdate,
     ManualGateAttestationRequiredError, PassAllOutcome,
 };
+pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
@@ -3300,6 +3301,7 @@ mod tests {
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         registry.gates.insert(
@@ -3316,6 +3318,7 @@ mod tests {
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,
+                inputs: None,
             },
         );
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);
@@ -3387,6 +3390,8 @@ mod tests {
             by: None,
             message: None,
             findings: None,
+            inputs_digest: None,
+            origin: crate::domain::GateVerdictOrigin::Executed,
         }
     }
 
@@ -3462,6 +3467,7 @@ mod tests {
             reserved: std::collections::HashMap::new(),
             auto: false,
             example_integration: None,
+            inputs: None,
         };
         GateRegistry {
             gates: std::collections::HashMap::from([(key.to_string(), definition)]),

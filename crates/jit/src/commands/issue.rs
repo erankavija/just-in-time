@@ -865,6 +865,7 @@ mod tests {
                     reserved: HashMap::new(),
                     auto: false,
                     example_integration: None,
+                    inputs: None,
                 },
             );
         }
@@ -963,6 +964,7 @@ mod tests {
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,
+                inputs: None,
             },
         );
         crate::commands::test_helpers::seed_gate_registry(&executor.storage, &registry);
@@ -1021,6 +1023,7 @@ mod tests {
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,
+                inputs: None,
             },
         );
         crate::commands::test_helpers::seed_gate_registry(&executor.storage, &registry);
@@ -1257,6 +1260,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,
+                inputs: None,
             },
         );
         crate::commands::test_helpers::seed_gate_registry(&storage, &registry);

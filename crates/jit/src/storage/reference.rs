@@ -101,11 +101,15 @@ pub enum GateRunField {
     Message,
     /// `findings`
     Findings,
+    /// `inputs_digest`
+    InputsDigest,
+    /// `origin`
+    Origin,
 }
 
 impl GateRunField {
     /// Every field of the record, in [`GateRunResult`] declaration order.
-    pub const ALL: [GateRunField; 19] = [
+    pub const ALL: [GateRunField; 21] = [
         GateRunField::SchemaVersion,
         GateRunField::RunId,
         GateRunField::GateKey,
@@ -125,6 +129,8 @@ impl GateRunField {
         GateRunField::By,
         GateRunField::Message,
         GateRunField::Findings,
+        GateRunField::InputsDigest,
+        GateRunField::Origin,
     ];
 
     /// The JSON key serde writes for this field.
@@ -149,6 +155,8 @@ impl GateRunField {
             GateRunField::By => "by",
             GateRunField::Message => "message",
             GateRunField::Findings => "findings",
+            GateRunField::InputsDigest => "inputs_digest",
+            GateRunField::Origin => "origin",
         }
     }
 
@@ -237,6 +245,22 @@ impl GateRunField {
                  either way. `jit gate status --findings` prints this field."
                     .to_string()
             }
+            GateRunField::InputsDigest => {
+                "Digest of the repository files the gate declares its checker reads, taken \
+                 before the verdict was obtained. Two runs of one gate carrying the same value \
+                 read byte-identical content at byte-identical paths. Unset when the gate \
+                 declares no inputs, which is what keeps its checker running on every \
+                 evaluation."
+                    .to_string()
+            }
+            GateRunField::Origin => {
+                "Where the verdict came from. `{\"derivation\": \"executed\"}` means this run \
+                 ran the checker; `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}` \
+                 means it carries the named earlier run's verdict, whose `inputs_digest` \
+                 matched, without the checker running again. The report text behind a reused \
+                 verdict lives at the named run."
+                    .to_string()
+            }
         }
     }
 }
@@ -315,6 +339,16 @@ fn sample_gate_run() -> GateRunResult {
                 references: vec!["@/inv/atomic-writes".to_string()],
             }],
         }),
+        inputs_digest: Some({
+            // Produced by the same builder the evaluator digests with, so the
+            // sample cannot show a value the encoding could not have written.
+            let mut builder = crate::domain::InputsDigestBuilder::new();
+            builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
+            builder.finish()
+        }),
+        origin: crate::domain::GateVerdictOrigin::Reused(
+            "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34".to_string(),
+        ),
     }
 }
 
@@ -334,6 +368,8 @@ fn sample_gate_run_minimal() -> GateRunResult {
         by: None,
         message: None,
         findings: None,
+        inputs_digest: None,
+        origin: crate::domain::GateVerdictOrigin::Executed,
         ..sample_gate_run()
     }
 }

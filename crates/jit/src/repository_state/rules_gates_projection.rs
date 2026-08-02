@@ -244,6 +244,7 @@ assert = { require-section = { heading = "Goal" } }
             reserved: HashMap::new(),
             auto: false,
             example_integration: None,
+            inputs: None,
         }
     }
 

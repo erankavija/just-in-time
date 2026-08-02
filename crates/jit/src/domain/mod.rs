@@ -11,6 +11,8 @@
 //! - **gate_findings**: Pure parser extracting structured findings from checker stdout
 //! - **build_provenance**: Pure comparison of a running binary's build commit/dirty
 //!   flag against a repository's current HEAD (the stale-binary gate check)
+//! - **repository_inputs**: Declared root-and-exclusion input sets and the content
+//!   digest taken over one, shared by build provenance and gate input declarations
 //! - **queries**: Pure query operations on issue collections
 //! - **type_taxonomy**: The taxonomy of type labels and their levels, and validation against it
 //! - **graph**: Dependency graph algorithms (cycle detection, topological sort, transitive reduction)
@@ -34,6 +36,7 @@ pub mod gate_findings;
 pub mod item;
 pub mod projection;
 pub mod queries;
+pub mod repository_inputs;
 pub mod type_taxonomy;
 pub mod types;
 
@@ -42,6 +45,11 @@ pub use types::*;
 
 // Re-export the structured gate-findings parser and its types.
 pub use gate_findings::{parse_gate_findings, GateFinding, GateFindings};
+
+// Re-export the declared-input model and its digest.
+pub use repository_inputs::{
+    DeclaredRoot, ExclusionPattern, InputsDigest, InputsDigestBuilder, RepositoryInputs,
+};
 
 // Re-export the event-tag catalog and its projection.
 pub use event_catalog::{event_catalog, render_event_reference, EventScope, EventTag, EventTagDoc};

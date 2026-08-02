@@ -19,6 +19,7 @@ mod package;
 #[cfg(any(test, feature = "test-support"))]
 pub mod template_region;
 
+pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
 pub use application::{
     ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileListResult,
@@ -31,9 +32,9 @@ pub use dogfood::{
     JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
 };
 pub use manifest::{
-    profile_manifest_schema, AssetDeclaration, ExclusionPattern, LiveSourceDeclaration,
-    LiveSourceRoot, ProfileId, ProfileManifest, ProfileMetadata, RegionDeclaration,
-    RegionPlacement, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
+    profile_manifest_schema, AssetDeclaration, LiveSourceDeclaration, ProfileId, ProfileManifest,
+    ProfileMetadata, RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME,
+    PROFILE_MANIFEST_VERSION,
 };
 pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,

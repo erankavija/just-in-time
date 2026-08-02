@@ -508,6 +508,63 @@ impl Default for InMemoryStorage {
     }
 }
 
+impl InMemoryStorage {
+    /// Read every recorded gate run the predicate keeps.
+    ///
+    /// One enumeration of the gate-run entries behind every whole-history
+    /// question, matching the file backend's own
+    /// (`@/invariant/convention-convergence`).
+    fn read_gate_runs(
+        &self,
+        mut keep: impl FnMut(&GateRunResult) -> bool,
+    ) -> Result<Vec<GateRunResult>> {
+        let state = self.repository_state();
+        if !Self::gate_run_parent_is_directory(&state, &VirtualPath::GATE_RUNS)? {
+            return Ok(Vec::new());
+        }
+        let run_ids = state
+            .entries
+            .iter()
+            .filter_map(|(vpath, entry)| match entry {
+                RepositoryEntry::Directory { .. } => Self::gate_run_directory_id(vpath),
+                RepositoryEntry::Absent
+                | RepositoryEntry::File { .. }
+                | RepositoryEntry::Symlink { .. }
+                | RepositoryEntry::Unsupported { .. } => None,
+            })
+            .collect::<Vec<_>>();
+        run_ids
+            .into_iter()
+            .filter_map(|run_id| {
+                let vpath = match Self::gate_run_vpath(run_id) {
+                    Ok(vpath) => vpath,
+                    Err(error) => return Some(Err(error)),
+                };
+                match state.entries.get(&vpath) {
+                    None | Some(RepositoryEntry::Absent) => None,
+                    Some(RepositoryEntry::File { bytes, .. }) => Some(
+                        serde_json::from_slice::<GateRunResult>(bytes).with_context(|| {
+                            format!(
+                                "Failed to deserialize gate-run result at {}",
+                                vpath.relative().as_path().display()
+                            )
+                        }),
+                    ),
+                    Some(_) => Some(Err(anyhow!(
+                        "Gate run result at {} must be an ordinary file",
+                        vpath.relative().as_path().display()
+                    ))),
+                }
+            })
+            .filter_map(|result| match result {
+                Ok(run) if keep(&run) => Some(Ok(run)),
+                Ok(_) => None,
+                Err(error) => Some(Err(error)),
+            })
+            .collect()
+    }
+}
+
 impl IssueStore for InMemoryStorage {
     fn repository_layout(&self) -> Result<crate::repository_state::RepositoryLayout> {
         Ok(InMemoryStorage::repository_layout(self))
@@ -623,50 +680,17 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn list_gate_runs_for_issue(&self, issue_id: &str) -> Result<Vec<GateRunResult>> {
-        let state = self.repository_state();
-        if !Self::gate_run_parent_is_directory(&state, &VirtualPath::GATE_RUNS)? {
-            return Ok(Vec::new());
-        }
-        let run_ids = state
-            .entries
-            .iter()
-            .filter_map(|(vpath, entry)| match entry {
-                RepositoryEntry::Directory { .. } => Self::gate_run_directory_id(vpath),
-                RepositoryEntry::Absent
-                | RepositoryEntry::File { .. }
-                | RepositoryEntry::Symlink { .. }
-                | RepositoryEntry::Unsupported { .. } => None,
-            })
-            .collect::<Vec<_>>();
-        run_ids
-            .into_iter()
-            .filter_map(|run_id| {
-                let vpath = match Self::gate_run_vpath(run_id) {
-                    Ok(vpath) => vpath,
-                    Err(error) => return Some(Err(error)),
-                };
-                match state.entries.get(&vpath) {
-                    None | Some(RepositoryEntry::Absent) => None,
-                    Some(RepositoryEntry::File { bytes, .. }) => Some(
-                        serde_json::from_slice::<GateRunResult>(bytes).with_context(|| {
-                            format!(
-                                "Failed to deserialize gate-run result at {}",
-                                vpath.relative().as_path().display()
-                            )
-                        }),
-                    ),
-                    Some(_) => Some(Err(anyhow!(
-                        "Gate run result at {} must be an ordinary file",
-                        vpath.relative().as_path().display()
-                    ))),
-                }
-            })
-            .filter_map(|result| match result {
-                Ok(r) if r.issue_id == issue_id => Some(Ok(r)),
-                Ok(_) => None,
-                Err(e) => Some(Err(e)),
-            })
-            .collect()
+        self.read_gate_runs(|result| result.issue_id == issue_id)
+    }
+
+    fn find_reusable_gate_run(
+        &self,
+        gate_key: &str,
+        digest: &crate::domain::InputsDigest,
+    ) -> Result<Option<GateRunResult>> {
+        Ok(crate::domain::latest_gate_run(self.read_gate_runs(
+            |result| result.is_reusable_for(gate_key, digest),
+        )?))
     }
 
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {

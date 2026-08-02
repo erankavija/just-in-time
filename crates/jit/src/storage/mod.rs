@@ -267,6 +267,27 @@ pub trait IssueStore: Clone {
     fn list_gate_runs_for_issue(&self, issue_id: &str)
         -> Result<Vec<crate::domain::GateRunResult>>;
 
+    /// The most recent run of `gate_key` whose verdict an evaluation over
+    /// inputs digesting to `digest` may carry.
+    ///
+    /// The search spans every recorded run, not one issue's: a whole-tree
+    /// checker's verdict over an input set belongs to that input set, so the
+    /// issue it was first derived for does not narrow who may cite it.
+    ///
+    /// A run qualifies only when it recorded the same digest, executed its own
+    /// checker ([`GateVerdictOrigin::Executed`](crate::domain::GateVerdictOrigin)),
+    /// and reached a verdict — `passed` or `failed`. A run that errored reached
+    /// none, so it is never a source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if recorded runs cannot be read.
+    fn find_reusable_gate_run(
+        &self,
+        gate_key: &str,
+        digest: &crate::domain::InputsDigest,
+    ) -> Result<Option<crate::domain::GateRunResult>>;
+
     /// Get the root directory path for this storage backend.
     ///
     /// Returns the path where configuration files are stored.

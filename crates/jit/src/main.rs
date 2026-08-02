@@ -1181,6 +1181,8 @@ mod gate_findings_text_tests {
                     references,
                 }],
             }),
+            inputs_digest: None,
+            origin: jit::domain::GateVerdictOrigin::Executed,
         }
     }
 
@@ -1250,6 +1252,9 @@ fn print_gate_run_details(result: &GateRunResult) {
     }
     if let Some(dirty) = result.tree_dirty {
         println!("  Tree: {}", if dirty { "dirty" } else { "clean" });
+    }
+    if let Some(source_run) = result.origin.source_run() {
+        println!("  Verdict: taken from run {source_run} over the same declared inputs");
     }
     if let Some(f) = &result.findings {
         println!(
@@ -8023,6 +8028,8 @@ mod exit_code_projection_tests {
             by: None,
             message: None,
             findings: None,
+            inputs_digest: None,
+            origin: jit::domain::GateVerdictOrigin::Executed,
         };
         jit::commands::GatePassFailed {
             issue_id: "abc123".to_string(),
