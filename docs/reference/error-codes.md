@@ -30,7 +30,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `REPOSITORY_FORMAT_TOO_NEW` | The repository format is newer than this binary supports. | `10` |
 | `STALE_BINARY` | The running binary predates the repository under review. | `10` |
 | `DELETION_NOT_CONFIRMED` | Issue deletion lacks the required operator confirmation. | `2` |
-| `PROFILE_NOT_FOUND` | The requested embedded profile does not exist. | `3` |
+| `PROFILE_NOT_FOUND` | No resolution route found the requested profile. | `3` |
 | `PROFILE_CONFLICT` | Profile planning or validation found a conflict. | `4` |
 | `DEPENDENCY_ERROR` | A dependency command failed. | `3` |
 | `GATE_ERROR` | A gate command failed. | `6` |
