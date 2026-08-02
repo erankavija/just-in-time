@@ -1003,8 +1003,8 @@ mod tests {
     use super::*;
     use crate::domain::artifact_plan::EvidenceCode;
     use crate::domain::{DocumentReference, State};
-    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::JsonFileStorage;
+    use crate::test_taxonomy::test_taxonomy;
     use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
@@ -1117,14 +1117,18 @@ mod tests {
     ) -> (TempDir, CommandExecutor<JsonFileStorage>, Vec<String>) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
@@ -1248,11 +1252,12 @@ mod tests {
         use std::os::unix::fs::symlink;
 
         let (repo, executor, id) = configured_repo();
-        fs::write(
-            repo.path().join(".jit/config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"safe/archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
-        )
-        .unwrap();
+        let config_path = repo.path().join(".jit/config.toml");
+        let config = fs::read_to_string(&config_path).unwrap().replace(
+            "archive_root = \"archive\"",
+            "archive_root = \"safe/archive\"",
+        );
+        fs::write(config_path, config).unwrap();
         fs::create_dir(repo.path().join("outside")).unwrap();
         symlink("outside", repo.path().join("safe")).unwrap();
 
@@ -1430,14 +1435,18 @@ mod tests {
     fn test_execution_preserves_positive_relative_and_root_relative_multi_edge_layout() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"shared\"]\narchive_root = \"archive\"\n",
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"shared\"]\narchive_root = \"archive\"\n",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::create_dir(repo.path().join("shared")).unwrap();
@@ -1501,20 +1510,22 @@ mod tests {
     fn test_publication_only_execution_records_one_event() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            concat!(
-                "[documentation]\n",
-                "development_root = \"dev\"\n",
-                "managed_paths = [\"fixtures\"]\n",
-                "permanent_paths = [\"dev/guides\"]\n",
-                "archive_root = \"archive\"\n"
-            ),
+            format!("{}\n", taxonomy.config_fragment())
+                + concat!(
+                    "[documentation]\n",
+                    "development_root = \"dev\"\n",
+                    "managed_paths = [\"fixtures\"]\n",
+                    "permanent_paths = [\"dev/guides\"]\n",
+                    "archive_root = \"archive\"\n"
+                ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
         fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
@@ -1542,20 +1553,22 @@ mod tests {
     fn test_preexisting_identical_permanent_copy_is_adopted_once_without_deletion() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            concat!(
-                "[documentation]\n",
-                "development_root = \"dev\"\n",
-                "managed_paths = [\"fixtures\"]\n",
-                "permanent_paths = [\"dev/guides\"]\n",
-                "archive_root = \"archive\"\n"
-            ),
+            format!("{}\n", taxonomy.config_fragment())
+                + concat!(
+                    "[documentation]\n",
+                    "development_root = \"dev\"\n",
+                    "managed_paths = [\"fixtures\"]\n",
+                    "permanent_paths = [\"dev/guides\"]\n",
+                    "archive_root = \"archive\"\n"
+                ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("archive/guides")).unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
@@ -1634,31 +1647,37 @@ mod tests {
     fn test_container_preview_and_execution_share_owner_relative_destinations_across_areas() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            concat!(
-                "[documentation]\n",
-                "development_root = \"workspace\"\n",
-                "managed_paths = [\"workspace/active\", \"workspace/presentations\"]\n",
-                "issue_scoped_areas = [\"workspace/active\", \"workspace/presentations\"]\n",
-                "permanent_paths = []\n",
-                "archive_root = \"workspace/archive\"\n\n",
-                "[type_hierarchy]\n",
-                "types = { epic = 1, task = 2 }\n",
-                "[type_hierarchy.label_associations]\n",
-                "epic = \"epic\"\n",
-            ),
+            format!("{}\n", taxonomy.config_fragment())
+                + concat!(
+                    "[documentation]\n",
+                    "development_root = \"workspace\"\n",
+                    "managed_paths = [\"workspace/active\", \"workspace/presentations\"]\n",
+                    "issue_scoped_areas = [\"workspace/active\", \"workspace/presentations\"]\n",
+                    "permanent_paths = []\n",
+                    "archive_root = \"workspace/archive\"\n",
+                ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
 
         let mut container =
             crate::domain::types::fixture_issue("Owned archive layout".into(), String::new());
         container.state = State::Done;
-        container.labels = vec!["type:epic".into(), "epic:platform-archive".into()];
+        let container_type = taxonomy.type_at_level(1);
+        let container_namespace = taxonomy
+            .label_associations
+            .get(container_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        container.labels = vec![
+            format!("type:{container_type}"),
+            format!("{container_namespace}:platform-archive"),
+        ];
         let owner = format!("{}-platform-archive", container.short_id());
         let sources = [
             format!("workspace/active/{owner}/plan.md"),
@@ -1733,14 +1752,18 @@ mod tests {
 
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n\n[type_hierarchy]\ntypes = { epic = 1, task = 2 }\n[type_hierarchy.label_associations]\nepic = \"epic\"\n",
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), b"shared").unwrap();
@@ -1753,7 +1776,7 @@ mod tests {
 
         let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());
         container.state = State::Done;
-        container.labels = vec!["type:epic".into()];
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
         container.documents = vec![
             DocumentReference::new("fixtures/root.md".into()),
             DocumentReference::at_commit("fixtures/root.md".into(), commit),
@@ -1763,7 +1786,7 @@ mod tests {
         let mut outside =
             crate::domain::types::fixture_issue("Outside active".into(), String::new());
         outside.state = State::InProgress;
-        outside.labels = vec!["type:task".into()];
+        outside.labels = vec![format!("type:{}", taxonomy.type_at_level(4))];
         outside.documents = vec![DocumentReference::new("fixtures/root.md".into())];
         let outside_id = outside.id.clone();
         seed_archive_issue_precondition(&storage, outside);
@@ -1790,25 +1813,18 @@ mod tests {
         let repo = TempDir::new().unwrap();
         let jit = repo.path().join(".jit");
         let storage = JsonFileStorage::new(&jit);
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(&jit).unwrap();
         fs::write(
             jit.join("config.toml"),
-            r#"
-[documentation]
-development_root = ""
-managed_paths = ["fixtures"]
-permanent_paths = ["docs"]
-archive_root = "archive"
-
-[type_hierarchy]
-types = { epic = 1, task = 2 }
-[type_hierarchy.label_associations]
-epic = "epic"
-"#,
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = [\"docs\"]\narchive_root = \"archive\"\n",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
 
         fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
@@ -1834,7 +1850,15 @@ epic = "epic"
 
         let mut epic = crate::domain::types::fixture_issue("Archive fixture".into(), String::new());
         epic.state = State::Done;
-        epic.labels = vec!["type:epic".into(), "epic:archive-fixture".into()];
+        let epic_type = taxonomy.type_at_level(1);
+        let epic_namespace = taxonomy
+            .label_associations
+            .get(epic_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        epic.labels = vec![
+            format!("type:{epic_type}"),
+            format!("{epic_namespace}:archive-fixture"),
+        ];
         epic.documents = [
             "fixtures/readme.md",
             "fixtures/bundle/index.html",
@@ -2019,20 +2043,22 @@ epic = "epic"
     fn development_root_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            concat!(
-                "[documentation]\n",
-                "development_root = \"workspace\"\n",
-                "managed_paths = [\"workspace/active\"]\n",
-                "permanent_paths = []\n",
-                "archive_root = \"workspace/archive\"\n"
-            ),
+            format!("{}\n", taxonomy.config_fragment())
+                + concat!(
+                    "[documentation]\n",
+                    "development_root = \"workspace\"\n",
+                    "managed_paths = [\"workspace/active\"]\n",
+                    "permanent_paths = []\n",
+                    "archive_root = \"workspace/archive\"\n"
+                ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("scripts")).unwrap();
         fs::create_dir_all(repo.path().join("workspace/active")).unwrap();
@@ -2075,20 +2101,22 @@ epic = "epic"
     ) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            concat!(
-                "[documentation]\n",
-                "development_root = \"workspace\"\n",
-                "managed_paths = [\"workspace/active\"]\n",
-                "permanent_paths = []\n",
-                "archive_root = \"workspace/archive\"\n"
-            ),
+            format!("{}\n", taxonomy.config_fragment())
+                + concat!(
+                    "[documentation]\n",
+                    "development_root = \"workspace\"\n",
+                    "managed_paths = [\"workspace/active\"]\n",
+                    "permanent_paths = []\n",
+                    "archive_root = \"workspace/archive\"\n"
+                ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         for (path, content) in [
             ("workspace/active/target.md", "# Target\n"),
@@ -2291,14 +2319,18 @@ epic = "epic"
 
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("real.md"), "[referent](secret.html)").unwrap();
@@ -2330,14 +2362,22 @@ epic = "epic"
 
         let regular_repo = TempDir::new().unwrap();
         let regular_storage = JsonFileStorage::new(regular_repo.path().join(".jit"));
+        let regular_taxonomy = test_taxonomy();
         fs::create_dir_all(regular_storage.root()).unwrap();
         fs::write(
             regular_storage.root().join("config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+                regular_taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&regular_repo, regular_storage.clone())
-            .initialize_fresh_repository(regular_repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(
+                regular_repo.path(),
+                &regular_taxonomy.hierarchy_template(),
+                None,
+            )
             .unwrap();
         fs::create_dir(regular_repo.path().join("fixtures")).unwrap();
         fs::create_dir(regular_repo.path().join("real-archive")).unwrap();
@@ -2357,14 +2397,22 @@ epic = "epic"
 
         let owner_repo = TempDir::new().unwrap();
         let owner_storage = JsonFileStorage::new(owner_repo.path().join(".jit"));
+        let owner_taxonomy = test_taxonomy();
         fs::create_dir_all(owner_storage.root()).unwrap();
         fs::write(
             owner_storage.root().join("config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+                owner_taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&owner_repo, owner_storage.clone())
-            .initialize_fresh_repository(owner_repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(
+                owner_repo.path(),
+                &owner_taxonomy.hierarchy_template(),
+                None,
+            )
             .unwrap();
         fs::create_dir_all(owner_repo.path().join("docs")).unwrap();
         fs::create_dir_all(owner_repo.path().join("fixtures")).unwrap();
@@ -2407,25 +2455,18 @@ epic = "epic"
     fn directory_link_repo() -> (TempDir, JsonFileStorage, String) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            r#"
-[documentation]
-development_root = ""
-managed_paths = ["fixtures"]
-permanent_paths = []
-archive_root = "archive"
-
-[type_hierarchy]
-types = { epic = 1, task = 2 }
-[type_hierarchy.label_associations]
-epic = "epic"
-"#,
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/index.md"), "[section](section/)").unwrap();
@@ -2433,7 +2474,15 @@ epic = "epic"
         let mut epic =
             crate::domain::types::fixture_issue("Directory link container".into(), String::new());
         epic.state = State::Done;
-        epic.labels = vec!["type:epic".into(), "epic:directory-link".into()];
+        let epic_type = taxonomy.type_at_level(1);
+        let epic_namespace = taxonomy
+            .label_associations
+            .get(epic_type)
+            .expect("taxonomy declares a membership namespace for level one");
+        epic.labels = vec![
+            format!("type:{epic_type}"),
+            format!("{epic_namespace}:directory-link"),
+        ];
         epic.documents = vec![DocumentReference::new("fixtures/index.md".into())];
         let id = epic.id.clone();
         seed_archive_issue_precondition(&storage, epic);
@@ -2504,20 +2553,24 @@ epic = "epic"
     ) -> (TempDir, CommandExecutor<JsonFileStorage>, String) {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = test_taxonomy();
         fs::create_dir_all(storage.root()).unwrap();
         fs::write(
             storage.root().join("config.toml"),
-            "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
         let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());
         container.state = state;
-        container.labels = vec!["type:epic".to_string()];
+        container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
         container.documents = vec![DocumentReference::new("fixtures/root.md".into())];
         let id = container.id.clone();
         seed_archive_issue_precondition(&storage, container);
