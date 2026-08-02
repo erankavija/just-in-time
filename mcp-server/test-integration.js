@@ -453,6 +453,23 @@ async function main() {
 
         const shown = await profileCall('jit_profile_show', { id: 'jit-dogfood' });
         assert.strictEqual(shown.manifest.profile.id, 'jit-dogfood');
+        const liveSources = shown.manifest['live-source'];
+        assert.ok(Array.isArray(liveSources) && liveSources.length > 0,
+          'the reported manifest declares live-source roots');
+        const roots = liveSources.map(source => source && source.root);
+        assert.ok(roots.every(root => typeof root === 'string' && root.length > 0),
+          'every reported live-source declaration names a root');
+        const liveAssets = shown.manifest.asset.filter(asset =>
+          asset.source.startsWith('assets/live/'));
+        assert.ok(liveAssets.length > 0, 'the reported manifest declares live assets');
+        const targetUnderRoot = (target, root) =>
+          target === root || target.startsWith(`${root}/`);
+        assert.ok(liveAssets.every(asset => roots.some(root =>
+          targetUnderRoot(asset.target, root))),
+        'every reported live asset target is accounted for by a reported root');
+        assert.ok(roots.every(root => liveAssets.some(asset =>
+          targetUnderRoot(asset.target, root))),
+        'every reported root accounts for a reported live asset target');
         assert.deepStrictEqual(shown.origin, { source: 'embedded' });
 
         const preview = await profileCall('jit_profile_apply', {
