@@ -114,6 +114,18 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
     {
         return ErrorCode::ProfileConflict;
     }
+    // Which package bytes a profile command reads could not be settled. It is
+    // classified here, ahead of the source-chain searches below, because a
+    // location that is simply gone carries a NotFound I/O cause: taking that
+    // classification would report a repository whose record outlived its
+    // package as a missing repository or an absent profile, which is the
+    // reading the record exists to rule out.
+    if error
+        .downcast_ref::<jit::commands::ProfileResolutionError>()
+        .is_some()
+    {
+        return ErrorCode::ProfileError;
+    }
 
     // The repository-state derivation error is classified by an exhaustive match
     // over every current variant — no fallback arm — so a newly added variant forces
@@ -896,6 +908,15 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
             .is_some()
     {
         return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
+    }
+    // Stated rather than left to the fallback below, so this envelope and
+    // `error_to_error_code`'s classification of the same failure are read from
+    // one decision.
+    if error
+        .downcast_ref::<jit::commands::ProfileResolutionError>()
+        .is_some()
+    {
+        return JsonError::new(ErrorCode::ProfileError, error.to_string());
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
     // repository-state error: a profile target conflict (raised directly or through

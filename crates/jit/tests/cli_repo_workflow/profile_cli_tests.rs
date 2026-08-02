@@ -316,6 +316,21 @@ fn test_profile_list_reports_a_recorded_location_that_no_longer_resolves() {
         listed["error"]["code"], "PROFILE_NOT_FOUND",
         "a record whose package moved is not a profile this repository never applied"
     );
+
+    // A location that is simply gone carries a NotFound cause, which the human
+    // path would otherwise classify as a missing repository. Both renderings
+    // report one failure, so they carry one exit status.
+    let plain = jit(repo.path(), &["profile", "list"]);
+    assert_eq!(
+        plain.status.code(),
+        jit(repo.path(), &["profile", "list", "--json"])
+            .status
+            .code(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&plain.stdout),
+        String::from_utf8_lossy(&plain.stderr)
+    );
+    assert_ne!(plain.status.code(), Some(3), "{plain:?}");
 }
 
 #[test]
