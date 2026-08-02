@@ -78,10 +78,12 @@ pub enum StaleBinaryReason {
         /// The repository's current `HEAD` commit hash.
         head: String,
     },
-    /// The binary was built from a dirty working tree. A dirty build has no
-    /// commit that fully describes its sources, so it can never be proven to
-    /// still match the current tree — it is always treated as stale,
-    /// regardless of whether the build commit equals `HEAD`.
+    /// The binary was built from a tree carrying an uncommitted build input.
+    /// Such a build has no commit that fully describes its sources, so it can
+    /// never be proven to still match the current tree — it is always treated
+    /// as stale, regardless of whether the build commit equals `HEAD`. What
+    /// counts as a build input is the inventory below, so an uncommitted file
+    /// that feeds no build never reaches this state.
     DirtyBuild {
         /// Full commit hash the running binary was built from (dirty on top
         /// of it).
@@ -109,35 +111,38 @@ pub enum BinaryProvenance {
     NotApplicable,
 }
 
-/// Paths that are actual inputs to the production `jit` binary.
+/// The inventory of the binary's build inputs, verbatim.
 ///
-/// This is a positive build-input inventory, not a denylist of paths that are
-/// presumed safe. The source and manifest roots cover Cargo's compilation
-/// inputs; the profile and hook paths cover the files embedded by
-/// `include_dir!`/`include_str!` in production code. A newly added path
-/// elsewhere in the repository therefore remains irrelevant by construction.
-const BINARY_BUILD_INPUT_ROOTS: &[&str] = &[
-    "Cargo.toml",
-    "Cargo.lock",
-    "crates/jit/Cargo.toml",
-    "crates/jit/Cargo.lock",
-    "crates/jit/build.rs",
-    "crates/jit/src",
-    "profiles/jit-dogfood",
-    "scripts/hooks/pre-commit",
-    "scripts/hooks/pre-push",
-];
+/// Compiled in from `binary_build_inputs.txt` rather than written here, because
+/// `scripts/install-jit.sh` reads the same file to decide whether the tree it
+/// is installing from carries uncommitted build inputs. One inventory, two
+/// consumers, neither restating it (REQ-12). Its own header states the format
+/// and why it is shared; embedding it also makes the file a build input of the
+/// binary in the ordinary way, so editing it rebuilds what reads it.
+const BINARY_BUILD_INPUT_DECLARATION: &str = include_str!("binary_build_inputs.txt");
+
+/// The inventory's lines, comments and blanks removed.
+///
+/// The parsing is the file's stated format and nothing more, so the installer's
+/// reading of the same file cannot disagree about which lines are entries.
+pub(crate) fn declared_build_input_roots() -> Vec<&'static str> {
+    BINARY_BUILD_INPUT_DECLARATION
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect()
+}
 
 /// The binary's build inputs as a declared input set.
 ///
 /// The same declaration shape a quality gate states its checker's inputs in,
-/// so one covering rule serves both questions
-/// (`@/invariant/convention-convergence`). Built once and reused; the
-/// inventory above is fixed source text, and
+/// resolved by the same covering rule, so one rule answers both questions
+/// (REQ-12, `@/invariant/convention-convergence`). Built once and reused; the
+/// inventory is fixed source text, and
 /// `test_binary_build_input_inventory_ignores_unrelated_paths` fails outright
 /// if an entry stops parsing, so the `None` arm cannot ship silently.
 static BINARY_BUILD_INPUTS: std::sync::LazyLock<Option<RepositoryInputs>> =
-    std::sync::LazyLock::new(|| RepositoryInputs::parse(BINARY_BUILD_INPUT_ROOTS, &[]).ok());
+    std::sync::LazyLock::new(|| RepositoryInputs::parse(&declared_build_input_roots(), &[]).ok());
 
 /// Whether `path` can affect the production `jit` binary.
 pub fn is_binary_build_input(path: &str) -> bool {
@@ -319,7 +324,7 @@ mod tests {
     #[test]
     fn test_binary_build_input_inventory_ignores_unrelated_paths() {
         assert!(
-            RepositoryInputs::parse(BINARY_BUILD_INPUT_ROOTS, &[]).is_ok(),
+            RepositoryInputs::parse(&declared_build_input_roots(), &[]).is_ok(),
             "every build-input entry must parse as a declared root"
         );
         assert!(is_binary_build_input("Cargo.toml"));
@@ -332,6 +337,56 @@ mod tests {
             "docs/new-reference.md",
             "scripts/new-tool.sh",
         ]));
+    }
+
+    /// REQ-12: the covering rule and git's pathspec matching read one
+    /// inventory, and this holds them to selecting the same files.
+    ///
+    /// The installer hands the inventory's lines to `git status` as pathspecs
+    /// while the guard matches them through [`is_binary_build_input`]. Nothing
+    /// in either mechanism forces those to agree, so it is asserted here over
+    /// this repository's own file set: a root spelled in a way git reads
+    /// differently, or an exclusion added to the declaration that a pathspec
+    /// cannot express, fails this test rather than silently giving the
+    /// installer and the guard different answers.
+    #[test]
+    fn test_binary_build_inputs_select_the_same_files_as_the_installer_pathspecs() {
+        use std::collections::BTreeSet;
+        use std::process::Command;
+
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let list = |pathspecs: &[&str]| -> BTreeSet<String> {
+            let output = Command::new("git")
+                .arg("ls-files")
+                .arg("-z")
+                .arg("--")
+                .args(pathspecs)
+                .current_dir(&root)
+                .output()
+                .expect("git ls-files should run");
+            assert!(output.status.success(), "git ls-files should succeed");
+            output
+                .stdout
+                .split(|byte| *byte == 0)
+                .filter(|entry| !entry.is_empty())
+                .map(|entry| String::from_utf8_lossy(entry).into_owned())
+                .collect()
+        };
+
+        let by_pathspec = list(&declared_build_input_roots());
+        let by_covering_rule: BTreeSet<String> = list(&[])
+            .into_iter()
+            .filter(|path| is_binary_build_input(path))
+            .collect();
+
+        assert!(
+            !by_pathspec.is_empty(),
+            "the inventory must select some of this repository's files"
+        );
+        assert_eq!(
+            by_pathspec, by_covering_rule,
+            "the installer's pathspecs and the guard's covering rule must select the same build inputs"
+        );
     }
 
     #[test]

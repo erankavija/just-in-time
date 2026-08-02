@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Installing marks a binary stale only when a path it is built from is
+  uncommitted.** `scripts/install-jit.sh` embeds a dirty flag that makes the
+  installed binary report itself stale for its whole life, and it computed that
+  flag from the whole working tree bar the tracker's data root. An uncommitted
+  plan note, changelog entry or web asset therefore produced a binary that
+  refused every gate it was asked to run, until it was reinstalled from a tree
+  clean in ways that had nothing to do with the build. The flag is now derived
+  from the paths that do feed the binary. Those paths are declared once, in
+  `crates/jit/src/domain/binary_build_inputs.txt`: the guard compiles that file
+  in and matches it with the same covering rule a quality gate's declared inputs
+  use, and the installer hands its lines to `git status` as pathspecs, so
+  neither question is answered by an inventory that can drift from the other. A
+  conformance test holds the two matchers to selecting the same files over this
+  repository, and an unreadable inventory records the tree as dirty rather than
+  assuming it clean.
+
 ### Added
 
 - **A gate verdict is reused when its declared inputs are unchanged.** A quality

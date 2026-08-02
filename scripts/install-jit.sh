@@ -37,18 +37,35 @@ git_hash="$(git -C "$repo_root" rev-parse HEAD)"
 git_short_hash="$(git -C "$repo_root" rev-parse --short=8 HEAD)"
 # The dirty flag makes the resulting binary report itself stale for its whole
 # life (`assess_binary_provenance`, crates/jit/src/domain/build_provenance.rs),
-# so it must mean "sources the binary is built from are uncommitted" and
-# nothing wider. The tracker's own data root is excluded because it is the
-# binary's output rather than its input: issue records, the event log and gate
-# results are written by running jit, and they cannot change what a rebuild
-# produces. Without this, evaluating a gate immediately before installing
-# yields a binary that refuses every subsequent gate run.
+# so it means "sources the binary is built from are uncommitted" and nothing
+# wider. An uncommitted plan note, changelog entry or web asset feeds no build,
+# and must leave an installed binary current.
 #
-# Only this one directory is excluded, and by that argument alone. The
-# authoritative statement of what does feed the binary is BINARY_BUILD_INPUTS
-# in the module above; it is deliberately not restated here, since a second
-# copy in shell would go stale against it (@/invariant/single-source-prose).
-if [ -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal -- . ':(exclude).jit')" ]; then
+# The paths that do feed the binary are declared once, in the inventory below,
+# which crates/jit/src/domain/build_provenance.rs compiles in and matches with
+# the same covering rule a quality gate's declared inputs use. This script
+# restates none of them: it reads that file and hands its lines to git as
+# pathspecs. A conformance test
+# (`test_binary_build_inputs_select_the_same_files_as_the_installer_pathspecs`)
+# holds the two matchers to selecting the same files, so neither question is
+# answered by an inventory that can drift from the other.
+#
+# Fails closed: an unreadable or empty inventory records the tree as dirty,
+# because a binary wrongly believed current is the costlier error.
+build_inputs_file="$repo_root/crates/jit/src/domain/binary_build_inputs.txt"
+build_input_paths=()
+if [ -r "$build_inputs_file" ]; then
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(printf '%s' "$line" | tr -d '[:space:]')"
+    [ -n "$line" ] && build_input_paths+=("$line")
+  done <"$build_inputs_file"
+fi
+
+if [ "${#build_input_paths[@]}" -eq 0 ]; then
+  echo "install-jit: cannot read build inputs from $build_inputs_file; recording the tree as dirty" >&2
+  git_dirty=true
+elif [ -n "$(git -C "$repo_root" status --porcelain --untracked-files=normal -- "${build_input_paths[@]}")" ]; then
   git_dirty=true
 else
   git_dirty=false
