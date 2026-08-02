@@ -8,23 +8,17 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-fn init_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(jit_binary())
-        .args(["init"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    temp
+fn init_repo() -> crate::TaxonomyRepo {
+    crate::setup_test_repo_with_taxonomy()
 }
 
 /// Create an issue and return its id (the third whitespace token of the success
 /// line, matching the sibling graph tests).
-fn create(temp: &TempDir, title: &str, labels: &[&str]) -> String {
+fn create<L: AsRef<str>>(temp: &TempDir, title: &str, labels: &[L]) -> String {
     let mut args = vec!["issue", "create", "-t", title];
     for label in labels {
         args.push("-l");
-        args.push(label);
+        args.push(label.as_ref());
     }
     let output = Command::new(jit_binary())
         .args(&args)
@@ -49,8 +43,8 @@ fn dep_add(temp: &TempDir, issue: &str, dep: &str) {
 #[test]
 fn test_graph_export_batch_emits_parseable_array() {
     let temp = init_repo();
-    let epic = create(&temp, "Epic", &["type:epic"]);
-    let task = create(&temp, "Task", &["type:task"]);
+    let epic = create(&temp, "Epic", &[crate::type_label(&temp.taxonomy, 2)]);
+    let task = create(&temp, "Task", &[crate::type_label(&temp.taxonomy, 4)]);
     dep_add(&temp, &epic, &task); // epic depends on task
 
     let output = Command::new(jit_binary())
@@ -80,9 +74,9 @@ fn test_graph_export_batch_emits_parseable_array() {
 #[test]
 fn test_graph_export_scope_composes_with_json_format() {
     let temp = init_repo();
-    let epic = create(&temp, "Epic", &["type:epic"]);
-    let task = create(&temp, "Task", &["type:task"]);
-    let other = create(&temp, "Other", &["type:epic"]);
+    let epic = create(&temp, "Epic", &[crate::type_label(&temp.taxonomy, 2)]);
+    let task = create(&temp, "Task", &[crate::type_label(&temp.taxonomy, 4)]);
+    let other = create(&temp, "Other", &[crate::type_label(&temp.taxonomy, 2)]);
     dep_add(&temp, &epic, &task);
 
     // Scoped JSON export lists only the epic's membership (epic + task), not the
@@ -108,8 +102,8 @@ fn test_graph_export_scope_composes_with_json_format() {
 #[test]
 fn test_graph_export_batch_roundtrips_into_fresh_repo() {
     let source = init_repo();
-    let epic = create(&source, "Auth", &["type:epic"]);
-    let task = create(&source, "Login", &["type:task"]);
+    let epic = create(&source, "Auth", &[crate::type_label(&source.taxonomy, 2)]);
+    let task = create(&source, "Login", &[crate::type_label(&source.taxonomy, 4)]);
     dep_add(&source, &epic, &task);
 
     let seed = source.path().join("seed.json");
@@ -162,7 +156,7 @@ fn test_graph_export_batch_roundtrips_into_fresh_repo() {
 #[test]
 fn test_graph_export_batch_rejects_conflicting_flags() {
     let temp = init_repo();
-    create(&temp, "Solo", &["type:task"]);
+    create(&temp, "Solo", &[crate::type_label(&temp.taxonomy, 4)]);
 
     // `--json` (sugar for --format json) conflicts with `--format batch`.
     let json_conflict = Command::new(jit_binary())

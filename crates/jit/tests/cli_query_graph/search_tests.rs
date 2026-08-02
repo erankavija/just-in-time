@@ -234,13 +234,7 @@ fn test_search_extracts_issue_ids() {
 
 #[test]
 fn test_search_json_uses_count_not_total() {
-    let temp = TempDir::new().unwrap();
-    let init = Command::new(jit_binary())
-        .current_dir(temp.path())
-        .arg("init")
-        .output()
-        .unwrap();
-    assert!(init.status.success());
+    let temp = crate::setup_test_repo_with_taxonomy();
 
     let create = Command::new(jit_binary())
         .current_dir(temp.path())

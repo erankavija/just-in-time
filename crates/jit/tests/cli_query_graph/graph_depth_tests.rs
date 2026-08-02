@@ -5,15 +5,8 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit = jit_binary();
-    Command::new(jit)
-        .args(["init"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    temp
+fn setup_test_repo() -> crate::TaxonomyRepo {
+    crate::setup_test_repo_with_taxonomy()
 }
 
 #[test]

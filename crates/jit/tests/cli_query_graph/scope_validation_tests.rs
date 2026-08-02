@@ -901,7 +901,6 @@ mod file_backed_external_plan {
     use super::{COVERAGE_ON_EPIC, PLAN_TEMPLATE_EXTERNAL};
     use jit::commands::CommandExecutor;
     use jit::domain::State;
-    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{IssueStore, JsonFileStorage};
     use tempfile::TempDir;
 
@@ -911,9 +910,9 @@ mod file_backed_external_plan {
     /// Returns the temp dir (kept alive = the repo root) and the executor.
     fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
         std::env::set_var("JIT_TEST_MODE", "1");
-        let repo_root = TempDir::new().unwrap();
+        let repo = crate::setup_test_repo_with_taxonomy();
+        let repo_root = repo.temp;
         let jit_dir = repo_root.path().join(".jit");
-        std::fs::create_dir(&jit_dir).unwrap();
         std::fs::write(
             jit_dir.join("config.toml"),
             "[type_hierarchy]\ntypes = { epic = 2, planning = 3, breakdown = 3, task = 4 }\n",
@@ -922,12 +921,6 @@ mod file_backed_external_plan {
         std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_EXTERNAL).unwrap();
         std::fs::write(jit_dir.join("rules.toml"), COVERAGE_ON_EPIC).unwrap();
         let storage = JsonFileStorage::new(&jit_dir);
-        let layout =
-            jit::storage::discover_repository_layout(repo_root.path(), storage.root()).unwrap();
-        CommandExecutor::new(storage.clone())
-            .with_layout(layout)
-            .initialize_fresh_repository(repo_root.path(), &HierarchyTemplate::default(), None)
-            .unwrap();
         let layout =
             jit::storage::discover_repository_layout(repo_root.path(), storage.root()).unwrap();
         (repo_root, CommandExecutor::new(storage).with_layout(layout))
@@ -1187,8 +1180,7 @@ assert = { label-coverage = { } }
 
     #[test]
     fn test_cli_scope_rejects_combination_with_id() {
-        let dir = TempDir::new().unwrap();
-        assert!(run(&dir, &["init"]).status.success());
+        let dir = crate::setup_test_repo_with_taxonomy();
         let out = run(&dir, &["validate", "someid", "--scope", "other"]);
         assert!(
             !out.status.success(),

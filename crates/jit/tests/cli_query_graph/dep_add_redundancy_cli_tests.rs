@@ -5,20 +5,13 @@
 //! clean.
 
 use std::process::Command;
-use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(jit_binary())
-        .args(["init"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    temp
+fn setup_test_repo() -> crate::TaxonomyRepo {
+    crate::setup_test_repo_with_taxonomy()
 }
 
 fn create_issue(dir: &std::path::Path, title: &str) -> String {
