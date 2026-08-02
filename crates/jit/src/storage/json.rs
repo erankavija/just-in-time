@@ -1507,19 +1507,9 @@ mod tests {
         JsonFileStorage,
         RetainedMutationSessionGuard,
     ) {
-        let temp = TempDir::new().unwrap();
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         let data = temp.path().join(".jit");
-        let storage = JsonFileStorage::new(&data);
-        let initial_layout =
-            crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        crate::commands::CommandExecutor::new(storage.clone())
-            .with_layout(initial_layout)
-            .initialize_fresh_repository(
-                temp.path(),
-                &crate::hierarchy_templates::HierarchyTemplate::default(),
-                None,
-            )
-            .unwrap();
         let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let retained = storage
             .open_and_retain_mutation_session(layout.clone())
@@ -1923,7 +1913,8 @@ mod tests {
         use std::process::Command;
 
         fn setup_git_repo() -> (TempDir, PathBuf, JsonFileStorage) {
-            let temp_dir = TempDir::new().unwrap();
+            let (temp_dir, storage, _taxonomy) =
+                crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
             let repo_path = temp_dir.path().to_path_buf();
 
             // Initialize git repository
@@ -1943,18 +1934,6 @@ mod tests {
                 .args(["config", "user.email", "test@example.com"])
                 .current_dir(&repo_path)
                 .output()
-                .unwrap();
-
-            let data = repo_path.join(".jit");
-            let storage = JsonFileStorage::new(&data);
-            let layout = crate::storage::discover_repository_layout(&repo_path, &data).unwrap();
-            crate::commands::CommandExecutor::new(storage.clone())
-                .with_layout(layout)
-                .initialize_fresh_repository(
-                    &repo_path,
-                    &crate::hierarchy_templates::HierarchyTemplate::default(),
-                    None,
-                )
                 .unwrap();
 
             (temp_dir, repo_path, storage)
