@@ -8,6 +8,7 @@
   ],
   "description": "The repository's applied-profile record carries the location the package was read from, so a later run can read the same package again.\n\n## Background\n\nThe record beside an applied profile carries its id, its version, its origin, the package's content address, and a digest per installed target. Origin has one value, meaning the bytes were compiled into the binary — a vocabulary shaped for a second one but never given it. So a repository that applied a package from a directory has nowhere to say so, and nothing that runs later has anywhere to look for the bytes.\n\nThe location belongs in this record and nowhere else. It is repository-local state, versioned with the repository that applied the profile, and it is the one place that has to agree with itself. Putting the same location in a configuration key as well would create two carriers of one fact and a precedence question between them.\n\nWhere the location may point is part of the contract. A location outside the worktree makes a repository's derived-state repair depend on machine state, so the record is confined to a worktree-relative path and an application from outside it is refused rather than recorded.\n\n## Success Criteria\n\n- [hard] REQ-01: The applied-profile record carries the repository-relative location the package was read from.\n- [hard] REQ-02: The recorded location lies inside the repository worktree; applying a package from outside it is refused, naming the path.\n- [hard] REQ-03: The record's origin distinguishes a package read from a repository location from one compiled into the binary.\n- [hard] REQ-04: Application records the location it actually read from, not one supplied independently of the bytes.\n- [hard] REQ-05: A record whose location is absent or malformed is a validation failure rather than an ignored field.\n\n## Notes\n\nThe record carries a path, never package content. No package bytes are written under the tracker's data root.\n",
   "documents": [],
+  "done_at": "2026-08-02T19:58:51.129631100Z",
   "first_ready_at": "2026-08-01T20:29:24.306373691Z",
   "gates_required": [
     "cargo-ci",
@@ -17,17 +18,17 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T12:30:13.886141955Z",
+      "updated_at": "2026-08-02T19:43:23.887239597Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-02T12:32:42.745805859Z",
+      "status": "passed",
+      "updated_at": "2026-08-02T19:57:42.536643521Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T12:32:43.626187115Z",
+      "updated_at": "2026-08-02T19:43:27.917199973Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,7 +44,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record where an applied package came from",
-  "updated_at": "2026-08-02T12:32:43.626187115Z"
+  "updated_at": "2026-08-02T19:58:51.129631100Z"
 }

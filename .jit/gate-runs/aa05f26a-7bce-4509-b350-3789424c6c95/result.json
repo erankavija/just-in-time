@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ebc3cd5e41a1b3532049bebad9e9d2b0e0df8ffe",
+  "completed_at": "2026-08-02T19:55:14.662898045Z",
+  "duration_ms": 323163,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met in the shipping tree; the prior REQ-05 finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7835fdc0-bd54-473c-a6fc-bd8c55dc390b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aa05f26a-7bce-4509-b350-3789424c6c95",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T19:49:51.499314520Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0cdcab54, 7f523c83, 82c389e5, 4133b83a, e652e33b, d279ab40, 61b5ee82\nPolicy sources: AGENTS.md\nResolved items: @/issue/7835fdc0/requirement/REQ-01–REQ-06 (issue success criteria); @/issue/e204e63d/decision/D-14 (issue decision); @/invariant/dag-acyclic, @/invariant/derived-state-coherence, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code unavailable); code-review failed (exit 1, prior F1)\nTruncation recovery: re-read tagged patches by commit/path/hunk and current profile, init, and validation ranges; resolved D-14 through `jit item show` after its single-line issue source truncated\n\nNo findings. The prior F1 is addressed in the shipping tree by provenance-based recorded-package resolution and declaring-package diagnostics at `crates/jit/src/commands/validate.rs:674-828`.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met in the shipping tree; the prior REQ-05 finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

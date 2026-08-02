@@ -15,12 +15,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T18:47:21.737576963Z",
+      "updated_at": "2026-08-02T19:43:23.168159350Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-02T18:53:06.382964019Z",
+      "status": "passed",
+      "updated_at": "2026-08-02T19:55:15.020222660Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Apply a package together with the packages it depends on",
-  "updated_at": "2026-08-02T18:53:06.382964019Z"
+  "updated_at": "2026-08-02T19:55:15.020222660Z"
 }
