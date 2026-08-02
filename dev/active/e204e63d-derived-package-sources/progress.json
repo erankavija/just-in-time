@@ -260,6 +260,17 @@
           "worker": null
         }
       ]
+    },
+    {
+      "wave_number": 2,
+      "note": "Unblocked by 32779829. Five roots: 7d038e97, 4873b32f, 0db28190, e4ba28c5, 5d12a79f. 6c47b99a stays open until 8371bd46 lands (owner ruling); 6f8f02ba closes behind daddfc0b.",
+      "issues": [
+        "7d038e97",
+        "4873b32f",
+        "0db28190",
+        "e4ba28c5",
+        "5d12a79f"
+      ]
     }
   ],
   "created_during_execution": [
@@ -830,6 +841,11 @@
       "at": "2026-08-02",
       "session": 6,
       "note": "Adoption footprints were not what the issue Notes implied in two cases. 76b16af0's four call sites are commands/config.rs, validation/repository.rs and two in storage/json.rs (confirmed by a read-only codex spark pass against the Notes' 'four call sites across three modules'); its first worker instead took profile.rs and validate.rs, and its profile.rs edit destroyed the subject of c7058cac's scaffold-comparison test. be918f22 legitimately owns config.rs as a repository-inspection module, so 76b16af0-r2's config.rs hunk is the redundant one at merge. Measure a footprint before dispatch; the Notes' counts are advisory."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "note": "Wave 1 closed: 41 -> 42 done of 77. 32779829 delivered and gated; gate-verdict reuse measured in production at 0ms against 411s executed. HierarchyTemplate::default() call sites 43 -> 4, which is what lets daddfc0b delete the type without carrying the rewrite. Wave 2 is the five issues behind 32779829: 7d038e97, 4873b32f, 0db28190, e4ba28c5, 5d12a79f; everything in layers 2-7 sits transitively behind them."
     }
   ]
 }

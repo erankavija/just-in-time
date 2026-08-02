@@ -26,7 +26,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "State the root declaration in the adopter manifest reference",
-  "updated_at": "2026-08-02T10:53:05.829298961Z"
+  "updated_at": "2026-08-02T14:28:42.112932267Z"
 }

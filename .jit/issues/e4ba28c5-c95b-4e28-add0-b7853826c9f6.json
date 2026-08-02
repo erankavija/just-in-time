@@ -9,6 +9,7 @@
   ],
   "description": "The workflow package declares a dependency on the default package and only the vocabulary it adds, so the shared vocabulary exists once.\n\n## Background\n\nThe workflow package declares its own type names, namespaces and item kinds, several of which the default package now also declares. Two packages restating the same values would be the hand-maintained duplicate this container exists to remove, and the alternative the decisions rejected.\n\nThe split is already disjoint where it matters: the namespaces the two declare do not overlap, and on types the workflow package declares the default's four plus four of its own. It drops the four the default carries and keeps its own, so applying it composes rather than collides.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow package declares a dependency on the default package.\n- [hard] REQ-02: It declares no type name, namespace, or item kind the default package already declares, except where restating it identically is necessary and the restatement is exact.\n- [hard] REQ-03: Applying it to a bare repository produces the same configuration as applying both packages by hand, and reports no conflict.\n- [hard] REQ-04: It declares the one item kind whose source file it ships and the default package does not.\n\n## Notes\n\nAn adopter applying the workflow package receives the default package as a resolved dependency and never names it.\n",
   "documents": [],
+  "first_ready_at": "2026-08-02T14:28:57.406594669Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,7 +28,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Reduce the workflow package to its delta over the default",
-  "updated_at": "2026-08-02T10:53:10.957097043Z"
+  "updated_at": "2026-08-02T14:28:57.406594669Z"
 }

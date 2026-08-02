@@ -33,7 +33,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Assemble the packaged tree from the repository files it mirrors",
-  "updated_at": "2026-08-02T10:52:55.543747208Z"
+  "updated_at": "2026-08-02T14:28:52.313518493Z"
 }

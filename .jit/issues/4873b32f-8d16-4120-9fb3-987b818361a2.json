@@ -24,7 +24,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Cover the declared roots on the agent-facing bridge",
-  "updated_at": "2026-08-02T10:53:00.690691241Z"
+  "updated_at": "2026-08-02T14:28:47.216012659Z"
 }

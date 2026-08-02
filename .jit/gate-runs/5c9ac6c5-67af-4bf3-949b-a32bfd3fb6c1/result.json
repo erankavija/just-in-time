@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "649de1b3e353714e9b37729585a9102c6887347a",
+  "completed_at": "2026-08-02T14:27:39.502653427Z",
+  "duration_ms": 163024,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are implemented; the prior ignored-file reuse defect is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "32779829-319f-40b0-bd41-fe213f4885fc",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5c9ac6c5-67af-4bf3-949b-a32bfd3fb6c1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T14:24:56.478095638Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0d0c65d4, 5f807562, 86223f24, bccf0483, 3edcbdfd, a39e357d, f2aa0b37, 9bf34bc0, 0616c160, 6dc8d71c, 649de1b3 (`jit:32779829`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/convention-convergence (.jit/invariants.toml); @/invariant/semantic-types (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T14:15:38Z); mcp-ci passed (exit 0, 2026-08-02T12:27:01Z); docs-mechanical passed (exit 0, 2026-08-02T12:27:05Z); prior code-review failed (exit 1, 2026-08-02T12:27:00Z), addressed by the declared-input filesystem walk\nTruncation recovery: narrowed policy reads to configured registries and split tagged-patch inspection into affected-path reads\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are implemented; the prior ignored-file reuse defect is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

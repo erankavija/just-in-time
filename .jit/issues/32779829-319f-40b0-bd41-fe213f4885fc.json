@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "A gate verdict is keyed to a digest of the repository inputs its checker reads, so a checker that would inspect an unchanged input set is not run again and the reused verdict names the run it came from.\n\n## Background\n\nA quality gate is required per issue, and its checker runs once per issue. When several issues sit on one repository state, a whole-tree checker re-derives an identical verdict for each of them. Measured on this repository: a fifteen-issue wave landing on one tree spent about 450 seconds per issue in the Rust workspace checker, roughly 112 minutes producing one result fifteen times. The remaining work in this container repeats that shape several times over.\n\nNothing in the gate record supports avoiding it. A run records the commit and whether the tree differed from it, but a gate pipeline dirties the tree by running — the tracker writes its own run records as it goes — so consecutive runs over one unchanged source state disagree about whether the tree was clean. Keying reuse to the commit would therefore almost never fire, and keying it to the commit plus a clean tree would fire wrongly the moment tracker data was staged.\n\nThe property that actually determines a checker's verdict is the content of the files it reads. A Rust workspace checker reads the workspace; a bridge checker reads the bridge; a documentation checker reads the documentation sources and their renderers. None of them reads the tracker's own data, and a change confined to files a checker never opens cannot change what it reports. An adopter already declares each gate and its checker, so the same declaration is where the checker's inputs belong, and the repository already carries a root-and-glob-exclusion declaration shape for exactly this kind of \"these paths, minus these categories\" statement.\n\nReuse is unsound for a checker whose verdict depends on anything beyond those files. A review checker scoped to one issue's own commits returns a different verdict per issue over one identical tree, and a checker consulting the clock, the network, or machine state is not a function of the repository at all. So an input declaration is what opts a gate in, and a gate that declares nothing keeps running every time.\n\nA reused verdict must remain distinguishable from an independently derived one. Fifteen issues reporting a passed gate where one checker ran is honest only if each record says so and names its source; read as fifteen independent verifications it would overstate the evidence behind a container's completion.\n\n## Success Criteria\n\n- [hard] REQ-01: A gate declaration carries the repository inputs its checker reads, expressed as roots with glob exclusion patterns, and both are constrained values rejected where the registry is parsed rather than by whichever consumer reads them first.\n- [hard] REQ-02: A gate run records a digest over its declared inputs, taken across every file beneath a declared root that no declared exclusion matches, and covering files the repository does not track so that an uncommitted source file changes the digest.\n- [hard] REQ-03: Evaluating a gate whose declared inputs digest to a value a prior run of that same gate already recorded yields that run's verdict without executing the checker.\n- [hard] REQ-04: A verdict obtained without executing the checker records the identity of the run it was taken from, and carries that run's status whether it passed or failed.\n- [hard] REQ-05: Machine-readable gate status distinguishes a verdict that was derived by executing the checker from one taken from an earlier run, and names the earlier run for the latter.\n- [hard] REQ-06: Changing a file beneath a declared root that no exclusion matches, adding one, or removing one, each produce a different digest, so the following evaluation executes the checker.\n- [hard] REQ-07: Changing a file that no declared root covers leaves the digest unchanged, so an evaluation following it reuses rather than re-executes.\n- [hard] REQ-08: A gate declaring no inputs executes its checker on every evaluation, and an explicit request re-executes a gate that would otherwise reuse.\n- [hard] REQ-09: This repository's gate registry declares inputs for its tree-scoped gates and none for its issue-scoped review gate, and a wave of issues evaluated over one unchanged source state executes each tree-scoped checker once.\n- [hard] REQ-10: The adopter documentation for declaring a gate states the input declaration, what a reused verdict means, and that a gate omitting the declaration always executes.\n- [hard] REQ-11: The provenance recorded when the binary is installed marks it stale only when a declared binary build input is uncommitted, so an uncommitted file that feeds no build leaves the installed binary current.\n- [hard] REQ-12: The binary's declared build inputs and a gate's declared inputs are covered by one rule, so neither question is answered by a second inventory that can drift from the first.\n\n## Notes\n\nThe digest is over content, not modification times, so a checkout that rewrites timestamps without changing bytes reuses.\n\nReuse is not an exemption from a gate. The verdict a reused record carries was produced by executing the checker over an input set proven identical by the digest, and the record states its provenance; a verdict recorded without any checker having produced it over those inputs remains outside what this mechanism can express.\n\nThe binary already digests a declared input set to decide whether an installed build is stale. That mechanism and this one answer the same question over different input sets, and a single form serving both is preferable to a second one beside it.\n\nThe named measurement above is this repository's own and is dated; it states the order of the cost, not a figure to preserve.\n\nThe installer decides staleness from a working-tree state it computes separately from the inventory that states what feeds the binary, and it excludes one directory by argument rather than by consulting that inventory. An uncommitted file under a development-notes path is not a build input by that inventory, and marking the binary stale for it has refused whole gate pipelines. The two halves answer one question and are stated once.\n",
   "documents": [],
+  "done_at": "2026-08-02T14:28:37.005804268Z",
   "first_ready_at": "2026-08-02T10:52:15.512014624Z",
   "gates_required": [
     "cargo-ci",
@@ -16,22 +17,22 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T12:23:59.224503494Z",
+      "updated_at": "2026-08-02T14:24:55.416920660Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-02T12:27:00.870188470Z",
+      "status": "passed",
+      "updated_at": "2026-08-02T14:27:39.812170875Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-02T12:27:15.487616165Z",
+      "updated_at": "2026-08-02T14:27:54.638747536Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T12:27:04.203817345Z",
+      "updated_at": "2026-08-02T14:27:43.313084779Z",
       "updated_by": "auto:executor"
     }
   },
@@ -45,7 +46,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "A gate verdict is reused when its declared inputs are unchanged",
-  "updated_at": "2026-08-02T13:59:12.929171659Z"
+  "updated_at": "2026-08-02T14:28:37.005804268Z"
 }
