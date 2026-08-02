@@ -401,6 +401,31 @@
       "at": "2026-08-02",
       "session": 6,
       "text": "jit-dogfood's packaged [namespaces.satisfies] contribution still carries the pre-amendment one-line description, while .jit/config.toml carries the sharpened one the owner ruled in session 5. A package re-apply would overwrite the ruling. [namespaces.per] is in neither package and is repository-local only. Whoever reduces the packages (e4ba28c5) or applies one to this repository must reconcile both."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "`cargo test --workspace --no-run` does not catch a cross-branch break that compiles and fails at run time. Session 5's handoff proposed it as the fix for the verify-commit-builds gap; it closed the compile half only. c7058cac and 6c47b99a merged into a tree that compiled and whose profile acceptance test panicked. Run the suite, not the build."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "Editing a live consumer mid-pipeline trips the stale-binary guard on every subsequent gate with exit 10. contrib/gates/ is not a build input, but its packaged mirror under profiles/jit-dogfood/assets/live/ is, and the drift assertion requires editing both. Two of c7058cac's gates were refused this way. Make live-consumer edits between pipelines, never during one."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "merge-and-gate.sh cleared incremental state at -maxdepth 2, which misses the nested target dirs tests create (target/init-commands/debug/incremental, target/jit-stale-child-test-cache/debug/incremental). cargo-ci's post-run incremental-state check finds them and fails the gate. The session copy now sweeps at -maxdepth 4."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "A worker citing an invariant as its reason to defer is worth checking against what the invariant says. 0cf1f351 cited @/invariant/convention-convergence for NOT changing a shared method's matching base, when that invariant prescribes changing the shared form at its source. Reading it correctly turned a deferral into a two-commit fix."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "A worker's targeted-target pass is not evidence for the target. 60c211d6 changed a pub(crate) helper in doc_show_tests.rs that artifact_conformance_cli_tests.rs imports, ran only its own module, and reported the sibling's failure as an 'unrelated baseline failure'. It failed cargo-ci on main. Briefs now require the whole target plus a base-commit control before any baseline claim."
     }
   ],
   "rework_counts": {
@@ -414,7 +439,10 @@
     "09aea8b3": 1,
     "c7058cac": 1,
     "06b736c7": 1,
-    "39c34568": 0
+    "39c34568": 0,
+    "0cf1f351": 1,
+    "76b16af0": 2,
+    "60c211d6": 1
   },
   "started_at": "2026-07-31",
   "owner_rulings": [
@@ -761,6 +789,11 @@
       "at": "2026-08-02",
       "session": 6,
       "note": "Wave-1 tail: c7058cac merged (one additive conflict in commands/profile.rs; both sides' test helpers kept). Its merge with 6c47b99a is a cross-branch regression \u2014 c7058cac's test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration applies profiles/jit-default read from the real checkout, and 6c47b99a's apply now refuses a package directory outside the TARGET repository's worktree. `cargo test --workspace --no-run` passed on the merged tree and did not catch it: the pair compiles, it fails at run time. Lead fixes the one call site on main. The ten adoptions were re-dispatched on fresh -r1 worktrees off a3291826; their old branches hold one superseded commit each (SHAs in the session scratchpad's discarded-wip-sha.txt) because branch deletion is blocked in this harness."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "note": "Adoption footprints were not what the issue Notes implied in two cases. 76b16af0's four call sites are commands/config.rs, validation/repository.rs and two in storage/json.rs (confirmed by a read-only codex spark pass against the Notes' 'four call sites across three modules'); its first worker instead took profile.rs and validate.rs, and its profile.rs edit destroyed the subject of c7058cac's scaffold-comparison test. be918f22 legitimately owns config.rs as a repository-inspection module, so 76b16af0-r2's config.rs hunk is the redundant one at merge. Measure a footprint before dispatch; the Notes' counts are advisory."
     }
   ]
 }
