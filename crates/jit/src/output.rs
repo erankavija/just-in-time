@@ -699,7 +699,7 @@ pub enum ErrorCode {
     StaleBinary,
     /// Issue deletion was refused because operator confirmation was absent.
     DeletionNotConfirmed,
-    /// The requested embedded profile does not exist.
+    /// No resolution route found the requested profile.
     ProfileNotFound,
     /// Profile planning or final-state validation rejected the operation.
     ProfileConflict,
@@ -941,7 +941,7 @@ impl ErrorCode {
             ErrorCode::DeletionNotConfirmed => {
                 "Issue deletion lacks the required operator confirmation."
             }
-            ErrorCode::ProfileNotFound => "The requested embedded profile does not exist.",
+            ErrorCode::ProfileNotFound => "No resolution route found the requested profile.",
             ErrorCode::ProfileConflict => "Profile planning or validation found a conflict.",
             ErrorCode::DependencyError => "A dependency command failed.",
             ErrorCode::GateError => "A gate command failed.",
@@ -1300,8 +1300,9 @@ pub struct InitResponse {
     pub created_paths: Vec<String>,
     /// Existing files modified by this run.
     pub modified_paths: Vec<String>,
-    /// Applied profile result when initialization included one.
-    pub profile: Option<crate::profile::ProfileApplyResult>,
+    /// Applied profile results when initialization included a profile, one per
+    /// package of its dependency closure.
+    pub profile: Option<crate::profile::ProfileComposedApplyResult>,
 }
 
 /// Response for `status` command

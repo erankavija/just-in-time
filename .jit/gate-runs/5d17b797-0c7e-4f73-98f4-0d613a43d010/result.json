@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b191fd179298788d6d062dd53fd749ae86b3d753",
+  "completed_at": "2026-08-02T17:59:09.769212822Z",
+  "duration_ms": 253528,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 696,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-8"
+        ],
+        "severity": "high",
+        "summary": "Derived-state repair resolves recorded profiles only from the embedded package, so a package applied from --from cannot be repaired from its recorded directory."
+      }
+    ],
+    "summary": "Derived-state repair still ignores recorded package directories.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5d12a79f-c29e-43ba-b14c-1f030790c01e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5d17b797-0c7e-4f73-98f4-0d613a43d010",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T17:54:56.240557333Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9491 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc39d-5753-7aa0-9e5d-22b626642de9\n--------\nuser\n--- 9478 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:5d12a79f commits 3f0d8b82, 76b992ad, 2bd49e42, 08ac9aea, 5f8620f9, 3d9ca0a0, b191fd17\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json\nResolved items: @/issue/e204e63d/requirement/REQ-08 and @/issue/e204e63d/decision/D-8 (.jit issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (reused; exit code unavailable); code-review has no prior recorded run\nTruncation recovery: bounded per-commit/path/line reads; clean merge confirmed with git show --cc after remerge-diff was unavailable in the read-only sandbox\n\n1. [blocking][issue-impact][high] [validate.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:696) still resolves every recorded profile with `embedded_profile(id)`, never reading the record’s directory origin or calling `recorded_package`. Thus `jit validate --fix` cannot repair a noncompiled package applied via `--from` even when its recorded location exists, contradicting the issue’s `per:` decision. References: @/issue/e204e63d/decision/D-8.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Derived-state repair still ignores recorded package directories.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Derived-state repair resolves recorded profiles only from the embedded package, so a package applied from --from cannot be repaired from its recorded directory.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":696,\"references\":[\"@/issue/e204e63d/decision/D-8\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

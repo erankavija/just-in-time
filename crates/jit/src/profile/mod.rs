@@ -9,6 +9,13 @@ mod apply_claims;
 mod dogfood;
 mod manifest;
 mod package;
+// Repository-local generator seam: the package tree this repository assembles
+// is produced by one entry point and read back by nothing, so the render has no
+// production caller. It builds with dev-dependencies active, which turns on
+// `test-support` through the crate's own self-edge, so gating the module on
+// that pair keeps it out of an adopter build entirely.
+#[cfg(any(test, feature = "test-support"))]
+pub mod package_assembly;
 // Repository-local generator seam: the render of this repository's generated
 // template region has two consumers, the artifact registry the `regenerate`
 // example publishes through and the dogfood module's drift assertion, and no
@@ -22,9 +29,9 @@ pub mod template_region;
 pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
 pub use application::{
-    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileListResult,
-    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
+    ProfileComposedApplyResult, ProfileListResult, ProfilePlanResult, ProfilePlanStatus,
+    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
 pub use dogfood::{

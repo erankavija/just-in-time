@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ebc3cd5e41a1b3532049bebad9e9d2b0e0df8ffe",
+  "completed_at": "2026-08-02T19:57:42.139093482Z",
+  "duration_ms": 145648,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are met; the prior repair-resolution finding is addressed in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6c47b99a-e0bc-4705-82b6-5404d285fa58",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b4ebb2fb-a22c-4914-8eb2-1c98b3b5cf68",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T19:55:16.490378806Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:6c47b99a commits 99091eab, 9ee75f2a, 05d3f92d, 92b478a8, b558fa4f\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-8 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, markdown-first); @/invariant/derived-state-coherence (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit code none, 2026-08-02T19:43:23Z); mcp-ci passed (exit code 0, 2026-08-02T19:43:25Z)\nTruncation recovery: narrowed reads of each tagged patch, merge combined diff, current provenance/repair paths, and repair tests\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are met; the prior repair-resolution finding is addressed in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

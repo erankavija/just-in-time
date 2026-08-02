@@ -1,0 +1,36 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b191fd179298788d6d062dd53fd749ae86b3d753",
+  "completed_at": "2026-08-02T17:44:46.370993086Z",
+  "duration_ms": 167526,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Only one cargo-ci execution is recorded, leaving REQ-03's required consecutive whole-workspace-run evidence materially unverified."
+      }
+    ],
+    "summary": "The implementation satisfies the behavioral criteria, but the required consecutive whole-workspace-run evidence is absent.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fd61b44f-e208-4ff9-bc8b-262706782043",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "74966308-d362-42df-8aa1-e3a86723ea44",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T17:41:58.844798192Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4868 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc391-7c43-7741-bf54-16e18d2323f2\n--------\nuser\n--- 4855 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 40f69824; 0587ef96 (merge first-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/invariant/semantic-test-assertions, @/invariant/pid-safety, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, last-run 2026-08-02T17:33:40.640864341Z); code-review unrun\nTruncation recovery: Re-read the individual code and merge-parent patches, current test/shutdown paths, and narrowed the unrelated merge metadata diff to its fd61b44f references.\n\n1. [blocking][issue-impact][high] REQ-03 remains materially unverified. Only one `cargo-ci` execution is recorded for this issue, so the evidence establishes one whole-workspace pass but not the required consecutive runs under contention.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The implementation satisfies the behavioral criteria, but the required consecutive whole-workspace-run evidence is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Only one cargo-ci execution is recorded, leaving REQ-03's required consecutive whole-workspace-run evidence materially unverified.\",\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

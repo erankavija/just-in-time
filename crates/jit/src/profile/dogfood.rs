@@ -1268,9 +1268,9 @@ mod tests {
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         let package = jit_dogfood_package().unwrap();
-        let applied = executor.apply_embedded_profile(&package).unwrap();
+        let applied = executor.apply_profile_package(&package).unwrap();
         assert_eq!(
-            applied.status,
+            applied.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Applied
         );
         assert!(temp
@@ -1328,9 +1328,9 @@ mod tests {
         let rendered = fs::read_to_string(temp.path().join(&reference.target)).unwrap();
         assert_eq!(rendered.matches("@/gate/").count(), 6);
 
-        let unchanged = reloaded.apply_embedded_profile(&package).unwrap();
+        let unchanged = reloaded.apply_profile_package(&package).unwrap();
         assert_eq!(
-            unchanged.status,
+            unchanged.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Unchanged
         );
     }

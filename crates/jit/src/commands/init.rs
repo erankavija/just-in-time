@@ -2,7 +2,8 @@ use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
-    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfilePackage,
+    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfilePackage,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
@@ -16,14 +17,30 @@ use std::path::Path;
 /// Result of publishing a fresh repository scaffold.
 #[derive(Debug)]
 pub struct FreshInitResult {
-    /// Applied profile result when initialization included one.
-    pub profile: Option<ProfileApplyResult>,
+    /// Applied profile results when initialization included a profile, one per
+    /// package of its dependency closure.
+    pub profile: Option<ProfileComposedApplyResult>,
     /// Outcome of the worktree `.gitattributes` merge-driver claim.
     pub gitattributes: GitattributesStatus,
     /// Files whose canonical plan preimage was absent.
     pub created_paths: Vec<String>,
     /// Files whose canonical plan preimage was an existing file.
     pub modified_paths: Vec<String>,
+}
+
+/// The profile one initialization applies, and where its package is read from.
+///
+/// A repository being created has no applied-profile record to read, so the
+/// caller supplies the location its bytes are at; omitting it leaves
+/// resolution to the routes
+/// [`resolve_profile_package`](CommandExecutor::resolve_profile_package)
+/// takes for any other command.
+#[derive(Debug, Clone, Copy)]
+pub struct ProfileSelection<'a> {
+    /// Stable profile id to apply.
+    pub id: &'a str,
+    /// Repository directory holding the package, when the caller names one.
+    pub location: Option<&'a Path>,
 }
 
 impl CommandExecutor<JsonFileStorage> {
@@ -36,9 +53,9 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
-        profile_id: &str,
+        profile: ProfileSelection<'_>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, template, Some(profile_id))
+        self.run_initialization(repo_dir, template, Some(profile))
     }
 
     /// Publish a fresh neutral or profiled repository through the recovered
@@ -52,27 +69,44 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
-        profile_id: Option<&str>,
+        profile: Option<ProfileSelection<'_>>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, template, profile_id)
+        self.run_initialization(repo_dir, template, profile)
     }
 
     /// Capture the base under one recovered session, validate the proposed
     /// scaffold/profile overlay, and publish the complete initialization delta.
+    ///
+    /// A selected profile is resolved into its complete dependency closure
+    /// before anything is published, so an unresolvable id, an unresolvable
+    /// dependency, or a dependency cycle fails before a repository is created.
+    /// The first package of that closure — the one nothing else in it depends
+    /// on — is published together with the scaffold, because a package needs a
+    /// repository to be applied to; the rest follow in closure order through
+    /// the ordinary application, each with its own record and event.
     fn run_initialization(
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
-        profile_id: Option<&str>,
+        profile: Option<ProfileSelection<'_>>,
     ) -> Result<FreshInitResult> {
-        let package = profile_id.map(embedded_profile).transpose()?;
+        let closure = profile
+            .map(|profile| {
+                let package = self.resolve_profile_package(profile.id, profile.location)?;
+                self.resolve_profile_closure(&package)
+            })
+            .transpose()?;
+        let (package, dependants) = match closure.as_deref() {
+            Some([scaffolded, dependants @ ..]) => (Some(scaffolded.clone()), dependants),
+            Some([]) | None => (None, &[][..]),
+        };
         let layout = self.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so a composed ProfileApplied event's id/timestamp stay stable.
         let context = crate::repository_state::MutationContext::production();
-        with_mutation_session(
+        let mut result = with_mutation_session(
             self.storage(),
             &layout,
             "repository initialization",
@@ -194,15 +228,17 @@ impl CommandExecutor<JsonFileStorage> {
 
                 let profile = profile_status
                     .zip(package.as_ref())
-                    .map(|(status, package)| ProfileApplyResult {
-                        id: package.manifest().profile.id.to_string(),
-                        version: package.manifest().profile.version.clone(),
-                        status,
-                        plan_hash: plan.hash().to_string(),
-                        // The applied transaction hash is the plan hash by construction.
-                        transaction_id: (status == ProfileApplicationStatus::Applied)
-                            .then(|| plan.hash().to_string()),
-                        warnings: Vec::new(),
+                    .map(|(status, package)| {
+                        ProfileComposedApplyResult::new(vec![ProfileApplyResult {
+                            id: package.manifest().profile.id.to_string(),
+                            version: package.manifest().profile.version.clone(),
+                            status,
+                            plan_hash: plan.hash().to_string(),
+                            // The applied transaction hash is the plan hash by construction.
+                            transaction_id: (status == ProfileApplicationStatus::Applied)
+                                .then(|| plan.hash().to_string()),
+                            warnings: Vec::new(),
+                        }])
                     });
                 Ok(SessionStep::Apply(
                     plan,
@@ -214,7 +250,20 @@ impl CommandExecutor<JsonFileStorage> {
                     },
                 ))
             },
-        )
+        )?;
+
+        // The published repository is what the remaining packages of the
+        // closure are applied to, in the order the closure fixed.
+        let applied = dependants
+            .iter()
+            .map(|package| self.apply_one_profile_package(package))
+            .collect::<Result<Vec<_>>>()?;
+        result.profile = result.profile.map(|scaffolded| {
+            ProfileComposedApplyResult::new(
+                scaffolded.profiles.into_iter().chain(applied).collect(),
+            )
+        });
+        Ok(result)
     }
 
     /// Resolve the effective configuration bytes and project identity: an existing
@@ -261,7 +310,7 @@ impl CommandExecutor<JsonFileStorage> {
         }
     }
 
-    /// Capture the neutral proposed base and convert one embedded package into
+    /// Capture the neutral proposed base and convert one resolved package into
     /// complete neutral claims and provenance metadata.
     ///
     /// The base is captured under the held session, overlaid with the neutral
@@ -384,11 +433,6 @@ fn init_validation_error(
     unsupported.map_or(error, |(found, supported)| {
         crate::storage::RepositoryFormatTooNewError::new(found, supported).into()
     })
-}
-
-/// Resolve one embedded profile package by stable id.
-fn embedded_profile(id: &str) -> Result<ProfilePackage> {
-    super::profile::embedded_profile(id)
 }
 
 /// Acquire typed Git evidence for the worktree `.gitattributes` merge-driver claim.
@@ -627,6 +671,92 @@ mod tests {
         assert_repo_valid(repo.path());
     }
 
+    static COMPOSITION_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
+        "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
+    );
+
+    #[test]
+    fn test_fresh_profile_init_applies_the_packages_the_named_one_depends_on() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        // Two packages beside each other inside the worktree the repository is
+        // created in, which is where an adopter puts an obtained set.
+        crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &repo.path().join("packages/base"),
+            "base",
+            &[],
+        );
+        crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &repo.path().join("packages/workflow"),
+            "workflow",
+            &["base"],
+        );
+
+        let result = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                ProfileSelection {
+                    id: "workflow",
+                    location: Some(&repo.path().join("packages/workflow")),
+                },
+            )
+            .unwrap();
+
+        // One initialization, both packages, the dependency first.
+        let profile = result
+            .profile
+            .expect("a profiled initialization reports it");
+        assert_eq!(
+            profile
+                .profiles
+                .iter()
+                .map(|applied| (applied.id.as_str(), applied.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("base", ProfileApplicationStatus::Applied),
+                ("workflow", ProfileApplicationStatus::Applied),
+            ]
+        );
+        assert!(repo.path().join("docs/base.txt").is_file());
+        assert!(repo.path().join("docs/workflow.txt").is_file());
+        assert!(repo.path().join(".jit/profiles/base.json").is_file());
+        assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+    }
+
+    #[test]
+    fn test_fresh_profile_init_creates_no_repository_when_a_dependency_cannot_be_resolved() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &repo.path().join("packages/workflow"),
+            "workflow",
+            &["absent-base"],
+        );
+
+        let error = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                ProfileSelection {
+                    id: "workflow",
+                    location: Some(&repo.path().join("packages/workflow")),
+                },
+            )
+            .unwrap_err();
+
+        let message = format!("{error:#}");
+        assert!(message.contains("workflow"), "{message}");
+        assert!(message.contains("absent-base"), "{message}");
+        assert!(
+            !repo.path().join(".jit").exists(),
+            "the closure is resolved before a repository is created"
+        );
+    }
+
     #[test]
     fn test_fresh_profile_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
@@ -637,12 +767,15 @@ mod tests {
             .initialize_fresh_repository(
                 repo.path(),
                 &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                Some("jit-dogfood"),
+                Some(ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
             )
             .unwrap();
 
         assert_eq!(
-            result.profile.unwrap().status,
+            result.profile.unwrap().requested().unwrap().status,
             ProfileApplicationStatus::Applied
         );
         assert!(repo.path().join(".jit/index.json").is_file());
@@ -680,7 +813,10 @@ mod tests {
             .initialize_fresh_repository(
                 repo.path(),
                 &HierarchyTemplate::default(),
-                Some("jit-dogfood"),
+                Some(ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
             )
             .unwrap();
         let compact_record = {
@@ -705,12 +841,15 @@ mod tests {
             .initialize_profiled_repository(
                 repo.path(),
                 &HierarchyTemplate::default(),
-                "jit-dogfood",
+                ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                },
             )
             .unwrap();
 
         assert_eq!(
-            again.profile.unwrap().status,
+            again.profile.unwrap().requested().unwrap().status,
             ProfileApplicationStatus::Unchanged
         );
         assert_eq!(
@@ -860,7 +999,10 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                     executor.initialize_fresh_repository(
                         repo.path(),
                         &HierarchyTemplate::default(),
-                        Some("jit-dogfood"),
+                        Some(ProfileSelection {
+                            id: "jit-dogfood",
+                            location: None,
+                        }),
                     )
                 })
             })

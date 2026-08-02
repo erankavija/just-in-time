@@ -16,10 +16,20 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T18:31:34.195656602Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T19:25:17.891674500Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-07-31T16:39:04.997993971Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-02T18:31:45.825582059Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7d038e97-87e8-4d02-9101-6ffef1e8bdc0",
@@ -36,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Assemble the packaged tree from the repository files it mirrors",
-  "updated_at": "2026-08-02T15:40:18.883014737Z"
+  "updated_at": "2026-08-02T19:25:17.891674500Z"
 }

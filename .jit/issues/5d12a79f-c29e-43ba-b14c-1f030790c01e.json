@@ -8,11 +8,23 @@
   ],
   "description": "The profile commands read their package from a location the caller gives or from the location the repository's own record names, so a package that is not compiled in can be inspected, applied, and re-read.\n\n## Background\n\nResolution today compares a requested id against one compiled-in package and returns it or reports the profile missing, and enumeration returns a one-element list built from that same package. Neither can express a package that lives in a directory, so every profile command is limited to the one the binary carries.\n\nTwo routes replace it, in a fixed order. A location the caller gives answers the first application: an adopter who has obtained a package has bytes and no record yet. The location the repository's record names answers every run after that, without the caller having to remember where the package came from. While a package is still compiled in, it stays as the last resort behind both, so nothing that works today stops working before the package it depends on has left.\n\nEnumeration follows the same principle: what the repository reports is what its own records name, each resolved from its recorded location, so the answer describes this repository rather than the binary.\n\nA recorded location that no longer resolves is a failure and says so. Reporting it as an absent profile would make a deleted directory look like a repository that never applied one.\n\n## Success Criteria\n\n- [hard] REQ-01: A profile command reads its package from an explicitly given repository location when one is supplied.\n- [hard] REQ-02: With no location supplied, a profile command reads the package from the location the repository's applied-profile record names.\n- [hard] REQ-03: A supplied location takes precedence over a recorded one, and both take precedence over any package compiled into the binary.\n- [hard] REQ-04: Enumeration reports the profiles the repository's own records name, each resolved from its recorded location.\n- [hard] REQ-05: A recorded location that no longer resolves is reported as an error naming the record and the path, never as an absent profile.\n\n## Notes\n\nInitialization applying a profile takes the same supplied location, because a repository being created has no record to read.\n",
   "documents": [],
+  "first_ready_at": "2026-08-02T19:58:56.870726349Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T19:43:22.460029940Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T19:49:50.078168913Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d12a79f-c29e-43ba-b14c-1f030790c01e",
   "labels": [
     "epic:derived-package-sources",
@@ -24,7 +36,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Resolve a profile package from a given location or the repository's record",
-  "updated_at": "2026-08-02T10:53:16.097221925Z"
+  "updated_at": "2026-08-02T19:58:56.870726349Z"
 }

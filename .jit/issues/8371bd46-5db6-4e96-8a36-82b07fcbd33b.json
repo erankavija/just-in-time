@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T19:43:20.825439340Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T19:46:21.263788833Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8371bd46-5db6-4e96-8a36-82b07fcbd33b",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Repair profile-owned targets from the recorded package location",
-  "updated_at": "2026-07-31T18:14:44.873621444Z"
+  "updated_at": "2026-08-02T19:46:21.263788833Z"
 }

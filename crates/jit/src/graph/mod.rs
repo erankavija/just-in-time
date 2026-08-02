@@ -12,7 +12,7 @@ use thiserror::Error;
 pub mod hierarchy;
 pub mod keyed;
 
-pub use keyed::find_keyed_cycle;
+pub use keyed::{find_keyed_cycle, keyed_topological_order};
 
 /// Which way a traversal follows dependency edges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

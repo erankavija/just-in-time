@@ -6,12 +6,24 @@
   "dependencies": [],
   "description": "The graceful-shutdown drain assertions observe what they assert, so the whole-workspace suite stops failing on a correct server.\n\n## Background\n\n`test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero` is `#[ignore]`d. It failed the `cargo-ci` gate on three separate commits of a correct server, and passes ten times out of ten when run alone. Two independent causes were established while wave 0 of `e204e63d` was gating.\n\nThe first is a deadline race. The test sends `SIGTERM`, then waits out three other connections, each entitled to its own `STREAM_EOF_BUDGET`, before asserting that the stalled connection is still open partway through the drain. Those waits together may exceed `GRACEFUL_DRAIN_TIMEOUT`, and once they do a correct server has already force-closed the survivor, so the assertion fails on conforming behaviour. In isolation the waits return in milliseconds and the probe lands mid-drain, which is why the failure never reproduces alone. A guard now takes the probe only while the deadline is intact; that half is fixed and is not what remains.\n\nThe second is an acceptance race, and it is what the ignore is for. `open_stalled_connection` sends a partial request and returns as soon as the bytes are written, with nothing establishing that the server has accepted and registered the connection. When `SIGTERM` arrives before the accept loop takes it, the socket is not a live connection the drain is obliged to protect, and it dies with the listener. The signature is a run that completes in about a second where a passing run takes the full drain.\n\nThe design question this issue must answer is how a test establishes that the server has registered a connection whose request is deliberately incomplete. No response is readable by construction, the server exposes no live-connection count to a client, and sampling the log is itself timing-dependent. A round trip on a second connection proves the accept loop ran but not that this socket was the one taken.\n\n## Success Criteria\n\n- [hard] REQ-01: The test establishes that the server has registered the stalled connection before the shutdown signal is sent, by an observation that cannot pass while the connection is still unaccepted.\n- [hard] REQ-02: The test is no longer `#[ignore]`d and runs in the default `cargo test --workspace` run.\n- [hard] REQ-03: The suite passes repeatedly under the contention a whole-workspace run produces, evidenced by consecutive whole-workspace runs rather than by running the test alone.\n- [hard] REQ-04: The properties the test asserted before this change are all still asserted: the event streams reach EOF under cancellation, an idle keep-alive connection is retired by the graceful shutdown, the connection that cannot finish keeps the drain it is entitled to, and the process exits zero within its budget.\n- [hard] REQ-05: No assertion is weakened to a form that would pass against a server that force-closes a live connection before `GRACEFUL_DRAIN_TIMEOUT`.\n\n## Notes\n\nThe deadline-race guard already landed as `fix(jit:e204e63d)` and is not to be reverted; it is correct on its own terms and addresses a genuinely separate cause. This issue owns the acceptance race and the removal of the `#[ignore]`.\n\nIgnoring the test removes graceful-shutdown coverage from the authoritative `cargo-ci` gate, so `e204e63d` depends on this issue: that container may not close while the coverage its own gating disabled is still missing.",
   "documents": [],
+  "done_at": "2026-08-02T18:18:28.022938877Z",
   "first_ready_at": "2026-07-31T23:07:58.116132681Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T18:11:08.076384341Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T18:15:00.028851297Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fd61b44f-e208-4ff9-bc8b-262706782043",
   "labels": [
     "milestone:v1.0",
@@ -20,7 +32,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Observe the drain assertions the graceful-shutdown test makes",
-  "updated_at": "2026-08-02T15:40:29.102049583Z"
+  "updated_at": "2026-08-02T18:18:28.022938877Z"
 }

@@ -26,6 +26,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **A profile package is applied together with the packages it depends on.** A
+  manifest could declare a dependency, and nothing read it: a package carrying
+  only its delta over another applied against a repository missing the
+  vocabulary it extends. Applying a package now resolves everything it declares
+  a dependency on, transitively, and applies each before the package that
+  declares it, so a delta package and a self-contained one produce the same
+  repository. A dependency is looked for beside the declaring package's own
+  directory, under the dependency's own id, before this repository's record and
+  the compiled-in package answer — so one obtained directory of packages applies
+  as a set without every member being named. Each applied package writes its own
+  provenance record and appends its own audit event, a package two others depend
+  on is applied once, and re-applying a set that is already applied reports no
+  work anywhere in it. Declared dependencies that close a cycle are rejected
+  naming the cycle, and a dependency that resolves through no route fails the
+  application naming the package that declared it beside the one that could not
+  be found; both refusals are raised over the whole set before any of it is
+  applied. `jit profile apply --json` therefore answers with the standard
+  count-wrapped envelope, one result per applied package, and `jit validate`
+  reporting a recorded package it cannot obtain states which recorded package
+  declared a dependency on it, where one did.
+
+- **The workflow package tree is assembled from the repository files it
+  mirrors.** Most of the `jit-dogfood` package's assets name a repository file
+  as their target and carry a byte copy of it, so an edit to a packaged skill or
+  gate script had to be made twice and a missed second edit was drift a guard
+  could only report after the fact. `./scripts/assemble-package.sh <destination>`
+  now produces the whole tree. It draws each declared source from the side that
+  owns it — a live asset from the repository file its declaration targets,
+  everything else from the checked-in sources under `profiles/jit-dogfood` — and
+  publishes each run as a freshly staged tree, so a source the manifest stops
+  declaring is absent from the next one. The destination is the caller's,
+  untracked and disposable, and no build reads it: no build consumes the
+  assembled tree, so producing it in the build would make every build do work no
+  build consumes. The render lives in the crate and reads the manifest through
+  the crate's own package model, which leaves the manifest one reader; the
+  assembled tree is validated as a package before it is published, and published
+  through the storage layer's atomic no-replace rename, so an occupied
+  destination is reported rather than overwritten.
+
 - **A gate verdict is reused when its declared inputs are unchanged.** A quality
   gate runs once per issue, so several issues sitting on one repository state
   each paid for a whole-tree checker to re-derive an identical verdict; nothing

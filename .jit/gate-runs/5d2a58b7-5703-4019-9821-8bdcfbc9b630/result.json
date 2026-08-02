@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ebc3cd5e41a1b3532049bebad9e9d2b0e0df8ffe",
+  "completed_at": "2026-08-02T19:46:20.905442847Z",
+  "duration_ms": 171866,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 734,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-8"
+        ],
+        "severity": "medium",
+        "summary": "Validation does not require a provenance record's profile ID to match its .jit/profiles/<id>.json filename, so malformed records can validate and repair targets."
+      }
+    ],
+    "summary": "Validation accepts a provenance record whose embedded profile ID disagrees with its canonical filename, allowing repair from malformed provenance.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8371bd46-5db6-4e96-8a36-82b07fcbd33b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5d2a58b7-5703-4019-9821-8bdcfbc9b630",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T19:43:29.039084888Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9853 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc400-bca2-7573-b704-785e15f24b24\n--------\nuser\n--- 9840 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0aec4d2a, ff303490, ebc3cd5e (`jit:8371bd46`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-10 and @/issue/e204e63d/decision/D-8 (issue Markdown-first); @/invariant/derived-state-coherence and @/invariant/convention-convergence (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T19:31:49Z)\nTruncation recovery: narrowed repair-code, record-contract, test, documentation, and merge-parent metadata reads; discarded unrelated global requirement matches.\n1. **F1 — medium — blocking, issue-impact.** Validation never verifies that the profile ID in a provenance record matches the ID encoded by its `.jit/profiles/<id>.json` filename. `attempted_recorded_package` uses the filename only to find the record, then resolves and accepts the package from `record.id`; the later expected-record comparison also succeeds for a valid record moved to a differently named file. Thus `.jit/profiles/not-planner.json` containing an otherwise valid `planner` directory record can validate and repair planner-owned targets, contrary to the canonical record-path contract. Add an ID/path equality check and regression coverage. References: `@/issue/e204e63d/decision/D-8`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Validation accepts a provenance record whose embedded profile ID disagrees with its canonical filename, allowing repair from malformed provenance.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Validation does not require a provenance record's profile ID to match its .jit/profiles/<id>.json filename, so malformed records can validate and repair targets.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":734,\"references\":[\"@/issue/e204e63d/decision/D-8\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

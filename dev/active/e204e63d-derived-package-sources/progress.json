@@ -1,851 +1,950 @@
 {
-  "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
-  "epic_short_id": "e204e63d",
-  "current_wave": 2,
-  "waves": [
+ "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
+ "epic_short_id": "e204e63d",
+ "current_wave": 2,
+ "waves": [
+  {
+   "wave_number": 0,
+   "note": "Roots. All twelve dispatched 2026-07-31 session 3: batch A (7) on 56cc6c0f, batch B (5) on 4abed8d8. Two hardest leaves (a30d704d three-site taxonomy removal, 09aea8b3 owned-bytes package reader) to Opus agents; the other ten to codex gpt-5.6-luna at high effort.",
+   "issues": [
     {
-      "wave_number": 0,
-      "note": "Roots. All twelve dispatched 2026-07-31 session 3: batch A (7) on 56cc6c0f, batch B (5) on 4abed8d8. Two hardest leaves (a30d704d three-site taxonomy removal, 09aea8b3 owned-bytes package reader) to Opus agents; the other ten to codex gpt-5.6-luna at high effort.",
-      "issues": [
-        {
-          "short_id": "a30d704d",
-          "status": "done",
-          "worker": "opus-agent",
-          "batch": "A",
-          "base": "56cc6c0f",
-          "lead_review": "pass",
-          "note": "Four commits. Both taxonomy-supplying Default impls (HierarchyConfig, LabelNamespaces) and the unwrap_or_default fallback branches are gone; no impl Default for remains in domain/types.rs, config.rs, config_manager.rs or graph/hierarchy.rs. A 290-line fast_rules suite proves a repository declaring neither table receives an empty registry, no enumerating rule and no schema, and still validates. Its own follow-up commit 69fe7b28 is the substantive catch: file membership followed only the namespace-unique-* prefix, so withdrawing [type_hierarchy] would have left the type-enumeration rule and both hierarchy warnings behind. Docs swept in present tense (configuration.md, example-config.toml, labels.md). Merged into main with no conflicts despite three changed-in-both files; fast_rules passes 178/178 post-merge.",
-          "gate_decision": "docs-mechanical deliberately NOT added despite three docs/reference edits: the plan's gate assignment passed breakdown-review, story 93fef456 above it already carries docs-mechanical and doc-review, and the edits are the convention-required stale-text sweep rather than a deliverable. Changing a reviewed gate assignment mid-wave is scope drift.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "ae435979",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "A",
-          "base": "56cc6c0f",
-          "lead_review": "pass",
-          "note": "Fixture declares objective/initiative/deliverable/action and its own namespaces \u2014 deliberately not a copy of any package's vocabulary \u2014 and returns TestTaxonomy so consumers assert against what they were given. Self-verifying test proves the built repository carries exactly the declaration. Binds the 11 wave-1 adoptions.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "4c40e165",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "B",
-          "base": "4abed8d8",
-          "lead_review": "pass",
-          "note": "New Scalar contribution kind for the two documentation scalars and the two validation defaults; the three documentation lists join SetStringTarget. Conflict handling reuses equal_or_conflict, so no precedence is introduced.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "5dd0df5b",
-          "status": "gates: cargo-ci + mcp-ci passed; code-review failed twice on the same satisfies:REQ-08 finding. Owner ruled the fix is a citation in AGENTS.md naming the namespace declaration as a label's authority (c250dbcf). Re-run pending a binary reinstall.",
-          "worker": "codex-luna",
-          "batch": "A",
-          "base": "56cc6c0f",
-          "lead_review": "pass",
-          "note": "ProfileId is a proper semantic type shared by package id and dependency id. The pre-existing private is_lowercase_kebab in package.rs was moved to manifest.rs and shared rather than duplicated, satisfying convention-convergence. Self-reference is caught in validate_manifest, the only path a manifest reaches the system through."
-        },
-        {
-          "short_id": "09aea8b3",
-          "status": "done",
-          "worker": "opus-agent",
-          "batch": "A",
-          "base": "56cc6c0f",
-          "lead_review": "pass",
-          "note": "Closed session 5. Two gate-driven fixes landed in session 4 (no-follow package-entry reader, then a non-blocking open); cargo-ci and code-review both passed at 2026-07-31T23:55Z/23:59Z."
-        },
-        {
-          "short_id": "3e340587",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "A",
-          "base": "56cc6c0f",
-          "lead_review": "pass",
-          "note": "Region source relocated to assets/regions/; live-prefix sources and files both drop 61->60 with total package assets unchanged at 64. REQ-04 is enforced jointly by package validation (no undeclared package file), the existing per-asset counterpart comparison, and the new region-source prefix assertion.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "510297e4",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "B",
-          "base": "4abed8d8",
-          "lead_review": "pass-after-rework",
-          "note": "Closed session 5. The third hardcoded bracket-label site at validate.rs:2434 was fixed and merged in session 4; both gates passed."
-        },
-        {
-          "short_id": "0439da41",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "B",
-          "base": "4abed8d8",
-          "lead_review": "pass",
-          "note": "Icon presets deleted; deny_unknown_fields on the icons table reports a configuration still naming one. Swept: no residual icon-preset reference in crates/docs/web; the remaining 'preset' hits are gate presets and hierarchy-template names, a different concept.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "fdae1023",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "A",
-          "base": "56cc6c0f",
-          "lead_review": "pass-after-rework",
-          "note": "Round 1 FAILED lead review: REQ-02 is universal over every shipped tool description but the guard checked three hand-listed keys. Rework replaced it with a scan over SERVER_INSTRUCTIONS, every CURATION.include entry and every generated tools/list description, deriving the kind vocabulary from the repository's own config rather than hardcoding it; the worker verified the guard fires when @/inv/dag-acyclic is reinjected. npm test 12/12 unsandboxed.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "9bdf8025",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "A",
-          "base": "56cc6c0f",
-          "lead_review": "pass",
-          "note": "Graph fallback hierarchy removed (renders without tiers on fetch failure); label colours derived from the API namespace registry with a muted fallback. All four LabelBadge call sites pass the registry; getNamespaces had no prior caller so no duplicate fetch. REQ-03 read as the graph half: a literal reading over colours would make REQ-02/03/04 jointly unsatisfiable.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "f6c23c09",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "B",
-          "base": "4abed8d8",
-          "lead_review": "pass",
-          "note": "Four constants moved into cfg(any(test, feature=test-support)) pub(crate) mod test_support; renders and conformance assertions unchanged; both regeneration scripts still exit 0.",
-          "gates": "all passed"
-        },
-        {
-          "short_id": "28e1c647",
-          "status": "done",
-          "worker": "codex-luna",
-          "batch": "B",
-          "base": "4abed8d8",
-          "lead_review": "pass",
-          "note": "Three constants and their fallbacks gone; an incomplete kind declaration is reported rather than completed. The only surviving reference to the removed names is the dated audit findings record.",
-          "gates": "all passed"
-        }
-      ],
-      "gate_run": "All twelve merged. Gate pipeline restarted 2026-07-31 20:36Z over the complete set on an idle host, after the first pass produced only a load-induced cargo-ci failure. Merges and gate runs are serialised against each other: merging 09aea8b3 mid-run moved HEAD under a live code-review and the stale-binary guard refused it with exit 10."
+     "short_id": "a30d704d",
+     "status": "done",
+     "worker": "opus-agent",
+     "batch": "A",
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Four commits. Both taxonomy-supplying Default impls (HierarchyConfig, LabelNamespaces) and the unwrap_or_default fallback branches are gone; no impl Default for remains in domain/types.rs, config.rs, config_manager.rs or graph/hierarchy.rs. A 290-line fast_rules suite proves a repository declaring neither table receives an empty registry, no enumerating rule and no schema, and still validates. Its own follow-up commit 69fe7b28 is the substantive catch: file membership followed only the namespace-unique-* prefix, so withdrawing [type_hierarchy] would have left the type-enumeration rule and both hierarchy warnings behind. Docs swept in present tense (configuration.md, example-config.toml, labels.md). Merged into main with no conflicts despite three changed-in-both files; fast_rules passes 178/178 post-merge.",
+     "gate_decision": "docs-mechanical deliberately NOT added despite three docs/reference edits: the plan's gate assignment passed breakdown-review, story 93fef456 above it already carries docs-mechanical and doc-review, and the edits are the convention-required stale-text sweep rather than a deliverable. Changing a reviewed gate assignment mid-wave is scope drift.",
+     "gates": "all passed"
     },
     {
-      "wave_number": 1,
-      "note": "Dispatched 2026-08-01 session 5, all fourteen at once on base da174a6b. The ten taxonomy-fixture adoptions are disjoint by construction (one test target or crate each) and went to codex gpt-5.6-luna at high effort; the four leaves carrying design judgement went to Opus agents. fd61b44f (the graceful-shutdown drain test) is held back deliberately: it edits crates/server/tests/server_integration/graceful_shutdown_tests.rs, which is one of a53a6f09's three call sites. Mid-wave: the ten adoptions were rewired behind new task 06b736c7 and will be reworked once it lands; see the owner ruling of the same date.",
-      "issues": [
-        {
-          "short_id": "1aa2b486",
-          "title": "Adopt the taxonomy fixture in the rules integration target",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "1cfb66ff",
-          "title": "Adopt the taxonomy fixture in the documents-and-templates integration target",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "60c211d6",
-          "title": "Adopt the taxonomy fixture in the repository-workflow integration target",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "76b16af0",
-          "title": "Adopt the taxonomy fixture in the modules that seed a repository directly",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "889a939a",
-          "title": "Adopt the taxonomy fixture in the archive command tests",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "a4f03da3",
-          "title": "Adopt the taxonomy fixture in the item-validation integration target",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "a53a6f09",
-          "title": "Adopt the taxonomy fixture in the server crate",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "a603f02d",
-          "title": "Adopt the taxonomy fixture in the query-and-graph integration target",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "be918f22",
-          "title": "Adopt the taxonomy fixture in the repository-inspection command tests",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "ffe6de33",
-          "title": "Adopt the taxonomy fixture in the initialization command tests",
-          "classification": "implementation",
-          "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
-          "worker": "codex-luna",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "39c34568",
-          "title": "Declare the repository roots the packaged live assets are drawn from",
-          "classification": "implementation",
-          "status": "merged; gates re-running after the lead fixed a cross-branch compile break in its test helper",
-          "worker": "opus-agent",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "c7058cac",
-          "title": "Assemble the default vocabulary as a package",
-          "classification": "implementation",
-          "status": "reviewed PASS on all seven criteria after the invariant-kind rework; NOT merged. Add docs-mechanical before gating.",
-          "worker": "opus-agent",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "f9cab4c2",
-          "title": "Stop naming this checkout's paths in the domain and storage layers",
-          "classification": "implementation",
-          "status": "done \u2014 cargo-ci and code-review passed on merged main",
-          "worker": "opus-agent",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "6c47b99a",
-          "title": "Record where an applied package came from",
-          "classification": "implementation",
-          "status": "merged; gates re-running after the lead fixed the bridge assertion its tagged origin encoding broke",
-          "worker": "opus-agent",
-          "base": "da174a6b"
-        },
-        {
-          "short_id": "06b736c7",
-          "title": "One declared vocabulary serves every shared test fixture",
-          "classification": "implementation",
-          "status": "merged; gates re-running",
-          "worker": "opus-agent",
-          "base": "73172f44"
-        },
-        {
-          "short_id": "fd61b44f",
-          "title": "Observe the drain assertions the graceful-shutdown test makes",
-          "classification": "implementation",
-          "status": "ready, deliberately undispatched \u2014 conflicts with a53a6f09's footprint and its REQ-03 evidence needs a quiet host",
-          "worker": null
-        }
-      ]
+     "short_id": "ae435979",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "A",
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Fixture declares objective/initiative/deliverable/action and its own namespaces \u2014 deliberately not a copy of any package's vocabulary \u2014 and returns TestTaxonomy so consumers assert against what they were given. Self-verifying test proves the built repository carries exactly the declaration. Binds the 11 wave-1 adoptions.",
+     "gates": "all passed"
     },
     {
-      "wave_number": 2,
-      "note": "Unblocked by 32779829. Five roots: 7d038e97, 4873b32f, 0db28190, e4ba28c5, 5d12a79f. 6c47b99a stays open until 8371bd46 lands (owner ruling); 6f8f02ba closes behind daddfc0b.",
-      "issues": [
-        "7d038e97",
-        "4873b32f",
-        "0db28190",
-        "e4ba28c5",
-        "5d12a79f"
-      ]
+     "short_id": "4c40e165",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "B",
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "New Scalar contribution kind for the two documentation scalars and the two validation defaults; the three documentation lists join SetStringTarget. Conflict handling reuses equal_or_conflict, so no precedence is introduced.",
+     "gates": "all passed"
+    },
+    {
+     "short_id": "5dd0df5b",
+     "status": "gates: cargo-ci + mcp-ci passed; code-review failed twice on the same satisfies:REQ-08 finding. Owner ruled the fix is a citation in AGENTS.md naming the namespace declaration as a label's authority (c250dbcf). Re-run pending a binary reinstall.",
+     "worker": "codex-luna",
+     "batch": "A",
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "ProfileId is a proper semantic type shared by package id and dependency id. The pre-existing private is_lowercase_kebab in package.rs was moved to manifest.rs and shared rather than duplicated, satisfying convention-convergence. Self-reference is caught in validate_manifest, the only path a manifest reaches the system through."
+    },
+    {
+     "short_id": "09aea8b3",
+     "status": "done",
+     "worker": "opus-agent",
+     "batch": "A",
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Closed session 5. Two gate-driven fixes landed in session 4 (no-follow package-entry reader, then a non-blocking open); cargo-ci and code-review both passed at 2026-07-31T23:55Z/23:59Z."
+    },
+    {
+     "short_id": "3e340587",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "A",
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Region source relocated to assets/regions/; live-prefix sources and files both drop 61->60 with total package assets unchanged at 64. REQ-04 is enforced jointly by package validation (no undeclared package file), the existing per-asset counterpart comparison, and the new region-source prefix assertion.",
+     "gates": "all passed"
+    },
+    {
+     "short_id": "510297e4",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "B",
+     "base": "4abed8d8",
+     "lead_review": "pass-after-rework",
+     "note": "Closed session 5. The third hardcoded bracket-label site at validate.rs:2434 was fixed and merged in session 4; both gates passed."
+    },
+    {
+     "short_id": "0439da41",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "B",
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "Icon presets deleted; deny_unknown_fields on the icons table reports a configuration still naming one. Swept: no residual icon-preset reference in crates/docs/web; the remaining 'preset' hits are gate presets and hierarchy-template names, a different concept.",
+     "gates": "all passed"
+    },
+    {
+     "short_id": "fdae1023",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "A",
+     "base": "56cc6c0f",
+     "lead_review": "pass-after-rework",
+     "note": "Round 1 FAILED lead review: REQ-02 is universal over every shipped tool description but the guard checked three hand-listed keys. Rework replaced it with a scan over SERVER_INSTRUCTIONS, every CURATION.include entry and every generated tools/list description, deriving the kind vocabulary from the repository's own config rather than hardcoding it; the worker verified the guard fires when @/inv/dag-acyclic is reinjected. npm test 12/12 unsandboxed.",
+     "gates": "all passed"
+    },
+    {
+     "short_id": "9bdf8025",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "A",
+     "base": "56cc6c0f",
+     "lead_review": "pass",
+     "note": "Graph fallback hierarchy removed (renders without tiers on fetch failure); label colours derived from the API namespace registry with a muted fallback. All four LabelBadge call sites pass the registry; getNamespaces had no prior caller so no duplicate fetch. REQ-03 read as the graph half: a literal reading over colours would make REQ-02/03/04 jointly unsatisfiable.",
+     "gates": "all passed"
+    },
+    {
+     "short_id": "f6c23c09",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "B",
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "Four constants moved into cfg(any(test, feature=test-support)) pub(crate) mod test_support; renders and conformance assertions unchanged; both regeneration scripts still exit 0.",
+     "gates": "all passed"
+    },
+    {
+     "short_id": "28e1c647",
+     "status": "done",
+     "worker": "codex-luna",
+     "batch": "B",
+     "base": "4abed8d8",
+     "lead_review": "pass",
+     "note": "Three constants and their fallbacks gone; an incomplete kind declaration is reported rather than completed. The only surviving reference to the removed names is the dated audit findings record.",
+     "gates": "all passed"
     }
-  ],
-  "created_during_execution": [
-    {
-      "short_id": "9d451c98",
-      "title": "Relocate the packaged gate machinery out of the script directory",
-      "reason": "Owner-approved (2026-07-31) escalation outcome. The script directory had 4 packaged files of 45 tracked, with no category separating packaged from unpackaged review prompts, so it could not carry a category-shaped exclusion list. Retiring it as a live-source root also collapses the byte-identical scripts/ai-review.sh + contrib/gates/ai-review.sh pair.",
-      "wired": "39c34568 depends on 9d451c98"
-    },
-    {
-      "short_id": "65ff0f38",
-      "title": "Regenerating a checked-in generated artifact has one invocation form",
-      "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that \u2014 six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) \u2014 so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
-      "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label \u2014 the work is cross-cutting)"
-    },
-    {
-      "short_id": "7cbefe7c",
-      "title": "Inventory the binary's declarative configuration and sequence its removal",
-      "reason": "Owner-approved (2026-07-31). The clean-jit ruling widened the epic past the profile to every embedded declarative configuration. A grep-assembled survey found eight sites and is not a basis for sequencing a change of this size.",
-      "wired": "e204e63d depends on 7cbefe7c"
-    }
-  ],
-  "escalations": [
-    {
-      "at": "2026-07-31",
-      "category": "4 \u2014 issue scope change (criteria)",
-      "issue": "779ea308",
-      "situation": "The plan required ~60 hand-written path literals in the BINARY_BUILD_INPUTS constant plus a reconciliation test against the packaged targets. That is a hand-maintained copy held correct by an assertion \u2014 the defect class this container removes \u2014 and it ships ~60 of this repository's paths inside every adopter binary. dogfood::jit_dogfood_package() already exposes the parsed embedded manifest and dogfood.rs:386 already filters live assets by the assets/live/ prefix; every live asset's target IS its repository path; and the caller at commands/gate_check.rs:672 sits in a layer that can reach the package.",
-      "resolution": "Owner approved rewriting 779ea308 to derive the set from the packaged live-asset targets at the changed-path comparison boundary. REQ-02/REQ-05 (the literals + reconciliation test) replaced; domain-layer purity criterion retained and strengthened."
-    },
-    {
-      "at": "2026-07-31",
-      "category": "4 \u2014 issue scope change (criteria) + 1 \u2014 new work item",
-      "issue": "39c34568",
-      "situation": "D-6 requires glob-category exclusions rather than path literals. Measured at execution time: .agents/ is 55 packaged / 52 unpackaged with cleanly categorical exclusions; contrib/ is 1/4; .jit/reference/ is 1/0. But scripts/ is 4 packaged of 45 tracked and no category separates code-review-prompt.md and plan-review-prompt.md (packaged) from doc-review-prompt.md and holistic-review-prompt.md (not), so its exclusion list would be ~41 near-literals and every future unrelated script would fail the walk. Additionally scripts/ai-review.sh and contrib/gates/ai-review.sh are byte-identical and both packaged.",
-      "resolution": "Owner approved relocating the four packaged files under contrib/gates/, retiring scripts/ as a declared root, and collapsing the duplicate wrapper. New task 9d451c98 created and wired before 39c34568; 39c34568's REQ-05 no longer fixes a root count."
-    },
-    {
-      "at": "2026-08-02",
-      "category": "3 \u2014 epic criteria/decision change + 4 \u2014 issue scope change",
-      "issue": "c7058cac",
-      "situation": "REQ-02 (old D-20) required omitting the invariant kind because only jit-dogfood ships .jit/invariants.toml; REQ-04 required the applied configuration to equal the scaffold's apart from one named exception, and the scaffold declares six kinds. The worker delivered the D-20-correct five-kind package and asserted the second difference explicitly rather than hiding it.",
-      "resolution": "Owner ruled the exclusion was about the scaffolder rather than the kind, and chose to expand c7058cac now over a follow-up task or deferral. Rework dispatched to the same agent with the amended contract."
-    }
-  ],
-  "surfaced_pitfalls": [
-    {
-      "at": "2026-07-31",
-      "finding": "`.jit/config.toml:9-49` carries a third hand-maintained copy of the managed/permanent/issue-scoped area lists, asserting at :10-11 that it adopts the shipped classification verbatim with nothing binding it. Surfaced by the 67da1d70 worker.",
-      "disposition": "Out of scope by construction. The plan's 'A residual copy this container does not remove' entry and investigation \u00a74.3 both place it outside REQ-01: it is repository-local policy, not adopter documentation. Re-check at the epic gate against REQ-01's exact wording ('The adopter configuration reference and the copyable example configuration'), which names two documents and does not reach this one."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "CHANGELOG treatment diverged across wave-1 siblings: 67da1d70 added an Unreleased entry for its adopter-visible doc change; 9d451c98 deliberately added none for its adopter-visible packaged-target relocation, reasoning that later issues in this container re-derive the same tree and would rewrite it.",
-      "disposition": "Lead decision: leave both as landed and reconcile the container's CHANGELOG once at epic close, when the packaged tree has its final shape. Both workers' reasoning is defensible; churn now is the worse option. Revisit before the epic's holistic-review gate."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "Every worker running the full `cargo-ci` pipeline itself serialises the whole wave behind the host-wide `flock /tmp/jit-cargo-ci.lock`: four builds queued at once in wave 1, one of them verifying work already rejected in review.",
-      "disposition": "Dispatch-prompt defect on the lead's side. Waves 2-6 instruct workers to run only targeted checks (`cargo test -p jit --lib <module>`, `jit validate`, `docs-mechanical` where cheap); the lead runs the authoritative `cargo-ci` gate once per issue on main after merge."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "`crates/jit/tests/fast_docs_templates/ai_review_verdict_tests.rs:1` carries a `(REQ-11)` tag naming a requirement id local to a different epic (2e926e39). Pre-existing; surfaced by the 9d451c98 worker and left alone.",
-      "disposition": "Outside this container's criteria. Not fixed here; worth a standalone issue at epic close alongside the `jit issue create --description-file` gap."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat \u2026)\"` and survive shell quoting.",
-      "disposition": "Dogfooding friction. File as a separate issue at epic close; not in this epic's scope."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "The plan's counts of unpackaged files under the script and contributed-gate roots (35/36) measure 45 at execution time. D-6's preference for patterns over literals is strengthened, not reversed.",
-      "disposition": "Recorded in the plan's amendment section; no criterion depends on the count."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "codex-cli 0.146.0 forces .git read-only under -s workspace-write; neither sandbox_workspace_write.writable_roots nor --add-dir lifts it (reproduced on a throwaway repo in /tmp, so it is not a worktree artifact). Node's spawnSync additionally reports a spurious EPERM error even though the child runs and returns correct output, which makes mcp-server's suite unrunnable inside the sandbox.",
-      "disposition": "Lead-side dispatch design, not an issue defect. Codex worker briefs forbid git writes and the lead commits each worker's worktree diff onto its branch with the jit:<short-id> attribution the code-review gate reads. Node-heavy issues are verified by the lead running the suite unsandboxed, or dispatched to an unsandboxed Opus agent instead."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "A debug cargo test/clippy --all-targets build ran inside the parent checkout during wave 0 and left target/debug/incremental populated, which fails cargo-ci's incremental preflight in 247ms for every issue in the wave before any compilation is paid for.",
-      "disposition": "The gate pipeline now exports CARGO_INCREMENTAL=0 and clears target/*/incremental before evaluating. Both Opus workers were asked to confirm their working directory; the codex workers are sandboxed to their worktree and cannot have caused it."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md states the pre-change packaged-asset counts and names assets/live/regions/agents-jit-guidance.md as a present-tense fact; 3e340587 falsifies both.",
-      "disposition": "Not treated as a stale-narrative failure: an investigation is a dated finding record whose sections the plan cites by id, and its counts go stale on essentially every issue in this container. Re-check at the epic gate if the holistic reviewer reads it as living documentation."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "The 09aea8b3 worker wrote its conflict resolution into the PARENT checkout's crates/jit/src/profile/package.rs instead of its worktree. Its shell commands were correctly prefixed with an absolute cd, but its file-editing tool resolves relative paths against the parent checkout, which the shell prefix does not affect.",
-      "disposition": "Detected by check-leak-into-main.sh, reverted with git restore, worker instructed to use the absolute worktree path in every file-editing call. Dispatch briefs should state the path rule for FILE-EDITING TOOLS specifically, not only for shell commands \u2014 the current wording only covers the shell."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "scripts/verify-commit-builds.sh reports a cold `cargo build --workspace` of a fresh git-archive extraction as passing in 24-30 seconds, with no sccache, no RUSTC_WRAPPER, no VERIFY_COMMIT_TARGET_DIR, and an empty cache directory. A genuine cold build of this workspace's 260 dependencies cannot complete in that time, so the merge-integrity guard may be reporting a vacuous PASS.",
-      "disposition": "Not investigated further inside this container: main's compile integrity is independently evidenced by cargo-ci, which runs `cargo test --workspace` per issue and demonstrably fails on real defects (it caught the 510297e4 regression). Worth a standalone issue at epic close \u2014 a guard that cannot fail is worse than no guard, because the protocol relies on it."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "cargo-ci is not deterministic under host load. crates/server/tests/server_integration/graceful_shutdown_tests.rs::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero failed the gate for 3e340587 with 'the stalled connection was dropped before the drain deadline' at load average 6-10 (a worker build running beside the gate). It passes 5/5 in isolation on the same commit. The assertion is that a stalled connection SURVIVES to a drain deadline, which is precisely what CPU contention breaks.",
-      "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close \u2014 a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests.",
-      "correction": "Superseded: the failure is NOT load-induced flakiness. The test spends up to three consecutive 2s wait_for_close budgets after SIGTERM before asserting the stalled connection is still open, while GRACEFUL_DRAIN_TIMEOUT is 5s \u2014 so once those waits exceed 5s a CORRECT server has already force-closed the survivor and the assertion fails on conforming behaviour. It failed 2/2 whole-workspace runs including one on an idle host, and passes 10/10 in isolation. Fixed lead-direct at owner direction. The earlier 'do not run worker builds beside the gate' advice still stands on its own merits but was not the cause here."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "a30d704d introduced a SECOND shared test taxonomy: HierarchyConfig::test_vocabulary() (domain/type_taxonomy.rs, milestone/epic/story/task) and declared_test_taxonomy() (commands/test_helpers.rs), alongside ae435979's setup_test_repo_with_taxonomy()/test_taxonomy() (objective/initiative/deliverable/action) which landed on main during a30d704d's run. Both were dispatched in the same batch from the same base, so the worker could not have consumed a fixture that did not yet exist. ae435979's own description rejects per-family fixtures as 'the near-duplicate setup the shared-contract rule exists to prevent'.",
-      "disposition": "Convergence is already planned rather than missing: wave-1 issues a53a6f09 (server crate) and 76b16af0 (modules that seed a repository directly) migrate exactly these call sites onto the shared fixture. Brief BOTH workers explicitly to delete declared_test_taxonomy() and HierarchyConfig::test_vocabulary() rather than adopt the fixture beside them \u2014 an adoption that leaves the parallel variant standing satisfies the criterion's letter and violates @/invariant/convention-convergence. Precedent: the owner ruled convergence mandatory inside this epic when the same class arose in session 1 (65ff0f38)."
-    },
-    {
-      "at": "2026-07-31",
-      "finding": "0439da41's REQ-05 assertion `assert!(data.icons.is_empty())` in crates/server/src/routes.rs passed vacuously: the server test fixture declared no type hierarchy, so there were no types to resolve icons for and the endpoint's icon behaviour was never observed. a30d704d's fixture change (declaring a taxonomy, required once the compiled defaults are gone) exposed it as a cargo-ci failure on merged main.",
-      "disposition": "Lead-direct fix committed as fix(jit:0439da41): the assertion now states the level-keying property \u2014 one icon per declared type, two types sharing an icon exactly when they share a level \u2014 which holds for any taxonomy the fixture declares and actually observes REQ-05. Worth carrying to the epic's holistic review as evidence for @/invariant/semantic-test-assertions: an assertion that passes because its fixture is empty is not coverage."
-    },
-    {
-      "at": "2026-08-01",
-      "finding": "Immediately after the shutdown-test edit, one run of the graceful_shutdown tests failed in 0.31s (a passing run takes 5.35s). It was not reproducible in ten subsequent runs and its message was not captured.",
-      "disposition": "Recorded rather than explained. If the whole-workspace gate fails on this test again, capture the panic message before assuming the fix is complete."
-    },
-    {
-      "at": "2026-08-01",
-      "finding": "The dogfood-guidance region has two carriers with nothing binding them: profiles/jit-dogfood/assets/regions/agents-jit-guidance.md (the package's authority) and the rendered region in AGENTS.md. `jit project render` does not touch it (only the charter, invariants and rules-and-gates projections are declared), and `jit profile apply` would materialise it from the compiled-in embed rather than the working file, so a source edit reaches AGENTS.md only by hand or by a rebuild-plus-apply. This repository has no .jit/profiles/ record at all, so nothing validates the pair.",
-      "disposition": "Both carriers edited together at c250dbcf. Not a criterion violation as written: no [hard] criterion names the region pair. Recheck at epic close against REQ-03 \u2014 'the packaged live-asset tree is derived from the repository files it mirrors' \u2014 since assets/regions/ sits outside assets/live/ and may fall outside that criterion's reach by construction."
-    },
-    {
-      "at": "2026-08-01",
-      "finding": "The ten taxonomy adoptions are contracted to consume ae435979's fixture 'as authored', but setup_test_repo_with_taxonomy() writes the whole .jit/config.toml from its own vocabulary and TestTaxonomy::config_toml() is private, so a suite that must declare item kinds, gates or rules in the same file cannot use it. Measured: cli_item_validate (3 sites), cli_query_graph/scope_validation_tests.rs and fast_docs_templates/template_apply_atomicity_tests.rs write extra tables; the remaining sites do not. Both workers back before the finding reached for declared_test_taxonomy() instead \u2014 the parallel helper the session-3 handoff had already flagged.",
-      "disposition": "Root cause on the lead's side: session 3's handoff named this trap and required a53a6f09 and 76b16af0 to be briefed to delete the parallel helpers; the wave-1 briefs did not carry it. Resolved structurally by 06b736c7 rather than per issue. Brief-composition step must read the prior handoff's trap list against the dispatch set, not only the issue descriptions."
-    },
-    {
-      "at": "2026-08-02",
-      "finding": "Merging 39c34568, 06b736c7 and 6c47b99a produced a tree that does not compile: 6c47b99a gave ProfilePackage::from_files a second `source` argument while 39c34568 added a test helper calling the one-argument form. The edits do not overlap textually, so git merged all three cleanly. scripts/verify-commit-builds.sh reported the merge commit as building and was right to: its contract is `cargo build --workspace`, which never compiles #[cfg(test)] code, and the broken call site is inside a `mod tests`. cargo-ci caught it one gate cycle later. Separately, 6c47b99a's tagged ProfileOrigin encoding broke mcp-server/test-integration.js:456, which asserted the bare string; the mcp-ci gate the lead added to that issue caught it.",
-      "disposition": "Both fixed lead-direct on main with per-issue attribution (a89586ec, b558fa4f) so each lands in its own issue's review footprint. The verify-commit-builds gap is real and unfiled: a merge that breaks only test targets passes the guard. `cargo test --workspace --no-run` would close it. The session-3 handoff's stronger claim \u2014 that the guard is vacuous because a cold build cannot finish in 24-30s \u2014 is NOT what this incident shows and remains unverified."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "jit-dogfood's packaged [namespaces.satisfies] contribution still carries the pre-amendment one-line description, while .jit/config.toml carries the sharpened one the owner ruled in session 5. A package re-apply would overwrite the ruling. [namespaces.per] is in neither package and is repository-local only. Whoever reduces the packages (e4ba28c5) or applies one to this repository must reconcile both."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "`cargo test --workspace --no-run` does not catch a cross-branch break that compiles and fails at run time. Session 5's handoff proposed it as the fix for the verify-commit-builds gap; it closed the compile half only. c7058cac and 6c47b99a merged into a tree that compiled and whose profile acceptance test panicked. Run the suite, not the build."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "Editing a live consumer mid-pipeline trips the stale-binary guard on every subsequent gate with exit 10. contrib/gates/ is not a build input, but its packaged mirror under profiles/jit-dogfood/assets/live/ is, and the drift assertion requires editing both. Two of c7058cac's gates were refused this way. Make live-consumer edits between pipelines, never during one."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "merge-and-gate.sh cleared incremental state at -maxdepth 2, which misses the nested target dirs tests create (target/init-commands/debug/incremental, target/jit-stale-child-test-cache/debug/incremental). cargo-ci's post-run incremental-state check finds them and fails the gate. The session copy now sweeps at -maxdepth 4."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "A worker citing an invariant as its reason to defer is worth checking against what the invariant says. 0cf1f351 cited @/invariant/convention-convergence for NOT changing a shared method's matching base, when that invariant prescribes changing the shared form at its source. Reading it correctly turned a deferral into a two-commit fix."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "A worker's targeted-target pass is not evidence for the target. 60c211d6 changed a pub(crate) helper in doc_show_tests.rs that artifact_conformance_cli_tests.rs imports, ran only its own module, and reported the sibling's failure as an 'unrelated baseline failure'. It failed cargo-ci on main. Briefs now require the whole target plus a base-commit control before any baseline claim."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "The lead chose a reading of a criteria conflict instead of escalating, exactly as session 3's trap forbids, and briefed ten workers with it. The gate ruled the other way and two issues lost a round. A criteria conflict noticed at DISPATCH time is the same escalation as one noticed at review time \u2014 the trap is not limited to lead review."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "Sharpening [namespaces.per] and the review prompt fixed 39c34568's label over-reach but NOT 6c47b99a's: that reviewer stopped citing the label and cited the decision text directly. The amendment addressed a narrower thing than the pattern. Resequencing \u2014 landing the issue that actually delivers the decision \u2014 is what has worked both times."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "text": "The lead's own brief created a soundness hole in 32779829: it instructed that ignored files must never enter a gate's input digest, so git ls-files --exclude-standard silently drops web/node_modules, which npm-ci genuinely reads. A dependency change would move that checker's verdict without moving the digest. Exclusion must be declared, not inherited from the ignore rules. Review a brief's own instructions when a finding lands on them."
-    }
-  ],
-  "rework_counts": {
-    "e1a18372": 1,
-    "097b9f48": 1,
-    "f77fd51b": 1,
-    "65ff0f38": 2,
-    "7eecace8": 4,
-    "fdae1023": 1,
-    "510297e4": 2,
-    "09aea8b3": 1,
-    "c7058cac": 1,
-    "06b736c7": 1,
-    "39c34568": 0,
-    "0cf1f351": 1,
-    "76b16af0": 2,
-    "60c211d6": 1
+   ],
+   "gate_run": "All twelve merged. Gate pipeline restarted 2026-07-31 20:36Z over the complete set on an idle host, after the first pass produced only a load-induced cargo-ci failure. Merges and gate runs are serialised against each other: merging 09aea8b3 mid-run moved HEAD under a live code-review and the stale-binary guard refused it with exit 10."
   },
-  "started_at": "2026-07-31",
-  "owner_rulings": [
+  {
+   "wave_number": 1,
+   "note": "Dispatched 2026-08-01 session 5, all fourteen at once on base da174a6b. The ten taxonomy-fixture adoptions are disjoint by construction (one test target or crate each) and went to codex gpt-5.6-luna at high effort; the four leaves carrying design judgement went to Opus agents. fd61b44f (the graceful-shutdown drain test) is held back deliberately: it edits crates/server/tests/server_integration/graceful_shutdown_tests.rs, which is one of a53a6f09's three call sites. Mid-wave: the ten adoptions were rewired behind new task 06b736c7 and will be reworked once it lands; see the owner ruling of the same date.",
+   "issues": [
     {
-      "at": "2026-07-31",
-      "ruling": "Domain agnosticism is the only durable long-term invariant. Tying specific profiles and workflows to the source is bad practice. Template system, for instance, belongs to source, but specific applications like the planning bracket do not.",
-      "effect": "jit's own workflow profile leaves the binary. @/invariant/domain-agnostic's sanctioned exception for the planning-bracket preset trio is removed. Investigation a62d444d (dev/active/a62d444d/findings.md) established mechanism, sequencing and consequences."
+     "short_id": "1aa2b486",
+     "title": "Adopt the taxonomy fixture in the rules integration target",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "No contributed profiles in .jit by default. Our repo shall contain the dogfooding profile, but it shall be disjoint from jit proper. It should be just like an externally contributed profile.",
-      "effect": "Rejects the investigation's recommended repository-local package location (.jit/profiles/packages/). profiles/jit-dogfood/ stays in this repository, outside crates/jit/, consumed as a third-party contribution would be. OPEN: how `jit validate --fix` re-resolves the package on a later run without package bytes in .jit/ \u2014 the provenance record at .jit/profiles/<id>.json could carry the source path. Must be settled before extraction step 2 builds the resolver. Step 1 (229e7389) REQ-04 fails loudly on an unresolvable package rather than degrading, keeping the decision open."
+     "short_id": "1cfb66ff",
+     "title": "Adopt the taxonomy fixture in the documents-and-templates integration target",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Convergence is mandatory within this epic. Invariant must hold.",
-      "effect": "65ff0f38 created inside this epic rather than excepted with a tracked follow-up."
+     "short_id": "60c211d6",
+     "title": "Adopt the taxonomy fixture in the repository-workflow integration target",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Land step 1, then re-plan.",
-      "effect": "229e7389 dispatched in wave 2; a full re-plan goes to the owner for approval after this wave."
+     "short_id": "76b16af0",
+     "title": "Adopt the taxonomy fixture in the modules that seed a repository directly",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Epic REQ-04 is restated over the produced package (identical package hash + identical provenance across two assemblies); REQ-06 is struck as covered by REQ-03.",
-      "effect": "Epic description amended. REQ-06's number is retired rather than reused, so findings.md \u00a78's per-criterion table keeps its referents. Recorded as @/issue/e204e63d/decision/D-7."
+     "short_id": "889a939a",
+     "title": "Adopt the taxonomy fixture in the archive command tests",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "`jit validate --fix` re-resolves the package from a source path carried in the provenance record at .jit/profiles/<id>.json; unresolvable is a hard error, never a degraded replay of the stored record.",
-      "effect": "Settles the OPEN item on the 'no contributed profiles in .jit' ruling. Binds extraction step 2's resolver. Epic REQ-10. Recorded as @/issue/e204e63d/decision/D-8."
+     "short_id": "a4f03da3",
+     "title": "Adopt the taxonomy fixture in the item-validation integration target",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Amend @/charter/D-8 narrowly to 'one offline profile discovered from a declared repository-local location'; the rest of the deferred lifecycle list stays deferred.",
-      "effect": "dev/vision/9db27a3a-charter.md D-8 summary row and detail entry amended; charter projection re-rendered into AGENTS.md. Recorded as @/issue/e204e63d/decision/D-9."
+     "short_id": "a53a6f09",
+     "title": "Adopt the taxonomy fixture in the server crate",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Extraction steps 2-5 and cc75b4e6's surviving retargeted interior are new tasks inside e204e63d, not a separate epic.",
-      "effect": "Epic gains REQ-07..REQ-10 covering the invariant amendment, discovery, distribution, and repair. Lead flagged that the epic then delivers work its original criteria did not describe; owner accepted and approved the four drafted criteria. Recorded as @/issue/e204e63d/decision/D-10."
+     "short_id": "a603f02d",
+     "title": "Adopt the taxonomy fixture in the query-and-graph integration target",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "The release asset ships in the same release that removes the embed: publish is a hard predecessor of delete, with no checkout-only window.",
-      "effect": "Epic REQ-09; a hard dependency edge in the extraction interior. Recorded as @/issue/e204e63d/decision/D-11."
+     "short_id": "be918f22",
+     "title": "Adopt the taxonomy fixture in the repository-inspection command tests",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "DEFAULT_PLANNING_ROLE / DEFAULT_BREAKDOWN_ROLE / DEFAULT_CONTAINER_ANCHOR stay in the engine; the amended @/invariant/domain-agnostic admits mechanism-parameter defaults as engine vocabulary while excluding workflow shapes, presets and gate bundles.",
-      "effect": "Binds the invariant amendment's wording at extraction step 5. Answers findings.md \u00a711 question 5. Recorded as @/issue/e204e63d/decision/D-12."
+     "short_id": "ffe6de33",
+     "title": "Adopt the taxonomy fixture in the initialization command tests",
+     "classification": "implementation",
+     "status": "blocked on 06b736c7; pre-convergence WIP preserved on its branch; rework not yet dispatched",
+     "worker": "codex-luna",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Re-plan by amending the existing plan document; 7eecace8 and 237b15be reopen rather than a second bracket being applied.",
-      "effect": "e204e63d-plan.md gains an extraction section; plan-review re-runs over the whole document; the breakdown manifest gains the extraction interior."
+     "short_id": "39c34568",
+     "title": "Declare the repository roots the packaged live assets are drawn from",
+     "classification": "implementation",
+     "status": "merged; gates re-running after the lead fixed a cross-branch compile break in its test helper",
+     "worker": "opus-agent",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Clean jit before 1.0: no embedded configurations, template or otherwise. The binary carries mechanism and no instance of it.",
-      "effect": "Widens the epic past the profile. Bare `jit init` writes the structural minimum; `jit init --profile <id> --from <path>` is the populated path through the resolver REQ-08 builds; the scaffold code path is deleted. Recorded as @/issue/e204e63d/decision/D-13."
+     "short_id": "c7058cac",
+     "title": "Assemble the default vocabulary as a package",
+     "classification": "implementation",
+     "status": "reviewed PASS on all seven criteria after the invariant-kind rework; NOT merged. Add docs-mechanical before gating.",
+     "worker": "opus-agent",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Two packages ship: jit-default (generic vocabulary) and jit-dogfood (this project's workflow), with jit-dogfood declaring a package dependency on jit-default. Composition enters v1.0.",
-      "effect": "@/charter/D-8 amended a second time to admit composition. Rejected: generating jit-default from jit-dogfood, and each package carrying a guarded copy of the shared vocabulary. Recorded as @/issue/e204e63d/decision/D-14."
+     "short_id": "f9cab4c2",
+     "title": "Stop naming this checkout's paths in the domain and storage layers",
+     "classification": "implementation",
+     "status": "done \u2014 cargo-ci and code-review passed on merged main",
+     "worker": "opus-agent",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "Epic REQ-01's authority moves from SHIPPED_DOCUMENTATION_POLICY to the packaged default profile's [documentation] declaration; the delivered generator is retargeted, not discarded.",
-      "effect": "Story 6f8f02ba reopens when the constant's removal is planned. REQ-01 is restated then, not before, so it keeps describing what shipped. Recorded as @/issue/e204e63d/decision/D-15."
+     "short_id": "6c47b99a",
+     "title": "Record where an applied package came from",
+     "classification": "implementation",
+     "status": "merged; gates re-running after the lead fixed the bridge assertion its tagged origin encoding broke",
+     "worker": "opus-agent",
+     "base": "da174a6b"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "The release archive carries both package directories alongside the binaries, so one download initializes offline.",
-      "effect": "Extends the current flat four-file archive. @/charter/D-16 intact. Rejected: separate per-package assets, and installer-placed machine-level packages. Recorded as @/issue/e204e63d/decision/D-16."
+     "short_id": "06b736c7",
+     "title": "One declared vocabulary serves every shared test fixture",
+     "classification": "implementation",
+     "status": "merged; gates re-running",
+     "worker": "opus-agent",
+     "base": "73172f44"
     },
     {
-      "at": "2026-07-31",
-      "ruling": "The registry-derived default rules stay in the binary; orphan-leaf and strategic-consistency move to jit-dogfood.",
-      "effect": "label-format, namespace-registry, type-hierarchy-known and namespace-unique-<ns> are mechanism over the adopter's own declarations. Recorded as @/issue/e204e63d/decision/D-17."
-    },
-    {
-      "at": "2026-07-31",
-      "ruling": "An audit inside this epic inventories the remaining embedded configuration and sequences its removal before any of it is planned; fan-out blocks on it.",
-      "effect": "Task 7cbefe7c created, wired as a dependency of the epic, claimed and dispatched. The running plan amendment finishes on the profile-extraction scope; one re-plan after the audit covers everything. Recorded as @/issue/e204e63d/decision/D-18."
-    },
-    {
-      "at": "2026-07-31",
-      "ruling": "One more plan-review round past the rework limit; hard stop after it.",
-      "effect": "Round 5 dispatched with the three round-4 findings. If it fails, or the leaf-sizing class repeats a third time, work stops and returns to the owner."
-    },
-    {
-      "at": "2026-08-01",
-      "ruling": "Fix the graceful-shutdown test defect lead-direct, now, rather than as a task inside the epic or a standalone issue outside it.",
-      "effect": "crates/server/tests/server_integration/graceful_shutdown_tests.rs probes the mid-drain survivor only while signalled_at.elapsed() + DEADLINE_SLACK < GRACEFUL_DRAIN_TIMEOUT. Committed as fix(jit:e204e63d). No coverage lost: the stalled_closed_after assertion already states the same entitlement unconditionally. The lead noted it would be both author and reviewer of a shared-infrastructure change; the owner accepted that."
-    },
-    {
-      "at": "2026-08-01",
-      "ruling": "Amend the [namespaces.satisfies] description so the label denotes contribution to a container criterion rather than sole delivery.",
-      "effect": "'.jit/config.toml' updated to say several children may credit one id and that the label-coverage gate credits a criterion when any labelled child exists. Resolves 5dd0df5b's code-review failure at the class level rather than per issue; the same finding would otherwise have hit every partial contributor to REQ-01/03/05/08."
-    },
-    {
-      "at": "2026-08-01",
-      "ruling": "Mark the graceful-shutdown drain test #[ignore]d against a filed issue rather than attempting a second lead-direct fix.",
-      "effect": "crates/server/tests/server_integration/graceful_shutdown_tests.rs:425 carries #[ignore = \"... re-enable with jit:fd61b44f\"]. Issue fd61b44f created (task, milestone:v1.0, component:server, cargo-ci + code-review) with five criteria that pin the acceptance race, forbid weakening any assertion, and require evidence from consecutive whole-workspace runs rather than isolated ones. e204e63d depends on fd61b44f, so this container cannot close while the coverage its own gating disabled is still missing. The lead's first fix (the deadline guard) stays: it addresses a genuinely separate cause and is correct on its own terms."
-    },
-    {
-      "at": "2026-08-01",
-      "ruling": "Resolve 5dd0df5b's repeated code-review finding by citing the namespace declaration as a label's authority in AGENTS.md, rather than dropping the label, re-labelling REQ-08's contributors, or overriding the verdict.",
-      "effect": "profiles/jit-dogfood/assets/regions/agents-jit-guidance.md and the AGENTS.md region it feeds gained one bullet: a label means what its [namespaces.<ns>] declaration says. A citation rather than a copy, so it adds no hand-maintained duplicate. Fixes the class for every partial contributor to REQ-01/03/05/07/08 still to come. Commit c250dbcf."
-    },
-    {
-      "at": "2026-08-01",
-      "ruling": "Converge the two shared test vocabularies first, then rework the adoptions onto the single fixture. Rejected: closing the adoptions as landed and converging afterwards, which closes issues whose REQ-01/REQ-04 are unmet at the moment of closing; amending the ten adoptions' criteria to name a fixture family; killing the wave outright.",
-      "effect": "Task 06b736c7 created inside the epic and wired between ae435979 and all ten adoptions (dep add --reduce dropped the now-redundant ae435979 and story edges). One declaration reachable from the pure domain and graph suites, rendered into a whole-repository fixture and into a composable configuration fragment; the second declaration (HierarchyConfig::test_vocabulary, 118 call sites) and the second renderer (declared_test_taxonomy) are retired, rewriting ~160 literal type-name assertions onto the surviving vocabulary."
-    },
-    {
-      "at": "2026-08-02",
-      "ruling": "The invariant kind is default vocabulary. Initialization creates the invariant registry the way it creates the gate registry (present and empty), jit-default declares all six kinds, and jit-dogfood contributes its invariant entries instead of publishing the registry file. Delivered by expanding c7058cac rather than by a follow-up task.",
-      "effect": "D-20 amended on the epic. c7058cac gains REQ-06 (initialization creates the registry) and REQ-07 (the workflow package contributes rather than publishes); REQ-02 restated to 'every item kind a freshly initialized repository can carry'. REQ-04 becomes literally satisfiable. The trigger was c7058cac's own delivery: REQ-02 and REQ-04 could not both hold, because the scaffold writes six kinds and the old D-20 permitted five. Commit 8289cdfc."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "question": "39c34568's code-review reads per:@/issue/e204e63d/decision/D-6 as a claim to deliver D-6's completeness walk, which 0cf1f351 owns.",
-      "ruling": "Sharpen [namespaces.per] only; add no verbosity elsewhere.",
-      "applied": "a3291826 \u2014 the namespace now says the label denotes conformance, not delivery of the decision whole.",
-      "outcome": "Did NOT bind the reviewer. Round 2 failed on the same finding, now citing D-2 and D-6 and 39c34568's own REQ-05. Lead resequenced instead of escalating again: 0cf1f351 delivers the walk and is dispatched ahead of 39c34568's close, so the claim the reviewer tests becomes true in the tree."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "question": "REQ-02 ('a test that needs only a repository, and asserts on no vocabulary, is left alone') and REQ-03 ('no test here constructs the scaffold's hierarchy template to obtain a taxonomy') conflict for a repository-only test that constructs the template only because initialize_fresh_repository requires the argument.",
-      "ruling": "The gate's reading governs: REQ-02 means what it says, setup included. Repository-only tests keep HierarchyTemplate::default(); daddfc0b absorbs those call sites when it deletes the type.",
-      "outcome": "1cfb66ff and ffe6de33 reverted to the narrowed form. The lead had chosen the opposite reading at dispatch and briefed all ten adoption workers with it, which cost those two issues a review round."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "question": "6c47b99a failed code-review twice demanding jit validate --fix re-resolve a directory-origin package, which is 8371bd46's job.",
-      "ruling": "Pull 8371bd46's chain forward \u2014 32779829 then 5d12a79f then 8371bd46 \u2014 and re-run 6c47b99a's review afterwards.",
-      "outcome": "Same resequencing that resolved 39c34568. 6c47b99a stays open meanwhile."
-    },
-    {
-      "at": "2026-08-02",
-      "session": 6,
-      "question": "cargo-ci re-ran a whole-workspace suite once per issue over one unchanged tree \u2014 about 112 minutes for a fifteen-issue wave.",
-      "ruling": "File gate-verdict input provenance as an issue inside this epic, to be completed next; no further work proceeds without it.",
-      "outcome": "32779829 created and delivered. Measured in production: 06b736c7's cargo-ci reused 32779829's verdict in 0ms against 411s executed, origin.derivation='reused' naming the source run. Pipeline 4 gated fourteen issues in ~50 minutes."
+     "short_id": "fd61b44f",
+     "title": "Observe the drain assertions the graceful-shutdown test makes",
+     "classification": "implementation",
+     "status": "ready, deliberately undispatched \u2014 conflicts with a53a6f09's footprint and its REQ-03 evidence needs a quiet host",
+     "worker": null
     }
-  ],
-  "halted": {
-    "story": "cc75b4e6",
-    "reason": "Owner ruling: the profile leaves the binary, so deriving the packaged tree into it targets a structure being removed. Per investigation \u00a78, three tasks are superseded and seven survive retargeted from a build-output tree to a publishable distribution artefact.",
-    "superseded": [
-      "1d2f454e (the embed is deleted, not re-rooted)",
-      "ce0172c3 (retargets to the produced tree)",
-      "779ea308 (epic REQ-06 becomes meaningless)"
-    ],
-    "survive_retargeted": [
-      "7d038e97",
-      "26f503cc",
-      "0cf1f351",
-      "39c34568",
-      "4873b32f",
-      "0db28190",
-      "3e340587",
-      "380a8e9e",
-      "8e7a82dc"
-    ],
-    "epic_criteria": {
-      "REQ-03": "survives unchanged, gains value",
-      "REQ-04": "superseded \u2014 'embed' loses its referent",
-      "REQ-05": "survives unchanged, matters more",
-      "REQ-06": "meaningless after extraction"
-    }
+   ]
   },
-  "blocked": null,
-  "session": 6,
-  "open_findings": [
-    {
-      "at": "2026-07-31",
-      "gate": "plan-review",
-      "issue": "7eecace8",
-      "verdict": "fail",
-      "round": 2,
-      "findings": [
-        {
-          "id": "F1",
-          "severity": "high",
-          "status": "resolved",
-          "text": "The manifest specifies repository-time assembly but the graph retained the build-time assembly task and obsolete build-chain work.",
-          "resolution": "Lead reconciled the graph to the manifest: eight surviving issues retargeted to their manifest title, description, type, priority, labels and gates; 7d038e97 gained docs-mechanical. Zero title mismatches remain."
-        },
-        {
-          "id": "F2",
-          "severity": "high",
-          "status": "open-by-sequence",
-          "text": "The plan omits implementation of settled D-13 and D-14 while citing them.",
-          "resolution": "Not a plan defect to fix in place. D-18 sequences that work behind audit 7cbefe7c, and the owner's chosen order is amendment, then audit, then one re-plan covering everything. The gate cannot pass until the audit lands and the plan decomposes D-13/D-14. Lead ran plan-review before that point."
-        },
-        {
-          "id": "F3",
-          "severity": "medium",
-          "status": "open",
-          "text": "Two 'Superseded:' design rows and two 'Open:' correction rows read as accumulation rather than a concise current design (plan.md:413).",
-          "resolution": "For the re-plan: fold the load-bearing substance into the decision rows it justifies and delete the historical framing."
-        },
-        {
-          "id": "F4",
-          "severity": "medium",
-          "status": "open",
-          "text": "Manifest entries have unordered overlapping footprints despite the plan claiming shared writers are ordered (breakdown.json:845).",
-          "resolution": "For the re-plan: add edges, or state a credible disjoint-edit contract per overlapping pair."
-        }
-      ]
-    },
-    {
-      "at": "2026-08-02",
-      "gate": "code-review",
-      "issue": "06b736c7",
-      "verdict": "fail",
-      "round": 1,
-      "findings": [
-        {
-          "id": "F1",
-          "severity": "high",
-          "status": "reworking",
-          "text": "Migrated taxonomy consumers still encode the shared vocabulary as literals instead of reading it from TestTaxonomy (crates/jit/src/graph/hierarchy.rs:779).",
-          "resolution": "Rework dispatched on worktree-agent-06b736c7-r1, scoped to crates/jit/src/** only: four modules that consume the declaration and still spell its names (hierarchy.rs ~44, type_taxonomy.rs ~31, validation/graph.rs ~20, visualization.rs ~1), plus six that re-declare the same names inline. crates/jit/tests/** is excluded because the ten adoption workers own those targets concurrently."
-        },
-        {
-          "id": "F2",
-          "severity": "high",
-          "status": "not-a-defect",
-          "text": "The latest required cargo-ci run failed, leaving REQ-06's suite-passing criterion materially unverified.",
-          "resolution": "The cargo-ci failure is the c7058cac/6c47b99a integration defect in commands/profile.rs, unrelated to this issue. Clears when the lead's fix lands."
-        }
-      ]
-    },
-    {
-      "at": "2026-08-02",
-      "gate": "code-review",
-      "issue": "39c34568",
-      "verdict": "fail",
-      "round": 2,
-      "findings": [
-        {
-          "id": "F1",
-          "severity": "high",
-          "status": "resequenced",
-          "text": "The root test checks declared assets only and never walks declared roots to reject files absent from the asset inventory and exclusions (crates/jit/src/profile/dogfood.rs:426), citing D-2 and D-6.",
-          "resolution": "Not a defect in 39c34568, whose REQ-01 states the exclusion lists may be empty because what belongs in them is measured elsewhere. Sharpening [namespaces.per] did not bind the reviewer across two rounds. 0cf1f351 \u2014 which owns the walk and depends only on 39c34568, whose code is on main \u2014 was dispatched ahead of 39c34568's close so the claim the reviewer tests becomes true in the tree. Re-run 39c34568's code-review after 0cf1f351 lands."
-        }
-      ]
-    }
-  ],
-  "gate_history": [
-    {
-      "gate": "plan-review",
-      "issue": "7eecace8",
-      "round": 1,
-      "verdict": "fail",
-      "findings": 1,
-      "summary": "Coverage: REQ-07..REQ-10 had no satisfying child. Resolved by instantiating the manifest."
-    },
-    {
-      "gate": "plan-review",
-      "issue": "7eecace8",
-      "round": 2,
-      "verdict": "fail",
-      "findings": 4,
-      "summary": "Graph not reconciled to the manifest (lead); D-13/D-14 cited but not decomposed (sequencing \u2014 the audit had not landed); accumulation rows; unordered footprint overlaps."
-    },
-    {
-      "gate": "plan-review",
-      "issue": "7eecace8",
-      "round": 3,
-      "verdict": "fail",
-      "findings": 9,
-      "summary": "Membership residue on rejected issues (lead); D-23 omitted (lead never briefed it); seven leaves oversized or mixing implementation with prose."
-    },
-    {
-      "gate": "plan-review",
-      "issue": "7eecace8",
-      "round": 4,
-      "verdict": "fail",
-      "findings": 3,
-      "summary": "Taxonomy fixture still 64 sites across 11 modules; integration split spans several target families; overlap table omitted production writers on commands/validate.rs."
-    },
-    {
-      "gate": "plan-review",
-      "issue": "7eecace8",
-      "round": 5,
-      "verdict": "pass",
-      "findings": 0,
-      "summary": "Fixture authored once and adopted by ten bounded families; integration split by Cargo target; overlap generator unfiltered."
-    },
-    {
-      "gate": "coverage-preview",
-      "issue": "237b15be",
-      "verdict": "pass"
-    },
-    {
-      "gate": "breakdown-review",
-      "issue": "237b15be",
-      "round": 1,
-      "verdict": "fail",
-      "findings": 4,
-      "summary": "Lead-side graph defects: 13 roots missing the bracket edge, two live issues depending on rejected ones, one incoherent Ready state."
-    },
-    {
-      "gate": "breakdown-review",
-      "issue": "237b15be",
-      "round": 2,
-      "verdict": "pass",
-      "findings": 0
-    }
-  ],
-  "graph_state": {
-    "manifest_entries": 72,
-    "manifest_edges": 101,
-    "issue_states": {
-      "ready": 12,
-      "done": 14,
-      "backlog": 48,
-      "in_progress": 1
-    },
-    "reconciled": "Zero edge and zero content differences at 5e427854.",
-    "rejected": [
-      "1d2f454e",
-      "ce0172c3",
-      "779ea308",
-      "8e7a82dc",
-      "380a8e9e",
-      "e103d7a4",
-      "45e250c6"
-    ],
-    "note": "Rejected issues carry no membership labels; the resulting orphan-leaf warnings are advisory and cannot be cleared by archiving."
+  {
+   "wave_number": 2,
+   "note": "Unblocked by 32779829. Five roots: 7d038e97, 4873b32f, 0db28190, e4ba28c5, 5d12a79f. 6c47b99a stays open until 8371bd46 lands (owner ruling); 6f8f02ba closes behind daddfc0b.",
+   "issues": [
+    "7d038e97",
+    "4873b32f",
+    "0db28190",
+    "e4ba28c5",
+    "5d12a79f"
+   ]
   },
-  "bracket": {
-    "planning": "7eecace8 done (plan-review passed round 5)",
-    "breakdown": "237b15be done (coverage-preview + breakdown-review passed)",
-    "note": "@/charter/D-3 satisfied; implementation may be dispatched."
-  },
-  "session_notes": [
+  {
+   "wave_number": 2,
+   "session": 7,
+   "note": "Dispatched 2026-08-02 session 7, all six at once on base 25b14f14. Three hard leaves to Opus agents (7d038e97 package assembly, 5d12a79f resolution routes, fd61b44f the graceful-shutdown acceptance race with its open design question); three mechanical leaves to codex gpt-5.6-luna at high effort (0db28190 adopter doc, 4873b32f mcp bridge assertion, e4ba28c5 manifest delta). 5d12a79f dispatched unclaimed: its dependency 6c47b99a is merged on main and open only pending the re-review that session 6's resequencing ruling defers behind 8371bd46, so the code it builds on is present while the issue state is not yet terminal.",
+   "issues": [
     {
-      "at": "2026-07-31",
-      "session": 3,
-      "note": "Codex CLI workers cannot commit: codex-cli 0.146.0 makes .git read-only under -s workspace-write, and neither -c sandbox_workspace_write.writable_roots nor --add-dir lifts it (verified on a throwaway repo in /tmp as well as in a worktree). Worker briefs therefore forbid git writes and the lead commits each worker's worktree diff onto its branch with the jit:<short-id> attribution the code-review gate reads. --add-dir DOES work for non-.git paths, so $HOME/.cargo, $HOME/.cache and $HOME/.npm are granted or cargo cannot take its package-cache lock. jit read-only commands (item show, issue show, validate) work unmodified inside the sandbox."
+     "short_id": "7d038e97",
+     "worker": "opus",
+     "status": "dispatched",
+     "lead_review": "pass pending report",
+     "note": "All seven criteria verified. parse_manifest is the crate's only production manifest parse (the two other toml::from_str sites in package.rs are inside #[cfg(test)] mod tests at :920), so REQ-02 holds. The REQ-05 comparison carries two explicit anti-vacuity guards: produced.len() > 1, and an assertion that some produced file IS executable so the mode half observes something. Destination defaults under target/, covered by .gitignore, with no build reading it. Followed the 65ff0f38 entry-point shape.",
+     "gate_outcome": "Rework r1 merged at e975abc4, re-gating. code-review round 1 raised two real findings: check-then-rename publication (TOCTOU overwriting an occupied destination, against @/invariant/atomic-writes) and false prose in dev/index.md claiming nothing compiles the package in while include_dir! still embeds it. Worker fixed both, adding publish_staged_directory_noreplace beside the existing publish_external_directory_noreplace rather than a private variant. Lead verified the shipped entry point end to end: 64 files, diff -r against the checked-in tree is identical, executable sets match, second run over an occupied destination succeeds."
     },
     {
-      "at": "2026-08-01",
-      "session": 5,
-      "note": "Session 4 ended without a handoff. Reconstructed from git log, .jit state and the gate-run records: it merged and gated the wave-0 tail (a30d704d, then reworks for 09aea8b3 and 510297e4), fixed the graceful-shutdown drain test twice, marked it #[ignore]d against the new issue fd61b44f, and amended [namespaces.satisfies]. Wave 0 closed in session 5 with 09aea8b3 and 510297e4; 5dd0df5b is the only wave-0 issue still open."
+     "short_id": "5d12a79f",
+     "worker": "opus",
+     "status": "dispatched (unclaimed; dep 6c47b99a open by ruling)",
+     "lead_review": "fail, rework r1 dispatched",
+     "rework": 1,
+     "note": "All five criteria met in code and tests; precedence tests are non-vacuous by construction. FAILED Tier 2.5: crates/jit/src/output.rs:944 and its doc comment at :702 still describe PROFILE_NOT_FOUND as 'The requested embedded profile does not exist', and that string renders into the generated docs/reference/error-codes.md:33.",
+     "gate_outcome": "cargo-ci passed; code-review failed on the jit validate gap its own worker disclosed. Held open behind 8371bd46 per the resequencing pattern; NOT reworked, because its five criteria are met and validation is 8371bd46's literal subject."
     },
     {
-      "at": "2026-08-02",
-      "session": 5,
-      "note": "Handoff written at the invoker's request while the 39c34568/06b736c7/6c47b99a gate batch was still running. handoff-4.md carries the full state."
+     "short_id": "fd61b44f",
+     "worker": "opus",
+     "status": "dispatched",
+     "lead_review": "pass pending REQ-03 evidence",
+     "note": "Design answer accepted and confined to the test harness, no product-surface change. The stalled socket is opened first so a probe connection queues behind it; the probe answering proves axum-server's sequential accept loop moved past the stalled socket, which it cannot do without registering it. Worker also added a meta-test that SIGSTOPs the server so the kernel completes the handshake while the accept loop provably cannot have run: a fixture reporting registration from the write alone fails there. Lead verified probe_health, wait_for_connection_count at crates/server/src/shutdown.rs:323, budget nesting (1s window inside 10s EXCHANGE_BUDGET), all four REQ-04 properties and REQ-05 non-weakening.",
+     "gate_outcome": "DONE. cargo-ci passed (498s execution), code-review failed round 1 on a pipeline-ordering artifact (only one cargo-ci execution recorded, so REQ-03's consecutive-run evidence was invisible to the reviewer), passed round 2 after a forced second execution. Lead also ran two consecutive whole-workspace runs on merged main: 4298 passed, 0 failed, twice."
     },
     {
-      "at": "2026-08-02",
-      "session": 6,
-      "note": "Wave-1 tail: c7058cac merged (one additive conflict in commands/profile.rs; both sides' test helpers kept). Its merge with 6c47b99a is a cross-branch regression \u2014 c7058cac's test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration applies profiles/jit-default read from the real checkout, and 6c47b99a's apply now refuses a package directory outside the TARGET repository's worktree. `cargo test --workspace --no-run` passed on the merged tree and did not catch it: the pair compiles, it fails at run time. Lead fixes the one call site on main. The ten adoptions were re-dispatched on fresh -r1 worktrees off a3291826; their old branches hold one superseded commit each (SHAs in the session scratchpad's discarded-wip-sha.txt) because branch deletion is blocked in this harness."
+     "short_id": "0db28190",
+     "worker": "codex-luna",
+     "status": "dispatched",
+     "lead_review": "pass after 2 reworks",
+     "rework": 2,
+     "note": "r1 extended the existing eight-noun enumeration in place, stranding 'carried by the running binary' behind a fourteen-word qualifier: FAIL on prose coherence. r2 restored the original sentence and added a separate one, but its purpose clause was circular, failing REQ-02's literal demand to state what the declaration is FOR. r3 states the completeness consequence: a file under a declared root that no asset claims and no exclusion matches is caught rather than silently omitted.",
+     "gate_outcome": "DONE. docs-mechanical and doc-review passed; code-review failed round 1 because it ran BEFORE docs-mechanical and read REQ-04 as unevidenced, then passed round 2 unchanged. Pipeline defect, not a work defect."
     },
     {
-      "at": "2026-08-02",
-      "session": 6,
-      "note": "Adoption footprints were not what the issue Notes implied in two cases. 76b16af0's four call sites are commands/config.rs, validation/repository.rs and two in storage/json.rs (confirmed by a read-only codex spark pass against the Notes' 'four call sites across three modules'); its first worker instead took profile.rs and validate.rs, and its profile.rs edit destroyed the subject of c7058cac's scaffold-comparison test. be918f22 legitimately owns config.rs as a repository-inspection module, so 76b16af0-r2's config.rs hunk is the redundant one at merge. Measure a footprint before dispatch; the Notes' counts are advisory."
+     "short_id": "4873b32f",
+     "worker": "codex-luna",
+     "status": "dispatched",
+     "lead_review": "pass",
+     "note": "Asserts the reported live-source declaration is present, that every entry names a root, and cross-checks reported roots against reported live-asset targets in BOTH directions, so no literal root value appears. Lead ran the full mcp-server suite outside the codex sandbox: 12/12 including the profile test. REQ-03 evidenced.",
+     "gate_outcome": "DONE. mcp-ci and code-review passed first time. The only issue in the wave to pass every gate on the first attempt."
     },
     {
-      "at": "2026-08-02",
-      "session": 6,
-      "note": "Wave 1 closed: 41 -> 42 done of 77. 32779829 delivered and gated; gate-verdict reuse measured in production at 0ms against 411s executed. HierarchyTemplate::default() call sites 43 -> 4, which is what lets daddfc0b delete the type without carrying the rewrite. Wave 2 is the five issues behind 32779829: 7d038e97, 4873b32f, 0db28190, e4ba28c5, 5d12a79f; everything in layers 2-7 sits transitively behind them."
+     "short_id": "e4ba28c5",
+     "worker": "codex-luna",
+     "status": "dispatched",
+     "gate_outcome": "FAIL, rework prepared and held until 7835fdc0 lands. Its own two new tests were in the failure list it reported as out of scope, and its REQ-03 test compares nothing (three table-existence checks where the criterion demands equality against hand-application)."
     }
-  ]
+   ]
+  }
+ ],
+ "created_during_execution": [
+  {
+   "short_id": "9d451c98",
+   "title": "Relocate the packaged gate machinery out of the script directory",
+   "reason": "Owner-approved (2026-07-31) escalation outcome. The script directory had 4 packaged files of 45 tracked, with no category separating packaged from unpackaged review prompts, so it could not carry a category-shaped exclusion list. Retiring it as a live-source root also collapses the byte-identical scripts/ai-review.sh + contrib/gates/ai-review.sh pair.",
+   "wired": "39c34568 depends on 9d451c98"
+  },
+  {
+   "short_id": "65ff0f38",
+   "title": "Regenerating a checked-in generated artifact has one invocation form",
+   "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that \u2014 six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) \u2014 so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
+   "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label \u2014 the work is cross-cutting)"
+  },
+  {
+   "short_id": "7cbefe7c",
+   "title": "Inventory the binary's declarative configuration and sequence its removal",
+   "reason": "Owner-approved (2026-07-31). The clean-jit ruling widened the epic past the profile to every embedded declarative configuration. A grep-assembled survey found eight sites and is not a basis for sequencing a change of this size.",
+   "wired": "e204e63d depends on 7cbefe7c"
+  }
+ ],
+ "escalations": [
+  {
+   "at": "2026-07-31",
+   "category": "4 \u2014 issue scope change (criteria)",
+   "issue": "779ea308",
+   "situation": "The plan required ~60 hand-written path literals in the BINARY_BUILD_INPUTS constant plus a reconciliation test against the packaged targets. That is a hand-maintained copy held correct by an assertion \u2014 the defect class this container removes \u2014 and it ships ~60 of this repository's paths inside every adopter binary. dogfood::jit_dogfood_package() already exposes the parsed embedded manifest and dogfood.rs:386 already filters live assets by the assets/live/ prefix; every live asset's target IS its repository path; and the caller at commands/gate_check.rs:672 sits in a layer that can reach the package.",
+   "resolution": "Owner approved rewriting 779ea308 to derive the set from the packaged live-asset targets at the changed-path comparison boundary. REQ-02/REQ-05 (the literals + reconciliation test) replaced; domain-layer purity criterion retained and strengthened."
+  },
+  {
+   "at": "2026-07-31",
+   "category": "4 \u2014 issue scope change (criteria) + 1 \u2014 new work item",
+   "issue": "39c34568",
+   "situation": "D-6 requires glob-category exclusions rather than path literals. Measured at execution time: .agents/ is 55 packaged / 52 unpackaged with cleanly categorical exclusions; contrib/ is 1/4; .jit/reference/ is 1/0. But scripts/ is 4 packaged of 45 tracked and no category separates code-review-prompt.md and plan-review-prompt.md (packaged) from doc-review-prompt.md and holistic-review-prompt.md (not), so its exclusion list would be ~41 near-literals and every future unrelated script would fail the walk. Additionally scripts/ai-review.sh and contrib/gates/ai-review.sh are byte-identical and both packaged.",
+   "resolution": "Owner approved relocating the four packaged files under contrib/gates/, retiring scripts/ as a declared root, and collapsing the duplicate wrapper. New task 9d451c98 created and wired before 39c34568; 39c34568's REQ-05 no longer fixes a root count."
+  },
+  {
+   "at": "2026-08-02",
+   "category": "3 \u2014 epic criteria/decision change + 4 \u2014 issue scope change",
+   "issue": "c7058cac",
+   "situation": "REQ-02 (old D-20) required omitting the invariant kind because only jit-dogfood ships .jit/invariants.toml; REQ-04 required the applied configuration to equal the scaffold's apart from one named exception, and the scaffold declares six kinds. The worker delivered the D-20-correct five-kind package and asserted the second difference explicitly rather than hiding it.",
+   "resolution": "Owner ruled the exclusion was about the scaffolder rather than the kind, and chose to expand c7058cac now over a follow-up task or deferral. Rework dispatched to the same agent with the amended contract."
+  }
+ ],
+ "surfaced_pitfalls": [
+  {
+   "at": "2026-07-31",
+   "finding": "`.jit/config.toml:9-49` carries a third hand-maintained copy of the managed/permanent/issue-scoped area lists, asserting at :10-11 that it adopts the shipped classification verbatim with nothing binding it. Surfaced by the 67da1d70 worker.",
+   "disposition": "Out of scope by construction. The plan's 'A residual copy this container does not remove' entry and investigation \u00a74.3 both place it outside REQ-01: it is repository-local policy, not adopter documentation. Re-check at the epic gate against REQ-01's exact wording ('The adopter configuration reference and the copyable example configuration'), which names two documents and does not reach this one."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "CHANGELOG treatment diverged across wave-1 siblings: 67da1d70 added an Unreleased entry for its adopter-visible doc change; 9d451c98 deliberately added none for its adopter-visible packaged-target relocation, reasoning that later issues in this container re-derive the same tree and would rewrite it.",
+   "disposition": "Lead decision: leave both as landed and reconcile the container's CHANGELOG once at epic close, when the packaged tree has its final shape. Both workers' reasoning is defensible; churn now is the worse option. Revisit before the epic's holistic-review gate."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "Every worker running the full `cargo-ci` pipeline itself serialises the whole wave behind the host-wide `flock /tmp/jit-cargo-ci.lock`: four builds queued at once in wave 1, one of them verifying work already rejected in review.",
+   "disposition": "Dispatch-prompt defect on the lead's side. Waves 2-6 instruct workers to run only targeted checks (`cargo test -p jit --lib <module>`, `jit validate`, `docs-mechanical` where cheap); the lead runs the authoritative `cargo-ci` gate once per issue on main after merge."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "`crates/jit/tests/fast_docs_templates/ai_review_verdict_tests.rs:1` carries a `(REQ-11)` tag naming a requirement id local to a different epic (2e926e39). Pre-existing; surfaced by the 9d451c98 worker and left alone.",
+   "disposition": "Outside this container's criteria. Not fixed here; worth a standalone issue at epic close alongside the `jit issue create --description-file` gap."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat \u2026)\"` and survive shell quoting.",
+   "disposition": "Dogfooding friction. File as a separate issue at epic close; not in this epic's scope."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "The plan's counts of unpackaged files under the script and contributed-gate roots (35/36) measure 45 at execution time. D-6's preference for patterns over literals is strengthened, not reversed.",
+   "disposition": "Recorded in the plan's amendment section; no criterion depends on the count."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "codex-cli 0.146.0 forces .git read-only under -s workspace-write; neither sandbox_workspace_write.writable_roots nor --add-dir lifts it (reproduced on a throwaway repo in /tmp, so it is not a worktree artifact). Node's spawnSync additionally reports a spurious EPERM error even though the child runs and returns correct output, which makes mcp-server's suite unrunnable inside the sandbox.",
+   "disposition": "Lead-side dispatch design, not an issue defect. Codex worker briefs forbid git writes and the lead commits each worker's worktree diff onto its branch with the jit:<short-id> attribution the code-review gate reads. Node-heavy issues are verified by the lead running the suite unsandboxed, or dispatched to an unsandboxed Opus agent instead."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "A debug cargo test/clippy --all-targets build ran inside the parent checkout during wave 0 and left target/debug/incremental populated, which fails cargo-ci's incremental preflight in 247ms for every issue in the wave before any compilation is paid for.",
+   "disposition": "The gate pipeline now exports CARGO_INCREMENTAL=0 and clears target/*/incremental before evaluating. Both Opus workers were asked to confirm their working directory; the codex workers are sandboxed to their worktree and cannot have caused it."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md states the pre-change packaged-asset counts and names assets/live/regions/agents-jit-guidance.md as a present-tense fact; 3e340587 falsifies both.",
+   "disposition": "Not treated as a stale-narrative failure: an investigation is a dated finding record whose sections the plan cites by id, and its counts go stale on essentially every issue in this container. Re-check at the epic gate if the holistic reviewer reads it as living documentation."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "The 09aea8b3 worker wrote its conflict resolution into the PARENT checkout's crates/jit/src/profile/package.rs instead of its worktree. Its shell commands were correctly prefixed with an absolute cd, but its file-editing tool resolves relative paths against the parent checkout, which the shell prefix does not affect.",
+   "disposition": "Detected by check-leak-into-main.sh, reverted with git restore, worker instructed to use the absolute worktree path in every file-editing call. Dispatch briefs should state the path rule for FILE-EDITING TOOLS specifically, not only for shell commands \u2014 the current wording only covers the shell."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "scripts/verify-commit-builds.sh reports a cold `cargo build --workspace` of a fresh git-archive extraction as passing in 24-30 seconds, with no sccache, no RUSTC_WRAPPER, no VERIFY_COMMIT_TARGET_DIR, and an empty cache directory. A genuine cold build of this workspace's 260 dependencies cannot complete in that time, so the merge-integrity guard may be reporting a vacuous PASS.",
+   "disposition": "Not investigated further inside this container: main's compile integrity is independently evidenced by cargo-ci, which runs `cargo test --workspace` per issue and demonstrably fails on real defects (it caught the 510297e4 regression). Worth a standalone issue at epic close \u2014 a guard that cannot fail is worse than no guard, because the protocol relies on it."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "cargo-ci is not deterministic under host load. crates/server/tests/server_integration/graceful_shutdown_tests.rs::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero failed the gate for 3e340587 with 'the stalled connection was dropped before the drain deadline' at load average 6-10 (a worker build running beside the gate). It passes 5/5 in isolation on the same commit. The assertion is that a stalled connection SURVIVES to a drain deadline, which is precisely what CPU contention breaks.",
+   "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close \u2014 a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests.",
+   "correction": "Superseded: the failure is NOT load-induced flakiness. The test spends up to three consecutive 2s wait_for_close budgets after SIGTERM before asserting the stalled connection is still open, while GRACEFUL_DRAIN_TIMEOUT is 5s \u2014 so once those waits exceed 5s a CORRECT server has already force-closed the survivor and the assertion fails on conforming behaviour. It failed 2/2 whole-workspace runs including one on an idle host, and passes 10/10 in isolation. Fixed lead-direct at owner direction. The earlier 'do not run worker builds beside the gate' advice still stands on its own merits but was not the cause here."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "a30d704d introduced a SECOND shared test taxonomy: HierarchyConfig::test_vocabulary() (domain/type_taxonomy.rs, milestone/epic/story/task) and declared_test_taxonomy() (commands/test_helpers.rs), alongside ae435979's setup_test_repo_with_taxonomy()/test_taxonomy() (objective/initiative/deliverable/action) which landed on main during a30d704d's run. Both were dispatched in the same batch from the same base, so the worker could not have consumed a fixture that did not yet exist. ae435979's own description rejects per-family fixtures as 'the near-duplicate setup the shared-contract rule exists to prevent'.",
+   "disposition": "Convergence is already planned rather than missing: wave-1 issues a53a6f09 (server crate) and 76b16af0 (modules that seed a repository directly) migrate exactly these call sites onto the shared fixture. Brief BOTH workers explicitly to delete declared_test_taxonomy() and HierarchyConfig::test_vocabulary() rather than adopt the fixture beside them \u2014 an adoption that leaves the parallel variant standing satisfies the criterion's letter and violates @/invariant/convention-convergence. Precedent: the owner ruled convergence mandatory inside this epic when the same class arose in session 1 (65ff0f38)."
+  },
+  {
+   "at": "2026-07-31",
+   "finding": "0439da41's REQ-05 assertion `assert!(data.icons.is_empty())` in crates/server/src/routes.rs passed vacuously: the server test fixture declared no type hierarchy, so there were no types to resolve icons for and the endpoint's icon behaviour was never observed. a30d704d's fixture change (declaring a taxonomy, required once the compiled defaults are gone) exposed it as a cargo-ci failure on merged main.",
+   "disposition": "Lead-direct fix committed as fix(jit:0439da41): the assertion now states the level-keying property \u2014 one icon per declared type, two types sharing an icon exactly when they share a level \u2014 which holds for any taxonomy the fixture declares and actually observes REQ-05. Worth carrying to the epic's holistic review as evidence for @/invariant/semantic-test-assertions: an assertion that passes because its fixture is empty is not coverage."
+  },
+  {
+   "at": "2026-08-01",
+   "finding": "Immediately after the shutdown-test edit, one run of the graceful_shutdown tests failed in 0.31s (a passing run takes 5.35s). It was not reproducible in ten subsequent runs and its message was not captured.",
+   "disposition": "Recorded rather than explained. If the whole-workspace gate fails on this test again, capture the panic message before assuming the fix is complete."
+  },
+  {
+   "at": "2026-08-01",
+   "finding": "The dogfood-guidance region has two carriers with nothing binding them: profiles/jit-dogfood/assets/regions/agents-jit-guidance.md (the package's authority) and the rendered region in AGENTS.md. `jit project render` does not touch it (only the charter, invariants and rules-and-gates projections are declared), and `jit profile apply` would materialise it from the compiled-in embed rather than the working file, so a source edit reaches AGENTS.md only by hand or by a rebuild-plus-apply. This repository has no .jit/profiles/ record at all, so nothing validates the pair.",
+   "disposition": "Both carriers edited together at c250dbcf. Not a criterion violation as written: no [hard] criterion names the region pair. Recheck at epic close against REQ-03 \u2014 'the packaged live-asset tree is derived from the repository files it mirrors' \u2014 since assets/regions/ sits outside assets/live/ and may fall outside that criterion's reach by construction."
+  },
+  {
+   "at": "2026-08-01",
+   "finding": "The ten taxonomy adoptions are contracted to consume ae435979's fixture 'as authored', but setup_test_repo_with_taxonomy() writes the whole .jit/config.toml from its own vocabulary and TestTaxonomy::config_toml() is private, so a suite that must declare item kinds, gates or rules in the same file cannot use it. Measured: cli_item_validate (3 sites), cli_query_graph/scope_validation_tests.rs and fast_docs_templates/template_apply_atomicity_tests.rs write extra tables; the remaining sites do not. Both workers back before the finding reached for declared_test_taxonomy() instead \u2014 the parallel helper the session-3 handoff had already flagged.",
+   "disposition": "Root cause on the lead's side: session 3's handoff named this trap and required a53a6f09 and 76b16af0 to be briefed to delete the parallel helpers; the wave-1 briefs did not carry it. Resolved structurally by 06b736c7 rather than per issue. Brief-composition step must read the prior handoff's trap list against the dispatch set, not only the issue descriptions."
+  },
+  {
+   "at": "2026-08-02",
+   "finding": "Merging 39c34568, 06b736c7 and 6c47b99a produced a tree that does not compile: 6c47b99a gave ProfilePackage::from_files a second `source` argument while 39c34568 added a test helper calling the one-argument form. The edits do not overlap textually, so git merged all three cleanly. scripts/verify-commit-builds.sh reported the merge commit as building and was right to: its contract is `cargo build --workspace`, which never compiles #[cfg(test)] code, and the broken call site is inside a `mod tests`. cargo-ci caught it one gate cycle later. Separately, 6c47b99a's tagged ProfileOrigin encoding broke mcp-server/test-integration.js:456, which asserted the bare string; the mcp-ci gate the lead added to that issue caught it.",
+   "disposition": "Both fixed lead-direct on main with per-issue attribution (a89586ec, b558fa4f) so each lands in its own issue's review footprint. The verify-commit-builds gap is real and unfiled: a merge that breaks only test targets passes the guard. `cargo test --workspace --no-run` would close it. The session-3 handoff's stronger claim \u2014 that the guard is vacuous because a cold build cannot finish in 24-30s \u2014 is NOT what this incident shows and remains unverified."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "jit-dogfood's packaged [namespaces.satisfies] contribution still carries the pre-amendment one-line description, while .jit/config.toml carries the sharpened one the owner ruled in session 5. A package re-apply would overwrite the ruling. [namespaces.per] is in neither package and is repository-local only. Whoever reduces the packages (e4ba28c5) or applies one to this repository must reconcile both."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "`cargo test --workspace --no-run` does not catch a cross-branch break that compiles and fails at run time. Session 5's handoff proposed it as the fix for the verify-commit-builds gap; it closed the compile half only. c7058cac and 6c47b99a merged into a tree that compiled and whose profile acceptance test panicked. Run the suite, not the build."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "Editing a live consumer mid-pipeline trips the stale-binary guard on every subsequent gate with exit 10. contrib/gates/ is not a build input, but its packaged mirror under profiles/jit-dogfood/assets/live/ is, and the drift assertion requires editing both. Two of c7058cac's gates were refused this way. Make live-consumer edits between pipelines, never during one."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "merge-and-gate.sh cleared incremental state at -maxdepth 2, which misses the nested target dirs tests create (target/init-commands/debug/incremental, target/jit-stale-child-test-cache/debug/incremental). cargo-ci's post-run incremental-state check finds them and fails the gate. The session copy now sweeps at -maxdepth 4."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "A worker citing an invariant as its reason to defer is worth checking against what the invariant says. 0cf1f351 cited @/invariant/convention-convergence for NOT changing a shared method's matching base, when that invariant prescribes changing the shared form at its source. Reading it correctly turned a deferral into a two-commit fix."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "A worker's targeted-target pass is not evidence for the target. 60c211d6 changed a pub(crate) helper in doc_show_tests.rs that artifact_conformance_cli_tests.rs imports, ran only its own module, and reported the sibling's failure as an 'unrelated baseline failure'. It failed cargo-ci on main. Briefs now require the whole target plus a base-commit control before any baseline claim."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "The lead chose a reading of a criteria conflict instead of escalating, exactly as session 3's trap forbids, and briefed ten workers with it. The gate ruled the other way and two issues lost a round. A criteria conflict noticed at DISPATCH time is the same escalation as one noticed at review time \u2014 the trap is not limited to lead review."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "Sharpening [namespaces.per] and the review prompt fixed 39c34568's label over-reach but NOT 6c47b99a's: that reviewer stopped citing the label and cited the decision text directly. The amendment addressed a narrower thing than the pattern. Resequencing \u2014 landing the issue that actually delivers the decision \u2014 is what has worked both times."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "text": "The lead's own brief created a soundness hole in 32779829: it instructed that ignored files must never enter a gate's input digest, so git ls-files --exclude-standard silently drops web/node_modules, which npm-ci genuinely reads. A dependency change would move that checker's verdict without moving the digest. Exclusion must be declared, not inherited from the ignore rules. Review a brief's own instructions when a finding lands on them."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "Amending a container decision does not sweep the leaf criteria written against the old decision. Session 6 amended D-20 (invariant moves into jit-default) and expanded c7058cac to deliver it, but e4ba28c5's REQ-04 still named the kind the amendment removed. Caught at dispatch by measuring the two manifests, not by reading the criterion. After any decision amendment, re-read every not-yet-dispatched leaf that cites that decision."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "The session-1 trap repeated in a new place: 5d12a79f swept every adopter markdown page its change invalidated (cli-commands.md, profiles.md, events.md, curated-tools.json) and still left the defect, because the stale text was a Rust string literal in crates/jit/src/output.rs that RENDERS INTO a generated reference page. A markdown-only sweep cannot find it and the generated page must not be hand-edited. When a change moves an error's meaning, grep the description tables in output.rs, not docs/."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "code-review reads an issue's RECORDED GATE EVIDENCE, not only its diff, so gate order inside the pipeline changes the verdict. Running it first cost two review rounds: 0db28190's REQ-04 ('the mechanical documentation checks pass') was failed while docs-mechanical sat queued behind the reviewer and passed twelve seconds later, and fd61b44f's REQ-03 was failed for having one cargo-ci execution on record. merge-and-gate.sh now sorts code-review last. Corollary: evidence the lead gathers in its own terminal does not exist as far as the reviewer is concerned \u2014 32779829's verdict reuse means a second `jit gate evaluate` will NOT produce a second execution record unless --force is passed."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "A worker can hand-roll around a shared primitive it never found. 7d038e97 wrote check-then-rename publication when crates/jit/src/storage/external_publish.rs already exposed publish_external_directory_noreplace over renameat2/RENAME_NOREPLACE. The brief named the invariant but not the primitive; naming the invariant is not enough, because the worker satisfied its own reading of it. Name the function."
+  }
+ ],
+ "rework_counts": {
+  "e1a18372": 1,
+  "097b9f48": 1,
+  "f77fd51b": 1,
+  "65ff0f38": 2,
+  "7eecace8": 4,
+  "fdae1023": 1,
+  "510297e4": 2,
+  "09aea8b3": 1,
+  "c7058cac": 1,
+  "06b736c7": 1,
+  "39c34568": 0,
+  "0cf1f351": 1,
+  "76b16af0": 2,
+  "60c211d6": 1,
+  "0db28190": 2,
+  "5d12a79f": 1,
+  "7d038e97": 1
+ },
+ "started_at": "2026-07-31",
+ "owner_rulings": [
+  {
+   "at": "2026-07-31",
+   "ruling": "Domain agnosticism is the only durable long-term invariant. Tying specific profiles and workflows to the source is bad practice. Template system, for instance, belongs to source, but specific applications like the planning bracket do not.",
+   "effect": "jit's own workflow profile leaves the binary. @/invariant/domain-agnostic's sanctioned exception for the planning-bracket preset trio is removed. Investigation a62d444d (dev/active/a62d444d/findings.md) established mechanism, sequencing and consequences."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "No contributed profiles in .jit by default. Our repo shall contain the dogfooding profile, but it shall be disjoint from jit proper. It should be just like an externally contributed profile.",
+   "effect": "Rejects the investigation's recommended repository-local package location (.jit/profiles/packages/). profiles/jit-dogfood/ stays in this repository, outside crates/jit/, consumed as a third-party contribution would be. OPEN: how `jit validate --fix` re-resolves the package on a later run without package bytes in .jit/ \u2014 the provenance record at .jit/profiles/<id>.json could carry the source path. Must be settled before extraction step 2 builds the resolver. Step 1 (229e7389) REQ-04 fails loudly on an unresolvable package rather than degrading, keeping the decision open."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Convergence is mandatory within this epic. Invariant must hold.",
+   "effect": "65ff0f38 created inside this epic rather than excepted with a tracked follow-up."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Land step 1, then re-plan.",
+   "effect": "229e7389 dispatched in wave 2; a full re-plan goes to the owner for approval after this wave."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Epic REQ-04 is restated over the produced package (identical package hash + identical provenance across two assemblies); REQ-06 is struck as covered by REQ-03.",
+   "effect": "Epic description amended. REQ-06's number is retired rather than reused, so findings.md \u00a78's per-criterion table keeps its referents. Recorded as @/issue/e204e63d/decision/D-7."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "`jit validate --fix` re-resolves the package from a source path carried in the provenance record at .jit/profiles/<id>.json; unresolvable is a hard error, never a degraded replay of the stored record.",
+   "effect": "Settles the OPEN item on the 'no contributed profiles in .jit' ruling. Binds extraction step 2's resolver. Epic REQ-10. Recorded as @/issue/e204e63d/decision/D-8."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Amend @/charter/D-8 narrowly to 'one offline profile discovered from a declared repository-local location'; the rest of the deferred lifecycle list stays deferred.",
+   "effect": "dev/vision/9db27a3a-charter.md D-8 summary row and detail entry amended; charter projection re-rendered into AGENTS.md. Recorded as @/issue/e204e63d/decision/D-9."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Extraction steps 2-5 and cc75b4e6's surviving retargeted interior are new tasks inside e204e63d, not a separate epic.",
+   "effect": "Epic gains REQ-07..REQ-10 covering the invariant amendment, discovery, distribution, and repair. Lead flagged that the epic then delivers work its original criteria did not describe; owner accepted and approved the four drafted criteria. Recorded as @/issue/e204e63d/decision/D-10."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "The release asset ships in the same release that removes the embed: publish is a hard predecessor of delete, with no checkout-only window.",
+   "effect": "Epic REQ-09; a hard dependency edge in the extraction interior. Recorded as @/issue/e204e63d/decision/D-11."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "DEFAULT_PLANNING_ROLE / DEFAULT_BREAKDOWN_ROLE / DEFAULT_CONTAINER_ANCHOR stay in the engine; the amended @/invariant/domain-agnostic admits mechanism-parameter defaults as engine vocabulary while excluding workflow shapes, presets and gate bundles.",
+   "effect": "Binds the invariant amendment's wording at extraction step 5. Answers findings.md \u00a711 question 5. Recorded as @/issue/e204e63d/decision/D-12."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Re-plan by amending the existing plan document; 7eecace8 and 237b15be reopen rather than a second bracket being applied.",
+   "effect": "e204e63d-plan.md gains an extraction section; plan-review re-runs over the whole document; the breakdown manifest gains the extraction interior."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Clean jit before 1.0: no embedded configurations, template or otherwise. The binary carries mechanism and no instance of it.",
+   "effect": "Widens the epic past the profile. Bare `jit init` writes the structural minimum; `jit init --profile <id> --from <path>` is the populated path through the resolver REQ-08 builds; the scaffold code path is deleted. Recorded as @/issue/e204e63d/decision/D-13."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Two packages ship: jit-default (generic vocabulary) and jit-dogfood (this project's workflow), with jit-dogfood declaring a package dependency on jit-default. Composition enters v1.0.",
+   "effect": "@/charter/D-8 amended a second time to admit composition. Rejected: generating jit-default from jit-dogfood, and each package carrying a guarded copy of the shared vocabulary. Recorded as @/issue/e204e63d/decision/D-14."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "Epic REQ-01's authority moves from SHIPPED_DOCUMENTATION_POLICY to the packaged default profile's [documentation] declaration; the delivered generator is retargeted, not discarded.",
+   "effect": "Story 6f8f02ba reopens when the constant's removal is planned. REQ-01 is restated then, not before, so it keeps describing what shipped. Recorded as @/issue/e204e63d/decision/D-15."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "The release archive carries both package directories alongside the binaries, so one download initializes offline.",
+   "effect": "Extends the current flat four-file archive. @/charter/D-16 intact. Rejected: separate per-package assets, and installer-placed machine-level packages. Recorded as @/issue/e204e63d/decision/D-16."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "The registry-derived default rules stay in the binary; orphan-leaf and strategic-consistency move to jit-dogfood.",
+   "effect": "label-format, namespace-registry, type-hierarchy-known and namespace-unique-<ns> are mechanism over the adopter's own declarations. Recorded as @/issue/e204e63d/decision/D-17."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "An audit inside this epic inventories the remaining embedded configuration and sequences its removal before any of it is planned; fan-out blocks on it.",
+   "effect": "Task 7cbefe7c created, wired as a dependency of the epic, claimed and dispatched. The running plan amendment finishes on the profile-extraction scope; one re-plan after the audit covers everything. Recorded as @/issue/e204e63d/decision/D-18."
+  },
+  {
+   "at": "2026-07-31",
+   "ruling": "One more plan-review round past the rework limit; hard stop after it.",
+   "effect": "Round 5 dispatched with the three round-4 findings. If it fails, or the leaf-sizing class repeats a third time, work stops and returns to the owner."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Fix the graceful-shutdown test defect lead-direct, now, rather than as a task inside the epic or a standalone issue outside it.",
+   "effect": "crates/server/tests/server_integration/graceful_shutdown_tests.rs probes the mid-drain survivor only while signalled_at.elapsed() + DEADLINE_SLACK < GRACEFUL_DRAIN_TIMEOUT. Committed as fix(jit:e204e63d). No coverage lost: the stalled_closed_after assertion already states the same entitlement unconditionally. The lead noted it would be both author and reviewer of a shared-infrastructure change; the owner accepted that."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Amend the [namespaces.satisfies] description so the label denotes contribution to a container criterion rather than sole delivery.",
+   "effect": "'.jit/config.toml' updated to say several children may credit one id and that the label-coverage gate credits a criterion when any labelled child exists. Resolves 5dd0df5b's code-review failure at the class level rather than per issue; the same finding would otherwise have hit every partial contributor to REQ-01/03/05/08."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Mark the graceful-shutdown drain test #[ignore]d against a filed issue rather than attempting a second lead-direct fix.",
+   "effect": "crates/server/tests/server_integration/graceful_shutdown_tests.rs:425 carries #[ignore = \"... re-enable with jit:fd61b44f\"]. Issue fd61b44f created (task, milestone:v1.0, component:server, cargo-ci + code-review) with five criteria that pin the acceptance race, forbid weakening any assertion, and require evidence from consecutive whole-workspace runs rather than isolated ones. e204e63d depends on fd61b44f, so this container cannot close while the coverage its own gating disabled is still missing. The lead's first fix (the deadline guard) stays: it addresses a genuinely separate cause and is correct on its own terms."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Resolve 5dd0df5b's repeated code-review finding by citing the namespace declaration as a label's authority in AGENTS.md, rather than dropping the label, re-labelling REQ-08's contributors, or overriding the verdict.",
+   "effect": "profiles/jit-dogfood/assets/regions/agents-jit-guidance.md and the AGENTS.md region it feeds gained one bullet: a label means what its [namespaces.<ns>] declaration says. A citation rather than a copy, so it adds no hand-maintained duplicate. Fixes the class for every partial contributor to REQ-01/03/05/07/08 still to come. Commit c250dbcf."
+  },
+  {
+   "at": "2026-08-01",
+   "ruling": "Converge the two shared test vocabularies first, then rework the adoptions onto the single fixture. Rejected: closing the adoptions as landed and converging afterwards, which closes issues whose REQ-01/REQ-04 are unmet at the moment of closing; amending the ten adoptions' criteria to name a fixture family; killing the wave outright.",
+   "effect": "Task 06b736c7 created inside the epic and wired between ae435979 and all ten adoptions (dep add --reduce dropped the now-redundant ae435979 and story edges). One declaration reachable from the pure domain and graph suites, rendered into a whole-repository fixture and into a composable configuration fragment; the second declaration (HierarchyConfig::test_vocabulary, 118 call sites) and the second renderer (declared_test_taxonomy) are retired, rewriting ~160 literal type-name assertions onto the surviving vocabulary."
+  },
+  {
+   "at": "2026-08-02",
+   "ruling": "The invariant kind is default vocabulary. Initialization creates the invariant registry the way it creates the gate registry (present and empty), jit-default declares all six kinds, and jit-dogfood contributes its invariant entries instead of publishing the registry file. Delivered by expanding c7058cac rather than by a follow-up task.",
+   "effect": "D-20 amended on the epic. c7058cac gains REQ-06 (initialization creates the registry) and REQ-07 (the workflow package contributes rather than publishes); REQ-02 restated to 'every item kind a freshly initialized repository can carry'. REQ-04 becomes literally satisfiable. The trigger was c7058cac's own delivery: REQ-02 and REQ-04 could not both hold, because the scaffold writes six kinds and the old D-20 permitted five. Commit 8289cdfc."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "question": "39c34568's code-review reads per:@/issue/e204e63d/decision/D-6 as a claim to deliver D-6's completeness walk, which 0cf1f351 owns.",
+   "ruling": "Sharpen [namespaces.per] only; add no verbosity elsewhere.",
+   "applied": "a3291826 \u2014 the namespace now says the label denotes conformance, not delivery of the decision whole.",
+   "outcome": "Did NOT bind the reviewer. Round 2 failed on the same finding, now citing D-2 and D-6 and 39c34568's own REQ-05. Lead resequenced instead of escalating again: 0cf1f351 delivers the walk and is dispatched ahead of 39c34568's close, so the claim the reviewer tests becomes true in the tree."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "question": "REQ-02 ('a test that needs only a repository, and asserts on no vocabulary, is left alone') and REQ-03 ('no test here constructs the scaffold's hierarchy template to obtain a taxonomy') conflict for a repository-only test that constructs the template only because initialize_fresh_repository requires the argument.",
+   "ruling": "The gate's reading governs: REQ-02 means what it says, setup included. Repository-only tests keep HierarchyTemplate::default(); daddfc0b absorbs those call sites when it deletes the type.",
+   "outcome": "1cfb66ff and ffe6de33 reverted to the narrowed form. The lead had chosen the opposite reading at dispatch and briefed all ten adoption workers with it, which cost those two issues a review round."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "question": "6c47b99a failed code-review twice demanding jit validate --fix re-resolve a directory-origin package, which is 8371bd46's job.",
+   "ruling": "Pull 8371bd46's chain forward \u2014 32779829 then 5d12a79f then 8371bd46 \u2014 and re-run 6c47b99a's review afterwards.",
+   "outcome": "Same resequencing that resolved 39c34568. 6c47b99a stays open meanwhile."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "question": "cargo-ci re-ran a whole-workspace suite once per issue over one unchanged tree \u2014 about 112 minutes for a fifteen-issue wave.",
+   "ruling": "File gate-verdict input provenance as an issue inside this epic, to be completed next; no further work proceeds without it.",
+   "outcome": "32779829 created and delivered. Measured in production: 06b736c7's cargo-ci reused 32779829's verdict in 0ms against 411s executed, origin.derivation='reused' naming the source run. Pipeline 4 gated fourteen issues in ~50 minutes."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "question": "e4ba28c5 REQ-03 ('applying it to a bare repository produces the same configuration as applying both packages by hand') reads either as a disjointness test or as composed application, which is 7835fdc0's job three layers downstream. ProfileManifest::dependencies is parsed but nothing consumes it.",
+   "ruling": "Disjointness only. REQ-03 is satisfied by applying jit-default then jit-dogfood explicitly to a bare repository and asserting the result equals hand-application with no conflict reported. 7835fdc0 keeps ownership of resolving a declared dependency automatically.",
+   "applied": "Brief add-e4ba28c5.md states the reading as a binding ruling. No criterion text changed.",
+   "rationale": "Matches the plan's 'touches 1' footprint for jit-dogfood-dependency-delta and c7058cac's established apply_embedded_profile test precedent."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "question": "e4ba28c5 REQ-04 ('it declares the one item kind whose source file it ships and the default package does not') has no satisfiable referent after session 6 amended D-20: jit-default declares all six item kinds, jit-dogfood declares none and ships no item-kind source file.",
+   "ruling": "Restate REQ-04 as a zero-kind guard rather than retiring it.",
+   "applied": "REQ-04 now reads 'It declares no item kind; every kind an initialized repository can carry is declared by the default package (@/issue/e204e63d/decision/D-20).' Committed as chore(jit:e4ba28c5).",
+   "rationale": "Keeps a testable criterion instead of deleting one, and states the property D-20's amendment actually established."
+  }
+ ],
+ "halted": {
+  "story": "cc75b4e6",
+  "reason": "Owner ruling: the profile leaves the binary, so deriving the packaged tree into it targets a structure being removed. Per investigation \u00a78, three tasks are superseded and seven survive retargeted from a build-output tree to a publishable distribution artefact.",
+  "superseded": [
+   "1d2f454e (the embed is deleted, not re-rooted)",
+   "ce0172c3 (retargets to the produced tree)",
+   "779ea308 (epic REQ-06 becomes meaningless)"
+  ],
+  "survive_retargeted": [
+   "7d038e97",
+   "26f503cc",
+   "0cf1f351",
+   "39c34568",
+   "4873b32f",
+   "0db28190",
+   "3e340587",
+   "380a8e9e",
+   "8e7a82dc"
+  ],
+  "epic_criteria": {
+   "REQ-03": "survives unchanged, gains value",
+   "REQ-04": "superseded \u2014 'embed' loses its referent",
+   "REQ-05": "survives unchanged, matters more",
+   "REQ-06": "meaningless after extraction"
+  }
+ },
+ "blocked": null,
+ "session": 7,
+ "open_findings": [
+  {
+   "at": "2026-07-31",
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "verdict": "fail",
+   "round": 2,
+   "findings": [
+    {
+     "id": "F1",
+     "severity": "high",
+     "status": "resolved",
+     "text": "The manifest specifies repository-time assembly but the graph retained the build-time assembly task and obsolete build-chain work.",
+     "resolution": "Lead reconciled the graph to the manifest: eight surviving issues retargeted to their manifest title, description, type, priority, labels and gates; 7d038e97 gained docs-mechanical. Zero title mismatches remain."
+    },
+    {
+     "id": "F2",
+     "severity": "high",
+     "status": "open-by-sequence",
+     "text": "The plan omits implementation of settled D-13 and D-14 while citing them.",
+     "resolution": "Not a plan defect to fix in place. D-18 sequences that work behind audit 7cbefe7c, and the owner's chosen order is amendment, then audit, then one re-plan covering everything. The gate cannot pass until the audit lands and the plan decomposes D-13/D-14. Lead ran plan-review before that point."
+    },
+    {
+     "id": "F3",
+     "severity": "medium",
+     "status": "open",
+     "text": "Two 'Superseded:' design rows and two 'Open:' correction rows read as accumulation rather than a concise current design (plan.md:413).",
+     "resolution": "For the re-plan: fold the load-bearing substance into the decision rows it justifies and delete the historical framing."
+    },
+    {
+     "id": "F4",
+     "severity": "medium",
+     "status": "open",
+     "text": "Manifest entries have unordered overlapping footprints despite the plan claiming shared writers are ordered (breakdown.json:845).",
+     "resolution": "For the re-plan: add edges, or state a credible disjoint-edit contract per overlapping pair."
+    }
+   ]
+  },
+  {
+   "at": "2026-08-02",
+   "gate": "code-review",
+   "issue": "06b736c7",
+   "verdict": "fail",
+   "round": 1,
+   "findings": [
+    {
+     "id": "F1",
+     "severity": "high",
+     "status": "reworking",
+     "text": "Migrated taxonomy consumers still encode the shared vocabulary as literals instead of reading it from TestTaxonomy (crates/jit/src/graph/hierarchy.rs:779).",
+     "resolution": "Rework dispatched on worktree-agent-06b736c7-r1, scoped to crates/jit/src/** only: four modules that consume the declaration and still spell its names (hierarchy.rs ~44, type_taxonomy.rs ~31, validation/graph.rs ~20, visualization.rs ~1), plus six that re-declare the same names inline. crates/jit/tests/** is excluded because the ten adoption workers own those targets concurrently."
+    },
+    {
+     "id": "F2",
+     "severity": "high",
+     "status": "not-a-defect",
+     "text": "The latest required cargo-ci run failed, leaving REQ-06's suite-passing criterion materially unverified.",
+     "resolution": "The cargo-ci failure is the c7058cac/6c47b99a integration defect in commands/profile.rs, unrelated to this issue. Clears when the lead's fix lands."
+    }
+   ]
+  },
+  {
+   "at": "2026-08-02",
+   "gate": "code-review",
+   "issue": "39c34568",
+   "verdict": "fail",
+   "round": 2,
+   "findings": [
+    {
+     "id": "F1",
+     "severity": "high",
+     "status": "resequenced",
+     "text": "The root test checks declared assets only and never walks declared roots to reject files absent from the asset inventory and exclusions (crates/jit/src/profile/dogfood.rs:426), citing D-2 and D-6.",
+     "resolution": "Not a defect in 39c34568, whose REQ-01 states the exclusion lists may be empty because what belongs in them is measured elsewhere. Sharpening [namespaces.per] did not bind the reviewer across two rounds. 0cf1f351 \u2014 which owns the walk and depends only on 39c34568, whose code is on main \u2014 was dispatched ahead of 39c34568's close so the claim the reviewer tests becomes true in the tree. Re-run 39c34568's code-review after 0cf1f351 lands."
+    }
+   ]
+  }
+ ],
+ "gate_history": [
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 1,
+   "verdict": "fail",
+   "findings": 1,
+   "summary": "Coverage: REQ-07..REQ-10 had no satisfying child. Resolved by instantiating the manifest."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 2,
+   "verdict": "fail",
+   "findings": 4,
+   "summary": "Graph not reconciled to the manifest (lead); D-13/D-14 cited but not decomposed (sequencing \u2014 the audit had not landed); accumulation rows; unordered footprint overlaps."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 3,
+   "verdict": "fail",
+   "findings": 9,
+   "summary": "Membership residue on rejected issues (lead); D-23 omitted (lead never briefed it); seven leaves oversized or mixing implementation with prose."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 4,
+   "verdict": "fail",
+   "findings": 3,
+   "summary": "Taxonomy fixture still 64 sites across 11 modules; integration split spans several target families; overlap table omitted production writers on commands/validate.rs."
+  },
+  {
+   "gate": "plan-review",
+   "issue": "7eecace8",
+   "round": 5,
+   "verdict": "pass",
+   "findings": 0,
+   "summary": "Fixture authored once and adopted by ten bounded families; integration split by Cargo target; overlap generator unfiltered."
+  },
+  {
+   "gate": "coverage-preview",
+   "issue": "237b15be",
+   "verdict": "pass"
+  },
+  {
+   "gate": "breakdown-review",
+   "issue": "237b15be",
+   "round": 1,
+   "verdict": "fail",
+   "findings": 4,
+   "summary": "Lead-side graph defects: 13 roots missing the bracket edge, two live issues depending on rejected ones, one incoherent Ready state."
+  },
+  {
+   "gate": "breakdown-review",
+   "issue": "237b15be",
+   "round": 2,
+   "verdict": "pass",
+   "findings": 0
+  }
+ ],
+ "graph_state": {
+  "manifest_entries": 72,
+  "manifest_edges": 101,
+  "issue_states": {
+   "ready": 12,
+   "done": 14,
+   "backlog": 48,
+   "in_progress": 1
+  },
+  "reconciled": "Zero edge and zero content differences at 5e427854.",
+  "rejected": [
+   "1d2f454e",
+   "ce0172c3",
+   "779ea308",
+   "8e7a82dc",
+   "380a8e9e",
+   "e103d7a4",
+   "45e250c6"
+  ],
+  "note": "Rejected issues carry no membership labels; the resulting orphan-leaf warnings are advisory and cannot be cleared by archiving."
+ },
+ "bracket": {
+  "planning": "7eecace8 done (plan-review passed round 5)",
+  "breakdown": "237b15be done (coverage-preview + breakdown-review passed)",
+  "note": "@/charter/D-3 satisfied; implementation may be dispatched."
+ },
+ "session_notes": [
+  {
+   "at": "2026-07-31",
+   "session": 3,
+   "note": "Codex CLI workers cannot commit: codex-cli 0.146.0 makes .git read-only under -s workspace-write, and neither -c sandbox_workspace_write.writable_roots nor --add-dir lifts it (verified on a throwaway repo in /tmp as well as in a worktree). Worker briefs therefore forbid git writes and the lead commits each worker's worktree diff onto its branch with the jit:<short-id> attribution the code-review gate reads. --add-dir DOES work for non-.git paths, so $HOME/.cargo, $HOME/.cache and $HOME/.npm are granted or cargo cannot take its package-cache lock. jit read-only commands (item show, issue show, validate) work unmodified inside the sandbox."
+  },
+  {
+   "at": "2026-08-01",
+   "session": 5,
+   "note": "Session 4 ended without a handoff. Reconstructed from git log, .jit state and the gate-run records: it merged and gated the wave-0 tail (a30d704d, then reworks for 09aea8b3 and 510297e4), fixed the graceful-shutdown drain test twice, marked it #[ignore]d against the new issue fd61b44f, and amended [namespaces.satisfies]. Wave 0 closed in session 5 with 09aea8b3 and 510297e4; 5dd0df5b is the only wave-0 issue still open."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 5,
+   "note": "Handoff written at the invoker's request while the 39c34568/06b736c7/6c47b99a gate batch was still running. handoff-4.md carries the full state."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "note": "Wave-1 tail: c7058cac merged (one additive conflict in commands/profile.rs; both sides' test helpers kept). Its merge with 6c47b99a is a cross-branch regression \u2014 c7058cac's test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration applies profiles/jit-default read from the real checkout, and 6c47b99a's apply now refuses a package directory outside the TARGET repository's worktree. `cargo test --workspace --no-run` passed on the merged tree and did not catch it: the pair compiles, it fails at run time. Lead fixes the one call site on main. The ten adoptions were re-dispatched on fresh -r1 worktrees off a3291826; their old branches hold one superseded commit each (SHAs in the session scratchpad's discarded-wip-sha.txt) because branch deletion is blocked in this harness."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "note": "Adoption footprints were not what the issue Notes implied in two cases. 76b16af0's four call sites are commands/config.rs, validation/repository.rs and two in storage/json.rs (confirmed by a read-only codex spark pass against the Notes' 'four call sites across three modules'); its first worker instead took profile.rs and validate.rs, and its profile.rs edit destroyed the subject of c7058cac's scaffold-comparison test. be918f22 legitimately owns config.rs as a repository-inspection module, so 76b16af0-r2's config.rs hunk is the redundant one at merge. Measure a footprint before dispatch; the Notes' counts are advisory."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 6,
+   "note": "Wave 1 closed: 41 -> 42 done of 77. 32779829 delivered and gated; gate-verdict reuse measured in production at 0ms against 411s executed. HierarchyTemplate::default() call sites 43 -> 4, which is what lets daddfc0b delete the type without carrying the rewrite. Wave 2 is the five issues behind 32779829: 7d038e97, 4873b32f, 0db28190, e4ba28c5, 5d12a79f; everything in layers 2-7 sits transitively behind them."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "note": "Reclaimed 25 merged worktrees before dispatch, freeing 68 GB (91% -> 84% on /). Only unmerged worker branches keep their worktrees. Session tooling (merge-and-gate.sh, dispatch-codex.sh, mkbrief.py, briefs/) was recovered from session 6's scratchpad and lives in this session's scratchpad; it is not committed."
+  }
+ ]
 }

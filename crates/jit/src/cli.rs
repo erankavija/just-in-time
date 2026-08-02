@@ -45,15 +45,19 @@ pub enum Commands {
         #[arg(long)]
         hierarchy_template: Option<String>,
 
-        /// Apply an embedded profile during initialization
+        /// Apply a profile during initialization
         #[arg(long)]
         profile: Option<String>,
+
+        /// Repository directory holding the profile's package
+        #[arg(long, value_name = "PATH", requires = "profile")]
+        from: Option<std::path::PathBuf>,
 
         #[arg(long)]
         json: bool,
     },
 
-    /// Inspect and apply embedded repository profiles
+    /// Inspect and apply repository profiles
     #[command(subcommand)]
     Profile(ProfileCommands),
 
@@ -2876,30 +2880,40 @@ pub enum HooksCommands {
     },
 }
 
-/// Embedded repository profile commands.
+/// Repository profile commands.
 #[derive(Debug, Subcommand)]
 pub enum ProfileCommands {
-    /// List profiles embedded in this JIT binary
+    /// List the profiles this repository's own records name
     List {
         /// Output as JSON
         #[arg(long)]
         json: bool,
     },
 
-    /// Show one embedded profile manifest and package identity
+    /// Show one profile manifest and package identity
     Show {
-        /// Stable embedded profile ID
+        /// Stable profile ID
         id: String,
+
+        /// Repository directory holding the package, instead of the location
+        /// this repository's record names
+        #[arg(long, value_name = "PATH")]
+        from: Option<std::path::PathBuf>,
 
         /// Output as JSON
         #[arg(long)]
         json: bool,
     },
 
-    /// Apply an embedded profile through one recoverable multi-target transaction
+    /// Apply a profile through one recoverable multi-target transaction
     Apply {
-        /// Stable embedded profile ID
+        /// Stable profile ID
         id: String,
+
+        /// Repository directory holding the package, instead of the location
+        /// this repository's record names
+        #[arg(long, value_name = "PATH")]
+        from: Option<std::path::PathBuf>,
 
         /// Build and validate the exact application plan without writing
         #[arg(long)]
@@ -3591,6 +3605,7 @@ mod recovery_dispatch_tests {
         assert!(Commands::Init {
             hierarchy_template: None,
             profile: None,
+            from: None,
             json: false,
         }
         .requires_recovery_dispatch());

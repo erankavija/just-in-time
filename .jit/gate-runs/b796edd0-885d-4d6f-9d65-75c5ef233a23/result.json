@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f0240cd64844e2fa4c1df409593beebd665d29d9",
+  "completed_at": "2026-08-02T19:25:17.590056594Z",
+  "duration_ms": 219448,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/package_assembly.rs",
+        "id": "F1",
+        "line": 19,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Attributed prose says an arbitrary caller-selected destination is untracked and disposable, although only the documented target/ example has those properties."
+      }
+    ],
+    "summary": "Three attributed prose locations still falsely describe arbitrary caller destinations as untracked and disposable.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7d038e97-87e8-4d02-9101-6ffef1e8bdc0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b796edd0-885d-4d6f-9d65-75c5ef233a23",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T19:21:38.141405891Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10310 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc3ec-b86d-74f2-a1a2-9f4ec16942b0\n--------\nuser\n--- 10297 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a02ea421, 4053f6b7, b737ea82, 35f5df3a, 4ff5cd21, 954d7b35, 5e961152, c5b4d229, e975abc4, a5b8de02, f0240cd6 (`jit:7d038e97`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/7d038e97/requirement/REQ-03 and @/issue/e204e63d/decision/D-2 (issue Markdown-first sources); @/invariant/atomic-writes, @/invariant/bounded-rust-build-footprint, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T18:22:08Z); docs-mechanical passed (exit 0, 2026-08-02T18:31:35Z)\nTruncation recovery: split truncated commit/current-file reads into bounded assembly, package-model, publication, test, and final-prose ranges; inspected individual tagged patches and merge statistics\n\n1. **F1 — medium — blocking, issue-impact.** The entry point accepts whichever destination the caller supplies, but attributed prose still claims that caller destination is “untracked and disposable” in [package_assembly.rs:19](crates/jit/src/profile/package_assembly.rs:19), [assemble-package.sh:25](scripts/assemble-package.sh:25), and [CHANGELOG.md:59](CHANGELOG.md:59). The corrected contributor page properly scopes the ignored/disposable property to its `target/` example at [dev/index.md:132](dev/index.md:132). Narrow the remaining claims likewise; they are false for an arbitrary caller-selected path. References: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three attributed prose locations still falsely describe arbitrary caller destinations as untracked and disposable.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Attributed prose says an arbitrary caller-selected destination is untracked and disposable, although only the documented target/ example has those properties.\",\"file\":\"crates/jit/src/profile/package_assembly.rs\",\"line\":19,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

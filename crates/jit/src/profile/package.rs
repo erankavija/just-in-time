@@ -94,6 +94,32 @@ impl ProfilePackage {
         Self::from_files(embedded_files(directory), ProfilePackageSource::Embedded)
     }
 
+    /// Parse manifest bytes and validate everything they declare about
+    /// themselves.
+    ///
+    /// This is the crate's only manifest parse. Both constructors run it over
+    /// the bytes their package carries, and the repository's package assembly
+    /// runs it over the checked-in sources' manifest to learn which files to
+    /// draw, so a manifest key means one thing wherever it is read.
+    ///
+    /// Everything a manifest can be judged on alone is settled here: the wire
+    /// version, the package identity and its version requirements, the semantic
+    /// contributions, the shape of every declared path, and the live-source
+    /// roots. A returned manifest therefore declares only safe relative paths,
+    /// which is what lets a caller join one onto a directory. The cross-check
+    /// against the files a package actually holds needs those files and stays
+    /// with the constructors.
+    pub(crate) fn parse_manifest(
+        manifest_bytes: &[u8],
+    ) -> Result<ProfileManifest, ProfilePackageError> {
+        let manifest_text = std::str::from_utf8(manifest_bytes)
+            .map_err(|source| ProfilePackageError::ManifestUtf8 { source })?;
+        let manifest: ProfileManifest =
+            toml::from_str(manifest_text).map_err(ProfilePackageError::ManifestToml)?;
+        validate_manifest_declarations(&manifest)?;
+        Ok(manifest)
+    }
+
     fn from_files(
         files: BTreeMap<String, Vec<u8>>,
         source: ProfilePackageSource,
@@ -102,12 +128,9 @@ impl ProfilePackage {
         let manifest_bytes = files
             .get(MANIFEST_FILE_NAME)
             .ok_or(ProfilePackageError::MissingManifest)?;
-        let manifest_text = std::str::from_utf8(manifest_bytes)
-            .map_err(|source| ProfilePackageError::ManifestUtf8 { source })?;
-        let manifest: ProfileManifest =
-            toml::from_str(manifest_text).map_err(ProfilePackageError::ManifestToml)?;
+        let manifest = Self::parse_manifest(manifest_bytes)?;
 
-        validate_manifest(&manifest, &files)?;
+        validate_declared_content(&manifest, &files)?;
         let hashes = compute_hashes(&manifest, &files)?;
 
         Ok(Self {
@@ -514,10 +537,12 @@ fn package_bounds_failure(file_count: usize, byte_size: usize) -> Option<Profile
     )
 }
 
-fn validate_manifest(
-    manifest: &ProfileManifest,
-    files: &BTreeMap<String, Vec<u8>>,
-) -> Result<(), ProfilePackageError> {
+/// Validate everything a manifest declares about itself, independently of the
+/// files declaring it.
+///
+/// See [`ProfilePackage::parse_manifest`] for what this settles and what it
+/// deliberately leaves to [`validate_declared_content`].
+fn validate_manifest_declarations(manifest: &ProfileManifest) -> Result<(), ProfilePackageError> {
     if manifest.profile.manifest_version != PROFILE_MANIFEST_VERSION {
         return Err(ProfilePackageError::ManifestVersion {
             actual: manifest.profile.manifest_version,
@@ -556,17 +581,9 @@ fn validate_manifest(
         }
     }
 
-    let mut declared_sources = BTreeSet::new();
-    let mut content_targets = BTreeSet::new();
     for asset in &manifest.assets {
         validate_relative_path("asset source", &asset.source)?;
         validate_relative_path("asset target", &asset.target)?;
-        insert_unique_source(&mut declared_sources, &asset.source)?;
-        if !content_targets.insert(asset.target.clone()) {
-            return Err(ProfilePackageError::DuplicateContentTarget(
-                asset.target.clone(),
-            ));
-        }
     }
     for region in &manifest.regions {
         validate_relative_path("region source", &region.source)?;
@@ -576,17 +593,55 @@ fn validate_manifest(
                 region.region_id.clone(),
             ));
         }
-        insert_unique_source(&mut declared_sources, &region.source)?;
-        if !content_targets.insert(region.target.clone()) {
-            return Err(ProfilePackageError::DuplicateContentTarget(
-                region.target.clone(),
-            ));
-        }
     }
+    // Collecting the sources is what rejects one declared twice.
+    declared_sources(manifest)?;
+    validate_content_targets(manifest)?;
+    validate_live_source_roots(manifest)
+}
 
-    validate_live_source_roots(manifest)?;
+/// Every package-relative source the manifest declares, rejecting one declared
+/// twice and one claiming the reserved manifest name.
+///
+/// The single enumeration of what a package is made of: the assembly draws
+/// these, and the constructors hold a package's files against them.
+fn declared_sources(manifest: &ProfileManifest) -> Result<BTreeSet<String>, ProfilePackageError> {
+    manifest
+        .assets
+        .iter()
+        .map(|asset| &asset.source)
+        .chain(manifest.regions.iter().map(|region| &region.source))
+        .try_fold(BTreeSet::new(), |mut sources, source| {
+            insert_unique_source(&mut sources, source)?;
+            Ok(sources)
+        })
+}
 
-    for source in &declared_sources {
+/// Reject two declarations writing the same repository path.
+fn validate_content_targets(manifest: &ProfileManifest) -> Result<(), ProfilePackageError> {
+    manifest
+        .assets
+        .iter()
+        .map(|asset| &asset.target)
+        .chain(manifest.regions.iter().map(|region| &region.target))
+        .try_fold(BTreeSet::new(), |mut targets, target| {
+            if targets.insert(target.clone()) {
+                Ok(targets)
+            } else {
+                Err(ProfilePackageError::DuplicateContentTarget(target.clone()))
+            }
+        })
+        .map(|_| ())
+}
+
+/// Hold a package's files against what its manifest declares: every declared
+/// source is present, and no file beyond the manifest is undeclared.
+fn validate_declared_content(
+    manifest: &ProfileManifest,
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), ProfilePackageError> {
+    let declared = declared_sources(manifest)?;
+    for source in &declared {
         if !files.contains_key(source) {
             return Err(ProfilePackageError::MissingContent(source.clone()));
         }
@@ -595,7 +650,7 @@ fn validate_manifest(
         .keys()
         .filter(|path| path.as_str() != MANIFEST_FILE_NAME)
     {
-        if !declared_sources.contains(path) {
+        if !declared.contains(path) {
             return Err(ProfilePackageError::ExtraContent(path.clone()));
         }
     }
@@ -1323,9 +1378,8 @@ value = "workspace/active"
         ));
 
         let bad_map = parse_modified("value = 1", "value = \"one\"").unwrap();
-        let files = package().files.clone();
         assert!(matches!(
-            validate_manifest(&bad_map, &files),
+            validate_manifest_declarations(&bad_map),
             Err(ProfilePackageError::InvalidContribution { index: 0, .. })
         ));
 
@@ -1335,7 +1389,7 @@ value = "workspace/active"
         )
         .unwrap();
         assert!(matches!(
-            validate_manifest(&bad_key, &files),
+            validate_manifest_declarations(&bad_key),
             Err(ProfilePackageError::InvalidContribution { index: 6, .. })
         ));
     }
@@ -1478,6 +1532,29 @@ value = "workspace/active"
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood");
         assert!(production_tree.join(MANIFEST_FILE_NAME).is_file());
         assert!(!manifest_text().contains("jit-dogfood"));
+    }
+
+    /// The manifest a caller parses on its own is the manifest the constructors
+    /// validated, and it is already judged on everything a manifest can be
+    /// judged on without its files — which is what lets the package assembly
+    /// learn what to draw from a manifest before the tree declaring it exists.
+    #[test]
+    fn test_parse_manifest_reads_the_declarations_the_constructors_validate() {
+        let package = package();
+        let parsed = ProfilePackage::parse_manifest(manifest_text().as_bytes())
+            .expect("the fixture manifest parses");
+        assert_eq!(&parsed, package.manifest());
+
+        // A declared path a package could never hold is refused by the parse
+        // itself, so no caller reaches a join against it.
+        let unsafe_manifest = manifest_text().replace(
+            "target = \"docs/workflow.txt\"",
+            "target = \"../outside.txt\"",
+        );
+        assert!(matches!(
+            ProfilePackage::parse_manifest(unsafe_manifest.as_bytes()),
+            Err(ProfilePackageError::UnsafePath { path, .. }) if path == "../outside.txt"
+        ));
     }
 
     #[test]

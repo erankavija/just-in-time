@@ -313,10 +313,12 @@ async function main() {
           .filter(tool => tool.name.startsWith('jit_profile_'))
           .map(tool => [tool.name, Object.keys(tool.inputSchema.properties).sort()])
       );
+      // `from` names the repository directory holding the package; enumeration
+      // takes none, because it follows the repository's own records.
       assert.deepStrictEqual(profileInputKeys, {
-        jit_profile_apply: ['dry-run', 'id', 'json'],
+        jit_profile_apply: ['dry-run', 'from', 'id', 'json'],
         jit_profile_list: ['json'],
-        jit_profile_show: ['id', 'json'],
+        jit_profile_show: ['from', 'id', 'json'],
       });
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.required,
@@ -446,13 +448,31 @@ async function main() {
       try {
         await profileTester.callToolRaw('jit_init', {});
 
+        // Enumeration follows the repository's own applied-profile records, so
+        // a repository that has applied nothing names no profile.
         const listed = await profileCall('jit_profile_list');
-        assert.strictEqual(listed.count, 1);
-        assert.strictEqual(listed.profiles[0].id, 'jit-dogfood');
-        assert.strictEqual(listed.profiles[0].applied, false);
+        assert.strictEqual(listed.count, 0);
+        assert.deepStrictEqual(listed.profiles, []);
 
         const shown = await profileCall('jit_profile_show', { id: 'jit-dogfood' });
         assert.strictEqual(shown.manifest.profile.id, 'jit-dogfood');
+        const liveSources = shown.manifest['live-source'];
+        assert.ok(Array.isArray(liveSources) && liveSources.length > 0,
+          'the reported manifest declares live-source roots');
+        const roots = liveSources.map(source => source && source.root);
+        assert.ok(roots.every(root => typeof root === 'string' && root.length > 0),
+          'every reported live-source declaration names a root');
+        const liveAssets = shown.manifest.asset.filter(asset =>
+          asset.source.startsWith('assets/live/'));
+        assert.ok(liveAssets.length > 0, 'the reported manifest declares live assets');
+        const targetUnderRoot = (target, root) =>
+          target === root || target.startsWith(`${root}/`);
+        assert.ok(liveAssets.every(asset => roots.some(root =>
+          targetUnderRoot(asset.target, root))),
+        'every reported live asset target is accounted for by a reported root');
+        assert.ok(roots.every(root => liveAssets.some(asset =>
+          targetUnderRoot(asset.target, root))),
+        'every reported root accounts for a reported live asset target');
         assert.deepStrictEqual(shown.origin, { source: 'embedded' });
 
         const preview = await profileCall('jit_profile_apply', {
@@ -463,14 +483,25 @@ async function main() {
         assert.ok(preview.targets.some(target =>
           target.path === 'contrib/gates/ai-review.sh' && target.executable === true));
 
+        // An application reports one result per applied package: the packages
+        // the named one depends on, then the named one.
         const applied = await profileCall('jit_profile_apply', { id: 'jit-dogfood' });
-        assert.strictEqual(applied.status, 'applied');
+        assert.strictEqual(applied.count, applied.profiles.length);
+        assert.strictEqual(applied.profiles.at(-1).id, 'jit-dogfood');
+        assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
         const unchanged = await profileCall('jit_profile_apply', {
           id: 'jit-dogfood',
           'dry-run': true,
         });
         assert.strictEqual(unchanged.status, 'unchanged');
+
+        // The record the application wrote is what the repository now names.
+        const recorded = await profileCall('jit_profile_list');
+        assert.strictEqual(recorded.count, 1);
+        assert.strictEqual(recorded.profiles[0].id, 'jit-dogfood');
+        assert.strictEqual(recorded.profiles[0].applied, true);
+        assert.deepStrictEqual(recorded.profiles[0].origin, { source: 'embedded' });
       } finally {
         await profileTester.stop();
       }

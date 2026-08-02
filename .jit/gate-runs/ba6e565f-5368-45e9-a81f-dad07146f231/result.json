@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b191fd179298788d6d062dd53fd749ae86b3d753",
+  "completed_at": "2026-08-02T18:14:59.702828672Z",
+  "duration_ms": 230603,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard success criteria are satisfied; the prior REQ-03 finding is resolved by two consecutive recorded cargo-ci passes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fd61b44f-e208-4ff9-bc8b-262706782043",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ba6e565f-5368-45e9-a81f-dad07146f231",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T18:11:09.099003626Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 40b5626a, 40f69824, 0587ef96 (`jit:fd61b44f`; merge first-parent patch duplicates 40f69824)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions, @/invariant/pid-safety, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first); @/gate/cargo-ci (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 18:11; preceding pass exit 0, 17:41); prior code-review failed (exit 1, 17:44), with its REQ-03 finding resolved by the later cargo-ci pass\nTruncation recovery: split tagged patches; reread current test, shutdown, dependency accept-loop, gate, and cargo-ci script ranges; narrowed secondary merge metadata\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard success criteria are satisfied; the prior REQ-03 finding is resolved by two consecutive recorded cargo-ci passes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

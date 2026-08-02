@@ -663,7 +663,7 @@ pub enum MaterializationRequest<'a> {
     RepairDerivedState {
         /// Parsed declarations captured from the image.
         declarations: RepositoryDeclarations<'a>,
-        /// Neutral claims for every installed profile whose exact embedded package
+        /// Neutral claims for every installed profile whose exact package
         /// identity was proven from repository provenance.
         profiles: Vec<ProfileClaims>,
         /// Closed semantic seed for this operation.
@@ -676,7 +676,7 @@ pub enum MaterializationRequest<'a> {
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
     },
-    /// Derive one embedded profile application over an existing repository.
+    /// Derive one profile application over an existing repository.
     ApplyProfile {
         /// Parsed package metadata and neutral canonical claims.
         profile: ProfileApplicationInput,

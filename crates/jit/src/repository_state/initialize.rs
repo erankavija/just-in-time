@@ -134,7 +134,7 @@ pub enum InitializationError {
         /// The offending path.
         path: VirtualPath,
     },
-    #[error("installed profile record '{path:?}' conflicts with embedded package {id}@{version}")]
+    #[error("installed profile record '{path:?}' conflicts with package {id}@{version}")]
     InstalledRecordConflict {
         path: VirtualPath,
         id: String,
@@ -285,7 +285,7 @@ impl InitializationScaffold {
         files
     }
 
-    /// Whether the scaffold carries an embedded profile contribution.
+    /// Whether the scaffold carries a profile contribution.
     pub fn profile(&self) -> Option<&ProfileApplicationInput> {
         self.profile.as_ref()
     }

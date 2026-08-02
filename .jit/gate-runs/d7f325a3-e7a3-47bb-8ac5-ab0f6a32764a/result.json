@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b191fd179298788d6d062dd53fd749ae86b3d753",
+  "completed_at": "2026-08-02T17:54:53.496031056Z",
+  "duration_ms": 226468,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/package_assembly.rs",
+        "id": "F1",
+        "line": 272,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "Plain rename can overwrite a destination created after the existence check; publication must be atomic no-replace."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/index.md",
+        "id": "F2",
+        "line": 133,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "New prose falsely says the package is not compiled in although production still embeds profiles/jit-dogfood."
+      }
+    ],
+    "summary": "Assembly has a racy overwrite publication path and introduces inaccurate build-behavior prose.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7d038e97-87e8-4d02-9101-6ffef1e8bdc0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d7f325a3-e7a3-47bb-8ac5-ab0f6a32764a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T17:51:07.027315065Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6866 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc399-d7fe-7fb0-afee-42fa77dce49d\n--------\nuser\n--- 6853 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:7d038e97 commits a02ea421, 4053f6b7, b737ea82, 35f5df3a, 4ff5cd21, 954d7b35\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-2 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, markdown-first); @/invariant/atomic-writes, @/invariant/bounded-rust-build-footprint, @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/semantic-types, @/invariant/single-source-prose (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (2026-08-02T17:51:06Z; exit code not recorded); docs-mechanical pending (no run)\nTruncation recovery: Narrowed the added assembly patch, package model, manifest, publication helper, embed, and documentation reads after broad-result truncation.\n\n1. **[blocking][issue-impact][high]** `publish_tree` moves an existing destination aside, then publishes with plain `std::fs::rename` at [package_assembly.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/profile/package_assembly.rs:272). A process can create a file or empty directory at that path between the existence check and this rename; `rename` replaces it instead of rejecting the collision. Use an atomic no-replace publication (and restore the retired tree on collision) so an occupied destination is never overwritten, as required by `@/invariant/atomic-writes`.\n\n2. **[blocking][issue-impact][medium]** New prose says “nothing compiles the package in” in [dev/index.md](/home/vkaskivuo/Projects/just-in-time/dev/index.md:133), [CHANGELOG.md](/home/vkaskivuo/Projects/just-in-time/CHANGELOG.md:39), the entry-point script, and module docs. This contradicts the current production `include_dir!` embedding of `profiles/jit-dogfood` in [dogfood.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/profile/dogfood.rs:8). State the narrower true fact—that no build reads the assembled destination—rather than claiming the package is not compiled in. `@/invariant/single-source-prose` applies.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Assembly has a racy overwrite publication path and introduces inaccurate build-behavior prose.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Plain rename can overwrite a destination created after the existence check; publication must be atomic no-replace.\",\"file\":\"crates/jit/src/profile/package_assembly.rs\",\"line\":272,\"references\":[\"@/invariant/atomic-writes\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"New prose falsely says the package is not compiled in although production still embeds profiles/jit-dogfood.\",\"file\":\"dev/index.md\",\"line\":133,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
