@@ -1,0 +1,48 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a3291826526674452900bbbb909620b8028dd6c8",
+  "completed_at": "2026-08-02T09:32:24.920021675Z",
+  "duration_ms": 179610,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 375,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "cargo-ci fails because package-origin validation rejects the checkout-local jit-default package used by an existing application test."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F2",
+        "line": 717,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-8",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Validation repair resolves every applied profile as embedded and never uses a directory origin recorded in provenance."
+      }
+    ],
+    "summary": "Directory-profile provenance is not repairable and the required Rust gate currently fails.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6c47b99a-e0bc-4705-82b6-5404d285fa58",
+  "message": null,
+  "run_id": "3ce2fc97-8287-4b64-9c07-d199bfe17d60",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T09:29:25.309519703Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10550 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc1ce-9d6b-7761-b223-8d96228dd0ef\n--------\nuser\n--- 10537 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 99091eab, 9ee75f2, 05d3f92, 92b478a (merge), b558fa4  \nPolicy sources: AGENTS.md  \nResolved items: @/issue/e204e63d/decision/D-8 (issue description, markdown-first); @/invariant/derived-state-coherence (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)  \nGate evidence: cargo-ci failed (exit 1, 2026-08-02T09:29:13Z); mcp-ci pending; code-review pending  \nTruncation recovery: recovered bounded current-file and per-commit reads for truncated package, profile, validation, and merge evidence  \n\n1. [blocking][issue-impact] F1 — `cargo-ci` fails because `package_origin` rejects the checkout-local `jit-default` directory as outside the temporary repository; the existing application test unwraps that error at `crates/jit/src/commands/profile.rs:854`. The latest required Rust gate reports 2,300 passed and this one failure, so the attributable change does not satisfy workspace validation.\n\n2. [blocking][issue-impact] F2 — Repair never re-resolves directory-backed packages from their provenance record. `resolve_recorded_packages` accepts only profile IDs and unconditionally calls `embedded_profile` at `crates/jit/src/commands/validate.rs:717`; it neither reads the record’s `ProfileOrigin::Directory` nor loads its recorded location. Consequently, `jit validate --fix` cannot restore an applied directory package and instead reports it unobtainable (or mismatched), violating the linked decision’s unattended repair contract.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Directory-profile provenance is not repairable and the required Rust gate currently fails.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"cargo-ci fails because package-origin validation rejects the checkout-local jit-default package used by an existing application test.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":375,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Validation repair resolves every applied profile as embedded and never uses a directory origin recorded in provenance.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":717,\"references\":[\"@/issue/e204e63d/decision/D-8\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

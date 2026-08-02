@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "a3291826526674452900bbbb909620b8028dd6c8",
+  "completed_at": "2026-08-02T09:29:13.001668766Z",
+  "duration_ms": 302736,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "6c47b99a-e0bc-4705-82b6-5404d285fa58",
+  "message": null,
+  "run_id": "0f0ed618-87a7-426a-aa99-205436dff60e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T09:24:10.265456886Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest commands::profile::tests::test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration ... FAILED\ntest result: FAILED. 2300 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.15s\n---- commands::profile::tests::test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration stdout ----\n\nthread 'commands::profile::tests::test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration' (2436925) panicked at crates/jit/src/commands/profile.rs:855:14:\ncalled `Result::unwrap()` on an `Err` value: profile package directory '/home/vkaskivuo/Projects/just-in-time/profiles/jit-default' is not inside the repository worktree\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1545 bytes=28106712)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1418308024/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}

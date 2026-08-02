@@ -15,10 +15,20 @@
     "mcp-ci"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-02T09:29:13.065177998Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T09:32:25.251855369Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-01T21:49:31.643184498Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-02T09:32:30.719274978Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "6c47b99a-e0bc-4705-82b6-5404d285fa58",
@@ -35,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record where an applied package came from",
-  "updated_at": "2026-08-01T21:49:31.643184498Z"
+  "updated_at": "2026-08-02T09:32:30.719274978Z"
 }

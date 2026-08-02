@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "a3291826526674452900bbbb909620b8028dd6c8",
+  "completed_at": "2026-08-02T09:35:58.891008093Z",
+  "duration_ms": 206005,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "c7058cac-cd23-4692-9b4b-01059cdedf8b",
+  "message": null,
+  "run_id": "b29ec4a3-3c95-444c-9dfb-0afb3260118a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T09:32:32.885549024Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest commands::archive::tests::test_execute_waits_for_competing_repository_write_guard ... FAILED\ntest commands::profile::tests::test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration ... FAILED\ntest result: FAILED. 2299 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 60.31s\n---- commands::archive::tests::test_execute_waits_for_competing_repository_write_guard stdout ----\n\nthread 'commands::archive::tests::test_execute_waits_for_competing_repository_write_guard' (2589211) panicked at crates/jit/src/commands/archive.rs:1317:14:\ncalled `Result::unwrap()` on an `Err` value: Timeout\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- commands::profile::tests::test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration stdout ----\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1545 bytes=28108984)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1418308024/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}

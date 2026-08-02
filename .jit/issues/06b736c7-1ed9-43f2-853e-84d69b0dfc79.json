@@ -16,7 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-08-01T21:59:26.931974400Z",
+      "updated_at": "2026-08-02T09:20:08.037942534Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T09:24:09.199408370Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "One declared vocabulary serves every shared test fixture",
-  "updated_at": "2026-08-01T21:59:26.931974400Z"
+  "updated_at": "2026-08-02T09:24:09.199408370Z"
 }

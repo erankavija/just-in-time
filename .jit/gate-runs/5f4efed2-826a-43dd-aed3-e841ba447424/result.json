@@ -1,0 +1,49 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a3291826526674452900bbbb909620b8028dd6c8",
+  "completed_at": "2026-08-02T09:24:08.892434146Z",
+  "duration_ms": 239819,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/graph/hierarchy.rs",
+        "id": "F1",
+        "line": 779,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/shared-test-contracts",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "Migrated taxonomy consumers still encode the shared vocabulary as literals instead of reading it from TestTaxonomy."
+      },
+      {
+        "disposition": "blocking",
+        "id": "F2",
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci"
+        ],
+        "severity": "high",
+        "summary": "The latest required cargo-ci run failed, leaving REQ-06's suite-passing criterion materially unverified."
+      }
+    ],
+    "summary": "The shared taxonomy exists, but consumers still duplicate its vocabulary and the required Rust CI gate is failing.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "06b736c7-1ed9-43f2-853e-84d69b0dfc79",
+  "message": null,
+  "run_id": "5f4efed2-826a-43dd-aed3-e841ba447424",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T09:20:09.073192690Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14286 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc1c6-0a5a-7a02-aaa0-c972b563839a\n--------\nuser\n--- 14273 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 528cc692, 790b23d9, 439750fe, 801da18a, de7836e0 (`jit:06b736c7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (issue description), @/invariant/shared-test-contracts (.jit/invariants.toml), @/invariant/convention-convergence (.jit/invariants.toml), @/gate/jit-validate (.jit/gates.toml), @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-08-02T09:18:15Z); code-review pending\nTruncation recovery: re-read tagged patches by commit/path; partitioned 790b23d9 validation patch into bounded line ranges and graph patch into two ranges\n\n1. [blocking][issue-impact] Consumers of the surviving taxonomy still repeat its type vocabulary as literals rather than reading it from the declaration. For example, [crates/jit/src/graph/hierarchy.rs:779](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/graph/hierarchy.rs:779) constructs nodes with `\"objective\"`, `\"initiative\"`, `\"deliverable\"`, and `\"action\"` despite `default_config()` deriving from `test_taxonomy()`. The same pattern remains in the domain, validation, and visualization suites. This preserves scattered implicit declarations and fails REQ-04/REQ-05’s requirement that consumers assert against the supplied vocabulary. References: @/invariant/shared-test-contracts, @/invariant/convention-convergence.\n\n2. [blocking][issue-impact] The latest required `cargo-ci` projection failed with exit code 1. Its test-suite component is the available evidence for REQ-06, so the criterion that every migrated consumer suite passes remains materially unverified. References: @/gate/cargo-ci.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The shared taxonomy exists, but consumers still duplicate its vocabulary and the required Rust CI gate is failing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Migrated taxonomy consumers still encode the shared vocabulary as literals instead of reading it from TestTaxonomy.\",\"file\":\"crates/jit/src/graph/hierarchy.rs\",\"line\":779,\"references\":[\"@/invariant/shared-test-contracts\",\"@/invariant/convention-convergence\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The latest required cargo-ci run failed, leaving REQ-06's suite-passing criterion materially unverified.\",\"references\":[\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

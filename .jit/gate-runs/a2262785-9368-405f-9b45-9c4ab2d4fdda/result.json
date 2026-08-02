@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a3291826526674452900bbbb909620b8028dd6c8",
+  "completed_at": "2026-08-02T09:18:11.725154039Z",
+  "duration_ms": 166151,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/dogfood.rs",
+        "id": "F1",
+        "line": 426,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-2",
+          "@/issue/e204e63d/decision/D-6"
+        ],
+        "severity": "high",
+        "summary": "The root test checks declared assets only and never walks declared roots to reject files absent from the asset inventory and exclusions."
+      }
+    ],
+    "summary": "Declared live-source roots are not walked to reject un-packaged, unexcluded files.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "39c34568-98ee-47d6-ba5f-875b06c59285",
+  "message": null,
+  "run_id": "a2262785-9368-405f-9b45-9c4ab2d4fdda",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T09:15:25.573912998Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9233 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc1c1-b6ea-79a3-a117-40ddd2ec5d78\n--------\nuser\n--- 9220 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 953845eb, 2b98eaf2, 46cfae8e, ab55c464, 6c0037d6, a89586ec (`jit:39c34568`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; .jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json\nResolved items: @/issue/39c34568/requirement/REQ-05, @/issue/e204e63d/decision/D-2, @/issue/e204e63d/decision/D-6, @/invariant/semantic-types, @/invariant/canonical-cutover, @/gate/jit-validate\nGate evidence: cargo-ci failed (exit 1, 2026-08-02T09:12:52Z); mcp-ci failed (exit 1, 2026-08-01T21:57:37Z)\nTruncation recovery: re-read the manifest and package patches in bounded ranges; separately inspected current root declarations, validators, tests, gate records, and root/asset inventories\n\n1. **[blocking][issue-impact] F1 (high):** `crates/jit/src/profile/dogfood.rs:426` checks only that already-declared live asset targets belong to exactly one root; it never walks each declared root and rejects files that are neither packaged nor excluded. All three declarations have empty exclusions (`profiles/jit-dogfood/manifest.toml:335`), while 52 of 107 skill-tree files and 3 of 7 contributed-gate files are not packaged. This leaves omissions undetected and does not satisfy the claimed completeness check. References: `@/issue/e204e63d/decision/D-2`, `@/issue/e204e63d/decision/D-6`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Declared live-source roots are not walked to reject un-packaged, unexcluded files.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The root test checks declared assets only and never walks declared roots to reject files absent from the asset inventory and exclusions.\",\"file\":\"crates/jit/src/profile/dogfood.rs\",\"line\":426,\"references\":[\"@/issue/e204e63d/decision/D-2\",\"@/issue/e204e63d/decision/D-6\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

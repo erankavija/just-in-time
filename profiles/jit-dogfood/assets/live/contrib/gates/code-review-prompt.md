@@ -29,7 +29,7 @@ Within the attributable impact cone, collect potentially governing qualified IDs
 
 Do not enumerate every project item or turn the review into a repository-wide policy audit. Resolve each collected ID with `jit item show` before using it in a judgment, then read its configured source of truth. For a markdown-first item, the configured Markdown or issue section governs. For a registry-first item, the configured registry governs. A rendered projection is checked for freshness but does not override its source. Attributable projection drift is blocking; unrelated pre-existing drift is advisory.
 
-Treat `satisfies:`, `enforces:`, and `per:` relationship labels as evidence claims, not proof. Resolve their targets and test the assertions against current behavior. Attributable dangling, contradictory, or unsupported claims are blocking. An unrelated pre-existing defect is advisory.
+Treat `satisfies:`, `enforces:`, and `per:` relationship labels as evidence claims, not proof. Resolve their targets and test the assertions against current behavior, at the strength the label's own `[namespaces.<ns>]` declaration gives it: a label declared to denote contribution or conformance claims that the issue's criteria are consistent with the target, not that this issue delivers the target whole. Attributable dangling, contradictory, or unsupported claims are blocking. An unrelated pre-existing defect is advisory.
 
 ## Bounded inspection and truncation recovery
 
