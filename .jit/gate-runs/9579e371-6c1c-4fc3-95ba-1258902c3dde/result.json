@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b191fd179298788d6d062dd53fd749ae86b3d753",
+  "completed_at": "2026-08-02T17:51:04.695059951Z",
+  "duration_ms": 140733,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed bridge integration-test coverage satisfies all issue hard criteria with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4873b32f-8d16-4120-9fb3-987b818361a2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9579e371-6c1c-4fc3-95ba-1258902c3dde",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T17:48:43.961668246Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 186104a1, 3162b643 (`jit:4873b32f`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/cc75b4e6/requirement/REQ-05 (.jit/issues/cc75b4e6-dca6-4b12-be45-ee25ca6560bd.json); @/issue/e204e63d/decision/D-2 and D-6 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: mcp-ci: passed (exit 0, 2026-08-02T17:48:40.579176993+00:00)\nTruncation recovery: narrowed reads of mcp-server/test-integration.js, mcp-server/index.js, profiles/jit-dogfood/manifest.toml, .jit/gates.toml, and governing item sources\n\nThe added integration assertions read `live-source` from the reported MCP value, validate root declarations and their relationship to reported live assets at [mcp-server/test-integration.js](/home/vkaskivuo/Projects/just-in-time/mcp-server/test-integration.js:459), and retain the existing profile assertions. All hard criteria are met.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed bridge integration-test coverage satisfies all issue hard criteria with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

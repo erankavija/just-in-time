@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T17:54:55.296036793Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T17:59:10.078295370Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5d12a79f-c29e-43ba-b14c-1f030790c01e",
   "labels": [
     "epic:derived-package-sources",
@@ -26,5 +37,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Resolve a profile package from a given location or the repository's record",
-  "updated_at": "2026-08-02T10:53:16.097221925Z"
+  "updated_at": "2026-08-02T17:59:10.078295370Z"
 }

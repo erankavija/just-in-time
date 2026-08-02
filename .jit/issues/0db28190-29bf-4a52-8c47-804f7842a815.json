@@ -9,13 +9,30 @@
   ],
   "description": "The adopter reference that describes what the package manifest carries accounts for the declared roots, so its enumeration of the manifest's contents is not silently incomplete.\n\n## Background\n\nThe adopter reference for packaged workflows describes the manifest as the package inventory and lists what it holds: version, contributions, assets, managed regions, hashes, and executable declarations. That sentence is a hand-written enumeration of a structure that has just gained a section, which makes it the kind of copy that is wrong the moment its subject changes.\n\nThe page's own approach is to point a reader at the inspection command for exact contents rather than reproduce them, which is the right shape and should be kept. What needs saying is that the manifest also declares where the packaged live assets are drawn from — a fact an adopter reading about the package's structure would otherwise not learn exists.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference's description of the manifest's contents accounts for the root declaration.\n- [hard] REQ-02: The description states what the declaration is for, not merely that a section exists.\n- [hard] REQ-03: The page continues to direct a reader to the inspection output for exact contents rather than reproducing them.\n- [hard] REQ-04: The mechanical documentation checks pass over the adopter surface.\n\n## Notes\n\nThis is the one adopter-facing page that enumerates the manifest's structure; no other page restates it.\n",
   "documents": [],
+  "done_at": "2026-08-02T18:18:36.221358950Z",
   "first_ready_at": "2026-08-02T10:24:28.452505837Z",
   "gates_required": [
     "code-review",
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T18:17:40.402550140Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T17:48:39.423440293Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-02T17:46:49.541583197Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0db28190-29bf-4a52-8c47-804f7842a815",
   "labels": [
     "epic:derived-package-sources",
@@ -27,7 +44,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "State the root declaration in the adopter manifest reference",
-  "updated_at": "2026-08-02T15:40:08.668836669Z"
+  "updated_at": "2026-08-02T18:18:36.221358950Z"
 }

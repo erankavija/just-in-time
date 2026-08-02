@@ -9,12 +9,24 @@
   ],
   "description": "The bridge that exposes profile inspection to agents is covered for the root declaration, so an additive manifest change is observed on that surface rather than assumed compatible with it.\n\n## Background\n\nThe profile manifest's shape is public twice over: once through the command-line inspection output, and once through the bridge that republishes the same command surface to agent clients. The bridge's own suite drives the profile inspection tool against this package and asserts on the manifest it gets back, which is what makes it a real consumer rather than a pass-through nobody checks.\n\nA recorded constraint from the work that built this package applies directly: changes must preserve the public profile, schema, and bridge journey rather than silently invalidating it. An additive field satisfies that by construction, but \"by construction\" is the claim, not the evidence. The evidence is an assertion on the surface itself, in the suite that already exercises it.\n\nThe assertion belongs to a different workspace from the type it observes, with its own toolchain and its own suite, which is why it stands apart from the declaration it covers.\n\n## Success Criteria\n\n- [hard] REQ-01: The bridge's integration suite asserts that the reported manifest carries the root declaration.\n- [hard] REQ-02: The assertion reads the declaration from the reported value rather than restating what it should contain.\n- [hard] REQ-03: The suite's existing assertions on the reported manifest continue to pass, so the addition is shown not to disturb the surface.\n\n## Notes\n\nNothing else in that workspace refers to the packaged asset paths or the roots, so this is the whole of the bridge-side change.\n",
   "documents": [],
+  "done_at": "2026-08-02T18:18:41.443722515Z",
   "first_ready_at": "2026-08-02T10:24:33.866532550Z",
   "gates_required": [
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T17:51:05.059518378Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T17:48:42.938358959Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4873b32f-8d16-4120-9fb3-987b818361a2",
   "labels": [
     "epic:derived-package-sources",
@@ -25,7 +37,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Cover the declared roots on the agent-facing bridge",
-  "updated_at": "2026-08-02T15:40:13.793481016Z"
+  "updated_at": "2026-08-02T18:18:41.443722515Z"
 }
