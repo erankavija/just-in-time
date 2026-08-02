@@ -1011,6 +1011,44 @@ fn test_repo_gates_toml_declares_repo_validate_whole_repo_checker() {
     );
 }
 
+/// REQ-09 (issue 32779829): this repository's registry declares the inputs of
+/// the gates whose verdict is a function of the tree, and declares none for the
+/// issue-scoped review gate whose verdict differs per issue over one identical
+/// tree. Read through the registry parser, so the declarations are held to the
+/// constrained root and pattern types rather than to raw TOML.
+#[test]
+fn test_repo_gates_toml_declares_inputs_for_tree_scoped_gates_only() {
+    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.toml");
+    let raw = std::fs::read(&gates_path)
+        .unwrap_or_else(|error| panic!("reading {}: {error}", gates_path.display()));
+    let registry = jit::declarations::parse_gate_registry(&raw)
+        .expect("this repository's gate registry parses");
+    let gate = |key: &str| {
+        registry
+            .gates
+            .get(key)
+            .unwrap_or_else(|| panic!(".jit/gates.toml must declare the `{key}` gate"))
+    };
+
+    let workspace = gate("cargo-ci")
+        .inputs
+        .as_ref()
+        .expect("the Rust workspace gate declares the files its checker reads");
+    assert!(
+        workspace.covers("crates/jit/src/lib.rs"),
+        "a workspace source the checker compiles must be a declared input"
+    );
+    assert!(
+        !workspace.covers(".jit/gate-runs/some-run/result.json"),
+        "the tracker's own run records, rewritten by every evaluation, must be excluded"
+    );
+
+    assert!(
+        gate("code-review").inputs.is_none(),
+        "an issue-scoped review's verdict is not a function of the tree, so it declares no inputs"
+    );
+}
+
 #[test]
 fn test_apply_rejects_invalid_node_label_before_creating_any_node() {
     let h = TestHarness::new();

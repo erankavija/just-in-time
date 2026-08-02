@@ -185,13 +185,15 @@ impl GateRunField {
                     .to_string()
             }
             GateRunField::Commit => {
-                "Git commit the run was taken at, when the working directory is a git \
-                 repository."
+                "Git commit the checker was launched at, when the working directory is a git \
+                 repository. Unset for a run that launched no checker: a verdict taken from an \
+                 earlier run ran at no commit of its own, and `origin` names the run that \
+                 carries one."
                     .to_string()
             }
             GateRunField::Branch => {
-                "Git branch the run was taken on, when the working directory is a git \
-                 repository."
+                "Git branch the checker was launched on, under the same conditions as \
+                 `commit`."
                     .to_string()
             }
             GateRunField::TreeDirty => {
@@ -199,8 +201,9 @@ impl GateRunField {
                  `true` if it carried uncommitted or untracked changes, `false` if it matched \
                  the commit exactly. A `true` run evidences that modified tree rather than the \
                  commit alone. `null` when no cleanliness value provably describes the recorded \
-                 commit: there was no commit to compare against (not a git repository, or no \
-                 commits yet), or `HEAD` moved through every paired probe attempt while the \
+                 commit: there was no commit to compare against (not a git repository, no \
+                 commits yet, or no checker launched), or `HEAD` moved through every paired \
+                 probe attempt while the \
                  evidence was being taken, so the tree state is recorded as unknown rather than \
                  paired with a commit it might not describe."
                     .to_string()
