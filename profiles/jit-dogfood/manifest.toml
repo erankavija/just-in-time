@@ -329,12 +329,24 @@ source = "assets/install/.jit/reference/rules-and-gates.md"
 target = ".jit/reference/rules-and-gates.md"
 
 # Repository roots the live assets below are drawn from. Each exclusion pattern
-# matches a root-relative path and names a category of repository material the
-# package deliberately does not carry, so material of the same shape needs no
-# new entry. What belongs in a list is measured by a walk over the root.
+# matches a repository-relative path and names a category of repository material
+# the package deliberately does not carry, so material of the same shape needs
+# no new entry. A tracked file beneath a root that neither an asset packages nor
+# a pattern matches fails the suite, so every list here is measured against the
+# repository tree rather than maintained by hand.
 [[live-source]]
 root = ".agents/skills"
-exclude = []
+exclude = [
+  # Skill-evaluation harnesses: cases, fixtures, setup scripts, and the
+  # transcripts a run leaves behind.
+  ".agents/skills/*/evals/**",
+  # Trigger-activation measurements recorded beside a skill's entry point.
+  ".agents/skills/*/trigger_eval*.json",
+  # Test suites for the packaged scripts they sit beside.
+  ".agents/skills/*/scripts/test-*.sh",
+  # Placeholders holding a directory that is otherwise empty.
+  ".agents/skills/**/.gitkeep",
+]
 
 [[live-source]]
 root = ".jit/reference"
@@ -342,7 +354,11 @@ exclude = []
 
 [[live-source]]
 root = "contrib/gates"
-exclude = []
+exclude = [
+  # The contributed prompt library: worked examples an adopter composes a gate
+  # from, rather than prompts this workflow's own gates resolve.
+  "contrib/gates/prompts/**",
+]
 
 # Live consumers, drawn from the roots declared above. The `assets/live/` source
 # prefix is also the renderer's data-owned selection rule; targets remain

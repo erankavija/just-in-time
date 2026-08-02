@@ -123,6 +123,7 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
+    use crate::profile::{ExclusionPattern, LiveSourceDeclaration};
     use crate::repository_state::{
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
     };
@@ -131,6 +132,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
+    use std::process::Command;
     use tempfile::TempDir;
 
     #[test]
@@ -358,23 +360,14 @@ mod tests {
         }
     }
 
+    /// Which repository files are packaged is settled by the walk over the
+    /// declared live-source roots, so what is left here is the other side: the
+    /// adopter state the package installs is never drawn from this repository.
     #[test]
-    fn test_live_assets_cover_source_consumers_and_exclude_install_only_state() {
+    fn test_live_assets_exclude_install_only_adopter_state() {
         let package = jit_dogfood_package().unwrap();
-        let live: BTreeSet<&str> = package
-            .manifest()
-            .assets
-            .iter()
-            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
-            .map(|asset| asset.target.as_str())
-            .collect();
-        // Live consumers are packaged from `assets/live/`.
-        assert!(live.contains(".agents/skills/jit-manage/SKILL.md"));
-        assert!(live.contains(
-            ".agents/skills/jit-planning-lead/references/breakdown-manifest.schema.json"
-        ));
-        assert!(live.contains(".agents/skills/jit-planning-lead/scripts/breakdown_manifest.py"));
-        assert!(live.contains("contrib/gates/ai-review.sh"));
+        let live: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
+        assert!(!live.is_empty(), "the package declares live assets");
         let regions: BTreeSet<&str> = package
             .manifest()
             .regions
@@ -511,6 +504,359 @@ mod tests {
             "an install-only asset writes into a declared root, which is what makes \
              the source-side rule distinct from a target-side one"
         );
+    }
+
+    /// The repository-relative paths the repository at `worktree` tracks.
+    ///
+    /// Tracked rather than present, so a contributor's scratch file beneath a
+    /// packaged root is not read as a packaging defect. The provenance
+    /// fixtures' repository-input inventory lists untracked non-ignored paths
+    /// beside tracked ones, which is the opposite property, so this listing
+    /// takes its own flags rather than that idiom's.
+    ///
+    /// Panics when the listing cannot be obtained, and when it comes back
+    /// empty: a walk over nothing reports nothing, so either would let the
+    /// checks below pass by vacuity instead of by the property holding.
+    fn tracked_repository_paths(worktree: &Path) -> Vec<String> {
+        let listing = Command::new("git")
+            .current_dir(worktree)
+            .args(["ls-files", "--cached", "--full-name", "-z"])
+            .output()
+            .unwrap_or_else(|error| {
+                panic!(
+                    "failed to list the tracked files under {}: {error}",
+                    worktree.display()
+                )
+            });
+        assert!(
+            listing.status.success(),
+            "failed to list the tracked files under {}: {}",
+            worktree.display(),
+            String::from_utf8_lossy(&listing.stderr)
+        );
+
+        let paths: Vec<String> = String::from_utf8(listing.stdout)
+            .expect("tracked repository paths are valid UTF-8")
+            .split('\0')
+            .filter(|path| !path.is_empty())
+            .map(str::to_string)
+            .collect();
+        assert!(
+            !paths.is_empty(),
+            "{} tracks no file, so a walk over the listing would report nothing \
+             rather than fail",
+            worktree.display()
+        );
+        paths
+    }
+
+    /// Every path in `tracked` that lies beneath a declared root, is packaged
+    /// by none of the live-asset targets in `packaged`, and is matched by none
+    /// of that root's exclusion patterns.
+    ///
+    /// The root decides membership and the patterns decide coverage, both over
+    /// the same repository-relative path: one glob names a repository directory
+    /// of unpackaged material however many files it holds.
+    ///
+    /// `packaged` holds live-asset targets alone. An install-only asset is
+    /// authored by the package rather than drawn from the repository, so a
+    /// repository file at such a target is unpackaged material a declared
+    /// exclusion covers, not a file the declaration claims.
+    fn unpackaged_files_under_declared_roots<'a>(
+        roots: &[LiveSourceDeclaration],
+        packaged: &BTreeSet<&str>,
+        tracked: &'a [String],
+    ) -> Vec<&'a str> {
+        tracked
+            .iter()
+            .map(String::as_str)
+            .filter(|path| !packaged.contains(path))
+            .filter(|path| {
+                roots.iter().any(|declaration| {
+                    declaration.root.relative_path(path).is_some() && !declaration.excludes(path)
+                })
+            })
+            .collect()
+    }
+
+    /// Every path in `tracked` that lies beneath a declared root and is matched
+    /// by one of that root's exclusion patterns.
+    fn excluded_files_under_declared_roots<'a>(
+        roots: &[LiveSourceDeclaration],
+        tracked: &'a [String],
+    ) -> Vec<&'a str> {
+        tracked
+            .iter()
+            .map(String::as_str)
+            .filter(|path| {
+                roots.iter().any(|declaration| {
+                    declaration.root.relative_path(path).is_some() && declaration.excludes(path)
+                })
+            })
+            .collect()
+    }
+
+    /// Every tracked repository file beneath a declared live-source root is
+    /// either packaged as a live asset or covered by a declared exclusion.
+    ///
+    /// This is the direction the drift assertion does not walk: that one reads
+    /// each declared asset's repository file, so a live consumer added under a
+    /// packaged root and declared nowhere is absent from every adopter install
+    /// with nothing reporting it.
+    #[test]
+    fn test_unpackaged_files_under_declared_roots_is_empty_across_the_tracked_repository_tree() {
+        let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let package = jit_dogfood_package().unwrap();
+        let roots = &package.manifest().live_sources;
+        let tracked = tracked_repository_paths(&worktree);
+        let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
+
+        // The walk's domain covers the whole packaged live surface: every live
+        // asset is a tracked repository file beneath a declared root, so no
+        // packaged file sits where the walk never looks.
+        let unwalked: Vec<&str> = packaged
+            .iter()
+            .copied()
+            .filter(|target| {
+                !tracked.iter().any(|path| path == target)
+                    || !roots
+                        .iter()
+                        .any(|declaration| declaration.root.relative_path(target).is_some())
+            })
+            .collect();
+        assert_eq!(
+            unwalked,
+            Vec::<&str>::new(),
+            "each entry names a packaged live asset that is not a tracked file \
+             beneath a declared root, so the walk never visits it"
+        );
+
+        assert_eq!(
+            unpackaged_files_under_declared_roots(roots, &packaged, &tracked),
+            Vec::<&str>::new(),
+            "each entry names a tracked repository file under a declared \
+             live-source root that no live asset packages and no declared \
+             exclusion matches. Package it as a live asset, or add a pattern \
+             covering its category to that root's exclusions in \
+             profiles/jit-dogfood/manifest.toml"
+        );
+    }
+
+    /// A consumer added under any declared root, packaged nowhere and of no
+    /// shape that root's exclusions describe, is reported by name — which is
+    /// what fails the walk above, whose assertion is that nothing is reported.
+    #[test]
+    fn test_unpackaged_files_under_declared_roots_names_a_tracked_file_no_declaration_covers() {
+        let package = jit_dogfood_package().unwrap();
+        let roots = &package.manifest().live_sources;
+        assert!(!roots.is_empty(), "the package declares live-source roots");
+        let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
+
+        for declaration in roots {
+            let added = format!("{}/a-new-consumer/SKILL.md", declaration.root);
+            let tracked: Vec<String> = packaged
+                .iter()
+                .map(|target| (*target).to_string())
+                .chain([added.clone()])
+                .collect();
+
+            assert_eq!(
+                unpackaged_files_under_declared_roots(roots, &packaged, &tracked),
+                vec![added.as_str()],
+                "a consumer added under {} is not reported by name",
+                declaration.root
+            );
+        }
+    }
+
+    /// The walk consults a declaration's patterns only for paths that
+    /// declaration's own root contains, so an exclusion cannot reach across
+    /// into another root.
+    ///
+    /// Membership and coverage are separate terms of one conjunction:
+    /// `relative_path(path).is_some() && excludes(path)`. Since matching moved
+    /// to repository-relative paths, a pattern's text can name a location
+    /// outside the root that declares it, which is what makes the membership
+    /// term load-bearing rather than decorative — [`LiveSourceDeclaration::excludes`]
+    /// alone would match such a path. Package validation rejects a root
+    /// declared twice or nested inside another
+    /// ([`ProfilePackageError::DuplicateLiveSourceRoot`],
+    /// [`ProfilePackageError::NestedLiveSourceRoot`]), so every repository path
+    /// lies under exactly one declared root; that is what makes the conjunction
+    /// sufficient rather than merely conventional, since there is never a
+    /// second declaration whose patterns could also claim the path.
+    #[test]
+    fn test_unpackaged_files_under_declared_roots_consults_only_the_declaration_owning_the_path() {
+        let package = jit_dogfood_package().unwrap();
+        let declared = &package.manifest().live_sources;
+        assert!(
+            declared.len() >= 2,
+            "the package declares two roots to reach between"
+        );
+        let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
+
+        // An unpackaged consumer under the last declared root, and a pattern
+        // naming everything under that root. Whichever declaration carries the
+        // pattern, its text matches the path.
+        let owner = declared.last().expect("a declared root");
+        let added = format!("{}/a-new-consumer/SKILL.md", owner.root);
+        let tracked: Vec<String> = packaged
+            .iter()
+            .map(|target| (*target).to_string())
+            .chain([added.clone()])
+            .collect();
+        let reaching =
+            ExclusionPattern::try_from(format!("{}/**", owner.root)).expect("a compilable pattern");
+        assert!(
+            reaching.matches(&added),
+            "the pattern must match the added path for this test to say anything"
+        );
+
+        // Carried by a declaration whose root does not contain the path, the
+        // pattern is never consulted and the path is still reported.
+        let reaching_across: Vec<LiveSourceDeclaration> = declared
+            .iter()
+            .enumerate()
+            .map(|(position, declaration)| {
+                let mut declaration = declaration.clone();
+                if position == 0 {
+                    declaration.exclude.push(reaching.clone());
+                }
+                declaration
+            })
+            .collect();
+        assert_eq!(
+            unpackaged_files_under_declared_roots(&reaching_across, &packaged, &tracked),
+            vec![added.as_str()],
+            "a pattern declared under {} suppressed a path under {}",
+            reaching_across[0].root,
+            owner.root
+        );
+
+        // Carried by the declaration that does contain it, the same pattern
+        // covers it. The walk's silence turns on which declaration owns the
+        // path, not on which one spells a matching pattern.
+        let owning: Vec<LiveSourceDeclaration> = declared
+            .iter()
+            .map(|declaration| {
+                let mut declaration = declaration.clone();
+                if declaration.root == owner.root {
+                    declaration.exclude.push(reaching.clone());
+                }
+                declaration
+            })
+            .collect();
+        assert_eq!(
+            unpackaged_files_under_declared_roots(&owning, &packaged, &tracked),
+            Vec::<&str>::new(),
+            "the owning root's own exclusion did not cover the path"
+        );
+    }
+
+    /// The exclusions describe categories rather than files: they cover more
+    /// repository files than there are patterns, which a list of path literals
+    /// could not do, and none of them shadows a packaged live asset.
+    #[test]
+    fn test_excluded_files_under_declared_roots_covers_more_files_than_there_are_patterns() {
+        let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let package = jit_dogfood_package().unwrap();
+        let roots = &package.manifest().live_sources;
+        let tracked = tracked_repository_paths(&worktree);
+        let covered = excluded_files_under_declared_roots(roots, &tracked);
+        let patterns: usize = roots
+            .iter()
+            .map(|declaration| declaration.exclude.len())
+            .sum();
+
+        assert!(
+            covered.len() > patterns,
+            "{patterns} declared patterns cover {} repository files, so the \
+             declaration reads as a path inventory rather than a set of \
+             categories",
+            covered.len()
+        );
+
+        // A pattern widened until the walk passes would drop a live consumer
+        // from the check while leaving it packaged, so no exclusion may reach
+        // one.
+        let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
+        let shadowed: Vec<&str> = covered
+            .iter()
+            .copied()
+            .filter(|path| packaged.contains(path))
+            .collect();
+        assert_eq!(
+            shadowed,
+            Vec::<&str>::new(),
+            "each entry names a packaged live asset that a declared exclusion \
+             also matches"
+        );
+    }
+
+    /// Every declared pattern is authored beneath the root that declares it.
+    ///
+    /// Patterns and roots are both repository-relative, which is what lets a
+    /// pattern read as the repository location it names — and what allows one
+    /// to be written outside its own root, where the walk consults it for no
+    /// path and it silently covers nothing. A pattern's text has to open with
+    /// its root for the exclusion to bound the root it is declared under.
+    #[test]
+    fn test_excluded_files_under_declared_roots_matches_only_patterns_authored_beneath_their_root()
+    {
+        let package = jit_dogfood_package().unwrap();
+        let roots = &package.manifest().live_sources;
+
+        let stray: Vec<(&str, &str)> = roots
+            .iter()
+            .flat_map(|declaration| {
+                declaration
+                    .exclude
+                    .iter()
+                    .map(|pattern| (declaration.root.as_str(), pattern.as_str()))
+            })
+            .filter(|(root, pattern)| !pattern.starts_with(&format!("{root}/")))
+            .collect();
+        assert_eq!(
+            stray,
+            Vec::<(&str, &str)>::new(),
+            "each entry pairs a declared root with a pattern authored outside \
+             it, which the walk consults for no path"
+        );
+
+        // The patterns are repository-relative, so each one matches the very
+        // paths the walk hands it: a root-relative spelling of the same
+        // category would match nothing.
+        let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let tracked = tracked_repository_paths(&worktree);
+        assert!(
+            !excluded_files_under_declared_roots(roots, &tracked).is_empty(),
+            "no declared pattern matches any repository path"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "failed to list the tracked files under")]
+    fn test_tracked_repository_paths_panics_when_the_listing_cannot_be_obtained() {
+        let unlistable = TempDir::new().unwrap();
+        // A malformed gitfile stops the repository search here and fails it,
+        // whatever the enclosing directories are.
+        fs::write(unlistable.path().join(".git"), b"not a gitfile\n").unwrap();
+
+        let _ = tracked_repository_paths(unlistable.path());
+    }
+
+    #[test]
+    #[should_panic(expected = "tracks no file")]
+    fn test_tracked_repository_paths_panics_when_the_listing_is_empty() {
+        let empty = TempDir::new().unwrap();
+        let initialized = Command::new("git")
+            .current_dir(empty.path())
+            .args(["init", "-q"])
+            .status()
+            .unwrap();
+        assert!(initialized.success(), "the fixture repository initializes");
+
+        let _ = tracked_repository_paths(empty.path());
     }
 
     #[test]

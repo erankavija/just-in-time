@@ -151,20 +151,23 @@ pub struct RegionDeclaration {
 pub struct LiveSourceDeclaration {
     /// Repository-relative directory the live assets beneath it are drawn from.
     pub root: LiveSourceRoot,
-    /// Patterns matching root-relative paths the package does not carry.
+    /// Patterns matching repository-relative paths the package does not carry.
     #[serde(default)]
     pub exclude: Vec<ExclusionPattern>,
 }
 
 impl LiveSourceDeclaration {
-    /// Whether any declared pattern matches `root_relative`.
+    /// Whether any declared pattern matches `repository_path`.
     ///
-    /// `root_relative` is a path beneath [`Self::root`], as
-    /// [`LiveSourceRoot::relative_path`] returns it.
-    pub fn excludes(&self, root_relative: &str) -> bool {
+    /// `repository_path` is a repository-relative path, the same form
+    /// [`Self::root`] and every manifest target take, so a pattern reads as the
+    /// repository location it names. Membership of the root is a separate
+    /// question, answered by [`LiveSourceRoot::relative_path`]: this asks only
+    /// whether the declaration's patterns cover the path.
+    pub fn excludes(&self, repository_path: &str) -> bool {
         self.exclude
             .iter()
-            .any(|pattern| pattern.matches(root_relative))
+            .any(|pattern| pattern.matches(repository_path))
     }
 }
 
@@ -249,7 +252,8 @@ const EXCLUSION_MATCH_OPTIONS: glob::MatchOptions = glob::MatchOptions {
     require_literal_leading_dot: false,
 };
 
-/// A shell-style pattern naming root-relative paths a package does not carry.
+/// A shell-style pattern naming repository-relative paths a package does not
+/// carry.
 ///
 /// The pattern is compiled where the manifest is parsed, so an uncompilable
 /// pattern is a manifest error rather than a surprise for whichever consumer
@@ -263,19 +267,20 @@ impl ExclusionPattern {
         self.0.as_str()
     }
 
-    /// Whether this pattern matches the root-relative path `root_relative`.
+    /// Whether this pattern matches the repository-relative path
+    /// `repository_path`.
     ///
     /// `*` stays inside one path segment and `**` spans segments, which is what
-    /// lets a pattern describe a category — a directory anywhere beneath the
-    /// root, or a filename shape within one directory — rather than a path
-    /// literal. Matching is case-sensitive, and a leading dot is an ordinary
-    /// character, so a pattern reaches dot-directories without a spelling of
-    /// its own.
+    /// lets a pattern describe a category — a directory anywhere in the tree,
+    /// or a filename shape within one directory — rather than a path literal.
+    /// Matching is case-sensitive, and a leading dot is an ordinary character,
+    /// so a pattern reaches dot-directories without a spelling of its own.
     ///
-    /// The match is whole-path: `evals/**` matches every path beneath an
-    /// `evals` directory, while `evals` alone matches only that exact path.
-    pub fn matches(&self, root_relative: &str) -> bool {
-        self.0.matches_with(root_relative, EXCLUSION_MATCH_OPTIONS)
+    /// The match is whole-path: `docs/evals/**` matches every path beneath that
+    /// `evals` directory, while `docs/evals` alone matches only that exact path.
+    pub fn matches(&self, repository_path: &str) -> bool {
+        self.0
+            .matches_with(repository_path, EXCLUSION_MATCH_OPTIONS)
     }
 }
 
@@ -389,8 +394,8 @@ fn has_ordinary_segments(value: &str) -> bool {
 /// Whether `value` has the shape of a relative path pattern, before any attempt
 /// to compile it.
 ///
-/// A pattern names root-relative paths, so the segment rules a path is held to
-/// apply to it. Wildcards are left to the compiler: `*`, `?` and bracket
+/// A pattern names repository-relative paths, so the segment rules a path is
+/// held to apply to it. Wildcards are left to the compiler: `*`, `?` and bracket
 /// expressions are ordinary segment content, and `**` forms a segment of its
 /// own. The path predicate is not reused, because its rejection of `:` would
 /// reject a bracket expression that merely contains one.
@@ -446,7 +451,7 @@ mod tests {
         let manifest = manifest_of(
             "[[live-source]]\n\
              root = \".agents/skills\"\n\
-             exclude = [\"*/evals/**\", \"*/references/fixtures/**\"]\n\
+             exclude = [\".agents/skills/*/evals/**\", \".agents/skills/*/references/fixtures/**\"]\n\
              \n\
              [[live-source]]\n\
              root = \"contrib/gates\"\n\
@@ -463,11 +468,11 @@ mod tests {
 
         let skills = &manifest.live_sources[0];
         let gates = &manifest.live_sources[1];
-        assert!(skills.excludes("jit-manage/evals/case.md"));
-        assert!(!skills.excludes("jit-manage/SKILL.md"));
+        assert!(skills.excludes(".agents/skills/jit-manage/evals/case.md"));
+        assert!(!skills.excludes(".agents/skills/jit-manage/SKILL.md"));
         // An empty list bounds nothing, so the root claims everything beneath it.
         assert!(gates.exclude.is_empty());
-        assert!(!gates.excludes("ai-review.sh"));
+        assert!(!gates.excludes("contrib/gates/ai-review.sh"));
     }
 
     #[test]
@@ -532,7 +537,8 @@ mod tests {
     }
 
     #[test]
-    fn test_profile_manifest_deserialize_rejects_an_exclusion_pattern_that_is_not_root_relative() {
+    fn test_profile_manifest_deserialize_rejects_an_exclusion_pattern_that_is_not_repository_relative(
+    ) {
         for pattern in [
             "/absolute/**",
             "../escape/**",
@@ -552,26 +558,27 @@ mod tests {
 
     #[test]
     fn test_exclusion_pattern_matches_across_segments_only_through_the_recursive_wildcard() {
-        let within = ExclusionPattern::try_from("*.md").expect("a compilable pattern");
-        assert!(within.matches("notes.md"));
-        assert!(!within.matches("references/notes.md"));
+        let within = ExclusionPattern::try_from("skills/*.md").expect("a compilable pattern");
+        assert!(within.matches("skills/notes.md"));
+        assert!(!within.matches("skills/references/notes.md"));
 
-        let across = ExclusionPattern::try_from("**/*.md").expect("a compilable pattern");
-        assert!(across.matches("references/notes.md"));
-        assert!(across.matches("a/b/c/notes.md"));
-        assert!(!across.matches("references/notes.txt"));
+        let across = ExclusionPattern::try_from("skills/**/*.md").expect("a compilable pattern");
+        assert!(across.matches("skills/references/notes.md"));
+        assert!(across.matches("skills/a/b/c/notes.md"));
+        assert!(!across.matches("skills/references/notes.txt"));
 
         // A whole-path match, so a category is named by spanning what follows it.
-        let category = ExclusionPattern::try_from("*/evals/**").expect("a compilable pattern");
-        assert!(category.matches("jit-manage/evals/case.md"));
-        assert!(category.matches("jit-manage/evals/fixtures/input.json"));
-        assert!(!category.matches("jit-manage/evals"));
+        let category =
+            ExclusionPattern::try_from("skills/*/evals/**").expect("a compilable pattern");
+        assert!(category.matches("skills/jit-manage/evals/case.md"));
+        assert!(category.matches("skills/jit-manage/evals/fixtures/input.json"));
+        assert!(!category.matches("skills/jit-manage/evals"));
     }
 
     #[test]
     fn test_exclusion_pattern_matches_a_dot_prefixed_segment_without_spelling_the_dot() {
         let pattern = ExclusionPattern::try_from("**/*").expect("a compilable pattern");
-        assert!(pattern.matches(".hidden/notes.md"));
+        assert!(pattern.matches(".agents/notes.md"));
         assert!(pattern.matches("visible/.gitignore"));
     }
 
@@ -594,15 +601,15 @@ mod tests {
     fn test_live_source_declaration_excludes_a_path_matched_by_any_declared_pattern() {
         let declaration = LiveSourceDeclaration {
             root: LiveSourceRoot::try_from("skills").expect("a relative root"),
-            exclude: ["**/evals/**", "**/trigger-*.md"]
+            exclude: ["skills/**/evals/**", "skills/**/trigger-*.md"]
                 .into_iter()
                 .map(|pattern| ExclusionPattern::try_from(pattern).expect("a compilable pattern"))
                 .collect(),
         };
 
-        assert!(declaration.excludes("jit-manage/evals/case.md"));
-        assert!(declaration.excludes("jit-manage/references/trigger-log.md"));
-        assert!(!declaration.excludes("jit-manage/references/plan-schema.md"));
+        assert!(declaration.excludes("skills/jit-manage/evals/case.md"));
+        assert!(declaration.excludes("skills/jit-manage/references/trigger-log.md"));
+        assert!(!declaration.excludes("skills/jit-manage/references/plan-schema.md"));
     }
 
     #[test]
@@ -610,13 +617,16 @@ mod tests {
         let manifest = manifest_of(
             "[[live-source]]\n\
              root = \".agents/skills\"\n\
-             exclude = [\"*/evals/**\"]\n",
+             exclude = [\".agents/skills/*/evals/**\"]\n",
         )
         .expect("a manifest declaring one root parses");
 
         let wire = serde_json::to_value(&manifest).expect("the manifest serializes");
         assert_eq!(wire["live-source"][0]["root"], ".agents/skills");
-        assert_eq!(wire["live-source"][0]["exclude"][0], "*/evals/**");
+        assert_eq!(
+            wire["live-source"][0]["exclude"][0],
+            ".agents/skills/*/evals/**"
+        );
 
         // The wire form is the parsed value's own form: reading it back is exact.
         let restored: ProfileManifest =
