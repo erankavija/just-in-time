@@ -254,7 +254,7 @@ impl EventTag {
                  lifecycle timestamps; the record carries the number of issues it updated."
             }
             EventTag::ProfileApplied => {
-                "An embedded profile package, its minimal installed record, and this audit \
+                "A profile package, its minimal installed record, and this audit \
                  event reached one durable transaction commit point."
             }
         }

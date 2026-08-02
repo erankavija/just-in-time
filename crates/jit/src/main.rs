@@ -883,8 +883,10 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::repository_state::{InitializationError, ProducerError, RepositoryStateError};
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
-        return JsonError::new(ErrorCode::ProfileNotFound, error.to_string())
-            .with_suggestion("Run 'jit profile list --json' to see embedded profiles");
+        return JsonError::new(ErrorCode::ProfileNotFound, error.to_string()).with_suggestion(
+            "Name the directory holding the package with --from, or run \
+             'jit profile list --json' to see the profiles this repository records",
+        );
     }
     if error
         .downcast_ref::<jit::profile::ProfileClaimError>()

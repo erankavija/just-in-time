@@ -868,6 +868,17 @@ mod tests {
             .to_string()
     }
 
+    /// Store `record` as this repository's applied-profile record for its id.
+    fn store_record(temp: &TempDir, record: &AppliedProfileRecord) {
+        fs::create_dir_all(temp.path().join(".jit/profiles")).unwrap();
+        fs::write(
+            temp.path()
+                .join(format!(".jit/profiles/{}.json", record.id)),
+            record.to_bytes().unwrap(),
+        )
+        .unwrap();
+    }
+
     #[test]
     fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
         let (temp, _storage, executor, _embedded) = fixture();
@@ -930,6 +941,40 @@ mod tests {
             .unwrap();
 
         assert_eq!(resolved.hashes(), rewritten.hashes());
+    }
+
+    #[test]
+    fn test_resolve_profile_package_prefers_the_record_over_the_compiled_in_package() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let compiled = jit_dogfood_package().unwrap();
+        let id = compiled.manifest().profile.id.to_string();
+
+        // A directory package declaring the id this binary also carries, so
+        // nothing but the route taken decides which of the two answers.
+        package_read_from(&temp, "vendor/dogfood");
+        let manifest = fs::read_to_string(temp.path().join("vendor/dogfood/manifest.toml"))
+            .unwrap()
+            .replace(
+                &format!("id = \"{}\"", fixture_id()),
+                &format!("id = \"{id}\""),
+            );
+        let recorded = repackage(&temp, "vendor/dogfood", "manifest.toml", &manifest);
+        assert_eq!(recorded.manifest().profile.id.as_str(), id);
+        assert_ne!(recorded.hashes(), compiled.hashes());
+        store_record(
+            &temp,
+            &AppliedProfileRecord::new(
+                id.clone(),
+                recorded.manifest().profile.version.clone(),
+                ProfileOrigin::Directory(RootRelativePath::parse("vendor/dogfood").unwrap()),
+                recorded.hashes().package.clone(),
+                recorded.hashes().targets.clone(),
+            ),
+        );
+
+        let resolved = executor.resolve_profile_package(&id, None).unwrap();
+
+        assert_eq!(resolved.hashes(), recorded.hashes());
     }
 
     #[test]
@@ -1102,20 +1147,16 @@ mod tests {
     #[test]
     fn test_list_recorded_profiles_reports_a_record_naming_a_package_this_binary_lacks() {
         let (temp, _storage, executor, _embedded) = fixture();
-        let record = AppliedProfileRecord::new(
-            "absent-from-this-binary",
-            "1.0.0",
-            ProfileOrigin::Embedded,
-            "package-hash",
-            BTreeMap::new(),
+        store_record(
+            &temp,
+            &AppliedProfileRecord::new(
+                "absent-from-this-binary",
+                "1.0.0",
+                ProfileOrigin::Embedded,
+                "package-hash",
+                BTreeMap::new(),
+            ),
         );
-        fs::create_dir_all(temp.path().join(".jit/profiles")).unwrap();
-        fs::write(
-            temp.path()
-                .join(".jit/profiles/absent-from-this-binary.json"),
-            record.to_bytes().unwrap(),
-        )
-        .unwrap();
 
         let error = executor.list_recorded_profiles().unwrap_err();
 

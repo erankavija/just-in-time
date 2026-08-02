@@ -578,7 +578,7 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
             .iter()
             .map(|flag| flag["name"].as_str().unwrap().to_string())
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["dry-run", "json"])
+        expected_keys(&["dry-run", "from", "json"])
     );
 
     let list_schema = &commands["list"]["output"]["success_schema"];

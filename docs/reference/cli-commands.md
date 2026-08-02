@@ -533,18 +533,21 @@ canonicalize unusual-but-valid TOML syntax spellings elsewhere in the file —
 semantically lossless, with every rule, comment, and unrelated table preserved.
 
 ```bash
-jit init [--hierarchy-template <name>] [--profile <profile-id>] [--json]
+jit init [--hierarchy-template <name>] [--profile <profile-id>] [--from <PATH>]
+         [--json]
 ```
 
 `--hierarchy-template` selects the type hierarchy seeded into `config.toml`
 (`default`, `extended`, `agile`, `minimal`); an unknown name is a usage error
 (exit `2`).
 
-`--profile <profile-id>` applies an embedded repository profile as part of
+`--profile <profile-id>` applies a repository profile as part of
 initialization. `jit init --profile jit-dogfood` is the preferred setup for
-JIT's portable workflow; plain init remains methodology-neutral. For a fresh
-repository, the neutral scaffold and profile projection are planned, validated,
-and published together. If the data root is absent, JIT stages the complete root
+JIT's portable workflow; plain init remains methodology-neutral. `--from <PATH>`
+names the repository directory holding that profile's package, which a
+repository being created has no record of yet; it requires `--profile`. For a
+fresh repository, the neutral scaffold and profile projection are planned,
+validated, and published together. If the data root is absent, JIT stages the complete root
 beside its destination and publishes it with an atomic no-replace rename; an
 occupied destination is never overwritten. The same flag can complete and apply
 the profile to an existing partial repository. See
@@ -612,30 +615,43 @@ Profile inspection works without an initialized repository. Application targets
 the current JIT repository and runs mandatory transaction recovery before
 planning or writing.
 
+`show` and `apply` read their package through one resolution order. `--from
+<PATH>` names a repository directory holding the package and outranks everything
+else; with no `--from`, the location this repository's applied-profile record
+names answers; where neither does, the package this binary carries answers. So
+an adopter who has just obtained a package names its directory once, and every
+later run reads it back from the record. A supplied directory must hold a
+package declaring the requested profile ID.
+
 ### `jit profile list`
 
-List the immutable profiles embedded in the running binary:
+List the profiles this repository's own applied-profile records name:
 
 ```bash
 jit profile list [--json]
 ```
 
-Human output shows each profile's ID, version, compatible JIT range, origin, and
-whether a matching stored provenance record exists. This record
-check does not read every installed target. JSON uses the standard list envelope
-`{"count": N, "profiles": [...]}`. Each profile entry carries `id`, `version`,
-`origin`, `jit`, and `applied`.
+Each record's package is read from the location that record names, so the answer
+describes this repository. A repository that has applied nothing names no
+profile. Human output shows each profile's ID, version, compatible JIT range,
+origin, and whether the stored record still matches the package at its location.
+That check compares records, not installed target bytes. JSON uses the standard
+list envelope `{"count": N, "profiles": [...]}`. Each profile entry carries
+`id`, `version`, `origin`, `jit`, and `applied`.
 
-The running binary is authoritative for the live values; scripts should inspect
+A recorded location that no longer holds a readable package fails the command,
+naming the record and the location.
+
+The resolved package is authoritative for the live values; scripts should inspect
 the returned fields rather than copy package identity or compatibility values
 from prose.
 
 ### `jit profile show`
 
-Inspect one embedded package:
+Inspect one package:
 
 ```bash
-jit profile show <PROFILE_ID> [--json]
+jit profile show <PROFILE_ID> [--from <PATH>] [--json]
 ```
 
 Human output summarizes package identity, compatibility, hashes, contribution
@@ -648,10 +664,10 @@ verification.
 
 ### `jit profile apply`
 
-Preview or apply an embedded profile to the current repository:
+Preview or apply a profile to the current repository:
 
 ```bash
-jit profile apply <PROFILE_ID> [--dry-run] [--json]
+jit profile apply <PROFILE_ID> [--from <PATH>] [--dry-run] [--json]
 ```
 
 `--dry-run` builds and validates the exact plan without writing. JSON returns

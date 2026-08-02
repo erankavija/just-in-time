@@ -20,19 +20,31 @@ base repository without installing the dogfood workflow.
 
 ## Commands
 
-Inspect the profiles carried by the running binary:
+List the profiles this repository's own records name, and inspect one:
 
 ```bash
 jit profile list
 jit profile show jit-dogfood
 ```
 
-Preview and apply the embedded profile to an existing JIT repository:
+Preview and apply a profile to an existing JIT repository:
 
 ```bash
 jit profile apply jit-dogfood --dry-run
 jit profile apply jit-dogfood
 ```
+
+`show` and `apply` read their package through one resolution order: the
+directory `--from` names, else the location this repository's applied-profile
+record names, else the package this binary carries. A package obtained as a
+directory is therefore named once —
+`jit profile apply <id> --from vendor/<id>` — and every later run reads it back
+from the record. `jit init --profile <id> --from <path>` takes the same
+location, because a repository being created has no record to read.
+
+Enumeration follows the records alone: a repository that has applied nothing
+names no profile, and a recorded location that no longer holds a readable
+package fails the command by naming the record and the location.
 
 All profile commands support `--json`. `profile list` uses the standard
 count-wrapped list shape. `profile show` returns the manifest, package identity,
@@ -167,7 +179,6 @@ The v1.0 surface is intentionally apply-only. The following capabilities are
 deferred to the post-1.0 profile epic and do not exist in this release:
 
 - multiple profile composition;
-- explicit local profile directories;
 - profile dependencies and incompatibilities;
 - variables and sensitive-value handling;
 - semantic shared ownership;
@@ -176,10 +187,11 @@ deferred to the post-1.0 profile epic and do not exist in this release:
 - three-way upgrade;
 - safe removal.
 
-There is no local-package discovery, composition flag, variable input,
-profile-upgrade command, or profile-removal command hidden behind the v1.0
-interface. Edit repository configuration directly for advanced customization,
-or start from the manual guides below.
+There is no composition flag, variable input, profile-upgrade command, or
+profile-removal command hidden behind the v1.0 interface. A package's location
+is named explicitly or read from this repository's own record; no configured
+search path discovers one. Edit repository configuration directly for advanced
+customization, or start from the manual guides below.
 
 ## Advanced customization
 

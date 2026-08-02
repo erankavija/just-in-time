@@ -46,18 +46,18 @@ pub struct ProfileApplyResult {
     pub warnings: Vec<ProfileApplicationWarning>,
 }
 
-/// One embedded profile exposed by `jit profile list`.
+/// One profile exposed by `jit profile list`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileSummary {
     /// Stable package identifier.
     pub id: String,
     /// Semantic package version.
     pub version: String,
-    /// Package discovery origin.
+    /// Where the resolved package's bytes were read from.
     pub origin: ProfileOrigin,
     /// Compatible JIT version requirement authored by the manifest.
     pub jit: String,
-    /// Whether stored provenance exactly names this embedded package version and hash.
+    /// Whether the stored record exactly names the resolved package's version and hashes.
     pub applied: bool,
 }
 
@@ -66,11 +66,11 @@ pub struct ProfileSummary {
 pub struct ProfileListResult {
     /// Number of profiles in [`Self::profiles`].
     pub count: usize,
-    /// Embedded profiles sorted by stable ID.
+    /// Profiles sorted by stable ID.
     pub profiles: Vec<ProfileSummary>,
 }
 
-/// Complete embedded package inspection response.
+/// Complete package inspection response.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ProfileShowResult {
     /// Parsed immutable manifest.
@@ -81,9 +81,9 @@ pub struct ProfileShowResult {
     pub package_hash: String,
     /// Per-target package hashes.
     pub target_hashes: BTreeMap<String, String>,
-    /// Embedded file count, including `manifest.toml`.
+    /// Package file count, including `manifest.toml`.
     pub file_count: usize,
-    /// Total embedded byte size.
+    /// Total package byte size.
     pub byte_size: usize,
     /// Stored provenance record when the selected repository has one.
     #[serde(skip_serializing_if = "Option::is_none")]

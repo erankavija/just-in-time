@@ -446,10 +446,11 @@ async function main() {
       try {
         await profileTester.callToolRaw('jit_init', {});
 
+        // Enumeration follows the repository's own applied-profile records, so
+        // a repository that has applied nothing names no profile.
         const listed = await profileCall('jit_profile_list');
-        assert.strictEqual(listed.count, 1);
-        assert.strictEqual(listed.profiles[0].id, 'jit-dogfood');
-        assert.strictEqual(listed.profiles[0].applied, false);
+        assert.strictEqual(listed.count, 0);
+        assert.deepStrictEqual(listed.profiles, []);
 
         const shown = await profileCall('jit_profile_show', { id: 'jit-dogfood' });
         assert.strictEqual(shown.manifest.profile.id, 'jit-dogfood');
@@ -471,6 +472,13 @@ async function main() {
           'dry-run': true,
         });
         assert.strictEqual(unchanged.status, 'unchanged');
+
+        // The record the application wrote is what the repository now names.
+        const recorded = await profileCall('jit_profile_list');
+        assert.strictEqual(recorded.count, 1);
+        assert.strictEqual(recorded.profiles[0].id, 'jit-dogfood');
+        assert.strictEqual(recorded.profiles[0].applied, true);
+        assert.deepStrictEqual(recorded.profiles[0].origin, { source: 'embedded' });
       } finally {
         await profileTester.stop();
       }

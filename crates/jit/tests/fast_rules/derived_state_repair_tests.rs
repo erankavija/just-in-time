@@ -37,7 +37,10 @@ fn profiled_harness(omit_profile_record: bool) -> TestHarness {
         .initialize_fresh_repository(
             source.path(),
             &taxonomy.hierarchy_template(),
-            Some("jit-dogfood"),
+            Some(jit::commands::ProfileSelection {
+                id: "jit-dogfood",
+                location: None,
+            }),
         )
         .unwrap();
 
@@ -193,7 +196,10 @@ fn repair_target_path_strings() -> Vec<String> {
                 .initialize_fresh_repository(
                     source.path(),
                     &taxonomy.hierarchy_template(),
-                    Some("jit-dogfood"),
+                    Some(jit::commands::ProfileSelection {
+                        id: "jit-dogfood",
+                        location: None,
+                    }),
                 )
                 .unwrap();
 
