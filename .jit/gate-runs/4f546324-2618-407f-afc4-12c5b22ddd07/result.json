@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54c408d3a5a5ad916fcd8ef01fb07546cd1ab1a4",
+  "completed_at": "2026-08-02T20:26:05.161668785Z",
+  "duration_ms": 203291,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard profile-resolution criteria are implemented and the prior documentation-drift finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5d12a79f-c29e-43ba-b14c-1f030790c01e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4f546324-2618-407f-afc4-12c5b22ddd07",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T20:22:41.869931423Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3f0d8b82, 76b992ad, 2bd49e42, 08ac9aea, 5f8620f9, 3d9ca0a0, b191fd17, 7f3dd719, ef4c7689; uncommitted `.jit` changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-8 (issue decision), @/invariant/derived-state-coherence and @/invariant/single-source-prose (.jit/invariants.toml), @/charter/D-13 (dev/vision/9db27a3a-charter.md), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T20:11:46Z); prior code-review documentation finding was addressed by 7f3dd719\nTruncation recovery: split the 3f0d8b82 profile patch and current profile/validation reads into narrower path and line-range inspections\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard profile-resolution criteria are implemented and the prior documentation-drift finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

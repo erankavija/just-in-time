@@ -25,7 +25,7 @@
     "per:@/issue/e204e63d/decision/D-7"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Two assemblies of the package report the same hashes",
-  "updated_at": "2026-07-31T16:28:51.612395576Z"
+  "updated_at": "2026-08-02T20:35:18.247793299Z"
 }

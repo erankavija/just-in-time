@@ -35,8 +35,8 @@ pub use application::{
 };
 pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
 pub use dogfood::{
-    jit_dogfood_gate, jit_dogfood_package, jit_dogfood_planning_gate_keys, DogfoodProfileError,
-    JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
+    jit_default_package, jit_dogfood_gate, jit_dogfood_package, jit_dogfood_planning_gate_keys,
+    EmbeddedProfileError, JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
 };
 pub use manifest::{
     profile_manifest_schema, AssetDeclaration, LiveSourceDeclaration, ProfileId, ProfileManifest,

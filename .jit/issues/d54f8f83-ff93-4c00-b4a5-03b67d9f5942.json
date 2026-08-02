@@ -8,6 +8,7 @@
   ],
   "description": "A conflict between two packages' declarations names both packages, so a collision is diagnosed as a package conflict rather than as adopter drift.\n\n## Background\n\nTwo failure paths guard a composed application. A second package declaring a key the first already wrote with different content fails the contribution merge; a second package declaring an asset target the first wrote with different bytes fails the target conflict. Both are the right semantics and stay: a dependant silently overriding its dependency's declarations would give it authority no criterion grants, and validation could not then distinguish an override from drift.\n\nNeither error names the other package. The contribution error carries the identity and the registry; the target error carries the path. Before composition that was complete, because there was only ever one package and the occupant was the adopter's own content. With two, the same message tells an adopter their file conflicts with itself.\n\n## Success Criteria\n\n- [hard] REQ-01: A contribution conflict between two packages names both the package whose declaration is already in the image and the package whose declaration conflicts with it.\n- [hard] REQ-02: An asset target conflict between two packages names both packages and the target path.\n- [hard] REQ-03: A conflict between a package and content the repository authored still reports the repository as the occupant, distinguishably from a package-to-package conflict.\n- [hard] REQ-04: The conflict semantics are unchanged: identical restatements merge, differing ones fail, and no package takes precedence over another.\n\n## Notes\n\nThis is a message and error-payload change. Nothing about which applications succeed changes.\n",
   "documents": [],
+  "first_ready_at": "2026-08-02T20:32:33.927166974Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "per:@/issue/e204e63d/decision/D-14"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Name the declaring package when two packages collide",
-  "updated_at": "2026-07-31T17:28:56.596684919Z"
+  "updated_at": "2026-08-02T20:32:33.927166974Z"
 }

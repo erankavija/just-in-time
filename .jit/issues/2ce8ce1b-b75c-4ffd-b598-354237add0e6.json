@@ -25,7 +25,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Describe the supplied-location form in the command reference",
-  "updated_at": "2026-07-31T17:55:07.378515624Z"
+  "updated_at": "2026-08-02T20:26:35.788517563Z"
 }

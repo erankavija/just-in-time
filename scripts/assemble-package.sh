@@ -22,9 +22,9 @@ set -euo pipefail
 #
 # WHY THIS IS NOT A GENERATED ARTIFACT. Its siblings scripts/generate-*.sh
 # publish committed files, each guarded by a drift assertion. The tree here is
-# deliberately not committed: the destination is the caller's, untracked and
-# disposable, and each run publishes a freshly staged tree, so a source the
-# manifest stops declaring cannot survive into the next run. It shares those
+# deliberately not committed: the destination is the caller's, a run replaces it
+# whole, and each run publishes a freshly staged tree, so a source the manifest
+# stops declaring cannot survive into the next run. It shares those
 # scripts' shape — a render in the crate, a thin script over it — and differs in
 # taking a destination, because its consumer is a release job staging its own
 # directory.

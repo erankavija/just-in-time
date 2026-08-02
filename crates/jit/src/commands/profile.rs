@@ -1,9 +1,9 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
-    build_profile_claims, jit_dogfood_package, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
-    ProfilePackageError, ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus,
-    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    build_profile_claims, jit_default_package, jit_dogfood_package, ProfileApplicationStatus,
+    ProfileApplyResult, ProfileComposedApplyResult, ProfileId, ProfileListResult, ProfileOrigin,
+    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanResult,
+    ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -837,12 +837,10 @@ fn profile_application_input(
 
 /// Resolve one embedded profile package by stable id.
 fn embedded_profile(id: &str) -> Result<ProfilePackage> {
-    let package = jit_dogfood_package()?;
-    if package.manifest().profile.id.as_str() == id {
-        Ok(package)
-    } else {
-        Err(crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
-    }
+    [jit_default_package()?, jit_dogfood_package()?]
+        .into_iter()
+        .find(|package| package.manifest().profile.id.as_str() == id)
+        .ok_or_else(|| crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
 }
 
 /// Repo-relative spelling of a canonical virtual path (`.jit/...` for Data).
@@ -1210,18 +1208,64 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_profile_package_falls_back_to_the_compiled_in_package_without_a_record() {
+    fn test_resolve_profile_package_falls_back_to_each_compiled_in_package_without_a_record() {
         let (temp, _storage, executor, _embedded) = fixture();
         assert!(!temp.path().join(".jit/profiles").exists());
-        let compiled = jit_dogfood_package().unwrap();
+        for compiled in [
+            crate::profile::jit_default_package().unwrap(),
+            jit_dogfood_package().unwrap(),
+        ] {
+            let resolved = executor
+                .resolve_profile_package(compiled.manifest().profile.id.as_str(), None)
+                .unwrap();
 
-        let resolved = executor
-            .resolve_profile_package(compiled.manifest().profile.id.as_str(), None)
-            .unwrap();
+            assert_eq!(resolved.hashes(), compiled.hashes());
+            assert_eq!(
+                package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
+                ProfileOrigin::Embedded
+            );
+        }
+    }
 
-        assert_eq!(resolved.hashes(), compiled.hashes());
+    #[test]
+    fn test_resolve_profile_package_reports_an_id_absent_from_compiled_packages() {
+        let (_temp, _storage, executor, _embedded) = fixture();
+
+        let error = executor
+            .resolve_profile_package("not-compiled-in", None)
+            .unwrap_err();
+
+        assert!(
+            error
+                .downcast_ref::<crate::errors::NotFoundError>()
+                .is_some(),
+            "an unknown compiled package remains a profile-not-found error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_resolves_a_compiled_in_default_dependency_for_a_workflow() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let config_path = temp.path().join(".jit/config.toml");
+        let scaffolded = fs::read_to_string(&config_path).unwrap();
+        let mut bare = scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
+        bare.as_table_mut()
+            .retain(|key, _| matches!(key, "version" | "project"));
+        fs::write(&config_path, bare.to_string()).unwrap();
+
+        let workflow = package_declaring(&temp, "vendor/workflow", "workflow", &["jit-default"]);
+        let applied = executor.apply_profile_package(&workflow).unwrap();
+
         assert_eq!(
-            package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
+            applied
+                .profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["jit-default", "workflow"]
+        );
+        assert_eq!(
+            record_for(&temp, "jit-default").origin,
             ProfileOrigin::Embedded
         );
     }
@@ -1492,7 +1536,7 @@ mod tests {
     }
 
     /// The directory holding this repository's checked-in generic vocabulary
-    /// package. Nothing embeds it, so every reader reaches it as bytes on disk.
+    /// package, used by tests that exercise the directory route.
     fn jit_default_directory() -> std::path::PathBuf {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-default")
     }

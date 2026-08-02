@@ -544,8 +544,9 @@ jit init [--hierarchy-template <name>] [--profile <profile-id>] [--from <PATH>]
 `--profile <profile-id>` applies a repository profile as part of
 initialization. `jit init --profile jit-dogfood` is the preferred setup for
 JIT's portable workflow; plain init remains methodology-neutral. `--from <PATH>`
-names the repository directory holding that profile's package, which a
-repository being created has no record of yet; it requires `--profile`. For a
+names the repository directory holding that profile's package and requires
+`--profile`; [Repository Profiles](profiles.md#commands) states when it is
+needed. For a
 fresh repository, the neutral scaffold and profile projection are planned,
 validated, and published together. If the data root is absent, JIT stages the complete root
 beside its destination and publishes it with an atomic no-replace rename; an
@@ -616,13 +617,10 @@ Profile inspection works without an initialized repository. Application targets
 the current JIT repository and runs mandatory transaction recovery before
 planning or writing.
 
-`show` and `apply` read their package through one resolution order. `--from
-<PATH>` names a repository directory holding the package and outranks everything
-else; with no `--from`, the location this repository's applied-profile record
-names answers; where neither does, the package this binary carries answers. So
-an adopter who has just obtained a package names its directory once, and every
-later run reads it back from the record. A supplied directory must hold a
-package declaring the requested profile ID.
+`show` and `apply` take `--from <PATH>`: a repository directory holding the
+package to read, which must hold a package declaring the requested profile ID.
+Which package a command reads when `--from` is absent is stated in
+[Repository Profiles](profiles.md#commands).
 
 A package the resolved one declares a dependency on is looked for beside it,
 in a directory named by that dependency's own ID, before the record and the
@@ -632,22 +630,18 @@ binary answer. One obtained directory of packages therefore applies as a set:
 
 ### `jit profile list`
 
-List the profiles this repository's own applied-profile records name:
+List the profiles this repository records:
 
 ```bash
 jit profile list [--json]
 ```
 
-Each record's package is read from the location that record names, so the answer
-describes this repository. A repository that has applied nothing names no
-profile. Human output shows each profile's ID, version, compatible JIT range,
-origin, and whether the stored record still matches the package at its location.
-That check compares records, not installed target bytes. JSON uses the standard
-list envelope `{"count": N, "profiles": [...]}`. Each profile entry carries
-`id`, `version`, `origin`, `jit`, and `applied`.
-
-A recorded location that no longer holds a readable package fails the command,
-naming the record and the location.
+Human output shows each profile's ID, version, compatible JIT range, origin, and
+whether the stored record still matches the package at its location. That check
+compares records, not installed target bytes. JSON uses the standard list
+envelope `{"count": N, "profiles": [...]}`. Each profile entry carries `id`,
+`version`, `origin`, `jit`, and `applied`. What the command reports, and when it
+fails, is stated in [Repository Profiles](profiles.md#commands).
 
 The resolved package is authoritative for the live values; scripts should inspect
 the returned fields rather than copy package identity or compatibility values

@@ -15,7 +15,7 @@
 //! and for the dev-dependency-active builds those two need, so an adopter build
 //! carries none of it.
 
-use crate::profile::{jit_dogfood_package, DogfoodProfileError};
+use crate::profile::{jit_dogfood_package, EmbeddedProfileError};
 use crate::repository_state::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
@@ -46,7 +46,7 @@ pub const TEMPLATE_REGION_GENERATOR: &str = "./scripts/generate-template-region.
 pub enum TemplateRegionError {
     /// The embedded package failed to load.
     #[error(transparent)]
-    Package(#[from] DogfoodProfileError),
+    Package(#[from] EmbeddedProfileError),
     /// A packaged template contribution does not parse as a graph template.
     #[error("a packaged template contribution is not a graph template: {0}")]
     Contribution(#[from] serde_json::Error),

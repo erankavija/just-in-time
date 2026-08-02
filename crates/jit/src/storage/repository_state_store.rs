@@ -87,6 +87,10 @@ pub(crate) fn is_advisory_permission_denied(error: &RepositoryStateStoreError) -
 /// second session; that reentry is legitimate only for the same selected roots.
 /// A different worktree or data root while a session is live is a programming
 /// error the session boundary rejects rather than silently serving stale roots.
+/// Publishing a selected data root that was absent keeps those roots and
+/// renews their evidence, so the publishing session
+/// [rebinds](Self::rebind_published_root) what is tracked to the layout it
+/// published.
 #[derive(Default)]
 pub(crate) struct ActiveLayoutTracker(Mutex<Option<(RepositoryLayout, usize)>>);
 
@@ -111,6 +115,30 @@ impl ActiveLayoutTracker {
             None => {
                 *slot = Some((layout.clone(), 1));
                 Ok(())
+            }
+        }
+    }
+
+    /// Track `published` as the layout for the roots it publishes.
+    ///
+    /// An absent data root is bound to its parent plus the name it will take,
+    /// and the published root is bound to itself, so publication renews the
+    /// evidence for roots nothing selected differently. Every holder of the
+    /// pre-publication layout — a retained startup session outermost — would
+    /// otherwise refuse the next session over the repository this one just
+    /// created. Only the roots' evidence is renewed: a `published` naming other
+    /// roots is not this transition and leaves what is tracked alone, so the
+    /// guard still rejects a genuinely different selection.
+    fn rebind_published_root(&self, published: &RepositoryLayout) {
+        let mut slot = self
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some((active, _)) = slot.as_mut() {
+            if active.worktree_root() == published.worktree_root()
+                && active.data_root() == published.data_root()
+            {
+                *active = published.clone();
             }
         }
     }
@@ -501,6 +529,16 @@ impl RepositoryMutationSession for JsonMutationSession {
         if published_absent_data_root {
             let refreshed =
                 discover_repository_layout(self.layout.worktree_root(), self.layout.data_root())?;
+            // The published root is the layout for these roots from here on, for
+            // every holder of the one this session opened with: the storage every
+            // later session reads its layout from, and the reentry guard a
+            // retained startup session left the pre-publication layout in. A
+            // session opened after this one — the second package of a profile
+            // closure applied to the repository initialization just created — is
+            // otherwise refused for roots nothing changed.
+            self.storage
+                .active_mutation_layout()
+                .rebind_published_root(&refreshed);
             self.storage.configure_repository_layout(&refreshed);
         }
         self.captured = None;
