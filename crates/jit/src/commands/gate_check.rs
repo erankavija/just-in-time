@@ -1592,7 +1592,6 @@ mod tests {
     use crate::domain::{
         GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
     };
-    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage};
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
@@ -1905,29 +1904,38 @@ enforce_leases = "off"
         assert!(result.findings.is_some());
     }
 
-    const LATE_REPOSITORY_RULE: &str = r#"
+    fn late_repository_rule(taxonomy: &crate::test_taxonomy::TestTaxonomy) -> String {
+        format!(
+            r#"
 [[rules]]
 name = "planned-task-needs-summary"
-when = { type = "task" }
+when = {{ type = "{}" }}
 severity = "error"
 enforce = false
-assert = { require-section = { heading = "Summary" } }
-"#;
+assert = {{ require-section = {{ heading = "Summary" }} }}
+"#,
+            taxonomy.type_at_level(4)
+        )
+    }
 
     fn setup_file_repository() -> (tempfile::TempDir, CommandExecutor<JsonFileStorage>, String) {
         let repo = tempfile::tempdir().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(
             storage.root().join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
+            format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
         executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         executor
             .define_gate(
@@ -1959,7 +1967,7 @@ assert = { require-section = { heading = "Summary" } }
                 "Test".to_string(),
                 crate::domain::Priority::Normal,
                 Vec::new(),
-                vec!["type:task".to_string()],
+                vec![format!("type:{}", taxonomy.type_at_level(4))],
                 None,
                 None,
                 false,
@@ -2167,6 +2175,7 @@ assert = { require-section = { heading = "Summary" } }
     #[test]
     fn test_repository_validation_checker_uses_injected_overlay_result_path() {
         let (_repo, executor, issue_id) = setup_file_repository();
+        let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
         let live_image = executor
             .capture_validation_image_with(&std::collections::BTreeMap::new())
             .unwrap();
@@ -2194,7 +2203,7 @@ assert = { require-section = { heading = "Summary" } }
             [
                 (
                     PathBuf::from(".jit/rules.toml"),
-                    Some(LATE_REPOSITORY_RULE.as_bytes().to_vec()),
+                    Some(late_rule.as_bytes().to_vec()),
                 ),
                 (
                     PathBuf::from(format!(".jit/issues/{issue_id}.json")),
@@ -2237,12 +2246,13 @@ assert = { require-section = { heading = "Summary" } }
     #[test]
     fn test_check_gate_file_repository_ignores_legacy_cached_rules() {
         let (repo, executor, issue_id) = setup_file_repository();
+        let late_rule = late_repository_rule(&crate::test_taxonomy::test_taxonomy());
         let cached = executor.run_rules(None).unwrap();
         assert!(!cached
             .findings
             .iter()
             .any(|finding| finding.rule == "planned-task-needs-summary"));
-        std::fs::write(repo.path().join(".jit/rules.toml"), LATE_REPOSITORY_RULE).unwrap();
+        std::fs::write(repo.path().join(".jit/rules.toml"), late_rule).unwrap();
 
         let result = executor
             .check_gate(&issue_id, "not-a-reserved-repository-key")
@@ -4218,17 +4228,21 @@ assert = { require-section = { heading = "Summary" } }
         std::env::set_var("JIT_TEST_MODE", "1");
         let jit_root = repo_root.join(".jit");
         let storage = crate::storage::JsonFileStorage::new(&jit_root);
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         std::fs::create_dir_all(&jit_root).unwrap();
         std::fs::write(
             jit_root.join("config.toml"),
-            "[worktree]\nenforce_leases = \"off\"\n",
+            format!(
+                "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                taxonomy.config_fragment()
+            ),
         )
         .unwrap();
 
         let layout = crate::storage::discover_repository_layout(repo_root, &jit_root).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
         executor
-            .initialize_fresh_repository(repo_root, &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo_root, &taxonomy.hierarchy_template(), None)
             .unwrap();
         executor
             .define_gate(

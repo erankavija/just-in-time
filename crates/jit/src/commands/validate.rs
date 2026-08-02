@@ -2671,7 +2671,6 @@ fn validate_claims_index_with_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::JsonFileStorage;
     use chrono::Duration;
 
@@ -2679,35 +2678,6 @@ mod tests {
         "assert = { json-schema = \"schemas/default-label-format.json\" }";
     const STALE_LABEL_ASSERTION: &str =
         "assert = { require-label = { label = \"authored:*\", min = 99 } }";
-
-    const PROFILE_ITEM_KINDS_CONFIG: &str = r#"
-[item_kinds.invariant]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
-source-of-truth = "registry-first"
-
-[item_kinds.rule]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
-source-of-truth = "registry-first"
-
-[item_kinds.gate]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
-source-of-truth = "registry-first"
-"#;
 
     fn drift_default_assertion(rules: &str) -> (String, String) {
         let stale = format!(
@@ -2730,6 +2700,48 @@ source-of-truth = "registry-first"
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::test_taxonomy::test_taxonomy;
 
+        const PROFILE_TABLES: &str = r#"
+[item_kinds.invariant]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+aliases = ["inv"]
+
+[item_kinds.rule]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
+source-of-truth = "registry-first"
+
+[item_kinds.gate]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
+source-of-truth = "registry-first"
+
+[projection.invariants]
+kind = "invariant"
+mode = "region"
+target = "AGENTS.md"
+style = "id-anchor"
+
+[projection.rules-and-gates]
+kind = ["rule", "gate"]
+mode = "separate-file"
+target = ".jit/reference/rules-and-gates.md"
+style = "full"
+"#;
+
         fn seed_tree(
             storage: &crate::storage::InMemoryStorage,
             root: &std::path::Path,
@@ -2751,15 +2763,14 @@ source-of-truth = "registry-first"
 
         let taxonomy = test_taxonomy();
         let source = tempfile::tempdir().unwrap();
-        let jit_root = source.path().join(".jit");
-        std::fs::create_dir_all(&jit_root).unwrap();
-        let config = format!(
-            "{}{}",
-            taxonomy.config_fragment(),
-            PROFILE_ITEM_KINDS_CONFIG
-        );
-        std::fs::write(jit_root.join("config.toml"), config).unwrap();
-        let source_storage = JsonFileStorage::new(&jit_root);
+        let source_storage = JsonFileStorage::new(source.path().join(".jit"));
+        std::fs::create_dir_all(source_storage.root()).unwrap();
+        let config = if profile.is_some() {
+            format!("{}\n{PROFILE_TABLES}", taxonomy.config_fragment())
+        } else {
+            taxonomy.config_fragment()
+        };
+        std::fs::write(source_storage.root().join("config.toml"), config).unwrap();
         let source_layout =
             crate::storage::discover_repository_layout(source.path(), source_storage.root())
                 .unwrap();
@@ -2858,26 +2869,14 @@ depends_on = ["planning"]
 
     #[test]
     fn test_validate_fix_repairs_stale_derived_projection_through_the_session() {
-        let repo = tempfile::tempdir().unwrap();
+        let (repo, storage, taxonomy) = crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         let jit_dir = repo.path().join(".jit");
-        std::fs::create_dir(&jit_dir).unwrap();
-        std::fs::write(
-            jit_dir.join("config.toml"),
-            "[type_hierarchy.types]\ntask = 4\n\
-             [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
-        )
-        .unwrap();
-        let config = "[type_hierarchy.types]\ntask = 4\n\
-            [namespaces.type]\ndescription = \"Issue type\"\nunique = true\n\
-            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = []\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
-            [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n";
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        CommandExecutor::new(storage.clone())
-            .with_layout(layout)
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
-            .unwrap();
+        let config = format!(
+            "{}\n\
+            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = []\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = {{ toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }}\n\
+            [projection.invariants]\nkind = \"invariant\"\nmode = \"region\"\ntarget = \"AGENTS.md\"\nstyle = \"id-anchor\"\n",
+            taxonomy.config_fragment()
+        );
         std::fs::write(jit_dir.join("config.toml"), config).unwrap();
         std::fs::write(
             repo.path().join(".jit/invariants.toml"),
@@ -2919,7 +2918,7 @@ depends_on = ["planning"]
             .with_layout(layout)
             .initialize_fresh_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some("jit-dogfood"),
             )
             .unwrap();
@@ -3008,7 +3007,7 @@ depends_on = ["planning"]
             .with_layout(layout)
             .initialize_fresh_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some("jit-dogfood"),
             )
             .unwrap();
@@ -3254,7 +3253,7 @@ depends_on = ["planning"]
         executor
             .initialize_fresh_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some("jit-dogfood"),
             )
             .unwrap();
