@@ -456,17 +456,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     /// use jit::commands::CommandExecutor;
     /// use jit::domain::Priority;
-    /// use jit::hierarchy_templates::HierarchyTemplate;
-    /// use jit::storage::{discover_repository_layout, JsonFileStorage};
-    /// use tempfile::TempDir;
+    /// use jit::storage::discover_repository_layout;
+    /// use jit::test_utils::setup_test_repo_with_taxonomy;
     ///
     /// // Resolution reads the hierarchy the repository's `config.toml` declares.
-    /// let repo = TempDir::new().unwrap();
-    /// let storage = JsonFileStorage::new(repo.path().join(".jit"));
+    /// let (repo, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
     /// let layout = discover_repository_layout(repo.path(), repo.path().join(".jit")).unwrap();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
-    /// executor.initialize_fresh_repository(
-    ///     repo.path(), &HierarchyTemplate::default(), None).unwrap();
     /// let new = |title: &str, labels: Vec<String>| {
     ///     executor
     ///         .create_issue(title.into(), String::new(), Priority::Normal,
@@ -475,8 +471,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///         .0
     /// };
     ///
-    /// let epic = new("Epic", vec!["type:epic".into()]);
-    /// let task = new("Task", vec!["type:task".into()]);
+    /// let epic = new("Epic", vec![format!("type:{}", taxonomy.type_at_level(2))]);
+    /// let task = new("Task", vec![format!("type:{}", taxonomy.type_at_level(4))]);
     /// executor.add_dependency(&epic, &task).unwrap();
     ///
     /// let response = executor.resolve_hierarchy_tree(None).unwrap();
@@ -549,29 +545,32 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ```
     /// use jit::commands::CommandExecutor;
     /// use jit::domain::Priority;
-    /// use jit::hierarchy_templates::HierarchyTemplate;
-    /// use jit::storage::{discover_repository_layout, JsonFileStorage};
-    /// use tempfile::TempDir;
+    /// use jit::storage::discover_repository_layout;
+    /// use jit::test_utils::setup_test_repo_with_taxonomy;
     ///
-    /// let repo = TempDir::new().unwrap();
-    /// let storage = JsonFileStorage::new(repo.path().join(".jit"));
+    /// let (repo, storage, taxonomy) = setup_test_repo_with_taxonomy().unwrap();
     /// let layout = discover_repository_layout(repo.path(), repo.path().join(".jit")).unwrap();
     /// let executor = CommandExecutor::new(storage).with_layout(layout);
-    /// executor.initialize_fresh_repository(
-    ///     repo.path(), &HierarchyTemplate::default(), None).unwrap();
     /// // An epic that contains nothing, plus a task that claims to belong to it.
+    /// let container_type = taxonomy.type_at_level(2);
+    /// let leaf_type = taxonomy.type_at_level(4);
+    /// let membership_namespace = taxonomy
+    ///     .label_associations
+    ///     .get(container_type)
+    ///     .expect("the test taxonomy declares container membership");
+    /// let membership = format!("{membership_namespace}:auth");
     /// executor
     ///     .create_issue("Auth".into(), String::new(), Priority::Normal, vec![],
-    ///         vec!["type:epic".into(), "epic:auth".into()], None, None, false)
+    ///         vec![format!("type:{container_type}"), membership.clone()], None, None, false)
     ///     .unwrap();
     /// executor
     ///     .create_issue("Stray".into(), String::new(), Priority::Normal, vec![],
-    ///         vec!["type:task".into(), "epic:auth".into()], None, None, false)
+    ///         vec![format!("type:{leaf_type}"), membership.clone()], None, None, false)
     ///     .unwrap();
     ///
     /// let report = executor.detect_divergences().unwrap();
     /// assert_eq!(report.count, 1);
-    /// assert_eq!(report.divergences[0].label, "epic:auth");
+    /// assert_eq!(report.divergences[0].label, membership);
     /// ```
     pub fn detect_divergences(&self) -> Result<crate::output::DivergenceResponse> {
         use crate::output::{DivergenceResponse, DivergenceView};

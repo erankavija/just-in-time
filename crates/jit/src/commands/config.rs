@@ -390,7 +390,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchy_templates::HierarchyTemplate;
 
     #[test]
     fn test_resolve_dotted_key_scalar_leaf() {
@@ -591,6 +590,8 @@ schema = 1
         let dir = tempfile::TempDir::new().unwrap();
         // A repo `config set` publishes through the recovered session and validates
         // the proposed repository, so it needs an initialized, layout-backed repo.
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        std::fs::write(dir.path().join("config.toml"), taxonomy.config_fragment()).unwrap();
         let storage = crate::storage::JsonFileStorage::new(dir.path());
         let layout =
             crate::storage::discover_repository_layout(dir.path().parent().unwrap(), dir.path())
@@ -599,7 +600,7 @@ schema = 1
         executor
             .initialize_fresh_repository(
                 dir.path().parent().unwrap(),
-                &HierarchyTemplate::default(),
+                &taxonomy.hierarchy_template(),
                 None,
             )
             .unwrap();
