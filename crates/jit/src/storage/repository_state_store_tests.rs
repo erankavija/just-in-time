@@ -1065,6 +1065,36 @@ fn test_control_path_symlink_is_never_followed() {
 }
 
 #[test]
+fn test_publishing_an_absent_data_root_admits_the_next_session_under_a_retained_one() {
+    let temp = TempDir::new().unwrap();
+    let data = temp.path().join(".jit");
+    let storage = JsonFileStorage::new(&data);
+    // The layout a repository is created through: the selected data root does
+    // not exist yet, so its evidence is the parent it will be published under.
+    let absent = discover_repository_layout(temp.path(), &data).unwrap();
+    let retained = storage
+        .open_and_retain_mutation_session(absent.clone())
+        .unwrap();
+
+    let mut session = storage.open_mutation_session(absent.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    session
+        .apply(&test_plan(&image, &initialization_delta(&absent)))
+        .unwrap();
+    drop(session);
+
+    // The published root is what the repository is at from here on, and the
+    // roots the retained session selected are the ones it was selecting all
+    // along, so the next session over that repository opens through it.
+    let published = discover_repository_layout(temp.path(), &data).unwrap();
+    assert_ne!(published.data_identity(), absent.data_identity());
+    let next = storage.open_mutation_session(absent).unwrap();
+    assert_eq!(next.layout().data_identity(), published.data_identity());
+    drop(next);
+    drop(retained);
+}
+
+#[test]
 fn test_shared_retained_lock_chain_reenters_same_layout() {
     let temp = TempDir::new().unwrap();
     let data = temp.path().join(".jit");

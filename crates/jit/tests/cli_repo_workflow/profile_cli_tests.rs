@@ -77,6 +77,19 @@ fn set_package_version(repo: &Path, location: &str, version: &str) -> PathBuf {
     manifest
 }
 
+/// Rewrite the package tree at `location` to declare a dependency on `id`.
+///
+/// No package this repository ships declares a dependency, so a composition
+/// scenario is authored over the fixture rather than borrowed from one.
+fn declare_dependency(repo: &Path, location: &str, id: &str) {
+    let manifest = repo.join(location).join("manifest.toml");
+    let declared = fs::read_to_string(&manifest).unwrap().replace(
+        "[profile]",
+        &format!("dependencies = [\"{id}\"]\n\n[profile]"),
+    );
+    fs::write(&manifest, declared).unwrap();
+}
+
 fn json(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -395,6 +408,80 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
     );
     assert!(reapplied.status.success(), "{reapplied:?}");
     assert_eq!(requested_profile(&json(&reapplied))["status"], "unchanged");
+}
+
+#[test]
+fn test_init_profile_resolves_a_declared_dependency_from_the_binary() {
+    let repo = TempDir::new().unwrap();
+    let location = package_at(repo.path(), "vendor/planner");
+    declare_dependency(repo.path(), location, "jit-default");
+
+    // The dependency is named and nothing says where it is: no location is
+    // supplied for it, and a repository being created has recorded nothing, so
+    // the package this binary carries is the only route left to it.
+    let init = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            FIXTURE_PROFILE,
+            "--from",
+            location,
+            "--json",
+        ],
+    );
+
+    assert!(
+        init.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&init.stdout),
+        String::from_utf8_lossy(&init.stderr)
+    );
+    let applied = &json(&init)["profile"];
+    assert_eq!(applied_ids(applied), vec!["jit-default", FIXTURE_PROFILE]);
+    assert_eq!(requested_profile(applied)["status"], "applied");
+
+    // Both packages reached the created repository: each has its provenance
+    // record, the dependency's names the binary it came from, and the named
+    // package published its asset.
+    assert_eq!(
+        serde_json::from_slice::<Value>(
+            &fs::read(repo.path().join(".jit/profiles/jit-default.json")).unwrap()
+        )
+        .unwrap()["origin"],
+        serde_json::json!({ "source": "embedded" })
+    );
+    assert_eq!(
+        stored_record(repo.path())["origin"],
+        serde_json::json!({ "source": "directory", "location": location })
+    );
+    assert!(repo.path().join("docs/profile.txt").is_file());
+
+    // Validation compares every record against the repository state it
+    // describes, so a clean report is both applications having landed whole.
+    let validate = jit(repo.path(), &["validate", "--json"]);
+    assert!(validate.status.success(), "{validate:?}");
+    assert_eq!(json(&validate)["valid"], true);
+    let listed = jit(repo.path(), &["profile", "list", "--json"]);
+    assert!(listed.status.success(), "{listed:?}");
+    let listed = json(&listed);
+    let carried: Vec<(&str, &Value)> = listed["profiles"]
+        .as_array()
+        .expect("the repository names the profiles it carries")
+        .iter()
+        .map(|profile| {
+            (
+                profile["id"].as_str().expect("a named profile"),
+                &profile["applied"],
+            )
+        })
+        .collect();
+    assert!(
+        ["jit-default", FIXTURE_PROFILE]
+            .iter()
+            .all(|id| carried.contains(&(*id, &Value::Bool(true)))),
+        "the repository carries both packages as applied: {listed}"
+    );
 }
 
 #[test]
