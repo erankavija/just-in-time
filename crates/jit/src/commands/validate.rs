@@ -2819,48 +2819,6 @@ mod tests {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::test_taxonomy::test_taxonomy;
 
-        const PROFILE_TABLES: &str = r#"
-[item_kinds.invariant]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
-source-of-truth = "registry-first"
-aliases = ["inv"]
-
-[item_kinds.rule]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
-source-of-truth = "registry-first"
-
-[item_kinds.gate]
-section = "success_criteria"
-id-pattern = "[a-z][a-z0-9-]*"
-markers = []
-link-namespaces = ["enforces"]
-scope = "project"
-source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
-source-of-truth = "registry-first"
-
-[projection.invariants]
-kind = "invariant"
-mode = "region"
-target = "AGENTS.md"
-style = "id-anchor"
-
-[projection.rules-and-gates]
-kind = ["rule", "gate"]
-mode = "separate-file"
-target = ".jit/reference/rules-and-gates.md"
-style = "full"
-"#;
-
         fn seed_tree(
             storage: &crate::storage::InMemoryStorage,
             root: &std::path::Path,
@@ -2884,8 +2842,17 @@ style = "full"
         let source = tempfile::tempdir().unwrap();
         let source_storage = JsonFileStorage::new(source.path().join(".jit"));
         std::fs::create_dir_all(source_storage.root()).unwrap();
+        // A profiled repository takes its vocabulary, item kinds and
+        // projections from the packages applied to it, and authors only the
+        // schema version an initialization derives from the repository itself.
+        // Authoring another value for an identity a package declares is the
+        // conflict an application refuses, and authoring a projection ahead of
+        // the package that installs its target fails on the absent region, so
+        // a fixture doing either would stand for a repository that cannot
+        // exist. Nothing supplies a vocabulary without a profile, so the test
+        // taxonomy is authored in that case.
         let config = if profile.is_some() {
-            format!("{}\n{PROFILE_TABLES}", taxonomy.config_fragment())
+            "[version]\nschema = 2\n".to_string()
         } else {
             taxonomy.config_fragment()
         };
