@@ -282,7 +282,8 @@
      "worker": "opus",
      "status": "dispatched",
      "lead_review": "pass pending report",
-     "note": "All seven criteria verified. parse_manifest is the crate's only production manifest parse (the two other toml::from_str sites in package.rs are inside #[cfg(test)] mod tests at :920), so REQ-02 holds. The REQ-05 comparison carries two explicit anti-vacuity guards: produced.len() > 1, and an assertion that some produced file IS executable so the mode half observes something. Destination defaults under target/, covered by .gitignore, with no build reading it. Followed the 65ff0f38 entry-point shape."
+     "note": "All seven criteria verified. parse_manifest is the crate's only production manifest parse (the two other toml::from_str sites in package.rs are inside #[cfg(test)] mod tests at :920), so REQ-02 holds. The REQ-05 comparison carries two explicit anti-vacuity guards: produced.len() > 1, and an assertion that some produced file IS executable so the mode half observes something. Destination defaults under target/, covered by .gitignore, with no build reading it. Followed the 65ff0f38 entry-point shape.",
+     "gate_outcome": "Rework r1 merged at e975abc4, re-gating. code-review round 1 raised two real findings: check-then-rename publication (TOCTOU overwriting an occupied destination, against @/invariant/atomic-writes) and false prose in dev/index.md claiming nothing compiles the package in while include_dir! still embeds it. Worker fixed both, adding publish_staged_directory_noreplace beside the existing publish_external_directory_noreplace rather than a private variant. Lead verified the shipped entry point end to end: 64 files, diff -r against the checked-in tree is identical, executable sets match, second run over an occupied destination succeeds."
     },
     {
      "short_id": "5d12a79f",
@@ -290,14 +291,16 @@
      "status": "dispatched (unclaimed; dep 6c47b99a open by ruling)",
      "lead_review": "fail, rework r1 dispatched",
      "rework": 1,
-     "note": "All five criteria met in code and tests; precedence tests are non-vacuous by construction. FAILED Tier 2.5: crates/jit/src/output.rs:944 and its doc comment at :702 still describe PROFILE_NOT_FOUND as 'The requested embedded profile does not exist', and that string renders into the generated docs/reference/error-codes.md:33."
+     "note": "All five criteria met in code and tests; precedence tests are non-vacuous by construction. FAILED Tier 2.5: crates/jit/src/output.rs:944 and its doc comment at :702 still describe PROFILE_NOT_FOUND as 'The requested embedded profile does not exist', and that string renders into the generated docs/reference/error-codes.md:33.",
+     "gate_outcome": "cargo-ci passed; code-review failed on the jit validate gap its own worker disclosed. Held open behind 8371bd46 per the resequencing pattern; NOT reworked, because its five criteria are met and validation is 8371bd46's literal subject."
     },
     {
      "short_id": "fd61b44f",
      "worker": "opus",
      "status": "dispatched",
      "lead_review": "pass pending REQ-03 evidence",
-     "note": "Design answer accepted and confined to the test harness, no product-surface change. The stalled socket is opened first so a probe connection queues behind it; the probe answering proves axum-server's sequential accept loop moved past the stalled socket, which it cannot do without registering it. Worker also added a meta-test that SIGSTOPs the server so the kernel completes the handshake while the accept loop provably cannot have run: a fixture reporting registration from the write alone fails there. Lead verified probe_health, wait_for_connection_count at crates/server/src/shutdown.rs:323, budget nesting (1s window inside 10s EXCHANGE_BUDGET), all four REQ-04 properties and REQ-05 non-weakening."
+     "note": "Design answer accepted and confined to the test harness, no product-surface change. The stalled socket is opened first so a probe connection queues behind it; the probe answering proves axum-server's sequential accept loop moved past the stalled socket, which it cannot do without registering it. Worker also added a meta-test that SIGSTOPs the server so the kernel completes the handshake while the accept loop provably cannot have run: a fixture reporting registration from the write alone fails there. Lead verified probe_health, wait_for_connection_count at crates/server/src/shutdown.rs:323, budget nesting (1s window inside 10s EXCHANGE_BUDGET), all four REQ-04 properties and REQ-05 non-weakening.",
+     "gate_outcome": "DONE. cargo-ci passed (498s execution), code-review failed round 1 on a pipeline-ordering artifact (only one cargo-ci execution recorded, so REQ-03's consecutive-run evidence was invisible to the reviewer), passed round 2 after a forced second execution. Lead also ran two consecutive whole-workspace runs on merged main: 4298 passed, 0 failed, twice."
     },
     {
      "short_id": "0db28190",
@@ -305,19 +308,22 @@
      "status": "dispatched",
      "lead_review": "pass after 2 reworks",
      "rework": 2,
-     "note": "r1 extended the existing eight-noun enumeration in place, stranding 'carried by the running binary' behind a fourteen-word qualifier: FAIL on prose coherence. r2 restored the original sentence and added a separate one, but its purpose clause was circular, failing REQ-02's literal demand to state what the declaration is FOR. r3 states the completeness consequence: a file under a declared root that no asset claims and no exclusion matches is caught rather than silently omitted."
+     "note": "r1 extended the existing eight-noun enumeration in place, stranding 'carried by the running binary' behind a fourteen-word qualifier: FAIL on prose coherence. r2 restored the original sentence and added a separate one, but its purpose clause was circular, failing REQ-02's literal demand to state what the declaration is FOR. r3 states the completeness consequence: a file under a declared root that no asset claims and no exclusion matches is caught rather than silently omitted.",
+     "gate_outcome": "DONE. docs-mechanical and doc-review passed; code-review failed round 1 because it ran BEFORE docs-mechanical and read REQ-04 as unevidenced, then passed round 2 unchanged. Pipeline defect, not a work defect."
     },
     {
      "short_id": "4873b32f",
      "worker": "codex-luna",
      "status": "dispatched",
      "lead_review": "pass",
-     "note": "Asserts the reported live-source declaration is present, that every entry names a root, and cross-checks reported roots against reported live-asset targets in BOTH directions, so no literal root value appears. Lead ran the full mcp-server suite outside the codex sandbox: 12/12 including the profile test. REQ-03 evidenced."
+     "note": "Asserts the reported live-source declaration is present, that every entry names a root, and cross-checks reported roots against reported live-asset targets in BOTH directions, so no literal root value appears. Lead ran the full mcp-server suite outside the codex sandbox: 12/12 including the profile test. REQ-03 evidenced.",
+     "gate_outcome": "DONE. mcp-ci and code-review passed first time. The only issue in the wave to pass every gate on the first attempt."
     },
     {
      "short_id": "e4ba28c5",
      "worker": "codex-luna",
-     "status": "dispatched"
+     "status": "dispatched",
+     "gate_outcome": "FAIL, rework prepared and held until 7835fdc0 lands. Its own two new tests were in the failure list it reported as out of scope, and its REQ-03 test compares nothing (three table-existence checks where the criterion demands equality against hand-application)."
     }
    ]
   }
@@ -511,6 +517,16 @@
    "at": "2026-08-02",
    "session": 7,
    "text": "The session-1 trap repeated in a new place: 5d12a79f swept every adopter markdown page its change invalidated (cli-commands.md, profiles.md, events.md, curated-tools.json) and still left the defect, because the stale text was a Rust string literal in crates/jit/src/output.rs that RENDERS INTO a generated reference page. A markdown-only sweep cannot find it and the generated page must not be hand-edited. When a change moves an error's meaning, grep the description tables in output.rs, not docs/."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "code-review reads an issue's RECORDED GATE EVIDENCE, not only its diff, so gate order inside the pipeline changes the verdict. Running it first cost two review rounds: 0db28190's REQ-04 ('the mechanical documentation checks pass') was failed while docs-mechanical sat queued behind the reviewer and passed twelve seconds later, and fd61b44f's REQ-03 was failed for having one cargo-ci execution on record. merge-and-gate.sh now sorts code-review last. Corollary: evidence the lead gathers in its own terminal does not exist as far as the reviewer is concerned \u2014 32779829's verdict reuse means a second `jit gate evaluate` will NOT produce a second execution record unless --force is passed."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "A worker can hand-roll around a shared primitive it never found. 7d038e97 wrote check-then-rename publication when crates/jit/src/storage/external_publish.rs already exposed publish_external_directory_noreplace over renameat2/RENAME_NOREPLACE. The brief named the invariant but not the primitive; naming the invariant is not enough, because the worker satisfied its own reading of it. Name the function."
   }
  ],
  "rework_counts": {
@@ -529,7 +545,8 @@
   "76b16af0": 2,
   "60c211d6": 1,
   "0db28190": 2,
-  "5d12a79f": 1
+  "5d12a79f": 1,
+  "7d038e97": 1
  },
  "started_at": "2026-07-31",
  "owner_rulings": [
