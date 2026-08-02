@@ -325,7 +325,8 @@
      "status": "dispatched",
      "gate_outcome": "FAIL, rework prepared and held until 7835fdc0 lands. Its own two new tests were in the failure list it reported as out of scope, and its REQ-03 test compares nothing (three table-existence checks where the criterion demands equality against hand-application)."
     }
-   ]
+   ],
+   "closed": "all six dispatched issues closed, plus d35cc3f2 filed and closed mid-wave"
   }
  ],
  "created_during_execution": [
@@ -988,7 +989,7 @@
   {
    "at": "2026-08-02",
    "session": 7,
-   "note": "Eight issues closed (42 -> 49 of 78; d35cc3f2 filed mid-session). Wave 2's last two, d35cc3f2 and e4ba28c5, were merged and verified by the lead with gates still running at session end \u2014 see handoff-6.md. The resequencing pattern (land the issue that makes a reviewer's claim true, then re-review) was used five times and worked every time: 39c34568 and 6c47b99a in earlier sessions, then 5d12a79f, 7835fdc0 and d35cc3f2 here."
+   "note": "Ten issues closed (42 -> 51 of 78; d35cc3f2 filed mid-session). Wave 2 is closed. The resequencing pattern \u2014 land the issue that makes a reviewer's claim true, then re-review \u2014 was used five times and worked every time: 39c34568 and 6c47b99a in earlier sessions, then 5d12a79f, 7835fdc0 and d35cc3f2 here. d35cc3f2 and e4ba28c5 are mutually entangled: d35cc3f2's reviewer wanted the dependency declaration that e4ba28c5 provides, while e4ba28c5 needed d35cc3f2's embed to work at all. Merging both and re-reviewing d35cc3f2 afterwards resolved it."
   }
  ],
  "handoff": "handoff-6.md",

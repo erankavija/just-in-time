@@ -9,18 +9,11 @@ here records its resolution.
 ## Current state
 
 - Epic `e204e63d` — state: backlog. **78 issues** carry the epic label (one filed this session).
-  **49 done** (42 at session start), 22 backlog, 4 ready, 3 in_progress.
-- **Closed this session (8):** `fd61b44f`, `0db28190`, `4873b32f`, `6c47b99a`, `5d12a79f`,
-  `8371bd46`, `7835fdc0`, `7d038e97`.
-- **Gating when the session ended** — both merged to `main`, both verified by the lead, gates still
-  running in `scratchpad/logs/gate-final.log`:
-  - `d35cc3f2` — `cargo-ci` passed earlier; `code-review` failed once on the resequencing pattern
-    and is being re-run now that `e4ba28c5` has landed the declaration it needed.
-  - `e4ba28c5` — `cargo-ci` and `code-review` running for the first time on the round-2 rework.
-  **Read `jit gate status-all d35cc3f2 e4ba28c5` first.** If both pass, close `e4ba28c5` then
-  `d35cc3f2` (DAG order: `d35cc3f2` is `e4ba28c5`'s predecessor, so close the predecessor first —
-  check `jit issue status` rather than assuming).
-- `6f8f02ba` holds no work of its own; it closes behind `daddfc0b`.
+  **51 done** (42 at session start), 21 backlog, 5 ready, 1 in_progress. `jit validate` clean.
+- **Wave 2 is closed.** Ten issues closed this session: `fd61b44f`, `0db28190`, `4873b32f`,
+  `6c47b99a`, `5d12a79f`, `8371bd46`, `7835fdc0`, `7d038e97`, `d35cc3f2`, `e4ba28c5`.
+- `6f8f02ba` is the only issue still `in_progress`; it holds no work of its own and closes behind
+  `daddfc0b`.
 - Progress file: `progress.json`, same directory.
 
 ## What this session did
@@ -42,10 +35,11 @@ here records its resolution.
 
 ## What to do next
 
-- [ ] Read the two gate verdicts. Close what passed; rework what did not.
-- [ ] **Then reclaim worktrees again** — this session created seven more and closed eight issues.
-- [ ] Wave 3 is unblocked and mostly independent: `d94f6849`, `ebbb254f`, `2ce8ce1b`, `d54f8f83`
-      are `ready`; `26f503cc`, `959274b6`, `9de22aa7`, `590ff4db` unblock as their predecessors close.
+- [ ] **Reclaim worktrees first.** This session created seven and closed ten issues; each worktree
+      carries a full build tree. Last time this freed 68 GB.
+- [ ] Wave 3 is unblocked and mostly independent. `ready` now: `d94f6849`, `ebbb254f`, `2ce8ce1b`,
+      `d54f8f83`, `959274b6`. `26f503cc`, `9de22aa7` and `590ff4db` unblock as their predecessors
+      close. Nothing is waiting on a decision.
 - [ ] Still unfiled after three sessions, both worth filing as dogfooding friction: `jit issue create`
       has no `--description-file` (unlike `jit issue update`, which does), and `jit gate` cannot
       evaluate one gate across several issues in one command.
