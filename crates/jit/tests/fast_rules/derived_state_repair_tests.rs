@@ -360,6 +360,11 @@ impl DirectoryPackageRepo {
             jit::profile::ProfilePackage::from_directory(&directory).expect("a valid package tree");
     }
 
+    /// The applied-profile record path for `id`, as an absolute path.
+    fn record_path(&self, id: &str) -> std::path::PathBuf {
+        self.root.path().join(format!(".jit/profiles/{id}.json"))
+    }
+
     /// Store the record the package now at the recorded location would write,
     /// so record and location agree on a package this repository never applied.
     fn record_the_current_package(&self) {
@@ -374,9 +379,7 @@ impl DirectoryPackageRepo {
             self.package.hashes().targets.clone(),
         );
         std::fs::write(
-            self.root
-                .path()
-                .join(format!(".jit/profiles/{}.json", self.id())),
+            self.record_path(self.id()),
             record
                 .to_bytes()
                 .expect("encode the applied-profile record"),
@@ -568,6 +571,48 @@ fn test_validate_fails_when_the_recorded_location_no_longer_resolves() {
     assert!(
         changed_paths(&before, &repo.snapshot()).is_empty(),
         "a repair that cannot obtain a recorded package writes nothing: {:?}",
+        changed_paths(&before, &repo.snapshot())
+    );
+}
+
+/// A record whose body declares a profile its own name does not is refused
+/// before anything resolves.
+///
+/// A record states its profile twice — in the name application publishes it
+/// under, and in the id inside it — and a repository that trusted whichever it
+/// read first would repair one profile's targets while filing the provenance
+/// for them under another profile's name. This is REQ-05's principle applied to
+/// a record disagreeing with itself rather than with its package.
+#[test]
+fn test_validate_fails_when_a_record_declares_a_profile_its_name_does_not() {
+    const IMPOSTOR: &str = "impostor";
+
+    let mut repo = DirectoryPackageRepo::applied();
+    let declared = repo.id().to_string();
+    std::fs::rename(repo.record_path(&declared), repo.record_path(IMPOSTOR)).unwrap();
+    // A profile-owned target repair would restore were the record trusted, so
+    // refusing to restore it is what the snapshot observes; the REQ-01 case
+    // proves this same drift is repairable from a record that agrees.
+    std::fs::remove_file(repo.target()).unwrap();
+    let before = repo.snapshot();
+
+    let diagnosis = format!("{:#}", repo.executor.validate_silent().unwrap_err());
+    let repair = repo.executor.validate_with_fix(true, false);
+
+    for named in [
+        format!(".jit/profiles/{IMPOSTOR}.json"),
+        IMPOSTOR.to_string(),
+        declared,
+    ] {
+        assert!(
+            diagnosis.contains(&named),
+            "a record disagreeing with its own name must name {named}: {diagnosis}"
+        );
+    }
+    assert!(format!("{:#}", repair.unwrap_err()).contains(IMPOSTOR));
+    assert!(
+        changed_paths(&before, &repo.snapshot()).is_empty(),
+        "a record that does not state which profile it records repairs nothing: {:?}",
         changed_paths(&before, &repo.snapshot())
     );
 }

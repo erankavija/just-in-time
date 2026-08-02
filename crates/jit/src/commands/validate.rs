@@ -722,6 +722,10 @@ fn resolve_recorded_packages(
 /// One recorded profile's resolution attempt, over the record `records` holds
 /// at that profile's canonical record path.
 ///
+/// The record must be filed under its own profile before it names anything to
+/// resolve ([`record_filed_under_its_own_id`]), so a package is never obtained
+/// for a profile other than the one whose record named it.
+///
 /// `Ok(None)` reports a listed record the capture no longer holds.
 fn attempted_recorded_package(
     records: &crate::repository_state::RepositoryImage,
@@ -731,10 +735,36 @@ fn attempted_recorded_package(
     let Some(record) = captured_applied_record(records, &record_path)? else {
         return Ok(None);
     };
-    let package = record.and_then(|record| {
-        super::profile::recorded_package(&record, &record_path, records.layout())
-    });
+    let package = record
+        .and_then(|record| record_filed_under_its_own_id(record, &record_path))
+        .and_then(|record| {
+            super::profile::recorded_package(&record, &record_path, records.layout())
+        });
     Ok(Some((id.to_string(), record_path, package)))
+}
+
+/// `record` when it is stored at the path its own profile id names.
+///
+/// A record states its profile twice: application publishes it under a path
+/// built from that profile's id, and stores the id inside it. Resolving either
+/// of two disagreeing answers would act on one profile while addressing the
+/// provenance for it under another's name, so disagreement is the record
+/// failing to state which profile it records rather than a choice between them.
+fn record_filed_under_its_own_id(
+    record: crate::repository_state::AppliedProfileRecord,
+    record_path: &crate::repository_state::VirtualPath,
+) -> Result<crate::repository_state::AppliedProfileRecord> {
+    let declared = super::profile::applied_record_path(&record.id)?;
+    if &declared == record_path {
+        Ok(record)
+    } else {
+        Err(anyhow!(
+            "applied profile provenance stored at '{}' declares profile '{}', whose record is '{}'",
+            super::profile::repo_string(record_path),
+            record.id,
+            super::profile::repo_string(&declared)
+        ))
+    }
 }
 
 /// The applied-profile record `image` holds at `record_path`.
@@ -829,6 +859,11 @@ fn declaring_records(
 
 /// Repair claims for every recorded profile whose captured record proves it.
 ///
+/// The record admitted here is the one the plan is derived over, so it is held
+/// to the same two conditions resolution held its own read to: it is filed
+/// under its own profile ([`record_filed_under_its_own_id`]), and it is the
+/// record its package would write today.
+///
 /// `Ok(None)` reports a listed record the capture no longer sees, which the
 /// caller retries rather than repairing without it.
 #[allow(clippy::type_complexity)]
@@ -854,14 +889,15 @@ fn captured_profile_repair_claims(
         let Some(record) = captured_applied_record(image, record_path)? else {
             return Ok(None);
         };
-        let actual = match record {
-            Ok(actual) => actual,
-            Err(error) => {
-                return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                    error,
-                ))))
-            }
-        };
+        let actual =
+            match record.and_then(|record| record_filed_under_its_own_id(record, record_path)) {
+                Ok(actual) => actual,
+                Err(error) => {
+                    return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                        error,
+                    ))))
+                }
+            };
         if actual != super::profile::expected_record(package, image.layout())? {
             return Ok(Some(Err(RepositoryValidationFailure::materialization(
                 anyhow!(
