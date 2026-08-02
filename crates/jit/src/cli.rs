@@ -1536,9 +1536,12 @@ pub enum GateCommands {
     /// and lookup errors (codes 2 and 3) carry no `verdict` field.
     ///
     /// When an automated gate already passed at the current HEAD commit, its
-    /// checker is skipped and JSON reports `already_passed: true`. Every manual
-    /// evaluation records a fresh attestation. Use --force to re-run an automated
-    /// checker unconditionally.
+    /// checker is skipped and JSON reports `already_passed: true`. A gate that
+    /// declares the repository files its checker reads takes a prior run's
+    /// verdict over the same content instead of executing again, and its run
+    /// record names the run that verdict came from. Every manual evaluation
+    /// records a fresh attestation. Use --force to execute an automated checker
+    /// unconditionally.
     #[command(visible_alias = "eval")]
     Evaluate {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1557,7 +1560,8 @@ pub enum GateCommands {
         #[arg(short, long)]
         by: Option<String>,
 
-        /// Re-run the checker even if the gate already passed at the current HEAD
+        /// Execute the checker even where the gate already passed at the
+        /// current HEAD, or declares inputs a prior run's verdict covers
         #[arg(long)]
         force: bool,
 
@@ -1581,9 +1585,10 @@ pub enum GateCommands {
     /// list (auto gates before it still run and record their verdict; later
     /// gates are not attempted) — it never silently passes a manual gate.
     ///
-    /// Automated gates inherit skip-if-passed-at-HEAD; every manual gate records
-    /// a fresh attestation. Use --force to re-run every automated checker. An
-    /// issue with no required gates succeeds (exit 0) with an empty result set.
+    /// Automated gates inherit skip-if-passed-at-HEAD and declared-input
+    /// verdict reuse; every manual gate records a fresh attestation. Use --force
+    /// to execute every automated checker. An issue with no required gates
+    /// succeeds (exit 0) with an empty result set.
     EvaluateAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
         id: String,
@@ -1593,7 +1598,8 @@ pub enum GateCommands {
         #[arg(short, long)]
         by: Option<String>,
 
-        /// Re-run checkers even if gates already passed at the current HEAD
+        /// Execute every checker, even where a gate already passed at the
+        /// current HEAD or declares inputs a prior run's verdict covers
         #[arg(long)]
         force: bool,
 

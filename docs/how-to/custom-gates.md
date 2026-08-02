@@ -122,6 +122,92 @@ jit gate evaluate $ISSUE fmt
 jit gate evaluate $ISSUE code-review --by human:alice
 ```
 
+## Declare the Files a Checker Reads
+
+A gate may declare the repository files its checker reads, as roots with glob
+exclusion patterns, in a `[gates.inputs]` table beside `[gates.checker]` in
+`.jit/gates.toml`:
+
+```toml
+[[gates]]
+key         = "tests"
+title       = "All Tests Pass"
+description = "Run the test suite"
+stage       = "postcheck"
+mode        = "auto"
+
+[gates.checker]
+type            = "exec"
+command         = "cargo test --workspace"
+timeout_seconds = 300
+
+[gates.inputs]
+roots   = ["Cargo.toml", "Cargo.lock", "crates"]
+exclude = ["crates/*/fixtures/**"]
+```
+
+A root is a repository-relative path: a file, or a directory standing for
+everything beneath it. An exclusion pattern removes paths a root would
+otherwise claim — `*` stays inside one path segment, `**` spans segments, and
+the match is against the whole repository-relative path. Both are validated
+when the registry is parsed, so an absolute root or an uncompilable pattern is
+a registry error rather than a surprise at evaluation time. `roots` must name
+at least one path.
+
+### What Declaring Inputs Does
+
+Evaluating a gate that declares inputs first digests the content of every file
+beneath a declared root that no exclusion matches. The digest covers files the
+repository does not track — an uncommitted source file changes what a compiler
+reads, so it changes the digest — while files the repository's ignore rules
+exclude stay out, keeping build artefacts from entering it. It is a digest of
+content, not of modification times: a checkout that rewrites timestamps without
+changing bytes produces the same value.
+
+When a prior run of that same gate already recorded the same digest, the
+evaluation takes that run's verdict — pass or fail — and records it without
+executing the checker. This is what lets a batch of issues sitting on one
+unchanged tree pay for a whole-tree checker once instead of once per issue.
+
+A reused verdict stays distinguishable from an independently derived one. Its
+run record names the run it was taken from, and `jit gate status <issue> <gate>
+--json` reports the distinction:
+
+```json
+{
+  "run_id": "e4c1…",
+  "key": "tests",
+  "status": "passed",
+  "inputs_digest": "9a3f…",
+  "origin": { "derivation": "reused", "source_run": "7b2b…" }
+}
+```
+
+A run that executed its own checker reports `{"derivation": "executed"}`. The
+report text and findings behind a reused verdict live at the named source run.
+Reuse is not an exemption: the verdict was produced by a real checker execution
+over an input set the digest proves identical.
+
+### When Not to Declare Inputs
+
+**A gate that declares no inputs executes its checker on every evaluation.**
+That is the right declaration — the absence of one — whenever the verdict is
+not a function of repository content alone:
+
+- a checker scoped to one issue (a review of that issue's own commits) returns
+  a different verdict per issue over one identical tree;
+- a checker that consults the clock, the network, or machine state (a
+  vulnerability audit against a remote advisory database) is not a function of
+  the repository at all;
+- a checker that reads files the repository rewrites on every evaluation.
+
+Declare roots that cover everything the checker reads. A checker that reads a
+file no declared root covers can reuse a verdict that the file's change would
+have overturned.
+
+`jit gate evaluate <issue> <gate> --force` executes the checker regardless of
+any reusable verdict.
+
 ## Environment Variables
 
 Every gate checker receives these environment variables:

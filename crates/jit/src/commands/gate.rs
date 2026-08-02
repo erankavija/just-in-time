@@ -793,8 +793,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// For an automated gate this runs the checker; for a manual gate it records
     /// the attestation. Automated gates whose latest run passed at the current
-    /// `HEAD` are skipped unless `force` is set. Manual attestations are always
-    /// recorded as fresh evidence.
+    /// `HEAD` are skipped, and a gate declaring inputs a prior run's verdict
+    /// already covers reuses that verdict
+    /// ([`check_gate`](Self::check_gate)); `force` refuses both and executes.
+    /// Manual attestations are always recorded as fresh evidence.
     ///
     /// Returns a [`GatePassOutcome`] carrying any warnings (e.g. lease warnings)
     /// and whether the checker was skipped.

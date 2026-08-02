@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **A gate verdict is reused when its declared inputs are unchanged.** A quality
+  gate runs once per issue, so several issues sitting on one repository state
+  each paid for a whole-tree checker to re-derive an identical verdict; nothing
+  in a run record supported avoiding it, because a gate pipeline dirties the
+  tree by running and consecutive runs over one unchanged source state
+  therefore disagreed about whether the tree was clean. A gate declaration now
+  carries the repository files its checker reads, as a `[gates.inputs]` table of
+  roots with glob exclusions — the same root-and-exclusion shape a profile
+  manifest states its live sources in, and the same one the binary's own
+  build-input inventory is now expressed as. Evaluating a gate that declares
+  inputs digests their content first, covering files the repository does not
+  track (an uncommitted source file changes what a compiler reads) while
+  leaving ignored build artefacts out, and taking content rather than
+  modification times. When a prior run of that gate recorded the same digest,
+  the evaluation carries that run's verdict — passed or failed — instead of
+  executing the checker. The reuse stays visible: the record names the run it
+  was taken from, and `jit gate status --json` reports `inputs_digest` and an
+  `origin` distinguishing `executed` from `reused`, so a container whose issues
+  all report a passed gate is not read as that many independent verifications.
+  Declaring inputs is what opts a gate in: a gate that declares none executes
+  its checker on every evaluation, which is the right answer for a checker
+  scoped to one issue or one that consults the clock, the network, or machine
+  state, and `jit gate evaluate --force` re-executes a gate that would otherwise
+  reuse.
 - **A profile package declares the repository roots its live assets are drawn
   from.** Some of a package's assets are drawn from repository files the same
   repository also consumes at their working paths, and which directories those
