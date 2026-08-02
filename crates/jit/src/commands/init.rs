@@ -540,7 +540,11 @@ mod tests {
         let executor = executor_with_layout(&storage, repo.path());
 
         let result = executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                None,
+            )
             .unwrap();
 
         assert!(result.profile.is_none());
@@ -568,7 +572,11 @@ mod tests {
         let executor = executor_with_layout(&storage, repo.path());
 
         let result = executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                None,
+            )
             .unwrap();
 
         // Present and empty, like the gate registry beside it: the file exists,
@@ -600,7 +608,11 @@ mod tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
         executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                None,
+            )
             .unwrap();
 
         // The adopter authors into the registry initialization gave them; nothing
@@ -636,7 +648,7 @@ mod tests {
         let result = executor
             .initialize_fresh_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some("jit-dogfood"),
             )
             .unwrap();
@@ -679,7 +691,7 @@ mod tests {
         executor
             .initialize_fresh_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some("jit-dogfood"),
             )
             .unwrap();
@@ -704,7 +716,7 @@ mod tests {
         let again = reinit
             .initialize_profiled_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 "jit-dogfood",
             )
             .unwrap();
@@ -729,7 +741,11 @@ mod tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
         executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                None,
+            )
             .unwrap();
 
         let config_path = repo.path().join(".jit/config.toml");
@@ -794,15 +810,17 @@ unique = true\n";
 
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
 
         let config_path = repo.path().join(".jit/config.toml");
         let rules_path = repo.path().join(".jit/rules.toml");
+        let leaf_type = taxonomy.type_at_level(4);
         let config = fs::read_to_string(&config_path).unwrap().replacen(
-            "task = 4 }",
-            "task = 4, planning = 3 }",
+            &format!("{leaf_type} = 4 }}"),
+            &format!("{leaf_type} = 4, planning = 3 }}"),
             1,
         ) + SQUAD_NAMESPACE;
         fs::write(&config_path, &config).unwrap();
@@ -820,7 +838,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         fs::write(&rules_path, authored_rules).unwrap();
 
         executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
 
         let refreshed = fs::read_to_string(&rules_path).unwrap();
@@ -836,7 +854,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
 
         fs::write(&config_path, config.replace(SQUAD_NAMESPACE, "")).unwrap();
         executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
             .unwrap();
         let refreshed = fs::read_to_string(&rules_path).unwrap();
         assert!(!refreshed.contains("name = \"namespace-unique-squad\""));
@@ -857,7 +875,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                     barrier.wait();
                     executor.initialize_fresh_repository(
                         repo.path(),
-                        &HierarchyTemplate::default(),
+                        &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                         Some("jit-dogfood"),
                     )
                 })
