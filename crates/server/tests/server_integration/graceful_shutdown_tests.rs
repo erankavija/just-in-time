@@ -11,6 +11,7 @@ use std::net::TcpStream;
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 use jit::commands::CommandExecutor;
@@ -41,6 +42,12 @@ const DEADLINE_SLACK: Duration = Duration::from_millis(500);
 
 /// Blocking-read slice, short enough that a poll loop stays responsive.
 const READ_POLL: Duration = Duration::from_millis(50);
+
+/// How long the registration observation is watched for a premature result
+/// while the server is stopped. Any result inside the window is a defect, so the
+/// window sets the test's sensitivity and never its correctness, and it stays
+/// well inside the observation's own [`EXCHANGE_BUDGET`].
+const STOPPED_OBSERVATION_WINDOW: Duration = Duration::from_secs(1);
 
 // ── Repository fixture ──────────────────────────────────────────────────────
 
@@ -371,33 +378,58 @@ fn open_completed_connection(port: u16) -> TcpStream {
     stream
 }
 
-/// Opens a connection whose request never completes: the request line and a
-/// header are sent, the terminating blank line never is. The server stays mid
-/// message, so nothing but the drain deadline can retire this connection.
-fn open_stalled_connection(port: u16) -> TcpStream {
-    let mut stream = connect(port);
+/// Opens a connection whose request never completes, and returns only once the
+/// server has accepted and registered it.
+///
+/// The request line and a header are sent, the terminating blank line never is,
+/// so the server stays mid message and nothing but the drain deadline can retire
+/// the connection. That construction is also why the socket can never answer:
+/// the registration has to be established off it.
+///
+/// It is established on the listener's queue instead, and the probe connection
+/// is what establishes it:
+///
+/// 1. This socket's handshake completes before the probe connects, so the probe
+///    is queued behind it, and `accept` takes the first pending connection off
+///    that queue.
+/// 2. The probe's exchange only produces a response once the accept loop has
+///    spawned a serving task for the probe's socket.
+/// 3. axum-server's accept loop is one sequential loop that registers each
+///    accepted connection with its handle — the increment
+///    `Handle::connection_count` reports, and the count the drain deadline
+///    samples — before it accepts the next one.
+///
+/// So the probe answering is not merely evidence that the accept loop ran: it is
+/// evidence that the loop moved past this socket, which it cannot do without
+/// registering it. `shutdown::tests::wait_for_connection_count` states the same
+/// precondition in process, where the count is reachable directly.
+fn open_registered_stalled_connection(port: u16) -> TcpStream {
+    let mut stalled = connect(port);
     send(
-        &mut stream,
+        &mut stalled,
         "GET /api/health HTTP/1.1\r\nHost: localhost\r\n",
     );
-    stream
+    probe_health(port);
+    stalled
 }
 
 // ── Signalling ──────────────────────────────────────────────────────────────
 
-/// Sends `SIGTERM` to the server process.
+/// Sends `signal` to the server process.
 ///
 /// `@/inv/pid-safety`: a PID that does not convert to a positive `i32` is
 /// rejected before the syscall, so a lossy conversion can never turn this
 /// targeted signal into `kill(-1, …)` against every process the user owns.
-fn send_sigterm(pid: u32) {
+fn send_signal(pid: u32, signal: Signal) {
     let target =
         i32::try_from(pid).unwrap_or_else(|_| panic!("PID {pid} is out of range for kill(2)"));
     assert!(
         target > 0,
         "refusing to signal PID {pid}: the value would target a process group"
     );
-    kill(Pid::from_raw(target), Signal::SIGTERM).expect("send SIGTERM to the server");
+    kill(Pid::from_raw(target), signal).unwrap_or_else(|error| {
+        panic!("send {signal} to the server: {error}");
+    });
 }
 
 /// Asserts the server keeps its work in process: no child whose lifetime a
@@ -422,25 +454,27 @@ fn assert_no_child_processes(pid: u32) {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[test]
-#[ignore = "the stalled-connection fixture races the accept loop; re-enable with jit:fd61b44f"]
 fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     let repository = TempDir::new().expect("create the fixture repository directory");
     initialize_repository(repository.path());
     let mut server = start_server(repository.path(), "127.0.0.1:0", "server.log");
 
-    // Two live event streams, plus a completing and a non-completing ordinary
-    // connection: the four the shutdown logs must account for.
+    // The four connections the shutdown logs must account for: one that cannot
+    // finish, two live event streams, and one that completes. The one that
+    // cannot finish is opened first because establishing its registration spends
+    // a probe connection, and the three opened after it separate that probe's
+    // retirement from the count the signal samples.
+    let mut stalled = open_registered_stalled_connection(server.port);
     let mut first_stream = open_event_stream(server.port);
     let mut second_stream = open_event_stream(server.port);
     record_repository_change(repository.path());
     read_until(&mut first_stream, "event: change", EXCHANGE_BUDGET);
     read_until(&mut second_stream, "event: change", EXCHANGE_BUDGET);
     let mut completed = open_completed_connection(server.port);
-    let mut stalled = open_stalled_connection(server.port);
     assert_no_child_processes(server.pid());
 
     let signalled_at = Instant::now();
-    send_sigterm(server.pid());
+    send_signal(server.pid(), Signal::SIGTERM);
 
     // Cancellation reaches the event streams, so they end instead of waiting
     // out their keepalive interval.
@@ -506,6 +540,55 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     );
 }
 
+/// The drain assertions above are only about a live connection if the fixture
+/// hands them one, so the observation that establishes it is itself asserted
+/// here: a stopped process runs no accept loop, and a socket it has not accepted
+/// is not a connection the drain owes anything to.
+///
+/// `SIGSTOP` makes that state reachable on demand. The kernel still completes
+/// the handshake for a stopped listener, so the connection exists and its bytes
+/// are delivered while the accept loop provably cannot have taken it. A fixture
+/// that reports registration from the write alone reports it here too, and this
+/// test fails. Resuming the process is what lets the observation complete.
+#[test]
+fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
+    let repository = TempDir::new().expect("create the fixture repository directory");
+    initialize_repository(repository.path());
+    let mut server = start_server(repository.path(), "127.0.0.1:0", "stopped.log");
+
+    send_signal(server.pid(), Signal::SIGSTOP);
+    let port = server.port;
+    let (registered, observed) = mpsc::channel();
+    let opener = std::thread::spawn(move || {
+        let stalled = open_registered_stalled_connection(port);
+        registered.send(()).expect("report the registration");
+        stalled
+    });
+
+    let while_stopped = observed.recv_timeout(STOPPED_OBSERVATION_WINDOW);
+    // Resume before asserting, so a failing assertion leaves neither a stopped
+    // process nor a fixture thread waiting out its budget against one.
+    send_signal(server.pid(), Signal::SIGCONT);
+    assert!(
+        matches!(while_stopped, Err(RecvTimeoutError::Timeout)),
+        "the fixture reported the stalled connection registered while the server \
+         was stopped and could not have accepted it: {while_stopped:?}"
+    );
+
+    let stalled = opener
+        .join()
+        .expect("the registration observation completes once the server resumes");
+
+    // Closing the survivor leaves the shutdown a voluntary drain, so this test
+    // stops at the exit it asserts instead of spending the drain deadline that
+    // the force-close test owns.
+    drop(stalled);
+    let signalled_at = Instant::now();
+    send_signal(server.pid(), Signal::SIGTERM);
+    let (exit_code, _) = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+}
+
 #[test]
 fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
     let repository = TempDir::new().expect("create the fixture repository directory");
@@ -514,7 +597,7 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
     let port = first.port;
 
     let signalled_at = Instant::now();
-    send_sigterm(first.pid());
+    send_signal(first.pid(), Signal::SIGTERM);
     let (exit_code, exited_after) = first.wait_for_exit(signalled_at, EXIT_BUDGET);
     assert_eq!(exit_code, 0, "server log:\n{}", first.log());
     assert!(
@@ -531,7 +614,7 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
     assert_eq!(second.port, port);
 
     let restart_signalled_at = Instant::now();
-    send_sigterm(second.pid());
+    send_signal(second.pid(), Signal::SIGTERM);
     let (restart_exit_code, _) = second.wait_for_exit(restart_signalled_at, EXIT_BUDGET);
     assert_eq!(restart_exit_code, 0, "server log:\n{}", second.log());
 }
