@@ -32,6 +32,8 @@ set -euo pipefail
 #   assemble-package.sh <destination>
 # for example, into a disposable directory this repository already ignores:
 #   assemble-package.sh target/package/jit-dogfood
+# An occupied destination is replaced whole, so name a directory the run may
+# take over.
 #
 # Exit codes:
 #   0 — the tree is assembled at the destination

@@ -750,6 +750,27 @@ target = "docs/guide.md"
         );
     }
 
+    /// The entry point this module names is a runnable script in the checkout,
+    /// so the command its documentation states is one a contributor can run.
+    #[test]
+    fn test_assemble_package_tree_names_a_runnable_entry_point() {
+        let entry_point = PACKAGE_ASSEMBLY_ENTRY_POINT
+            .strip_prefix("./")
+            .expect("the entry point is repository-relative");
+        let metadata = fs::metadata(repository_root().join(entry_point))
+            .unwrap_or_else(|error| panic!("{entry_point} is not in the checkout: {error}"));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert!(
+                metadata.permissions().mode() & 0o111 != 0,
+                "{entry_point} is not executable"
+            );
+        }
+        #[cfg(not(unix))]
+        assert!(metadata.is_file(), "{entry_point} is not a file");
+    }
+
     /// The destination is the caller's: untracked, disposable, and read by no
     /// build. The entry point's documented destination is a path this
     /// repository ignores, and no build script names the assembly or the

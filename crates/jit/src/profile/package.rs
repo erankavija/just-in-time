@@ -594,6 +594,7 @@ fn validate_manifest_declarations(manifest: &ProfileManifest) -> Result<(), Prof
             ));
         }
     }
+    // Collecting the sources is what rejects one declared twice.
     declared_sources(manifest)?;
     validate_content_targets(manifest)?;
     validate_live_source_roots(manifest)
