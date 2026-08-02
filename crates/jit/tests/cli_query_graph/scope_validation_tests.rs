@@ -1076,38 +1076,49 @@ mod cli {
     }
 
     /// Coverage rule keyed on the breakdown node; error-severity, enforcing.
-    const RULES: &str = r#"
+    fn coverage_rules(breakdown_type: &str) -> String {
+        format!(
+            r#"
 [[rules]]
 name = "breakdown-coverage-preview"
-when = { type = "breakdown" }
+when = {{ type = "{breakdown_type}" }}
 severity = "error"
 enforce = true
-assert = { label-coverage = { } }
-"#;
+assert = {{ label-coverage = {{ }} }}
+"#
+        )
+    }
 
-    /// init + write rules.toml + build a `C -> impl -> B` spine where B carries
-    /// the criterion. Returns (TempDir, container-id). The impl child carries
+    /// Build a `C -> impl -> B` spine where B carries the criterion from the
+    /// shared taxonomy fixture. Returns (repository, container-id). The impl child carries
     /// `satisfies:REQ-01` only when `covered`.
-    fn setup_spine(covered: bool) -> (TempDir, String) {
-        let dir = TempDir::new().unwrap();
-        assert!(run(&dir, &["init"]).status.success());
-        fs::write(dir.path().join(".jit/rules.toml"), RULES).unwrap();
+    fn setup_spine(covered: bool) -> (crate::TaxonomyRepo, String) {
+        let dir = crate::setup_test_repo_with_taxonomy();
+        let breakdown_type = dir.taxonomy.type_at_level(3);
+        fs::write(
+            dir.path().join(".jit/rules.toml"),
+            coverage_rules(breakdown_type),
+        )
+        .unwrap();
 
+        let breakdown_label = crate::type_label(&dir.taxonomy, 3);
         let b = create(
             &dir,
             "breakdown",
             "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
-            &["type:breakdown"],
+            &[breakdown_label.as_str()],
         );
+        let implementation_label = crate::type_label(&dir.taxonomy, 4);
         let impl_labels: &[&str] = if covered {
-            &["type:task", "satisfies:REQ-01"]
+            &[implementation_label.as_str(), "satisfies:REQ-01"]
         } else {
-            &["type:task"]
+            &[implementation_label.as_str()]
         };
         let impl_id = create(&dir, "impl", "", impl_labels);
         assert!(run(&dir, &["dep", "add", &impl_id, &b]).status.success());
 
-        let c = create(&dir, "container", "", &["type:epic"]);
+        let container_label = crate::type_label(&dir.taxonomy, 2);
+        let c = create(&dir, "container", "", &[container_label.as_str()]);
         assert!(run(&dir, &["dep", "add", &c, &impl_id]).status.success());
 
         (dir, c)
