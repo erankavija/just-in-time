@@ -554,9 +554,9 @@ mod tests {
     /// by none of the live-asset targets in `packaged`, and is matched by none
     /// of that root's exclusion patterns.
     ///
-    /// Each root is a repository-relative directory and its patterns match the
-    /// remainder beneath it, so a root and one glob together name a repository
-    /// directory of unpackaged material however many files it holds.
+    /// The root decides membership and the patterns decide coverage, both over
+    /// the same repository-relative path: one glob names a repository directory
+    /// of unpackaged material however many files it holds.
     ///
     /// `packaged` holds live-asset targets alone. An install-only asset is
     /// authored by the package rather than drawn from the repository, so a
@@ -573,10 +573,7 @@ mod tests {
             .filter(|path| !packaged.contains(path))
             .filter(|path| {
                 roots.iter().any(|declaration| {
-                    declaration
-                        .root
-                        .relative_path(path)
-                        .is_some_and(|root_relative| !declaration.excludes(root_relative))
+                    declaration.root.relative_path(path).is_some() && !declaration.excludes(path)
                 })
             })
             .collect()
@@ -593,10 +590,7 @@ mod tests {
             .map(String::as_str)
             .filter(|path| {
                 roots.iter().any(|declaration| {
-                    declaration
-                        .root
-                        .relative_path(path)
-                        .is_some_and(|root_relative| declaration.excludes(root_relative))
+                    declaration.root.relative_path(path).is_some() && declaration.excludes(path)
                 })
             })
             .collect()
@@ -712,6 +706,47 @@ mod tests {
             Vec::<&str>::new(),
             "each entry names a packaged live asset that a declared exclusion \
              also matches"
+        );
+    }
+
+    /// Every declared pattern is authored beneath the root that declares it.
+    ///
+    /// Patterns and roots are both repository-relative, which is what lets a
+    /// pattern read as the repository location it names — and what allows one
+    /// to be written outside its own root, where the walk consults it for no
+    /// path and it silently covers nothing. A pattern's text has to open with
+    /// its root for the exclusion to bound the root it is declared under.
+    #[test]
+    fn test_excluded_files_under_declared_roots_matches_only_patterns_authored_beneath_their_root()
+    {
+        let package = jit_dogfood_package().unwrap();
+        let roots = &package.manifest().live_sources;
+
+        let stray: Vec<(&str, &str)> = roots
+            .iter()
+            .flat_map(|declaration| {
+                declaration
+                    .exclude
+                    .iter()
+                    .map(|pattern| (declaration.root.as_str(), pattern.as_str()))
+            })
+            .filter(|(root, pattern)| !pattern.starts_with(&format!("{root}/")))
+            .collect();
+        assert_eq!(
+            stray,
+            Vec::<(&str, &str)>::new(),
+            "each entry pairs a declared root with a pattern authored outside \
+             it, which the walk consults for no path"
+        );
+
+        // The patterns are repository-relative, so each one matches the very
+        // paths the walk hands it: a root-relative spelling of the same
+        // category would match nothing.
+        let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let tracked = tracked_repository_paths(&worktree);
+        assert!(
+            !excluded_files_under_declared_roots(roots, &tracked).is_empty(),
+            "no declared pattern matches any repository path"
         );
     }
 

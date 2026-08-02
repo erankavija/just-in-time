@@ -1043,7 +1043,7 @@ mod tests {
         let package = package_with_manifest_suffix(
             "[[live-source]]\n\
              root = \"docs\"\n\
-             exclude = [\"**/drafts/**\"]\n\
+             exclude = [\"docs/**/drafts/**\"]\n\
              \n\
              [[live-source]]\n\
              root = \"bin\"\n\
@@ -1059,7 +1059,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["docs", "bin"]
         );
-        assert!(declared[0].excludes("guide/drafts/next.md"));
+        assert!(declared[0].excludes("docs/guide/drafts/next.md"));
         assert!(declared[1].exclude.is_empty());
 
         let schema = serde_json::to_value(profile_manifest_schema()).unwrap();
@@ -1070,7 +1070,10 @@ mod tests {
             .expect("manifest with live-source roots must satisfy generated schema");
         assert!(schema_has_property(&schema, "live-source"));
         assert_eq!(instance["live-source"][0]["root"], "docs");
-        assert_eq!(instance["live-source"][0]["exclude"][0], "**/drafts/**");
+        assert_eq!(
+            instance["live-source"][0]["exclude"][0],
+            "docs/**/drafts/**"
+        );
     }
 
     #[test]
