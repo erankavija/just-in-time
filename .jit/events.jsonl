@@ -12569,3 +12569,7 @@
 {"id":"e79ec5c1-bfd0-4558-a9af-8f75a999ebb3","issue_id":"7d038e97-87e8-4d02-9101-6ffef1e8bdc0","timestamp":"2026-08-02T20:35:06.987780398Z","type":"issue_completed"}
 {"from":"backlog","id":"3de905e5-9069-42bc-989d-ff257aeab83e","issue_id":"d94f6849-355c-47ed-9a35-ca72eb865337","timestamp":"2026-08-02T20:35:12.662408130Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"c68be18d-2793-48da-8881-3ec99a570fea","issue_id":"ebbb254f-6bfe-4886-bbe4-b21c5268a56c","timestamp":"2026-08-02T20:35:18.247793299Z","to":"ready","type":"issue_state_changed"}
+{"id":"0f56619c-10af-49b7-940c-4696fe71f1b2","issue_id":"d35cc3f2-7549-4a10-a61a-f49333b5e67c","priority":"normal","timestamp":"2026-08-02T20:53:26.846209665Z","title":"The binary carries the package its embedded workflow depends on","type":"issue_created"}
+{"fields":["dependencies"],"id":"8e4ea9a4-b0bc-4927-bd4e-c54f374d65bd","issue_id":"e4ba28c5-c95b-4e28-add0-b7853826c9f6","timestamp":"2026-08-02T20:53:43.484996702Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"80117e78-b465-46f9-a680-2ee31cbfbc8e","issue_id":"d35cc3f2-7549-4a10-a61a-f49333b5e67c","timestamp":"2026-08-02T20:54:33.390497276Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"9b3c53fb-a232-4dbf-b40b-7e979c03065a","issue_id":"d35cc3f2-7549-4a10-a61a-f49333b5e67c","timestamp":"2026-08-02T20:54:33.390497276Z","type":"issue_claimed"}
