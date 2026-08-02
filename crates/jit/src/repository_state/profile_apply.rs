@@ -263,6 +263,17 @@ pub struct ProfileApplicationInput {
 }
 
 impl ProfileApplicationInput {
+    /// Whether this package contributes either authored input of the coupled
+    /// default-rule/schema materialization.
+    ///
+    /// Such a package re-derives the default rules and the schemas they
+    /// reference, so an application of it reaches the generated schema
+    /// directory whether or not the package names a target under it.
+    pub(crate) fn owns_default_rule_authority(&self) -> bool {
+        self.target_hashes.contains_key(".jit/config.toml")
+            || self.target_hashes.contains_key(".jit/rules.toml")
+    }
+
     pub(crate) fn record(&self) -> AppliedProfileRecord {
         AppliedProfileRecord::new(
             self.id.clone(),

@@ -506,6 +506,13 @@ impl CommandExecutor<JsonFileStorage> {
             &base,
             &input.claims,
         )?);
+        // A package that re-derives the default rules reaches the schemas they
+        // reference, and reaching a schema that is absent means proving its
+        // absence against the directory listing, so the directory is discovered
+        // whether or not the package names a target under it.
+        if input.owns_default_rule_authority() {
+            expanded_paths.push(VirtualPath::SCHEMAS);
+        }
         let base =
             match self.capture_proposed_base(session, &BTreeMap::new(), &expanded_paths, None)? {
                 None => return Ok(None),
@@ -1735,6 +1742,37 @@ mod tests {
                 "no declared kind reads {registry}"
             );
         }
+    }
+
+    #[test]
+    fn test_apply_profile_package_repairs_a_generated_schema_outside_the_package_targets() {
+        let (temp, _storage, executor, _fixture_package) = fixture();
+        let package_root = crate::test_utils::copy_package_tree(
+            &jit_default_directory(),
+            &temp.path().join("profiles/jit-default"),
+        );
+        let package = ProfilePackage::from_directory(&package_root).unwrap();
+        // The package writes the configuration, so applying it re-derives the
+        // default rules and the schemas they reference — targets it names none
+        // of, and whose drift it therefore has to reach without being told.
+        assert!(package
+            .hashes()
+            .targets
+            .keys()
+            .all(|target| !target.starts_with(".jit/schemas/")));
+        let schema = temp
+            .path()
+            .join(".jit/schemas/default-namespace-registry.json");
+        let generated = fs::read(&schema).unwrap();
+        fs::remove_file(&schema).unwrap();
+
+        let applied = executor.apply_profile_package(&package).unwrap();
+
+        assert_eq!(
+            applied.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
+        assert_eq!(fs::read(&schema).unwrap(), generated);
     }
 
     #[test]
