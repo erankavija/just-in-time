@@ -11,12 +11,24 @@
   ],
   "description": "The workflow package declares a dependency on the default package and only the vocabulary it adds, so the shared vocabulary exists once.\n\n## Background\n\nThe workflow package declares its own type names, namespaces and item kinds, several of which the default package now also declares. Two packages restating the same values would be the hand-maintained duplicate this container exists to remove, and the alternative the decisions rejected.\n\nThe split is already disjoint where it matters: the namespaces the two declare do not overlap, and on types the workflow package declares the default's four plus four of its own. It drops the four the default carries and keeps its own, so applying it composes rather than collides.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow package declares a dependency on the default package.\n- [hard] REQ-02: It declares no type name, namespace, or item kind the default package already declares, except where restating it identically is necessary and the restatement is exact.\n- [hard] REQ-03: Applying it to a bare repository produces the same configuration as applying both packages by hand, and reports no conflict.\n- [hard] REQ-04: It declares no item kind; every kind an initialized repository can carry is declared by the default package (`@/issue/e204e63d/decision/D-20`).\n\n## Notes\n\nAn adopter applying the workflow package receives the default package as a resolved dependency and never names it.\n",
   "documents": [],
+  "done_at": "2026-08-02T23:03:25.961534279Z",
   "first_ready_at": "2026-08-02T14:28:57.406594669Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T22:50:45.917068332Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T23:00:12.502721472Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e4ba28c5-c95b-4e28-add0-b7853826c9f6",
   "labels": [
     "epic:derived-package-sources",
@@ -30,7 +42,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Reduce the workflow package to its delta over the default",
-  "updated_at": "2026-08-02T20:53:43.484996702Z"
+  "updated_at": "2026-08-02T23:03:25.961534279Z"
 }

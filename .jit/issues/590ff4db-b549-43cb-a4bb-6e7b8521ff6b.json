@@ -24,7 +24,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Move the two workflow rules into the workflow package",
-  "updated_at": "2026-07-31T17:55:23.038518096Z"
+  "updated_at": "2026-08-02T23:03:31.089615512Z"
 }

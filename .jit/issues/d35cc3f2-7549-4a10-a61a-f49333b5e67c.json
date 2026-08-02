@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The binary carries the default package alongside the workflow package it embeds, so an embedded package's declared dependency resolves by the same route the package itself came from.\n\n## Background\n\nThe binary embeds the workflow package. Once that package declares a dependency on the default package, applying it needs somewhere to obtain the dependency, and the binary carries no such place: `jit init --profile jit-dogfood` on a bare repository fails with `profile 'jit-dogfood' declares a dependency on profile 'jit-default', which cannot be resolved`. The failure is the composed-application path behaving correctly (`@/issue/e204e63d/decision/D-14`); what is missing is a route to the dependency.\n\nResolution answers a supplied location first, then the location the repository's record names, then the package compiled into the binary. A repository being created has neither of the first two, so for the embedded route the dependency has to come from the embed as well. That is what \"resolve the dependency from the same routes the package itself came from\" means for a package that came from the binary.\n\nThis is transitional by construction. The container removes every embed and ships both packages in the release archive instead, at which point this issue's subject disappears with the route it serves.\n\n## Success Criteria\n\n- [hard] REQ-01: The binary carries the default package alongside the workflow package it already embeds.\n- [hard] REQ-02: Resolving a profile id against the packages compiled into the binary answers for either package.\n- [hard] REQ-03: Applying the embedded workflow package to a bare repository resolves and applies its declared dependency from the binary, with no location supplied and no record present.\n- [hard] REQ-04: Initialization naming the workflow profile succeeds on a repository that has no applied-profile record and is given no location.\n- [hard] REQ-05: A profile id no compiled-in package declares is still reported as an absent profile rather than as an unresolvable dependency.\n\n## Notes\n\nThe reduction that makes this necessary is `e4ba28c5`, which depends on this issue. Both embeds are removed together by the issue that takes the workflow profile out of the binary, so nothing here needs a separate retirement step.",
   "documents": [],
+  "done_at": "2026-08-02T23:03:20.773277070Z",
   "first_ready_at": "2026-08-02T20:53:26.846209665Z",
   "gates_required": [
     "cargo-ci",
@@ -14,12 +15,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T21:53:19.393714444Z",
+      "updated_at": "2026-08-02T22:58:02.111347800Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-02T21:56:06.135874186Z",
+      "status": "passed",
+      "updated_at": "2026-08-02T23:03:02.194239200Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,7 +34,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "The binary carries the package its embedded workflow depends on",
-  "updated_at": "2026-08-02T21:56:06.135874186Z"
+  "updated_at": "2026-08-02T23:03:20.773277070Z"
 }

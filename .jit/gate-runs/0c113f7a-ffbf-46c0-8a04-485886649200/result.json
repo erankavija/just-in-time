@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "85e7109a68c5a7d674a2890bf1b9467033873af6",
+  "completed_at": "2026-08-02T23:00:12.197177700Z",
+  "duration_ms": 129135,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are satisfied by the attributable package, resolver, tests, and documentation changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e4ba28c5-c95b-4e28-add0-b7853826c9f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0c113f7a-ffbf-46c0-8a04-485886649200",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T22:58:03.061259598Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:e4ba28c5 commits fe75e8b4, e3cb38ea, 43dc083a, 9da6d554, 11ff3920, 42ceb370, c93ea7c2, 62667c60, d3f198e0\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-14 and D-20 (issue description, markdown-first); @/invariant/single-source-prose (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T22:42:44Z)\nTruncation recovery: narrower reads of manifests, resolver, tests, and merge-parent diffs completed\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are satisfied by the attributable package, resolver, tests, and documentation changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "85e7109a68c5a7d674a2890bf1b9467033873af6",
+  "completed_at": "2026-08-02T23:03:01.890250721Z",
+  "duration_ms": 168112,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five requirements are met; the prior missing-dependency finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d35cc3f2-7549-4a10-a61a-f49333b5e67c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "10e1f115-d709-403d-9eda-10ac7ed27ffa",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T23:00:13.777328133Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 14314516, eb1414e5, 132a6472 (all `jit:d35cc3f2`; merge adds no unique diff over its worker parent)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-14 (issue description, markdown-first); @/charter/D-4 and D-8 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/derived-state-coherence, architecture-dependency-direction, atomic-writes (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T22:50:46Z)\nTruncation recovery: bounded rereads of each tagged patch, merge-parent diffs, manifests, resolver/init/storage paths, tests, and item sources\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five requirements are met; the prior missing-dependency finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
