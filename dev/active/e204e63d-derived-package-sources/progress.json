@@ -280,27 +280,39 @@
     {
      "short_id": "7d038e97",
      "worker": "opus",
-     "status": "dispatched"
+     "status": "dispatched",
+     "lead_review": "pass pending report",
+     "note": "All seven criteria verified. parse_manifest is the crate's only production manifest parse (the two other toml::from_str sites in package.rs are inside #[cfg(test)] mod tests at :920), so REQ-02 holds. The REQ-05 comparison carries two explicit anti-vacuity guards: produced.len() > 1, and an assertion that some produced file IS executable so the mode half observes something. Destination defaults under target/, covered by .gitignore, with no build reading it. Followed the 65ff0f38 entry-point shape."
     },
     {
      "short_id": "5d12a79f",
      "worker": "opus",
-     "status": "dispatched (unclaimed; dep 6c47b99a open by ruling)"
+     "status": "dispatched (unclaimed; dep 6c47b99a open by ruling)",
+     "lead_review": "fail, rework r1 dispatched",
+     "rework": 1,
+     "note": "All five criteria met in code and tests; precedence tests are non-vacuous by construction. FAILED Tier 2.5: crates/jit/src/output.rs:944 and its doc comment at :702 still describe PROFILE_NOT_FOUND as 'The requested embedded profile does not exist', and that string renders into the generated docs/reference/error-codes.md:33."
     },
     {
      "short_id": "fd61b44f",
      "worker": "opus",
-     "status": "dispatched"
+     "status": "dispatched",
+     "lead_review": "pass pending REQ-03 evidence",
+     "note": "Design answer accepted and confined to the test harness, no product-surface change. The stalled socket is opened first so a probe connection queues behind it; the probe answering proves axum-server's sequential accept loop moved past the stalled socket, which it cannot do without registering it. Worker also added a meta-test that SIGSTOPs the server so the kernel completes the handshake while the accept loop provably cannot have run: a fixture reporting registration from the write alone fails there. Lead verified probe_health, wait_for_connection_count at crates/server/src/shutdown.rs:323, budget nesting (1s window inside 10s EXCHANGE_BUDGET), all four REQ-04 properties and REQ-05 non-weakening."
     },
     {
      "short_id": "0db28190",
      "worker": "codex-luna",
-     "status": "dispatched"
+     "status": "dispatched",
+     "lead_review": "pass after 2 reworks",
+     "rework": 2,
+     "note": "r1 extended the existing eight-noun enumeration in place, stranding 'carried by the running binary' behind a fourteen-word qualifier: FAIL on prose coherence. r2 restored the original sentence and added a separate one, but its purpose clause was circular, failing REQ-02's literal demand to state what the declaration is FOR. r3 states the completeness consequence: a file under a declared root that no asset claims and no exclusion matches is caught rather than silently omitted."
     },
     {
      "short_id": "4873b32f",
      "worker": "codex-luna",
-     "status": "dispatched"
+     "status": "dispatched",
+     "lead_review": "pass",
+     "note": "Asserts the reported live-source declaration is present, that every entry names a root, and cross-checks reported roots against reported live-asset targets in BOTH directions, so no literal root value appears. Lead ran the full mcp-server suite outside the codex sandbox: 12/12 including the profile test. REQ-03 evidenced."
     },
     {
      "short_id": "e4ba28c5",
@@ -494,6 +506,11 @@
    "at": "2026-08-02",
    "session": 7,
    "text": "Amending a container decision does not sweep the leaf criteria written against the old decision. Session 6 amended D-20 (invariant moves into jit-default) and expanded c7058cac to deliver it, but e4ba28c5's REQ-04 still named the kind the amendment removed. Caught at dispatch by measuring the two manifests, not by reading the criterion. After any decision amendment, re-read every not-yet-dispatched leaf that cites that decision."
+  },
+  {
+   "at": "2026-08-02",
+   "session": 7,
+   "text": "The session-1 trap repeated in a new place: 5d12a79f swept every adopter markdown page its change invalidated (cli-commands.md, profiles.md, events.md, curated-tools.json) and still left the defect, because the stale text was a Rust string literal in crates/jit/src/output.rs that RENDERS INTO a generated reference page. A markdown-only sweep cannot find it and the generated page must not be hand-edited. When a change moves an error's meaning, grep the description tables in output.rs, not docs/."
   }
  ],
  "rework_counts": {
@@ -510,7 +527,9 @@
   "39c34568": 0,
   "0cf1f351": 1,
   "76b16af0": 2,
-  "60c211d6": 1
+  "60c211d6": 1,
+  "0db28190": 2,
+  "5d12a79f": 1
  },
  "started_at": "2026-07-31",
  "owner_rulings": [
