@@ -121,6 +121,7 @@ mod tests {
     use super::*;
     use crate::commands::CommandExecutor;
     use crate::config::ProjectionStyle;
+    use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
     use crate::profile::{ExclusionPattern, LiveSourceDeclaration};
@@ -166,6 +167,23 @@ mod tests {
                 "repo-validate",
             ])
         );
+
+        let invariants = package
+            .manifest()
+            .contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                Contribution::KeyedArray {
+                    target: KeyedArrayTarget::Invariants,
+                    identity,
+                    ..
+                } => Some(identity.as_str()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(invariants.len(), 18);
+        assert!(invariants.contains("label-format"));
+        assert!(invariants.contains("convention-convergence"));
 
         let skill_roots = package
             .manifest()
@@ -313,6 +331,7 @@ mod tests {
                 let kind = match target {
                     KeyedArrayTarget::Rules => Some("rule"),
                     KeyedArrayTarget::Gates => Some("gate"),
+                    KeyedArrayTarget::Invariants => Some("invariant"),
                     KeyedArrayTarget::Templates => None,
                 };
                 if let Some(kind) = kind {
@@ -323,9 +342,6 @@ mod tests {
                 }
             }
         }
-        // The invariant registry is initialization's, not this package's: the
-        // package declares no invariant, so a packaged citation to one resolves
-        // against nothing and is a defect this walk reports.
         let citation =
             regex::Regex::new(r"@/([a-z][a-z0-9-]*)/([A-Za-z0-9][A-Za-z0-9-]*)").unwrap();
 
@@ -1242,7 +1258,11 @@ mod tests {
             .unwrap();
         fs::write(temp.path().join("AGENTS.md"), b"# Existing guidance\n").unwrap();
         let invariants_path = temp.path().join(".jit/invariants.toml");
-        let scaffolded_invariants = fs::read(&invariants_path).unwrap();
+        let scaffolded_invariants = fs::read_to_string(&invariants_path).unwrap();
+        assert!(InvariantRegistry::from_toml_str(&scaffolded_invariants)
+            .unwrap()
+            .invariants
+            .is_empty());
 
         let layout =
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
@@ -1258,14 +1278,25 @@ mod tests {
             .join(".agents/skills/jit-manage/SKILL.md")
             .is_file());
         // The invariant registry belongs to the repository, which already carried
-        // one: the application declares no invariant and claims no target here, so
-        // it neither replaces the file nor depends on its absence.
+        // one: the application contributes entries into it and does not publish a
+        // replacement asset.
         assert!(!package
             .manifest()
             .assets
             .iter()
             .any(|asset| asset.target == ".jit/invariants.toml"));
-        assert_eq!(fs::read(&invariants_path).unwrap(), scaffolded_invariants);
+        let contributed =
+            InvariantRegistry::from_toml_str(&fs::read_to_string(&invariants_path).unwrap())
+                .unwrap();
+        assert_eq!(contributed.invariants.len(), 18);
+        assert!(contributed
+            .invariants
+            .iter()
+            .any(|invariant| invariant.id == "label-format"));
+        assert_ne!(
+            fs::read_to_string(&invariants_path).unwrap(),
+            scaffolded_invariants
+        );
         assert!(temp
             .path()
             .join(".jit/reference/content-standards.md")
@@ -1285,7 +1316,7 @@ mod tests {
         assert_eq!(invariants.mode, "region");
         assert_eq!(invariants.style, "id-anchor");
         assert_eq!(invariants.kinds, ["invariant"]);
-        assert_eq!(invariants.count, 0);
+        assert_eq!(invariants.count, 18);
         let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
         let reference = &reference.projections[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");

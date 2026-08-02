@@ -306,6 +306,196 @@ to = "breakdown"
 kind = "move-upstream-to-role"
 role = "planning"
 
+# The workflow's repository invariants are contributions to the registry that
+# initialization creates. The package never publishes that registry file.
+# The checkout-only `cargo-ci` gate is not package content, so its generic
+# enforcement claims bind to the package's portable `repo-validate` gate.
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "label-format"
+
+[contribution.value]
+id = "label-format"
+statement = "Every label is namespace:value (namespace lowercase-kebab, value non-empty)."
+kind = "enforced"
+enforced-by = "@/rule/label-format"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "namespace-registry"
+
+[contribution.value]
+id = "namespace-registry"
+statement = "Every label namespace is declared in the namespace registry."
+kind = "enforced"
+enforced-by = "@/rule/namespace-registry"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "dag-acyclic"
+
+[contribution.value]
+id = "dag-acyclic"
+statement = "Cycle detection runs before every dependency operation; the graph stays acyclic."
+kind = "enforced"
+enforced-by = "@/gate/repo-validate"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "gate-semantics"
+
+[contribution.value]
+id = "gate-semantics"
+statement = "An issue cannot reach Done with pending or failed gates; unpassed gates divert completion to Gated."
+kind = "enforced"
+enforced-by = "@/gate/repo-validate"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "event-log"
+
+[contribution.value]
+id = "event-log"
+statement = "Every state change appends an event to events.jsonl."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "atomic-writes"
+
+[contribution.value]
+id = "atomic-writes"
+statement = "All file replacements use the temp-file + atomic-rename pattern; new-file publication uses verified staging plus atomic no-replace publication, so an occupied destination is never overwritten."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "derived-state-coherence"
+
+[contribution.value]
+id = "derived-state-coherence"
+statement = "Every semantic mutation derives its coupled materializations from one final repository view and publishes the resulting state recoverably."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "pid-safety"
+
+[contribution.value]
+id = "pid-safety"
+statement = "Process-signaling code rejects sentinel or lossy PID conversions before invoking the operating system, including the `u32::MAX as i32 == -1` case that would turn a targeted signal into `kill(-1, sig)`."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "assignee-format"
+
+[contribution.value]
+id = "assignee-format"
+statement = "Every assignee is {type}:{identifier} (e.g. agent:worker-1, human:alice)."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "domain-agnostic"
+
+[contribution.value]
+id = "domain-agnostic"
+statement = "Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions. The one sanctioned exception is the planning-bracket preset trio (plan-review, coverage-preview, breakdown-review): it encodes jit's own plan-before-fan-out workflow (@/charter/D-3), not an adopter domain, so it is retained as the single binary-shipped preset bundle."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "single-source-prose"
+
+[contribution.value]
+id = "single-source-prose"
+statement = "Every fact with a single source of truth reaches prose by projection or citation; volatile facts (counts, enumerations, registry contents) are stated structurally or derived, and a hand-maintained copy is a staleness defect."
+kind = "enforced"
+enforced-by = "@/gate/code-review"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "semantic-test-assertions"
+
+[contribution.value]
+id = "semantic-test-assertions"
+statement = "Tests assert observable semantic properties or relationships; exact field-name inventories and literal-value assertions are confined to one canonical suite for an intentionally stable external contract."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "shared-test-contracts"
+
+[contribution.value]
+id = "shared-test-contracts"
+statement = "Frequently repeated setup and interface behavior use shared fixtures and conformance suites; every implementation of an interface runs the same behavioral contract, while implementation-specific tests cover only implementation-specific behavior."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "bounded-rust-build-footprint"
+
+[contribution.value]
+id = "bounded-rust-build-footprint"
+statement = "Rust test topology stays bounded to a small number of cohesive suites rather than one Cargo target per test file, build profiles stay compact rather than embedding a full debugger payload in every test executable, dependency features stay intentional rather than pulling in unused remote-resolution or duplicate TLS infrastructure, and integration-test target count and active test-executable bytes remain within automatically enforced budgets."
+kind = "enforced"
+enforced-by = "@/gate/repo-validate"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "semantic-types"
+
+[contribution.value]
+id = "semantic-types"
+statement = "Every identity, constrained token, closed vocabulary, and protocol sentinel has one canonical semantic type; raw strings exist only at parsing and serialization boundaries."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "canonical-cutover"
+
+[contribution.value]
+id = "canonical-cutover"
+statement = "Superseded aliases, fields, and representations are removed after cutover; compatibility code is allowed only in a named, versioned migration boundary with a tracked removal condition."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "architecture-dependency-direction"
+
+[contribution.value]
+id = "architecture-dependency-direction"
+statement = "Dependencies point inward: domain and graph remain pure and I/O-free; storage owns persistence; commands orchestrate domain and storage; CLI, output, and server layers adapt inputs and outputs without pushing their concerns into inner layers."
+kind = "advisory"
+
+[[contribution]]
+kind = "keyed-array"
+target = "invariants"
+identity = "convention-convergence"
+
+[contribution.value]
+id = "convention-convergence"
+statement = "A shared convention or abstraction has one form: work that finds it harmful or ill-fitting changes it at its source, or reports the mismatch as a blocking concern before proceeding. A local parallel variant, a private helper duplicating a shared mechanism, or a bypass around an abstraction is a defect unless it is a named, cited exception with a tracked convergence condition."
+kind = "advisory"
+
 [[contribution]]
 kind = "projection"
 name = "invariants"
@@ -316,10 +506,9 @@ kind = "projection"
 name = "rules-and-gates"
 value = { kind = ["rule", "gate"], mode = "separate-file", target = ".jit/reference/rules-and-gates.md", style = "full" }
 
-# Install-only adopter state. The invariant registry is not among it: this
-# package declares no invariant, and initialization creates that registry, so
-# publishing a file over it would meet an occupied destination. A package
-# invariant would be contributed into the registry instead.
+# Install-only adopter state. The invariant registry is not among it:
+# initialization creates that registry, and the package contributes its
+# invariant entries into it instead of publishing a file over it.
 [[asset]]
 source = "assets/install/.jit/schemas/jit-content-standards.json"
 target = ".jit/schemas/jit-content-standards.json"

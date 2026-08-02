@@ -98,6 +98,7 @@ pub enum SetStringTarget {
 #[serde(rename_all = "kebab-case")]
 pub enum KeyedArrayTarget {
     Gates,
+    Invariants,
     Rules,
     Templates,
 }
@@ -106,6 +107,7 @@ impl KeyedArrayTarget {
     pub(crate) fn registry_path(self) -> &'static str {
         match self {
             Self::Gates => ".jit/gates.toml",
+            Self::Invariants => ".jit/invariants.toml",
             Self::Rules => ".jit/rules.toml",
             Self::Templates => ".jit/templates.toml",
         }
@@ -114,6 +116,7 @@ impl KeyedArrayTarget {
     pub(crate) fn identity_field(self) -> &'static str {
         match self {
             Self::Gates => "key",
+            Self::Invariants => "id",
             Self::Rules | Self::Templates => "name",
         }
     }
@@ -121,6 +124,7 @@ impl KeyedArrayTarget {
     pub(crate) fn array_name(self) -> &'static str {
         match self {
             Self::Gates => "gates",
+            Self::Invariants => "invariants",
             Self::Rules => "rules",
             Self::Templates => "template",
         }
@@ -195,6 +199,7 @@ impl Contribution {
             | Self::Projection { .. } => "config.toml",
             Self::KeyedArray { target, .. } => match target {
                 KeyedArrayTarget::Gates => "gates.toml",
+                KeyedArrayTarget::Invariants => "invariants.toml",
                 KeyedArrayTarget::Rules => "rules.toml",
                 KeyedArrayTarget::Templates => "templates.toml",
             },
