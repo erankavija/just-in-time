@@ -26,6 +26,21 @@ pub struct FreshInitResult {
     pub modified_paths: Vec<String>,
 }
 
+/// The profile one initialization applies, and where its package is read from.
+///
+/// A repository being created has no applied-profile record to read, so the
+/// caller supplies the location its bytes are at; omitting it leaves
+/// resolution to the routes
+/// [`resolve_profile_package`](CommandExecutor::resolve_profile_package)
+/// takes for any other command.
+#[derive(Debug, Clone, Copy)]
+pub struct ProfileSelection<'a> {
+    /// Stable profile id to apply.
+    pub id: &'a str,
+    /// Repository directory holding the package, when the caller names one.
+    pub location: Option<&'a Path>,
+}
+
 impl CommandExecutor<JsonFileStorage> {
     /// Atomically complete neutral initialization and apply one profile.
     ///
@@ -36,9 +51,9 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
-        profile_id: &str,
+        profile: ProfileSelection<'_>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, template, Some(profile_id))
+        self.run_initialization(repo_dir, template, Some(profile))
     }
 
     /// Publish a fresh neutral or profiled repository through the recovered
@@ -52,9 +67,9 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
-        profile_id: Option<&str>,
+        profile: Option<ProfileSelection<'_>>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, template, profile_id)
+        self.run_initialization(repo_dir, template, profile)
     }
 
     /// Capture the base under one recovered session, validate the proposed
@@ -63,9 +78,11 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
-        profile_id: Option<&str>,
+        profile: Option<ProfileSelection<'_>>,
     ) -> Result<FreshInitResult> {
-        let package = profile_id.map(embedded_profile).transpose()?;
+        let package = profile
+            .map(|profile| self.resolve_profile_package(profile.id, profile.location))
+            .transpose()?;
         let layout = self.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
@@ -386,11 +403,6 @@ fn init_validation_error(
     })
 }
 
-/// Resolve one embedded profile package by stable id.
-fn embedded_profile(id: &str) -> Result<ProfilePackage> {
-    super::profile::embedded_profile(id)
-}
-
 /// Acquire typed Git evidence for the worktree `.gitattributes` merge-driver claim.
 ///
 /// Eligible only when the worktree is inside a Git work tree AND the selected data
@@ -637,7 +649,10 @@ mod tests {
             .initialize_fresh_repository(
                 repo.path(),
                 &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                Some("jit-dogfood"),
+                Some(ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
             )
             .unwrap();
 
@@ -680,7 +695,10 @@ mod tests {
             .initialize_fresh_repository(
                 repo.path(),
                 &HierarchyTemplate::default(),
-                Some("jit-dogfood"),
+                Some(ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
             )
             .unwrap();
         let compact_record = {
@@ -705,7 +723,10 @@ mod tests {
             .initialize_profiled_repository(
                 repo.path(),
                 &HierarchyTemplate::default(),
-                "jit-dogfood",
+                ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                },
             )
             .unwrap();
 
@@ -860,7 +881,10 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                     executor.initialize_fresh_repository(
                         repo.path(),
                         &HierarchyTemplate::default(),
-                        Some("jit-dogfood"),
+                        Some(ProfileSelection {
+                            id: "jit-dogfood",
+                            location: None,
+                        }),
                     )
                 })
             })

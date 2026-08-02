@@ -1399,7 +1399,7 @@ pub enum Event {
         /// Number of issues whose lifecycle timestamps were backfilled
         issues_updated: usize,
     },
-    /// An embedded profile package was transactionally applied.
+    /// A profile package was transactionally applied.
     ///
     /// Repository-scoped: package targets, the minimal installed record, and
     /// this event become durable in one recoverable transaction.

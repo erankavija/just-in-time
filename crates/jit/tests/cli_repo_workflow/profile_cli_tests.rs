@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
@@ -9,6 +10,47 @@ fn jit(dir: &std::path::Path, args: &[&str]) -> Output {
         .current_dir(dir)
         .output()
         .expect("failed to run jit")
+}
+
+/// The id the checked-in fixture package declares.
+const FIXTURE_PROFILE: &str = "planner-asset-only";
+
+/// Copy the fixture package tree into `repo` at the repository-relative
+/// `location`, and return that location.
+///
+/// A package is applied from inside the repository it is applied to, because
+/// the applied-profile record names its worktree-relative location.
+fn package_at<'a>(repo: &Path, location: &'a str) -> &'a str {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/profile-packages")
+        .join(FIXTURE_PROFILE);
+    jit::test_utils::copy_package_tree(&source, &repo.join(location));
+    location
+}
+
+/// The record this repository stores for the fixture package.
+fn stored_record(repo: &Path) -> Value {
+    let path = repo.join(format!(".jit/profiles/{FIXTURE_PROFILE}.json"));
+    serde_json::from_slice(&fs::read(&path).unwrap_or_else(|error| {
+        panic!("failed to read {}: {error}", path.display());
+    }))
+    .expect("a stored record is JSON")
+}
+
+/// Republish the package tree at `location` under `version`.
+///
+/// Two copies of one fixture are byte-identical and therefore indistinguishable
+/// in everything a resolution reports, so a test that asks which copy was read
+/// edits one of them first. The published asset is left alone: identical target
+/// bytes are what keeps the second application an ordinary re-application
+/// rather than a target conflict.
+fn set_package_version(repo: &Path, location: &str, version: &str) -> PathBuf {
+    let manifest = repo.join(location).join("manifest.toml");
+    let declared = fs::read_to_string(&manifest)
+        .unwrap()
+        .replace("version = \"1.0.0\"", &format!("version = \"{version}\""));
+    fs::write(&manifest, declared).unwrap();
+    manifest
 }
 
 fn json(output: &Output) -> Value {
@@ -25,12 +67,13 @@ fn json(output: &Output) -> Value {
 fn test_profile_list_and_show_work_without_repository() {
     let repo = TempDir::new().unwrap();
 
+    // A directory that is not a repository has recorded no profile, so it names
+    // none; inspection still resolves the package this binary carries.
     let list = jit(repo.path(), &["profile", "list", "--json"]);
     assert!(list.status.success(), "{list:?}");
     let list = json(&list);
-    assert_eq!(list["count"], 1);
-    assert_eq!(list["profiles"][0]["id"], "jit-dogfood");
-    assert_eq!(list["profiles"][0]["applied"], false);
+    assert_eq!(list["count"], 0);
+    assert_eq!(list["profiles"].as_array().unwrap(), &Vec::<Value>::new());
 
     let show = jit(repo.path(), &["profile", "show", "jit-dogfood", "--json"]);
     assert!(show.status.success(), "{show:?}");
@@ -38,6 +81,303 @@ fn test_profile_list_and_show_work_without_repository() {
     assert_eq!(show["manifest"]["profile"]["id"], "jit-dogfood");
     assert_eq!(show["origin"], serde_json::json!({ "source": "embedded" }));
     assert!(show["package_hash"].as_str().unwrap().len() >= 64);
+    assert!(!repo.path().join(".jit").exists());
+}
+
+#[test]
+fn test_profile_show_reads_the_package_a_supplied_location_holds() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            FIXTURE_PROFILE,
+            "--from",
+            location,
+            "--json",
+        ],
+    );
+
+    assert!(show.status.success(), "{show:?}");
+    let show = json(&show);
+    // Nothing compiled into the binary declares this profile, so reporting it
+    // at all is the location having been read.
+    assert_eq!(show["manifest"]["profile"]["id"], FIXTURE_PROFILE);
+    assert_eq!(
+        show["origin"],
+        serde_json::json!({ "source": "directory", "location": location })
+    );
+}
+
+#[test]
+fn test_profile_show_refuses_a_supplied_location_outside_the_repository() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    // A package beside the repository rather than inside it. The location a
+    // record would have to name is worktree-relative, so there is none.
+    let elsewhere = TempDir::new().unwrap();
+    package_at(elsewhere.path(), "planner");
+
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            FIXTURE_PROFILE,
+            "--from",
+            elsewhere.path().join("planner").to_str().unwrap(),
+            "--json",
+        ],
+    );
+
+    assert!(!show.status.success(), "{show:?}");
+    let show = json(&show);
+    assert!(
+        show["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("is not inside the repository worktree"),
+        "{show}"
+    );
+}
+
+#[test]
+fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+
+    let preview = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            FIXTURE_PROFILE,
+            "--from",
+            location,
+            "--dry-run",
+            "--json",
+        ],
+    );
+
+    assert!(preview.status.success(), "{preview:?}");
+    let preview = json(&preview);
+    assert_eq!(preview["id"], FIXTURE_PROFILE);
+    assert_eq!(preview["status"], "would_apply");
+    assert!(
+        preview["targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|target| target["path"] == "docs/profile.txt"),
+        "{preview}"
+    );
+    // A preview writes nothing, the record included.
+    assert!(!repo.path().join(".jit/profiles").exists());
+    assert!(!repo.path().join("docs/profile.txt").exists());
+}
+
+#[test]
+fn test_profile_apply_from_a_supplied_location_is_re_read_from_the_record() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+
+    let applied = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            FIXTURE_PROFILE,
+            "--from",
+            location,
+            "--json",
+        ],
+    );
+    assert!(applied.status.success(), "{applied:?}");
+    assert_eq!(json(&applied)["status"], "applied");
+    assert_eq!(
+        stored_record(repo.path())["origin"],
+        serde_json::json!({ "source": "directory", "location": location })
+    );
+
+    // No location is named this time: the record is the repository's own
+    // statement of where the bytes are, and reading them back from there is
+    // what makes the second application an exact no-op.
+    let reapplied = jit(
+        repo.path(),
+        &["profile", "apply", FIXTURE_PROFILE, "--json"],
+    );
+    assert!(reapplied.status.success(), "{reapplied:?}");
+    assert_eq!(json(&reapplied)["status"], "unchanged");
+
+    let listed = jit(repo.path(), &["profile", "list", "--json"]);
+    assert!(listed.status.success(), "{listed:?}");
+    let listed = json(&listed);
+    assert_eq!(listed["count"], 1);
+    assert_eq!(listed["profiles"][0]["id"], FIXTURE_PROFILE);
+    assert_eq!(listed["profiles"][0]["applied"], true);
+    assert_eq!(
+        listed["profiles"][0]["origin"],
+        serde_json::json!({ "source": "directory", "location": location })
+    );
+}
+
+#[test]
+fn test_profile_show_prefers_a_supplied_location_over_the_recorded_one() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let recorded = package_at(repo.path(), "vendor/recorded");
+    assert!(jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            FIXTURE_PROFILE,
+            "--from",
+            recorded,
+            "--json"
+        ]
+    )
+    .status
+    .success());
+
+    // A second copy of the same profile, distinguishable from the recorded one
+    // by the version it declares.
+    let supplied = package_at(repo.path(), "vendor/supplied");
+    set_package_version(repo.path(), supplied, "2.0.0");
+
+    let shown = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            FIXTURE_PROFILE,
+            "--from",
+            supplied,
+            "--json",
+        ],
+    );
+    assert!(shown.status.success(), "{shown:?}");
+    let shown = json(&shown);
+    assert_eq!(shown["manifest"]["profile"]["version"], "2.0.0");
+    assert_eq!(
+        shown["origin"],
+        serde_json::json!({ "source": "directory", "location": supplied })
+    );
+
+    // Supplying nothing falls back to the record, which still names the copy it
+    // was applied from.
+    let recorded_show = jit(repo.path(), &["profile", "show", FIXTURE_PROFILE, "--json"]);
+    assert!(recorded_show.status.success(), "{recorded_show:?}");
+    let recorded_show = json(&recorded_show);
+    assert_eq!(recorded_show["manifest"]["profile"]["version"], "1.0.0");
+    assert_eq!(
+        recorded_show["origin"],
+        serde_json::json!({ "source": "directory", "location": recorded })
+    );
+}
+
+#[test]
+fn test_profile_list_reports_a_recorded_location_that_no_longer_resolves() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+    assert!(jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            FIXTURE_PROFILE,
+            "--from",
+            location,
+            "--json"
+        ]
+    )
+    .status
+    .success());
+    fs::remove_dir_all(repo.path().join(location)).unwrap();
+
+    let listed = jit(repo.path(), &["profile", "list", "--json"]);
+
+    assert!(!listed.status.success(), "{listed:?}");
+    let listed = json(&listed);
+    let message = listed["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains(&format!(".jit/profiles/{FIXTURE_PROFILE}.json"))
+            && message.contains(location),
+        "the failure must name the record and the location: {listed}"
+    );
+    assert_ne!(
+        listed["error"]["code"], "PROFILE_NOT_FOUND",
+        "a record whose package moved is not a profile this repository never applied"
+    );
+
+    // A location that is simply gone carries a NotFound cause, which the human
+    // path would otherwise classify as a missing repository. Both renderings
+    // report one failure, so they carry one exit status.
+    let plain = jit(repo.path(), &["profile", "list"]);
+    assert_eq!(
+        plain.status.code(),
+        jit(repo.path(), &["profile", "list", "--json"])
+            .status
+            .code(),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&plain.stdout),
+        String::from_utf8_lossy(&plain.stderr)
+    );
+    assert_ne!(plain.status.code(), Some(3), "{plain:?}");
+}
+
+#[test]
+fn test_init_profile_applies_the_package_a_supplied_location_holds() {
+    let repo = TempDir::new().unwrap();
+    let location = package_at(repo.path(), "vendor/planner");
+
+    // A repository being created has no record to read, so the location is the
+    // only statement of where its package is.
+    let init = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            FIXTURE_PROFILE,
+            "--from",
+            location,
+            "--json",
+        ],
+    );
+
+    assert!(init.status.success(), "{init:?}");
+    assert_eq!(json(&init)["profile"]["status"], "applied");
+    assert!(repo.path().join("docs/profile.txt").is_file());
+    assert_eq!(
+        stored_record(repo.path())["origin"],
+        serde_json::json!({ "source": "directory", "location": location })
+    );
+
+    // The record initialization wrote is readable as the location it names: a
+    // later application that supplies nothing resolves the same package.
+    let reapplied = jit(
+        repo.path(),
+        &["profile", "apply", FIXTURE_PROFILE, "--json"],
+    );
+    assert!(reapplied.status.success(), "{reapplied:?}");
+    assert_eq!(json(&reapplied)["status"], "unchanged");
+}
+
+#[test]
+fn test_init_from_without_a_profile_is_a_usage_error() {
+    let repo = TempDir::new().unwrap();
+    let location = package_at(repo.path(), "vendor/planner");
+
+    let init = jit(repo.path(), &["init", "--from", location, "--json"]);
+
+    assert_eq!(init.status.code(), Some(2), "{init:?}");
     assert!(!repo.path().join(".jit").exists());
 }
 

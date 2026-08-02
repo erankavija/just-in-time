@@ -1,32 +1,87 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
     build_profile_claims, jit_dogfood_package, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageSource, ProfilePlanResult,
-    ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError, ProfilePackageSource,
+    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
     MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
-    ProfileTargetDisposition, RepositoryEntry, RepositoryImage, RepositoryRootClass,
-    RootRelativePath, VirtualPath,
+    ProfileTargetDisposition, RepositoryEntry, RepositoryImage, RepositoryLayout,
+    RepositoryRootClass, RootRelativePath, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
+
+/// Failure resolving which package bytes a profile command reads.
+///
+/// Resolution takes the first route that answers — a location the caller
+/// supplied, the location this repository's applied-profile record names, the
+/// package compiled into this binary — and each variant names the route that
+/// failed together with what it addressed. A recorded location that no longer
+/// resolves is one of these rather than an absent profile: a deleted directory
+/// is a repository whose record outlived its package, not a repository that
+/// never applied one.
+#[derive(Debug, thiserror::Error)]
+pub enum ProfileResolutionError {
+    /// A supplied location holds no readable package.
+    #[error("profile package location '{location}' cannot be read: {source}")]
+    UnreadableLocation {
+        /// Location as the caller supplied it.
+        location: String,
+        /// Package-reader failure.
+        source: ProfilePackageError,
+    },
+    /// A supplied location holds a package declaring another profile.
+    #[error("profile package location '{location}' declares profile '{found}', not '{requested}'")]
+    UnexpectedProfileAtLocation {
+        /// Location as the caller supplied it.
+        location: String,
+        /// Profile the caller asked for.
+        requested: String,
+        /// Profile the package at that location declares.
+        found: String,
+    },
+    /// A recorded location no longer holds a readable package.
+    #[error(
+        "applied profile record '{record}' names package location '{location}', \
+         which no longer holds a readable package: {source}"
+    )]
+    UnresolvableRecordedLocation {
+        /// Repository-relative applied-record path.
+        record: String,
+        /// Worktree-relative location the record names.
+        location: String,
+        /// Package-reader failure.
+        source: ProfilePackageError,
+    },
+    /// A record names package bytes this binary does not carry.
+    #[error(
+        "applied profile record '{record}' names profile '{id}' as compiled into \
+         this binary, which does not carry it"
+    )]
+    UnresolvableRecordedEmbedding {
+        /// Repository-relative applied-record path.
+        record: String,
+        /// Profile the record names.
+        id: String,
+    },
+}
 
 /// Profile application conflict detected before transaction preparation.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileApplyError {
-    /// The installed record is not valid for the requested profile.
-    #[error("installed profile record '{path}' conflicts with embedded package {id}@{version}")]
+    /// The installed record is not readable provenance for its own profile.
+    #[error("installed profile record '{path}' is not a readable record for profile '{id}'")]
     InstalledRecordConflict {
         /// Repository-relative installed-record path.
         path: String,
-        /// Requested profile id.
+        /// Profile the record's own name identifies.
         id: String,
-        /// Requested profile version.
-        version: String,
     },
     /// The installed-record directory has an unsafe occupant.
     #[error("profile metadata path '{path}' has unsupported filesystem state")]
@@ -58,31 +113,88 @@ pub enum ProfileApplyError {
 }
 
 impl CommandExecutor<JsonFileStorage> {
-    /// List the immutable profiles embedded in this binary.
-    pub fn list_embedded_profiles(&self) -> Result<ProfileListResult> {
-        let package = jit_dogfood_package()?;
-        let metadata = &package.manifest().profile;
+    /// Read the package one profile command acts on.
+    ///
+    /// The routes are tried in a fixed order and the first that answers wins:
+    /// `location` when the caller supplies one, then the location this
+    /// repository's applied-profile record for `id` names, then the package
+    /// compiled into this binary. A supplied location answers the first
+    /// application, when the repository has obtained a package and recorded
+    /// nothing yet; the record answers every run after it, so a caller need not
+    /// remember where the bytes came from.
+    ///
+    /// A supplied location must hold a package declaring `id`, and a recorded
+    /// location that no longer holds a readable package is a
+    /// [`ProfileResolutionError`] naming the record and the location rather
+    /// than an absent profile.
+    pub fn resolve_profile_package(
+        &self,
+        id: &str,
+        location: Option<&Path>,
+    ) -> Result<ProfilePackage> {
+        match location {
+            Some(location) => supplied_package(location, id),
+            None => match self.read_applied_profile_record(id)? {
+                Some(record) => {
+                    recorded_package(&record, &applied_record_path(id)?, &self.require_layout()?)
+                }
+                None => embedded_profile(id),
+            },
+        }
+    }
+
+    /// List the profiles this repository's own applied-profile records name.
+    ///
+    /// The `.jit/profiles/` listing is where a repository states which profiles
+    /// it carries, and each record's package is read from the location that
+    /// record names, so the answer describes this repository rather than the
+    /// running binary. A record whose package cannot be resolved fails the
+    /// enumeration ([`ProfileResolutionError`]) instead of dropping the profile
+    /// from the answer.
+    pub fn list_recorded_profiles(&self) -> Result<ProfileListResult> {
         let layout = self.require_layout()?;
-        let expected = expected_record(&package, &layout)?;
-        let applied = self
-            .read_installed_record(&package)?
-            .is_some_and(|record| record == expected);
-        let profiles = vec![ProfileSummary {
-            id: metadata.id.to_string(),
-            version: metadata.version.clone(),
-            origin: package_origin(&package, &layout)?,
-            jit: metadata.jit.clone(),
-            applied,
-        }];
-        Ok(ProfileListResult {
-            count: profiles.len(),
-            profiles,
+        let profiles_dir = VirtualPath::PROFILES;
+        with_mutation_session(self.storage(), &layout, "profile enumeration", |session| {
+            let mut spec = CaptureSpec::phase_one([], RECORD_CAPTURE_BUDGET)?;
+            spec.discover_listing(profiles_dir.clone())?;
+            let Some(listed) = capture_or_retry(session.capture(spec.clone()))? else {
+                return Ok(SessionStep::Retry);
+            };
+            let recorded = recorded_profile_ids(&listed, &profiles_dir)?;
+            spec.discover_paths(
+                recorded
+                    .iter()
+                    .map(|id| applied_record_path(id))
+                    .collect::<Result<Vec<_>>>()?,
+            )?;
+            let Some(image) = capture_or_retry(session.capture(spec))? else {
+                return Ok(SessionStep::Retry);
+            };
+            // The record set was decided by the first capture; a concurrent
+            // application or removal restarts the attempt rather than reporting
+            // an inventory no single repository state ever held.
+            if recorded_profile_ids(&image, &profiles_dir)? != recorded {
+                return Ok(SessionStep::Retry);
+            }
+            let Some(profiles) = recorded
+                .iter()
+                .map(|id| recorded_summary(&image, id, &layout))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .collect::<Option<Vec<_>>>()
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            Ok(SessionStep::Done(ProfileListResult {
+                count: profiles.len(),
+                profiles,
+            }))
         })
     }
 
-    /// Inspect one immutable embedded profile package.
-    pub fn show_embedded_profile(&self, id: &str) -> Result<ProfileShowResult> {
-        let package = embedded_profile(id)?;
+    /// Inspect one resolved profile package.
+    pub fn show_profile(&self, id: &str, location: Option<&Path>) -> Result<ProfileShowResult> {
+        let package = self.resolve_profile_package(id, location)?;
         let layout = self.require_layout()?;
         Ok(ProfileShowResult {
             manifest: package.manifest().clone(),
@@ -91,20 +203,18 @@ impl CommandExecutor<JsonFileStorage> {
             target_hashes: package.hashes().targets.clone(),
             file_count: package.file_count(),
             byte_size: package.byte_size(),
-            applied: self.read_installed_record(&package)?,
+            applied: self.read_applied_profile_record(id)?,
         })
     }
 
-    /// Build the exact non-mutating target plan for one embedded profile.
-    pub fn plan_embedded_profile(&self, id: &str) -> Result<ProfilePlanResult> {
-        let package = embedded_profile(id)?;
+    /// Build the exact non-mutating target plan for one resolved profile.
+    pub fn plan_profile(&self, id: &str, location: Option<&Path>) -> Result<ProfilePlanResult> {
+        let package = self.resolve_profile_package(id, location)?;
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
         let context = MutationContext::preview();
         with_mutation_session(self.storage(), &layout, "profile planning", |session| {
-            let Some((plan, changes)) =
-                self.prepare_embedded_profile(session, &package, &context)?
-            else {
+            let Some((plan, changes)) = self.prepare_profile(session, &package, &context)? else {
                 return Ok(SessionStep::Retry);
             };
             Ok(SessionStep::Done(ProfilePlanResult {
@@ -121,19 +231,21 @@ impl CommandExecutor<JsonFileStorage> {
         })
     }
 
-    /// Resolve and apply one embedded profile by stable ID.
-    pub fn apply_profile(&self, id: &str) -> Result<ProfileApplyResult> {
-        let package = embedded_profile(id)?;
-        self.apply_embedded_profile(&package)
+    /// Resolve and apply one profile by stable ID.
+    pub fn apply_profile(&self, id: &str, location: Option<&Path>) -> Result<ProfileApplyResult> {
+        let package = self.resolve_profile_package(id, location)?;
+        self.apply_profile_package(&package)
     }
 
-    /// Validate an embedded profile identifier without reading or mutating a
-    /// repository.
-    pub fn validate_profile_id(&self, id: &str) -> Result<()> {
-        embedded_profile(id).map(|_| ())
+    /// Prove one profile selection resolves without mutating a repository.
+    ///
+    /// Initialization runs this before it publishes anything, so an
+    /// unresolvable id or location fails before a repository is created.
+    pub fn validate_profile_selection(&self, id: &str, location: Option<&Path>) -> Result<()> {
+        self.resolve_profile_package(id, location).map(drop)
     }
 
-    /// Apply one validated embedded profile package through the recovered session.
+    /// Apply one validated profile package through the recovered session.
     ///
     /// Each attempt captures the whole-repository base under the held session guard,
     /// derives the exact profile-owned targets through the repository-state
@@ -142,16 +254,14 @@ impl CommandExecutor<JsonFileStorage> {
     /// overlay, and publishes through `session.apply` with pre-journal revalidation.
     /// A no-op profile has an empty complete finalized delta: package targets and
     /// provenance are unchanged, and coupled default-rule/schema state is current.
-    pub fn apply_embedded_profile(&self, package: &ProfilePackage) -> Result<ProfileApplyResult> {
+    pub fn apply_profile_package(&self, package: &ProfilePackage) -> Result<ProfileApplyResult> {
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so the appended ProfileApplied event's id/timestamp stay stable.
         let context = MutationContext::production();
         with_mutation_session(self.storage(), &layout, "profile application", |session| {
-            let Some((plan, _changes)) =
-                self.prepare_embedded_profile(session, package, &context)?
-            else {
+            let Some((plan, _changes)) = self.prepare_profile(session, package, &context)? else {
                 return Ok(SessionStep::Retry);
             };
             if plan.delta().actions().is_empty() {
@@ -196,7 +306,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// into exact target bytes by `repository_state`; finalizing the complete probe
     /// delta decides whether the operation is a no-op and supplies the validation
     /// overlay reused by application.
-    fn prepare_embedded_profile(
+    fn prepare_profile(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
         package: &ProfilePackage,
@@ -309,35 +419,38 @@ impl CommandExecutor<JsonFileStorage> {
         Ok(Some((plan, changes)))
     }
 
-    /// Read the installed provenance record through a recovered session capture.
-    fn read_installed_record(
-        &self,
-        package: &ProfilePackage,
-    ) -> Result<Option<AppliedProfileRecord>> {
-        let metadata = &package.manifest().profile;
-        let record_path = applied_record_path(metadata.id.as_str())?;
+    /// Read the applied-profile record this repository holds for `id`, through
+    /// a recovered session capture.
+    fn read_applied_profile_record(&self, id: &str) -> Result<Option<AppliedProfileRecord>> {
+        let record_path = applied_record_path(id)?;
         let layout = self.require_layout()?;
-        let budget = CaptureBudget {
-            max_paths: 16,
-            max_listings: 0,
-            max_bytes: 4 * 1024 * 1024,
-            max_depth: 4,
-        };
         with_mutation_session(self.storage(), &layout, "profile record read", |session| {
-            let Some(image) = capture_or_retry(
-                session.capture(CaptureSpec::phase_one([record_path.clone()], budget)?),
-            )?
+            let Some(image) = capture_or_retry(session.capture(CaptureSpec::phase_one(
+                [record_path.clone()],
+                RECORD_CAPTURE_BUDGET,
+            )?))?
             else {
                 return Ok(SessionStep::Retry);
             };
             Ok(SessionStep::Done(read_applied_record(
                 &image,
                 &record_path,
-                metadata,
+                id,
             )?))
         })
     }
 }
+
+/// Bounds for the applied-record captures.
+///
+/// One record per applied profile, each a small JSON document directly under
+/// `.jit/profiles/`, plus the listing that names them.
+const RECORD_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
+    max_paths: 256,
+    max_listings: 1,
+    max_bytes: 4 * 1024 * 1024,
+    max_depth: 4,
+};
 
 /// Canonical applied-profile provenance path for one profile id.
 ///
@@ -354,6 +467,120 @@ pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
     name.strip_suffix(".json").filter(|id| !id.is_empty())
 }
 
+/// Profile ids the repository's own applied-profile records name.
+///
+/// Application writes one record per applied profile at
+/// `.jit/profiles/<id>.json`, so the listing of that directory is where the
+/// repository states which packages it carries. A child whose name is not a
+/// record name is not a record.
+pub(super) fn recorded_profile_ids(
+    image: &RepositoryImage,
+    profiles_dir: &VirtualPath,
+) -> Result<BTreeSet<String>> {
+    Ok(image
+        .listing_fingerprints()
+        .get(profiles_dir)
+        .ok_or_else(|| anyhow::anyhow!("capture did not list {profiles_dir:?}"))?
+        .children()
+        .keys()
+        .filter_map(|name| record_name_profile_id(name))
+        .map(str::to_string)
+        .collect())
+}
+
+/// Read the package at a location the caller supplied.
+///
+/// The package there must declare `id`: the record an application writes is
+/// named by the package's own identity, so admitting a package declaring
+/// something else would apply a profile the caller did not ask for and record
+/// it under the name it did not name.
+fn supplied_package(location: &Path, id: &str) -> Result<ProfilePackage> {
+    let package = ProfilePackage::from_directory(location).map_err(|source| {
+        ProfileResolutionError::UnreadableLocation {
+            location: location.display().to_string(),
+            source,
+        }
+    })?;
+    let found = package.manifest().profile.id.as_str();
+    if found == id {
+        Ok(package)
+    } else {
+        Err(ProfileResolutionError::UnexpectedProfileAtLocation {
+            location: location.display().to_string(),
+            requested: id.to_string(),
+            found: found.to_string(),
+        }
+        .into())
+    }
+}
+
+/// Read the package one applied-profile record names.
+///
+/// The record's origin is the whole answer: a worktree-relative location is
+/// resolved against this repository's worktree root, and bytes the record says
+/// were compiled in are read from this binary. Either route failing names the
+/// record, so a repository whose package moved or was deleted reports the
+/// record that outlived it rather than an absent profile.
+///
+/// Validation and repair resolve a recorded profile through this same route,
+/// which is why it is reachable from the whole command layer rather than
+/// private to the profile commands.
+pub(super) fn recorded_package(
+    record: &AppliedProfileRecord,
+    record_path: &VirtualPath,
+    layout: &RepositoryLayout,
+) -> Result<ProfilePackage> {
+    match &record.origin {
+        ProfileOrigin::Directory(location) => {
+            ProfilePackage::from_directory(&layout.worktree_root().join(location.as_path()))
+                .map_err(|source| {
+                    ProfileResolutionError::UnresolvableRecordedLocation {
+                        record: repo_string(record_path),
+                        location: location.as_path().display().to_string(),
+                        source,
+                    }
+                    .into()
+                })
+        }
+        ProfileOrigin::Embedded => embedded_profile(&record.id).map_err(|_| {
+            ProfileResolutionError::UnresolvableRecordedEmbedding {
+                record: repo_string(record_path),
+                id: record.id.clone(),
+            }
+            .into()
+        }),
+    }
+}
+
+/// Summarize one recorded profile from the package its record resolves to.
+///
+/// Every reported fact but `applied` comes from the resolved package, so the
+/// answer states what the recorded location holds now. `applied` is the
+/// comparison between the two: the stored record against the record that
+/// package would write today.
+///
+/// `Ok(None)` reports a record the listing named that the capture no longer
+/// holds, which the caller retries rather than reporting without it.
+fn recorded_summary(
+    image: &RepositoryImage,
+    id: &str,
+    layout: &RepositoryLayout,
+) -> Result<Option<ProfileSummary>> {
+    let record_path = applied_record_path(id)?;
+    let Some(record) = read_applied_record(image, &record_path, id)? else {
+        return Ok(None);
+    };
+    let package = recorded_package(&record, &record_path, layout)?;
+    let metadata = &package.manifest().profile;
+    Ok(Some(ProfileSummary {
+        id: metadata.id.to_string(),
+        version: metadata.version.clone(),
+        origin: package_origin(&package, layout)?,
+        jit: metadata.jit.clone(),
+        applied: record == expected_record(&package, layout)?,
+    }))
+}
+
 /// The provenance origin a package's own bytes came through.
 ///
 /// The location is taken from the source the package recorded while reading
@@ -366,7 +593,7 @@ pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
 /// refused by the same rule.
 pub(super) fn package_origin(
     package: &ProfilePackage,
-    layout: &crate::repository_state::RepositoryLayout,
+    layout: &RepositoryLayout,
 ) -> Result<ProfileOrigin> {
     let ProfilePackageSource::Directory(directory) = package.source() else {
         return Ok(ProfileOrigin::Embedded);
@@ -387,7 +614,7 @@ pub(super) fn package_origin(
 /// The expected provenance record for a package read through this repository.
 pub(super) fn expected_record(
     package: &ProfilePackage,
-    layout: &crate::repository_state::RepositoryLayout,
+    layout: &RepositoryLayout,
 ) -> Result<AppliedProfileRecord> {
     let metadata = &package.manifest().profile;
     Ok(AppliedProfileRecord::new(
@@ -402,7 +629,7 @@ pub(super) fn expected_record(
 /// Convert an immutable package into neutral claims plus provenance metadata.
 fn profile_application_input(
     package: &ProfilePackage,
-    layout: &crate::repository_state::RepositoryLayout,
+    layout: &RepositoryLayout,
     record_path: VirtualPath,
 ) -> Result<ProfileApplicationInput> {
     let metadata = &package.manifest().profile;
@@ -443,7 +670,7 @@ pub(super) fn repo_string(path: &VirtualPath) -> String {
 fn read_applied_record(
     base: &RepositoryImage,
     record_path: &VirtualPath,
-    metadata: &crate::profile::ProfileMetadata,
+    id: &str,
 ) -> Result<Option<AppliedProfileRecord>> {
     match base.entry(record_path)? {
         RepositoryEntry::Absent => Ok(None),
@@ -453,8 +680,7 @@ fn read_applied_record(
                 .map_err(|_| {
                     ProfileApplyError::InstalledRecordConflict {
                         path: repo_string(record_path),
-                        id: metadata.id.to_string(),
-                        version: metadata.version.clone(),
+                        id: id.to_string(),
                     }
                     .into()
                 })
@@ -620,12 +846,337 @@ mod tests {
         .unwrap()
     }
 
+    /// Rewrite one authored source of the package tree at `relative`, and read
+    /// the package back from there.
+    ///
+    /// Two copies of one fixture are byte-identical and therefore
+    /// indistinguishable in everything a resolution reports, so a test that
+    /// asks which copy was read edits one of them first.
+    fn repackage(temp: &TempDir, relative: &str, source: &str, bytes: &str) -> ProfilePackage {
+        let root = temp.path().join(relative);
+        fs::write(root.join(source), bytes).unwrap();
+        ProfilePackage::from_directory(&root).expect("a valid package tree")
+    }
+
+    /// The fixture package's id, which its manifest declares.
+    fn fixture_id() -> String {
+        ProfilePackage::from_embedded_dir(&PACKAGE)
+            .unwrap()
+            .manifest()
+            .profile
+            .id
+            .to_string()
+    }
+
+    /// Store `record` as this repository's applied-profile record for its id.
+    fn store_record(temp: &TempDir, record: &AppliedProfileRecord) {
+        fs::create_dir_all(temp.path().join(".jit/profiles")).unwrap();
+        fs::write(
+            temp.path()
+                .join(format!(".jit/profiles/{}.json", record.id)),
+            record.to_bytes().unwrap(),
+        )
+        .unwrap();
+    }
+
     #[test]
-    fn test_apply_embedded_profile_records_the_worktree_location_it_read_the_package_from() {
+    fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let supplied = package_read_from(&temp, "vendor/supplied");
+
+        let resolved = executor
+            .resolve_profile_package(&fixture_id(), Some(&temp.path().join("vendor/supplied")))
+            .unwrap();
+
+        assert_eq!(resolved.hashes(), supplied.hashes());
+        assert_eq!(
+            package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
+            ProfileOrigin::Directory(RootRelativePath::parse("vendor/supplied").unwrap())
+        );
+    }
+
+    #[test]
+    fn test_resolve_profile_package_prefers_a_supplied_location_over_the_recorded_one() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let recorded = package_read_from(&temp, "vendor/recorded");
+        executor.apply_profile_package(&recorded).unwrap();
+        // A second copy the record does not name, distinguishable from the
+        // recorded one by its bytes alone.
+        package_read_from(&temp, "vendor/supplied");
+        let supplied = repackage(
+            &temp,
+            "vendor/supplied",
+            "assets/profile.txt",
+            "supplied bytes\n",
+        );
+        assert_ne!(supplied.hashes(), recorded.hashes());
+
+        let resolved = executor
+            .resolve_profile_package(&fixture_id(), Some(&temp.path().join("vendor/supplied")))
+            .unwrap();
+
+        assert_eq!(resolved.hashes(), supplied.hashes());
+    }
+
+    #[test]
+    fn test_resolve_profile_package_reads_the_location_the_record_names() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let applied = package_read_from(&temp, "vendor/recorded");
+        executor.apply_profile_package(&applied).unwrap();
+
+        // Nothing names the location at the call site: the repository's own
+        // record is the only statement of where the bytes are. Rewriting the
+        // package there afterwards proves the answer is a read of that
+        // location rather than a replay of what the record stored.
+        let rewritten = repackage(
+            &temp,
+            "vendor/recorded",
+            "assets/profile.txt",
+            "rewritten bytes\n",
+        );
+        assert_ne!(rewritten.hashes(), applied.hashes());
+
+        let resolved = executor
+            .resolve_profile_package(&fixture_id(), None)
+            .unwrap();
+
+        assert_eq!(resolved.hashes(), rewritten.hashes());
+    }
+
+    #[test]
+    fn test_resolve_profile_package_prefers_the_record_over_the_compiled_in_package() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let compiled = jit_dogfood_package().unwrap();
+        let id = compiled.manifest().profile.id.to_string();
+
+        // A directory package declaring the id this binary also carries, so
+        // nothing but the route taken decides which of the two answers.
+        package_read_from(&temp, "vendor/dogfood");
+        let manifest = fs::read_to_string(temp.path().join("vendor/dogfood/manifest.toml"))
+            .unwrap()
+            .replace(
+                &format!("id = \"{}\"", fixture_id()),
+                &format!("id = \"{id}\""),
+            );
+        let recorded = repackage(&temp, "vendor/dogfood", "manifest.toml", &manifest);
+        assert_eq!(recorded.manifest().profile.id.as_str(), id);
+        assert_ne!(recorded.hashes(), compiled.hashes());
+        store_record(
+            &temp,
+            &AppliedProfileRecord::new(
+                id.clone(),
+                recorded.manifest().profile.version.clone(),
+                ProfileOrigin::Directory(RootRelativePath::parse("vendor/dogfood").unwrap()),
+                recorded.hashes().package.clone(),
+                recorded.hashes().targets.clone(),
+            ),
+        );
+
+        let resolved = executor.resolve_profile_package(&id, None).unwrap();
+
+        assert_eq!(resolved.hashes(), recorded.hashes());
+    }
+
+    #[test]
+    fn test_resolve_profile_package_falls_back_to_the_compiled_in_package_without_a_record() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        assert!(!temp.path().join(".jit/profiles").exists());
+        let compiled = jit_dogfood_package().unwrap();
+
+        let resolved = executor
+            .resolve_profile_package(compiled.manifest().profile.id.as_str(), None)
+            .unwrap();
+
+        assert_eq!(resolved.hashes(), compiled.hashes());
+        assert_eq!(
+            package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
+            ProfileOrigin::Embedded
+        );
+    }
+
+    #[test]
+    fn test_resolve_profile_package_reports_a_recorded_location_that_no_longer_resolves() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let applied = package_read_from(&temp, "vendor/recorded");
+        executor.apply_profile_package(&applied).unwrap();
+        fs::remove_dir_all(temp.path().join("vendor/recorded")).unwrap();
+
+        let error = executor
+            .resolve_profile_package(&fixture_id(), None)
+            .unwrap_err();
+
+        // The record outlived its package: naming the record and the location
+        // is what distinguishes that from a profile this repository never
+        // applied, which is what an absent-profile answer would claim.
+        let message = format!("{error:#}");
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableRecordedLocation { record, location, .. })
+                    if record == ".jit/profiles/planner-asset-only.json"
+                        && location == "vendor/recorded"
+            ),
+            "{message}"
+        );
+        assert!(
+            error
+                .downcast_ref::<crate::errors::NotFoundError>()
+                .is_none(),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn test_resolve_profile_package_refuses_a_supplied_location_declaring_another_profile() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        package_read_from(&temp, "vendor/supplied");
+
+        let error = executor
+            .resolve_profile_package("jit-dogfood", Some(&temp.path().join("vendor/supplied")))
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnexpectedProfileAtLocation { requested, found, .. })
+                    if requested == "jit-dogfood" && *found == fixture_id()
+            ),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn test_resolve_profile_package_reports_a_supplied_location_holding_no_package() {
+        let (temp, _storage, executor, _embedded) = fixture();
+
+        let error = executor
+            .resolve_profile_package(&fixture_id(), Some(&temp.path().join("vendor/absent")))
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnreadableLocation { location, .. })
+                    if location.ends_with("vendor/absent")
+            ),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn test_list_recorded_profiles_names_no_profile_until_a_record_does() {
+        let (temp, _storage, executor, _embedded) = fixture();
+
+        let before = executor.list_recorded_profiles().unwrap();
+        assert_eq!(before.count, 0);
+        assert!(before.profiles.is_empty());
+
+        let applied = package_read_from(&temp, "vendor/recorded");
+        executor.apply_profile_package(&applied).unwrap();
+
+        let after = executor.list_recorded_profiles().unwrap();
+        assert_eq!(after.count, after.profiles.len());
+        assert_eq!(
+            after
+                .profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec![fixture_id().as_str()]
+        );
+        assert_eq!(
+            after.profiles[0].origin,
+            ProfileOrigin::Directory(RootRelativePath::parse("vendor/recorded").unwrap())
+        );
+        assert!(after.profiles[0].applied);
+    }
+
+    #[test]
+    fn test_list_recorded_profiles_resolves_each_record_from_the_location_it_names() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let applied = package_read_from(&temp, "vendor/recorded");
+        executor.apply_profile_package(&applied).unwrap();
+        let recorded_version = stored_record(&temp).version;
+
+        // The package at the recorded location moves on without the repository.
+        // What enumeration reports is what reading that location now yields, so
+        // the new version is reported and the stored record no longer describes
+        // it.
+        let manifest = fs::read_to_string(temp.path().join("vendor/recorded/manifest.toml"))
+            .unwrap()
+            .replace(
+                &format!("version = \"{recorded_version}\""),
+                "version = \"2.0.0\"",
+            );
+        let rewritten = repackage(&temp, "vendor/recorded", "manifest.toml", &manifest);
+        assert_ne!(rewritten.manifest().profile.version, recorded_version);
+
+        let listed = executor.list_recorded_profiles().unwrap();
+
+        assert_eq!(listed.count, 1);
+        assert_eq!(
+            listed.profiles[0].version,
+            rewritten.manifest().profile.version
+        );
+        assert!(
+            !listed.profiles[0].applied,
+            "a record that no longer describes the package at its location is not applied state"
+        );
+    }
+
+    #[test]
+    fn test_list_recorded_profiles_reports_a_recorded_location_that_no_longer_resolves() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        let applied = package_read_from(&temp, "vendor/recorded");
+        executor.apply_profile_package(&applied).unwrap();
+        fs::remove_dir_all(temp.path().join("vendor/recorded")).unwrap();
+
+        let error = executor.list_recorded_profiles().unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableRecordedLocation { record, location, .. })
+                    if record == ".jit/profiles/planner-asset-only.json"
+                        && location == "vendor/recorded"
+            ),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn test_list_recorded_profiles_reports_a_record_naming_a_package_this_binary_lacks() {
+        let (temp, _storage, executor, _embedded) = fixture();
+        store_record(
+            &temp,
+            &AppliedProfileRecord::new(
+                "absent-from-this-binary",
+                "1.0.0",
+                ProfileOrigin::Embedded,
+                "package-hash",
+                BTreeMap::new(),
+            ),
+        );
+
+        let error = executor.list_recorded_profiles().unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileResolutionError>(),
+                Some(ProfileResolutionError::UnresolvableRecordedEmbedding { record, id })
+                    if record == ".jit/profiles/absent-from-this-binary.json"
+                        && id == "absent-from-this-binary"
+            ),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_records_the_worktree_location_it_read_the_package_from() {
         let (temp, _storage, executor, _embedded) = fixture();
         let package = package_read_from(&temp, "vendor/profiles/planner");
 
-        executor.apply_embedded_profile(&package).unwrap();
+        executor.apply_profile_package(&package).unwrap();
 
         // The stored location resolves, from the worktree root alone, back to
         // the directory whose bytes were applied — which is the whole point of
@@ -642,7 +1193,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_embedded_profile_records_the_directory_read_rather_than_a_peer_copy() {
+    fn test_apply_profile_package_records_the_directory_read_rather_than_a_peer_copy() {
         // Two directories inside the worktree hold byte-identical packages.
         // Nothing but the directory a package was read through distinguishes
         // them, so the recorded location must follow that and only that.
@@ -652,8 +1203,8 @@ mod tests {
         let second = package_read_from(&second_temp, "packages/second/tree");
         assert_eq!(first.hashes(), second.hashes());
 
-        first_executor.apply_embedded_profile(&first).unwrap();
-        second_executor.apply_embedded_profile(&second).unwrap();
+        first_executor.apply_profile_package(&first).unwrap();
+        second_executor.apply_profile_package(&second).unwrap();
 
         assert_eq!(
             stored_record(&first_temp).origin,
@@ -666,13 +1217,13 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_embedded_profile_refuses_a_package_read_from_outside_the_worktree() {
+    fn test_apply_profile_package_refuses_a_package_read_from_outside_the_worktree() {
         let (temp, storage, executor, _embedded) = fixture();
         let elsewhere = TempDir::new().unwrap();
         let root = crate::test_utils::write_package_tree(&PACKAGE, &elsewhere.path().join("pkg"));
         let package = ProfilePackage::from_directory(&root).expect("a valid package tree");
 
-        let error = executor.apply_embedded_profile(&package).unwrap_err();
+        let error = executor.apply_profile_package(&package).unwrap_err();
 
         assert!(
             matches!(
@@ -688,13 +1239,13 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_embedded_profile_refuses_a_package_read_from_the_data_root() {
+    fn test_apply_profile_package_refuses_a_package_read_from_the_data_root() {
         // The selected data root is not a worktree location, so a package
         // placed under it has no worktree-relative location to record.
         let (temp, storage, executor, _embedded) = fixture();
         let package = package_read_from(&temp, ".jit/vendored");
 
-        let error = executor.apply_embedded_profile(&package).unwrap_err();
+        let error = executor.apply_profile_package(&package).unwrap_err();
 
         assert!(
             matches!(
@@ -834,7 +1385,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration() {
+    fn test_apply_profile_package_jit_default_reproduces_the_scaffolded_configuration() {
         let (temp, storage, _executor, _fixture_package) = fixture();
         let config_path = temp.path().join(".jit/config.toml");
         let scaffolded = fs::read_to_string(&config_path).unwrap();
@@ -855,7 +1406,7 @@ mod tests {
             &temp.path().join("profiles/jit-default"),
         );
         let package = ProfilePackage::from_directory(&package_root).unwrap();
-        let applied = executor.apply_embedded_profile(&package).unwrap();
+        let applied = executor.apply_profile_package(&package).unwrap();
         assert_eq!(applied.status, ProfileApplicationStatus::Applied);
 
         let produced: serde_json::Value =
@@ -901,7 +1452,7 @@ mod tests {
     fn test_profile_application_commits_targets_record_event_and_exact_no_op() {
         let (temp, storage, executor, package) = fixture();
 
-        let applied = executor.apply_embedded_profile(&package).unwrap();
+        let applied = executor.apply_profile_package(&package).unwrap();
         assert_eq!(applied.status, ProfileApplicationStatus::Applied);
         assert_eq!(
             fs::read(temp.path().join("docs/profile.txt")).unwrap(),
@@ -922,7 +1473,7 @@ mod tests {
             &compact_record,
         )
         .unwrap();
-        let unchanged = executor.apply_embedded_profile(&package).unwrap();
+        let unchanged = executor.apply_profile_package(&package).unwrap();
         assert_eq!(unchanged.status, ProfileApplicationStatus::Unchanged);
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
@@ -947,7 +1498,7 @@ mod tests {
         );
 
         let (plan, changes) = executor
-            .prepare_embedded_profile(session.as_mut(), &package, &context)
+            .prepare_profile(session.as_mut(), &package, &context)
             .unwrap()
             .unwrap();
         let paths = plan
@@ -974,11 +1525,11 @@ mod tests {
         let context = MutationContext::preview();
 
         let first = executor
-            .prepare_embedded_profile(session.as_mut(), &package, &context)
+            .prepare_profile(session.as_mut(), &package, &context)
             .unwrap()
             .unwrap();
         let second = executor
-            .prepare_embedded_profile(session.as_mut(), &package, &context)
+            .prepare_profile(session.as_mut(), &package, &context)
             .unwrap()
             .unwrap();
 
@@ -991,7 +1542,7 @@ mod tests {
         let (temp, storage, executor, package) = fixture();
         fs::write(temp.path().join(".jit/config.toml"), b"not = [valid").unwrap();
 
-        assert!(executor.apply_embedded_profile(&package).is_err());
+        assert!(executor.apply_profile_package(&package).is_err());
         assert!(!temp.path().join("docs/profile.txt").exists());
         assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
@@ -1008,8 +1559,7 @@ mod tests {
             config_path: temp.path().join(".jit/config.toml"),
         };
 
-        let result =
-            executor.prepare_embedded_profile(&mut session, &package, &MutationContext::preview());
+        let result = executor.prepare_profile(&mut session, &package, &MutationContext::preview());
 
         assert!(result.is_err());
         assert!(!temp.path().join("docs/profile.txt").exists());
@@ -1030,12 +1580,12 @@ mod tests {
         };
 
         let first = executor
-            .prepare_embedded_profile(&mut session, &package, &MutationContext::preview())
+            .prepare_profile(&mut session, &package, &MutationContext::preview())
             .unwrap();
         assert!(first.is_none(), "an expanded final closure must retry");
 
         let (plan, _) = executor
-            .prepare_embedded_profile(&mut session, &package, &MutationContext::preview())
+            .prepare_profile(&mut session, &package, &MutationContext::preview())
             .unwrap()
             .expect("the repeated capture includes the new source");
         assert!(plan
@@ -1051,7 +1601,7 @@ mod tests {
         let torn = b"{\"torn\":";
         fs::write(temp.path().join(".jit/events.jsonl"), torn).unwrap();
 
-        executor.apply_embedded_profile(&package).unwrap();
+        executor.apply_profile_package(&package).unwrap();
 
         let image = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         assert!(image.starts_with(b"{\"torn\":\n"));
@@ -1083,7 +1633,7 @@ mod tests {
         )
         .unwrap();
 
-        executor.apply_embedded_profile(&package).unwrap();
+        executor.apply_profile_package(&package).unwrap();
 
         let events = storage.read_events().unwrap();
         assert_eq!(events.len(), 2);
