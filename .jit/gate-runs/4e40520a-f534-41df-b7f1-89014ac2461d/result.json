@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "132a647238a0804516aa38eaa87f53f8d25973b4",
+  "completed_at": "2026-08-02T21:56:05.819719347Z",
+  "duration_ms": 164305,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "profiles/jit-dogfood/manifest.toml",
+        "id": "F1",
+        "line": 1,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-14"
+        ],
+        "severity": "high",
+        "summary": "jit-dogfood lacks the jit-default dependency declaration, so its embedded initialization path does not apply a dependency closure."
+      }
+    ],
+    "summary": "The embedded jit-dogfood package never declares its required jit-default dependency.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d35cc3f2-7549-4a10-a61a-f49333b5e67c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4e40520a-f534-41df-b7f1-89014ac2461d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T21:53:21.514558067Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9673 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc477-a4a0-7e41-9d8f-80d479add39a\n--------\nuser\n--- 9660 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 14314516, eb1414e5, 132a6472 (`jit:d35cc3f2`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-14 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, markdown-first); @/invariant/derived-state-coherence (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T21:43:41.887684390+00:00); code-review pending\nTruncation recovery: narrowed tagged commit and merge-parent patches to individual affected files; read current resolver, storage, manifest, test, and registry sources after broad results truncated\n\n1. [blocking][issue-impact] The shipped embedded workflow package does not declare `jit-default` as a dependency: [profiles/jit-dogfood/manifest.toml](/home/vkaskivuo/Projects/just-in-time/profiles/jit-dogfood/manifest.toml:1) has no `dependencies` field. The new resolver can find both embeds, but `jit init --profile jit-dogfood` therefore never exercises or applies the required dependency closure. The added tests instead manufacture a separate `workflow` package ([init.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/init.rs:794), [profile_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs:417)), leaving REQ-03 unmet for the actual embedded workflow and contradicting its claimed conformance to D-14.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The embedded jit-dogfood package never declares its required jit-default dependency.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"jit-dogfood lacks the jit-default dependency declaration, so its embedded initialization path does not apply a dependency closure.\",\"file\":\"profiles/jit-dogfood/manifest.toml\",\"line\":1,\"references\":[\"@/issue/e204e63d/decision/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

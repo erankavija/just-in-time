@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T21:53:19.393714444Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-02T21:56:06.135874186Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d35cc3f2-7549-4a10-a61a-f49333b5e67c",
   "labels": [
     "epic:derived-package-sources",
@@ -24,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "The binary carries the package its embedded workflow depends on",
-  "updated_at": "2026-08-02T20:54:33.390497276Z"
+  "updated_at": "2026-08-02T21:56:06.135874186Z"
 }
