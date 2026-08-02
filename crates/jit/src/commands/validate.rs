@@ -560,10 +560,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// is decided by its own applied-profile records: the `.jit/profiles/`
     /// listing names them, so a repository that has applied nothing captures no
     /// package target and resolves no package. A recorded profile contributes
-    /// repair claims only when its captured record exactly matches the resolved
-    /// package identity and target hashes; what that profile then owns comes
-    /// from the package the record proves, never from a target's filename or
-    /// occupant.
+    /// repair claims only when its captured record exactly matches the record
+    /// its resolved package would write today; what that profile then owns comes
+    /// from that package, never from a target's filename or occupant.
+    ///
+    /// The records are therefore read before anything is resolved: a record is
+    /// what names the location its package is read from, so the closure of
+    /// package targets this capture must cover is only knowable once they are in
+    /// hand.
     ///
     /// A record whose package cannot be obtained fails the whole capture rather
     /// than repairing the targets still accounted for: a repair that silently
@@ -587,47 +591,42 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         let profiles_dir = VirtualPath::PROFILES;
         let listings = std::slice::from_ref(&profiles_dir);
-        let Some(discovered) = self.capture_proposed_base_with_listings(session, &[], listings)?
+        let Some((records, recorded)) =
+            super::profile::capture_applied_records(session, &profiles_dir)?
         else {
             return Ok(None);
         };
-        let recorded = super::profile::recorded_profile_ids(&discovered, &profiles_dir)?;
-        let packages = match resolve_recorded_packages(&recorded)? {
-            Ok(packages) => packages,
-            Err(failure) => return Ok(Some(Err(failure))),
+        let packages = match resolve_recorded_packages(&records, &recorded)? {
+            None => return Ok(None),
+            Some(Ok(packages)) => packages,
+            Some(Err(failure)) => return Ok(Some(Err(failure))),
         };
-
-        let image = if packages.is_empty() {
-            discovered
-        } else {
-            let layout = self.require_layout()?;
-            let profile_paths = packages
-                .iter()
-                .flat_map(|(_, package)| package.hashes().targets.keys())
-                .map(|path| {
-                    layout
-                        .classify_repository_relative(path)
-                        .map_err(Into::into)
-                })
-                .chain(
-                    packages
-                        .iter()
-                        .map(|(record_path, _)| Ok(record_path.clone())),
-                )
-                .collect::<Result<Vec<_>>>()?;
-            let Some(image) =
-                self.capture_proposed_base_with_listings(session, &profile_paths, listings)?
-            else {
-                return Ok(None);
-            };
-            // The closure was planned from the record set the first capture saw;
-            // a concurrent application or removal restarts the attempt rather
-            // than deriving repair over a stale answer.
-            if super::profile::recorded_profile_ids(&image, &profiles_dir)? != recorded {
-                return Ok(None);
-            }
-            image
+        let profile_paths = packages
+            .iter()
+            .flat_map(|(_, package)| package.hashes().targets.keys())
+            .map(|path| {
+                records
+                    .layout()
+                    .classify_repository_relative(path)
+                    .map_err(Into::into)
+            })
+            .chain(
+                packages
+                    .iter()
+                    .map(|(record_path, _)| Ok(record_path.clone())),
+            )
+            .collect::<Result<Vec<_>>>()?;
+        let Some(image) =
+            self.capture_proposed_base_with_listings(session, &profile_paths, listings)?
+        else {
+            return Ok(None);
         };
+        // The closure was planned from the record set the records capture saw; a
+        // concurrent application or removal restarts the attempt rather than
+        // deriving repair over a stale answer.
+        if super::profile::recorded_profile_ids(&image, &profiles_dir)? != recorded {
+            return Ok(None);
+        }
         let profiles = match captured_profile_repair_claims(&image, &packages)? {
             Some(Ok(profiles)) => profiles,
             Some(Err(failure)) => return Ok(Some(Err(failure))),
@@ -674,38 +673,92 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
 /// Resolve one package, and its record's canonical path, per recorded profile.
 ///
+/// Each package is read through the route its own record names
+/// ([`recorded_package`](super::profile::recorded_package)) — a worktree
+/// location, or this binary's compiled-in bytes — so validation reads the
+/// package the repository applied rather than the one this binary happens to
+/// carry. `records` is the capture holding those records.
+///
 /// The first record whose package cannot be obtained is the whole answer:
 /// repairing the profiles that did resolve would narrow what repair restores
-/// without reporting it (`@/invariant/derived-state-coherence`).
+/// without reporting it (`@/invariant/derived-state-coherence`). A record that
+/// does not read as a record is the same condition — the package it names
+/// cannot be obtained, because what names it cannot be read.
 ///
 /// Every record is attempted before any failure is reported, because the
 /// failure is diagnosed against the records that did resolve: a package
 /// obtained as another package's dependency was never named by the adopter, so
 /// the record that declared it is named beside it ([`declaring_records`]).
+///
+/// `Ok(None)` reports a listed record the capture no longer holds, which the
+/// caller retries rather than resolving without it.
 #[allow(clippy::type_complexity)]
 fn resolve_recorded_packages(
+    records: &crate::repository_state::RepositoryImage,
     recorded: &std::collections::BTreeSet<String>,
 ) -> Result<
-    std::result::Result<
-        Vec<(
-            crate::repository_state::VirtualPath,
-            crate::profile::ProfilePackage,
-        )>,
-        crate::validation::repository::RepositoryValidationFailure,
+    Option<
+        std::result::Result<
+            Vec<(
+                crate::repository_state::VirtualPath,
+                crate::profile::ProfilePackage,
+            )>,
+            crate::validation::repository::RepositoryValidationFailure,
+        >,
     >,
 > {
-    Ok(compose_recorded_resolution(
-        recorded
-            .iter()
-            .map(|id| {
-                Ok((
-                    id.clone(),
-                    super::profile::applied_record_path(id)?,
-                    super::profile::embedded_profile(id),
-                ))
-            })
-            .collect::<Result<Vec<_>>>()?,
-    ))
+    let Some(attempted) = recorded
+        .iter()
+        .map(|id| attempted_recorded_package(records, id))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+    else {
+        return Ok(None);
+    };
+    Ok(Some(compose_recorded_resolution(attempted)))
+}
+
+/// One recorded profile's resolution attempt, over the record `records` holds
+/// at that profile's canonical record path.
+///
+/// `Ok(None)` reports a listed record the capture no longer holds.
+fn attempted_recorded_package(
+    records: &crate::repository_state::RepositoryImage,
+    id: &str,
+) -> Result<Option<AttemptedRecordedPackage>> {
+    let record_path = super::profile::applied_record_path(id)?;
+    let Some(record) = captured_applied_record(records, &record_path)? else {
+        return Ok(None);
+    };
+    let package = record.and_then(|record| {
+        super::profile::recorded_package(&record, &record_path, records.layout())
+    });
+    Ok(Some((id.to_string(), record_path, package)))
+}
+
+/// The applied-profile record `image` holds at `record_path`.
+///
+/// `Ok(None)` reports a record path the capture no longer holds, which the
+/// caller retries. Bytes that are not a record, and an occupant that is not a
+/// file, are reported rather than read past: the record is the repository's own
+/// statement about a profile, so provenance that cannot be read is a fact about
+/// that profile rather than a missing one.
+fn captured_applied_record(
+    image: &crate::repository_state::RepositoryImage,
+    record_path: &crate::repository_state::VirtualPath,
+) -> Result<Option<Result<crate::repository_state::AppliedProfileRecord>>> {
+    use crate::repository_state::RepositoryEntry;
+
+    Ok(match image.entry(record_path)? {
+        RepositoryEntry::Absent => None,
+        RepositoryEntry::File { bytes, .. } => {
+            Some(serde_json::from_slice(bytes).context("invalid applied profile provenance"))
+        }
+        _ => Some(Err(anyhow!(
+            "applied profile provenance path {record_path:?} is not a regular file"
+        ))),
+    })
 }
 
 /// One recorded profile's id, its record's canonical path, and the outcome of
@@ -793,50 +846,36 @@ fn captured_profile_repair_claims(
         >,
     >,
 > {
-    use crate::repository_state::RepositoryEntry;
     use crate::validation::repository::RepositoryValidationFailure;
 
     let mut claims = Vec::with_capacity(packages.len());
     for (record_path, package) in packages {
         let metadata = &package.manifest().profile;
-        match image.entry(record_path)? {
-            RepositoryEntry::Absent => return Ok(None),
-            RepositoryEntry::File { bytes, .. } => {
-                let actual: crate::repository_state::AppliedProfileRecord =
-                    match serde_json::from_slice(bytes)
-                        .context("invalid applied profile provenance")
-                    {
-                        Ok(actual) => actual,
-                        Err(error) => {
-                            return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                                error,
-                            ))))
-                        }
-                    };
-                if actual != super::profile::expected_record(package, image.layout())? {
-                    return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                        anyhow!(
-                            "applied profile provenance for '{}@{}' does not match the resolvable embedded package",
-                            metadata.id,
-                            metadata.version
-                        ),
-                    ))));
-                }
-                match crate::profile::build_profile_repair_claims(package, image.layout()) {
-                    Ok(built) => claims.push(built),
-                    Err(error) => {
-                        return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                            error.into(),
-                        ))))
-                    }
-                }
-            }
-            _ => {
+        let Some(record) = captured_applied_record(image, record_path)? else {
+            return Ok(None);
+        };
+        let actual = match record {
+            Ok(actual) => actual,
+            Err(error) => {
                 return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                    anyhow!(
-                        "applied profile provenance path {:?} is not a regular file",
-                        record_path
-                    ),
+                    error,
+                ))))
+            }
+        };
+        if actual != super::profile::expected_record(package, image.layout())? {
+            return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                anyhow!(
+                    "applied profile provenance for '{}@{}' does not match the package its record resolves to",
+                    metadata.id,
+                    metadata.version
+                ),
+            ))));
+        }
+        match crate::profile::build_profile_repair_claims(package, image.layout()) {
+            Ok(built) => claims.push(built),
+            Err(error) => {
+                return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                    error.into(),
                 ))))
             }
         }

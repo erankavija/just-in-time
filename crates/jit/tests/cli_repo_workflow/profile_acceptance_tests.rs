@@ -378,6 +378,67 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
         .all(|profile| profile["status"] == "unchanged"));
 }
 
+/// A repository that applied a directory package validates, and repairs the
+/// targets that package owns from the location its record names.
+///
+/// The package is a fixture this binary does not carry, so every fact
+/// validation states about it — that the repository is coherent, and the bytes
+/// it restores to a deleted target — can only have come from reading the
+/// recorded location again.
+#[test]
+fn test_validate_repairs_a_profile_applied_from_a_directory() {
+    const LOCATION: &str = "packages/planner";
+
+    let repo = TestRepo::new();
+    let directory =
+        jit::test_utils::write_package_tree(&COMPOSITION_PACKAGE, &repo.path.join(LOCATION));
+    let package = jit::profile::ProfilePackage::from_directory(&directory)
+        .expect("a valid package tree")
+        .manifest()
+        .clone();
+    let declared = package
+        .assets
+        .first()
+        .expect("the fixture package declares one asset");
+    let asset = fs::read_to_string(directory.join(&declared.source)).expect("read package asset");
+
+    success_json(
+        &repo.path,
+        &[
+            "init",
+            "--profile",
+            package.profile.id.as_str(),
+            "--from",
+            LOCATION,
+            "--json",
+        ],
+    );
+
+    assert_eq!(
+        success_json(&repo.path, &["validate", "--json"])["valid"],
+        true,
+        "a repository that correctly applied a directory package is coherent"
+    );
+
+    let target = repo.path.join(&declared.target);
+    fs::remove_file(&target).expect("delete the profile-owned target");
+    let repaired = success_json(&repo.path, &["validate", "--fix", "--json"]);
+
+    assert!(
+        repaired["fixes_applied"].as_u64().unwrap_or_default() > 0,
+        "the deleted profile-owned target is repairable: {repaired}"
+    );
+    assert_eq!(
+        fs::read_to_string(&target).expect("the deleted target is restored"),
+        asset,
+        "repair restores the bytes the recorded location holds"
+    );
+    assert_eq!(
+        success_json(&repo.path, &["validate", "--json"])["valid"],
+        true
+    );
+}
+
 #[test]
 fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
     let repo = TestRepo::new();

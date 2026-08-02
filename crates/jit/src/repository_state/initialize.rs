@@ -285,7 +285,7 @@ impl InitializationScaffold {
         files
     }
 
-    /// Whether the scaffold carries an embedded profile contribution.
+    /// Whether the scaffold carries a profile contribution.
     pub fn profile(&self) -> Option<&ProfileApplicationInput> {
         self.profile.as_ref()
     }

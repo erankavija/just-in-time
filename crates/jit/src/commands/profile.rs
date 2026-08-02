@@ -17,7 +17,7 @@ use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-/// Failure resolving which package bytes a profile command reads.
+/// Failure resolving which package bytes a command reads.
 ///
 /// Resolution takes the first route that answers — a location the caller
 /// supplied, the location this repository's applied-profile record names, the
@@ -187,27 +187,9 @@ impl CommandExecutor<JsonFileStorage> {
         let layout = self.require_layout()?;
         let profiles_dir = VirtualPath::PROFILES;
         with_mutation_session(self.storage(), &layout, "profile enumeration", |session| {
-            let mut spec = CaptureSpec::phase_one([], RECORD_CAPTURE_BUDGET)?;
-            spec.discover_listing(profiles_dir.clone())?;
-            let Some(listed) = capture_or_retry(session.capture(spec.clone()))? else {
+            let Some((image, recorded)) = capture_applied_records(session, &profiles_dir)? else {
                 return Ok(SessionStep::Retry);
             };
-            let recorded = recorded_profile_ids(&listed, &profiles_dir)?;
-            spec.discover_paths(
-                recorded
-                    .iter()
-                    .map(|id| applied_record_path(id))
-                    .collect::<Result<Vec<_>>>()?,
-            )?;
-            let Some(image) = capture_or_retry(session.capture(spec))? else {
-                return Ok(SessionStep::Retry);
-            };
-            // The record set was decided by the first capture; a concurrent
-            // application or removal restarts the attempt rather than reporting
-            // an inventory no single repository state ever held.
-            if recorded_profile_ids(&image, &profiles_dir)? != recorded {
-                return Ok(SessionStep::Retry);
-            }
             let Some(profiles) = recorded
                 .iter()
                 .map(|id| recorded_summary(&image, id, &layout))
@@ -637,6 +619,45 @@ pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
     name.strip_suffix(".json").filter(|id| !id.is_empty())
 }
 
+/// Read this repository's applied-profile records through a held session.
+///
+/// The `.jit/profiles/` listing states which packages the repository carries,
+/// so the records it names are read in the same capture that re-reads that
+/// listing: the returned image holds every named record's bytes, and the ids
+/// are the profiles those records name.
+///
+/// `Ok(None)` reports a record set that moved while it was being read — a
+/// concurrent application or removal — which the caller retries rather than
+/// answering over an inventory no single repository state ever held.
+///
+/// Enumeration and derived-state repair both begin here, because a record is
+/// what names the location its package is read from: neither can resolve a
+/// package before reading the records.
+pub(super) fn capture_applied_records(
+    session: &mut (dyn RepositoryMutationSession + '_),
+    profiles_dir: &VirtualPath,
+) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
+    let mut spec = CaptureSpec::phase_one([], RECORD_CAPTURE_BUDGET)?;
+    spec.discover_listing(profiles_dir.clone())?;
+    let Some(listed) = capture_or_retry(session.capture(spec.clone()))? else {
+        return Ok(None);
+    };
+    let recorded = recorded_profile_ids(&listed, profiles_dir)?;
+    spec.discover_paths(
+        recorded
+            .iter()
+            .map(|id| applied_record_path(id))
+            .collect::<Result<Vec<_>>>()?,
+    )?;
+    let Some(image) = capture_or_retry(session.capture(spec))? else {
+        return Ok(None);
+    };
+    if recorded_profile_ids(&image, profiles_dir)? != recorded {
+        return Ok(None);
+    }
+    Ok(Some((image, recorded)))
+}
+
 /// Profile ids the repository's own applied-profile records name.
 ///
 /// Application writes one record per applied profile at
@@ -815,7 +836,7 @@ fn profile_application_input(
 }
 
 /// Resolve one embedded profile package by stable id.
-pub(super) fn embedded_profile(id: &str) -> Result<ProfilePackage> {
+fn embedded_profile(id: &str) -> Result<ProfilePackage> {
     let package = jit_dogfood_package()?;
     if package.manifest().profile.id.as_str() == id {
         Ok(package)
