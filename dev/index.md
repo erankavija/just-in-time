@@ -129,8 +129,10 @@ one. It exits 0 when the tree is assembled at the destination, 1 when the
 assembly or the publication failed, and 2 on a usage or environment error.
 
 It is not one of the artifacts above: what it writes is not committed, so it
-carries no drift assertion. The destination is the caller's, untracked and
-disposable, and nothing in the workspace reads what a run produces — so
+carries no drift assertion. The destination is whichever path the caller names —
+the example above names one under `target/`, which this repository ignores — and
+a run replaces it whole. No build consumes what a run produces; the run reads its
+own result back to validate it, which is a check rather than a dependency, so
 assembling during a build would make every build do work no build consumes, and
 the directory watching a build step needs is what once relinked every test
 target on an unchanged rebuild. The render lives in
