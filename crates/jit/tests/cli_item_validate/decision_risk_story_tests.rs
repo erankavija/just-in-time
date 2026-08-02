@@ -44,7 +44,6 @@
 //!   file duplicates either `D-01` or `RISK-01`.
 
 use jit::commands::CommandExecutor;
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use serde_json::Value;
 use std::path::Path;
@@ -55,15 +54,28 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-/// `jit init` a fresh, DEFAULT repo in a tempdir (no custom `[item_kinds]`).
+/// Build a fresh repo from the shared taxonomy fixture and declare both item kinds.
 fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-    assert!(output.status.success(), "jit init failed");
+    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    let config_path = temp.path().join(".jit/config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap();
+    config.push_str(
+        "\n[item_kinds.decision]\n\
+         section = \"decisions\"\n\
+         id-pattern = \"D-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"per\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n\n\
+         [item_kinds.risk]\n\
+         section = \"risks\"\n\
+         id-pattern = \"RISK-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"mitigates\", \"resolves\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n",
+    );
+    std::fs::write(config_path, config).unwrap();
     temp
 }
 
@@ -108,11 +120,13 @@ fn default_executor_with(
     repo: &Path,
     issues: Vec<(&str, &str)>,
 ) -> (CommandExecutor<JsonFileStorage>, Vec<String>) {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let jit_dir = repo.join(".jit");
     std::fs::create_dir_all(&jit_dir).unwrap();
     std::fs::write(
         jit_dir.join("config.toml"),
-        "[item_kinds.decision]\n\
+        format!(
+            "{}[item_kinds.decision]\n\
          section = \"decisions\"\n\
          id-pattern = \"D-[0-9]+\"\n\
          markers = []\n\
@@ -126,13 +140,15 @@ fn default_executor_with(
          link-namespaces = [\"mitigates\", \"resolves\"]\n\
          scope = \"issue\"\n\
          source-of-truth = \"markdown-first\"\n",
+            taxonomy.config_fragment()
+        ),
     )
     .unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
     let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(repo, &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(repo, &taxonomy.hierarchy_template(), None)
         .unwrap();
     let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);
@@ -145,7 +161,7 @@ fn default_executor_with(
 
 #[test]
 fn test_story_item_list_decision_and_risk_coexist() {
-    // REQ-01 + REQ-02: in a DEFAULT-initialized repo, an issue that carries BOTH a
+    // REQ-01 + REQ-02: in a fixture-initialized repo, an issue that carries BOTH a
     // `## Decisions` section and a `## Risks` section in its description is indexed
     // by BOTH kinds through the SAME generic code path. `jit item list --kind
     // decision` returns ONLY the decision items; `jit item list --kind risk`
@@ -257,8 +273,8 @@ fn test_story_mitigates_and_resolves_labels_resolve_risk() {
     // REQ-04: BOTH a `mitigates:<issue>/RISK-01` AND a `resolves:<issue>/RISK-01`
     // label resolve to the addressed risk item through the generic
     // `resolve_link_label`, even when the same issue also carries a `## Decisions`
-    // section. Both namespaces are recognized because the `risk` kind that `jit init`
-    // emits declares them; neither requires custom config.
+    // section. Both namespaces are recognized because the configured `risk` kind
+    // declares them.
     let temp = TempDir::new().unwrap();
     let (exec, shorts) =
         default_executor_with(temp.path(), vec![("Architecture + risks", STORY_BODY)]);
