@@ -36,11 +36,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   everything else from the checked-in sources under `profiles/jit-dogfood` — and
   publishes each run as a freshly staged tree, so a source the manifest stops
   declaring is absent from the next one. The destination is the caller's,
-  untracked and disposable, and no build reads it: nothing compiles the package
-  in, so assembling it in the build would make every build do work no build
-  consumes. The render lives in the crate and reads the manifest through the
-  crate's own package model, which leaves the manifest one reader, and the
-  assembled tree is validated as a package before it is published.
+  untracked and disposable, and no build reads it: no build consumes the
+  assembled tree, so producing it in the build would make every build do work no
+  build consumes. The render lives in the crate and reads the manifest through
+  the crate's own package model, which leaves the manifest one reader; the
+  assembled tree is validated as a package before it is published, and published
+  through the storage layer's atomic no-replace rename, so an occupied
+  destination is reported rather than overwritten.
 
 - **A gate verdict is reused when its declared inputs are unchanged.** A quality
   gate runs once per issue, so several issues sitting on one repository state

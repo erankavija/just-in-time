@@ -12,9 +12,10 @@ set -euo pipefail
 # profiles/jit-dogfood, and the assembly draws each declared source from
 # whichever of the two owns it.
 #
-# WHY THIS IS NOT A BUILD STEP. Nothing compiles the package in, so a build step
-# would make every build do work no build consumes, and the directory watching
-# it would need is what once relinked every test target on an unchanged rebuild.
+# WHY THIS IS NOT A BUILD STEP. No build consumes the tree it writes, so a build
+# step would make every build do work no build consumes, and the directory
+# watching it would need is what once relinked every test target on an unchanged
+# rebuild.
 # Running as an entry point also leaves the manifest one reader, the crate's own
 # package model, where a build script could only have been a second one: a build
 # script cannot import the crate it builds.
