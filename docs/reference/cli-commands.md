@@ -702,9 +702,8 @@ that declared it beside the one that could not be found; declared dependencies
 that close a cycle fail the same way, naming the cycle. Conflicts, invalid
 package state, final-state validation failures, filesystem failures, and
 recovery-required conditions use the shared typed error envelope and exit-code
-taxonomy. The
-[Repository Profiles reference](profiles.md) defines what application may
-change and the v1.0 features that do not exist.
+taxonomy. The [Repository Profiles reference](profiles.md) defines what
+application may change and the v1.0 features that do not exist.
 
 ## Version and Provenance
 
