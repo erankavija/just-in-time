@@ -390,7 +390,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchy_templates::HierarchyTemplate;
 
     #[test]
     fn test_resolve_dotted_key_scalar_leaf() {
@@ -588,21 +587,13 @@ schema = 1
     fn test_set_config_rejects_invalid_strictness() {
         // F1: `jit config set validation.strictness <invalid>` must be rejected
         // eagerly, and must not overwrite a previously-valid persisted value.
-        let dir = tempfile::TempDir::new().unwrap();
+        let (repo, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         // A repo `config set` publishes through the recovered session and validates
         // the proposed repository, so it needs an initialized, layout-backed repo.
-        let storage = crate::storage::JsonFileStorage::new(dir.path());
         let layout =
-            crate::storage::discover_repository_layout(dir.path().parent().unwrap(), dir.path())
-                .unwrap();
+            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
-        executor
-            .initialize_fresh_repository(
-                dir.path().parent().unwrap(),
-                &HierarchyTemplate::default(),
-                None,
-            )
-            .unwrap();
 
         // A recognized level is accepted and persisted.
         executor

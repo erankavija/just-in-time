@@ -859,22 +859,18 @@ fn validate_materializations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::storage::{IssueStore, JsonFileStorage};
     use std::path::PathBuf;
 
     fn fixture() -> tempfile::TempDir {
-        let repo = tempfile::tempdir().unwrap();
-        let store = JsonFileStorage::new(repo.path().join(".jit"));
-        std::fs::create_dir_all(store.root()).unwrap();
+        let (repo, _storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
         std::fs::write(
             repo.path().join(".jit/config.toml"),
             "[type_hierarchy.types]\ntask = 4\n\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n",
         )
         .unwrap();
-        executor(&repo)
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
-            .unwrap();
+        executor(&repo).validate_with_fix(true, false).unwrap();
         executor(&repo)
             .create_issue(
                 "Root".to_string(),
