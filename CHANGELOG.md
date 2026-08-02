@@ -26,6 +26,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **The workflow package tree is assembled from the repository files it
+  mirrors.** Most of the `jit-dogfood` package's assets name a repository file
+  as their target and carry a byte copy of it, so an edit to a packaged skill or
+  gate script had to be made twice and a missed second edit was drift a guard
+  could only report after the fact. `./scripts/assemble-package.sh <destination>`
+  now produces the whole tree. It draws each declared source from the side that
+  owns it — a live asset from the repository file its declaration targets,
+  everything else from the checked-in sources under `profiles/jit-dogfood` — and
+  publishes each run as a freshly staged tree, so a source the manifest stops
+  declaring is absent from the next one. The destination is the caller's,
+  untracked and disposable, and no build reads it: nothing compiles the package
+  in, so assembling it in the build would make every build do work no build
+  consumes. The render lives in the crate and reads the manifest through the
+  crate's own package model, which leaves the manifest one reader, and the
+  assembled tree is validated as a package before it is published.
+
 - **A gate verdict is reused when its declared inputs are unchanged.** A quality
   gate runs once per issue, so several issues sitting on one repository state
   each paid for a whole-tree checker to re-derive an identical verdict; nothing
