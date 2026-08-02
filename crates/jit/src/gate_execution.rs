@@ -472,6 +472,13 @@ fn git_listed_repository_paths(worktree_root: &Path) -> Option<Vec<String>> {
 
 /// Recursively collect every file path beneath `directory`, relative to the
 /// worktree root `prefix` names it from.
+///
+/// This walk honours no ignore rules — there are none to honour where git is
+/// not answering — so one tree can digest differently with and without git. The
+/// difference is over-inclusion only: this path can name files the git-listed
+/// inventory omits, never the reverse. An extra file yields an unfamiliar
+/// digest and therefore an extra checker execution, so the divergence costs a
+/// run rather than licensing a reuse the content did not earn.
 fn collect_walked_paths(directory: &Path, prefix: &str, paths: &mut Vec<String>) -> Result<()> {
     let entries = std::fs::read_dir(directory)
         .with_context(|| format!("Failed to walk declared inputs at {}", directory.display()))?;
