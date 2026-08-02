@@ -19,10 +19,11 @@
 //! source-of-truth  = "markdown-first"
 //! ```
 //!
-//! Coverage of the issue's `[hard]` success criteria, all against a DEFAULT repo:
+//! Coverage of the issue's `[hard]` success criteria, all against a repository
+//! initialized with the shared taxonomy fixture:
 //! - REQ-01: [`test_default_repo_item_list_kind_decision_returns_decisions`] runs
 //!   the real `jit` binary so `jit item list --kind decision` returns decisions
-//!   parsed from an issue description, with NO custom config.
+//!   parsed from an issue description with the configured `decision` item kind.
 //! - REQ-02: [`test_default_repo_per_label_resolves_decision`] proves a
 //!   `per:<issue>/D-01` label resolves to the addressed decision through the
 //!   existing generic `resolve_link_label` (the `per` namespace is recognized
@@ -33,7 +34,6 @@
 //! - REQ-04: every test below runs under `cargo test`.
 
 use jit::commands::CommandExecutor;
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use serde_json::Value;
 use std::path::Path;
@@ -44,15 +44,21 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-/// `jit init` a fresh, DEFAULT repo in a tempdir (no custom `[item_kinds]`).
+/// Build a fresh repo from the shared taxonomy fixture and declare `decision`.
 fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-    assert!(output.status.success(), "jit init failed");
+    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    let config_path = temp.path().join(".jit/config.toml");
+    let mut config = std::fs::read_to_string(&config_path).unwrap();
+    config.push_str(
+        "\n[item_kinds.decision]\n\
+         section = \"decisions\"\n\
+         id-pattern = \"D-[0-9]+\"\n\
+         markers = []\n\
+         link-namespaces = [\"per\"]\n\
+         scope = \"issue\"\n\
+         source-of-truth = \"markdown-first\"\n",
+    );
+    std::fs::write(config_path, config).unwrap();
     temp
 }
 
@@ -75,7 +81,7 @@ fn create_issue(repo: &Path, title: &str, body: &str) -> String {
 
 #[test]
 fn test_default_repo_item_list_kind_decision_returns_decisions() {
-    // REQ-01: in a DEFAULT-initialized repo (no custom config), `jit item list
+    // REQ-01: in a fixture-initialized repo with the configured `decision` kind, `jit item list
     // --kind decision` returns decision items parsed from an issue's `## Decisions`
     // section — exercised through the actual binary.
     let temp = setup_test_repo();
@@ -158,24 +164,28 @@ fn default_executor_with(
     repo: &Path,
     issues: Vec<(&str, &str)>,
 ) -> (CommandExecutor<JsonFileStorage>, Vec<String>) {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let jit_dir = repo.join(".jit");
     std::fs::create_dir_all(&jit_dir).unwrap();
     std::fs::write(
         jit_dir.join("config.toml"),
-        "[item_kinds.decision]\n\
+        format!(
+            "{}[item_kinds.decision]\n\
          section = \"decisions\"\n\
          id-pattern = \"D-[0-9]+\"\n\
          markers = []\n\
          link-namespaces = [\"per\"]\n\
          scope = \"issue\"\n\
          source-of-truth = \"markdown-first\"\n",
+            taxonomy.config_fragment()
+        ),
     )
     .unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
     let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(repo, &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(repo, &taxonomy.hierarchy_template(), None)
         .unwrap();
     let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);
@@ -189,9 +199,8 @@ fn default_executor_with(
 #[test]
 fn test_default_repo_per_label_resolves_decision() {
     // REQ-02: a `per:<issue>/D-01` label resolves to the addressed decision item
-    // through the existing generic `resolve_link_label`, with NO custom config —
-    // the `per` namespace is recognized because the `decision` kind that `jit init`
-    // emits declares it.
+    // through the existing generic `resolve_link_label`; the configured `decision`
+    // kind declares the `per` namespace.
     let temp = TempDir::new().unwrap();
     let (exec, shorts) = default_executor_with(
         temp.path(),
