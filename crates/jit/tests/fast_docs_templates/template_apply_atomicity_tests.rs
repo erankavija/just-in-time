@@ -15,16 +15,14 @@ use anyhow::Result;
 use jit::declarations::{GateRegistry, GateStage};
 use jit::domain::{Event, Issue, Priority};
 use jit::gate_presets::{GatePresetDefinition, PresetInfo};
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
 use jit::storage::{
     InMemoryStorage, IssueStore, JsonFileStorage, PathReadError, RepositoryStateStore,
 };
 use jit::templates::{GraphTemplate, TemplateRegistry};
+use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use jit::CommandExecutor;
-use tempfile::TempDir;
 
-const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 const SNAPSHOT_BUDGET: CaptureBudget = CaptureBudget {
     max_paths: 1 << 12,
     max_listings: 1,
@@ -312,24 +310,37 @@ impl<S: IssueStore + RepositoryStateStore> RepositoryStateStore for PublicationP
     }
 }
 
-fn plan_template() -> GraphTemplate {
-    let toml = r#"
+fn plan_template(taxonomy: &TestTaxonomy) -> GraphTemplate {
+    let container_type = taxonomy.type_at_level(2);
+    let planning_type = taxonomy.type_at_level(3);
+    let breakdown_type = taxonomy.type_at_level(4);
+    let membership_namespace = taxonomy
+        .label_associations
+        .get(container_type)
+        .expect("the test taxonomy associates the container type with a namespace");
+    let hierarchy_types = taxonomy
+        .hierarchy
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let toml = format!(
+        r#"
 [[template]]
 name = "plan"
-applies_to = ["epic"]
+applies_to = ["{container_type}"]
   [[template.anchors]]
   name = "container"
   gates = ["repo-validate"]
   [[template.nodes]]
   role = "planning"
-  type = "planning"
-  doc = "dev/active/{container.id}-plan.md"
-  description = "Planning node for {container.title}."
+  type = "{planning_type}"
+  doc = "dev/active/{{container.id}}-plan.md"
+  description = "Planning node for {{container.title}}."
   [[template.nodes]]
   role = "breakdown"
-  type = "breakdown"
-  labels = ["brackets:{container.short_id}"]
-  description = "Breakdown node for {container.title}."
+  type = "{breakdown_type}"
+  labels = ["{membership_namespace}:{{container.short_id}}"]
+  description = "Breakdown node for {{container.title}}."
   depends_on = ["planning"]
   [[template.anchor_edges]]
   from = "container"
@@ -337,8 +348,9 @@ applies_to = ["epic"]
   [[template.transforms]]
   kind = "move-upstream-to-role"
   role = "planning"
-"#;
-    TemplateRegistry::from_toml_str(toml, &HIERARCHY)
+"#
+    );
+    TemplateRegistry::from_toml_str(&toml, &hierarchy_types)
         .unwrap()
         .get("plan")
         .unwrap()
@@ -349,14 +361,17 @@ fn bindings(container: &str) -> BTreeMap<String, String> {
     BTreeMap::from([("container".to_string(), container.to_string())])
 }
 
-fn memory_storage() -> InMemoryStorage {
+fn memory_storage() -> (InMemoryStorage, TestTaxonomy) {
+    let taxonomy = test_taxonomy();
     let storage = InMemoryStorage::new();
-    storage.add_data_file("config.toml", "");
-    storage
+    let config = taxonomy.config_fragment();
+    storage.add_data_file("config.toml", &config);
+    (storage, taxonomy)
 }
 
 fn fixture<S: IssueStore + RepositoryStateStore>(
     store: PublicationProbeStore<S>,
+    taxonomy: &TestTaxonomy,
 ) -> (CommandExecutor<PublicationProbeStore<S>>, String, String) {
     std::env::set_var("JIT_TEST_MODE", "1");
     assert!(store.read_repo_file(".jit/config.toml").unwrap().is_some());
@@ -392,7 +407,16 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
             Priority::Normal,
             vec![],
-            vec!["type:epic".to_string(), "area:auth".to_string()],
+            vec![
+                format!("type:{}", taxonomy.type_at_level(2)),
+                format!(
+                    "{}:auth",
+                    taxonomy
+                        .label_associations
+                        .get(taxonomy.type_at_level(2))
+                        .expect("the test taxonomy associates the container type with a namespace")
+                ),
+            ],
             None,
             None,
             false,
@@ -428,12 +452,18 @@ fn repository_image<S: IssueStore + RepositoryStateStore>(store: &S) -> Reposito
 
 fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
     store: PublicationProbeStore<S>,
+    taxonomy: &TestTaxonomy,
 ) {
-    let (executor, container, _) = fixture(store.clone());
+    let (executor, container, _) = fixture(store.clone(), taxonomy);
     let before = repository_image(&store);
     store.arm();
     let error = executor
-        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .apply_template_with(
+            &plan_template(taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
         .unwrap_err();
     assert!(store.fired());
     assert!(error.to_string().contains("publication failure"), "{error}");
@@ -442,7 +472,12 @@ fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
     // The one-shot fault is exhausted: a fresh recovered session can publish the
     // complete scaffold, proving the failure left no blocking transaction state.
     let result = executor
-        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .apply_template_with(
+            &plan_template(taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
         .unwrap()
         .0;
     assert_eq!(result.created_node_ids_by_role.len(), 2);
@@ -450,33 +485,44 @@ fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
 
 #[test]
 fn test_failed_publication_preserves_memory_preimage_and_retry_succeeds() {
-    assert_publication_failure_is_atomic(PublicationProbeStore::new(memory_storage()));
+    let (storage, taxonomy) = memory_storage();
+    assert_publication_failure_is_atomic(PublicationProbeStore::new(storage), &taxonomy);
 }
 
 #[test]
 fn test_failed_publication_preserves_file_preimage_and_retry_succeeds() {
-    let temp = TempDir::new().unwrap();
-    let storage = JsonFileStorage::new(temp.path().join(".jit"));
-    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
-        .unwrap();
-    assert_publication_failure_is_atomic(PublicationProbeStore::new(storage));
+    let (_temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    assert_publication_failure_is_atomic(PublicationProbeStore::new(storage), &taxonomy);
 }
 
 #[test]
 fn test_retryable_conflict_reuses_created_ids_and_timestamp() {
-    let store = PublicationProbeStore::retry_once(memory_storage());
-    let (executor, container, _) = fixture(store.clone());
+    let (storage, taxonomy) = memory_storage();
+    let store = PublicationProbeStore::retry_once(storage);
+    let (executor, container, _) = fixture(store.clone(), &taxonomy);
     store.arm();
     let result = executor
-        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .apply_template_with(
+            &plan_template(&taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
         .unwrap()
         .0;
     let attempts = store.attempts();
     assert_eq!(attempts.len(), 2, "one conflict and one successful apply");
     assert_eq!(attempts[0], attempts[1]);
+    let planning_label = format!("type:{}", taxonomy.type_at_level(3));
+    let container_issue = executor.storage().load_issue(&container).unwrap();
+    let breakdown_label = format!(
+        "{}:{}",
+        taxonomy
+            .label_associations
+            .get(taxonomy.type_at_level(2))
+            .expect("the test taxonomy associates the container type with a namespace"),
+        container_issue.short_id()
+    );
     let created = result
         .created_node_ids_by_role
         .values()
@@ -488,7 +534,7 @@ fn test_retryable_conflict_reuses_created_ids_and_timestamp() {
             issue
                 .labels
                 .iter()
-                .any(|label| matches!(label.as_str(), "type:planning" | "type:breakdown"))
+                .any(|label| label == &planning_label || label == &breakdown_label)
         })
         .map(|issue| issue.id.clone())
         .collect::<std::collections::BTreeSet<_>>();
@@ -497,17 +543,11 @@ fn test_retryable_conflict_reuses_created_ids_and_timestamp() {
 
 #[test]
 fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
-    let temp = TempDir::new().unwrap();
-    let jit_root = temp.path().join(".jit");
     let stall = Duration::from_millis(500);
-    let storage = JsonFileStorage::new(&jit_root);
-    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
-        .unwrap();
+    let (temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    let jit_root = temp.path().join(".jit");
     let store = PublicationProbeStore::with_stall(storage, stall);
-    let (executor, container, upstream) = fixture(store.clone());
+    let (executor, container, upstream) = fixture(store.clone(), &taxonomy);
     let original_container = executor.storage().load_issue(&container).unwrap();
     store.arm();
 
@@ -542,7 +582,12 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
     };
 
     let error = executor
-        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .apply_template_with(
+            &plan_template(&taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
         .unwrap_err();
     let (bystander, elapsed) = writer.join().unwrap();
     assert!(error.to_string().contains("publication failure"), "{error}");
@@ -563,6 +608,16 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
         executor.storage().load_issue(&bystander).unwrap().title,
         "Concurrent bystander"
     );
+    let planning_label = format!("type:{}", taxonomy.type_at_level(3));
+    let container_issue = executor.storage().load_issue(&container).unwrap();
+    let breakdown_label = format!(
+        "{}:{}",
+        taxonomy
+            .label_associations
+            .get(taxonomy.type_at_level(2))
+            .expect("the test taxonomy associates the container type with a namespace"),
+        container_issue.short_id()
+    );
     assert!(!executor
         .storage()
         .list_issues()
@@ -572,21 +627,31 @@ fn test_concurrent_writer_observes_failed_apply_preimage_then_publishes() {
             issue
                 .labels
                 .iter()
-                .any(|label| matches!(label.as_str(), "type:planning" | "type:breakdown"))
+                .any(|label| label == &planning_label || label == &breakdown_label)
         }));
 }
 
 #[test]
 fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
-    let store = PublicationProbeStore::new(memory_storage());
-    let (executor, container, _) = fixture(store.clone());
-    store
-        .inner
-        .add_data_file("config.toml", "[worktree]\nenforce_leases = \"warn\"\n");
+    let (storage, taxonomy) = memory_storage();
+    let store = PublicationProbeStore::new(storage);
+    let (executor, container, _) = fixture(store.clone(), &taxonomy);
+    store.inner.add_data_file(
+        "config.toml",
+        &format!(
+            "[worktree]\nenforce_leases = \"warn\"\n\n{}",
+            taxonomy.config_fragment()
+        ),
+    );
     let resolves_before = store.resolve_calls();
 
     let (_, warnings) = executor
-        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .apply_template_with(
+            &plan_template(&taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
         .unwrap();
 
     assert!(
@@ -599,8 +664,6 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
 
 #[test]
 fn test_phase_two_closure_change_retries_with_same_template_node_count() {
-    let temp = TempDir::new().unwrap();
-    let jit_root = temp.path().join(".jit");
     let changed_config = r#"
 [item_kinds.invariant]
 section = "success_criteria"
@@ -616,23 +679,24 @@ kind = "invariant"
 mode = "region"
 target = "docs/closure.md"
 "#;
-    let storage = JsonFileStorage::new(&jit_root);
-    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
-        .unwrap();
+    let (temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    let jit_root = temp.path().join(".jit");
     let store = PublicationProbeStore::rewrite_config_once(
         storage,
         jit_root.join("config.toml"),
         changed_config.to_string(),
     );
-    let (executor, container, _) = fixture(store.clone());
+    let (executor, container, _) = fixture(store.clone(), &taxonomy);
     let calls_before = store.apply_calls();
     store.arm();
 
     executor
-        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .apply_template_with(
+            &plan_template(&taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
         .unwrap();
 
     let target = VirtualPath::worktree("docs/closure.md").unwrap();
@@ -654,15 +718,21 @@ target = "docs/closure.md"
 }
 
 fn assert_planning_document_capture(existing: bool) {
-    let store = PublicationProbeStore::new(memory_storage());
-    let (executor, container, _) = fixture(store.clone());
+    let (storage, taxonomy) = memory_storage();
+    let store = PublicationProbeStore::new(storage);
+    let (executor, container, _) = fixture(store.clone(), &taxonomy);
     let target = format!("dev/active/{container}-plan.md");
     if existing {
         store.inner.add_worktree_file(&target, "existing plan\n");
     }
 
     executor
-        .apply_template_with(&plan_template(), &container, &bindings(&container), false)
+        .apply_template_with(
+            &plan_template(&taxonomy),
+            &container,
+            &bindings(&container),
+            false,
+        )
         .unwrap();
 
     let target = VirtualPath::worktree(&target).unwrap();
@@ -697,9 +767,10 @@ fn test_existing_planning_document_and_parents_are_captured_without_borrowing() 
 
 #[test]
 fn test_unchanged_force_is_exact_noop_without_publication_or_created_id_paths() {
-    let store = PublicationProbeStore::new(memory_storage());
-    let (executor, container, _) = fixture(store.clone());
-    let template = plan_template();
+    let (storage, taxonomy) = memory_storage();
+    let store = PublicationProbeStore::new(storage);
+    let (executor, container, _) = fixture(store.clone(), &taxonomy);
+    let template = plan_template(&taxonomy);
     let applied = executor
         .apply_template_with(&template, &container, &bindings(&container), false)
         .unwrap()
