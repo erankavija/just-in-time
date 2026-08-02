@@ -540,11 +540,7 @@ mod tests {
         let executor = executor_with_layout(&storage, repo.path());
 
         let result = executor
-            .initialize_fresh_repository(
-                repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                None,
-            )
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
 
         assert!(result.profile.is_none());
@@ -572,11 +568,7 @@ mod tests {
         let executor = executor_with_layout(&storage, repo.path());
 
         let result = executor
-            .initialize_fresh_repository(
-                repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                None,
-            )
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
 
         // Present and empty, like the gate registry beside it: the file exists,
@@ -608,11 +600,7 @@ mod tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
         executor
-            .initialize_fresh_repository(
-                repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                None,
-            )
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
 
         // The adopter authors into the registry initialization gave them; nothing
@@ -691,7 +679,7 @@ mod tests {
         executor
             .initialize_fresh_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                &HierarchyTemplate::default(),
                 Some("jit-dogfood"),
             )
             .unwrap();
@@ -716,7 +704,7 @@ mod tests {
         let again = reinit
             .initialize_profiled_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                &HierarchyTemplate::default(),
                 "jit-dogfood",
             )
             .unwrap();
@@ -741,11 +729,7 @@ mod tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
         executor
-            .initialize_fresh_repository(
-                repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                None,
-            )
+            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
             .unwrap();
 
         let config_path = repo.path().join(".jit/config.toml");
@@ -875,7 +859,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                     barrier.wait();
                     executor.initialize_fresh_repository(
                         repo.path(),
-                        &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                        &HierarchyTemplate::default(),
                         Some("jit-dogfood"),
                     )
                 })
