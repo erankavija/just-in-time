@@ -906,7 +906,7 @@ mod tests {
     use super::*;
     use crate::domain::Event;
     use crate::hierarchy_templates::HierarchyTemplate;
-    use crate::repository_state::RootRelativePath;
+    use crate::repository_state::{Contribution, MapEntryTarget, RootRelativePath};
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
@@ -1546,6 +1546,91 @@ mod tests {
             .expect("the checked-in jit-default package validates")
     }
 
+    /// The directory holding this repository's checked-in workflow package.
+    fn jit_dogfood_directory() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood")
+    }
+
+    /// The project name every repository built by
+    /// [`bare_repository_beside_shipped_packages`] carries, so two of them
+    /// differ in what was applied to them rather than in where they sit.
+    const COMPOSITION_PROJECT_NAME: &str = "composition";
+
+    /// A repository declaring nothing, with the two shipped package trees
+    /// beside each other inside its worktree.
+    ///
+    /// The configuration is reduced to what an initialization derives from the
+    /// repository itself — the schema version and the project name — so what an
+    /// application writes afterwards is what the applied packages declare and
+    /// nothing that survived the reduction. The package directories sit side by
+    /// side because that is where an adopter puts an obtained set, and where a
+    /// package's declared dependency is looked for.
+    ///
+    /// Answers with the repository, an executor over it, and the `jit-default`
+    /// and `jit-dogfood` packages read back from the trees inside it.
+    fn bare_repository_beside_shipped_packages() -> (
+        TempDir,
+        CommandExecutor<JsonFileStorage>,
+        ProfilePackage,
+        ProfilePackage,
+    ) {
+        let (temp, storage, _executor, _fixture_package) = fixture();
+        let config_path = temp.path().join(".jit/config.toml");
+        let mut bare = fs::read_to_string(&config_path)
+            .unwrap()
+            .parse::<toml_edit::DocumentMut>()
+            .unwrap();
+        bare.as_table_mut()
+            .retain(|key, _| matches!(key, "version" | "project"));
+        bare["project"]["name"] = toml_edit::value(COMPOSITION_PROJECT_NAME);
+        fs::write(&config_path, bare.to_string()).unwrap();
+
+        let default_root = crate::test_utils::copy_package_tree(
+            &jit_default_directory(),
+            &temp.path().join("profiles/jit-default"),
+        );
+        let dogfood_root = crate::test_utils::copy_package_tree(
+            &jit_dogfood_directory(),
+            &temp.path().join("profiles/jit-dogfood"),
+        );
+        let default = ProfilePackage::from_directory(&default_root)
+            .expect("the checked-in jit-default package validates");
+        let dogfood = ProfilePackage::from_directory(&dogfood_root)
+            .expect("the checked-in jit-dogfood package validates");
+        // Re-discovered over the reduced configuration, as a fresh process
+        // would read it.
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+        (temp, executor, default, dogfood)
+    }
+
+    /// The configuration a repository carries, parsed rather than read as
+    /// bytes: key order and formatting are not what a comparison is about.
+    fn published_configuration(temp: &TempDir) -> serde_json::Value {
+        toml_edit::de::from_str(&fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap())
+            .unwrap()
+    }
+
+    /// The map identities a package declares, each with the configuration
+    /// table it declares it in and the value it declares, in manifest order.
+    fn declared_map_entries(
+        package: &ProfilePackage,
+    ) -> Vec<(MapEntryTarget, &str, &serde_json::Value)> {
+        package
+            .manifest()
+            .contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                Contribution::MapEntry {
+                    target,
+                    identity,
+                    value,
+                } => Some((*target, identity.as_str(), value)),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// The repository-relative file a project-scope item-kind declaration reads
     /// its items from, or `None` for a kind that needs no source.
     fn item_kind_source(declaration: &serde_json::Value) -> Option<&str> {
@@ -1558,18 +1643,10 @@ mod tests {
 
     /// The item-kind declarations one package contributes, by kind name.
     fn declared_item_kinds(package: &ProfilePackage) -> BTreeMap<&str, &serde_json::Value> {
-        package
-            .manifest()
-            .contributions
-            .iter()
-            .filter_map(|contribution| match contribution {
-                crate::repository_state::Contribution::MapEntry {
-                    target: crate::repository_state::MapEntryTarget::ItemKinds,
-                    identity,
-                    value,
-                } => Some((identity.as_str(), value)),
-                _ => None,
-            })
+        declared_map_entries(package)
+            .into_iter()
+            .filter(|(target, ..)| *target == MapEntryTarget::ItemKinds)
+            .map(|(_, identity, value)| (identity, value))
             .collect()
     }
 
@@ -1722,135 +1799,142 @@ mod tests {
             vec!["jit-default"]
         );
 
+        // A type name, a namespace and an item kind are each a map identity in
+        // one of these tables, so what the two packages declare in them is what
+        // they may not both declare.
         let declared_vocabulary = |package: &ProfilePackage| {
-            package
-                .manifest()
-                .contributions
-                .iter()
-                .filter_map(|contribution| match contribution {
-                    crate::repository_state::Contribution::MapEntry {
-                        target:
-                            target @ (crate::repository_state::MapEntryTarget::TypeHierarchyTypes
-                            | crate::repository_state::MapEntryTarget::Namespaces
-                            | crate::repository_state::MapEntryTarget::ItemKinds),
-                        identity,
-                        ..
-                    } => Some(format!("{target:?}:{identity}")),
-                    _ => None,
+            declared_map_entries(package)
+                .into_iter()
+                .filter(|(target, ..)| {
+                    matches!(
+                        target,
+                        MapEntryTarget::TypeHierarchyTypes
+                            | MapEntryTarget::Namespaces
+                            | MapEntryTarget::ItemKinds
+                    )
                 })
+                .map(|(target, identity, _)| format!("{target:?}:{identity}"))
                 .collect::<BTreeSet<_>>()
         };
         let default_vocabulary = declared_vocabulary(&default);
         let dogfood_vocabulary = declared_vocabulary(&dogfood);
 
         assert!(
+            !dogfood_vocabulary.is_empty(),
+            "the disjointness is vacuous unless the workflow package declares vocabulary"
+        );
+        assert!(
             default_vocabulary.is_disjoint(&dogfood_vocabulary),
             "the workflow package must not restate default vocabulary"
         );
         assert!(
-            dogfood
-                .manifest()
-                .contributions
+            declared_map_entries(&dogfood)
                 .iter()
-                .all(|contribution| !matches!(
-                    contribution,
-                    crate::repository_state::Contribution::MapEntry {
-                        target: crate::repository_state::MapEntryTarget::ItemKinds,
-                        ..
-                    }
-                )),
+                .all(|(target, ..)| *target != MapEntryTarget::ItemKinds),
             "the workflow package must not declare item kinds"
         );
     }
 
     #[test]
-    fn test_apply_jit_dogfood_matches_explicit_package_composition_without_conflict() {
-        let (first_temp, first_storage, first_executor, _first_fixture_package) = fixture();
-        let first_config_path = first_temp.path().join(".jit/config.toml");
-        let first_scaffolded = fs::read_to_string(&first_config_path).unwrap();
-        let mut first_bare = first_scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
-        first_bare
-            .as_table_mut()
-            .retain(|key, _| matches!(key, "version" | "project"));
-        first_bare["project"]["name"] = toml_edit::value("composition-test");
-        fs::write(&first_config_path, first_bare.to_string()).unwrap();
-        let first_default_root = crate::test_utils::copy_package_tree(
-            &jit_default_directory(),
-            &first_temp.path().join("profiles/jit-default"),
-        );
-        let first_dogfood_root = crate::test_utils::copy_package_tree(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood"),
-            &first_temp.path().join("profiles/jit-dogfood"),
-        );
-        let first_default = ProfilePackage::from_directory(&first_default_root).unwrap();
-        let first_dogfood = ProfilePackage::from_directory(&first_dogfood_root).unwrap();
+    fn test_apply_profile_package_jit_dogfood_composes_what_applying_both_packages_composes() {
+        // Two bare repositories, one per route: the explicit one has both
+        // packages applied to it in turn, and the resolved one names only the
+        // workflow package and receives the default as its declared
+        // dependency. They start identical, so the configurations they end with
+        // may differ only by the route that reached them.
+        let (explicit_temp, explicit_executor, explicit_default, explicit_dogfood) =
+            bare_repository_beside_shipped_packages();
+        let (resolved_temp, resolved_executor, _, resolved_dogfood) =
+            bare_repository_beside_shipped_packages();
 
-        let first_default_result = first_executor
-            .apply_one_profile_package(&first_default)
-            .unwrap();
-        let first_dogfood_result = first_executor
-            .apply_one_profile_package(&first_dogfood)
-            .unwrap();
-        assert_eq!(
-            first_default_result.status,
-            ProfileApplicationStatus::Applied
-        );
-        assert_eq!(
-            first_dogfood_result.status,
-            ProfileApplicationStatus::Applied
-        );
-        assert_eq!(
-            applied_event_ids(&first_storage),
-            vec!["jit-default", "jit-dogfood"]
-        );
+        let explicit_default_result = explicit_executor.apply_profile_package(&explicit_default);
+        let explicit_dogfood_result = explicit_executor.apply_profile_package(&explicit_dogfood);
+        let resolved_result = resolved_executor.apply_profile_package(&resolved_dogfood);
 
-        let (second_temp, _second_storage, second_executor, _second_fixture_package) = fixture();
-        let second_config_path = second_temp.path().join(".jit/config.toml");
-        let second_scaffolded = fs::read_to_string(&second_config_path).unwrap();
-        let mut second_bare = second_scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
-        second_bare
-            .as_table_mut()
-            .retain(|key, _| matches!(key, "version" | "project"));
-        second_bare["project"]["name"] = toml_edit::value("composition-test");
-        fs::write(&second_config_path, second_bare.to_string()).unwrap();
-        let second_default_root = crate::test_utils::copy_package_tree(
-            &jit_default_directory(),
-            &second_temp.path().join("profiles/jit-default"),
-        );
-        let second_dogfood_root = crate::test_utils::copy_package_tree(
-            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood"),
-            &second_temp.path().join("profiles/jit-dogfood"),
-        );
-        let _second_default = ProfilePackage::from_directory(&second_default_root).unwrap();
-        let second_dogfood = ProfilePackage::from_directory(&second_dogfood_root).unwrap();
-
-        let second_result = second_executor
-            .apply_profile_package(&second_dogfood)
-            .unwrap();
+        // A contribution restating an identity under another value is refused
+        // as a conflict, so an application that answers at all reported none.
+        let conflicted = [
+            ("the default package by itself", &explicit_default_result),
+            ("the workflow package over it", &explicit_dogfood_result),
+            ("the workflow package alone", &resolved_result),
+        ]
+        .into_iter()
+        .filter_map(|(route, result)| {
+            result
+                .as_ref()
+                .err()
+                .map(|error| format!("{route}: {error:#}"))
+        })
+        .collect::<Vec<_>>();
         assert_eq!(
-            second_result
+            conflicted,
+            Vec::<String>::new(),
+            "each entry is a route whose application reported a conflict"
+        );
+        let explicit_default_result = explicit_default_result.unwrap();
+        let explicit_dogfood_result = explicit_dogfood_result.unwrap();
+        let resolved_result = resolved_result.unwrap();
+
+        // The two routes reach the composition differently. The explicit one
+        // applies the dependency in its own right, so the workflow package's
+        // own closure then finds it already applied; the resolved one applies
+        // both under the single application of the package naming the other.
+        let published_by = |result: &ProfileComposedApplyResult| {
+            result
                 .profiles
                 .iter()
-                .map(|profile| profile.id.as_str())
-                .collect::<Vec<_>>(),
-            vec!["jit-default", "jit-dogfood"]
+                .map(|profile| (profile.id.clone(), profile.status))
+                .collect::<Vec<_>>()
+        };
+        let default_id = explicit_default.manifest().profile.id.to_string();
+        let dogfood_id = explicit_dogfood.manifest().profile.id.to_string();
+        assert_eq!(
+            published_by(&explicit_default_result),
+            vec![(default_id.clone(), ProfileApplicationStatus::Applied)]
         );
-        assert!(
-            second_result
-                .profiles
-                .iter()
-                .all(|profile| profile.status == ProfileApplicationStatus::Applied),
-            "dependency-resolving application must apply every package without conflict: {:?}",
-            second_result.profiles
+        assert_eq!(
+            published_by(&explicit_dogfood_result),
+            vec![
+                (default_id.clone(), ProfileApplicationStatus::Unchanged),
+                (dogfood_id.clone(), ProfileApplicationStatus::Applied),
+            ]
+        );
+        assert_eq!(
+            published_by(&resolved_result),
+            vec![
+                (default_id, ProfileApplicationStatus::Applied),
+                (dogfood_id, ProfileApplicationStatus::Applied),
+            ]
         );
 
-        let first_config: serde_json::Value =
-            toml_edit::de::from_str(&fs::read_to_string(&first_config_path).unwrap()).unwrap();
-        let second_config: serde_json::Value =
-            toml_edit::de::from_str(&fs::read_to_string(&second_config_path).unwrap()).unwrap();
         assert_eq!(
-            first_config, second_config,
-            "explicit and dependency-resolving composition must produce the same configuration"
+            published_configuration(&explicit_temp),
+            published_configuration(&resolved_temp),
+            "naming the workflow package alone must produce what applying both packages produces"
+        );
+
+        // Not two repositories agreeing on nothing: every identity either
+        // package declares reached the configuration the comparison is over,
+        // carrying the value that package declares for it.
+        let composed = published_configuration(&resolved_temp);
+        let composed_table = |target: MapEntryTarget| match target {
+            MapEntryTarget::TypeHierarchyTypes => &composed["type_hierarchy"]["types"],
+            MapEntryTarget::LabelAssociations => &composed["type_hierarchy"]["label_associations"],
+            MapEntryTarget::Namespaces => &composed["namespaces"],
+            MapEntryTarget::ItemKinds => &composed["item_kinds"],
+        };
+        let divergent = [&explicit_default, &resolved_dogfood]
+            .into_iter()
+            .flat_map(declared_map_entries)
+            .filter(|(target, identity, value)| {
+                composed_table(*target).get(identity) != Some(*value)
+            })
+            .map(|(target, identity, _)| format!("{target:?}:{identity}"))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            divergent,
+            Vec::<String>::new(),
+            "each entry is a declared identity the composition lacks or carries another value for"
         );
     }
 
