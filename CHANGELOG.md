@@ -19,8 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   patterns describing categories of repository material the package
   deliberately does not carry, because a literal list of those files would
   itself be a hand-maintained inventory: `*` stays inside one path segment and
-  `**` spans segments, both matched against a path relative to the root that
-  declared them. A root and an exclusion pattern are constrained types rather
+  `**` spans segments, both matched against the repository-relative path. A
+  root and an exclusion pattern are constrained types rather
   than free strings — a root that is not a relative path of ordinary segments,
   and a pattern that does not compile, are rejected where the manifest is
   parsed rather than by whichever consumer matches first — and a manifest
