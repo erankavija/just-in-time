@@ -591,7 +591,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         else {
             return Ok(None);
         };
-        let recorded = recorded_profile_ids(&discovered, &profiles_dir)?;
+        let recorded = super::profile::recorded_profile_ids(&discovered, &profiles_dir)?;
         let packages = match resolve_recorded_packages(&recorded)? {
             Ok(packages) => packages,
             Err(failure) => return Ok(Some(Err(failure))),
@@ -623,7 +623,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             // The closure was planned from the record set the first capture saw;
             // a concurrent application or removal restarts the attempt rather
             // than deriving repair over a stale answer.
-            if recorded_profile_ids(&image, &profiles_dir)? != recorded {
+            if super::profile::recorded_profile_ids(&image, &profiles_dir)? != recorded {
                 return Ok(None);
             }
             image
@@ -670,27 +670,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             plan,
         })))
     }
-}
-
-/// Profile ids the repository's own applied-profile records name.
-///
-/// Application writes one record per applied profile at
-/// `.jit/profiles/<id>.json`, so the listing of that directory is where the
-/// repository states which packages it needs. A child whose name is not a
-/// record name is not a record.
-fn recorded_profile_ids(
-    image: &crate::repository_state::RepositoryImage,
-    profiles_dir: &crate::repository_state::VirtualPath,
-) -> Result<std::collections::BTreeSet<String>> {
-    Ok(image
-        .listing_fingerprints()
-        .get(profiles_dir)
-        .ok_or_else(|| anyhow!("capture did not list {profiles_dir:?}"))?
-        .children()
-        .keys()
-        .filter_map(|name| super::profile::record_name_profile_id(name))
-        .map(str::to_string)
-        .collect())
 }
 
 /// Resolve one package, and its record's canonical path, per recorded profile.
@@ -2776,7 +2755,11 @@ style = "full"
                 .unwrap();
         CommandExecutor::new(source_storage)
             .with_layout(source_layout)
-            .initialize_fresh_repository(source.path(), &taxonomy.hierarchy_template(), profile)
+            .initialize_fresh_repository(
+                source.path(),
+                &taxonomy.hierarchy_template(),
+                profile.map(|id| crate::commands::ProfileSelection { id, location: None }),
+            )
             .unwrap();
 
         let storage = crate::storage::InMemoryStorage::new();
@@ -2919,7 +2902,10 @@ depends_on = ["planning"]
             .initialize_fresh_repository(
                 repo.path(),
                 &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                Some("jit-dogfood"),
+                Some(crate::commands::ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
             )
             .unwrap();
 
@@ -3008,7 +2994,10 @@ depends_on = ["planning"]
             .initialize_fresh_repository(
                 repo.path(),
                 &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                Some("jit-dogfood"),
+                Some(crate::commands::ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
             )
             .unwrap();
 
@@ -3254,7 +3243,10 @@ depends_on = ["planning"]
             .initialize_fresh_repository(
                 repo.path(),
                 &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
-                Some("jit-dogfood"),
+                Some(crate::commands::ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
             )
             .unwrap();
         let rules_path = repo.path().join(".jit/rules.toml");

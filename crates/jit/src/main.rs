@@ -23,7 +23,7 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
     ProfileCommands, ProjectCommands,
 };
-use jit::commands::{CommandExecutor, DescriptionUpdate};
+use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelection};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
@@ -2100,6 +2100,7 @@ fn run() -> Result<()> {
         Commands::Init {
             hierarchy_template,
             profile,
+            from,
             json,
         } => {
             let output_ctx = OutputContext::new(quiet, *json);
@@ -2126,8 +2127,12 @@ fn run() -> Result<()> {
                 .as_ref()
                 .cloned()
                 .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
+            let profile_location = from.as_deref();
             if let Some(id) = profile.as_deref() {
-                profile_result(executor.validate_profile_id(id), *json)?;
+                profile_result(
+                    executor.validate_profile_selection(id, profile_location),
+                    *json,
+                )?;
             }
 
             // Every init and re-init — plain, profiled, or over an existing root —
@@ -2140,7 +2145,14 @@ fn run() -> Result<()> {
             // profiled init, closing the prior re-init gap.
             let init_result = profile_result(
                 if let Some(id) = profile.as_deref() {
-                    executor.initialize_profiled_repository(&current_dir, &chosen, id)
+                    executor.initialize_profiled_repository(
+                        &current_dir,
+                        &chosen,
+                        ProfileSelection {
+                            id,
+                            location: profile_location,
+                        },
+                    )
                 } else {
                     executor.initialize_fresh_repository(&current_dir, &chosen, None)
                 },
@@ -2240,7 +2252,7 @@ fn run() -> Result<()> {
             // Already handled above
         }
         Commands::Profile(profile_cmd) => match profile_cmd {
-            ProfileCommands::List { json } => match executor.list_embedded_profiles() {
+            ProfileCommands::List { json } => match executor.list_recorded_profiles() {
                 Ok(result) => {
                     if json {
                         let output = JsonOutput::success(&result);
@@ -2264,40 +2276,47 @@ fn run() -> Result<()> {
                 }
                 Err(error) => return Err(error),
             },
-            ProfileCommands::Show { id, json } => match executor.show_embedded_profile(&id) {
-                Ok(result) => {
-                    if json {
-                        let output = JsonOutput::success(&result);
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        let profile = &result.manifest.profile;
-                        println!("Profile: {}", profile.id);
-                        println!("Version: {}", profile.version);
-                        println!("Origin: {}", profile_origin_label(&result.origin));
-                        println!("Compatible JIT: {}", profile.jit);
-                        println!("Package hash: {}", result.package_hash);
-                        println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
-                        println!("Targets: {}", result.target_hashes.len());
-                        println!(
-                            "Applied: {}",
-                            if result.applied.is_some() {
-                                "yes"
-                            } else {
-                                "no"
-                            }
-                        );
+            ProfileCommands::Show { id, from, json } => {
+                match executor.show_profile(&id, from.as_deref()) {
+                    Ok(result) => {
+                        if json {
+                            let output = JsonOutput::success(&result);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            let profile = &result.manifest.profile;
+                            println!("Profile: {}", profile.id);
+                            println!("Version: {}", profile.version);
+                            println!("Origin: {}", profile_origin_label(&result.origin));
+                            println!("Compatible JIT: {}", profile.jit);
+                            println!("Package hash: {}", result.package_hash);
+                            println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
+                            println!("Targets: {}", result.target_hashes.len());
+                            println!(
+                                "Applied: {}",
+                                if result.applied.is_some() {
+                                    "yes"
+                                } else {
+                                    "no"
+                                }
+                            );
+                        }
                     }
+                    Err(error) if json => {
+                        let json_error = profile_json_error(&error);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    }
+                    Err(error) => return Err(error),
                 }
-                Err(error) if json => {
-                    let json_error = profile_json_error(&error);
-                    println!("{}", json_error.to_json_string()?);
-                    std::process::exit(json_error.exit_code().code());
-                }
-                Err(error) => return Err(error),
-            },
-            ProfileCommands::Apply { id, dry_run, json } => {
+            }
+            ProfileCommands::Apply {
+                id,
+                from,
+                dry_run,
+                json,
+            } => {
                 if dry_run {
-                    match executor.plan_embedded_profile(&id) {
+                    match executor.plan_profile(&id, from.as_deref()) {
                         Ok(plan) => {
                             if json {
                                 let output = JsonOutput::success(&plan);
@@ -2326,7 +2345,7 @@ fn run() -> Result<()> {
                         Err(error) => return Err(error),
                     }
                 } else {
-                    match executor.apply_profile(&id) {
+                    match executor.apply_profile(&id, from.as_deref()) {
                         Ok(applied) => {
                             if json {
                                 let output = JsonOutput::success(&applied);
