@@ -1727,7 +1727,7 @@ The gate key may be supplied as a positional argument or via `--gate <key>`. Exa
 **Options:**
 - `--gate <KEY>` - Gate key (flag form, alternative to the positional argument)
 - `--by <WHO>` - Who is passing the gate (e.g., `human:alice`, `ci:github-actions`). Required for a manual gate; ignored for an automated gate, whose verdict comes from the checker.
-- `--force` - Re-run an automated gate's checker even if it already passed at the current HEAD commit
+- `--force` - Execute an automated gate's checker even where it already passed at the current HEAD commit, or where the gate declares inputs a prior run's verdict covers
 
 **Examples:**
 ```bash
@@ -1761,9 +1761,23 @@ jit gate evaluate abc123 --gate tests --force
   cannot be proven current.
 - Manual attestations are never skipped; each invocation with `--by` records
   fresh evidence even at the same `HEAD`.
-- `--force` bypasses the automated check and re-runs the checker unconditionally.
+- `--force` bypasses the automated check and executes the checker unconditionally.
 - On a normal run (manual attestation, or a freshly executed checker), `--json`
   reports `already_passed: false`.
+
+**Verdict reuse over unchanged declared inputs:**
+- A gate that declares the repository files its checker reads
+  ([`[gates.inputs]`](../how-to/custom-gates.md#declare-the-files-a-checker-reads))
+  digests them before obtaining a verdict. When a prior run of that gate
+  recorded the same digest, the evaluation carries that run's verdict — passed
+  or failed — instead of executing the checker, and records where it came from.
+- The reuse spans issues: the digest identifies content, so a whole-tree
+  checker's verdict is available to every issue evaluated over that content.
+- `jit gate status <id> <gate> --json` reports the run's `inputs_digest` and an
+  `origin` of `{"derivation": "executed"}` or
+  `{"derivation": "reused", "source_run": "<run-id>"}`, so a reused verdict is
+  never counted as an independent verification. A gate declaring no inputs
+  executes its checker on every evaluation.
 
 **Exit-code taxonomy** (auto and manual gates): the
 [exit-code reference](exit-codes.md#command-specific-mappings) is the authority
@@ -1862,14 +1876,15 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 
 **Options:**
 - `--by <WHO>` - Record who passed the gates (e.g., `human:alice`, `ci:github-actions`)
-- `--force` - Re-run every gate's checker even if it already passed at the current HEAD commit
+- `--force` - Execute every gate's checker even where it already passed at the current HEAD commit, or declares inputs a prior run's verdict covers
 
 **Behavior:**
 - Runs each required gate in declaration order, delegating to `jit gate evaluate`, so
   every gate inherits the same exit-code taxonomy and `verdict` semantics.
   Automated gates also inherit **skip-if-passed-at-HEAD** behaviour (an
-  already-passed gate is not re-run; its entry reports `already_passed: true`),
-  while manual gates record fresh evidence on every invocation.
+  already-passed gate is not re-run; its entry reports `already_passed: true`)
+  and declared-input verdict reuse, while manual gates record fresh evidence on
+  every invocation.
 - **Manual gates require attestation:** every manual gate in the required set
   needs `--by <attestor>` (applied uniformly; ignored by automated gates).
   Without it, evaluation fails fast at the first manual gate reached in
