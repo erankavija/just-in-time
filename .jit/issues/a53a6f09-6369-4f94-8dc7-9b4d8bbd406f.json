@@ -8,6 +8,7 @@
   ],
   "description": "The server crate's tests build their repository from the shared taxonomy fixture, so none of them depends on the binary supplying a vocabulary.\n\n## Background\n\nThese tests construct a repository through the scaffold's default hierarchy template and then assert on the type names it wrote. Those assertions hold today because the binary supplies a taxonomy; they stop holding when it does not, and the change that removes it would otherwise carry the rewrite in the same diff as a deletion — two changes that cannot be reviewed against each other.\n\nWhat makes these one family is not that they each call the fixture: they are a separate crate with its own test targets and its own fixture module, so the substitution is one crate's setup rather than a slice of another's. So the substitution is the same edit against the same setup shape throughout, and reviewing one of them is reviewing all of them.\n\nThe fixture itself is authored by the work this depends on and is consumed here unchanged. A test needing a different vocabulary declares it beside its own assertions rather than adding a second fixture.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test here that asserts on a type name or a namespace builds its repository through the shared fixture.\n- [hard] REQ-02: A test that needs only a repository, and asserts on no vocabulary, is left alone.\n- [hard] REQ-03: No test here constructs the scaffold's hierarchy template to obtain a taxonomy.\n- [hard] REQ-04: No second fixture is introduced; the shared one is consumed as authored.\n- [hard] REQ-05: These tests pass unchanged, since nothing about the code under test changes.\n\n## Notes\n\nThree call sites in one crate, consuming a fixture the library authored.\n",
   "documents": [],
+  "done_at": "2026-08-02T14:14:01.030434411Z",
   "first_ready_at": "2026-07-31T17:55:01.855466366Z",
   "gates_required": [
     "cargo-ci",
@@ -36,7 +37,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Adopt the taxonomy fixture in the server crate",
-  "updated_at": "2026-08-02T13:00:09.104282021Z"
+  "updated_at": "2026-08-02T14:14:01.030434411Z"
 }

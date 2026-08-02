@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d661b67f3dbe4769ff267212f584ecc6de2576ef",
+  "completed_at": "2026-08-02T14:12:29.252170520Z",
+  "duration_ms": 145689,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Current test setup meets all five requirements; the previous REQ-02 finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ffe6de33-3d1e-4c2d-865a-af68462e194e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "74c8e83c-8508-4f68-a614-3e255462b76c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T14:10:03.562584078Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 51b6600c, 911c3d72, 3eab9c9f, 5e1f3a1e (merge patches duplicate their feature-parent changes)\nPolicy sources: AGENTS.md\nResolved items: @/issue/ffe6de33/requirement/REQ-01..REQ-05 and @/issue/e204e63d/decision/D-13 (markdown-first issue sections); @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code not recorded; 2026-08-02T14:10:02Z)\nTruncation recovery: re-read individual merge-parent patches, current init test range, configuration/item sources, and the shared taxonomy fixture\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Current test setup meets all five requirements; the previous REQ-02 finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

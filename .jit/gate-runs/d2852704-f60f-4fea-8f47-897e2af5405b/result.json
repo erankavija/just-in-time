@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "18601a8a1aeffad6e2a7eef2e1645c655416c211",
+  "completed_at": "2026-08-02T14:00:18.706678636Z",
+  "duration_ms": 217010,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared declared taxonomy now supplies all fixture forms and consumers, including the two suites from the prior finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "06b736c7-1ed9-43f2-853e-84d69b0dfc79",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d2852704-f60f-4fea-8f47-897e2af5405b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T13:56:41.696411437Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 528cc692, 790b23d9, 439750fe, 801da18a, de7836e0, 2447b327, 555e6cb6, 07d24ae3, e579f6e5 (`jit:06b736c7`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (issue markdown, markdown-first); @/invariant/shared-test-contracts and @/invariant/convention-convergence (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T13:47:22.579626757+00:00)\nTruncation recovery: narrowed individual commit diffs into path groups and word-level patches; reread the shared taxonomy module, fixture, and prior-finding suites in the current tree; inspected tagged merge first-parent deltas separately\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared declared taxonomy now supplies all fixture forms and consumers, including the two suites from the prior finding.\" ,\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

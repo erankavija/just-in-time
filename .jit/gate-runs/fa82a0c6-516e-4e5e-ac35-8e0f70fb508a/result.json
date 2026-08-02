@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d661b67f3dbe4769ff267212f584ecc6de2576ef",
+  "completed_at": "2026-08-02T14:10:01.120858819Z",
+  "duration_ms": 130033,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are satisfied; the prior repository-only test setup finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1cfb66ff-daa4-427e-8b92-fd75cc6081f0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fa82a0c6-516e-4e5e-ac35-8e0f70fb508a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T14:07:51.087775044Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 1bc902b4, ffd63ea2, 07e1a40c, cf771403 (`jit:1cfb66ff`)\nPolicy sources: AGENTS.md\nResolved items: REQ-01–REQ-05 (issue Markdown); @/issue/e204e63d/decision/D-13 (issue Markdown); @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-08-02T14:07:50Z; exit code none recorded)\nTruncation recovery: narrowed reads to the target entry point, both affected modules, taxonomy fixture, and repository setup helper\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are satisfied; the prior repository-only test setup finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
