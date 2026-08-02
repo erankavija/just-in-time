@@ -10,7 +10,6 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::{ContentFormat, Issue, Priority};
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::validation::evaluate_local;
 use std::fs;
@@ -38,11 +37,12 @@ unique = true
 "#;
     fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let initial_layout =
         jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(initial_layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
         .unwrap();
     (temp, jit_dir)
 }
@@ -245,6 +245,7 @@ fn test_missing_default_schema_still_validates_and_enforces() {
     // F1: a DELETED default projection must not break validation — the default
     // rules derive from config, so `effective_rules` loads and they still enforce.
     let (_temp, jit_dir) = setup_initialized_repo();
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
     std::fs::remove_file(namespace_registry_projection(&jit_dir)).unwrap();
 
     let exec = executor(&jit_dir);
@@ -255,7 +256,7 @@ fn test_missing_default_schema_still_validates_and_enforces() {
     // The default rule still ENFORCES from config: a registered namespace is
     // clean, an unregistered one still fails namespace-registry.
     let ok = evaluate_local(
-        &issue_with_label("type:task"),
+        &issue_with_label(&format!("type:{}", taxonomy.default_type)),
         rules,
         ContentFormat::Markdown,
     )

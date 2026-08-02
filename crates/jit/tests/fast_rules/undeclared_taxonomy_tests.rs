@@ -10,7 +10,6 @@
 //! when a repository receives something it did not declare.
 
 use jit::commands::CommandExecutor;
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::JsonFileStorage;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -25,10 +24,11 @@ fn scaffold_declaring(config_toml: &str) -> (TempDir, std::path::PathBuf) {
     fs::create_dir(&jit_dir).unwrap();
     fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let layout = jit::storage::discover_repository_layout(temp.path(), &jit_dir).unwrap();
     CommandExecutor::new(storage)
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
         .unwrap();
     (temp, jit_dir)
 }
@@ -154,11 +154,17 @@ fn test_scaffold_declaring_no_taxonomy_writes_the_label_grammar_alone() {
 fn test_scaffold_declaring_no_taxonomy_names_nothing_the_repository_did_not_declare() {
     let (_temp, jit_dir) = scaffold_declaring(DECLARES_NOTHING);
     let derived = derived_artefacts(&jit_dir);
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
 
     // A declaration-free configuration declares no vocabulary at all, so every
     // namespace and type name is one the repository did not declare. These are
     // the ones a supplied taxonomy would have introduced.
-    for undeclared in ["component", "team", "milestone", "epic", "story", "task"] {
+    for undeclared in taxonomy.hierarchy.keys().chain(
+        taxonomy
+            .namespaces
+            .keys()
+            .filter(|namespace| namespace.as_str() != "type"),
+    ) {
         assert!(
             !derived.contains(undeclared),
             "artefacts derived from an empty taxonomy name `{undeclared}`, \
