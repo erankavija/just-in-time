@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "92b478a86458089b99cce6cdc483223baac47759",
+  "completed_at": "2026-08-01T21:54:09.740906177Z",
+  "duration_ms": 149718,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "39c34568-98ee-47d6-ba5f-875b06c59285",
+  "message": null,
+  "run_id": "fdf58795-6f0a-4a7f-b505-8966df2209b0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-01T21:51:40.022310011Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nerror[E0061]: this function takes 2 arguments but 1 argument was supplied\nerror: could not compile `jit` (lib test) due to 1 previous error\n--- test failures ---\n--- provenance failures ---\ntest build_provenance_metadata_stability_tests::test_metadata_only_change_relinks_no_test_targets ... FAILED\ntest result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 69.78s\n--- budget output ---\nrust-build-budget: 'cargo test --workspace --no-run' failed under /home/vkaskivuo/Projects/just-in-time\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✗ clippy: FAILED (exit 101)\n  ✗ test: FAILED (exit 101)\n  ✗ provenance: FAILED (exit 101)\n  ✗ budget: FAILED (exit 2)\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

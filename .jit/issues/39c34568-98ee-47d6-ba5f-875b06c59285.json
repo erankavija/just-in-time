@@ -16,10 +16,20 @@
     "mcp-ci"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-01T21:54:09.755003200Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-01T21:57:37.019731006Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-01T21:49:31.969189083Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-01T21:57:40.194545975Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "39c34568-98ee-47d6-ba5f-875b06c59285",
@@ -37,5 +47,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Declare the repository roots the packaged live assets are drawn from",
-  "updated_at": "2026-08-01T21:49:31.969189083Z"
+  "updated_at": "2026-08-01T21:57:40.194545975Z"
 }
