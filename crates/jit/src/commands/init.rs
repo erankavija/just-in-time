@@ -253,7 +253,10 @@ impl CommandExecutor<JsonFileStorage> {
         )?;
 
         // The published repository is what the remaining packages of the
-        // closure are applied to, in the order the closure fixed.
+        // closure are applied to, in the order the closure fixed. Publication
+        // binds the selected roots to the repository it created, so each of
+        // these applications opens its session over that repository rather than
+        // over the absent data root the scaffold was captured against.
         let applied = dependants
             .iter()
             .map(|package| self.apply_one_profile_package(package))
@@ -501,8 +504,8 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::jit_dogfood_package;
-    use crate::repository_state::AppliedProfileRecord;
+    use crate::profile::{jit_default_package, jit_dogfood_package, ProfileOrigin};
+    use crate::repository_state::{AppliedProfileRecord, Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
     use std::fs;
     use std::path::PathBuf;
@@ -724,6 +727,145 @@ mod tests {
         assert!(repo.path().join("docs/workflow.txt").is_file());
         assert!(repo.path().join(".jit/profiles/base.json").is_file());
         assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+    }
+
+    #[test]
+    fn test_fresh_profile_init_records_every_package_of_the_embedded_closure() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let executor = executor_with_layout(&storage, repo.path());
+        // What the binary answers with before a repository exists: nothing is
+        // supplied and there is no record to read, so the compiled-in packages
+        // are the whole set initialization has to apply.
+        let closure = executor
+            .resolve_profile_closure(&jit_dogfood_package().unwrap())
+            .unwrap();
+
+        let result = executor
+            .initialize_fresh_repository(
+                repo.path(),
+                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
+                Some(ProfileSelection {
+                    id: "jit-dogfood",
+                    location: None,
+                }),
+            )
+            .unwrap();
+
+        let ids = closure
+            .iter()
+            .map(|package| package.manifest().profile.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            result
+                .profile
+                .expect("a profiled initialization reports it")
+                .profiles
+                .iter()
+                .map(|applied| applied.id.as_str())
+                .collect::<Vec<_>>(),
+            ids,
+            "initialization applies the whole set the named profile resolves to"
+        );
+        let unrecorded = ids
+            .iter()
+            .filter(|id| {
+                !repo
+                    .path()
+                    .join(format!(".jit/profiles/{id}.json"))
+                    .is_file()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            unrecorded,
+            Vec::<&&str>::new(),
+            "each entry is an applied package the created repository has no record of"
+        );
+        assert_repo_valid(repo.path());
+    }
+
+    #[test]
+    fn test_fresh_profile_init_applies_a_compiled_in_dependency_under_a_retained_session() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        // The dependency is named and nothing says where it is: no location is
+        // supplied for it and a repository being created has no record, so the
+        // package this binary carries is the only route left.
+        crate::test_utils::write_package_declaring(
+            &COMPOSITION_PACKAGE,
+            &repo.path().join("packages/workflow"),
+            "workflow",
+            &["jit-default"],
+        );
+        let layout = discover_repository_layout(repo.path(), storage.root()).unwrap();
+        // The shape every `jit init` runs in: startup recovers and retains its
+        // session, and initialization publishes and applies inside it.
+        let retained = storage
+            .open_and_retain_mutation_session(layout.clone())
+            .unwrap();
+
+        let result = CommandExecutor::new(storage.clone())
+            .with_layout(layout)
+            .initialize_profiled_repository(
+                repo.path(),
+                &HierarchyTemplate::default(),
+                ProfileSelection {
+                    id: "workflow",
+                    location: Some(&repo.path().join("packages/workflow")),
+                },
+            )
+            .unwrap();
+
+        assert_eq!(
+            result
+                .profile
+                .expect("a profiled initialization reports it")
+                .profiles
+                .iter()
+                .map(|applied| (applied.id.as_str(), applied.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("jit-default", ProfileApplicationStatus::Applied),
+                ("workflow", ProfileApplicationStatus::Applied),
+            ]
+        );
+        // Both packages reached the published repository: the dependency's own
+        // vocabulary, the named package's asset, and a provenance record each.
+        let record: AppliedProfileRecord = serde_json::from_slice(
+            &fs::read(repo.path().join(".jit/profiles/jit-default.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(record.origin, ProfileOrigin::Embedded);
+        assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+        assert!(repo.path().join("docs/workflow.txt").is_file());
+        let published = fs::read(repo.path().join(".jit/config.toml")).unwrap();
+        let types = crate::declarations::parse_configuration(&published)
+            .unwrap()
+            .hierarchy
+            .expect("the published configuration declares a type hierarchy")
+            .types;
+        let dependency = jit_default_package().unwrap();
+        let missing = dependency
+            .manifest()
+            .contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                Contribution::MapEntry {
+                    target: MapEntryTarget::TypeHierarchyTypes,
+                    identity,
+                    ..
+                } => Some(identity.as_str()),
+                _ => None,
+            })
+            .filter(|identity| !types.contains_key(*identity))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            missing,
+            Vec::<&str>::new(),
+            "each entry is a type the dependency declares that the published configuration lacks"
+        );
+        assert_repo_valid(repo.path());
+        drop(retained);
     }
 
     #[test]
