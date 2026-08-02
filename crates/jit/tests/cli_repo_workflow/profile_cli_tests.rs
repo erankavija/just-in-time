@@ -114,6 +114,74 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 }
 
 #[test]
+fn test_profile_show_refuses_a_supplied_location_outside_the_repository() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    // A package beside the repository rather than inside it. The location a
+    // record would have to name is worktree-relative, so there is none.
+    let elsewhere = TempDir::new().unwrap();
+    package_at(elsewhere.path(), "planner");
+
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            FIXTURE_PROFILE,
+            "--from",
+            elsewhere.path().join("planner").to_str().unwrap(),
+            "--json",
+        ],
+    );
+
+    assert!(!show.status.success(), "{show:?}");
+    let show = json(&show);
+    assert!(
+        show["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("is not inside the repository worktree"),
+        "{show}"
+    );
+}
+
+#[test]
+fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+
+    let preview = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            FIXTURE_PROFILE,
+            "--from",
+            location,
+            "--dry-run",
+            "--json",
+        ],
+    );
+
+    assert!(preview.status.success(), "{preview:?}");
+    let preview = json(&preview);
+    assert_eq!(preview["id"], FIXTURE_PROFILE);
+    assert_eq!(preview["status"], "would_apply");
+    assert!(
+        preview["targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|target| target["path"] == "docs/profile.txt"),
+        "{preview}"
+    );
+    // A preview writes nothing, the record included.
+    assert!(!repo.path().join(".jit/profiles").exists());
+    assert!(!repo.path().join("docs/profile.txt").exists());
+}
+
+#[test]
 fn test_profile_apply_from_a_supplied_location_is_re_read_from_the_record() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
