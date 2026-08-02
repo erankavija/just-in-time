@@ -483,8 +483,12 @@ async function main() {
         assert.ok(preview.targets.some(target =>
           target.path === 'contrib/gates/ai-review.sh' && target.executable === true));
 
+        // An application reports one result per applied package: the packages
+        // the named one depends on, then the named one.
         const applied = await profileCall('jit_profile_apply', { id: 'jit-dogfood' });
-        assert.strictEqual(applied.status, 'applied');
+        assert.strictEqual(applied.count, applied.profiles.length);
+        assert.strictEqual(applied.profiles.at(-1).id, 'jit-dogfood');
+        assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
         const unchanged = await profileCall('jit_profile_apply', {
           id: 'jit-dogfood',

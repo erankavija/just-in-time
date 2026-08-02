@@ -42,21 +42,40 @@ directory is therefore named once —
 from the record. `jit init --profile <id> --from <path>` takes the same
 location, because a repository being created has no record to read.
 
+A package a resolved one declares a dependency on is looked for beside it,
+under the dependency's own id, before the record and the binary answer. A
+directory of obtained packages therefore applies as a set: naming one of them
+reaches its siblings without naming them.
+
+Applying a package applies the packages it declares a dependency on first,
+transitively, so a package carrying a delta over another produces the same
+repository as one carrying both. A package two others depend on is applied once.
+Declared dependencies that close a cycle are rejected, naming the cycle, and a
+dependency that resolves through no route fails the application naming the
+package that declared it beside the one that could not be found — so an adopter
+is never left diagnosing a package they did not name. Both refusals are raised
+over the whole set before any of it is applied.
+
 Enumeration follows the records alone: a repository that has applied nothing
 names no profile, and a recorded location that no longer holds a readable
 package fails the command by naming the record and the location.
 
-All profile commands support `--json`. `profile list` uses the standard
-count-wrapped list shape. `profile show` returns the manifest, package identity,
-target hashes, size, and the stored provenance record when present. Showing that
-record does not re-verify current target bytes. Use
-`jit profile apply jit-dogfood --dry-run` for exact current-state verification:
-it returns the deterministic plan hash and every target's `create`, `update`, or
-`unchanged` action without writing. Successful reapplication of an exact
-installation returns `unchanged`.
+All profile commands support `--json`. `profile list` and `profile apply` use
+the standard count-wrapped list shape; an application reports one result per
+applied package, dependencies before the package that declares them.
+`profile show` returns the manifest, package identity, target hashes, size, and
+the stored provenance record when present. Showing that record does not
+re-verify current target bytes. Use
+`jit profile apply jit-dogfood --dry-run` for exact current-state verification
+of the named package: it returns the deterministic plan hash and every target's
+`create`, `update`, or `unchanged` action without writing. Successful
+reapplication of an exact installation returns `unchanged` for every package of
+the set.
 
 `jit init --profile jit-dogfood` combines the neutral init scaffold and profile
-projection into one validated publication. For an existing repository,
+projection into one validated publication; where the profile declares
+dependencies, the first package of the resolved set is published with the
+scaffold and the rest follow it in order. For an existing repository,
 `jit profile apply jit-dogfood` uses the same profile planner and publisher.
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
@@ -158,8 +177,12 @@ application.
 Successful application writes a minimal provenance record at
 `.jit/profiles/<profile-id>.json` (therefore the `jit-dogfood` ID selects the
 matching filename) and appends the repository-scoped `profile_applied` audit
-event. The record stores the profile ID, version, origin, package hash, and
-per-target hashes used to recognize an exact reapplication.
+event. Every applied package writes its own record and appends its own event, so
+applying a package that declares a dependency leaves one record and one event
+per package of the set. The record stores the profile ID, version, origin,
+package hash, and per-target hashes used to recognize an exact reapplication. It
+does not state why a package was applied, so a record reads the same whether the
+adopter named that package or received it as another's dependency.
 
 The origin says where the applied bytes came from: either compiled into the
 binary, or read from a repository directory, in which case it carries that
@@ -181,8 +204,8 @@ a Git repository. Profiles do not add or alter that lease surface.
 The v1.0 surface is intentionally apply-only. The following capabilities are
 deferred to the post-1.0 profile epic and do not exist in this release:
 
-- multiple profile composition;
-- profile dependencies and incompatibilities;
+- applying several profiles the adopter names in one operation;
+- profile incompatibilities;
 - variables and sensitive-value handling;
 - semantic shared ownership;
 - reconfiguration;
@@ -192,8 +215,9 @@ deferred to the post-1.0 profile epic and do not exist in this release:
 
 There is no composition flag, variable input, profile-upgrade command, or
 profile-removal command hidden behind the v1.0 interface. A package's location
-is named explicitly or read from this repository's own record; no configured
-search path discovers one. Edit repository configuration directly for advanced
+is named explicitly, read from this repository's own record, or taken from
+beside the package that declares it as a dependency; no configured search path
+discovers one. Edit repository configuration directly for advanced
 customization, or start from the manual guides below.
 
 ## Advanced customization

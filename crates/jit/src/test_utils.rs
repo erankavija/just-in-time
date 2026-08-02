@@ -88,6 +88,62 @@ pub fn write_package_tree(package: &include_dir::Dir<'_>, root: &Path) -> PathBu
     root.to_path_buf()
 }
 
+/// Write a compile-time-embedded profile package tree to `root` under a
+/// manifest rewritten to declare `id`, a dependency on each of `dependencies`,
+/// and asset targets named for `id`, and read the package back from there.
+///
+/// No package this repository ships declares a dependency, so every test of
+/// composition authors one. One rewrite serves them all
+/// (`@/invariant/shared-test-contracts`), and renaming the asset targets after
+/// the id is what keeps two authored packages from publishing the same file.
+pub fn write_package_declaring(
+    package: &include_dir::Dir<'_>,
+    root: &Path,
+    id: &str,
+    dependencies: &[&str],
+) -> crate::profile::ProfilePackage {
+    let tree = write_package_tree(package, root);
+    let manifest_path = tree.join(crate::profile::MANIFEST_FILE_NAME);
+    let authored = fs::read_to_string(&manifest_path).expect("read the package manifest");
+    let source = crate::profile::ProfilePackage::parse_manifest(authored.as_bytes())
+        .expect("the source package manifest parses");
+    let declared = dependencies
+        .iter()
+        .map(|dependency| format!("\"{dependency}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let rewritten = source.assets.iter().fold(
+        authored
+            .replace(
+                &format!("id = \"{}\"", source.profile.id),
+                &format!("id = \"{id}\""),
+            )
+            .replace(
+                "[profile]",
+                &format!("dependencies = [{declared}]\n\n[profile]"),
+            ),
+        |manifest, asset| {
+            let renamed = Path::new(&asset.target)
+                .parent()
+                .map(|parent| parent.join(id))
+                .unwrap_or_else(|| PathBuf::from(id))
+                .with_extension(
+                    Path::new(&asset.target)
+                        .extension()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .as_ref(),
+                );
+            manifest.replace(
+                &format!("target = \"{}\"", asset.target),
+                &format!("target = \"{}\"", renamed.display()),
+            )
+        },
+    );
+    fs::write(&manifest_path, rewritten).expect("write the rewritten package manifest");
+    crate::profile::ProfilePackage::from_directory(&tree).expect("a valid package tree")
+}
+
 /// Copy an on-disk profile package tree to `root`, creating it and every
 /// declared parent, and return `root`.
 ///

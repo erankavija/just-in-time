@@ -114,15 +114,19 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
     {
         return ErrorCode::ProfileConflict;
     }
-    // Which package bytes a profile command reads could not be settled. It is
-    // classified here, ahead of the source-chain searches below, because a
-    // location that is simply gone carries a NotFound I/O cause: taking that
-    // classification would report a repository whose record outlived its
-    // package as a missing repository or an absent profile, which is the
-    // reading the record exists to rule out.
+    // Which package bytes a profile command reads, or which packages an
+    // application applies, could not be settled. Both are classified here,
+    // ahead of the source-chain searches below, because a location that is
+    // simply gone carries a NotFound I/O cause: taking that classification
+    // would report a repository whose record outlived its package as a missing
+    // repository or an absent profile, which is the reading the record exists
+    // to rule out.
     if error
         .downcast_ref::<jit::commands::ProfileResolutionError>()
         .is_some()
+        || error
+            .downcast_ref::<jit::commands::ProfileDependencyError>()
+            .is_some()
     {
         return ErrorCode::ProfileError;
     }
@@ -917,6 +921,15 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
         .is_some()
     {
         return JsonError::new(ErrorCode::ProfileError, error.to_string());
+    }
+    if error
+        .downcast_ref::<jit::commands::ProfileDependencyError>()
+        .is_some()
+    {
+        return JsonError::new(ErrorCode::ProfileError, error.to_string()).with_suggestion(
+            "Place the package it depends on beside it, or apply that package \
+             first so this repository records where its bytes are",
+        );
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
     // repository-state error: a profile target conflict (raised directly or through
@@ -2374,15 +2387,22 @@ fn run() -> Result<()> {
                                 let output = JsonOutput::success(&applied);
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                let status = match applied.status {
-                                    jit::profile::ProfileApplicationStatus::Unchanged => {
-                                        "unchanged"
+                                for profile in applied.profiles {
+                                    let status = match profile.status {
+                                        jit::profile::ProfileApplicationStatus::Unchanged => {
+                                            "unchanged"
+                                        }
+                                        jit::profile::ProfileApplicationStatus::Applied => {
+                                            "applied"
+                                        }
+                                    };
+                                    println!(
+                                        "Profile {} {}: {}",
+                                        profile.id, profile.version, status
+                                    );
+                                    for warning in profile.warnings {
+                                        eprintln!("Warning: {:?}", warning);
                                     }
-                                    jit::profile::ProfileApplicationStatus::Applied => "applied",
-                                };
-                                println!("Profile {} {}: {}", applied.id, applied.version, status);
-                                for warning in applied.warnings {
-                                    eprintln!("Warning: {:?}", warning);
                                 }
                             }
                         }

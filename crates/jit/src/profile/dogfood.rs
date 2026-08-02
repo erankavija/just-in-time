@@ -1270,7 +1270,7 @@ mod tests {
         let package = jit_dogfood_package().unwrap();
         let applied = executor.apply_profile_package(&package).unwrap();
         assert_eq!(
-            applied.status,
+            applied.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Applied
         );
         assert!(temp
@@ -1330,7 +1330,7 @@ mod tests {
 
         let unchanged = reloaded.apply_profile_package(&package).unwrap();
         assert_eq!(
-            unchanged.status,
+            unchanged.requested().unwrap().status,
             super::super::ProfileApplicationStatus::Unchanged
         );
     }

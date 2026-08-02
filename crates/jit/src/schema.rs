@@ -487,14 +487,16 @@ impl CommandSchema {
             "profile_apply" => {
                 let union = json!({
                     "oneOf": [
-                        schema_to_value::<crate::profile::ProfileApplyResult>(),
+                        schema_to_value::<crate::profile::ProfileComposedApplyResult>(),
                         schema_to_value::<crate::profile::ProfilePlanResult>(),
                     ],
-                    "description": "Normal execution returns ProfileApplyResult. \
-                        With --dry-run, returns the exact non-mutating \
-                        ProfilePlanResult."
+                    "description": "Normal execution returns ProfileComposedApplyResult, \
+                        one ProfileApplyResult per applied package: the packages the \
+                        named one depends on, then the named one. With --dry-run, \
+                        returns the exact non-mutating ProfilePlanResult for the \
+                        named package."
                 });
-                (Some(union), "ProfileApplyResult")
+                (Some(union), "ProfileComposedApplyResult")
             }
 
             // Issue commands

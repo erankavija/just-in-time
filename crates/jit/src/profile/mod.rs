@@ -29,9 +29,9 @@ pub mod template_region;
 pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
 pub use application::{
-    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileListResult,
-    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
+    ProfileComposedApplyResult, ProfileListResult, ProfilePlanResult, ProfilePlanStatus,
+    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
 pub use dogfood::{
