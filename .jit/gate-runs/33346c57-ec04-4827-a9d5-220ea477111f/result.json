@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "76e9a916ce1c70bcbd74343c11bd1d2f6851aac6",
+  "completed_at": "2026-08-02T09:59:14.088479036Z",
+  "duration_ms": 178456,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact findings in the attributable default-vocabulary package and invariant-registry work.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c7058cac-cd23-4692-9b4b-01059cdedf8b",
+  "message": null,
+  "run_id": "33346c57-ec04-4827-a9d5-220ea477111f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T09:56:15.632139612Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: aaff9cf9, 3e8d072b, bd59b0bf, bc10c084, 79451c42, ae22659c (`jit:c7058cac`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-08, @/issue/e204e63d/decision/D-13, @/issue/e204e63d/decision/D-20 (issue markdown); @/invariant/domain-agnostic (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-08-02T09:47:38Z); docs-mechanical pending\nTruncation recovery: bounded manifest, per-commit/path patch, merge first-parent patch, source, and test reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact findings in the attributable default-vocabulary package and invariant-registry work.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

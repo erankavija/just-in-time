@@ -1,0 +1,20 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "76e9a916ce1c70bcbd74343c11bd1d2f6851aac6",
+  "completed_at": "2026-08-02T09:56:14.478940117Z",
+  "duration_ms": 516131,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "issue_id": "c7058cac-cd23-4692-9b4b-01059cdedf8b",
+  "message": null,
+  "run_id": "f68c095e-9b93-43fe-8b46-701642280b9b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T09:47:38.347908155Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest artifact_conformance_cli_tests::test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_declares ... FAILED\ntest result: FAILED. 322 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 85.96s\n---- artifact_conformance_cli_tests::test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_declares stdout ----\n\nthread 'artifact_conformance_cli_tests::test_doc_conformance_scans_exactly_the_areas_the_configuration_registry_declares' (2832802) panicked at crates/jit/tests/cli_repo_workflow/artifact_conformance_cli_tests.rs:162:10:\nthe scaffolded configuration declares issue_scoped_areas\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n--- incremental-state output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1545 bytes=28123762)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1448189848/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✗ incremental-state: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}

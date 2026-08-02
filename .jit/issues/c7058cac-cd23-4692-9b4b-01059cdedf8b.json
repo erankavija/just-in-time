@@ -17,7 +17,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-08-02T09:35:58.905800067Z",
+      "updated_at": "2026-08-02T09:56:14.494295501Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T09:59:15.244359576Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -41,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Assemble the default vocabulary as a package",
-  "updated_at": "2026-08-02T09:35:58.905800067Z"
+  "updated_at": "2026-08-02T09:59:15.244359576Z"
 }
