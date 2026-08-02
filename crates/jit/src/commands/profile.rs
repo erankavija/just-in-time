@@ -850,9 +850,12 @@ mod tests {
 
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        let applied = executor
-            .apply_embedded_profile(&jit_default_package())
-            .unwrap();
+        let package_root = crate::test_utils::copy_package_tree(
+            &jit_default_directory(),
+            &temp.path().join("profiles/jit-default"),
+        );
+        let package = ProfilePackage::from_directory(&package_root).unwrap();
+        let applied = executor.apply_embedded_profile(&package).unwrap();
         assert_eq!(applied.status, ProfileApplicationStatus::Applied);
 
         let produced: serde_json::Value =

@@ -88,6 +88,36 @@ pub fn write_package_tree(package: &include_dir::Dir<'_>, root: &Path) -> PathBu
     root.to_path_buf()
 }
 
+/// Copy an on-disk profile package tree to `root`, creating it and every
+/// declared parent, and return `root`.
+///
+/// A test that applies a package must read it from inside the repository it is
+/// applied to, because profile application records the package's worktree-
+/// relative location.
+pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
+    fn copy(source: &Path, root: &Path) {
+        fs::read_dir(source)
+            .expect("read package source directory")
+            .for_each(|entry| {
+                let entry = entry.expect("read package source entry");
+                let source_path = entry.path();
+                let destination = root.join(entry.file_name());
+                if source_path.is_dir() {
+                    fs::create_dir_all(&destination).expect("create package directory");
+                    copy(&source_path, &destination);
+                } else {
+                    fs::create_dir_all(destination.parent().expect("package file has a parent"))
+                        .expect("create package parent directory");
+                    fs::copy(source_path, destination).expect("copy package file");
+                }
+            });
+    }
+
+    fs::create_dir_all(root).expect("create package root");
+    copy(source, root);
+    root.to_path_buf()
+}
+
 /// Create test WorktreePaths from a TempDir
 ///
 /// Generates a WorktreePaths structure suitable for testing,
