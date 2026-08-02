@@ -607,7 +607,8 @@ envelope (`INVALID_ARGUMENT` / exit `2`, `REPOSITORY_FORMAT_TOO_NEW` / exit
 `10`).
 
 When `--profile` is present, `profile` contains the same
-`ProfileApplyResult` returned by `jit profile apply`; otherwise it is `null`.
+`ProfileComposedApplyResult` returned by `jit profile apply`, one entry per
+applied package; otherwise it is `null`.
 
 ## Profile Commands
 
@@ -622,6 +623,12 @@ names answers; where neither does, the package this binary carries answers. So
 an adopter who has just obtained a package names its directory once, and every
 later run reads it back from the record. A supplied directory must hold a
 package declaring the requested profile ID.
+
+A package the resolved one declares a dependency on is looked for beside it,
+in a directory named by that dependency's own ID, before the record and the
+binary answer. One obtained directory of packages therefore applies as a set:
+`jit profile apply <PROFILE_ID> --from packages/<PROFILE_ID>` reaches
+`packages/<DEPENDENCY_ID>` without naming it.
 
 ### `jit profile list`
 
@@ -675,16 +682,27 @@ jit profile apply <PROFILE_ID> [--from <PATH>] [--dry-run] [--json]
 `plan_hash`, and the sorted target list with each action (`create`, `update`, or
 `unchanged`) and executable intent.
 
-Without `--dry-run`, JSON returns `ProfileApplyResult`: profile identity,
-`status` (`applied` or `unchanged`), `plan_hash`, an optional
-`transaction_id`, and non-fatal cleanup warnings. Exact reapplication is a
-successful no-op. Application and all coupled derived targets use the canonical
-recoverable multi-target transaction described in
-[Repository Profiles](profiles.md), including strict managed-region composition.
+`--dry-run` previews the named package. Applying it applies the packages it
+declares a dependency on as well, so a preview accounts for the named package's
+own targets.
 
-Unknown IDs are not-found errors (exit `3`). Conflicts, invalid package state,
-final-state validation failures, filesystem failures, and recovery-required
-conditions use the shared typed error envelope and exit-code taxonomy. The
+Without `--dry-run`, JSON returns `ProfileComposedApplyResult`, the standard
+count-wrapped envelope `{"count": N, "profiles": [...]}` holding one
+`ProfileApplyResult` per applied package: the packages the named one depends on,
+then the named one. Each entry carries profile identity, `status` (`applied` or
+`unchanged`), `plan_hash`, an optional `transaction_id`, and non-fatal cleanup
+warnings. Exact reapplication of a whole set is a successful no-op. Application
+and all coupled derived targets use the canonical recoverable multi-target
+transaction described in [Repository Profiles](profiles.md), including strict
+managed-region composition.
+
+Unknown IDs are not-found errors (exit `3`). A dependency that resolves through
+no route fails the application before anything is written, naming the package
+that declared it beside the one that could not be found; declared dependencies
+that close a cycle fail the same way, naming the cycle. Conflicts, invalid
+package state, final-state validation failures, filesystem failures, and
+recovery-required conditions use the shared typed error envelope and exit-code
+taxonomy. The
 [Repository Profiles reference](profiles.md) defines what application may
 change and the v1.0 features that do not exist.
 
