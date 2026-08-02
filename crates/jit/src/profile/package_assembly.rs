@@ -19,7 +19,7 @@
 //! The destination belongs to the caller. It is untracked and disposable, and
 //! each run publishes a freshly staged tree, so the result holds exactly what
 //! the manifest declares and a source the manifest stops declaring cannot
-//! survive into the next run. Nothing reads the destination back, so no
+//! survive into the next run. No run consults what an earlier one left, so no
 //! incremental reconciliation, timestamp discipline or watch set is needed.
 //!
 //! The entry point is [`PACKAGE_ASSEMBLY_ENTRY_POINT`], a thin script over the
