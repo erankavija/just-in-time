@@ -878,6 +878,94 @@ mod tests {
     }
 
     #[test]
+    fn test_jit_dogfood_declares_default_dependency_and_only_additive_contributions() {
+        let default = jit_default_package();
+        let dogfood = jit_dogfood_package().unwrap();
+
+        assert_eq!(
+            dogfood
+                .manifest()
+                .dependencies
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            vec!["jit-default"]
+        );
+
+        let default_contributions = default
+            .manifest()
+            .contributions
+            .iter()
+            .map(|contribution| serde_json::to_string(contribution).unwrap())
+            .collect::<BTreeSet<_>>();
+        let dogfood_contributions = dogfood
+            .manifest()
+            .contributions
+            .iter()
+            .map(|contribution| serde_json::to_string(contribution).unwrap())
+            .collect::<BTreeSet<_>>();
+
+        assert!(
+            default_contributions.is_disjoint(&dogfood_contributions),
+            "the workflow package must not restate default contributions"
+        );
+        assert!(
+            dogfood
+                .manifest()
+                .contributions
+                .iter()
+                .all(|contribution| !matches!(
+                    contribution,
+                    crate::repository_state::Contribution::MapEntry {
+                        target: crate::repository_state::MapEntryTarget::ItemKinds,
+                        ..
+                    }
+                )),
+            "the workflow package must not declare item kinds"
+        );
+    }
+
+    #[test]
+    fn test_apply_jit_default_then_dogfood_reproduces_explicit_composition_without_conflict() {
+        let (first_temp, first_storage, _first_executor, _first_fixture_package) = fixture();
+        let first_config_path = first_temp.path().join(".jit/config.toml");
+        let first_scaffolded = fs::read_to_string(&first_config_path).unwrap();
+        let mut first_bare = first_scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
+        first_bare
+            .as_table_mut()
+            .retain(|key, _| matches!(key, "version" | "project"));
+        fs::write(&first_config_path, first_bare.to_string()).unwrap();
+        let first_executor = CommandExecutor::new(first_storage.clone()).with_layout(
+            discover_repository_layout(first_temp.path(), first_storage.root()).unwrap(),
+        );
+        let first_default_root = crate::test_utils::copy_package_tree(
+            &jit_default_directory(),
+            &first_temp.path().join("profiles/jit-default"),
+        );
+        let first_default = ProfilePackage::from_directory(&first_default_root).unwrap();
+
+        assert_eq!(
+            first_executor
+                .apply_embedded_profile(&first_default)
+                .unwrap()
+                .status,
+            ProfileApplicationStatus::Applied
+        );
+        assert_eq!(
+            first_executor
+                .apply_embedded_profile(&jit_dogfood_package().unwrap())
+                .unwrap()
+                .status,
+            ProfileApplicationStatus::Applied
+        );
+        let first_composed: serde_json::Value =
+            toml_edit::de::from_str(&fs::read_to_string(&first_config_path).unwrap()).unwrap();
+        assert!(first_composed["type_hierarchy"]["types"].is_object());
+        assert!(first_composed["namespaces"]["brackets"].is_object());
+        assert!(first_composed["item_kinds"]["invariant"].is_object());
+    }
+
+    #[test]
     fn test_jit_default_states_the_coordination_guidance_without_its_engine_defaults() {
         let manifest = fs::read_to_string(jit_default_directory().join("manifest.toml")).unwrap();
 

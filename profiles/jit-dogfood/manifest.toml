@@ -1,29 +1,13 @@
+dependencies = ["jit-default"]
+
 [profile]
 manifest-version = 1
 id = "jit-dogfood"
 version = "1.0.0"
 jit = ">=1.0.0, <2.0.0"
 
-# Repository-neutral workflow taxonomy. The four ordinary hierarchy entries
-# are shared with neutral `jit init`; the profile adds bracket and task
-# specialization without changing the engine's vocabulary.
-[[contribution]]
-kind = "map-entry"
-target = "type-hierarchy-types"
-identity = "milestone"
-value = 1
-
-[[contribution]]
-kind = "map-entry"
-target = "type-hierarchy-types"
-identity = "epic"
-value = 2
-
-[[contribution]]
-kind = "map-entry"
-target = "type-hierarchy-types"
-identity = "story"
-value = 3
+# Repository-neutral workflow taxonomy. `jit-default` supplies the shared
+# hierarchy and vocabulary; this profile adds bracket and task specialization.
 
 [[contribution]]
 kind = "map-entry"
@@ -40,12 +24,6 @@ value = 3
 [[contribution]]
 kind = "map-entry"
 target = "type-hierarchy-types"
-identity = "task"
-value = 4
-
-[[contribution]]
-kind = "map-entry"
-target = "type-hierarchy-types"
 identity = "bug"
 value = 4
 
@@ -54,34 +32,6 @@ kind = "map-entry"
 target = "type-hierarchy-types"
 identity = "enhancement"
 value = 4
-
-[[contribution]]
-kind = "map-entry"
-target = "label-associations"
-identity = "milestone"
-value = "milestone"
-
-[[contribution]]
-kind = "map-entry"
-target = "label-associations"
-identity = "epic"
-value = "epic"
-
-[[contribution]]
-kind = "map-entry"
-target = "label-associations"
-identity = "story"
-value = "story"
-
-[[contribution]]
-kind = "set-string"
-target = "strategic-types"
-value = "milestone"
-
-[[contribution]]
-kind = "set-string"
-target = "strategic-types"
-value = "epic"
 
 [[contribution]]
 kind = "map-entry"
