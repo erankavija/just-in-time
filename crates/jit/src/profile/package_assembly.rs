@@ -16,10 +16,11 @@
 //! model, where a build script could only have been a second one: a build
 //! script cannot import the crate it builds.
 //!
-//! The destination belongs to the caller. It is untracked and disposable, and
-//! each run publishes a freshly staged tree, so the result holds exactly what
-//! the manifest declares and a source the manifest stops declaring cannot
-//! survive into the next run. No run consults what an earlier one left, so no
+//! The destination belongs to the caller, so it carries no properties of its
+//! own; what a run guarantees about it is that it replaces it whole. Each run
+//! publishes a freshly staged tree, so the result holds exactly what the
+//! manifest declares and a source the manifest stops declaring cannot survive
+//! into the next run. No run consults what an earlier one left, so no
 //! incremental reconciliation, timestamp discipline or watch set is needed.
 //!
 //! The entry point is [`PACKAGE_ASSEMBLY_ENTRY_POINT`], a thin script over the
@@ -856,13 +857,16 @@ target = "docs/guide.md"
         assert!(metadata.is_file(), "{entry_point} is not a file");
     }
 
-    /// The destination is the caller's: untracked, disposable, and read by no
-    /// build. The entry point's documented destination is a path this
-    /// repository ignores, and no build script names the assembly or the
-    /// package sources it draws from, so no build watches either directory or
-    /// consumes what a run produces.
+    /// The entry point's documented destination is a path this repository
+    /// ignores, and no build script names the assembly or the package sources
+    /// it draws from, so no build watches either directory or consumes what a
+    /// run produces.
+    ///
+    /// Being ignored is a property of that documented destination rather than
+    /// of destinations in general: a caller names any path it likes, and what
+    /// holds of all of them is that a run replaces the destination whole.
     #[test]
-    fn test_assemble_package_tree_publishes_where_no_build_reads_and_git_does_not_track() {
+    fn test_package_assembly_documents_an_ignored_destination_and_no_build_script_names_it() {
         const DOCUMENTED_DESTINATION: &str = "target/package/jit-dogfood";
         let root = repository_root();
 
