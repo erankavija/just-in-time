@@ -157,12 +157,38 @@ at least one path.
 ### What Declaring Inputs Does
 
 Evaluating a gate that declares inputs first digests the content of every file
-beneath a declared root that no exclusion matches. The digest covers files the
-repository does not track — an uncommitted source file changes what a compiler
-reads, so it changes the digest — while files the repository's ignore rules
-exclude stay out, keeping build artefacts from entering it. It is a digest of
-content, not of modification times: a checkout that rewrites timestamps without
-changing bytes produces the same value.
+beneath a declared root that no exclusion matches. A file present beneath a
+declared root is in the digest unless a declared pattern removes it: an
+uncommitted source file changes what a compiler reads, so it changes the digest,
+and so does a file your `.gitignore` names. It is a digest of content, not of
+modification times: a checkout that rewrites timestamps without changing bytes
+produces the same value.
+
+**The ignore rules are not consulted.** What a project declines to version is a
+different question from what a checker reads, and checkers routinely read
+ignored material — an installed `node_modules` tree decides what a test suite
+runs against. Dropping such a path would leave the digest still while the
+checker's inputs moved, which is the one failure this mechanism must not have.
+Generated material your checker does not read therefore leaves the set by being
+declared out, where a reader can see it:
+
+```toml
+[gates.inputs]
+roots   = ["web"]
+exclude = ["web/node_modules", "web/dist"]
+```
+
+Naming a directory excludes everything beneath it, and the walk skips it whole
+rather than descending — so taking a large generated tree out of a gate's inputs
+costs one line and no traversal. A pattern that reaches only into a directory
+(`web/build/**`) still removes the paths it matches, but the walk descends to
+find them.
+
+Two things are never in the digest and need no pattern. The `.git` directory is
+where content is versioned rather than content a checker reads. And a checker's
+own build output is not an input at all — it is a function of the inputs,
+produced after the digest is taken — so leave it out of `roots` rather than
+excluding it.
 
 The digest is bound to the gate's own declaration as well as to that content,
 so editing the checker — its command, timeout, working directory, environment,
@@ -206,9 +232,12 @@ not a function of repository content alone:
   the repository at all;
 - a checker that reads files the repository rewrites on every evaluation.
 
-Declare roots that cover everything the checker reads. A checker that reads a
-file no declared root covers can reuse a verdict that the file's change would
-have overturned.
+Declare roots that cover everything the checker reads, and exclusions that cover
+only what it does not. A checker that reads a file no declared root covers — or
+one a declared pattern excludes — can reuse a verdict that the file's change
+would have overturned. Where excluding a large installed tree is the right
+trade, prefer excluding it alongside a lockfile that stays in the digest: the
+lockfile moves when the installed versions do.
 
 `jit gate evaluate <issue> <gate> --force` executes the checker regardless of
 any reusable verdict.

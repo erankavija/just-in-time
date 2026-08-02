@@ -688,7 +688,7 @@ Human-readable output includes:
 
 - `Version` — crate package version
 - `Commit` — short and full Git commit hash injected at build time, or `unknown`
-- `Dirty` — whether the build tree was dirty, as injected at build time, or `unknown`
+- `Dirty` — whether a declared build input was uncommitted when the binary was built, as injected at build time, or `unknown`
 - `Profile` — Cargo build profile such as `debug` or `release`
 - `Built` — build timestamp as Unix epoch seconds injected at build time, or `unknown`
 - `Target` — Cargo target triple
@@ -696,7 +696,10 @@ Human-readable output includes:
 The commit, dirty flag, and timestamp are populated only from the provenance
 the build injects (`JIT_BUILD_GIT_HASH`, `JIT_BUILD_GIT_SHORT_HASH`,
 `JIT_BUILD_GIT_DIRTY`, `SOURCE_DATE_EPOCH`); `scripts/install-jit.sh` supplies
-them from the current commit. An ordinary `cargo build`/`cargo test` reads no
+them from the current commit. Its dirty flag reports whether a path that feeds
+the binary was uncommitted, not whether the working tree carried any change at
+all: an uncommitted note or documentation edit changes no build, so it leaves
+an installed binary current. An ordinary `cargo build`/`cargo test` reads no
 ambient Git state or wall clock, so it reports `unknown` for these fields. This
 keeps unchanged rebuilds reproducible and insensitive to Git-metadata-only
 changes.
@@ -723,7 +726,10 @@ jit version --json
 ```
 
 `git_dirty` is `true` or `false` when a dirty flag was injected at build time,
-and `null` when none was (an ordinary build injecting no provenance).
+and `null` when none was (an ordinary build injecting no provenance). `true`
+means a path the binary is built from was uncommitted; the stale-binary guard
+treats such a build as stale for its whole life, since no commit describes its
+sources.
 
 ## Issue Commands
 
