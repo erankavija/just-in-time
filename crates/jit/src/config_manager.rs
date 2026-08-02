@@ -244,6 +244,13 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    fn test_config(extra: &str) -> String {
+        format!(
+            "{}\n{extra}",
+            crate::test_taxonomy::test_taxonomy().config_fragment()
+        )
+    }
+
     fn setup_test_dir() -> TempDir {
         TempDir::new().unwrap()
     }
@@ -276,8 +283,8 @@ schema = 2
 description = "Issue type"
 unique = true
 
-[namespaces.epic]
-description = "Epic membership"
+[namespaces.custom]
+description = "Custom membership"
 unique = false
 "#;
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
@@ -296,41 +303,27 @@ unique = false
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
 
-        let config_toml = r#"
-[version]
-schema = 2
-
-[namespaces.type]
-description = "Issue type (hierarchical)"
-unique = true
-
-[namespaces.epic]
-description = "Epic membership"
-unique = false
-
-[type_hierarchy]
-types = { milestone = 1, epic = 2, story = 3, task = 4 }
-strategic_types = ["milestone", "epic"]
-
-[type_hierarchy.label_associations]
-epic = "epic"
-milestone = "milestone"
-"#;
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config_toml = taxonomy.config_fragment();
         fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
         let config_mgr = ConfigManager::new(&jit_dir);
         let namespaces = config_mgr.get_namespaces().unwrap();
 
         assert_eq!(namespaces.schema_version, 2);
-        assert_eq!(namespaces.namespaces.len(), 3); // type, epic, + milestone (auto-synced)
+        assert_eq!(namespaces.namespaces.len(), taxonomy.namespaces.len());
         assert!(namespaces.namespaces.contains_key("type"));
-        assert!(namespaces.namespaces.contains_key("epic"));
-        assert!(namespaces.namespaces.contains_key("milestone"));
+        assert!(namespaces
+            .namespaces
+            .contains_key(taxonomy.type_at_level(1)));
+        assert!(namespaces
+            .namespaces
+            .contains_key(taxonomy.type_at_level(2)));
 
         // Check strategic types
         assert_eq!(
             namespaces.strategic_types.as_ref().unwrap(),
-            &vec!["milestone".to_string(), "epic".to_string()]
+            &taxonomy.strategic_types
         );
     }
 
@@ -371,21 +364,27 @@ milestone = "milestone"
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
-        fs::write(
-            jit_dir.join("config.toml"),
-            r#"
-[type_hierarchy]
-types = { objective = 1, initiative = 2, feature = 3, action = 4 }
-"#,
-        )
-        .unwrap();
+        fs::write(jit_dir.join("config.toml"), test_config("")).unwrap();
 
         let icons = ConfigManager::new(&jit_dir).get_hierarchy_icons().unwrap();
 
-        assert_eq!(icons.get("objective"), Some(&"⭐".to_string()));
-        assert_eq!(icons.get("initiative"), Some(&"📦".to_string()));
-        assert_eq!(icons.get("feature"), Some(&"📝".to_string()));
-        assert_eq!(icons.get("action"), Some(&"☑️".to_string()));
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(1)),
+            Some(&"⭐".to_string())
+        );
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(2)),
+            Some(&"📦".to_string())
+        );
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(3)),
+            Some(&"📝".to_string())
+        );
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(4)),
+            Some(&"☑️".to_string())
+        );
     }
 
     #[test]
@@ -393,23 +392,24 @@ types = { objective = 1, initiative = 2, feature = 3, action = 4 }
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");
         fs::create_dir(&jit_dir).unwrap();
-        fs::write(
-            jit_dir.join("config.toml"),
-            r#"
-[type_hierarchy]
-types = { objective = 1, action = 4 }
-
-[type_hierarchy.icons.custom]
-objective = "🎯"
-action = "🛠️"
-"#,
-        )
-        .unwrap();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
+        let config_toml = test_config(&format!(
+            "[type_hierarchy.icons.custom]\n{} = \"🎯\"\n{} = \"🛠️\"\n",
+            taxonomy.type_at_level(1),
+            taxonomy.type_at_level(4)
+        ));
+        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
 
         let icons = ConfigManager::new(&jit_dir).get_hierarchy_icons().unwrap();
 
-        assert_eq!(icons.get("objective"), Some(&"🎯".to_string()));
-        assert_eq!(icons.get("action"), Some(&"🛠️".to_string()));
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(1)),
+            Some(&"🎯".to_string())
+        );
+        assert_eq!(
+            icons.get(taxonomy.type_at_level(4)),
+            Some(&"🛠️".to_string())
+        );
     }
 
     #[test]
@@ -426,10 +426,10 @@ action = "🛠️"
 description = "Issue type"
 unique = true
 required = true
-values = ["task", "bug", "story"]
+values = ["workstream", "defect", "request"]
 
-[namespaces.milestone]
-description = "Release milestone"
+[namespaces.workstream-group]
+description = "Workstream group"
 unique = false
 pattern = '^v\d+\.\d+$'
 "#;
@@ -442,8 +442,8 @@ pattern = '^v\d+\.\d+$'
         assert_eq!(type_ns.description, "Issue type");
         assert!(type_ns.unique);
 
-        let ms_ns = namespaces.namespaces.get("milestone").unwrap();
-        assert_eq!(ms_ns.description, "Release milestone");
+        let ms_ns = namespaces.namespaces.get("workstream-group").unwrap();
+        assert_eq!(ms_ns.description, "Workstream group");
         assert!(!ms_ns.unique);
     }
 

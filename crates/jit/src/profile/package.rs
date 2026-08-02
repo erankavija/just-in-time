@@ -954,6 +954,7 @@ mod tests {
     #[test]
     fn test_embedded_package_recurses_and_preserves_manifest_order() {
         let package = package();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         assert_eq!(package.file_count(), 4);
         assert!(package.file_count() <= MAX_PROFILE_PACKAGE_FILES);
         assert!(package.byte_size() <= MAX_PROFILE_PACKAGE_BYTES);
@@ -965,7 +966,7 @@ mod tests {
                 target: MapEntryTarget::TypeHierarchyTypes,
                 identity,
                 ..
-            }) if identity == "initiative"
+            }) if identity == taxonomy.type_at_level(2)
         ));
         assert!(matches!(
             package.manifest().contributions.get(6),
@@ -1196,6 +1197,7 @@ value = "workspace/active"
     fn test_hashes_are_stable_grouped_by_target_and_cover_source_drift() {
         let first = package();
         let second = package();
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         assert_eq!(first.hashes(), second.hashes());
         assert_eq!(
             first.hashes().package,
@@ -1226,11 +1228,11 @@ value = "workspace/active"
             changed.hashes().targets["docs/workflow.txt"]
         );
 
-        let reordered_manifest = manifest_text().replacen(
-            "[[contribution]]\nkind = \"map-entry\"\ntarget = \"type-hierarchy-types\"\nidentity = \"initiative\"\nvalue = 1\n\n",
-            "",
-            1,
-        ) + "\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"type-hierarchy-types\"\nidentity = \"initiative\"\nvalue = 1\n";
+        let contribution = format!(
+            "[[contribution]]\nkind = \"map-entry\"\ntarget = \"type-hierarchy-types\"\nidentity = \"{}\"\nvalue = 1\n\n",
+            taxonomy.type_at_level(2)
+        );
+        let reordered_manifest = manifest_text().replacen(&contribution, "", 1) + &contribution;
         let mut reordered = first.files.clone();
         reordered.insert(
             MANIFEST_FILE_NAME.to_string(),

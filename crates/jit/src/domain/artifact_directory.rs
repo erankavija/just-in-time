@@ -119,7 +119,7 @@ mod tests {
     /// coincidence.
     const AREA: &str = "workspace/notes";
     const TYPE: &str = "workstream";
-    const NAMESPACE: &str = "initiative";
+    const NAMESPACE: &str = "workstream-group";
     const MEMBERSHIP: &str = "platform-archive";
 
     fn documentation(areas: Option<&[&str]>) -> DocumentationConfig {

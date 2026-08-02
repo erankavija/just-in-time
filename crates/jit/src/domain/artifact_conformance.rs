@@ -287,7 +287,7 @@ mod tests {
     /// assumption fails these tests rather than passing by coincidence.
     const AREA: &str = "workspace/notes";
     const TYPE: &str = "workstream";
-    const NAMESPACE: &str = "initiative";
+    const NAMESPACE: &str = "workstream-group";
 
     fn documentation() -> DocumentationConfig {
         DocumentationConfig {

@@ -1734,6 +1734,20 @@ mod tests {
         i
     }
 
+    fn test_type(level: u8) -> String {
+        crate::test_taxonomy::test_taxonomy()
+            .type_at_level(level)
+            .to_string()
+    }
+
+    fn typed_issue(title: &str, level: u8, extra_labels: &[&str]) -> Issue {
+        let mut labels = vec![format!("type:{}", test_type(level))];
+        labels.extend(extra_labels.iter().map(|label| (*label).to_string()));
+        let mut issue = crate::domain::types::fixture_issue(title.to_string(), String::new());
+        issue.labels = labels;
+        issue
+    }
+
     /// A fixed clock instant for deterministic graph evaluation. Rules other than
     /// `gate-recency` ignore it; recency tests subtract from it explicitly.
     fn fixed_now() -> DateTime<Utc> {
@@ -1854,8 +1868,9 @@ mod tests {
 
     fn coverage_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"coverage\"\nwhen = {{ type = \"initiative\" }}\n\
-             severity = \"error\"\nassert = {{ label-coverage = {{ {extra} }} }}\n"
+            "[[rules]]\nname = \"coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ {extra} }} }}\n",
+            test_type(2)
         ))
     }
 
@@ -1867,8 +1882,8 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut initiative = crate::domain::types::fixture_issue("initiative".to_string(), body);
-        initiative.labels = vec!["type:initiative".to_string()];
+        let mut initiative = typed_issue(&test_type(2), 2, &[]);
+        initiative.description = body;
         initiative
     }
 
@@ -1896,11 +1911,12 @@ source-of-truth = "markdown-first"
     fn test_label_coverage_kind_sugar_evaluates_like_inline() {
         // REQ-02: a `kind = "requirement"` rule produces IDENTICAL findings to the
         // equivalent inline-triple rule across both covered and uncovered cases.
-        let kind_rule = rule_from_repo(
-            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"initiative\" }\n\
-             severity = \"error\"\nassert = { label-coverage = { \
-             kind = \"requirement\", child-state = \"done\" } }\n",
-        );
+        let kind_rule = rule_from_repo(&format!(
+            "[[rules]]\nname = \"coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ \
+             kind = \"requirement\", child-state = \"done\" }} }}\n",
+            test_type(2)
+        ));
         let inline_rule = coverage_rule("child-state = \"done\"");
 
         // Covered case: a done child satisfies the criterion.
@@ -1966,7 +1982,10 @@ source-of-truth = "markdown-first"
             "impl".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: the action's own criterion\n".to_string(),
         );
-        impl_node.labels = vec!["type:action".to_string(), "satisfies:REQ-01".to_string()];
+        impl_node.labels = vec![
+            format!("type:{}", test_type(4)),
+            "satisfies:REQ-01".to_string(),
+        ];
         container.dependencies = vec![impl_node.id.clone()];
 
         // The two qualified ids are distinct by scope even though the self-id is
@@ -2137,9 +2156,8 @@ source-of-truth = "markdown-first"
         // Only [hard] criteria are required; an [aspirational] one is ignored.
         let rule = coverage_rule("marker = \"[hard]\"");
         let body = "## Success Criteria\n\n- [hard] REQ-01: must\n- [aspirational] REQ-99: nice\n";
-        let mut initiative =
-            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
-        initiative.labels = vec!["type:initiative".to_string()];
+        let mut initiative = typed_issue(&test_type(2), 2, &[]);
+        initiative.description = body.to_string();
         let mut child = issue("child", &["satisfies:REQ-01"]);
         child.dependencies = vec![initiative.id.clone()];
 
@@ -2168,9 +2186,8 @@ source-of-truth = "markdown-first"
         let body = "## Success Criteria\n\n\
             - [ ] [hard] REQ-01: unchecked, uncovered\n\
             - [x] [hard] REQ-02: checked, uncovered\n";
-        let mut initiative =
-            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
-        initiative.labels = vec!["type:initiative".to_string()];
+        let mut initiative = typed_issue(&test_type(2), 2, &[]);
+        initiative.description = body.to_string();
         // No satisfying children: both criteria must be reported as uncovered.
 
         let rules = vec![&rule];
@@ -2234,7 +2251,7 @@ source-of-truth = "markdown-first"
 
     // --- label-coverage: transitive closure (T3) ---------------------------
 
-    /// Build a `type:initiative` issue with `[hard]` criteria but no other labels, so
+    /// Build a strategic-container issue with `[hard]` criteria but no other labels, so
     /// callers can chain a `dependencies` spine of arbitrary depth beneath it.
     fn initiative_chain_head(ids: &[&str]) -> Issue {
         initiative_with_criteria(ids)
@@ -2248,8 +2265,8 @@ source-of-truth = "markdown-first"
         // it; the transitive walk must credit it.
         let rule = coverage_rule("child-link = \"dependencies\"");
         let mut initiative = initiative_chain_head(&["REQ-01"]);
-        let mut sink = issue("sink", &["type:action"]);
-        let deep = issue("deep", &["type:action", "satisfies:REQ-01"]);
+        let mut sink = typed_issue("sink", 4, &[]);
+        let deep = typed_issue("deep", 4, &["satisfies:REQ-01"]);
         // initiative depends on sink; sink depends on deep.
         initiative.dependencies = vec![sink.id.clone()];
         sink.dependencies = vec![deep.id.clone()];
@@ -2274,8 +2291,8 @@ source-of-truth = "markdown-first"
         // Same chain shape, but nobody satisfies REQ-01 — must still report.
         let rule = coverage_rule("child-link = \"dependencies\"");
         let mut initiative = initiative_chain_head(&["REQ-01"]);
-        let mut sink = issue("sink", &["type:action"]);
-        let deep = issue("deep", &["type:action"]); // no satisfies label
+        let mut sink = typed_issue("sink", 4, &[]);
+        let deep = typed_issue("deep", 4, &[]); // no satisfies label
         initiative.dependencies = vec![sink.id.clone()];
         sink.dependencies = vec![deep.id.clone()];
 
@@ -2302,8 +2319,8 @@ source-of-truth = "markdown-first"
         // <-dep- b, with b (a transitive dependent) satisfying the criterion.
         let rule = coverage_rule(""); // default child-link = dependents
         let initiative = initiative_chain_head(&["REQ-01"]);
-        let mut a = issue("a", &["type:action"]);
-        let mut b = issue("b", &["type:action", "satisfies:REQ-01"]);
+        let mut a = typed_issue("a", 4, &[]);
+        let mut b = typed_issue("b", 4, &["satisfies:REQ-01"]);
         a.dependencies = vec![initiative.id.clone()]; // a depends on initiative
         b.dependencies = vec![a.id.clone()]; // b depends on a (so transitively on initiative)
 
@@ -2332,7 +2349,7 @@ source-of-truth = "markdown-first"
         let rule =
             coverage_rule("child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]");
         let mut initiative = initiative_chain_head(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:action"]);
+        let mut impl_node = typed_issue("impl", 4, &[]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         let plan = issue("P", &["type:planning", "satisfies:REQ-01"]);
         initiative.dependencies = vec![impl_node.id.clone()];
@@ -2363,7 +2380,7 @@ source-of-truth = "markdown-first"
         let rule =
             coverage_rule("child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]");
         let mut initiative = initiative_chain_head(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:action", "satisfies:REQ-01"]);
+        let mut impl_node = typed_issue("impl", 4, &["satisfies:REQ-01"]);
         let breakdown = issue("B", &["type:breakdown"]);
         initiative.dependencies = vec![impl_node.id.clone()];
         impl_node.dependencies = vec![breakdown.id.clone()];
@@ -2414,7 +2431,7 @@ source-of-truth = "markdown-first"
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
         let mut container = initiative_with_criteria(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:action", "satisfies:REQ-01"]);
+        let mut impl_node = typed_issue("impl", 4, &["satisfies:REQ-01"]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         // Container depends on impl (its subtree); B brackets the container.
         container.dependencies = vec![impl_node.id.clone()];
@@ -2449,7 +2466,7 @@ source-of-truth = "markdown-first"
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
         let mut container = initiative_with_criteria(&["REQ-01"]);
-        let impl_node = issue("impl", &["type:action"]); // does NOT satisfy
+        let impl_node = typed_issue("impl", 4, &[]); // does NOT satisfy
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
         breakdown
@@ -2483,7 +2500,7 @@ source-of-truth = "markdown-first"
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
         let mut container = initiative_with_criteria(&["REQ-01"]);
-        let mut impl_node = issue("impl", &["type:action", "satisfies:REQ-01"]);
+        let mut impl_node = typed_issue("impl", 4, &["satisfies:REQ-01"]);
         impl_node.state = State::Backlog; // drafted, not done
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
@@ -2618,7 +2635,7 @@ source-of-truth = "markdown-first"
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
         let mut container = initiative_with_criteria(&["REQ-01"]);
-        let impl_node = issue("impl", &["type:action"]); // does NOT satisfy REQ-01
+        let impl_node = typed_issue("impl", 4, &[]); // does NOT satisfy REQ-01
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
         // SHORT id, per project convention -- not the full UUID.
@@ -2659,7 +2676,7 @@ source-of-truth = "markdown-first"
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
         let mut container = initiative_with_criteria(&["REQ-01"]);
-        let impl_node = issue("impl", &["type:action"]);
+        let impl_node = typed_issue("impl", 4, &[]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
         breakdown.labels.push(format!("brackets:{}", container.id));
@@ -2770,7 +2787,7 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_reference_resolves() {
         let rule = reference_rule("from = \"satisfies\", to = \"req\"");
-        let source = issue("initiative", &["req:REQ-01"]);
+        let source = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -2787,7 +2804,7 @@ source-of-truth = "markdown-first"
     #[test]
     fn test_label_reference_dangles() {
         let rule = reference_rule("from = \"satisfies\", to = \"req\"");
-        let source = issue("initiative", &["req:REQ-01"]);
+        let source = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-99"]); // no req:REQ-99 anywhere
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -2807,7 +2824,7 @@ source-of-truth = "markdown-first"
     fn test_label_reference_linked_scope_requires_edge() {
         let rule = reference_rule("from = \"satisfies\", to = \"req\", scope = \"linked\"");
         // Declaring issue exists globally but is NOT linked to the child.
-        let declarer = issue("initiative", &["req:REQ-01"]);
+        let declarer = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
         let child = issue("child", &["satisfies:REQ-01"]); // no dependency edge
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -2821,7 +2838,7 @@ source-of-truth = "markdown-first"
         assert_eq!(findings.len(), 1, "linked scope: unlinked source dangles");
 
         // Now add the edge: the reference resolves.
-        let declarer = issue("initiative", &["req:REQ-01"]);
+        let declarer = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
         let mut child = issue("child", &["satisfies:REQ-01"]);
         child.dependencies = vec![declarer.id.clone()];
         let findings = evaluate_graph(
@@ -2856,8 +2873,9 @@ source-of-truth = "markdown-first"
 
     fn shape_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"shape\"\nwhen = {{ type = \"action\" }}\nseverity = \"error\"\n\
-             assert = {{ dependency-shape = {{ {extra} }} }}\n"
+            "[[rules]]\nname = \"shape\"\nwhen = {{ type = \"{}\" }}\nseverity = \"error\"\n\
+             assert = {{ dependency-shape = {{ {extra} }} }}\n",
+            test_type(4)
         ))
     }
 
@@ -2865,7 +2883,7 @@ source-of-truth = "markdown-first"
     fn test_dependency_shape_satisfied() {
         let rule = shape_rule("target = { type = \"design\" }");
         let design = issue("design", &["type:design"]);
-        let mut action = issue("action", &["type:action"]);
+        let mut action = typed_issue(&test_type(4), 4, &[]);
         action.dependencies = vec![design.id.clone()];
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -2886,7 +2904,7 @@ source-of-truth = "markdown-first"
     fn test_dependency_shape_violated() {
         let rule = shape_rule("target = { type = \"design\" }");
         let design = issue("design", &["type:design"]);
-        let action = issue("action", &["type:action"]); // no dependency
+        let action = typed_issue(&test_type(4), 4, &[]); // no dependency
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2907,7 +2925,7 @@ source-of-truth = "markdown-first"
         let design = issue("design", &["type:design"]);
         let mut mid = issue("mid", &["type:other"]);
         mid.dependencies = vec![design.id.clone()];
-        let mut action = issue("action", &["type:action"]);
+        let mut action = typed_issue(&test_type(4), 4, &[]);
         action.dependencies = vec![mid.id.clone()];
 
         let direct = shape_rule("target = { type = \"design\" }");
@@ -2944,7 +2962,7 @@ source-of-truth = "markdown-first"
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[issue("action", &["type:action"])],
+            &[typed_issue(&test_type(4), 4, &[])],
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
@@ -3267,7 +3285,7 @@ source-of-truth = "markdown-first"
         let rules = vec![&local, &off];
         let findings = evaluate_graph(
             &rules,
-            &[issue("action", &["type:action"])],
+            &[typed_issue(&test_type(4), 4, &[])],
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),
@@ -3282,8 +3300,9 @@ source-of-truth = "markdown-first"
 
     fn ctc_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"ctc\"\nwhen = {{ type = \"initiative\" }}\n\
-             severity = \"error\"\nassert = {{ criteria-to-check = {{ {extra} }} }}\n"
+            "[[rules]]\nname = \"ctc\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ criteria-to-check = {{ {extra} }} }}\n",
+            test_type(2)
         ))
     }
 
@@ -3297,8 +3316,8 @@ source-of-truth = "markdown-first"
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut initiative = crate::domain::types::fixture_issue("initiative".to_string(), body);
-        initiative.labels = vec!["type:initiative".to_string()];
+        let mut initiative = typed_issue(&test_type(2), 2, &[]);
+        initiative.description = body;
         initiative
     }
 
@@ -3538,7 +3557,7 @@ source-of-truth = "markdown-first"
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         // A dependent child carries the would-be mapping; per-issue semantics
         // mean this is irrelevant to the initiative.
-        let mut child = issue("child", &["type:action", "checks:REQ-01"]);
+        let mut child = typed_issue("child", 4, &["checks:REQ-01"]);
         child.dependencies = vec![initiative.id.clone()];
         child.gates_required = vec!["verify:REQ-01".to_string()];
         let initiative_id = initiative.id.clone();
@@ -3574,7 +3593,7 @@ source-of-truth = "markdown-first"
              assert = { type-hierarchy = { kind = \"orphan-leaf\" } }\n",
         );
         let rules = vec![&rule];
-        let action = issue("action", &["type:action"]);
+        let action = typed_issue(&test_type(4), 4, &[]);
         let findings = evaluate_graph(
             &rules,
             std::slice::from_ref(&action),
@@ -3593,8 +3612,9 @@ source-of-truth = "markdown-first"
 
     fn clm_rule(extra: &str) -> Rule {
         rule_from(&format!(
-            "[[rules]]\nname = \"clm\"\nwhen = {{ type = \"initiative\" }}\n\
-             severity = \"error\"\nassert = {{ criteria-label-match = {{ {extra} }} }}\n"
+            "[[rules]]\nname = \"clm\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ criteria-label-match = {{ {extra} }} }}\n",
+            test_type(2)
         ))
     }
 
@@ -3607,8 +3627,8 @@ source-of-truth = "markdown-first"
                 .collect::<Vec<_>>()
                 .join("\n")
         );
-        let mut initiative = crate::domain::types::fixture_issue("initiative".to_string(), body);
-        initiative.labels = vec!["type:initiative".to_string()];
+        let mut initiative = typed_issue(&test_type(2), 2, &[]);
+        initiative.description = body;
         initiative
     }
 
@@ -3717,13 +3737,8 @@ source-of-truth = "markdown-first"
         let body = "## Success Criteria\n\n\
                     - [hard] REQ-01: required\n\
                     - [aspirational] REQ-99: nice-to-have\n";
-        let mut initiative =
-            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
-        initiative.labels = vec![
-            "type:initiative".to_string(),
-            "req:REQ-01".to_string(), // matches [hard] criterion -> not stray
-            "req:REQ-99".to_string(), // only on [aspirational] item -> stray under marker filter
-        ];
+        let mut initiative = typed_issue(&test_type(2), 2, &["req:REQ-01", "req:REQ-99"]);
+        initiative.description = body.to_string();
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -3747,9 +3762,8 @@ source-of-truth = "markdown-first"
         // A non-default criteria-section name is reflected in the finding text.
         let rule = clm_rule(r#"namespace = "req", criteria-section = "hard_requirements""#);
         let body = "## Hard Requirements\n\n- REQ-01: do it\n";
-        let mut initiative =
-            crate::domain::types::fixture_issue("initiative".to_string(), body.to_string());
-        initiative.labels = vec!["type:initiative".to_string(), "req:REQ-77".to_string()]; // stray
+        let mut initiative = typed_issue(&test_type(2), 2, &["req:REQ-77"]); // stray
+        initiative.description = body.to_string();
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -3773,7 +3787,7 @@ source-of-truth = "markdown-first"
     fn test_criteria_label_match_no_namespace_labels_produces_no_finding() {
         // An issue with no `req:*` labels at all has nothing to check.
         let rule = clm_rule(r#"namespace = "req""#);
-        let initiative = initiative_with_clm_criteria(&["REQ-01"]); // labels: just type:initiative
+        let initiative = initiative_with_clm_criteria(&["REQ-01"]); // labels: just its type
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -3803,7 +3817,7 @@ source-of-truth = "markdown-first"
         let initiative_id = initiative.id.clone();
         // A child that happens to carry req:REQ-77 must NOT silence the initiative's
         // stray finding (per-issue: the child is never consulted).
-        let mut child = issue("child", &["type:action", "req:REQ-77"]);
+        let mut child = typed_issue("child", 4, &["req:REQ-77"]);
         child.dependencies = vec![initiative.id.clone()];
 
         let rules = vec![&rule];
@@ -3839,8 +3853,8 @@ source-of-truth = "markdown-first"
         // Two unlinked initiatives both declaring req:REQ-01 — one finding naming the
         // value and both short-ids.
         let rule = uniqueness_rule("req");
-        let mut initiative_a = issue("initiative-a", &["type:initiative", "req:REQ-01"]);
-        let initiative_b = issue("initiative-b", &["type:initiative", "req:REQ-01"]);
+        let mut initiative_a = typed_issue("initiative-a", 2, &["req:REQ-01"]);
+        let initiative_b = typed_issue("initiative-b", 2, &["req:REQ-01"]);
         // Deliberately no dependency edge between them.
         let id_a = initiative_a.short_id().to_string();
         let id_b = initiative_b.short_id().to_string();
@@ -3872,8 +3886,8 @@ source-of-truth = "markdown-first"
     fn test_label_uniqueness_no_finding_for_unique_values() {
         // Two initiatives each declaring a distinct req — no collision.
         let rule = uniqueness_rule("req");
-        let initiative_a = issue("initiative-a", &["type:initiative", "req:REQ-01"]);
-        let initiative_b = issue("initiative-b", &["type:initiative", "req:REQ-02"]);
+        let initiative_a = typed_issue("initiative-a", 2, &["req:REQ-01"]);
+        let initiative_b = typed_issue("initiative-b", 2, &["req:REQ-02"]);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -3892,16 +3906,17 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_uniqueness_when_selector_filters_issues() {
-        // The rule has `when = { type = "initiative" }` via `rule_from`.
+        // The rule has a strategic-container selector via `rule_from`.
         // An action also carrying req:REQ-01 is NOT included because it fails the
         // `when` selector — only matching issues are checked for uniqueness.
-        let rule = rule_from(
-            "[[rules]]\nname = \"uniqueness\"\nwhen = { type = \"initiative\" }\n\
+        let rule = rule_from(&format!(
+            "[[rules]]\nname = \"uniqueness\"\nwhen = {{ type = \"{}\" }}\n\
              severity = \"error\"\n\
-             assert = { label-uniqueness = { namespace = \"req\", scope = \"all\" } }\n",
-        );
-        let initiative = issue("initiative", &["type:initiative", "req:REQ-01"]);
-        let action = issue("action", &["type:action", "req:REQ-01"]); // not matched
+             assert = {{ label-uniqueness = {{ namespace = \"req\", scope = \"all\" }} }}\n",
+            test_type(2)
+        ));
+        let initiative = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
+        let action = typed_issue(&test_type(4), 4, &["req:REQ-01"]); // not matched
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -4053,11 +4068,12 @@ source-of-truth = "markdown-first"
         // `(criteria-section, marker, id-pattern)` rule. `GraphFinding` is `Eq`, so
         // the WHOLE finding vectors (issue_id, rule, severity, message) are
         // compared, in BOTH the covered (empty) and uncovered cases.
-        let kind_rule = rule_from_repo(
-            "[[rules]]\nname = \"coverage\"\nwhen = { type = \"initiative\" }\n\
-             severity = \"error\"\nassert = { label-coverage = { \
-             kind = \"requirement\", child-state = \"done\" } }\n",
-        );
+        let kind_rule = rule_from_repo(&format!(
+            "[[rules]]\nname = \"coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ \
+             kind = \"requirement\", child-state = \"done\" }} }}\n",
+            test_type(2)
+        ));
         let inline_rule = coverage_rule(
             "criteria-section = \"success_criteria\", marker = \"[hard]\", \
              id-pattern = \"[A-Z][A-Z0-9]*-[0-9]+\", child-state = \"done\"",

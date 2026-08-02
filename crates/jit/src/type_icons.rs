@@ -106,24 +106,30 @@ pub fn resolve_icons_for_hierarchy(
 mod tests {
     use super::*;
 
+    fn test_type(level: u8) -> String {
+        crate::test_taxonomy::test_taxonomy()
+            .type_at_level(level)
+            .to_string()
+    }
+
     #[test]
     fn test_get_icon_default_level_mapping() {
         let config = IconConfig::default();
 
         assert_eq!(
-            get_icon_for_type("milestone", 1, &config),
+            get_icon_for_type(&test_type(1), 1, &config),
             Some("⭐".to_string())
         );
         assert_eq!(
-            get_icon_for_type("epic", 2, &config),
+            get_icon_for_type(&test_type(2), 2, &config),
             Some("📦".to_string())
         );
         assert_eq!(
-            get_icon_for_type("story", 3, &config),
+            get_icon_for_type(&test_type(3), 3, &config),
             Some("📝".to_string())
         );
         assert_eq!(
-            get_icon_for_type("task", 4, &config),
+            get_icon_for_type(&test_type(4), 4, &config),
             Some("☑️".to_string())
         );
     }
@@ -138,7 +144,7 @@ mod tests {
             Some("☑️".to_string())
         );
         assert_eq!(
-            get_icon_for_type("action", 10, &config),
+            get_icon_for_type(&test_type(4), 10, &config),
             Some("☑️".to_string())
         );
     }
@@ -146,21 +152,21 @@ mod tests {
     #[test]
     fn test_get_icon_from_custom() {
         let mut custom = HashMap::new();
-        custom.insert("epic".to_string(), "🚀".to_string());
+        custom.insert(test_type(2), "🚀".to_string());
         custom.insert("bug".to_string(), "🐛".to_string());
 
         let config = IconConfig::new(Some(custom));
 
         // Custom overrides
         assert_eq!(
-            get_icon_for_type("epic", 2, &config),
+            get_icon_for_type(&test_type(2), 2, &config),
             Some("🚀".to_string())
         );
         assert_eq!(get_icon_for_type("bug", 4, &config), Some("🐛".to_string()));
 
         // Falls back to default for non-custom types
         assert_eq!(
-            get_icon_for_type("task", 4, &config),
+            get_icon_for_type(&test_type(4), 4, &config),
             Some("☑️".to_string())
         );
     }
@@ -177,48 +183,40 @@ mod tests {
 
         // Level default used for others
         assert_eq!(
-            get_icon_for_type("epic", 2, &config),
+            get_icon_for_type(&test_type(2), 2, &config),
             Some("📦".to_string())
         );
         assert_eq!(
-            get_icon_for_type("task", 4, &config),
+            get_icon_for_type(&test_type(4), 4, &config),
             Some("☑️".to_string())
         );
     }
 
     #[test]
     fn test_resolve_icons_for_hierarchy() {
-        let mut types = HashMap::new();
-        types.insert("milestone".to_string(), 1);
-        types.insert("epic".to_string(), 2);
-        types.insert("story".to_string(), 3);
-        types.insert("task".to_string(), 4);
+        let types = crate::test_taxonomy::test_taxonomy().hierarchy;
 
         let config = IconConfig::default();
         let icons = resolve_icons_for_hierarchy(&types, &config);
 
         assert_eq!(icons.len(), 4);
-        assert_eq!(icons.get("milestone"), Some(&"⭐".to_string()));
-        assert_eq!(icons.get("epic"), Some(&"📦".to_string()));
-        assert_eq!(icons.get("story"), Some(&"📝".to_string()));
-        assert_eq!(icons.get("task"), Some(&"☑️".to_string()));
+        assert_eq!(icons.get(&test_type(1)), Some(&"⭐".to_string()));
+        assert_eq!(icons.get(&test_type(2)), Some(&"📦".to_string()));
+        assert_eq!(icons.get(&test_type(3)), Some(&"📝".to_string()));
+        assert_eq!(icons.get(&test_type(4)), Some(&"☑️".to_string()));
     }
 
     #[test]
     fn test_resolve_icons_with_custom_names() {
-        let mut types = HashMap::new();
-        types.insert("objective".to_string(), 1);
-        types.insert("initiative".to_string(), 2);
-        types.insert("feature".to_string(), 3);
-        types.insert("action".to_string(), 4);
+        let types = crate::test_taxonomy::test_taxonomy().hierarchy;
 
         let config = IconConfig::default();
         let icons = resolve_icons_for_hierarchy(&types, &config);
 
         // Icons assigned by level, not name
-        assert_eq!(icons.get("objective"), Some(&"⭐".to_string()));
-        assert_eq!(icons.get("initiative"), Some(&"📦".to_string()));
-        assert_eq!(icons.get("feature"), Some(&"📝".to_string()));
-        assert_eq!(icons.get("action"), Some(&"☑️".to_string()));
+        assert_eq!(icons.get(&test_type(1)), Some(&"⭐".to_string()));
+        assert_eq!(icons.get(&test_type(2)), Some(&"📦".to_string()));
+        assert_eq!(icons.get(&test_type(3)), Some(&"📝".to_string()));
+        assert_eq!(icons.get(&test_type(4)), Some(&"☑️".to_string()));
     }
 }
