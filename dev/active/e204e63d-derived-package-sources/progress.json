@@ -1,7 +1,7 @@
 {
   "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
   "epic_short_id": "e204e63d",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 0,
@@ -426,6 +426,21 @@
       "at": "2026-08-02",
       "session": 6,
       "text": "A worker's targeted-target pass is not evidence for the target. 60c211d6 changed a pub(crate) helper in doc_show_tests.rs that artifact_conformance_cli_tests.rs imports, ran only its own module, and reported the sibling's failure as an 'unrelated baseline failure'. It failed cargo-ci on main. Briefs now require the whole target plus a base-commit control before any baseline claim."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "The lead chose a reading of a criteria conflict instead of escalating, exactly as session 3's trap forbids, and briefed ten workers with it. The gate ruled the other way and two issues lost a round. A criteria conflict noticed at DISPATCH time is the same escalation as one noticed at review time \u2014 the trap is not limited to lead review."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "Sharpening [namespaces.per] and the review prompt fixed 39c34568's label over-reach but NOT 6c47b99a's: that reviewer stopped citing the label and cited the decision text directly. The amendment addressed a narrower thing than the pattern. Resequencing \u2014 landing the issue that actually delivers the decision \u2014 is what has worked both times."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "text": "The lead's own brief created a soundness hole in 32779829: it instructed that ignored files must never enter a gate's input digest, so git ls-files --exclude-standard silently drops web/node_modules, which npm-ci genuinely reads. A dependency change would move that checker's verdict without moving the digest. Exclusion must be declared, not inherited from the ignore rules. Review a brief's own instructions when a finding lands on them."
     }
   ],
   "rework_counts": {
@@ -573,6 +588,27 @@
       "ruling": "Sharpen [namespaces.per] only; add no verbosity elsewhere.",
       "applied": "a3291826 \u2014 the namespace now says the label denotes conformance, not delivery of the decision whole.",
       "outcome": "Did NOT bind the reviewer. Round 2 failed on the same finding, now citing D-2 and D-6 and 39c34568's own REQ-05. Lead resequenced instead of escalating again: 0cf1f351 delivers the walk and is dispatched ahead of 39c34568's close, so the claim the reviewer tests becomes true in the tree."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "question": "REQ-02 ('a test that needs only a repository, and asserts on no vocabulary, is left alone') and REQ-03 ('no test here constructs the scaffold's hierarchy template to obtain a taxonomy') conflict for a repository-only test that constructs the template only because initialize_fresh_repository requires the argument.",
+      "ruling": "The gate's reading governs: REQ-02 means what it says, setup included. Repository-only tests keep HierarchyTemplate::default(); daddfc0b absorbs those call sites when it deletes the type.",
+      "outcome": "1cfb66ff and ffe6de33 reverted to the narrowed form. The lead had chosen the opposite reading at dispatch and briefed all ten adoption workers with it, which cost those two issues a review round."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "question": "6c47b99a failed code-review twice demanding jit validate --fix re-resolve a directory-origin package, which is 8371bd46's job.",
+      "ruling": "Pull 8371bd46's chain forward \u2014 32779829 then 5d12a79f then 8371bd46 \u2014 and re-run 6c47b99a's review afterwards.",
+      "outcome": "Same resequencing that resolved 39c34568. 6c47b99a stays open meanwhile."
+    },
+    {
+      "at": "2026-08-02",
+      "session": 6,
+      "question": "cargo-ci re-ran a whole-workspace suite once per issue over one unchanged tree \u2014 about 112 minutes for a fifteen-issue wave.",
+      "ruling": "File gate-verdict input provenance as an issue inside this epic, to be completed next; no further work proceeds without it.",
+      "outcome": "32779829 created and delivered. Measured in production: 06b736c7's cargo-ci reused 32779829's verdict in 0ms against 411s executed, origin.derivation='reused' naming the source run. Pipeline 4 gated fourteen issues in ~50 minutes."
     }
   ],
   "halted": {

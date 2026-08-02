@@ -252,8 +252,8 @@ fn test_add_document_reference_new_path_appends() {
 #[test]
 fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     use jit::commands::CommandExecutor;
+    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{discover_repository_layout, JsonFileStorage};
-    use jit::test_taxonomy::test_taxonomy;
     use sha2::{Digest, Sha256};
 
     let temp = tempfile::tempdir().unwrap();
@@ -283,15 +283,11 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
         .unwrap()
         .to_string();
 
-    let taxonomy = test_taxonomy();
-    let jit_root = temp.path().join(".jit");
-    std::fs::create_dir_all(&jit_root).unwrap();
-    std::fs::write(jit_root.join("config.toml"), taxonomy.config_fragment()).unwrap();
-    let storage = JsonFileStorage::new(&jit_root);
+    let storage = JsonFileStorage::new(temp.path().join(".jit"));
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
@@ -349,10 +345,16 @@ fn test_add_document_rejects_asset_closure_over_fixed_budget_without_writes() {
 #[test]
 fn test_add_document_rejects_malformed_utf8_without_writes() {
     use jit::commands::CommandExecutor;
-    use jit::storage::discover_repository_layout;
-    use jit::test_utils::setup_test_repo_with_taxonomy;
+    use jit::hierarchy_templates::HierarchyTemplate;
+    use jit::storage::{discover_repository_layout, JsonFileStorage};
 
-    let (temp, storage, _taxonomy) = setup_test_repo_with_taxonomy().unwrap();
+    let temp = tempfile::tempdir().unwrap();
+    let storage = JsonFileStorage::new(temp.path().join(".jit"));
+    let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
+    CommandExecutor::new(storage.clone())
+        .with_layout(layout)
+        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
     let id = create_issue(&executor, "Malformed document");

@@ -305,6 +305,34 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
 }
 
 #[test]
+fn test_profile_application_contributes_workflow_invariants_to_scaffolded_registry() {
+    let repo = TestRepo::new();
+
+    success_json(&repo.path, &["init", "--json"]);
+    let applied = success_json(&repo.path, &["profile", "apply", "jit-dogfood", "--json"]);
+    assert_eq!(applied["status"], "applied");
+    assert_eq!(
+        success_json(&repo.path, &["validate", "--json"])["valid"],
+        true
+    );
+
+    let registry: toml::Value = fs::read_to_string(repo.path.join(".jit/invariants.toml"))
+        .expect("read contributed invariant registry")
+        .parse()
+        .expect("parse contributed invariant registry");
+    let ids = registry["invariants"]
+        .as_array()
+        .expect("invariant registry array")
+        .iter()
+        .map(|entry| entry["id"].as_str().expect("invariant id").to_string())
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(ids.len(), 18);
+    assert!(ids.contains("label-format"));
+    assert!(ids.contains("convention-convergence"));
+}
+
+#[test]
 #[cfg(unix)]
 fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let repo = TestRepo::new();
