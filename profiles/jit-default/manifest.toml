@@ -1,0 +1,463 @@
+# The generic domain vocabulary a repository needs to be usable: a four-level
+# type hierarchy, the label namespace registry, the addressable item kinds, the
+# strategic types, the validation defaults, and the documentation-area
+# classification. Everything here is a declaration an adopter may edit after
+# application; the package carries no asset, no gate, no template and no rule,
+# so it states what a repository's vocabulary is and nothing about how its work
+# is sequenced.
+
+[profile]
+manifest-version = 1
+id = "jit-default"
+version = "1.0.0"
+jit = ">=1.0.0, <2.0.0"
+
+# =============================================================================
+# TYPE HIERARCHY
+# =============================================================================
+# Issue types and their hierarchy level (lower number = more strategic).
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "milestone"
+value = 1
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "epic"
+value = 2
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "story"
+value = 3
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "task"
+value = 4
+
+# Types shown by `jit query strategic`.
+
+[[contribution]]
+kind = "set-string"
+target = "strategic-types"
+value = "milestone"
+
+[[contribution]]
+kind = "set-string"
+target = "strategic-types"
+value = "epic"
+
+# Maps each parent type to its membership label namespace. E.g. issues
+# belonging to an epic carry an "epic:<name>" label.
+
+[[contribution]]
+kind = "map-entry"
+target = "label-associations"
+identity = "milestone"
+value = "milestone"
+
+[[contribution]]
+kind = "map-entry"
+target = "label-associations"
+identity = "epic"
+value = "epic"
+
+[[contribution]]
+kind = "map-entry"
+target = "label-associations"
+identity = "story"
+value = "story"
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+# Repo-wide enforcement strictness. Modulates which rule violations block a
+# write or transition, on top of each rule's per-rule enforce/severity (in
+# rules.toml):
+#   strict      — any violation blocks (warning or error); suits CI/automation.
+#   loose       — only an enforced error blocks; warnings are advisory.
+#   permissive  — nothing blocks; every violation is report-only.
+
+[[contribution]]
+kind = "scalar"
+target = "validation-strictness"
+value = "loose"
+
+# Auto-assign this type when creating issues without a type:* label.
+
+[[contribution]]
+kind = "scalar"
+target = "validation-default-type"
+value = "task"
+
+# =============================================================================
+# NAMESPACE REGISTRY
+# =============================================================================
+# Each namespace declares:
+#   description — human-readable purpose (required)
+#   unique      — at most one label from this namespace per issue (required)
+#   examples    — documentation only, not enforced
+#
+# Allowed-value enums, value patterns, and required-ness are NOT declared here:
+# an adopter authors them as custom rules in `.jit/rules.toml`. The built-in
+# registry and `namespace-unique-*` rules derive from this table at load, and
+# are emitted only while it declares something.
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "type"
+value = { description = "Issue type (hierarchical). At most one per issue.", unique = true, examples = [
+  "type:task",
+  "type:story",
+  "type:epic",
+] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "component"
+value = { description = "Technical area or subsystem affected.", unique = false, examples = [
+  "component:backend",
+  "component:frontend",
+  "component:cli",
+] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "priority"
+value = { description = "Work priority. Orthogonal to issue priority field; used for filtering.", unique = true, examples = [
+  "priority:high",
+  "priority:low",
+] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "team"
+value = { description = "Owning team.", unique = true, examples = [
+  "team:backend",
+  "team:platform",
+] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "milestone"
+value = { description = "Release milestone membership (version tag).", unique = false, examples = [
+  "milestone:v1.0",
+  "milestone:v1.2.3",
+  "milestone:v2.0-rc1",
+] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "resolution"
+value = { description = "Reason for issue closure (used with rejected state).", unique = true, examples = [
+  "resolution:wont-fix",
+  "resolution:duplicate",
+] }
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "enforces"
+value = { description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces.", unique = false, examples = [
+  "enforces:@/invariant/label-format",
+  "enforces:@/rule/label-format",
+  "enforces:@/gate/cargo-ci",
+] }
+
+# =============================================================================
+# ITEM KINDS
+# =============================================================================
+# Addressable structured items projected from issue descriptions (or, for a
+# project-scope kind, a source file). Each declaration states HOW a kind's
+# entries are found and addressed; the engine interprets no kind NAME, only
+# these fields, so an adopter may rename, edit, remove, or add kinds freely.
+#
+# Required fields per kind:
+#   section          — heading slug whose list items are scanned
+#   id-pattern       — regex extracting each item's self-id from its text
+#   markers          — prefixes an item must start with ([] = every item qualifies)
+#   link-namespaces  — label namespaces that reference items of this kind
+#   scope            — "issue" (items live in issue descriptions) | "project"
+#   source-of-truth  — "markdown-first" | "registry-first"
+# A project-scope kind also needs `source`: a markdown file path, or a toml
+# descriptor { toml, table, id-field, text-field } for a registry-first kind.
+#
+# The kinds below name only sources a repository already carries: the
+# issue-scope kinds need none, and the invariant, rule, and gate registries are
+# all written by initialization, so every declaration resolves in a freshly
+# initialized repository before any package is applied.
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "requirement"
+
+[contribution.value]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]", "[aspirational]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "decision"
+
+[contribution.value]
+section = "decisions"
+id-pattern = "D-[0-9]+"
+markers = []
+link-namespaces = ["per"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "risk"
+
+[contribution.value]
+section = "risks"
+id-pattern = "RISK-[0-9]+"
+markers = []
+link-namespaces = ["mitigates", "resolves"]
+scope = "issue"
+source-of-truth = "markdown-first"
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "invariant"
+
+[contribution.value]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+# Shorthand for space-constrained citations: `@/inv/<self-id>` resolves the same
+# item as `@/invariant/<self-id>`.
+aliases = ["inv"]
+
+# Rules are colon-free-named entries in `.jit/rules.toml`; the rule kind
+# projects each entry's `name` as its self-id and its optional `description` as
+# its display text (falling back to the `name` when a rule has no description),
+# addressed at `@/rule/<name>`.
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "rule"
+
+[contribution.value]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
+source-of-truth = "registry-first"
+
+# Gates are kebab-case-keyed entries in `.jit/gates.toml` (the gate registry);
+# the gate kind projects each entry's `key` as its self-id and its
+# `description` as its display text, addressed at `@/gate/<key>`. A
+# freshly-scaffolded `.jit/gates.toml` starts as an EMPTY registry (unlike
+# `rules.toml`, which initialization also seeds with default rules), so `jit
+# item list --kind gate` returns nothing until a gate is defined via `jit gate
+# define`.
+
+[[contribution]]
+kind = "map-entry"
+target = "item-kinds"
+identity = "gate"
+
+[contribution.value]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
+source-of-truth = "registry-first"
+
+# =============================================================================
+# DOCUMENTATION LIFECYCLE
+# =============================================================================
+# Where development documents live, and what archiving one does. An artifact
+# under a managed path MOVES under the archive root when its owning issue is
+# archived; an artifact under a permanent path is COPIED there and keeps its
+# source. Paths match by prefix: a directory entry classifies everything
+# beneath it, a file entry classifies that one file. The development-root files
+# below are named one at a time because an entry for the root itself would
+# cover every area under it.
+#
+# The issue-scoped areas are a separate question: an area listed there
+# organizes its artifacts one directory per issue, and every other area stays
+# flat. An area is named whole — a path inside one is not itself an area — and
+# adoption is independent of the classification above, so a flat managed area
+# still archives its artifacts normally and only the naming differs.
+#
+# Reclassify freely: these are the adopter's areas, not engine policy.
+
+[[contribution]]
+kind = "scalar"
+target = "documentation-development-root"
+value = "dev"
+
+[[contribution]]
+kind = "scalar"
+target = "documentation-archive-root"
+value = "dev/archive"
+
+# Revision-specific work products of terminal issues: archiving the owning
+# issue takes them with it.
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/active"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/studies"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/sessions"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/plans"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/presentations"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/design"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/benchmarks"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-managed-paths"
+value = "dev/experiments"
+
+# Living documentation, a configured item-kind source, or documented
+# invocation paths: each keeps its source where readers and configuration
+# already point. The trailing entries are the development-root files that
+# belong to no area, classified one path at a time.
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-permanent-paths"
+value = "dev/architecture"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-permanent-paths"
+value = "dev/eval"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-permanent-paths"
+value = "dev/vision"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-permanent-paths"
+value = "dev/index.md"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-permanent-paths"
+value = "dev/TESTING.md"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-permanent-paths"
+value = "dev/authoring-conventions.md"
+
+# Areas whose contents are per-issue work products, so one issue owns a whole
+# directory. The remaining areas hold living documentation, dated records, or
+# generated output that no single issue owns, and stay flat.
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-issue-scoped-areas"
+value = "dev/active"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-issue-scoped-areas"
+value = "dev/studies"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-issue-scoped-areas"
+value = "dev/plans"
+
+[[contribution]]
+kind = "set-string"
+target = "documentation-issue-scoped-areas"
+value = "dev/presentations"
+
+# =============================================================================
+# WHAT THIS PACKAGE LEAVES TO THE ADOPTER
+# =============================================================================
+# The tables below are declared by no package. A repository that wants one
+# authors it in `.jit/config.toml`; a repository that declares none gets the
+# engine's behaviour for all of them.
+#
+# Worktree isolation and lease enforcement for parallel/agent work:
+#   [worktree]
+#   mode = "auto"              # "auto" | "on" | "off"
+#   enforce_leases = "strict"  # "strict" | "warn" | "off"
+#
+# Multi-agent lease coordination. The claim TTL before expiry
+# (`default_ttl_secs`) and the age at which an indefinite lease is considered
+# stale (`stale_threshold_secs`) each fall back to an engine constant. This
+# package is bytes and projects nothing, so their defaults are read from the
+# projected reference at `docs/reference/runtime-defaults.md` rather than
+# restated here:
+#   [coordination]
+#   default_ttl_secs
+#   stale_threshold_secs
+#   max_indefinite_leases_per_agent = 2
+#   max_indefinite_leases_per_repo = 10
+#
+# Branches permitted to modify global config (default: ["main"]):
+#   [global_operations]
+#   require_main_history = true
+#   allowed_branches = ["main"]
+#
+# Low-level tuning (rarely needed):
+#   [locks]
+#   max_age_secs = 3600       # stale lock file threshold
+#   [events]
+#   enable_sequences = true   # sequence numbers in event log

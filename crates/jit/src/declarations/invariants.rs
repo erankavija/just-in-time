@@ -14,7 +14,7 @@
 //! is keyed by its `id` field — the entry's SELF-ID, from which the project-scoped
 //! qualified id `@/invariant/<self-id>` is derived.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -49,6 +49,10 @@ pub enum InvariantConfigError {
         /// The id that appeared more than once.
         id: String,
     },
+
+    /// A registry could not be rendered back to authored TOML.
+    #[error("invariant registry cannot be serialized: {0}")]
+    Serialize(#[from] toml::ser::Error),
 }
 
 /// Whether an invariant is mechanically enforced or merely advisory.
@@ -56,7 +60,7 @@ pub enum InvariantConfigError {
 /// Deserialized from the kebab-case tokens `"enforced"` / `"advisory"`; an
 /// unrecognized value is a descriptive parse error rather than a silent default
 /// (there is no `Default`, so the field is required on every entry).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum InvariantKind {
     /// The invariant is mechanically enforced (typically by the bound rule/gate
@@ -71,7 +75,7 @@ pub enum InvariantKind {
 /// The `id` is the entry's SELF-ID; its project-scoped qualified id is
 /// `@/invariant/<id>`. `statement` and `kind` are required; `enforced_by` (authored as
 /// `enforced-by`) is an optional binding to a rule name or gate key.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Invariant {
     /// The entry's self-id; `@/invariant/<id>` is its project-scoped qualified id.
     pub id: String,
@@ -80,7 +84,11 @@ pub struct Invariant {
     /// Whether the invariant is mechanically enforced or advisory.
     pub kind: InvariantKind,
     /// Optional binding to the rule name or gate key that enforces it.
-    #[serde(default, rename = "enforced-by")]
+    #[serde(
+        default,
+        rename = "enforced-by",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub enforced_by: Option<String>,
 }
 
@@ -96,10 +104,30 @@ pub struct InvariantRegistry {
 }
 
 /// Top-level `invariants.toml` document.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 struct RawInvariantsFile {
     #[serde(default, rename = "invariants")]
     invariants: Vec<Invariant>,
+}
+
+/// Render a registry back to authored `invariants.toml` bytes.
+///
+/// Entries keep their authored order, so a round trip through
+/// [`InvariantRegistry::from_toml_str`] returns the same registry. An empty
+/// registry renders as the empty array rather than as nothing, which is what
+/// initialization writes: the file is present and declares no invariant, so the
+/// `invariant` kind resolves against a registry that exists.
+pub fn serialize_invariant_registry(
+    registry: &InvariantRegistry,
+) -> Result<Vec<u8>, InvariantConfigError> {
+    let document = RawInvariantsFile {
+        invariants: registry.invariants.clone(),
+    };
+    let mut bytes = toml::to_string_pretty(&document)?.into_bytes();
+    if !bytes.ends_with(b"\n") {
+        bytes.push(b'\n');
+    }
+    Ok(bytes)
 }
 
 impl InvariantRegistry {
@@ -186,6 +214,44 @@ kind = "advisory"
     fn test_from_toml_str_empty_document_is_empty_registry() {
         let reg = InvariantRegistry::from_toml_str("").unwrap();
         assert!(reg.invariants.is_empty());
+    }
+
+    #[test]
+    fn test_serialize_invariant_registry_round_trips_through_the_parser() {
+        let registry = InvariantRegistry {
+            invariants: vec![
+                Invariant {
+                    id: "second-declared".to_string(),
+                    statement: "Authored order is preserved.".to_string(),
+                    kind: InvariantKind::Advisory,
+                    enforced_by: None,
+                },
+                Invariant {
+                    id: "first-enforced".to_string(),
+                    statement: "Every dependency edge stays acyclic.".to_string(),
+                    kind: InvariantKind::Enforced,
+                    enforced_by: Some("dag-no-cycles".to_string()),
+                },
+            ],
+        };
+
+        let bytes = serialize_invariant_registry(&registry).unwrap();
+        let text = std::str::from_utf8(&bytes).unwrap();
+        assert_eq!(InvariantRegistry::from_toml_str(text).unwrap(), registry);
+    }
+
+    #[test]
+    fn test_serialize_invariant_registry_empty_declares_no_invariant_and_parses() {
+        let bytes = serialize_invariant_registry(&InvariantRegistry::empty()).unwrap();
+        let text = std::str::from_utf8(&bytes).unwrap();
+
+        // The scaffolded registry is a present file the parser accepts, not an
+        // absent one the loader forgives.
+        assert!(!bytes.is_empty());
+        assert!(InvariantRegistry::from_toml_str(text)
+            .unwrap()
+            .invariants
+            .is_empty());
     }
 
     #[test]

@@ -576,6 +576,7 @@ and projection republishing, are not path-listed):
   "created_paths": [
     ".jit/index.json",
     ".jit/gates.toml",
+    ".jit/invariants.toml",
     ".jit/events.jsonl",
     ".jit/config.toml",
     ".jit/rules.toml",
