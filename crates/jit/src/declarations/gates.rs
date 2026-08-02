@@ -186,6 +186,32 @@ pub struct GateDefinition {
     pub example_integration: Option<String>,
 }
 
+impl GateDefinition {
+    /// The declaration a verdict over this gate's inputs is bound to.
+    ///
+    /// A verdict is a function of two things: the content the checker reads,
+    /// and the checker itself. Digesting the input content alone would let an
+    /// edit to the checker — a changed command, timeout, working directory,
+    /// environment, or prompt — leave the digest untouched, and an evaluation
+    /// after that edit would carry a verdict the new checker never produced.
+    /// This is the second half of that key: the stage the checker runs at, the
+    /// checker declaration, and the input declaration bounding it, in a
+    /// canonical byte encoding whose map ordering does not vary between runs.
+    /// The fields left out — key, title, description, priority — cannot change
+    /// what a checker does.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the declaration cannot be encoded.
+    pub fn verdict_declaration(&self) -> Result<Vec<u8>, serde_json::Error> {
+        serde_json::to_vec(&serde_json::json!({
+            "stage": self.stage,
+            "checker": self.checker,
+            "inputs": self.inputs,
+        }))
+    }
+}
+
 fn default_gate_version() -> u32 {
     1
 }

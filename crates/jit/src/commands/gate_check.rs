@@ -1123,6 +1123,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Digest the repository files `gate` declares its checker reads.
     ///
+    /// The digest is bound to the gate's own declaration
+    /// ([`GateDefinition::verdict_declaration`](crate::declarations::GateDefinition::verdict_declaration)),
+    /// so an edit to the checker yields a different digest over identical
+    /// files and cannot inherit a verdict the edited checker never produced.
+    ///
     /// `None` when the gate declares no inputs — the case that keeps a checker
     /// whose verdict is not a function of repository content running every
     /// time — or when this executor is not rooted at a real worktree, where
@@ -1135,7 +1140,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let (Some(inputs), Some(root)) = (gate.inputs.as_ref(), self.real_repo_root()) else {
             return Ok(None);
         };
-        gate_execution::digest_declared_inputs(&root, inputs).map(Some)
+        let declaration = gate
+            .verdict_declaration()
+            .context("Failed to encode the gate declaration the digest is bound to")?;
+        gate_execution::digest_declared_inputs(&root, inputs, &declaration).map(Some)
     }
 
     /// The recorded run whose verdict an evaluation of `gate_key` over inputs
@@ -2237,6 +2245,33 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         fn remove(&self, relative: &str) {
             std::fs::remove_file(self.repo.path().join(relative)).expect("remove file");
         }
+
+        /// Replace the gate's checker command, leaving its declared inputs and
+        /// every repository file alone.
+        fn rewrite_checker_command(&self, command: &str) {
+            let mut registry = self
+                .executor
+                .storage
+                .load_gate_registry()
+                .expect("the registry loads");
+            let gate = registry
+                .gates
+                .get_mut(&self.gate_key)
+                .expect("the gate under test is registered");
+            gate.checker = Some(GateChecker::Exec {
+                command: command.to_string(),
+                timeout_seconds: 30,
+                working_dir: None,
+                env: HashMap::new(),
+                pass_context: false,
+                prompt: None,
+                prompt_file: None,
+            });
+            let bytes = crate::declarations::serialize_gate_registry(&registry)
+                .expect("the registry serializes");
+            std::fs::write(self.repo.path().join(".jit/gates.toml"), bytes)
+                .expect("write registry");
+        }
     }
 
     /// REQ-03/REQ-04: a second issue's evaluation over an unchanged declared
@@ -2433,6 +2468,29 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(errored.status, GateRunStatus::Error);
         assert_eq!(fixture.executions(), 2, "an errored run must not be reused");
         assert!(retried.origin.is_executed());
+    }
+
+    /// A verdict is a function of the checker as well as its inputs: editing
+    /// the checker over an unchanged tree executes rather than inheriting a
+    /// verdict the edited checker never produced.
+    #[test]
+    fn test_check_gate_executes_again_after_the_checker_declaration_changes() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let before = fixture.evaluate(&fixture.issue());
+
+        fixture.rewrite_checker_command(&format!(
+            "printf xx >> '{}'; exit 0",
+            fixture.repo.path().join("executions.log").to_string_lossy()
+        ));
+        let after = fixture.evaluate(&fixture.issue());
+
+        assert_eq!(
+            fixture.executions(),
+            3,
+            "the edited checker must run rather than inherit the old verdict"
+        );
+        assert!(after.origin.is_executed());
+        assert_ne!(after.inputs_digest, before.inputs_digest);
     }
 
     /// REQ-05: the machine-readable status of a reused verdict is

@@ -345,7 +345,7 @@ fn sample_gate_run() -> GateRunResult {
         inputs_digest: Some({
             // Produced by the same builder the evaluator digests with, so the
             // sample cannot show a value the encoding could not have written.
-            let mut builder = crate::domain::InputsDigestBuilder::new();
+            let mut builder = crate::domain::InputsDigestBuilder::new(b"gate declaration");
             builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
             builder.finish()
         }),

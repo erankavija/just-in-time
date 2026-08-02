@@ -164,6 +164,11 @@ exclude stay out, keeping build artefacts from entering it. It is a digest of
 content, not of modification times: a checkout that rewrites timestamps without
 changing bytes produces the same value.
 
+The digest is bound to the gate's own declaration as well as to that content,
+so editing the checker — its command, timeout, working directory, environment,
+or prompt — or editing the input declaration itself yields a different digest
+over identical files.
+
 When a prior run of that same gate already recorded the same digest, the
 evaluation takes that run's verdict — pass or fail — and records it without
 executing the checker. This is what lets a batch of issues sitting on one

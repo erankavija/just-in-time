@@ -388,10 +388,19 @@ pub struct InputsDigestBuilder {
 }
 
 impl InputsDigestBuilder {
-    /// Start a digest over an empty set.
-    pub fn new() -> Self {
+    /// Start a digest bound to `declaration`, the canonical encoding of
+    /// whatever turns these inputs into a verdict.
+    ///
+    /// Content alone does not determine a verdict — the thing reading it does
+    /// too — so the declaration opens the digest. An edit to it yields a
+    /// different value over identical files, and nothing recorded under the old
+    /// declaration can be mistaken for an answer under the new one. A caller
+    /// with nothing to bind passes an empty slice.
+    pub fn new(declaration: &[u8]) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(DIGEST_DOMAIN);
+        hasher.update((declaration.len() as u64).to_le_bytes());
+        hasher.update(declaration);
         Self { hasher }
     }
 
@@ -407,12 +416,6 @@ impl InputsDigestBuilder {
     /// Finish the digest over everything pushed so far.
     pub fn finish(self) -> InputsDigest {
         InputsDigest(format!("{:x}", self.hasher.finalize()))
-    }
-}
-
-impl Default for InputsDigestBuilder {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -471,12 +474,19 @@ mod tests {
     }
 
     fn digest_of(entries: &[(&str, &[u8])]) -> InputsDigest {
+        digest_under(b"declaration", entries)
+    }
+
+    fn digest_under(declaration: &[u8], entries: &[(&str, &[u8])]) -> InputsDigest {
         entries
             .iter()
-            .fold(InputsDigestBuilder::new(), |mut builder, (path, bytes)| {
-                builder.push_file(path, bytes);
-                builder
-            })
+            .fold(
+                InputsDigestBuilder::new(declaration),
+                |mut builder, (path, bytes)| {
+                    builder.push_file(path, bytes);
+                    builder
+                },
+            )
             .finish()
     }
 
@@ -599,6 +609,20 @@ mod tests {
             baseline,
             digest_of(&[("a.rs", b"one"), ("renamed.rs", b"two")]),
             "a renamed file must change the digest"
+        );
+    }
+
+    #[test]
+    fn test_inputs_digest_builder_binds_the_digest_to_its_declaration() {
+        let files: &[(&str, &[u8])] = &[("a.rs", b"one")];
+        assert_ne!(
+            digest_under(b"checker one", files),
+            digest_under(b"checker two", files),
+            "a changed declaration must change the digest over identical content"
+        );
+        assert_eq!(
+            digest_under(b"checker one", files),
+            digest_under(b"checker one", files)
         );
     }
 

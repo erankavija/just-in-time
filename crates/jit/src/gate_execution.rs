@@ -390,6 +390,7 @@ fn kill_process_group(child: &mut std::process::Child) {
 pub(crate) fn digest_declared_inputs(
     worktree_root: &Path,
     inputs: &RepositoryInputs,
+    declaration: &[u8],
 ) -> Result<InputsDigest> {
     let mut paths = list_repository_paths(worktree_root)?
         .into_iter()
@@ -400,28 +401,31 @@ pub(crate) fn digest_declared_inputs(
 
     paths
         .iter()
-        .try_fold(InputsDigestBuilder::new(), |mut builder, path| {
-            let absolute = worktree_root.join(path);
-            let Ok(metadata) = std::fs::symlink_metadata(&absolute) else {
-                // Listed but absent from the working tree: contributes nothing.
-                return Ok(builder);
-            };
-            if metadata.is_dir() {
-                return Ok(builder);
-            }
-            let contents = if metadata.is_symlink() {
-                std::fs::read_link(&absolute)
-                    .with_context(|| format!("Failed to read declared input link {path}"))?
-                    .as_os_str()
-                    .as_encoded_bytes()
-                    .to_vec()
-            } else {
-                std::fs::read(&absolute)
-                    .with_context(|| format!("Failed to read declared input {path}"))?
-            };
-            builder.push_file(path, &contents);
-            Ok(builder)
-        })
+        .try_fold(
+            InputsDigestBuilder::new(declaration),
+            |mut builder, path| {
+                let absolute = worktree_root.join(path);
+                let Ok(metadata) = std::fs::symlink_metadata(&absolute) else {
+                    // Listed but absent from the working tree: contributes nothing.
+                    return Ok(builder);
+                };
+                if metadata.is_dir() {
+                    return Ok(builder);
+                }
+                let contents = if metadata.is_symlink() {
+                    std::fs::read_link(&absolute)
+                        .with_context(|| format!("Failed to read declared input link {path}"))?
+                        .as_os_str()
+                        .as_encoded_bytes()
+                        .to_vec()
+                } else {
+                    std::fs::read(&absolute)
+                        .with_context(|| format!("Failed to read declared input {path}"))?
+                };
+                builder.push_file(path, &contents);
+                Ok(builder)
+            },
+        )
         .map(InputsDigestBuilder::finish)
 }
 
@@ -831,7 +835,7 @@ mod tests {
 
     fn digest_of(root: &Path, roots: &[&str], exclude: &[&str]) -> InputsDigest {
         let inputs = RepositoryInputs::parse(roots, exclude).expect("a declarable input set");
-        digest_declared_inputs(root, &inputs).expect("the declared inputs digest")
+        digest_declared_inputs(root, &inputs, b"checker").expect("the declared inputs digest")
     }
 
     /// REQ-02: the digest is over the working tree, so a source file the
