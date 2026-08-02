@@ -577,6 +577,20 @@ mod tests {
             .unwrap();
     }
 
+    /// Install the two shipped package directories so a workflow package can
+    /// resolve its declared default dependency from its sibling.
+    fn install_shipped_profile_packages(worktree: &Path) -> PathBuf {
+        let packages = worktree.join("profiles");
+        crate::test_utils::copy_package_tree(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-default"),
+            &packages.join("jit-default"),
+        );
+        crate::test_utils::copy_package_tree(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood"),
+            &packages.join("jit-dogfood"),
+        )
+    }
+
     #[test]
     fn test_fresh_init_publishes_complete_valid_repo_without_git() {
         let repo = TempDir::new().unwrap();
@@ -762,6 +776,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
+        let dogfood_location = install_shipped_profile_packages(repo.path());
 
         let result = executor
             .initialize_fresh_repository(
@@ -769,7 +784,7 @@ mod tests {
                 &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&dogfood_location),
                 }),
             )
             .unwrap();
@@ -789,7 +804,7 @@ mod tests {
                 .unwrap()
                 .lines()
                 .count(),
-            1
+            2
         );
         assert!(fs::read_to_string(repo.path().join(".jit/rules.toml"))
             .unwrap()
@@ -808,6 +823,7 @@ mod tests {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
+        let dogfood_location = install_shipped_profile_packages(repo.path());
 
         executor
             .initialize_fresh_repository(
@@ -815,7 +831,7 @@ mod tests {
                 &HierarchyTemplate::default(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&dogfood_location),
                 }),
             )
             .unwrap();
@@ -843,7 +859,7 @@ mod tests {
                 &HierarchyTemplate::default(),
                 ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&dogfood_location),
                 },
             )
             .unwrap();
@@ -987,6 +1003,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
     #[test]
     fn test_concurrent_fresh_profile_init_publishes_one_coherent_repository() {
         let repo = Arc::new(TempDir::new().unwrap());
+        install_shipped_profile_packages(repo.path());
         let barrier = Arc::new(Barrier::new(2));
         let handles = (0..2)
             .map(|_| {
@@ -995,13 +1012,14 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                 thread::spawn(move || {
                     let storage = JsonFileStorage::new(repo.path().join(".jit"));
                     let executor = executor_with_layout(&storage, repo.path());
+                    let dogfood_location = repo.path().join("profiles/jit-dogfood");
                     barrier.wait();
                     executor.initialize_fresh_repository(
                         repo.path(),
                         &HierarchyTemplate::default(),
                         Some(ProfileSelection {
                             id: "jit-dogfood",
-                            location: None,
+                            location: Some(&dogfood_location),
                         }),
                     )
                 })
@@ -1016,6 +1034,6 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
         assert_repo_valid(repo.path());
         let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
-        assert_eq!(events.lines().count(), 1);
+        assert_eq!(events.lines().count(), 2);
     }
 }

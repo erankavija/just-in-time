@@ -1678,22 +1678,30 @@ mod tests {
             vec!["jit-default"]
         );
 
-        let default_contributions = default
-            .manifest()
-            .contributions
-            .iter()
-            .map(|contribution| serde_json::to_string(contribution).unwrap())
-            .collect::<BTreeSet<_>>();
-        let dogfood_contributions = dogfood
-            .manifest()
-            .contributions
-            .iter()
-            .map(|contribution| serde_json::to_string(contribution).unwrap())
-            .collect::<BTreeSet<_>>();
+        let declared_vocabulary = |package: &ProfilePackage| {
+            package
+                .manifest()
+                .contributions
+                .iter()
+                .filter_map(|contribution| match contribution {
+                    crate::repository_state::Contribution::MapEntry {
+                        target:
+                            target @ (crate::repository_state::MapEntryTarget::TypeHierarchyTypes
+                            | crate::repository_state::MapEntryTarget::Namespaces
+                            | crate::repository_state::MapEntryTarget::ItemKinds),
+                        identity,
+                        ..
+                    } => Some(format!("{target:?}:{identity}")),
+                    _ => None,
+                })
+                .collect::<BTreeSet<_>>()
+        };
+        let default_vocabulary = declared_vocabulary(&default);
+        let dogfood_vocabulary = declared_vocabulary(&dogfood);
 
         assert!(
-            default_contributions.is_disjoint(&dogfood_contributions),
-            "the workflow package must not restate default contributions"
+            default_vocabulary.is_disjoint(&dogfood_vocabulary),
+            "the workflow package must not restate default vocabulary"
         );
         assert!(
             dogfood
@@ -1712,43 +1720,94 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_jit_default_then_dogfood_reproduces_explicit_composition_without_conflict() {
-        let (first_temp, first_storage, _first_executor, _first_fixture_package) = fixture();
+    fn test_apply_jit_dogfood_matches_explicit_package_composition_without_conflict() {
+        let (first_temp, first_storage, first_executor, _first_fixture_package) = fixture();
         let first_config_path = first_temp.path().join(".jit/config.toml");
         let first_scaffolded = fs::read_to_string(&first_config_path).unwrap();
         let mut first_bare = first_scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
         first_bare
             .as_table_mut()
             .retain(|key, _| matches!(key, "version" | "project"));
+        first_bare["project"]["name"] = toml_edit::value("composition-test");
         fs::write(&first_config_path, first_bare.to_string()).unwrap();
-        let first_executor = CommandExecutor::new(first_storage.clone()).with_layout(
-            discover_repository_layout(first_temp.path(), first_storage.root()).unwrap(),
-        );
         let first_default_root = crate::test_utils::copy_package_tree(
             &jit_default_directory(),
             &first_temp.path().join("profiles/jit-default"),
         );
+        let first_dogfood_root = crate::test_utils::copy_package_tree(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood"),
+            &first_temp.path().join("profiles/jit-dogfood"),
+        );
         let first_default = ProfilePackage::from_directory(&first_default_root).unwrap();
+        let first_dogfood = ProfilePackage::from_directory(&first_dogfood_root).unwrap();
 
+        let first_default_result = first_executor
+            .apply_one_profile_package(&first_default)
+            .unwrap();
+        let first_dogfood_result = first_executor
+            .apply_one_profile_package(&first_dogfood)
+            .unwrap();
         assert_eq!(
-            first_executor
-                .apply_embedded_profile(&first_default)
-                .unwrap()
-                .status,
+            first_default_result.status,
             ProfileApplicationStatus::Applied
         );
         assert_eq!(
-            first_executor
-                .apply_embedded_profile(&jit_dogfood_package().unwrap())
-                .unwrap()
-                .status,
+            first_dogfood_result.status,
             ProfileApplicationStatus::Applied
         );
-        let first_composed: serde_json::Value =
+        assert_eq!(
+            applied_event_ids(&first_storage),
+            vec!["jit-default", "jit-dogfood"]
+        );
+
+        let (second_temp, _second_storage, second_executor, _second_fixture_package) = fixture();
+        let second_config_path = second_temp.path().join(".jit/config.toml");
+        let second_scaffolded = fs::read_to_string(&second_config_path).unwrap();
+        let mut second_bare = second_scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
+        second_bare
+            .as_table_mut()
+            .retain(|key, _| matches!(key, "version" | "project"));
+        second_bare["project"]["name"] = toml_edit::value("composition-test");
+        fs::write(&second_config_path, second_bare.to_string()).unwrap();
+        let second_default_root = crate::test_utils::copy_package_tree(
+            &jit_default_directory(),
+            &second_temp.path().join("profiles/jit-default"),
+        );
+        let second_dogfood_root = crate::test_utils::copy_package_tree(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood"),
+            &second_temp.path().join("profiles/jit-dogfood"),
+        );
+        let _second_default = ProfilePackage::from_directory(&second_default_root).unwrap();
+        let second_dogfood = ProfilePackage::from_directory(&second_dogfood_root).unwrap();
+
+        let second_result = second_executor
+            .apply_profile_package(&second_dogfood)
+            .unwrap();
+        assert_eq!(
+            second_result
+                .profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["jit-default", "jit-dogfood"]
+        );
+        assert!(
+            second_result
+                .profiles
+                .iter()
+                .all(|profile| profile.status == ProfileApplicationStatus::Applied),
+            "dependency-resolving application must apply every package without conflict: {:?}",
+            second_result.profiles
+        );
+
+        let first_config: serde_json::Value =
             toml_edit::de::from_str(&fs::read_to_string(&first_config_path).unwrap()).unwrap();
-        assert!(first_composed["type_hierarchy"]["types"].is_object());
-        assert!(first_composed["namespaces"]["brackets"].is_object());
-        assert!(first_composed["item_kinds"]["invariant"].is_object());
+        let second_config: serde_json::Value =
+            toml_edit::de::from_str(&fs::read_to_string(&second_config_path).unwrap()).unwrap();
+        assert_eq!(
+            first_config, second_config,
+            "explicit and dependency-resolving composition must produce the same configuration"
+        );
     }
 
     #[test]
