@@ -170,42 +170,24 @@ pub(crate) fn jit(repo: &Path, args: &[&str]) -> Output {
         .unwrap()
 }
 
-/// A repository initialized from the shared taxonomy fixture, with no Git
-/// history. `doc dir` derives a path from configuration and the issue record
-/// alone, so Git has nothing to contribute.
+/// A repository initialized from the shared taxonomy fixture and the shipped
+/// documentation registry, with no Git history. The tests exercise both
+/// vocabularies, so the repository declares them rather than relying on
+/// compiled-in defaults.
 pub(crate) fn initialized_repo() -> TempDir {
-    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
-    temp
-}
-
-/// A taxonomy-backed repository whose documentation registry is explicitly
-/// authored because one test rewrites that table and checks the resulting
-/// configuration, rather than relying on the policy fallback.
-fn initialized_repo_with_documentation_registry() -> TempDir {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
-    let temp = TempDir::new().unwrap();
-    let jit_root = temp.path().join(".jit");
-    fs::create_dir_all(&jit_root).unwrap();
-
     let issue_scoped_areas = jit::config::SHIPPED_DOCUMENTATION_POLICY
         .issue_scoped_areas
         .iter()
         .map(|area| format!("\"{area}\""))
         .collect::<Vec<_>>()
         .join(", ");
-    let config = format!(
-        "{}\n[documentation]\nissue_scoped_areas = [{issue_scoped_areas}]\n",
-        taxonomy.config_fragment()
-    );
-    fs::write(jit_root.join("config.toml"), config).unwrap();
-
-    let storage = jit::storage::JsonFileStorage::new(&jit_root);
-    let layout = jit::storage::discover_repository_layout(temp.path(), &jit_root).unwrap();
-    jit::commands::CommandExecutor::new(storage.clone())
-        .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
-        .unwrap();
-    fs::create_dir(temp.path().join(".git")).unwrap();
+    let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    let config_path = temp.path().join(".jit/config.toml");
+    let mut config = fs::read_to_string(&config_path).unwrap();
+    config.push_str(&format!(
+        "\n[documentation]\nissue_scoped_areas = [{issue_scoped_areas}]\n"
+    ));
+    fs::write(config_path, config).unwrap();
 
     temp
 }
@@ -444,7 +426,7 @@ fn test_doc_dir_rejects_an_area_the_configured_registry_does_not_declare() {
 
 #[test]
 fn test_doc_dir_resolves_the_area_registry_from_repository_configuration() {
-    let repo = initialized_repo_with_documentation_registry();
+    let repo = initialized_repo();
     let declared = declared_area();
     let authored = undeclared_area();
     let issue = create_issue(repo.path(), "Configured registry", &[]);
