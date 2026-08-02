@@ -124,13 +124,7 @@ fn test_config_show_json_includes_namespace_registry() {
     // we're exercising the just-built binary — no silent skip path.
     let jit_bin = std::path::PathBuf::from(env!("CARGO_BIN_EXE_jit"));
 
-    let temp = TempDir::new().unwrap();
-    let init = std::process::Command::new(&jit_bin)
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    assert!(init.status.success(), "jit init failed: {:?}", init);
+    let temp = crate::setup_test_repo_with_taxonomy();
 
     let show = std::process::Command::new(&jit_bin)
         .args(["config", "show", "--json"])
@@ -148,9 +142,17 @@ fn test_config_show_json_includes_namespace_registry() {
         .get("namespaces")
         .expect("namespaces key present in config show --json output");
     // The registry is still exposed (description/unique stay in config.toml).
-    let type_ns = namespaces.get("type").expect("type namespace exposed");
+    let type_label = crate::type_label(&temp.taxonomy, 4);
+    let type_namespace = type_label
+        .split_once(':')
+        .map(|(namespace, _)| namespace)
+        .expect("type label has a namespace");
+    let membership_namespace = crate::membership_namespace(&temp.taxonomy, 1);
+    let type_ns = namespaces
+        .get(type_namespace)
+        .expect("type namespace exposed");
     assert_eq!(type_ns["unique"], serde_json::json!(true));
-    assert!(namespaces.get("milestone").is_some());
+    assert!(namespaces.get(membership_namespace).is_some());
 
     // The scaffolded rules.toml carries the FIXED default rules only: the
     // canonical format, the namespace registry, type-hierarchy-known, the

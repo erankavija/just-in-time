@@ -3,27 +3,20 @@
 use jit::output::ErrorCode;
 use std::process::Command;
 use std::str::FromStr;
-use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit = jit_binary();
-    Command::new(jit)
-        .args(["init"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-    temp
+fn setup_test_repo() -> crate::TaxonomyRepo {
+    crate::setup_test_repo_with_taxonomy()
 }
 
 #[test]
 fn test_query_label_json_exact_match() {
     let temp = setup_test_repo();
     let jit = jit_binary();
+    let label = crate::membership_label(&temp.taxonomy, 1, "v1.0");
 
     // Create issue with label
     Command::new(jit)
@@ -33,7 +26,7 @@ fn test_query_label_json_exact_match() {
             "-t",
             "Milestone Task",
             "--label",
-            "milestone:v1.0",
+            label.as_str(),
         ])
         .current_dir(temp.path())
         .output()
@@ -45,7 +38,7 @@ fn test_query_label_json_exact_match() {
             "query",
             "all",
             "--label",
-            "milestone:v1.0",
+            label.as_str(),
             "--full",
             "--json",
         ])
@@ -67,7 +60,7 @@ fn test_query_label_json_exact_match() {
     assert!(issue["labels"]
         .as_array()
         .unwrap()
-        .contains(&serde_json::json!("milestone:v1.0")));
+        .contains(&serde_json::json!(label)));
 }
 
 #[test]

@@ -14,24 +14,17 @@
 
 use serde_json::Value;
 use std::process::Command;
-use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    Command::new(jit_binary())
-        .current_dir(temp.path())
-        .arg("init")
-        .output()
-        .unwrap();
-    temp
+fn setup_test_repo() -> crate::TaxonomyRepo {
+    crate::setup_test_repo_with_taxonomy()
 }
 
 /// Create an issue with the given labels, returning its id.
-fn create_issue(dir: &std::path::Path, title: &str, labels: &[&str]) -> String {
+fn create_issue<L: AsRef<str>>(dir: &std::path::Path, title: &str, labels: &[L]) -> String {
     let mut args: Vec<String> = vec![
         "issue".into(),
         "create".into(),
@@ -42,7 +35,7 @@ fn create_issue(dir: &std::path::Path, title: &str, labels: &[&str]) -> String {
     ];
     for label in labels {
         args.push("--label".into());
-        args.push((*label).into());
+        args.push(label.as_ref().into());
     }
     let out = Command::new(jit_binary())
         .current_dir(dir)
@@ -88,10 +81,13 @@ fn add_dep(dir: &std::path::Path, from_id: &str, to_id: &str) {
     );
 }
 
-fn run_json(dir: &std::path::Path, args: &[&str]) -> Value {
+fn run_json<A: AsRef<std::ffi::OsStr> + std::fmt::Debug>(
+    dir: &std::path::Path,
+    args: &[A],
+) -> Value {
     let out = Command::new(jit_binary())
         .current_dir(dir)
-        .args(args)
+        .args(args.iter().map(AsRef::as_ref))
         .output()
         .unwrap();
     assert!(
@@ -162,7 +158,7 @@ fn test_query_all_repeatable_label_zero_match() {
 fn test_query_all_single_label_regression() {
     let temp = setup_test_repo();
     let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[]);
+    create_issue(temp.path(), "Untagged", &[] as &[&str]);
 
     let json = run_json(
         temp.path(),
@@ -198,7 +194,7 @@ fn test_query_available_repeatable_label_ands() {
 fn test_query_available_single_label_regression() {
     let temp = setup_test_repo();
     let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[]);
+    create_issue(temp.path(), "Untagged", &[] as &[&str]);
 
     let json = run_json(
         temp.path(),
@@ -212,7 +208,7 @@ fn test_query_available_single_label_regression() {
 #[test]
 fn test_query_blocked_repeatable_label_ands() {
     let temp = setup_test_repo();
-    let parent = create_issue(temp.path(), "Parent", &[]);
+    let parent = create_issue(temp.path(), "Parent", &[] as &[&str]);
 
     let both = create_issue(temp.path(), "Both", &["epic:auth", "component:api"]);
     add_dep(temp.path(), &both, &parent);
@@ -238,12 +234,12 @@ fn test_query_blocked_repeatable_label_ands() {
 #[test]
 fn test_query_blocked_single_label_regression() {
     let temp = setup_test_repo();
-    let parent = create_issue(temp.path(), "Parent", &[]);
+    let parent = create_issue(temp.path(), "Parent", &[] as &[&str]);
 
     let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
     add_dep(temp.path(), &tagged, &parent);
 
-    let untagged = create_issue(temp.path(), "Untagged", &[]);
+    let untagged = create_issue(temp.path(), "Untagged", &[] as &[&str]);
     add_dep(temp.path(), &untagged, &parent);
 
     let json = run_json(
@@ -258,42 +254,53 @@ fn test_query_blocked_single_label_regression() {
 #[test]
 fn test_query_strategic_repeatable_label_ands() {
     let temp = setup_test_repo();
+    let strategic = crate::type_label(&temp.taxonomy, 2);
+    let component = crate::membership_label(&temp.taxonomy, 3, "api");
+    let team = crate::membership_label(&temp.taxonomy, 1, "backend");
     let both = create_issue(
         temp.path(),
         "Both",
-        &["type:epic", "component:api", "team:backend"],
+        &[strategic.clone(), component.clone(), team.clone()],
     );
     create_issue(
         temp.path(),
         "ComponentOnly",
-        &["type:epic", "component:api"],
+        &[strategic, component.clone()],
     );
 
-    let json = run_json(
-        temp.path(),
-        &[
-            "query",
-            "strategic",
-            "--label",
-            "component:api",
-            "--label",
-            "team:backend",
-            "--json",
-        ],
-    );
+    let args = vec![
+        "query".to_string(),
+        "strategic".to_string(),
+        "--label".to_string(),
+        component,
+        "--label".to_string(),
+        team,
+        "--json".to_string(),
+    ];
+    let json = run_json(temp.path(), &args);
     assert_eq!(ids(&json), vec![both]);
 }
 
 #[test]
 fn test_query_strategic_single_label_regression() {
     let temp = setup_test_repo();
-    let tagged = create_issue(temp.path(), "Tagged", &["type:epic", "component:api"]);
-    create_issue(temp.path(), "Untagged", &["type:epic"]);
-
-    let json = run_json(
+    let strategic = crate::type_label(&temp.taxonomy, 2);
+    let component = crate::membership_label(&temp.taxonomy, 3, "api");
+    let tagged = create_issue(
         temp.path(),
-        &["query", "strategic", "--label", "component:api", "--json"],
+        "Tagged",
+        &[strategic.clone(), component.clone()],
     );
+    create_issue(temp.path(), "Untagged", &[strategic]);
+
+    let args = vec![
+        "query".to_string(),
+        "strategic".to_string(),
+        "--label".to_string(),
+        component,
+        "--json".to_string(),
+    ];
+    let json = run_json(temp.path(), &args);
     assert_eq!(ids(&json), vec![tagged]);
 }
 
@@ -327,7 +334,7 @@ fn test_query_closed_single_label_regression() {
     let temp = setup_test_repo();
     let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
     set_state(temp.path(), &tagged, "done");
-    let untagged = create_issue(temp.path(), "Untagged", &[]);
+    let untagged = create_issue(temp.path(), "Untagged", &[] as &[&str]);
     set_state(temp.path(), &untagged, "done");
 
     let json = run_json(
@@ -364,7 +371,7 @@ fn test_issue_list_repeatable_label_ands() {
 fn test_issue_list_single_label_regression() {
     let temp = setup_test_repo();
     let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[]);
+    create_issue(temp.path(), "Untagged", &[] as &[&str]);
 
     let json = run_json(
         temp.path(),
@@ -399,7 +406,7 @@ fn test_top_level_list_repeatable_label_ands() {
 fn test_top_level_list_single_label_regression() {
     let temp = setup_test_repo();
     let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[]);
+    create_issue(temp.path(), "Untagged", &[] as &[&str]);
 
     let json = run_json(temp.path(), &["list", "--label", "epic:auth", "--json"]);
     assert_eq!(ids(&json), vec![tagged]);
@@ -431,7 +438,7 @@ fn test_query_bare_repeatable_label_ands() {
 fn test_query_bare_single_label_regression() {
     let temp = setup_test_repo();
     let tagged = create_issue(temp.path(), "Tagged", &["epic:auth"]);
-    create_issue(temp.path(), "Untagged", &[]);
+    create_issue(temp.path(), "Untagged", &[] as &[&str]);
 
     let json = run_json(temp.path(), &["query", "--label", "epic:auth", "--json"]);
     assert_eq!(ids(&json), vec![tagged]);
