@@ -379,6 +379,42 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
 }
 
 #[test]
+fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
+    let repo = TestRepo::new();
+    jit::test_utils::write_package_declaring(
+        &COMPOSITION_PACKAGE,
+        &repo.path.join("packages/workflow"),
+        "workflow",
+        &["absent-base"],
+    );
+
+    let failure = failed_json_with_path(
+        &repo.path,
+        &[
+            "init",
+            "--profile",
+            "workflow",
+            "--from",
+            "packages/workflow",
+            "--json",
+        ],
+        1,
+        None,
+    );
+
+    assert_eq!(failure["error"]["code"], "PROFILE_ERROR");
+    let message = failure["error"]["message"]
+        .as_str()
+        .unwrap_or_else(|| panic!("a failure carries a message: {failure}"));
+    assert!(message.contains("workflow"), "{message}");
+    assert!(message.contains("absent-base"), "{message}");
+    assert!(
+        !repo.path.join(".jit").exists(),
+        "the set is resolved before a repository is created"
+    );
+}
+
+#[test]
 fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
     let repo = TestRepo::new();
     success_json(&repo.path, &["init", "--json"]);

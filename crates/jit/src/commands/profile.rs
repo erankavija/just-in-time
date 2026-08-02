@@ -377,9 +377,13 @@ impl CommandExecutor<JsonFileStorage> {
     /// Prove one profile selection resolves without mutating a repository.
     ///
     /// Initialization runs this before it publishes anything, so an
-    /// unresolvable id or location fails before a repository is created.
+    /// unresolvable id or location fails before a repository is created. What a
+    /// selection resolves to is the whole set applying it applies, so an
+    /// unresolvable dependency and a dependency cycle fail here too rather than
+    /// at the publication the check exists to precede.
     pub fn validate_profile_selection(&self, id: &str, location: Option<&Path>) -> Result<()> {
-        self.resolve_profile_package(id, location).map(drop)
+        let package = self.resolve_profile_package(id, location)?;
+        self.resolve_profile_closure(&package).map(drop)
     }
 
     /// Apply one validated package together with the packages it depends on.
