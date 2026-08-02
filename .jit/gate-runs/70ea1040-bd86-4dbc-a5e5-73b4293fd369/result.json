@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54c408d3a5a5ad916fcd8ef01fb07546cd1ab1a4",
+  "completed_at": "2026-08-02T20:34:51.147518406Z",
+  "duration_ms": 176583,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are implemented and the prior destination-prose finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7d038e97-87e8-4d02-9101-6ffef1e8bdc0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "70ea1040-bd86-4dbc-a5e5-73b4293fd369",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T20:31:54.564004306Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a02ea421, 4053f6b7, b737ea82, 35f5df3a, 4ff5cd21, 954d7b35, 5e961152, c5b4d229, e975abc4, a5b8de02, f0240cd6, 26dad1a2, 54c408d3\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/invariant/atomic-writes, @/invariant/bounded-rust-build-footprint, @/invariant/convention-convergence, @/invariant/semantic-types, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/e204e63d/decision/D-2, @/issue/e204e63d/decision/D-6, @/issue/e204e63d/requirement/REQ-03 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-08-02T20:22:25Z); docs-mechanical passed (exit 0, 2026-08-02T20:22:26Z)\nTruncation recovery: re-read individual first-parent merge patches and bounded final source/test ranges, including package_assembly.rs:707-805\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are implemented and the prior destination-prose finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

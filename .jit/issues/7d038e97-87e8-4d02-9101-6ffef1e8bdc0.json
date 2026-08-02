@@ -9,6 +9,7 @@
   ],
   "description": "One entry point produces the complete package tree from the checked-in package sources and the repository files the manifest's live assets name, and the result is proven equal to the checked-in copies it will replace.\n\n## Background\n\nThe package is a directory: a manifest, the assets it declares, and a managed-region source. Sixty of those assets name a repository file as their target and carry a byte copy of it as their source. Producing them instead of carrying them is what removes the second copy, and it is the piece everything else here waits on.\n\nThe production does not run in the build. Nothing compiles the package in any more, so a build step would make every build do work no build consumes, and it would reintroduce the directory watching that once relinked every test target on an unchanged rebuild. It runs as a repository entry point over a render inside the crate, which is the shape this repository already uses for the artifacts it generates into its own checkout. That also leaves one reader of the manifest — the crate's own package model — where a build step could only have been a second one, because a build script cannot import the crate it builds.\n\nThe destination is disposable. Each run publishes a freshly staged tree, so the result holds exactly what the manifest declares and a source the manifest stops declaring cannot survive into the next run. No incremental reconciliation and no timestamp discipline is needed, and neither is a watch set.\n\nThe checked-in copies are still in place while this lands, and that is the point: with both trees present, the produced tree can be compared against the one it will replace, file for file. That comparison is a direct observation rather than a claim made after the originals are gone, and it is the evidence the later retirement rests on.\n\n## Success Criteria\n\n- [hard] REQ-01: One entry point produces the complete package tree at a destination it is given, from the checked-in package sources and the repository files the manifest's live assets name.\n- [hard] REQ-02: The render it runs lives in the crate and reads the manifest through the crate's own package model, so nothing parses the manifest a second time.\n- [hard] REQ-03: A declared live source whose repository file is absent fails the run with a message naming the path.\n- [hard] REQ-04: Each run publishes a freshly staged tree, so a package-relative path the manifest no longer declares is absent from the result.\n- [hard] REQ-05: The produced tree carries the same package-relative paths as the checked-in one, with the same bytes and the same executable declaration, and a comparison observes that while both exist.\n- [hard] REQ-06: The produced tree validates as a package, so every declared source is present and no produced file is undeclared.\n- [hard] REQ-07: The destination is untracked and disposable, and no build depends on it.\n\n## Notes\n\nWhere the produced tree goes when it is published is decided by the work that publishes it; this entry point takes a destination and writes there.\n",
   "documents": [],
+  "done_at": "2026-08-02T20:35:06.987780398Z",
   "first_ready_at": "2026-08-02T10:24:39.227136637Z",
   "gates_required": [
     "cargo-ci",
@@ -18,17 +19,17 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T18:31:34.195656602Z",
+      "updated_at": "2026-08-02T20:22:25.790147385Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-02T19:25:17.891674500Z",
+      "status": "passed",
+      "updated_at": "2026-08-02T20:34:51.557935576Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-02T18:31:45.825582059Z",
+      "updated_at": "2026-08-02T20:22:40.642077847Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,7 +45,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Assemble the packaged tree from the repository files it mirrors",
-  "updated_at": "2026-08-02T19:25:17.891674500Z"
+  "updated_at": "2026-08-02T20:35:06.987780398Z"
 }

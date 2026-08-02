@@ -8,6 +8,8 @@
   ],
   "description": "Applying a package resolves and applies the packages it declares a dependency on first, so a package carrying a delta over another produces the same repository as one carrying both.\n\n## Background\n\nA dependency declaration means nothing until something reads it. Applying a package that depends on another must resolve the dependency from the same routes the package itself came from, apply it first, and only then apply the dependant — otherwise the dependant's declarations land against a repository missing the vocabulary they extend.\n\nMost of what this needs already exists. Provenance is one record per package id, and validation already lists that directory, derives the recorded ids, and resolves every one of them, so repair over several applied packages needs no change. Contribution merge is idempotent for identical restatements and a hard error otherwise, so two packages compose without a new merge rule. What is missing is the ordering itself, a cycle rejection, and the diagnosis when one package of a set cannot be resolved.\n\nThat last one is the sharp edge. A repository that applied a workflow package and then deleted the package it depends on fails validation naming a package the adopter never asked for by name. The error has to explain the relationship, or an adopter is left diagnosing something they never installed.\n\n## Success Criteria\n\n- [hard] REQ-01: Applying a package resolves every package it declares a dependency on, transitively, and applies each before the package that declares it.\n- [hard] REQ-02: A dependency cycle is rejected before anything is applied, naming the cycle.\n- [hard] REQ-03: Each applied package writes its own provenance record carrying its own hashes, and an application event is appended per package.\n- [hard] REQ-04: A dependency that cannot be resolved fails the application before anything is written, naming the package that declared the dependency alongside the one that could not be resolved.\n- [hard] REQ-05: Validation reporting an unresolvable recorded package states which recorded package declared it, where one did.\n- [hard] REQ-06: Applying a package whose dependencies are already applied and unchanged reports no work.\n\n## Notes\n\nOrdering is a topological sort over declared dependencies. The graph layer already owns that shape; what is new is a caller for it in the profile layer.\n",
   "documents": [],
+  "done_at": "2026-08-02T20:32:28.117938885Z",
+  "first_ready_at": "2026-08-02T20:32:14.878647689Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -36,7 +38,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "Apply a package together with the packages it depends on",
-  "updated_at": "2026-08-02T19:55:15.020222660Z"
+  "updated_at": "2026-08-02T20:32:28.117938885Z"
 }

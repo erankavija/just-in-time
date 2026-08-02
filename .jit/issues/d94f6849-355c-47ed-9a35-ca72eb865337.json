@@ -25,7 +25,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Retire the checked-in copies of the packaged live assets",
-  "updated_at": "2026-07-31T16:29:02.475100257Z"
+  "updated_at": "2026-08-02T20:35:12.662408130Z"
 }

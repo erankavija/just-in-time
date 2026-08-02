@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54c408d3a5a5ad916fcd8ef01fb07546cd1ab1a4",
+  "completed_at": "2026-08-02T20:31:52.657016117Z",
+  "duration_ms": 143347,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The repair path re-resolves recorded packages, rejects unresolved or mismatched provenance without repairing, and the prior record-ID/path finding is covered by the current implementation and regression test.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8371bd46-5db6-4e96-8a36-82b07fcbd33b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3d45101d-7364-4890-8a0a-f3b99fe47d10",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T20:29:29.309143904Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0aec4d2a, ff303490, ebc3cd5e, d6533d82, 8a830fba (`jit:8371bd46`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-10 and @/issue/e204e63d/decision/D-8 (issue Markdown-first); @/invariant/derived-state-coherence, @/invariant/convention-convergence, @/invariant/architecture-dependency-direction, and @/invariant/semantic-test-assertions (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-08-02T20:22:25Z)\nTruncation recovery: narrowed the over-broad registry search into bounded current-code, policy-source, merge-parent metadata, and test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The repair path re-resolves recorded packages, rejects unresolved or mismatched provenance without repairing, and the prior record-ID/path finding is covered by the current implementation and regression test.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
