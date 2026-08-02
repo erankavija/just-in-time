@@ -7,22 +7,33 @@
 //! the rule engine.
 
 use jit::commands::CommandExecutor;
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
+use jit::test_taxonomy::TestTaxonomy;
 use jit::validation::graph::GraphFinding;
 use tempfile::TempDir;
 
-fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>) {
-    let temp_dir = TempDir::new().unwrap();
-    let storage = JsonFileStorage::new(temp_dir.path().join(".jit"));
-    let initial_layout =
-        jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(initial_layout)
-        .initialize_fresh_repository(temp_dir.path(), &HierarchyTemplate::default(), None)
-        .unwrap();
+fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, TestTaxonomy) {
+    let (temp_dir, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
     let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
-    (temp_dir, CommandExecutor::new(storage).with_layout(layout))
+    (
+        temp_dir,
+        CommandExecutor::new(storage).with_layout(layout),
+        taxonomy,
+    )
+}
+
+fn type_label(taxonomy: &TestTaxonomy, level: u8) -> String {
+    format!("type:{}", taxonomy.type_at_level(level))
+}
+
+fn membership_label(taxonomy: &TestTaxonomy, type_name: &str) -> String {
+    format!(
+        "{}:auth",
+        taxonomy
+            .label_associations
+            .get(type_name)
+            .expect("the test taxonomy associates the strategic type with a namespace")
+    )
 }
 
 /// Graph-rule findings attributed to `id`, the rule-engine replacement for the
@@ -39,7 +50,8 @@ fn warnings_for(executor: &CommandExecutor<JsonFileStorage>, id: &str) -> Vec<Gr
 
 #[test]
 fn test_create_epic_without_label_shows_warning() {
-    let (_temp_dir, executor) = setup_test_repo();
+    let (_temp_dir, executor, taxonomy) = setup_test_repo();
+    let strategic_type = taxonomy.type_at_level(2);
 
     // Create epic without epic:* label
     let (id, _) = executor
@@ -48,7 +60,7 @@ fn test_create_epic_without_label_shows_warning() {
             "Epic description".to_string(),
             jit::domain::Priority::Normal,
             vec![],
-            vec!["type:epic".to_string()],
+            vec![type_label(&taxonomy, 2)],
             None,
             None,
             false,
@@ -58,12 +70,15 @@ fn test_create_epic_without_label_shows_warning() {
     let warnings = warnings_for(&executor, &id);
     assert_eq!(warnings.len(), 1);
     assert_eq!(warnings[0].finding.rule, "strategic-consistency");
-    assert!(warnings[0].finding.message.contains("epic:*"));
+    assert!(warnings[0].finding.message.contains(&format!(
+        "{}:*",
+        taxonomy.label_associations[strategic_type]
+    )));
 }
 
 #[test]
 fn test_create_task_without_parent_shows_warning() {
-    let (_temp_dir, executor) = setup_test_repo();
+    let (_temp_dir, executor, taxonomy) = setup_test_repo();
 
     // Create task without parent labels
     let (id, _) = executor
@@ -72,7 +87,7 @@ fn test_create_task_without_parent_shows_warning() {
             "Task description".to_string(),
             jit::domain::Priority::Normal,
             vec![],
-            vec!["type:task".to_string()],
+            vec![type_label(&taxonomy, 4)],
             None,
             None,
             false,
@@ -87,7 +102,8 @@ fn test_create_task_without_parent_shows_warning() {
 
 #[test]
 fn test_create_epic_with_label_no_warning() {
-    let (_temp_dir, executor) = setup_test_repo();
+    let (_temp_dir, executor, taxonomy) = setup_test_repo();
+    let strategic_type = taxonomy.type_at_level(2);
 
     // Create epic with epic:* label
     let (id, _) = executor
@@ -96,7 +112,10 @@ fn test_create_epic_with_label_no_warning() {
             "Epic description".to_string(),
             jit::domain::Priority::Normal,
             vec![],
-            vec!["type:epic".to_string(), "epic:auth".to_string()],
+            vec![
+                type_label(&taxonomy, 2),
+                membership_label(&taxonomy, strategic_type),
+            ],
             None,
             None,
             false,
@@ -108,7 +127,8 @@ fn test_create_epic_with_label_no_warning() {
 
 #[test]
 fn test_create_task_with_parent_no_warning() {
-    let (_temp_dir, executor) = setup_test_repo();
+    let (_temp_dir, executor, taxonomy) = setup_test_repo();
+    let strategic_type = taxonomy.type_at_level(2);
 
     // Create task with epic label
     let (id, _) = executor
@@ -117,7 +137,10 @@ fn test_create_task_with_parent_no_warning() {
             "Task description".to_string(),
             jit::domain::Priority::Normal,
             vec![],
-            vec!["type:task".to_string(), "epic:auth".to_string()],
+            vec![
+                type_label(&taxonomy, 4),
+                membership_label(&taxonomy, strategic_type),
+            ],
             None,
             None,
             false,

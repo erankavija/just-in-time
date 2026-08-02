@@ -1,5 +1,4 @@
 use jit::config::JitConfig;
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
 use tempfile::TempDir;
@@ -85,14 +84,7 @@ fn test_orphan_warning_is_unconditional_in_default_ruleset() {
     // built-in default rules (the former `warn_*` toggles were removed; MF1). With
     // no rules.toml, the in-memory defaults always emit them, so an orphaned task
     // warns. A repo that wants them silenced edits rules.toml.
-    let temp_dir = TempDir::new().unwrap();
-    let storage = JsonFileStorage::new(temp_dir.path().join(".jit"));
-    let initial_layout =
-        jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
-    CommandExecutor::new(storage.clone())
-        .with_layout(initial_layout)
-        .initialize_fresh_repository(temp_dir.path(), &HierarchyTemplate::default(), None)
-        .unwrap();
+    let (temp_dir, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
 
     // Remove only rules.toml so the command derives the in-memory defaults from
     // an otherwise canonically initialized repository.
@@ -108,7 +100,7 @@ fn test_orphan_warning_is_unconditional_in_default_ruleset() {
             "No parent labels".to_string(),
             jit::Priority::Normal,
             Vec::new(),
-            vec!["type:task".to_string()],
+            vec![format!("type:{}", taxonomy.default_type)],
             None,
             None,
             false,
