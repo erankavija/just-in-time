@@ -359,6 +359,15 @@ fn collect_all_nodes<'a>(graph: &DependencyGraph<'a, Issue>, nodes: &mut Vec<&'a
 mod tests {
     use super::*;
 
+    fn typed_issue(title: &str, level: u8) -> crate::domain::Issue {
+        let mut issue = crate::domain::types::fixture_issue(title.into(), String::new());
+        issue.labels = vec![format!(
+            "type:{}",
+            crate::test_taxonomy::test_taxonomy().type_at_level(level)
+        )];
+        issue
+    }
+
     #[test]
     fn test_export_dot_format() {
         let issue1 = crate::domain::types::fixture_issue(
@@ -539,11 +548,8 @@ mod tests {
     /// summary node never does.
     #[test]
     fn test_export_json_full_carries_resolved_hierarchy_fields() {
-        let mut initiative =
-            crate::domain::types::fixture_issue("Initiative".to_string(), String::new());
-        initiative.labels = vec!["type:initiative".to_string()];
-        let mut action = crate::domain::types::fixture_issue("Action".to_string(), String::new());
-        action.labels = vec!["type:action".to_string()];
+        let mut initiative = typed_issue("Initiative", 2);
+        let action = typed_issue("Action", 4);
         initiative.dependencies.push(action.id.clone());
 
         let issues = vec![&initiative, &action];
@@ -590,11 +596,8 @@ mod tests {
     fn test_export_json_full_hierarchy_keys_match_tree_view() {
         use crate::output::HierarchyNodeView;
 
-        let mut initiative =
-            crate::domain::types::fixture_issue("Initiative".to_string(), String::new());
-        initiative.labels = vec!["type:initiative".to_string()];
-        let mut action = crate::domain::types::fixture_issue("Action".to_string(), String::new());
-        action.labels = vec!["type:action".to_string()];
+        let mut initiative = typed_issue("Initiative", 2);
+        let action = typed_issue("Action", 4);
         initiative.dependencies.push(action.id.clone());
 
         let issues = vec![&initiative, &action];
@@ -610,7 +613,11 @@ mod tests {
             id: action.id.clone(),
             short_id: action.short_id(),
             title: action.title.clone(),
-            type_name: Some("action".to_string()),
+            type_name: Some(
+                crate::test_taxonomy::test_taxonomy()
+                    .type_at_level(4)
+                    .to_string(),
+            ),
             hierarchy: facts,
         })
         .unwrap();

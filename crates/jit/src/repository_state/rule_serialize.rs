@@ -456,6 +456,18 @@ mod tests {
     use crate::repository_state::default_rules::default_ruleset;
     use std::collections::HashMap;
 
+    fn test_type(level: u8) -> String {
+        crate::test_taxonomy::test_taxonomy()
+            .type_at_level(level)
+            .to_string()
+    }
+
+    fn test_toml(template: &str) -> String {
+        template
+            .replace("__strategic_type__", &test_type(2))
+            .replace("__leaf_type__", &test_type(4))
+    }
+
     fn registry(entries: Vec<(&str, LabelNamespace)>) -> LabelNamespaces {
         let mut namespaces = HashMap::new();
         for (name, ns) in entries {
@@ -545,11 +557,12 @@ mod tests {
     fn test_round_trip_full_default_ruleset() {
         // A registry exercising every default rule kind (json-schema, shorthand,
         // graph) the fixed default emits.
+        let taxonomy = crate::test_taxonomy::test_taxonomy();
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             (
-                "objective",
-                LabelNamespace::new("Objective membership", false),
+                taxonomy.type_at_level(1),
+                LabelNamespace::new("Strategic membership", false),
             ),
         ])
         .declaring_test_hierarchy();
@@ -671,7 +684,10 @@ assert = { require-section = { heading = "Goals" } }
         // fresh `jit init` scaffolds a fully-described rules.toml.
         let set = default_ruleset(&registry(vec![
             ("type", LabelNamespace::new("Type", true)),
-            ("milestone", LabelNamespace::new("Release", false)),
+            (
+                test_type(1).as_str(),
+                LabelNamespace::new("Strategic", false),
+            ),
         ]));
         assert!(!set.rules.is_empty());
         for rule in &set.rules {
@@ -689,10 +705,11 @@ assert = { require-section = { heading = "Goals" } }
     #[test]
     fn test_round_trip_criteria_to_check() {
         // The criteria-to-check kind round-trips all its optional fields.
-        let toml = r#"
+        let toml = test_toml(
+            r#"
 [[rules]]
 name = "ctc-both"
-when = { type = "epic" }
+when = { type = "__strategic_type__" }
 severity = "error"
 enforce = true
 assert = { criteria-to-check = { marker = "[hard]", gate-prefix = "verify:", check-namespace = "checks" } }
@@ -711,18 +728,20 @@ assert = { criteria-to-check = { check-namespace = "checks", id-pattern = "SC-[0
 name = "ctc-custom-section"
 severity = "warn"
 assert = { criteria-to-check = { criteria-section = "acceptance_criteria", gate-prefix = "gate:" } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+"#,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_round_trips(&set);
     }
 
     #[test]
     fn test_round_trip_graph_config_kinds() {
         // The three graph config-table kinds round-trip their config tables.
-        let toml = r#"
+        let toml = test_toml(
+            r#"
 [[rules]]
 name = "coverage"
-when = { type = "epic" }
+when = { type = "__strategic_type__" }
 severity = "error"
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", child-state = "done" } }
 
@@ -733,11 +752,12 @@ assert = { label-reference = { from = "satisfies", to = "req", scope = "linked" 
 
 [[rules]]
 name = "shape"
-when = { type = "task" }
+when = { type = "__leaf_type__" }
 severity = "error"
 assert = { dependency-shape = { target = { type = "design" }, mode = "must", transitive = true } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+"#,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_round_trips(&set);
     }
 
@@ -767,18 +787,20 @@ assert = { label-value-pattern = { namespace = "sc", regex = '^\[hard\]\s+\w+' }
     fn test_round_trip_state_predicate_single_and_list() {
         // A single-state selector serializes as a string and a multi-state
         // selector as a TOML array; both must reload to the same predicate.
-        let toml = r#"
+        let toml = test_toml(
+            r#"
 [[rules]]
 name = "single-state"
-when = { type = "epic", state = "in_progress" }
+when = { type = "__strategic_type__", state = "in_progress" }
 assert = { require-section = { heading = "Plan" } }
 
 [[rules]]
 name = "list-state"
 when = { state = ["ready", "in_progress", "gated"] }
 assert = { require-section = { heading = "Plan" } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+"#,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         let out = serialize_ruleset(&set);
         assert!(out.rules_toml.contains(r#"state = "in_progress""#));
         assert!(out
@@ -791,20 +813,22 @@ assert = { require-section = { heading = "Plan" } }
     fn test_round_trip_criteria_label_match() {
         // The criteria-label-match kind must serialize and reload with all
         // fields preserved, matching the gate-recency pattern for round-trip tests.
-        let toml = r#"
+        let toml = test_toml(
+            r#"
 [[rules]]
 name = "req-matches-criterion"
-when = { type = "epic" }
+when = { type = "__strategic_type__" }
 severity = "error"
 assert = { criteria-label-match = { namespace = "req", marker = "[hard]" } }
 
 [[rules]]
 name = "req-custom-section"
-when = { type = "epic" }
+when = { type = "__strategic_type__" }
 severity = "warn"
 assert = { criteria-label-match = { namespace = "req", criteria-section = "hard_requirements", id-pattern = 'REQ-[0-9]+' } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+"#,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         assert_eq!(set.rules.len(), 2);
         assert_eq!(set.rules[0].scope, RuleScope::Graph);
         assert_round_trips(&set);
@@ -938,14 +962,16 @@ assert = { json-schema = "schemas/second.json" }
     #[test]
     fn test_round_trip_label_uniqueness() {
         // label-uniqueness serializes to `scope = "all"` and reloads cleanly.
-        let toml = r#"
+        let toml = test_toml(
+            r#"
 [[rules]]
 name = "unique-req"
-when = { type = "epic" }
+when = { type = "__strategic_type__" }
 severity = "error"
 assert = { label-uniqueness = { namespace = "req", scope = "all" } }
-"#;
-        let set = RuleSet::parse(toml, None, []).unwrap();
+"#,
+        );
+        let set = RuleSet::parse(&toml, None, []).unwrap();
         let out = serialize_ruleset(&set);
         // The rendered form must contain the namespace and scope.
         assert!(

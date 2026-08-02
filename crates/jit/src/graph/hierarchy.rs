@@ -755,6 +755,14 @@ mod tests {
                 type_name: type_name.map(str::to_string),
             }
         }
+
+        fn typed(id: &str, level: u8, deps: &[&str]) -> Self {
+            Self::new(
+                id,
+                Some(crate::test_taxonomy::test_taxonomy().type_at_level(level)),
+                deps,
+            )
+        }
     }
 
     impl HierarchyNode for TestNode {
@@ -773,13 +781,29 @@ mod tests {
         crate::test_taxonomy::test_taxonomy().hierarchy_config()
     }
 
+    fn typed_issue(title: &str, level: u8) -> crate::domain::Issue {
+        let mut issue = crate::domain::types::fixture_issue(title.into(), String::new());
+        issue.labels = vec![format!(
+            "type:{}",
+            crate::test_taxonomy::test_taxonomy().type_at_level(level)
+        )];
+        issue
+    }
+
+    fn membership_label(level: u8, value: &str) -> String {
+        format!(
+            "{}:{value}",
+            crate::test_taxonomy::test_taxonomy().type_at_level(level)
+        )
+    }
+
     #[test]
     fn test_resolve_chain_parent_and_cluster() {
         // objective → initiative → deliverable → action
-        let m = TestNode::new("m", Some("objective"), &["e"]);
-        let e = TestNode::new("e", Some("initiative"), &["s"]);
-        let s = TestNode::new("s", Some("deliverable"), &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let m = TestNode::typed("m", 1, &["e"]);
+        let e = TestNode::typed("e", 2, &["s"]);
+        let s = TestNode::typed("s", 3, &["t"]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &s, &t], &default_config());
 
         assert_eq!(r.parent("t"), Some("s"));
@@ -796,9 +820,9 @@ mod tests {
 
     #[test]
     fn test_children_are_inverse_of_parent() {
-        let e = TestNode::new("e", Some("initiative"), &["t1", "t2"]);
-        let t1 = TestNode::new("t1", Some("action"), &[]);
-        let t2 = TestNode::new("t2", Some("action"), &[]);
+        let e = TestNode::typed("e", 2, &["t1", "t2"]);
+        let t1 = TestNode::typed("t1", 4, &[]);
+        let t2 = TestNode::typed("t2", 4, &[]);
         let r = resolve_hierarchy(&[&e, &t1, &t2], &default_config());
 
         assert_eq!(r.children("e"), ["t1".to_string(), "t2".to_string()]);
@@ -808,10 +832,10 @@ mod tests {
     #[test]
     fn test_membership_closure_descends_whole_subtree() {
         // objective → initiative → deliverable → action
-        let m = TestNode::new("m", Some("objective"), &["e"]);
-        let e = TestNode::new("e", Some("initiative"), &["s"]);
-        let s = TestNode::new("s", Some("deliverable"), &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let m = TestNode::typed("m", 1, &["e"]);
+        let e = TestNode::typed("e", 2, &["s"]);
+        let s = TestNode::typed("s", 3, &["t"]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &s, &t], &default_config());
 
         let from_initiative = r.membership_closure("e");
@@ -838,9 +862,9 @@ mod tests {
         // Two initiatives; the shared action resolves to exactly one container (the
         // smaller id wins the tie), so it is a member of `e1` only. The other
         // initiative's closure must not reach across the boundary into it.
-        let e1 = TestNode::new("e1", Some("initiative"), &["t"]);
-        let e2 = TestNode::new("e2", Some("initiative"), &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let e1 = TestNode::typed("e1", 2, &["t"]);
+        let e2 = TestNode::typed("e2", 2, &["t"]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&e1, &e2, &t], &default_config());
 
         assert!(r.membership_closure("e1").contains("t"));
@@ -851,9 +875,9 @@ mod tests {
     fn test_nearest_container_wins_over_strategic() {
         // Both the initiative and the objective directly depend on the action; the
         // NEAREST (deepest level) container — the initiative — is the parent.
-        let m = TestNode::new("m", Some("objective"), &["e", "t"]);
-        let e = TestNode::new("e", Some("initiative"), &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let m = TestNode::typed("m", 1, &["e", "t"]);
+        let e = TestNode::typed("e", 2, &["t"]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &t], &default_config());
 
         assert_eq!(r.parent("t"), Some("e"));
@@ -866,10 +890,10 @@ mod tests {
         // Initiative `ex` directly contains `tx` (ex→tx). A deeper deliverable `sy` only
         // reaches `tx` transitively through a cross-cutting dependency
         // (sy→ty→tx). The direct container wins even though the deliverable is deeper.
-        let ex = TestNode::new("ex", Some("initiative"), &["tx"]);
-        let sy = TestNode::new("sy", Some("deliverable"), &["ty"]);
-        let ty = TestNode::new("ty", Some("action"), &["tx"]);
-        let tx = TestNode::new("tx", Some("action"), &[]);
+        let ex = TestNode::typed("ex", 2, &["tx"]);
+        let sy = TestNode::typed("sy", 3, &["ty"]);
+        let ty = TestNode::typed("ty", 4, &["tx"]);
+        let tx = TestNode::typed("tx", 4, &[]);
         let r = resolve_hierarchy(&[&ex, &sy, &ty, &tx], &default_config());
 
         assert_eq!(
@@ -886,10 +910,10 @@ mod tests {
         // The initiative reaches `t1` twice: directly, and through its deliverable
         // (fe → fs → t2 → t1). The direct edge is transitively redundant, so
         // resolution ignores it and the deliverable keeps `t1`.
-        let fe = TestNode::new("fe", Some("initiative"), &["fs", "t1"]);
-        let fs = TestNode::new("fs", Some("deliverable"), &["t2"]);
-        let t2 = TestNode::new("t2", Some("action"), &["t1"]);
-        let t1 = TestNode::new("t1", Some("action"), &[]);
+        let fe = TestNode::typed("fe", 2, &["fs", "t1"]);
+        let fs = TestNode::typed("fs", 3, &["t2"]);
+        let t2 = TestNode::typed("t2", 4, &["t1"]);
+        let t1 = TestNode::typed("t1", 4, &[]);
         let r = resolve_hierarchy(&[&fe, &fs, &t2, &t1], &default_config());
 
         assert_eq!(r.parent("t1"), Some("fs"));
@@ -903,13 +927,9 @@ mod tests {
     #[test]
     fn test_redundant_edge_does_not_mutate_input() {
         // Reduction is internal to resolution; the caller's edge list survives.
-        let mut initiative =
-            crate::domain::types::fixture_issue("Initiative".into(), String::new());
-        initiative.labels = vec!["type:initiative".into()];
-        let mut deliverable =
-            crate::domain::types::fixture_issue("Deliverable".into(), String::new());
-        deliverable.labels = vec!["type:deliverable".into()];
-        let action = crate::domain::types::fixture_issue("Action".into(), String::new());
+        let mut initiative = typed_issue("Initiative", 2);
+        let mut deliverable = typed_issue("Deliverable", 3);
+        let action = typed_issue("Action", 4);
         deliverable.dependencies = vec![action.id.clone()];
         initiative.dependencies = vec![deliverable.id.clone(), action.id.clone()];
 
@@ -921,9 +941,9 @@ mod tests {
     #[test]
     fn test_diamond_tie_broken_by_id() {
         // Two initiatives at the same level, same hop distance → smallest id wins.
-        let a = TestNode::new("aaa", Some("initiative"), &["t"]);
-        let b = TestNode::new("bbb", Some("initiative"), &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let a = TestNode::typed("aaa", 2, &["t"]);
+        let b = TestNode::typed("bbb", 2, &["t"]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&a, &b, &t], &default_config());
 
         assert_eq!(r.parent("t"), Some("aaa"));
@@ -938,10 +958,10 @@ mod tests {
         // containment: the objective m1 must stay a root, keep its own child t,
         // and never nest under the initiative. The initiative itself stays under its own
         // objective m2.
-        let m2 = TestNode::new("m2", Some("objective"), &["e_late"]);
-        let e_late = TestNode::new("e_late", Some("initiative"), &["m1"]);
-        let m1 = TestNode::new("m1", Some("objective"), &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let m2 = TestNode::typed("m2", 1, &["e_late"]);
+        let e_late = TestNode::typed("e_late", 2, &["m1"]);
+        let m1 = TestNode::typed("m1", 1, &["t"]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m2, &e_late, &m1, &t], &default_config());
 
         // The objective is not captured by the initiative that sequences after it.
@@ -962,8 +982,8 @@ mod tests {
     fn test_same_tier_dependency_is_not_containment() {
         // One initiative depending on another (sequencing between peers) does not make
         // the depended-on initiative a child; both stay roots.
-        let e1 = TestNode::new("e1", Some("initiative"), &["e2"]);
-        let e2 = TestNode::new("e2", Some("initiative"), &[]);
+        let e1 = TestNode::typed("e1", 2, &["e2"]);
+        let e2 = TestNode::typed("e2", 2, &[]);
         let r = resolve_hierarchy(&[&e1, &e2], &default_config());
 
         assert_eq!(r.parent("e2"), None);
@@ -973,7 +993,7 @@ mod tests {
     #[test]
     fn test_root_leaf_is_orphan() {
         // An action with no container ancestor has no parent and no cluster.
-        let t = TestNode::new("t", Some("action"), &[]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&t], &default_config());
         assert_eq!(r.parent("t"), None);
         assert_eq!(r.cluster("t"), None);
@@ -984,7 +1004,7 @@ mod tests {
     fn test_untyped_node_is_leaf() {
         // A node with no type label is treated as a leaf, never a container.
         let untyped = TestNode::new("u", None, &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&untyped, &t], &default_config());
         assert_eq!(r.parent("t"), None, "an untyped node is not a container");
         assert_eq!(r.cluster("u"), None);
@@ -993,9 +1013,9 @@ mod tests {
     #[test]
     fn test_rank_longest_path() {
         // m → e → t and m → t (direct); the longest path from m is 2.
-        let m = TestNode::new("m", Some("objective"), &["e", "t"]);
-        let e = TestNode::new("e", Some("initiative"), &["t"]);
-        let t = TestNode::new("t", Some("action"), &[]);
+        let m = TestNode::typed("m", 1, &["e", "t"]);
+        let e = TestNode::typed("e", 2, &["t"]);
+        let t = TestNode::typed("t", 4, &[]);
         let r = resolve_hierarchy(&[&m, &e, &t], &default_config());
         assert_eq!(r.rank("t"), Some(0));
         assert_eq!(r.rank("e"), Some(1));
@@ -1006,12 +1026,9 @@ mod tests {
     fn test_rejected_container_still_resolves_structurally() {
         // State is out of scope for resolution: a rejected initiative still contains
         // its action. Resolution operates on Issues, so build them here.
-        let mut initiative =
-            crate::domain::types::fixture_issue("Initiative".into(), String::new());
-        initiative.labels = vec!["type:initiative".into()];
+        let mut initiative = typed_issue("Initiative", 2);
         initiative.state = crate::domain::State::Rejected;
-        let mut action = crate::domain::types::fixture_issue("Action".into(), String::new());
-        action.labels = vec!["type:action".into()];
+        let action = typed_issue("Action", 4);
         initiative.dependencies = vec![action.id.clone()];
 
         let r = resolve_hierarchy(&[&initiative, &action], &default_config());
@@ -1021,18 +1038,21 @@ mod tests {
     #[test]
     fn test_divergence_flags_label_without_dag_membership() {
         let config = default_config();
-        let mut initiative = crate::domain::types::fixture_issue("Auth".into(), String::new());
-        initiative.labels = vec!["type:initiative".into(), "initiative:auth".into()];
-        let mut inside = crate::domain::types::fixture_issue("Inside".into(), String::new());
-        inside.labels = vec!["type:action".into(), "initiative:auth".into()];
-        let mut outside = crate::domain::types::fixture_issue("Outside".into(), String::new());
-        outside.labels = vec!["type:action".into(), "initiative:auth".into()];
+        let mut initiative = typed_issue("Auth", 2);
+        initiative.labels.push(membership_label(2, "auth"));
+        let mut inside = typed_issue("Inside", 4);
+        inside.labels.push(membership_label(2, "auth"));
+        let mut outside = typed_issue("Outside", 4);
+        outside.labels.push(membership_label(2, "auth"));
         initiative.dependencies = vec![inside.id.clone()];
 
         let divergences = detect_membership_divergences(&[&initiative, &inside, &outside], &config);
         assert_eq!(divergences.len(), 1);
         assert_eq!(divergences[0].issue_id, outside.id);
-        assert_eq!(divergences[0].namespace, "initiative");
+        assert_eq!(
+            divergences[0].namespace,
+            crate::test_taxonomy::test_taxonomy().type_at_level(2)
+        );
         assert_eq!(divergences[0].value, "auth");
     }
 
@@ -1040,13 +1060,11 @@ mod tests {
     fn test_divergence_transitive_membership_is_not_flagged() {
         // An action reachable transitively (initiative → deliverable → action) is a DAG member.
         let config = default_config();
-        let mut initiative = crate::domain::types::fixture_issue("Auth".into(), String::new());
-        initiative.labels = vec!["type:initiative".into(), "initiative:auth".into()];
-        let mut deliverable =
-            crate::domain::types::fixture_issue("Deliverable".into(), String::new());
-        deliverable.labels = vec!["type:deliverable".into()];
-        let mut action = crate::domain::types::fixture_issue("Action".into(), String::new());
-        action.labels = vec!["type:action".into(), "initiative:auth".into()];
+        let mut initiative = typed_issue("Auth", 2);
+        initiative.labels.push(membership_label(2, "auth"));
+        let mut deliverable = typed_issue("Deliverable", 3);
+        let mut action = typed_issue("Action", 4);
+        action.labels.push(membership_label(2, "auth"));
         initiative.dependencies = vec![deliverable.id.clone()];
         deliverable.dependencies = vec![action.id.clone()];
 
@@ -1063,8 +1081,8 @@ mod tests {
         // A label with no anchor container is left to membership-reference
         // validation, not reported as a divergence.
         let config = default_config();
-        let mut action = crate::domain::types::fixture_issue("Action".into(), String::new());
-        action.labels = vec!["type:action".into(), "initiative:ghost".into()];
+        let mut action = typed_issue("Action", 4);
+        action.labels.push(membership_label(2, "ghost"));
         let divergences = detect_membership_divergences(&[&action], &config);
         assert!(divergences.is_empty());
     }
@@ -1100,7 +1118,7 @@ mod proptests {
     /// Generate an arbitrary acyclic graph: `n` nodes where node `k` may only
     /// depend on lower-indexed nodes (guaranteeing acyclicity). Each node gets an
     /// arbitrary type from the default hierarchy, or none.
-    fn arbitrary_dag() -> impl Strategy<Value = Vec<(Option<&'static str>, Vec<usize>)>> {
+    fn arbitrary_dag() -> impl Strategy<Value = Vec<(Option<u8>, Vec<usize>)>> {
         (1usize..=7)
             .prop_flat_map(|n| {
                 (
@@ -1113,10 +1131,10 @@ mod proptests {
                 (0..n)
                     .map(|k| {
                         let ty = match types[k] {
-                            0 => Some("objective"),
-                            1 => Some("initiative"),
-                            2 => Some("deliverable"),
-                            3 => Some("action"),
+                            0 => Some(1),
+                            1 => Some(2),
+                            2 => Some(3),
+                            3 => Some(4),
                             _ => None,
                         };
                         // Depend on a subset of the strictly-lower indices.
@@ -1127,13 +1145,17 @@ mod proptests {
             })
     }
 
-    fn build(spec: &[(Option<&'static str>, Vec<usize>)]) -> Vec<PropNode> {
+    fn build(spec: &[(Option<u8>, Vec<usize>)]) -> Vec<PropNode> {
         spec.iter()
             .enumerate()
             .map(|(k, (ty, deps))| PropNode {
                 id: format!("n{k}"),
                 deps: deps.iter().map(|i| format!("n{i}")).collect(),
-                type_name: ty.map(str::to_string),
+                type_name: ty.map(|level| {
+                    crate::test_taxonomy::test_taxonomy()
+                        .type_at_level(level)
+                        .to_string()
+                }),
             })
             .collect()
     }
