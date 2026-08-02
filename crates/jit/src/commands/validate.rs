@@ -727,23 +727,38 @@ fn attempted_recorded_package(
     records: &crate::repository_state::RepositoryImage,
     id: &str,
 ) -> Result<Option<AttemptedRecordedPackage>> {
-    use crate::repository_state::{AppliedProfileRecord, RepositoryEntry};
-
     let record_path = super::profile::applied_record_path(id)?;
-    let package = match records.entry(&record_path)? {
-        RepositoryEntry::Absent => return Ok(None),
-        RepositoryEntry::File { bytes, .. } => {
-            serde_json::from_slice::<AppliedProfileRecord>(bytes)
-                .context("invalid applied profile provenance")
-                .and_then(|record| {
-                    super::profile::recorded_package(&record, &record_path, records.layout())
-                })
-        }
-        _ => Err(anyhow!(
-            "applied profile provenance path {record_path:?} is not a regular file"
-        )),
+    let Some(record) = captured_applied_record(records, &record_path)? else {
+        return Ok(None);
     };
+    let package = record.and_then(|record| {
+        super::profile::recorded_package(&record, &record_path, records.layout())
+    });
     Ok(Some((id.to_string(), record_path, package)))
+}
+
+/// The applied-profile record `image` holds at `record_path`.
+///
+/// `Ok(None)` reports a record path the capture no longer holds, which the
+/// caller retries. Bytes that are not a record, and an occupant that is not a
+/// file, are reported rather than read past: the record is the repository's own
+/// statement about a profile, so provenance that cannot be read is a fact about
+/// that profile rather than a missing one.
+fn captured_applied_record(
+    image: &crate::repository_state::RepositoryImage,
+    record_path: &crate::repository_state::VirtualPath,
+) -> Result<Option<Result<crate::repository_state::AppliedProfileRecord>>> {
+    use crate::repository_state::RepositoryEntry;
+
+    Ok(match image.entry(record_path)? {
+        RepositoryEntry::Absent => None,
+        RepositoryEntry::File { bytes, .. } => {
+            Some(serde_json::from_slice(bytes).context("invalid applied profile provenance"))
+        }
+        _ => Some(Err(anyhow!(
+            "applied profile provenance path {record_path:?} is not a regular file"
+        ))),
+    })
 }
 
 /// One recorded profile's id, its record's canonical path, and the outcome of
@@ -831,50 +846,36 @@ fn captured_profile_repair_claims(
         >,
     >,
 > {
-    use crate::repository_state::RepositoryEntry;
     use crate::validation::repository::RepositoryValidationFailure;
 
     let mut claims = Vec::with_capacity(packages.len());
     for (record_path, package) in packages {
         let metadata = &package.manifest().profile;
-        match image.entry(record_path)? {
-            RepositoryEntry::Absent => return Ok(None),
-            RepositoryEntry::File { bytes, .. } => {
-                let actual: crate::repository_state::AppliedProfileRecord =
-                    match serde_json::from_slice(bytes)
-                        .context("invalid applied profile provenance")
-                    {
-                        Ok(actual) => actual,
-                        Err(error) => {
-                            return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                                error,
-                            ))))
-                        }
-                    };
-                if actual != super::profile::expected_record(package, image.layout())? {
-                    return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                        anyhow!(
-                            "applied profile provenance for '{}@{}' does not match the package its record resolves to",
-                            metadata.id,
-                            metadata.version
-                        ),
-                    ))));
-                }
-                match crate::profile::build_profile_repair_claims(package, image.layout()) {
-                    Ok(built) => claims.push(built),
-                    Err(error) => {
-                        return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                            error.into(),
-                        ))))
-                    }
-                }
-            }
-            _ => {
+        let Some(record) = captured_applied_record(image, record_path)? else {
+            return Ok(None);
+        };
+        let actual = match record {
+            Ok(actual) => actual,
+            Err(error) => {
                 return Ok(Some(Err(RepositoryValidationFailure::materialization(
-                    anyhow!(
-                        "applied profile provenance path {:?} is not a regular file",
-                        record_path
-                    ),
+                    error,
+                ))))
+            }
+        };
+        if actual != super::profile::expected_record(package, image.layout())? {
+            return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                anyhow!(
+                    "applied profile provenance for '{}@{}' does not match the package its record resolves to",
+                    metadata.id,
+                    metadata.version
+                ),
+            ))));
+        }
+        match crate::profile::build_profile_repair_claims(package, image.layout()) {
+            Ok(built) => claims.push(built),
+            Err(error) => {
+                return Ok(Some(Err(RepositoryValidationFailure::materialization(
+                    error.into(),
                 ))))
             }
         }

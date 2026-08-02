@@ -310,7 +310,7 @@ impl CommandExecutor<JsonFileStorage> {
         }
     }
 
-    /// Capture the neutral proposed base and convert one embedded package into
+    /// Capture the neutral proposed base and convert one resolved package into
     /// complete neutral claims and provenance metadata.
     ///
     /// The base is captured under the held session, overlaid with the neutral

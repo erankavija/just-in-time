@@ -1055,7 +1055,7 @@ pub enum RepositorySeedKind {
     },
     /// A fresh repository initialization.
     Initialization,
-    /// An embedded profile operation.
+    /// A profile operation.
     Profile {
         /// Profile identity.
         name: String,
@@ -1115,10 +1115,10 @@ pub enum MaterializationIntent {
     },
     /// Repair every explicitly owned derived-state drift finding.
     RepairDerivedState,
-    /// Publish a fresh (or missing-file) repository scaffold, optionally with an
-    /// embedded profile, as one complete delta.
+    /// Publish a fresh (or missing-file) repository scaffold, optionally with a
+    /// profile, as one complete delta.
     InitializeRepository,
-    /// Apply an embedded profile to an existing repository as one complete delta.
+    /// Apply a profile to an existing repository as one complete delta.
     ApplyProfile,
     /// Publish one explicitly selected repository-contained export file.
     /// Finalized by

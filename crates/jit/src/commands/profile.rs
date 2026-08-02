@@ -17,7 +17,7 @@ use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-/// Failure resolving which package bytes a profile command reads.
+/// Failure resolving which package bytes a command reads.
 ///
 /// Resolution takes the first route that answers — a location the caller
 /// supplied, the location this repository's applied-profile record names, the

@@ -387,21 +387,29 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
 /// recorded location again.
 #[test]
 fn test_validate_repairs_a_profile_applied_from_a_directory() {
+    const LOCATION: &str = "packages/planner";
+
     let repo = TestRepo::new();
-    let package = jit::test_utils::write_package_tree(
-        &COMPOSITION_PACKAGE,
-        &repo.path.join("packages/planner"),
-    );
-    let asset = fs::read_to_string(package.join("assets/profile.txt")).expect("read package asset");
+    let directory =
+        jit::test_utils::write_package_tree(&COMPOSITION_PACKAGE, &repo.path.join(LOCATION));
+    let package = jit::profile::ProfilePackage::from_directory(&directory)
+        .expect("a valid package tree")
+        .manifest()
+        .clone();
+    let declared = package
+        .assets
+        .first()
+        .expect("the fixture package declares one asset");
+    let asset = fs::read_to_string(directory.join(&declared.source)).expect("read package asset");
 
     success_json(
         &repo.path,
         &[
             "init",
             "--profile",
-            "planner-asset-only",
+            package.profile.id.as_str(),
             "--from",
-            "packages/planner",
+            LOCATION,
             "--json",
         ],
     );
@@ -412,7 +420,7 @@ fn test_validate_repairs_a_profile_applied_from_a_directory() {
         "a repository that correctly applied a directory package is coherent"
     );
 
-    let target = repo.path.join("docs/profile.txt");
+    let target = repo.path.join(&declared.target);
     fs::remove_file(&target).expect("delete the profile-owned target");
     let repaired = success_json(&repo.path, &["validate", "--fix", "--json"]);
 

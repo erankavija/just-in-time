@@ -384,11 +384,12 @@ impl DirectoryPackageRepo {
         .expect("store the applied-profile record");
     }
 
-    /// Every repository byte outside the package directory, keyed by
+    /// Every repository byte, the package tree included, keyed by
     /// worktree-relative path.
     ///
-    /// The event log and the machine-local scratch area are working state rather
-    /// than the repository content a refused repair is judged against.
+    /// The event log, lock files, and the machine-local scratch area are working
+    /// state rather than the repository content a refused repair is judged
+    /// against.
     fn snapshot(&self) -> BTreeMap<String, Vec<u8>> {
         fn visit(
             root: &std::path::Path,

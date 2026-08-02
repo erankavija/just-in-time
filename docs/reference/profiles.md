@@ -128,6 +128,12 @@ the complete final-state plan and publishes it in one recoverable transaction.
 It preserves authored rule comments, order, policy, and all unmanaged document
 bytes; it never treats a conventional filename as proof of ownership.
 
+What a recorded profile owns is recomputed from the package its own record
+resolves to, read again from the location that record names. A stored record
+that disagrees with the package read there, and a recorded location that no
+longer resolves, both fail validation naming the record, so repair restores
+every profile-owned target or none.
+
 Managed regions replace only the package- or projection-owned marked region.
 Distinct regions may nest, but delimiters must form one unambiguous containment
 tree. Duplicate, partial, reversed, crossing, or multiply owned regions fail
