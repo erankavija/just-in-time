@@ -23,33 +23,32 @@
 
 use jit::declarations::rules::RuleSet;
 use jit::domain::{ContentFormat, Issue};
+use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use jit::validation::local::evaluate_local;
 #[cfg(any(not(feature = "html"), not(feature = "xml")))]
 use jit::validation::local::LocalEvalError;
 
-/// A `require-section` rule (enforce/error) keyed on initiatives: the issue MUST have a
+/// A `require-section` rule (enforce/error) keyed on strategic issues: the issue MUST have a
 /// parsed `Success Criteria` section. Whether the section is found depends ENTIRELY
 /// on which parser ran over the body, which is exactly the dispatch we want to
 /// observe.
-fn require_criteria_rule() -> RuleSet {
-    RuleSet::parse(
+fn require_criteria_rule(issue_type: &str) -> RuleSet {
+    let source = format!(
         r#"
 [[rules]]
-name = "initiative-needs-criteria"
-when = { type = "initiative" }
+name = "{issue_type}-needs-criteria"
+when = {{ type = "{issue_type}" }}
 severity = "error"
 enforce = true
-assert = { require-section = { heading = "Success Criteria" } }
-"#,
-        None,
-        [],
-    )
-    .unwrap()
+assert = {{ require-section = {{ heading = "Success Criteria" }} }}
+"#
+    );
+    RuleSet::parse(&source, None, []).unwrap()
 }
 
-fn initiative(body: &str, format: Option<ContentFormat>) -> Issue {
-    let mut issue = crate::fixture_issue("An initiative".to_string(), body.to_string());
-    issue.labels = vec!["type:initiative".to_string()];
+fn typed_issue(body: &str, format: Option<ContentFormat>, taxonomy: &TestTaxonomy) -> Issue {
+    let mut issue = crate::fixture_issue("A strategic issue".to_string(), body.to_string());
+    issue.labels = vec![format!("type:{}", taxonomy.type_at_level(2))];
     issue.content_format = format;
     issue
 }
@@ -67,8 +66,9 @@ const XML_BODY: &str = "<document>\n  <section>\n    <heading level=\"2\">Succes
 /// the Markdown `## Success Criteria` heading is found and the rule passes.
 #[test]
 fn test_absent_format_falls_back_to_markdown_repo_default() {
-    let rules = require_criteria_rule();
-    let issue = initiative(MARKDOWN_BODY, None);
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(MARKDOWN_BODY, None, &taxonomy);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
         !eval.is_blocking(),
@@ -84,8 +84,9 @@ fn test_absent_format_falls_back_to_markdown_repo_default() {
 /// genuinely the parser in play here.
 #[test]
 fn test_html_body_under_markdown_default_is_not_parsed_as_sections() {
-    let rules = require_criteria_rule();
-    let issue = initiative(HTML_BODY, None);
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(HTML_BODY, None, &taxonomy);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
         eval.is_blocking(),
@@ -99,8 +100,9 @@ fn test_html_body_under_markdown_default_is_not_parsed_as_sections() {
 #[cfg(not(feature = "html"))]
 #[test]
 fn test_html_selected_without_feature_errors_not_silent_fallback() {
-    let rules = require_criteria_rule();
-    let issue = initiative(HTML_BODY, Some(ContentFormat::Html));
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(HTML_BODY, Some(ContentFormat::Html), &taxonomy);
     let err = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap_err();
     assert!(
         matches!(err, LocalEvalError::ContentParser(_)),
@@ -116,8 +118,9 @@ fn test_html_selected_without_feature_errors_not_silent_fallback() {
 #[cfg(not(feature = "xml"))]
 #[test]
 fn test_xml_selected_without_feature_errors_not_silent_fallback() {
-    let rules = require_criteria_rule();
-    let issue = initiative(XML_BODY, Some(ContentFormat::Xml));
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(XML_BODY, Some(ContentFormat::Xml), &taxonomy);
     let err = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap_err();
     assert!(
         matches!(err, LocalEvalError::ContentParser(_)),
@@ -142,8 +145,9 @@ fn test_xml_selected_without_feature_errors_not_silent_fallback() {
 #[cfg(feature = "html")]
 #[test]
 fn test_html_per_issue_override_uses_html_parser_in_production() {
-    let rules = require_criteria_rule();
-    let issue = initiative(HTML_BODY, Some(ContentFormat::Html));
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(HTML_BODY, Some(ContentFormat::Html), &taxonomy);
     // Repo default is Markdown; only the per-issue override selects HTML.
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
@@ -158,8 +162,9 @@ fn test_html_per_issue_override_uses_html_parser_in_production() {
 #[cfg(feature = "html")]
 #[test]
 fn test_html_repo_default_uses_html_parser_in_production() {
-    let rules = require_criteria_rule();
-    let issue = initiative(HTML_BODY, None);
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(HTML_BODY, None, &taxonomy);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Html).unwrap();
     assert!(
         !eval.is_blocking(),
@@ -168,7 +173,7 @@ fn test_html_repo_default_uses_html_parser_in_production() {
     );
 }
 
-/// The graph path dispatches per-issue too: an initiative with HTML success criteria
+/// The graph path dispatches per-issue too: a strategic issue with HTML success criteria
 /// and an UNCOVERED criterion produces a label-coverage finding ONLY because the
 /// HTML parser extracted the criterion id from the `<h2>` section. Under Markdown
 /// the section is opaque, no criteria are found, and the rule is vacuously
@@ -176,31 +181,32 @@ fn test_html_repo_default_uses_html_parser_in_production() {
 #[cfg(feature = "html")]
 #[test]
 fn test_html_graph_label_coverage_uses_html_parser_in_production() {
-    use jit::domain::type_taxonomy::HierarchyConfig;
     use jit::validation::graph::evaluate_graph;
 
-    let rule = RuleSet::parse(
-        "[[rules]]\nname = \"coverage\"\nwhen = { type = \"initiative\" }\n\
-         severity = \"error\"\nassert = { label-coverage = { child-state = \"done\" } }\n",
-        None,
-        [],
-    )
-    .unwrap()
-    .rules
-    .into_iter()
-    .next()
-    .unwrap();
+    let taxonomy = test_taxonomy();
+    let rule_source = format!(
+        "[[rules]]\nname = \"coverage\"\nwhen = {{ type = \"{}\" }}\n\
+         severity = \"error\"\nassert = {{ label-coverage = {{ child-state = \"done\" }} }}\n",
+        taxonomy.type_at_level(2)
+    );
+    let rule = RuleSet::parse(&rule_source, None, [])
+        .unwrap()
+        .rules
+        .into_iter()
+        .next()
+        .unwrap();
 
-    // Initiative with an HTML success-criteria section declaring REQ-01, no covering child.
-    let mut html_initiative = crate::fixture_issue("initiative".to_string(), HTML_BODY.to_string());
-    html_initiative.labels = vec!["type:initiative".to_string()];
-    html_initiative.content_format = Some(ContentFormat::Html);
+    // Strategic issue with an HTML success-criteria section declaring REQ-01, no covering child.
+    let mut html_issue =
+        crate::fixture_issue("A strategic issue".to_string(), HTML_BODY.to_string());
+    html_issue.labels = vec![format!("type:{}", taxonomy.type_at_level(2))];
+    html_issue.content_format = Some(ContentFormat::Html);
 
     let rules = vec![&rule];
     let findings = evaluate_graph(
         &rules,
-        &[html_initiative],
-        &jit::test_taxonomy::test_taxonomy().hierarchy_config(),
+        &[html_issue],
+        &taxonomy.hierarchy_config(),
         ContentFormat::Markdown,
         chrono::Utc::now(),
         &std::collections::HashMap::new(),
@@ -223,8 +229,9 @@ fn test_html_graph_label_coverage_uses_html_parser_in_production() {
 #[cfg(feature = "xml")]
 #[test]
 fn test_xml_per_issue_override_uses_xml_parser_in_production() {
-    let rules = require_criteria_rule();
-    let issue = initiative(XML_BODY, Some(ContentFormat::Xml));
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(XML_BODY, Some(ContentFormat::Xml), &taxonomy);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Markdown).unwrap();
     assert!(
         !eval.is_blocking(),
@@ -238,8 +245,9 @@ fn test_xml_per_issue_override_uses_xml_parser_in_production() {
 #[cfg(feature = "xml")]
 #[test]
 fn test_xml_repo_default_uses_xml_parser_in_production() {
-    let rules = require_criteria_rule();
-    let issue = initiative(XML_BODY, None);
+    let taxonomy = test_taxonomy();
+    let rules = require_criteria_rule(taxonomy.type_at_level(2));
+    let issue = typed_issue(XML_BODY, None, &taxonomy);
     let eval = evaluate_local(&issue, &rules, ContentFormat::Xml).unwrap();
     assert!(
         !eval.is_blocking(),
