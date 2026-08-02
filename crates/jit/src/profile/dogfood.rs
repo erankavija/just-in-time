@@ -554,6 +554,10 @@ mod tests {
     /// by none of the live-asset targets in `packaged`, and is matched by none
     /// of that root's exclusion patterns.
     ///
+    /// Each root is a repository-relative directory and its patterns match the
+    /// remainder beneath it, so a root and one glob together name a repository
+    /// directory of unpackaged material however many files it holds.
+    ///
     /// `packaged` holds live-asset targets alone. An install-only asset is
     /// authored by the package rather than drawn from the repository, so a
     /// repository file at such a target is unpackaged material a declared
@@ -645,7 +649,8 @@ mod tests {
     }
 
     /// A consumer added under any declared root, packaged nowhere and of no
-    /// shape that root's exclusions describe, is reported by name.
+    /// shape that root's exclusions describe, is reported by name — which is
+    /// what fails the walk above, whose assertion is that nothing is reported.
     #[test]
     fn test_unpackaged_files_under_declared_roots_names_a_tracked_file_no_declaration_covers() {
         let package = jit_dogfood_package().unwrap();
