@@ -9,7 +9,7 @@
 //! declared source from whichever of the two owns it.
 //!
 //! The production is a repository entry point over the render here, not a build
-//! step. Nothing compiles the package in, so a build step would make every
+//! step. No build consumes the assembled tree, so a build step would make every
 //! build do work no build consumes, and the directory watching it would need is
 //! what once relinked every test target on an unchanged rebuild. Running as an
 //! entry point also leaves the manifest one reader, the crate's own package
