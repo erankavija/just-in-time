@@ -12508,3 +12508,4 @@
 {"assignee":"agent:worker","id":"e135fcf1-3003-432f-b588-042e9f0787c1","issue_id":"e4ba28c5-c95b-4e28-add0-b7853826c9f6","timestamp":"2026-08-02T15:40:23.983881376Z","type":"issue_claimed"}
 {"from":"ready","id":"5063f97a-8129-481f-b48a-5554c61855d4","issue_id":"fd61b44f-e208-4ff9-bc8b-262706782043","timestamp":"2026-08-02T15:40:29.102049583Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"686e059a-6adc-4fdb-9309-bd6e6efbc375","issue_id":"fd61b44f-e208-4ff9-bc8b-262706782043","timestamp":"2026-08-02T15:40:29.102049583Z","type":"issue_claimed"}
+{"fields":["description"],"id":"6908157b-ec01-430c-a59a-0c8c0d813a82","issue_id":"e4ba28c5-c95b-4e28-add0-b7853826c9f6","timestamp":"2026-08-02T16:30:41.878295762Z","type":"issue_updated","updated_by":"issue-update"}
