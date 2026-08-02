@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1f9138c005b46b9c252cd069eab90f9d83341055",
+  "completed_at": "2026-08-02T18:35:56.560402392Z",
+  "duration_ms": 249770,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/index.md",
+        "id": "F1",
+        "line": 133,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Contributor documentation falsely says no workspace code reads a produced tree, although assembly reads the published destination back for validation."
+      }
+    ],
+    "summary": "Package assembly behavior is sound, but the updated contributor prose still makes a false claim about reads of the produced tree.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7d038e97-87e8-4d02-9101-6ffef1e8bdc0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "23173165-a101-46b8-b2c0-ef220583a2c0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T18:31:46.789867600Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14916 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc3bf-1313-7752-ba0f-729e63be09ea\n--------\nuser\n--- 14903 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a02ea421, 4053f6b7, b737ea82, 35f5df3a, 4ff5cd21, 954d7b35, 5e961152, c5b4d229, e975abc4\nPolicy sources: AGENTS.md\nResolved items: @/issue/7d038e97/requirement/REQ-03 (issue description, markdown-first); @/issue/e204e63d/decision/D-2 (issue description, markdown-first); @/invariant/atomic-writes, @/invariant/bounded-rust-build-footprint, @/invariant/single-source-prose (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T18:22:08Z); docs-mechanical passed (exit 0, 2026-08-02T18:31:35Z); prior code-review failed (exit 1, 2026-08-02T17:51:07Z)\nTruncation recovery: narrowed reads of the assembly, publication, atomic-rename, package-model, and documentation paths; inspected per-commit changed-file lists and focused patches.\n\n1. **[blocking][issue-impact][medium]** [dev/index.md:133](</home/vkaskivuo/Projects/just-in-time/dev/index.md:133>) says “nothing in the workspace reads what a run produces,” but the assembly deliberately reads the published destination back at [package_assembly.rs:302](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/profile/package_assembly.rs:302>) to validate it. The prior prose finding is therefore not fully resolved; state the narrower true fact that no build consumes the assembled tree. References: `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Package assembly behavior is sound, but the updated contributor prose still makes a false claim about reads of the produced tree.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Contributor documentation falsely says no workspace code reads a produced tree, although assembly reads the published destination back for validation.\",\"file\":\"dev/index.md\",\"line\":133,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
