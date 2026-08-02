@@ -2680,6 +2680,35 @@ mod tests {
     const STALE_LABEL_ASSERTION: &str =
         "assert = { require-label = { label = \"authored:*\", min = 99 } }";
 
+    const PROFILE_ITEM_KINDS_CONFIG: &str = r#"
+[item_kinds.invariant]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+
+[item_kinds.rule]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
+source-of-truth = "registry-first"
+
+[item_kinds.gate]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
+source-of-truth = "registry-first"
+"#;
+
     fn drift_default_assertion(rules: &str) -> (String, String) {
         let stale = format!(
             "# authored header remains byte-exact\n{}",
@@ -2699,6 +2728,7 @@ mod tests {
     /// applying `profile` when one is named.
     fn memory_fixture(profile: Option<&str>) -> crate::storage::InMemoryStorage {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
+        use crate::test_taxonomy::test_taxonomy;
 
         fn seed_tree(
             storage: &crate::storage::InMemoryStorage,
@@ -2719,14 +2749,23 @@ mod tests {
             }
         }
 
+        let taxonomy = test_taxonomy();
         let source = tempfile::tempdir().unwrap();
-        let source_storage = JsonFileStorage::new(source.path().join(".jit"));
+        let jit_root = source.path().join(".jit");
+        std::fs::create_dir_all(&jit_root).unwrap();
+        let config = format!(
+            "{}{}",
+            taxonomy.config_fragment(),
+            PROFILE_ITEM_KINDS_CONFIG
+        );
+        std::fs::write(jit_root.join("config.toml"), config).unwrap();
+        let source_storage = JsonFileStorage::new(&jit_root);
         let source_layout =
             crate::storage::discover_repository_layout(source.path(), source_storage.root())
                 .unwrap();
         CommandExecutor::new(source_storage)
             .with_layout(source_layout)
-            .initialize_fresh_repository(source.path(), &HierarchyTemplate::default(), profile)
+            .initialize_fresh_repository(source.path(), &taxonomy.hierarchy_template(), profile)
             .unwrap();
 
         let storage = crate::storage::InMemoryStorage::new();

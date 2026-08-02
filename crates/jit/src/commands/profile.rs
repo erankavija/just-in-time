@@ -490,11 +490,11 @@ pub(super) fn reject_reserved_application_targets<'a>(
 mod tests {
     use super::*;
     use crate::domain::Event;
-    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::repository_state::RootRelativePath;
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
+    use crate::test_utils::setup_test_repo_with_taxonomy;
     use include_dir::{include_dir, Dir};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
@@ -584,6 +584,36 @@ mod tests {
     static PACKAGE: Dir<'_> =
         include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only");
 
+    const PROFILE_ITEM_KINDS_CONFIG: &str = r#"
+[item_kinds.invariant]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/invariants.toml", table = "invariants", id-field = "id", text-field = "statement" }
+source-of-truth = "registry-first"
+aliases = ["inv"]
+
+[item_kinds.rule]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/rules.toml", table = "rules", id-field = "name", text-field = "description" }
+source-of-truth = "registry-first"
+
+[item_kinds.gate]
+section = "success_criteria"
+id-pattern = "[a-z][a-z0-9-]*"
+markers = []
+link-namespaces = ["enforces"]
+scope = "project"
+source = { toml = ".jit/gates.toml", table = "gates", id-field = "key", text-field = "description" }
+source-of-truth = "registry-first"
+"#;
+
     /// A file-backed executor over a canonically initialized repository carrying
     /// its canonical layout.
     fn fixture() -> (
@@ -592,13 +622,11 @@ mod tests {
         CommandExecutor<JsonFileStorage>,
         ProfilePackage,
     ) {
-        let temp = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        let initializer = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        initializer
-            .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
-            .unwrap();
+        let (temp, storage, _taxonomy) = setup_test_repo_with_taxonomy().unwrap();
+        let config_path = temp.path().join(".jit/config.toml");
+        let mut config = fs::read_to_string(&config_path).unwrap();
+        config.push_str(PROFILE_ITEM_KINDS_CONFIG);
+        fs::write(config_path, config).unwrap();
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
         let package = ProfilePackage::from_embedded_dir(&PACKAGE).unwrap();
