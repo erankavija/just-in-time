@@ -537,8 +537,14 @@ Quality gates are checkpoints that enforce process requirements before issues ca
 Gates exist in three states:
 
 1. **Pending** - Gate is attached to an issue but not yet checked
-2. **Passed** - `jit gate evaluate` ran an automated checker that succeeded, or attested a manual gate
-3. **Failed** - `jit gate evaluate` ran an automated checker that failed or errored, or `jit gate fail` recorded a manual gate as failed (`jit gate fail` rejects automated gates)
+2. **Passed** - `jit gate evaluate` obtained a succeeding automated verdict, or attested a manual gate
+3. **Failed** - `jit gate evaluate` obtained a failing or errored automated verdict, or `jit gate fail` recorded a manual gate as failed (`jit gate fail` rejects automated gates)
+
+An automated verdict comes from running the gate's checker, or — for a gate that
+declares the repository files its checker reads — from an earlier run of that
+gate over content the digest proves identical, which the new run records and
+names. See
+[Declare the Files a Checker Reads](../how-to/custom-gates.md#declare-the-files-a-checker-reads).
 
 **State transitions:**
 
