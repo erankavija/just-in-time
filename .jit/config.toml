@@ -138,7 +138,7 @@ unique = false
 examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
 
 [namespaces.per]
-description = "Decision link: names a decision item (issue-scope `decision` or project-scope `charter`) the labeled issue is done per"
+description = "Decision link: names a decision item (issue-scope `decision` or project-scope `charter`) the labeled issue is done in accordance with. Several issues may cite one decision; the label denotes conformance, not delivery of the decision whole."
 unique = false
 examples = ["per:@/charter/D-1", "per:@/issue/9db27a3a/decision/D-1"]
 

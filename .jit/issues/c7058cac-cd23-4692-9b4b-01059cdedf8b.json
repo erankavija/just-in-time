@@ -11,9 +11,16 @@
   "first_ready_at": "2026-07-31T23:07:26.938809316Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_at": "2026-08-02T09:06:01.886194182Z",
+      "updated_by": null
+    }
+  },
   "id": "c7058cac-cd23-4692-9b4b-01059cdedf8b",
   "labels": [
     "type:task",
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Assemble the default vocabulary as a package",
-  "updated_at": "2026-08-01T21:31:28.851244976Z"
+  "updated_at": "2026-08-02T09:06:01.886194182Z"
 }
