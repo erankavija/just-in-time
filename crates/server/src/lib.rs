@@ -87,7 +87,6 @@ pub fn prepare_server_storage(
 mod recovery_startup_tests {
     use super::*;
     use jit::commands::CommandExecutor;
-    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{TransactionFailureInjector, TransactionFailurePoint};
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -111,8 +110,9 @@ mod recovery_startup_tests {
         let interrupted =
             JsonFileStorage::with_repository_state_failures(&data, Arc::new(FailAfterCommit));
         let executor = CommandExecutor::new(interrupted).with_layout(layout);
+        let taxonomy = jit::test_taxonomy::test_taxonomy();
         assert!(executor
-            .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
             .is_err());
 
         let recovered_layout =

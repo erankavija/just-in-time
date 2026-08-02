@@ -1105,15 +1105,15 @@ mod tests {
     }
 
     fn initialize_file_backed_test_repository(worktree_root: &std::path::Path) {
-        use jit::hierarchy_templates::HierarchyTemplate;
         use jit::storage::JsonFileStorage;
 
         let storage = JsonFileStorage::new(worktree_root.join(".jit"));
         let layout =
             jit::storage::discover_repository_layout(worktree_root, storage.root()).unwrap();
+        let taxonomy = jit::test_taxonomy::test_taxonomy();
         CommandExecutor::new(storage)
             .with_layout(layout)
-            .initialize_fresh_repository(worktree_root, &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(worktree_root, &taxonomy.hierarchy_template(), None)
             .unwrap();
     }
 

@@ -15,7 +15,6 @@ use std::time::{Duration, Instant};
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit_server::shutdown::GRACEFUL_DRAIN_TIMEOUT;
 use nix::sys::signal::{kill, Signal};
@@ -47,8 +46,9 @@ const READ_POLL: Duration = Duration::from_millis(50);
 
 /// Builds the valid repository the server requires at startup.
 fn initialize_repository(worktree_root: &Path) {
+    let taxonomy = jit::test_taxonomy::test_taxonomy();
     executor_for(worktree_root)
-        .initialize_fresh_repository(worktree_root, &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(worktree_root, &taxonomy.hierarchy_template(), None)
         .expect("initialize the fixture repository");
 }
 
