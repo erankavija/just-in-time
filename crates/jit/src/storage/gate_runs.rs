@@ -99,6 +99,8 @@ mod tests {
                     ],
                 }],
             }),
+            inputs_digest: None,
+            origin: crate::domain::GateVerdictOrigin::Executed,
         };
 
         let run_id = record_gate_run(&temp, &storage, result, 1);
@@ -252,6 +254,8 @@ mod tests {
                     by: Some(crate::gate_execution::AUTO_EXECUTOR.to_string()),
                     message: None,
                     findings: None,
+                    inputs_digest: None,
+                    origin: crate::domain::GateVerdictOrigin::Executed,
                 };
                 record_gate_run(&temp, &storage, result, i + 1)
             })
@@ -307,6 +311,8 @@ mod tests {
             by: Some(crate::gate_execution::AUTO_EXECUTOR.to_string()),
             message: None,
             findings: None,
+            inputs_digest: None,
+            origin: crate::domain::GateVerdictOrigin::Executed,
         };
 
         let run_id = record_gate_run(&temp, &storage, result, 1);

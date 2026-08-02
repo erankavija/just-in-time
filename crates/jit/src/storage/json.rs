@@ -826,6 +826,100 @@ impl JsonFileStorage {
     }
 }
 
+impl JsonFileStorage {
+    /// Read every recorded gate run the predicate keeps.
+    ///
+    /// One enumeration of `gate-runs/` behind every whole-history question, so
+    /// a caller filtering by issue and one filtering by gate and digest walk
+    /// the directory the same way (`@/invariant/convention-convergence`).
+    fn read_gate_runs(
+        &self,
+        mut keep: impl FnMut(&crate::domain::GateRunResult) -> bool,
+    ) -> Result<Vec<crate::domain::GateRunResult>> {
+        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
+            Ok(data) => data,
+            Err(RepositoryStateStoreError::Io(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                return Ok(Vec::new())
+            }
+            Err(error) => return Err(error.into()),
+        };
+        let gate_runs = match data.symlink_metadata(GATE_RUNS_DIR) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(error.into()),
+            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
+                anyhow::bail!(
+                    "Gate run root at {} must be an ordinary directory",
+                    self.root.join(GATE_RUNS_DIR).display()
+                )
+            }
+            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&data, GATE_RUNS_DIR)?,
+        };
+
+        let mut results = Vec::new();
+        for entry in gate_runs.entries()? {
+            let entry = entry?;
+            let Ok(run_id) = entry.file_name().into_string() else {
+                continue;
+            };
+            let Ok(relative) = gate_run_result_relative_path(&run_id) else {
+                continue;
+            };
+            let metadata = gate_runs.symlink_metadata(&run_id)?;
+            if metadata.is_symlink() || !metadata.is_dir() {
+                continue;
+            }
+            let run_dir =
+                super::repository_state_store::open_child_dir_nofollow(&gate_runs, &run_id)?;
+            let result_path = self.root.join(relative.as_path());
+            let result_leaf = relative
+                .as_path()
+                .file_name()
+                .and_then(|name| name.to_str())
+                .context("canonical gate run result path has no file name")?;
+            match run_dir.symlink_metadata(result_leaf) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error.into()),
+                Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
+                    anyhow::bail!(
+                        "Gate run result at {} must be an ordinary file",
+                        result_path.display()
+                    )
+                }
+                Ok(_) => {}
+            }
+            let mut file =
+                super::file_transaction::open_regular_file_nofollow(&run_dir, result_leaf)
+                    .with_context(|| {
+                        format!(
+                            "Failed to open gate run result at {}",
+                            result_path.display()
+                        )
+                    })?;
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents).with_context(|| {
+                format!(
+                    "Failed to read gate run result at {}",
+                    result_path.display()
+                )
+            })?;
+            let result: crate::domain::GateRunResult = serde_json::from_slice(&contents)
+                .with_context(|| {
+                    format!(
+                        "Failed to deserialize gate run result at {}",
+                        result_path.display()
+                    )
+                })?;
+            if keep(&result) {
+                results.push(result);
+            }
+        }
+
+        Ok(results)
+    }
+}
+
 impl IssueStore for JsonFileStorage {
     fn configure_repository_layout(&self, layout: &RepositoryLayout) {
         // Bind once. A refreshed layout for the same roots may replace stale
@@ -1249,87 +1343,17 @@ impl IssueStore for JsonFileStorage {
         &self,
         issue_id: &str,
     ) -> Result<Vec<crate::domain::GateRunResult>> {
-        let data = match super::repository_state_store::open_absolute_dir_nofollow(&self.root) {
-            Ok(data) => data,
-            Err(RepositoryStateStoreError::Io(error))
-                if error.kind() == std::io::ErrorKind::NotFound =>
-            {
-                return Ok(Vec::new())
-            }
-            Err(error) => return Err(error.into()),
-        };
-        let gate_runs = match data.symlink_metadata(GATE_RUNS_DIR) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(error) => return Err(error.into()),
-            Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
-                anyhow::bail!(
-                    "Gate run root at {} must be an ordinary directory",
-                    self.root.join(GATE_RUNS_DIR).display()
-                )
-            }
-            Ok(_) => super::repository_state_store::open_child_dir_nofollow(&data, GATE_RUNS_DIR)?,
-        };
+        self.read_gate_runs(|result| result.issue_id == issue_id)
+    }
 
-        let mut results = Vec::new();
-        for entry in gate_runs.entries()? {
-            let entry = entry?;
-            let Ok(run_id) = entry.file_name().into_string() else {
-                continue;
-            };
-            let Ok(relative) = gate_run_result_relative_path(&run_id) else {
-                continue;
-            };
-            let metadata = gate_runs.symlink_metadata(&run_id)?;
-            if metadata.is_symlink() || !metadata.is_dir() {
-                continue;
-            }
-            let run_dir =
-                super::repository_state_store::open_child_dir_nofollow(&gate_runs, &run_id)?;
-            let result_path = self.root.join(relative.as_path());
-            let result_leaf = relative
-                .as_path()
-                .file_name()
-                .and_then(|name| name.to_str())
-                .context("canonical gate run result path has no file name")?;
-            match run_dir.symlink_metadata(result_leaf) {
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(error.into()),
-                Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
-                    anyhow::bail!(
-                        "Gate run result at {} must be an ordinary file",
-                        result_path.display()
-                    )
-                }
-                Ok(_) => {}
-            }
-            let mut file =
-                super::file_transaction::open_regular_file_nofollow(&run_dir, result_leaf)
-                    .with_context(|| {
-                        format!(
-                            "Failed to open gate run result at {}",
-                            result_path.display()
-                        )
-                    })?;
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents).with_context(|| {
-                format!(
-                    "Failed to read gate run result at {}",
-                    result_path.display()
-                )
-            })?;
-            let result: crate::domain::GateRunResult = serde_json::from_slice(&contents)
-                .with_context(|| {
-                    format!(
-                        "Failed to deserialize gate run result at {}",
-                        result_path.display()
-                    )
-                })?;
-            if result.issue_id == issue_id {
-                results.push(result);
-            }
-        }
-
-        Ok(results)
+    fn find_reusable_gate_run(
+        &self,
+        gate_key: &str,
+        digest: &crate::domain::InputsDigest,
+    ) -> Result<Option<crate::domain::GateRunResult>> {
+        Ok(crate::domain::latest_gate_run(self.read_gate_runs(
+            |result| result.is_reusable_for(gate_key, digest),
+        )?))
     }
 
     fn root(&self) -> &Path {

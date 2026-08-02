@@ -945,18 +945,21 @@ pub struct GateRunResult {
     pub stage: GateStage,
     /// Issue ID
     pub issue_id: String,
-    /// Git commit (if available)
+    /// Git commit the checker was launched at, when one was available. `None`
+    /// for a run that launched no checker — a verdict taken from an earlier run
+    /// ([`origin`](Self::origin)) ran at no commit of its own, and the run it
+    /// names carries the one its checker was launched at.
     pub commit: Option<String>,
-    /// Git branch (if available)
+    /// Git branch the checker was launched on, under the same conditions as
+    /// [`commit`](Self::commit).
     pub branch: Option<String>,
     /// Whether the working tree differed from the named [`commit`](Self::commit)
     /// when the checker started. `Some(true)` means the tree carried uncommitted
     /// or untracked changes, so the run evidences that modified tree rather than
     /// the commit alone; `Some(false)` means the tree matched the commit exactly;
-    /// `None` means there was no commit to compare against (the working directory
-    /// is not a git repository, or the repository has no commits yet) — a clean
-    /// tree is never fabricated in that case. Defaulted so run records written
-    /// before this field existed parse as `None`.
+    /// `None` means there was no commit to compare against — a clean tree is
+    /// never fabricated in that case. Defaulted so run records written before
+    /// this field existed parse as `None`.
     #[serde(default)]
     pub tree_dirty: Option<bool>,
     /// Result status
@@ -985,6 +988,90 @@ pub struct GateRunResult {
     /// kept alongside. See [`parse_gate_findings`](crate::domain::parse_gate_findings).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub findings: Option<GateFindings>,
+    /// Digest of the repository files the gate declares its checker reads, taken
+    /// before the verdict was obtained.
+    ///
+    /// `None` when the gate declares no inputs, or when the repository the run
+    /// was recorded against offers no worktree to read. Two runs of one gate
+    /// carrying the same digest read byte-identical content at byte-identical
+    /// paths, which is what makes [`origin`](Self::origin) able to carry a
+    /// verdict from one to the other.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inputs_digest: Option<crate::domain::InputsDigest>,
+    /// Where this record's verdict came from: this run's own checker execution,
+    /// or an earlier run over the same declared inputs.
+    #[serde(default)]
+    pub origin: GateVerdictOrigin,
+}
+
+impl GateRunResult {
+    /// Whether an evaluation of `gate_key` over inputs digesting to `digest`
+    /// may carry this run's verdict.
+    ///
+    /// Three things must hold together. The digests must match, which is what
+    /// makes the two evaluations questions about identical content. The run
+    /// must have executed its own checker, so the record a reuse names is
+    /// always the execution behind the verdict rather than another reference
+    /// to it. And the run must have reached a verdict — `passed` or `failed`;
+    /// an errored run reports the checker never getting there (a timeout, a
+    /// missing command), which says nothing about the inputs.
+    pub fn is_reusable_for(&self, gate_key: &str, digest: &crate::domain::InputsDigest) -> bool {
+        self.gate_key == gate_key
+            && self.inputs_digest.as_ref() == Some(digest)
+            && self.origin.is_executed()
+            && matches!(self.status, GateRunStatus::Passed | GateRunStatus::Failed)
+    }
+}
+
+/// The most recently started run among `runs`, or `None` when empty.
+///
+/// Ties on the start instant fall back to the run id so one repository state
+/// always selects one run.
+pub fn latest_gate_run(runs: Vec<GateRunResult>) -> Option<GateRunResult> {
+    runs.into_iter().max_by(|left, right| {
+        left.started_at
+            .cmp(&right.started_at)
+            .then_with(|| left.run_id.cmp(&right.run_id))
+    })
+}
+
+/// Where a recorded gate verdict came from.
+///
+/// A reused verdict is evidence of one checker execution read a second time,
+/// not of a second verification. Keeping the distinction in the record is what
+/// stops a container whose issues all report a passed gate from being read as
+/// that many independent verifications, and the named run is where the report
+/// text and findings that produced the verdict live.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(
+    tag = "derivation",
+    content = "source_run",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum GateVerdictOrigin {
+    /// This run executed the checker and the verdict is its own.
+    #[default]
+    Executed,
+    /// The verdict was taken from the run with this id, whose declared inputs
+    /// digested to the same value. That run executed the checker.
+    Reused(String),
+}
+
+impl GateVerdictOrigin {
+    /// The earlier run this verdict was taken from, or `None` when the checker
+    /// executed.
+    pub fn source_run(&self) -> Option<&str> {
+        match self {
+            Self::Executed => None,
+            Self::Reused(run_id) => Some(run_id),
+        }
+    }
+
+    /// Whether this run executed the checker that produced its verdict.
+    pub fn is_executed(&self) -> bool {
+        matches!(self, Self::Executed)
+    }
 }
 
 /// Gate run status

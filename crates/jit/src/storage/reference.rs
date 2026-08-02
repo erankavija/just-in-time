@@ -101,11 +101,15 @@ pub enum GateRunField {
     Message,
     /// `findings`
     Findings,
+    /// `inputs_digest`
+    InputsDigest,
+    /// `origin`
+    Origin,
 }
 
 impl GateRunField {
     /// Every field of the record, in [`GateRunResult`] declaration order.
-    pub const ALL: [GateRunField; 19] = [
+    pub const ALL: [GateRunField; 21] = [
         GateRunField::SchemaVersion,
         GateRunField::RunId,
         GateRunField::GateKey,
@@ -125,6 +129,8 @@ impl GateRunField {
         GateRunField::By,
         GateRunField::Message,
         GateRunField::Findings,
+        GateRunField::InputsDigest,
+        GateRunField::Origin,
     ];
 
     /// The JSON key serde writes for this field.
@@ -149,6 +155,8 @@ impl GateRunField {
             GateRunField::By => "by",
             GateRunField::Message => "message",
             GateRunField::Findings => "findings",
+            GateRunField::InputsDigest => "inputs_digest",
+            GateRunField::Origin => "origin",
         }
     }
 
@@ -177,13 +185,15 @@ impl GateRunField {
                     .to_string()
             }
             GateRunField::Commit => {
-                "Git commit the run was taken at, when the working directory is a git \
-                 repository."
+                "Git commit the checker was launched at, when the working directory is a git \
+                 repository. Unset for a run that launched no checker: a verdict taken from an \
+                 earlier run ran at no commit of its own, and `origin` names the run that \
+                 carries one."
                     .to_string()
             }
             GateRunField::Branch => {
-                "Git branch the run was taken on, when the working directory is a git \
-                 repository."
+                "Git branch the checker was launched on, under the same conditions as \
+                 `commit`."
                     .to_string()
             }
             GateRunField::TreeDirty => {
@@ -191,8 +201,9 @@ impl GateRunField {
                  `true` if it carried uncommitted or untracked changes, `false` if it matched \
                  the commit exactly. A `true` run evidences that modified tree rather than the \
                  commit alone. `null` when no cleanliness value provably describes the recorded \
-                 commit: there was no commit to compare against (not a git repository, or no \
-                 commits yet), or `HEAD` moved through every paired probe attempt while the \
+                 commit: there was no commit to compare against (not a git repository, no \
+                 commits yet, or no checker launched), or `HEAD` moved through every paired \
+                 probe attempt while the \
                  evidence was being taken, so the tree state is recorded as unknown rather than \
                  paired with a commit it might not describe."
                     .to_string()
@@ -235,6 +246,22 @@ impl GateRunField {
                  carry an optional `references` array of opaque strings; it is omitted when \
                  empty. Unset when the checker emitted no such block; the raw `stdout` is kept \
                  either way. `jit gate status --findings` prints this field."
+                    .to_string()
+            }
+            GateRunField::InputsDigest => {
+                "Digest of the repository files the gate declares its checker reads, taken \
+                 before the verdict was obtained. Two runs of one gate carrying the same value \
+                 read byte-identical content at byte-identical paths. Unset when the gate \
+                 declares no inputs, which is what keeps its checker running on every \
+                 evaluation."
+                    .to_string()
+            }
+            GateRunField::Origin => {
+                "Where the verdict came from. `{\"derivation\": \"executed\"}` means this run \
+                 ran the checker; `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}` \
+                 means it carries the named earlier run's verdict, whose `inputs_digest` \
+                 matched, without the checker running again. The report text behind a reused \
+                 verdict lives at the named run."
                     .to_string()
             }
         }
@@ -315,6 +342,16 @@ fn sample_gate_run() -> GateRunResult {
                 references: vec!["@/inv/atomic-writes".to_string()],
             }],
         }),
+        inputs_digest: Some({
+            // Produced by the same builder the evaluator digests with, so the
+            // sample cannot show a value the encoding could not have written.
+            let mut builder = crate::domain::InputsDigestBuilder::new(b"gate declaration");
+            builder.push_file("crates/jit/src/lib.rs", b"pub mod domain;\n");
+            builder.finish()
+        }),
+        origin: crate::domain::GateVerdictOrigin::Reused(
+            "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34".to_string(),
+        ),
     }
 }
 
@@ -334,6 +371,8 @@ fn sample_gate_run_minimal() -> GateRunResult {
         by: None,
         message: None,
         findings: None,
+        inputs_digest: None,
+        origin: crate::domain::GateVerdictOrigin::Executed,
         ..sample_gate_run()
     }
 }

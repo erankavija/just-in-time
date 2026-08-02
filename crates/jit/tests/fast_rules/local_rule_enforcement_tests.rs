@@ -868,6 +868,14 @@ impl IssueStore for FailingMutationStorage {
         self.inner.list_gate_runs_for_issue(issue_id)
     }
 
+    fn find_reusable_gate_run(
+        &self,
+        gate_key: &str,
+        digest: &jit::domain::InputsDigest,
+    ) -> anyhow::Result<Option<jit::domain::GateRunResult>> {
+        self.inner.find_reusable_gate_run(gate_key, digest)
+    }
+
     fn root(&self) -> &std::path::Path {
         self.inner.root()
     }

@@ -61,6 +61,9 @@ impl GateTemplate {
             stage: self.stage,
             mode: self.mode,
             checker: self.checker.clone(),
+            // A shipped preset declares no inputs: its checker's footprint is
+            // the adopting repository's, which the preset cannot know.
+            inputs: None,
             priority: 100,
             reserved: HashMap::new(),
             auto: self.mode == GateMode::Auto,

@@ -111,6 +111,7 @@ fn manual_gate(key: &str, title: &str, description: &str) -> GateDefinition {
         reserved: HashMap::new(),
         auto: false,
         example_integration: None,
+        inputs: None,
     }
 }
 

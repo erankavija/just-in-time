@@ -62,6 +62,8 @@
 //! and the `code-review` gate spent a review round chasing a defect that did
 //! not exist in the working tree).
 
+use crate::domain::repository_inputs::RepositoryInputs;
+
 /// Why a running binary is judged to predate, or no longer match, the
 /// repository it is validating.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,25 +116,34 @@ pub enum BinaryProvenance {
 /// inputs; the profile and hook paths cover the files embedded by
 /// `include_dir!`/`include_str!` in production code. A newly added path
 /// elsewhere in the repository therefore remains irrelevant by construction.
-const BINARY_BUILD_INPUTS: &[&str] = &[
+const BINARY_BUILD_INPUT_ROOTS: &[&str] = &[
     "Cargo.toml",
     "Cargo.lock",
     "crates/jit/Cargo.toml",
     "crates/jit/Cargo.lock",
     "crates/jit/build.rs",
-    "crates/jit/src/",
-    "profiles/jit-dogfood/",
+    "crates/jit/src",
+    "profiles/jit-dogfood",
     "scripts/hooks/pre-commit",
     "scripts/hooks/pre-push",
 ];
 
+/// The binary's build inputs as a declared input set.
+///
+/// The same declaration shape a quality gate states its checker's inputs in,
+/// so one covering rule serves both questions
+/// (`@/invariant/convention-convergence`). Built once and reused; the
+/// inventory above is fixed source text, and
+/// `test_binary_build_input_inventory_ignores_unrelated_paths` fails outright
+/// if an entry stops parsing, so the `None` arm cannot ship silently.
+static BINARY_BUILD_INPUTS: std::sync::LazyLock<Option<RepositoryInputs>> =
+    std::sync::LazyLock::new(|| RepositoryInputs::parse(BINARY_BUILD_INPUT_ROOTS, &[]).ok());
+
 /// Whether `path` can affect the production `jit` binary.
 pub fn is_binary_build_input(path: &str) -> bool {
-    BINARY_BUILD_INPUTS.iter().any(|input| {
-        input.strip_suffix('/').map_or(path == *input, |prefix| {
-            path == prefix || path.starts_with(input)
-        })
-    })
+    BINARY_BUILD_INPUTS
+        .as_ref()
+        .is_some_and(|inputs| inputs.covers(path))
 }
 
 /// Whether any changed repository path can affect the production `jit`
@@ -307,6 +318,10 @@ mod tests {
 
     #[test]
     fn test_binary_build_input_inventory_ignores_unrelated_paths() {
+        assert!(
+            RepositoryInputs::parse(BINARY_BUILD_INPUT_ROOTS, &[]).is_ok(),
+            "every build-input entry must parse as a declared root"
+        );
         assert!(is_binary_build_input("Cargo.toml"));
         assert!(is_binary_build_input("crates/jit/src/main.rs"));
         assert!(is_binary_build_input("profiles/jit-dogfood/manifest.toml"));

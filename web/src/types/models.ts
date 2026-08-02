@@ -37,7 +37,15 @@ export interface GateRunSummary {
   tree_dirty?: boolean;
   by?: string;
   message?: string;
+  inputs_digest?: string;
+  origin: GateVerdictOrigin;
 }
+
+/** Where a recorded gate verdict came from: this run's own checker execution,
+ * or an earlier run over the same declared inputs, which `source_run` names. */
+export type GateVerdictOrigin =
+  | { derivation: 'executed' }
+  | { derivation: 'reused'; source_run: string };
 
 export interface GateRunDetail extends GateRunSummary {
   stdout: string;

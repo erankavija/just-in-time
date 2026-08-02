@@ -2408,7 +2408,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// ```
 /// use chrono::Utc;
 /// use jit::declarations::GateStage;
-/// use jit::domain::{GateRunResult, GateRunStatus};
+/// use jit::domain::{GateRunResult, GateRunStatus, GateVerdictOrigin};
 /// use jit::output::GateRunSummary;
 ///
 /// let run = GateRunResult {
@@ -2431,6 +2431,8 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     by: None,
 ///     message: None,
 ///     findings: None,
+///     inputs_digest: None,
+///     origin: GateVerdictOrigin::Executed,
 /// };
 /// // Lean form drops stdout/stderr for passing runs.
 /// let lean = GateRunSummary::lean(&run);
@@ -2479,6 +2481,17 @@ pub struct GateRunSummary {
     /// without re-grepping a report that a passing lean summary omits entirely.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub findings: Option<GateFindings>,
+    /// Digest of the repository files the gate declares its checker reads.
+    /// Omitted when the gate declares none. Two summaries carrying the same
+    /// value describe evaluations over identical content.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inputs_digest: Option<crate::domain::InputsDigest>,
+    /// Whether this run executed the checker (`{"derivation": "executed"}`) or
+    /// carried an earlier run's verdict
+    /// (`{"derivation": "reused", "source_run": "<run-id>"}`). A reader tallying
+    /// how many times a gate was actually verified counts the executed ones and
+    /// follows the named run for the report text behind a reused verdict.
+    pub origin: crate::domain::GateVerdictOrigin,
 }
 
 impl GateRunSummary {
@@ -2514,6 +2527,8 @@ impl GateRunSummary {
             stdout: include_output.then(|| r.stdout.clone()),
             stderr: include_output.then(|| r.stderr.clone()),
             findings: r.findings.clone(),
+            inputs_digest: r.inputs_digest.clone(),
+            origin: r.origin.clone(),
         }
     }
 }
@@ -2653,6 +2668,11 @@ pub struct GateDefinition {
     /// Checker configuration for automated gates.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checker: Option<crate::declarations::GateChecker>,
+    /// Repository files this gate's checker reads. Omitted when the gate
+    /// declares none, which is what keeps its checker executing on every
+    /// evaluation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inputs: Option<crate::domain::RepositoryInputs>,
 }
 
 impl From<crate::declarations::GateDefinition> for GateDefinition {
@@ -2666,6 +2686,7 @@ impl From<crate::declarations::GateDefinition> for GateDefinition {
             stage: gate.stage,
             mode: gate.mode,
             checker: gate.checker,
+            inputs: gate.inputs,
         }
     }
 }
@@ -2874,6 +2895,7 @@ mod tests {
             reserved: Default::default(),
             auto: true,
             example_integration: None,
+            inputs: None,
         };
 
         let encoded = serde_json::to_value(GateDefinition::from(gate)).unwrap();
@@ -3081,6 +3103,8 @@ mod tests {
             by: None,
             message: None,
             findings: None,
+            inputs_digest: None,
+            origin: crate::domain::GateVerdictOrigin::Executed,
         };
 
         let resp = IssueShowResponse::from_issue(issue, vec![], std::slice::from_ref(&run));
@@ -3824,6 +3848,7 @@ mod tests {
             stage: GateStage::Postcheck,
             mode: GateMode::Auto,
             checker: None,
+            inputs: None,
         };
         let v = serde_json::to_value(&def).unwrap();
         assert_eq!(v["stage"], "postcheck", "stage must be snake_case");
@@ -3838,6 +3863,7 @@ mod tests {
             stage: GateStage::Precheck,
             mode: GateMode::Manual,
             checker: None,
+            inputs: None,
         };
         let v2 = serde_json::to_value(&def_pre).unwrap();
         assert_eq!(v2["stage"], "precheck");
@@ -3859,6 +3885,7 @@ mod tests {
             reserved: std::collections::HashMap::new(),
             auto: true,
             example_integration: None,
+            inputs: None,
         };
         let def = GateDefinition::from(gate);
         assert_eq!(def.stage, GateStage::Postcheck);

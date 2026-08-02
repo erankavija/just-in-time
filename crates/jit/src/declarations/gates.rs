@@ -1,5 +1,6 @@
 //! Neutral authored quality-gate declarations and pure TOML preservation.
 
+use crate::domain::repository_inputs::RepositoryInputs;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -161,6 +162,17 @@ pub struct GateDefinition {
     /// Automated checker declaration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checker: Option<GateChecker>,
+    /// Repository files this gate's checker reads.
+    ///
+    /// Declaring them opts the gate into verdict reuse: an evaluation digests
+    /// the declared set and, when a prior run of this gate recorded the same
+    /// digest, takes that run's verdict instead of executing the checker
+    /// again. Declare inputs only for a checker whose verdict is a function of
+    /// those files alone — a checker scoped to one issue, or one that consults
+    /// the clock, the network, or machine state, is not, and a gate that
+    /// declares nothing executes on every evaluation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inputs: Option<RepositoryInputs>,
     /// Lower values execute first.
     #[serde(default = "default_gate_priority")]
     pub priority: u32,
@@ -172,6 +184,32 @@ pub struct GateDefinition {
     pub auto: bool,
     /// Deprecated authored field preserved during round trips.
     pub example_integration: Option<String>,
+}
+
+impl GateDefinition {
+    /// The declaration a verdict over this gate's inputs is bound to.
+    ///
+    /// A verdict is a function of two things: the content the checker reads,
+    /// and the checker itself. Digesting the input content alone would let an
+    /// edit to the checker — a changed command, timeout, working directory,
+    /// environment, or prompt — leave the digest untouched, and an evaluation
+    /// after that edit would carry a verdict the new checker never produced.
+    /// This is the second half of that key: the stage the checker runs at, the
+    /// checker declaration, and the input declaration bounding it, in a
+    /// canonical byte encoding whose map ordering does not vary between runs.
+    /// The fields left out — key, title, description, priority — cannot change
+    /// what a checker does.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the declaration cannot be encoded.
+    pub fn verdict_declaration(&self) -> Result<Vec<u8>, serde_json::Error> {
+        serde_json::to_vec(&serde_json::json!({
+            "stage": self.stage,
+            "checker": self.checker,
+            "inputs": self.inputs,
+        }))
+    }
 }
 
 fn default_gate_version() -> u32 {
@@ -265,6 +303,72 @@ mode = "manual"
         ));
     }
 
+    /// One gate declaration whose `[gates.inputs]` body is under test.
+    fn registry_with_inputs(body: &str) -> Result<GateRegistry, GateDeclarationError> {
+        parse_gate_registry(
+            format!(
+                "[[gates]]\n\
+                 key = \"workspace\"\n\
+                 title = \"Workspace\"\n\
+                 description = \"Workspace\"\n\
+                 stage = \"postcheck\"\n\
+                 mode = \"auto\"\n\
+                 \n\
+                 [gates.inputs]\n\
+                 {body}"
+            )
+            .as_bytes(),
+        )
+    }
+
+    /// REQ-01: the registry parser is where a root and an exclusion pattern are
+    /// constrained, so no consumer can be the first to discover an unusable one.
+    #[test]
+    fn test_gate_registry_parser_rejects_input_values_it_cannot_constrain() {
+        let accepted =
+            registry_with_inputs("roots = [\"crates\"]\nexclude = [\"crates/**/target/**\"]\n")
+                .expect("a declarable input set parses");
+        let inputs = accepted.gates["workspace"]
+            .inputs
+            .as_ref()
+            .expect("the parsed gate carries its declared inputs");
+        assert!(inputs.covers("crates/jit/src/lib.rs"));
+        assert!(!inputs.covers("crates/jit/target/debug/build.rs"));
+
+        for rejected in [
+            "roots = [\"/absolute\"]\n",
+            "roots = [\"../escape\"]\n",
+            "roots = []\n",
+            "roots = [\"crates\"]\nexclude = [\"[unclosed\"]\n",
+            "roots = [\"crates\"]\nexclude = [\"../escape/**\"]\n",
+            "exclude = [\"crates/**\"]\n",
+        ] {
+            assert!(
+                matches!(
+                    registry_with_inputs(rejected),
+                    Err(GateDeclarationError::Toml(_))
+                ),
+                "the registry parser accepted an unconstrained declaration: {rejected}"
+            );
+        }
+    }
+
+    /// A declared input set survives the registry's own serialize/parse round
+    /// trip, so an authored declaration is not silently dropped by a rewrite.
+    #[test]
+    fn test_gate_registry_serialization_preserves_declared_inputs() {
+        let registry = registry_with_inputs(
+            "roots = [\"docs\", \"scripts\"]\nexclude = [\"docs/drafts/**\"]\n",
+        )
+        .expect("a declarable input set parses");
+        let bytes = serialize_gate_registry(&registry).expect("the registry serializes");
+
+        assert_eq!(
+            parse_gate_registry(&bytes).expect("the rewrite parses"),
+            registry
+        );
+    }
+
     #[test]
     fn test_gate_registry_serialization_is_sorted_and_round_trips() {
         let gate = |key: &str| GateDefinition {
@@ -275,6 +379,7 @@ mode = "manual"
             stage: GateStage::Postcheck,
             mode: GateMode::Manual,
             checker: None,
+            inputs: None,
             priority: 100,
             reserved: HashMap::new(),
             auto: false,

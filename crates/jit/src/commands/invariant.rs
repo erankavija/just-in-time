@@ -98,6 +98,7 @@ mod tests {
                     reserved: std::collections::HashMap::new(),
                     auto: false,
                     example_integration: None,
+                    inputs: None,
                 },
             );
         }

@@ -267,7 +267,17 @@ mode        = "auto"
 type            = "exec"
 command         = "cargo test"
 timeout_seconds = 300
+
+[gates.inputs]
+roots   = ["Cargo.toml", "crates"]
+exclude = ["crates/*/fixtures/**"]
 ```
+
+`[gates.inputs]` is optional. It names the repository files the checker reads,
+as roots minus glob exclusions; an evaluation digests them and reuses a prior
+run's verdict over the same digest instead of executing the checker again. A
+gate that omits the table executes its checker on every evaluation. See
+[Custom Gates](../how-to/custom-gates.md#declare-the-files-a-checker-reads).
 
 ## Validation Rules Registry
 

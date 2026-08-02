@@ -13,6 +13,53 @@ use std::collections::HashMap;
 /// Maximum prompt file size in bytes (~1000 lines of 80 chars).
 const MAX_PROMPT_FILE_SIZE: u64 = 100_000;
 
+/// Where an evaluation is allowed to obtain its verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerdictSource {
+    /// Take the verdict of a prior run of this gate whose declared inputs
+    /// digest to the same value, executing the checker only when no such run
+    /// exists. A gate declaring no inputs has nothing to match, so it executes.
+    ReuseUnchangedInputs,
+    /// Execute the checker, whatever any prior run recorded.
+    Execute,
+}
+
+/// Build the record for a verdict taken from `source` rather than derived by
+/// executing a checker.
+///
+/// The verdict, the command behind it, and the checker's structured findings
+/// come from the run that produced them; the timing is this record's own, and
+/// no exit code is claimed, because no process ran here. The raw report text
+/// stays at the source run, which [`GateVerdictOrigin::Reused`] names, rather
+/// than being copied into every record that carries the verdict.
+fn reused_gate_run(source: &GateRunResult, issue_id: &str, stage: GateStage) -> GateRunResult {
+    let started_at = chrono::Utc::now();
+    GateRunResult {
+        schema_version: crate::domain::GATE_RUN_SCHEMA_VERSION,
+        // Repository mutation finalization assigns the durable run identity.
+        run_id: String::new(),
+        gate_key: source.gate_key.clone(),
+        stage,
+        issue_id: issue_id.to_string(),
+        commit: None,
+        branch: None,
+        tree_dirty: None,
+        status: source.status,
+        started_at,
+        completed_at: Some(started_at),
+        duration_ms: Some(0),
+        exit_code: None,
+        stdout: String::new(),
+        stderr: String::new(),
+        command: source.command.clone(),
+        by: Some(gate_execution::AUTO_EXECUTOR.to_string()),
+        message: None,
+        findings: source.findings.clone(),
+        inputs_digest: source.inputs_digest.clone(),
+        origin: crate::domain::GateVerdictOrigin::Reused(source.run_id.clone()),
+    }
+}
+
 pub(super) struct PrecheckExecution {
     pub(super) runs: Vec<GateRunResult>,
     pub(super) error: Option<anyhow::Error>,
@@ -894,7 +941,31 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// checker has `pass_context: true`, builds structured context (issue data,
     /// gate definition, prompt, run history) and passes it to the checker
     /// process via a temp file.
+    ///
+    /// Equivalent to [`check_gate_with`](Self::check_gate_with) under
+    /// [`VerdictSource::ReuseUnchangedInputs`]: a gate declaring inputs whose
+    /// digest a prior run of that gate already recorded takes that run's
+    /// verdict instead of executing its checker again.
     pub fn check_gate(&self, issue_id: &str, gate_key: &str) -> Result<GateRunResult>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        self.check_gate_with(issue_id, gate_key, VerdictSource::ReuseUnchangedInputs)
+    }
+
+    /// Check a single gate, choosing whether a recorded verdict may stand in
+    /// for executing the checker.
+    ///
+    /// See [`check_gate`](Self::check_gate) for what an evaluation does;
+    /// `source` governs only whether reuse is considered.
+    /// [`VerdictSource::Execute`] runs the checker whatever any prior run
+    /// recorded, which is what an explicit re-run request asks for.
+    pub fn check_gate_with(
+        &self,
+        issue_id: &str,
+        gate_key: &str,
+        source: VerdictSource,
+    ) -> Result<GateRunResult>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -957,15 +1028,29 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .gates
                     .get(gate_key)
                     .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
-                let result = self.execute_captured_gate(CapturedGateExecution {
-                    image: &image,
-                    issue: &issue,
-                    issues: &issues,
-                    gate_key,
-                    gate,
-                    runs: &runs.results,
-                    prompt: captured.prompt.as_deref(),
-                })?;
+                // Digest the declared inputs BEFORE the checker runs: the value
+                // must name the content the verdict was derived over, not what
+                // the checker left behind.
+                let digest = self.declared_inputs_digest(gate)?;
+                let reused = match (source, digest.as_ref()) {
+                    (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
+                        self.reusable_verdict(gate_key, digest)?
+                    }
+                    _ => None,
+                };
+                let mut result = match reused {
+                    Some(source_run) => reused_gate_run(&source_run, &issue.id, gate.stage),
+                    None => self.execute_captured_gate(CapturedGateExecution {
+                        image: &image,
+                        issue: &issue,
+                        issues: &issues,
+                        gate_key,
+                        gate,
+                        runs: &runs.results,
+                        prompt: captured.prompt.as_deref(),
+                    })?,
+                };
+                result.inputs_digest = digest;
                 cached = Some(CachedGateEvaluation {
                     evidence: captured.evidence.clone(),
                     result,
@@ -1034,6 +1119,47 @@ impl<S: IssueStore> CommandExecutor<S> {
             result.run_id = run_id.clone();
             Ok(AttemptOutcome::Done(result))
         })
+    }
+
+    /// Digest the repository files `gate` declares its checker reads.
+    ///
+    /// The digest is bound to the gate's own declaration
+    /// ([`GateDefinition::verdict_declaration`](crate::declarations::GateDefinition::verdict_declaration)),
+    /// so an edit to the checker yields a different digest over identical
+    /// files and cannot inherit a verdict the edited checker never produced.
+    ///
+    /// `None` when the gate declares no inputs — the case that keeps a checker
+    /// whose verdict is not a function of repository content running every
+    /// time — or when this executor is not rooted at a real worktree, where
+    /// there is no content to digest and so nothing a later run could prove
+    /// identical.
+    fn declared_inputs_digest(
+        &self,
+        gate: &crate::declarations::GateDefinition,
+    ) -> Result<Option<crate::domain::InputsDigest>> {
+        let (Some(inputs), Some(root)) = (gate.inputs.as_ref(), self.real_repo_root()) else {
+            return Ok(None);
+        };
+        let declaration = gate
+            .verdict_declaration()
+            .context("Failed to encode the gate declaration the digest is bound to")?;
+        gate_execution::digest_declared_inputs(&root, inputs, &declaration).map(Some)
+    }
+
+    /// The recorded run whose verdict an evaluation of `gate_key` over inputs
+    /// digesting to `digest` may carry, or `None` when no such run exists.
+    ///
+    /// Only a run that executed its checker is a source, so a reused record
+    /// always names the execution behind its verdict rather than another
+    /// reference to it. Only a pass or a failure is carried: a run that errored
+    /// reports the checker never reaching a verdict — a timeout, a missing
+    /// command — which says nothing about the inputs and may not repeat.
+    fn reusable_verdict(
+        &self,
+        gate_key: &str,
+        digest: &crate::domain::InputsDigest,
+    ) -> Result<Option<GateRunResult>> {
+        self.storage.find_reusable_gate_run(gate_key, digest)
     }
 
     /// Execute a built-in checker against one exact repository image.
@@ -1211,6 +1337,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 summary,
                 findings,
             }),
+            // Stamped by the evaluator, which holds the gate declaration the
+            // digest is taken over.
+            inputs_digest: None,
+            origin: crate::domain::GateVerdictOrigin::Executed,
         })
     }
 
@@ -1618,6 +1748,7 @@ mod tests {
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -1669,6 +1800,8 @@ enforce_leases = "off"
             by: Some("agent:reviewer".to_string()),
             message: Some("review complete".to_string()),
             findings,
+            inputs_digest: None,
+            origin: crate::domain::GateVerdictOrigin::Executed,
         }
     }
 
@@ -1788,6 +1921,7 @@ enforce_leases = "off"
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -1977,6 +2111,415 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .add_gate(&issue_id, "not-a-reserved-repository-key".to_string())
             .unwrap();
         (repo, executor, issue_id)
+    }
+
+    /// A file-backed repository whose declared gate inputs live under
+    /// `workspace/`, with an `exec` checker that appends one byte per execution
+    /// to a log OUTSIDE every declared root — so executions can be counted
+    /// without the counting itself changing the digest.
+    struct ReuseFixture {
+        repo: tempfile::TempDir,
+        executor: CommandExecutor<JsonFileStorage>,
+        gate_key: String,
+    }
+
+    impl ReuseFixture {
+        /// `roots`/`exclude` are the gate's declared inputs; `None` declares
+        /// none. `verdict_exit` is the checker's exit status.
+        fn new(declaration: Option<(&[&str], &[&str])>, verdict_exit: u8) -> Self {
+            let repo = tempfile::tempdir().expect("a temp repository");
+            let storage = JsonFileStorage::new(repo.path().join(".jit"));
+            let taxonomy = crate::test_taxonomy::test_taxonomy();
+            std::fs::create_dir_all(storage.root()).expect("create data root");
+            std::fs::write(
+                storage.root().join("config.toml"),
+                format!(
+                    "[worktree]\nenforce_leases = \"off\"\n\n{}",
+                    taxonomy.config_fragment()
+                ),
+            )
+            .expect("write config");
+            let layout = crate::storage::discover_repository_layout(repo.path(), storage.root())
+                .expect("a repository layout");
+            let executor = CommandExecutor::new(storage).with_layout(layout);
+            executor
+                .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+                .expect("a fresh repository");
+
+            std::fs::create_dir_all(repo.path().join("workspace/src")).expect("create workspace");
+            std::fs::write(repo.path().join("workspace/src/lib.rs"), "fn main() {}\n")
+                .expect("write source");
+            std::fs::write(repo.path().join("elsewhere.txt"), "unread\n").expect("write outsider");
+
+            let gate_key = "workspace-check".to_string();
+            let log = repo.path().join("executions.log");
+            let mut registry = executor
+                .storage
+                .load_gate_registry()
+                .expect("the seeded registry");
+            registry.gates.insert(
+                gate_key.clone(),
+                crate::declarations::GateDefinition {
+                    version: 1,
+                    key: gate_key.clone(),
+                    title: "Workspace check".to_string(),
+                    description: "Workspace check".to_string(),
+                    stage: GateStage::Postcheck,
+                    mode: GateMode::Auto,
+                    checker: Some(GateChecker::Exec {
+                        command: format!(
+                            "printf x >> '{}'; exit {verdict_exit}",
+                            log.to_string_lossy()
+                        ),
+                        timeout_seconds: 30,
+                        working_dir: None,
+                        env: HashMap::new(),
+                        pass_context: false,
+                        prompt: None,
+                        prompt_file: None,
+                    }),
+                    inputs: declaration.map(|(roots, exclude)| {
+                        crate::domain::RepositoryInputs::parse(roots, exclude)
+                            .expect("a declarable input set")
+                    }),
+                    priority: 100,
+                    reserved: HashMap::new(),
+                    auto: true,
+                    example_integration: None,
+                },
+            );
+            let bytes = crate::declarations::serialize_gate_registry(&registry)
+                .expect("the registry serializes");
+            std::fs::write(repo.path().join(".jit/gates.toml"), bytes).expect("write registry");
+
+            Self {
+                repo,
+                executor,
+                gate_key,
+            }
+        }
+
+        /// A new issue requiring the gate under test.
+        fn issue(&self) -> String {
+            let taxonomy = crate::test_taxonomy::test_taxonomy();
+            let (issue_id, _) = self
+                .executor
+                .create_issue(
+                    "Test".to_string(),
+                    "Test".to_string(),
+                    crate::domain::Priority::Normal,
+                    Vec::new(),
+                    vec![format!("type:{}", taxonomy.type_at_level(4))],
+                    None,
+                    None,
+                    false,
+                )
+                .expect("an issue");
+            self.executor
+                .add_gate(&issue_id, self.gate_key.clone())
+                .expect("the gate is required");
+            issue_id
+        }
+
+        fn evaluate(&self, issue_id: &str) -> GateRunResult {
+            self.executor
+                .check_gate(issue_id, &self.gate_key)
+                .expect("the gate evaluates")
+        }
+
+        /// How many times the checker process has run.
+        fn executions(&self) -> usize {
+            std::fs::read(self.repo.path().join("executions.log"))
+                .map(|bytes| bytes.len())
+                .unwrap_or(0)
+        }
+
+        fn write(&self, relative: &str, contents: &str) {
+            let path = self.repo.path().join(relative);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).expect("create parent");
+            }
+            std::fs::write(path, contents).expect("write file");
+        }
+
+        fn remove(&self, relative: &str) {
+            std::fs::remove_file(self.repo.path().join(relative)).expect("remove file");
+        }
+
+        /// Replace the gate's checker command, leaving its declared inputs and
+        /// every repository file alone.
+        fn rewrite_checker_command(&self, command: &str) {
+            let mut registry = self
+                .executor
+                .storage
+                .load_gate_registry()
+                .expect("the registry loads");
+            let gate = registry
+                .gates
+                .get_mut(&self.gate_key)
+                .expect("the gate under test is registered");
+            gate.checker = Some(GateChecker::Exec {
+                command: command.to_string(),
+                timeout_seconds: 30,
+                working_dir: None,
+                env: HashMap::new(),
+                pass_context: false,
+                prompt: None,
+                prompt_file: None,
+            });
+            let bytes = crate::declarations::serialize_gate_registry(&registry)
+                .expect("the registry serializes");
+            std::fs::write(self.repo.path().join(".jit/gates.toml"), bytes)
+                .expect("write registry");
+        }
+    }
+
+    /// REQ-03/REQ-04: a second issue's evaluation over an unchanged declared
+    /// input set carries the first run's verdict, names it, and never reaches
+    /// the checker.
+    #[test]
+    fn test_check_gate_reuses_a_recorded_verdict_over_identical_declared_inputs() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let first_issue = fixture.issue();
+        let second_issue = fixture.issue();
+
+        let executed = fixture.evaluate(&first_issue);
+        let reused = fixture.evaluate(&second_issue);
+
+        assert_eq!(fixture.executions(), 1, "the checker must run exactly once");
+        assert!(executed.origin.is_executed());
+        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+        assert_eq!(reused.status, executed.status);
+        assert_eq!(reused.inputs_digest, executed.inputs_digest);
+        assert!(
+            executed.inputs_digest.is_some(),
+            "a gate declaring inputs must record their digest"
+        );
+        // Each issue carries its own record of the gate's outcome.
+        assert_eq!(reused.issue_id, second_issue);
+        assert_ne!(reused.run_id, executed.run_id);
+    }
+
+    /// REQ-04: a reused verdict carries the source run's status whether it
+    /// passed or failed — a recorded failure is not quietly dropped.
+    #[test]
+    fn test_check_gate_reuses_a_recorded_failure_and_names_its_run() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 1);
+        let first_issue = fixture.issue();
+        let second_issue = fixture.issue();
+
+        let executed = fixture.evaluate(&first_issue);
+        let reused = fixture.evaluate(&second_issue);
+
+        assert_eq!(executed.status, GateRunStatus::Failed);
+        assert_eq!(fixture.executions(), 1);
+        assert_eq!(reused.status, GateRunStatus::Failed);
+        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+    }
+
+    /// REQ-06: an edit, an addition, and a removal beneath a declared root each
+    /// change the digest, so the next evaluation executes the checker.
+    #[test]
+    fn test_check_gate_executes_again_after_declared_inputs_change() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let first = fixture.evaluate(&fixture.issue());
+        assert_eq!(fixture.executions(), 1);
+
+        fixture.write("workspace/src/lib.rs", "fn main() { /* edited */ }\n");
+        let after_edit = fixture.evaluate(&fixture.issue());
+        assert_eq!(fixture.executions(), 2, "an edited input must re-execute");
+        assert!(after_edit.origin.is_executed());
+        assert_ne!(after_edit.inputs_digest, first.inputs_digest);
+
+        fixture.write("workspace/src/added.rs", "fn added() {}\n");
+        let after_add = fixture.evaluate(&fixture.issue());
+        assert_eq!(fixture.executions(), 3, "an added input must re-execute");
+        assert_ne!(after_add.inputs_digest, after_edit.inputs_digest);
+
+        fixture.remove("workspace/src/lib.rs");
+        let after_remove = fixture.evaluate(&fixture.issue());
+        assert_eq!(fixture.executions(), 4, "a removed input must re-execute");
+        assert_ne!(after_remove.inputs_digest, after_add.inputs_digest);
+    }
+
+    /// Restoring an input set a checker has already been run over reuses that
+    /// run: the digest identifies content, not the sequence of edits that
+    /// produced it.
+    #[test]
+    fn test_check_gate_reuses_after_declared_inputs_return_to_a_verified_state() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let original = fixture.evaluate(&fixture.issue());
+
+        fixture.write("workspace/src/lib.rs", "fn main() { /* edited */ }\n");
+        fixture.evaluate(&fixture.issue());
+        assert_eq!(fixture.executions(), 2);
+
+        fixture.write("workspace/src/lib.rs", "fn main() {}\n");
+        let restored = fixture.evaluate(&fixture.issue());
+
+        assert_eq!(fixture.executions(), 2, "the restored content was verified");
+        assert_eq!(restored.inputs_digest, original.inputs_digest);
+        assert_eq!(restored.origin.source_run(), Some(original.run_id.as_str()));
+    }
+
+    /// REQ-07: a change to a file no declared root covers leaves the digest
+    /// alone, so the next evaluation reuses instead of re-executing.
+    #[test]
+    fn test_check_gate_reuses_after_a_change_no_declared_root_covers() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let executed = fixture.evaluate(&fixture.issue());
+
+        fixture.write("elsewhere.txt", "rewritten\n");
+        let reused = fixture.evaluate(&fixture.issue());
+
+        assert_eq!(fixture.executions(), 1);
+        assert_eq!(reused.inputs_digest, executed.inputs_digest);
+        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+    }
+
+    /// REQ-07: an excluded path beneath a declared root is outside the set too,
+    /// so changing it reuses.
+    #[test]
+    fn test_check_gate_reuses_after_a_change_a_declared_exclusion_matches() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &["workspace/notes/**"])), 0);
+        fixture.write("workspace/notes/scratch.md", "before\n");
+        let executed = fixture.evaluate(&fixture.issue());
+
+        fixture.write("workspace/notes/scratch.md", "after\n");
+        let reused = fixture.evaluate(&fixture.issue());
+
+        assert_eq!(fixture.executions(), 1);
+        assert_eq!(reused.origin.source_run(), Some(executed.run_id.as_str()));
+    }
+
+    /// REQ-08: a gate declaring no inputs has nothing to prove unchanged, so
+    /// every evaluation executes its checker and records no digest.
+    #[test]
+    fn test_check_gate_executes_every_time_for_a_gate_declaring_no_inputs() {
+        let fixture = ReuseFixture::new(None, 0);
+
+        let first = fixture.evaluate(&fixture.issue());
+        let second = fixture.evaluate(&fixture.issue());
+
+        assert_eq!(fixture.executions(), 2);
+        assert!(first.inputs_digest.is_none());
+        assert!(second.origin.is_executed());
+    }
+
+    /// REQ-08: an explicit re-run request executes the checker even where the
+    /// declared inputs would otherwise license reuse.
+    #[test]
+    fn test_check_gate_with_execute_source_ignores_a_reusable_verdict() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let executed = fixture.evaluate(&fixture.issue());
+
+        let forced = fixture
+            .executor
+            .check_gate_with(
+                &fixture.issue(),
+                &fixture.gate_key,
+                super::VerdictSource::Execute,
+            )
+            .expect("the forced evaluation runs");
+
+        assert_eq!(fixture.executions(), 2);
+        assert!(forced.origin.is_executed());
+        assert_eq!(
+            forced.inputs_digest, executed.inputs_digest,
+            "a forced run still records the digest it was derived over"
+        );
+    }
+
+    /// REQ-09: a wave of issues evaluated over one unchanged source state
+    /// executes the checker once, and every other issue's record names that one
+    /// run rather than claiming a verification of its own.
+    #[test]
+    fn test_check_gate_executes_once_across_a_wave_over_one_unchanged_tree() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let wave: Vec<GateRunResult> = (0..5).map(|_| fixture.evaluate(&fixture.issue())).collect();
+
+        assert_eq!(fixture.executions(), 1);
+        let executed: Vec<&GateRunResult> =
+            wave.iter().filter(|run| run.origin.is_executed()).collect();
+        assert_eq!(executed.len(), 1, "one checker execution across the wave");
+        assert!(
+            wave.iter()
+                .filter(|run| !run.origin.is_executed())
+                .all(|run| run.origin.source_run() == Some(executed[0].run_id.as_str())),
+            "every reused record must name the one run that executed"
+        );
+        assert!(
+            wave.iter().all(|run| run.status == GateRunStatus::Passed),
+            "every issue in the wave still reports the gate's verdict"
+        );
+    }
+
+    /// A run that errored reached no verdict about the inputs, so it is never
+    /// reused: the next evaluation executes the checker again.
+    #[test]
+    fn test_check_gate_never_reuses_a_run_that_errored() {
+        // Exit 127 is the shell's "command not found": a runner error, not a
+        // checker verdict.
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 127);
+
+        let errored = fixture.evaluate(&fixture.issue());
+        let retried = fixture.evaluate(&fixture.issue());
+
+        assert_eq!(errored.status, GateRunStatus::Error);
+        assert_eq!(fixture.executions(), 2, "an errored run must not be reused");
+        assert!(retried.origin.is_executed());
+    }
+
+    /// A verdict is a function of the checker as well as its inputs: editing
+    /// the checker over an unchanged tree executes rather than inheriting a
+    /// verdict the edited checker never produced.
+    #[test]
+    fn test_check_gate_executes_again_after_the_checker_declaration_changes() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let before = fixture.evaluate(&fixture.issue());
+
+        fixture.rewrite_checker_command(&format!(
+            "printf xx >> '{}'; exit 0",
+            fixture.repo.path().join("executions.log").to_string_lossy()
+        ));
+        let after = fixture.evaluate(&fixture.issue());
+
+        assert_eq!(
+            fixture.executions(),
+            3,
+            "the edited checker must run rather than inherit the old verdict"
+        );
+        assert!(after.origin.is_executed());
+        assert_ne!(after.inputs_digest, before.inputs_digest);
+    }
+
+    /// REQ-05: the machine-readable status of a reused verdict is
+    /// distinguishable from a derived one and names the run behind it.
+    #[test]
+    fn test_gate_run_summary_distinguishes_a_reused_verdict_from_a_derived_one() {
+        let fixture = ReuseFixture::new(Some((&["workspace"], &[])), 0);
+        let executed = fixture.evaluate(&fixture.issue());
+        let reused = fixture.evaluate(&fixture.issue());
+
+        let rendered = |run: &GateRunResult| {
+            serde_json::to_value(crate::output::GateRunSummary::lean(run))
+                .expect("the summary serializes")
+        };
+        let executed_json = rendered(&executed);
+        let reused_json = rendered(&reused);
+
+        assert_ne!(
+            executed_json["origin"], reused_json["origin"],
+            "the two derivations must not read identically"
+        );
+        assert!(
+            reused_json["origin"].to_string().contains(&executed.run_id),
+            "the reused summary must name the run it was taken from: {reused_json}"
+        );
+        assert_eq!(
+            executed_json["inputs_digest"], reused_json["inputs_digest"],
+            "both summaries describe the same declared input content"
+        );
     }
 
     fn add_exec_gate<S: IssueStore + crate::storage::RepositoryStateStore>(
@@ -2407,6 +2950,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -2451,6 +2995,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -2498,6 +3043,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         registry.gates.insert(
@@ -2514,6 +3060,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: false,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -2597,6 +3144,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     reserved: HashMap::new(),
                     auto: true,
                     example_integration: None,
+                    inputs: None,
                 },
             );
         }
@@ -2674,6 +3222,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         registry.gates.insert(
@@ -2698,6 +3247,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -2855,6 +3405,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -2900,6 +3451,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -2951,6 +3503,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3005,6 +3558,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3059,6 +3613,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3135,6 +3690,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3519,6 +4075,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3592,6 +4149,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3639,6 +4197,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3695,6 +4254,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3742,6 +4302,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3789,6 +4350,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3853,6 +4415,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3923,6 +4486,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 reserved: HashMap::new(),
                 auto: true,
                 example_integration: None,
+                inputs: None,
             },
         );
         seed_gate_registry(executor.storage(), &registry);
@@ -3972,6 +4536,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     reserved: HashMap::new(),
                     auto: true,
                     example_integration: None,
+                    inputs: None,
                 },
             );
         }
@@ -4033,6 +4598,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                     reserved: HashMap::new(),
                     auto: true,
                     example_integration: None,
+                    inputs: None,
                 },
             );
         }
@@ -4098,6 +4664,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             reserved: HashMap::new(),
             auto: true,
             example_integration: None,
+            inputs: None,
         }
     }
 

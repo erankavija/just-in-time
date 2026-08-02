@@ -99,6 +99,11 @@ its coupled issue and event updates.
         ]
       }
     ]
+  },
+  "inputs_digest": "105438fba9bc6384d757de31311105b5ea4839a5d519b14fcf59af7307567ef4",
+  "origin": {
+    "derivation": "reused",
+    "source_run": "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34"
   }
 }
 ```
@@ -116,9 +121,9 @@ a `null` one alike.
 | `gate_key` | always | Key of the gate that ran, as registered in `.jit/gates.toml`. |
 | `stage` | always | Stage the gate ran at: `precheck` or `postcheck`. |
 | `issue_id` | always | Full id of the issue the run is about. An issue's runs are selected by matching this field across the run directories, so `gate-runs/` is flat rather than nested per issue. |
-| `commit` | `null` when unset | Git commit the run was taken at, when the working directory is a git repository. |
-| `branch` | `null` when unset | Git branch the run was taken on, when the working directory is a git repository. |
-| `tree_dirty` | `null` when unset | Whether the working tree differed from `commit` when the checker started: `true` if it carried uncommitted or untracked changes, `false` if it matched the commit exactly. A `true` run evidences that modified tree rather than the commit alone. `null` when no cleanliness value provably describes the recorded commit: there was no commit to compare against (not a git repository, or no commits yet), or `HEAD` moved through every paired probe attempt while the evidence was being taken, so the tree state is recorded as unknown rather than paired with a commit it might not describe. |
+| `commit` | `null` when unset | Git commit the checker was launched at, when the working directory is a git repository. Unset for a run that launched no checker: a verdict taken from an earlier run ran at no commit of its own, and `origin` names the run that carries one. |
+| `branch` | `null` when unset | Git branch the checker was launched on, under the same conditions as `commit`. |
+| `tree_dirty` | `null` when unset | Whether the working tree differed from `commit` when the checker started: `true` if it carried uncommitted or untracked changes, `false` if it matched the commit exactly. A `true` run evidences that modified tree rather than the commit alone. `null` when no cleanliness value provably describes the recorded commit: there was no commit to compare against (not a git repository, no commits yet, or no checker launched), or `HEAD` moved through every paired probe attempt while the evidence was being taken, so the tree state is recorded as unknown rather than paired with a commit it might not describe. |
 | `status` | always | The run's verdict: `passed`, `failed`, `error`, `pending`, or `skipped`. For an executed checker the exit code decides it — `0` passes; a shell that could not run the command (`126`, `127`) and a checker killed by a signal or by its timeout are an `error`; any other code fails. |
 | `started_at` | always | RFC 3339 timestamp taken before the checker is launched. |
 | `completed_at` | `null` when unset | RFC 3339 timestamp taken once the checker has returned. |
@@ -130,3 +135,5 @@ a `null` one alike.
 | `by` | `null` when unset | Who triggered the run. |
 | `message` | `null` when unset | Free-text note attached to the run. |
 | `findings` | omitted when unset | Structured findings parsed from the checker's machine-readable block, carrying the checker's `verdict`, a `summary`, and the `findings` array. Each finding may carry an optional `references` array of opaque strings; it is omitted when empty. Unset when the checker emitted no such block; the raw `stdout` is kept either way. `jit gate status --findings` prints this field. |
+| `inputs_digest` | omitted when unset | Digest of the repository files the gate declares its checker reads, taken before the verdict was obtained. Two runs of one gate carrying the same value read byte-identical content at byte-identical paths. Unset when the gate declares no inputs, which is what keeps its checker running on every evaluation. |
+| `origin` | always | Where the verdict came from. `{"derivation": "executed"}` means this run ran the checker; `{"derivation": "reused", "source_run": "<run-id>"}` means it carries the named earlier run's verdict, whose `inputs_digest` matched, without the checker running again. The report text behind a reused verdict lives at the named run. |

@@ -38,6 +38,50 @@ pass_context = false
 
 [gates.checker.env]
 
+# Inputs: the whole tracked repository surface, minus the tracker's own
+# records. The Rust suites this gate runs read the repository itself —
+# the profile package's live-source conformance walks the worktree, the
+# build-provenance fixture seeds from every repository input, and the
+# documentation projections compare against docs/ — so the footprint is
+# the tree, not the workspace alone. The issue records, event log, run
+# records and index are excluded: nothing this gate runs opens them, and
+# every evaluation rewrites them.
+[gates.inputs]
+roots = [
+  ".agents",
+  ".dockerignore",
+  ".github",
+  ".gitattributes",
+  ".gitignore",
+  ".jit",
+  "AGENTS.md",
+  "CHANGELOG.md",
+  "CLAUDE.md",
+  "Cargo.lock",
+  "Cargo.toml",
+  "Dockerfile",
+  "INSTALL.md",
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "README.md",
+  "contrib",
+  "crates",
+  "dev",
+  "docker-compose.yml",
+  "docs",
+  "mcp-server",
+  "profiles",
+  "scripts",
+  "test-vectors",
+  "web",
+]
+exclude = [
+  ".jit/events.jsonl",
+  ".jit/gate-runs/**",
+  ".jit/index.json",
+  ".jit/issues/**",
+]
+
 [gates.reserved]
 
 [[gates]]
@@ -58,6 +102,45 @@ pass_context = false
 
 [gates.checker.env]
 
+# Inputs: the same tree-wide footprint as cargo-ci — the feature-enabled
+# run compiles and tests the same crate over the same repository.
+# See the cargo-ci declaration for why the footprint is the tree.
+[gates.inputs]
+roots = [
+  ".agents",
+  ".dockerignore",
+  ".github",
+  ".gitattributes",
+  ".gitignore",
+  ".jit",
+  "AGENTS.md",
+  "CHANGELOG.md",
+  "CLAUDE.md",
+  "Cargo.lock",
+  "Cargo.toml",
+  "Dockerfile",
+  "INSTALL.md",
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "README.md",
+  "contrib",
+  "crates",
+  "dev",
+  "docker-compose.yml",
+  "docs",
+  "mcp-server",
+  "profiles",
+  "scripts",
+  "test-vectors",
+  "web",
+]
+exclude = [
+  ".jit/events.jsonl",
+  ".jit/gate-runs/**",
+  ".jit/index.json",
+  ".jit/issues/**",
+]
+
 [gates.reserved]
 
 [[gates]]
@@ -77,6 +160,19 @@ timeout_seconds = 120
 pass_context = false
 
 [gates.checker.env]
+
+# Inputs: the compilation inputs of the jit library — the workspace
+# manifests and sources, plus the profile package and hook files
+# production code embeds.
+[gates.inputs]
+roots = [
+  "Cargo.lock",
+  "Cargo.toml",
+  "crates",
+  "profiles",
+  "scripts/hooks",
+]
+exclude = []
 
 [gates.reserved]
 
@@ -186,6 +282,47 @@ pass_context = false
 # citation scanning and archival permanence are separate configured contracts.
 DOCS_FOOTPRINT = "docs/"
 
+# Inputs: the tree-wide footprint. The citation checker scans every
+# tracked file and resolves `@/` items through the repository's
+# registries; the projection checker re-renders through a jit binary
+# built from the workspace. The tracker's records are excluded: no
+# checker here opens them, and every evaluation rewrites them.
+[gates.inputs]
+roots = [
+  ".agents",
+  ".dockerignore",
+  ".github",
+  ".gitattributes",
+  ".gitignore",
+  ".jit",
+  "AGENTS.md",
+  "CHANGELOG.md",
+  "CLAUDE.md",
+  "Cargo.lock",
+  "Cargo.toml",
+  "Dockerfile",
+  "INSTALL.md",
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "README.md",
+  "contrib",
+  "crates",
+  "dev",
+  "docker-compose.yml",
+  "docs",
+  "mcp-server",
+  "profiles",
+  "scripts",
+  "test-vectors",
+  "web",
+]
+exclude = [
+  ".jit/events.jsonl",
+  ".jit/gate-runs/**",
+  ".jit/index.json",
+  ".jit/issues/**",
+]
+
 [gates.reserved]
 
 [[gates]]
@@ -205,6 +342,15 @@ timeout_seconds = 30
 pass_context = false
 
 [gates.checker.env]
+
+# Inputs: the Rust sources the formatter reads, and the manifest it
+# resolves the workspace targets through.
+[gates.inputs]
+roots = [
+  "Cargo.toml",
+  "crates",
+]
+exclude = []
 
 [gates.reserved]
 
@@ -268,6 +414,19 @@ pass_context = false
 
 [gates.checker.env]
 
+# Inputs: the bridge workspace, plus the sources of the jit binary its
+# suite generates the tool schema from (it resolves `jit` from PATH).
+[gates.inputs]
+roots = [
+  "Cargo.lock",
+  "Cargo.toml",
+  "crates",
+  "mcp-server",
+  "profiles",
+  "scripts/hooks",
+]
+exclude = []
+
 [gates.reserved]
 
 [[gates]]
@@ -287,6 +446,14 @@ timeout_seconds = 600
 pass_context = false
 
 [gates.checker.env]
+
+# Inputs: the web workspace, which is the whole of what this gate
+# tests, lints and builds.
+[gates.inputs]
+roots = [
+  "web",
+]
+exclude = []
 
 [gates.reserved]
 
@@ -350,6 +517,41 @@ pass_context = false
 
 [gates.checker.env]
 
+# Inputs: every tracked file, the tracker's own records included —
+# scripts/secret-scan.sh copies the working-tree version of all of
+# them into the scan. Nothing is excluded, so a secret committed to an
+# issue record is a finding rather than a path outside the digest.
+[gates.inputs]
+roots = [
+  ".agents",
+  ".dockerignore",
+  ".github",
+  ".gitattributes",
+  ".gitignore",
+  ".jit",
+  "AGENTS.md",
+  "CHANGELOG.md",
+  "CLAUDE.md",
+  "Cargo.lock",
+  "Cargo.toml",
+  "Dockerfile",
+  "INSTALL.md",
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "README.md",
+  "contrib",
+  "crates",
+  "dev",
+  "docker-compose.yml",
+  "docs",
+  "mcp-server",
+  "profiles",
+  "scripts",
+  "test-vectors",
+  "web",
+]
+exclude = []
+
 [gates.reserved]
 
 [[gates]]
@@ -393,5 +595,44 @@ timeout_seconds = 300
 pass_context = false
 
 [gates.checker.env]
+
+# Inputs: the tree-wide footprint. `cargo test --lib` reaches the same
+# repository-walking suites cargo-ci does (profile live sources,
+# documentation projections, the repository's own registries).
+[gates.inputs]
+roots = [
+  ".agents",
+  ".dockerignore",
+  ".github",
+  ".gitattributes",
+  ".gitignore",
+  ".jit",
+  "AGENTS.md",
+  "CHANGELOG.md",
+  "CLAUDE.md",
+  "Cargo.lock",
+  "Cargo.toml",
+  "Dockerfile",
+  "INSTALL.md",
+  "LICENSE-APACHE",
+  "LICENSE-MIT",
+  "README.md",
+  "contrib",
+  "crates",
+  "dev",
+  "docker-compose.yml",
+  "docs",
+  "mcp-server",
+  "profiles",
+  "scripts",
+  "test-vectors",
+  "web",
+]
+exclude = [
+  ".jit/events.jsonl",
+  ".jit/gate-runs/**",
+  ".jit/index.json",
+  ".jit/issues/**",
+]
 
 [gates.reserved]
