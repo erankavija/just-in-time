@@ -2374,15 +2374,22 @@ fn run() -> Result<()> {
                                 let output = JsonOutput::success(&applied);
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                let status = match applied.status {
-                                    jit::profile::ProfileApplicationStatus::Unchanged => {
-                                        "unchanged"
+                                for profile in applied.profiles {
+                                    let status = match profile.status {
+                                        jit::profile::ProfileApplicationStatus::Unchanged => {
+                                            "unchanged"
+                                        }
+                                        jit::profile::ProfileApplicationStatus::Applied => {
+                                            "applied"
+                                        }
+                                    };
+                                    println!(
+                                        "Profile {} {}: {}",
+                                        profile.id, profile.version, status
+                                    );
+                                    for warning in profile.warnings {
+                                        eprintln!("Warning: {:?}", warning);
                                     }
-                                    jit::profile::ProfileApplicationStatus::Applied => "applied",
-                                };
-                                println!("Profile {} {}: {}", applied.id, applied.version, status);
-                                for warning in applied.warnings {
-                                    eprintln!("Warning: {:?}", warning);
                                 }
                             }
                         }

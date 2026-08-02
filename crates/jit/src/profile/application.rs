@@ -46,6 +46,41 @@ pub struct ProfileApplyResult {
     pub warnings: Vec<ProfileApplicationWarning>,
 }
 
+/// Result of applying one package together with the packages it depends on.
+///
+/// A package that declares a dependency is applied as a set: every package the
+/// closure resolves to is applied in its own right, with its own provenance
+/// record and its own audit event, so [`Self::profiles`] carries one entry per
+/// applied package rather than one summary over them. The order is the order
+/// they were applied — each package after everything it depends on — which puts
+/// the package the caller named last ([`Self::requested`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileComposedApplyResult {
+    /// Number of results in [`Self::profiles`].
+    pub count: usize,
+    /// One result per applied package, dependencies before their dependants.
+    pub profiles: Vec<ProfileApplyResult>,
+}
+
+impl ProfileComposedApplyResult {
+    /// Collect per-package results into the composed answer.
+    pub(crate) fn new(profiles: Vec<ProfileApplyResult>) -> Self {
+        Self {
+            count: profiles.len(),
+            profiles,
+        }
+    }
+
+    /// The result for the package the caller named.
+    ///
+    /// `None` only for an empty composition, which application does not
+    /// produce: the named package is always applied, after everything it
+    /// depends on.
+    pub fn requested(&self) -> Option<&ProfileApplyResult> {
+        self.profiles.last()
+    }
+}
+
 /// One profile exposed by `jit profile list`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileSummary {

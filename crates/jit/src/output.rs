@@ -1300,8 +1300,9 @@ pub struct InitResponse {
     pub created_paths: Vec<String>,
     /// Existing files modified by this run.
     pub modified_paths: Vec<String>,
-    /// Applied profile result when initialization included one.
-    pub profile: Option<crate::profile::ProfileApplyResult>,
+    /// Applied profile results when initialization included a profile, one per
+    /// package of its dependency closure.
+    pub profile: Option<crate::profile::ProfileComposedApplyResult>,
 }
 
 /// Response for `status` command

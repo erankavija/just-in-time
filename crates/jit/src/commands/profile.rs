@@ -1,9 +1,9 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
     build_profile_claims, jit_dogfood_package, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError, ProfilePackageSource,
-    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileComposedApplyResult, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
+    ProfilePackageError, ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus,
+    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -69,6 +69,38 @@ pub enum ProfileResolutionError {
         record: String,
         /// Profile the record names.
         id: String,
+    },
+}
+
+/// Failure composing the set of packages one application applies.
+///
+/// Both variants are raised while the closure is still being built, before the
+/// first package is applied, so a repository never carries part of a set it
+/// could not compose.
+#[derive(Debug, thiserror::Error)]
+pub enum ProfileDependencyError {
+    /// A declared dependency resolves through no route.
+    ///
+    /// The declaring package is named beside it because an adopter asked for
+    /// that one: a bare failure over the dependency would name a package they
+    /// never installed by name.
+    #[error(
+        "profile '{package}' declares a dependency on profile '{dependency}', \
+         which cannot be resolved: {cause:#}"
+    )]
+    UnresolvableDependency {
+        /// Package whose manifest declares the dependency.
+        package: String,
+        /// Dependency that manifest names.
+        dependency: String,
+        /// Why every resolution route refused it.
+        cause: anyhow::Error,
+    },
+    /// The declared dependencies close a cycle, which has no application order.
+    #[error("profile dependency cycle: {}", .cycle.join(" -> "))]
+    DependencyCycle {
+        /// The cycle as a closed path: the first id repeats as the last.
+        cycle: Vec<String>,
     },
 }
 
@@ -231,10 +263,115 @@ impl CommandExecutor<JsonFileStorage> {
         })
     }
 
-    /// Resolve and apply one profile by stable ID.
-    pub fn apply_profile(&self, id: &str, location: Option<&Path>) -> Result<ProfileApplyResult> {
+    /// Resolve and apply one profile by stable ID, with the packages it depends
+    /// on.
+    pub fn apply_profile(
+        &self,
+        id: &str,
+        location: Option<&Path>,
+    ) -> Result<ProfileComposedApplyResult> {
         let package = self.resolve_profile_package(id, location)?;
         self.apply_profile_package(&package)
+    }
+
+    /// Resolve the complete set of packages applying `package` applies, in the
+    /// order it applies them.
+    ///
+    /// A package's declared dependencies are resolved transitively, so the
+    /// answer closes over everything reachable from `package`, and ordered so
+    /// each package follows everything it depends on. `package` itself is
+    /// therefore last. A dependency reached by two packages is resolved and
+    /// applied once.
+    ///
+    /// Nothing here touches the repository: a
+    /// [`ProfileDependencyError::DependencyCycle`] or an unresolvable
+    /// dependency is raised over the whole closure before its first package is
+    /// applied.
+    pub fn resolve_profile_closure(&self, package: &ProfilePackage) -> Result<Vec<ProfilePackage>> {
+        let root = package.manifest().profile.id.to_string();
+        let mut resolved = BTreeMap::from([(root.clone(), package.clone())]);
+        let mut adjacency: Vec<(String, Vec<String>)> = Vec::new();
+        let mut pending = std::collections::VecDeque::from([root]);
+
+        while let Some(id) = pending.pop_front() {
+            let declaring = resolved
+                .get(&id)
+                .ok_or_else(|| anyhow::anyhow!("package '{id}' left the closure being built"))?
+                .clone();
+            let declared: Vec<String> = declaring
+                .manifest()
+                .dependencies
+                .iter()
+                .map(ProfileId::to_string)
+                .collect();
+            for dependency in &declared {
+                if resolved.contains_key(dependency) {
+                    continue;
+                }
+                let package = self
+                    .resolve_dependency_package(&declaring, dependency)
+                    .map_err(|cause| ProfileDependencyError::UnresolvableDependency {
+                        package: id.clone(),
+                        dependency: dependency.clone(),
+                        cause,
+                    })?;
+                resolved.insert(dependency.clone(), package);
+                pending.push_back(dependency.clone());
+            }
+            adjacency.push((id, declared));
+        }
+
+        crate::graph::keyed_topological_order(&adjacency)
+            .map_err(|cycle| ProfileDependencyError::DependencyCycle { cycle })?
+            .into_iter()
+            .map(|id| {
+                resolved
+                    .remove(&id)
+                    .ok_or_else(|| anyhow::anyhow!("ordered package '{id}' left the closure"))
+            })
+            .collect()
+    }
+
+    /// Read the package one declared dependency names.
+    ///
+    /// A package read from a directory states where its dependencies are by
+    /// where it sits: the dependency is looked for beside it, in a directory
+    /// named by the dependency's own id. That is the location the caller named
+    /// for the declaring package, carried to what that package declares, and it
+    /// is what lets one obtained directory of packages apply as a set before
+    /// any of them has a record.
+    ///
+    /// A directory that is not there, or that holds a package declaring another
+    /// profile, is not that dependency, so resolution continues through the
+    /// routes every other command takes
+    /// ([`resolve_profile_package`](Self::resolve_profile_package) without a
+    /// location): this repository's own applied-profile record, then the
+    /// package compiled into this binary. A directory that is there and cannot
+    /// be read as a package is reported rather than passed over, because
+    /// falling through would answer with a package the adopter did not put
+    /// there.
+    fn resolve_dependency_package(
+        &self,
+        declaring: &ProfilePackage,
+        dependency: &str,
+    ) -> Result<ProfilePackage> {
+        let ProfilePackageSource::Directory(directory) = declaring.source() else {
+            return self.resolve_profile_package(dependency, None);
+        };
+        let Some(location) = directory.parent().map(|parent| parent.join(dependency)) else {
+            return self.resolve_profile_package(dependency, None);
+        };
+        match ProfilePackage::from_directory(&location) {
+            Ok(package) if package.manifest().profile.id.as_str() == dependency => Ok(package),
+            Ok(_) | Err(ProfilePackageError::UnreadableDirectory { .. }) => {
+                self.resolve_profile_package(dependency, None)
+            }
+            Err(source) => Err(ProfileResolutionError::UnreadableLocation {
+                location: location.display().to_string(),
+                source,
+            }
+            .into()),
+        }
     }
 
     /// Prove one profile selection resolves without mutating a repository.
@@ -243,6 +380,27 @@ impl CommandExecutor<JsonFileStorage> {
     /// unresolvable id or location fails before a repository is created.
     pub fn validate_profile_selection(&self, id: &str, location: Option<&Path>) -> Result<()> {
         self.resolve_profile_package(id, location).map(drop)
+    }
+
+    /// Apply one validated package together with the packages it depends on.
+    ///
+    /// The whole closure is resolved and ordered first
+    /// ([`resolve_profile_closure`](Self::resolve_profile_closure)), so a cycle
+    /// or an unresolvable dependency fails before any package is applied. Each
+    /// package is then applied in that order through one application of its
+    /// own, which is what gives every applied package its own provenance record
+    /// and its own audit event. A package whose targets and provenance are
+    /// already exact reports no work, so re-applying a set that is already
+    /// applied publishes nothing.
+    pub fn apply_profile_package(
+        &self,
+        package: &ProfilePackage,
+    ) -> Result<ProfileComposedApplyResult> {
+        self.resolve_profile_closure(package)?
+            .iter()
+            .map(|package| self.apply_one_profile_package(package))
+            .collect::<Result<Vec<_>>>()
+            .map(ProfileComposedApplyResult::new)
     }
 
     /// Apply one validated profile package through the recovered session.
@@ -254,7 +412,15 @@ impl CommandExecutor<JsonFileStorage> {
     /// overlay, and publishes through `session.apply` with pre-journal revalidation.
     /// A no-op profile has an empty complete finalized delta: package targets and
     /// provenance are unchanged, and coupled default-rule/schema state is current.
-    pub fn apply_profile_package(&self, package: &ProfilePackage) -> Result<ProfileApplyResult> {
+    ///
+    /// This applies exactly the package it is handed; the packages that package
+    /// depends on are applied by
+    /// [`apply_profile_package`](Self::apply_profile_package), which orders them
+    /// against it.
+    pub(super) fn apply_one_profile_package(
+        &self,
+        package: &ProfilePackage,
+    ) -> Result<ProfileApplyResult> {
         let metadata = &package.manifest().profile;
         let layout = self.require_layout()?;
         // One MutationContext per operation, reused across probe/final finalize and
@@ -840,10 +1006,7 @@ mod tests {
 
     /// The provenance record a repository stores for the fixture package.
     fn stored_record(temp: &TempDir) -> AppliedProfileRecord {
-        serde_json::from_slice(
-            &fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
-        )
-        .unwrap()
+        record_for(temp, &fixture_id())
     }
 
     /// Rewrite one authored source of the package tree at `relative`, and read
@@ -866,6 +1029,64 @@ mod tests {
             .profile
             .id
             .to_string()
+    }
+
+    /// The fixture package tree written at `relative`, rewritten to declare
+    /// `id`, an asset target of its own, and a dependency on each of
+    /// `dependencies`, and read back from there.
+    ///
+    /// No package this repository ships declares a dependency, so a composition
+    /// scenario is authored here rather than borrowed from one. The asset
+    /// target follows the id so two authored packages publish different files
+    /// and their applications are distinguishable.
+    fn package_declaring(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        dependencies: &[&str],
+    ) -> ProfilePackage {
+        let root = crate::test_utils::write_package_tree(&PACKAGE, &temp.path().join(relative));
+        let declared = dependencies
+            .iter()
+            .map(|dependency| format!("\"{dependency}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let manifest = fs::read_to_string(root.join("manifest.toml"))
+            .unwrap()
+            .replace(
+                &format!("id = \"{}\"", fixture_id()),
+                &format!("id = \"{id}\""),
+            )
+            .replace(
+                "target = \"docs/profile.txt\"",
+                &format!("target = \"docs/{id}.txt\""),
+            )
+            .replace(
+                "[profile]",
+                &format!("dependencies = [{declared}]\n\n[profile]"),
+            );
+        fs::write(root.join("manifest.toml"), manifest).unwrap();
+        ProfilePackage::from_directory(&root).expect("a valid package tree")
+    }
+
+    /// The profile ids this repository's audit log records as applied, in the
+    /// order it recorded them.
+    fn applied_event_ids(storage: &JsonFileStorage) -> Vec<String> {
+        storage
+            .read_events()
+            .unwrap()
+            .into_iter()
+            .filter_map(|event| match event {
+                Event::ProfileApplied { profile_id, .. } => Some(profile_id),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The provenance record this repository stores for `id`.
+    fn record_for(temp: &TempDir, id: &str) -> AppliedProfileRecord {
+        serde_json::from_slice(&fs::read(temp.path().join(format!(".jit/profiles/{id}.json"))).unwrap())
+            .unwrap()
     }
 
     /// Store `record` as this repository's applied-profile record for its id.
@@ -1407,7 +1628,10 @@ mod tests {
         );
         let package = ProfilePackage::from_directory(&package_root).unwrap();
         let applied = executor.apply_profile_package(&package).unwrap();
-        assert_eq!(applied.status, ProfileApplicationStatus::Applied);
+        assert_eq!(
+            applied.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
 
         let produced: serde_json::Value =
             toml_edit::de::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
@@ -1453,7 +1677,10 @@ mod tests {
         let (temp, storage, executor, package) = fixture();
 
         let applied = executor.apply_profile_package(&package).unwrap();
-        assert_eq!(applied.status, ProfileApplicationStatus::Applied);
+        assert_eq!(
+            applied.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
         assert_eq!(
             fs::read(temp.path().join("docs/profile.txt")).unwrap(),
             package.source_bytes("assets/profile.txt").unwrap()
@@ -1474,7 +1701,10 @@ mod tests {
         )
         .unwrap();
         let unchanged = executor.apply_profile_package(&package).unwrap();
-        assert_eq!(unchanged.status, ProfileApplicationStatus::Unchanged);
+        assert_eq!(
+            unchanged.requested().unwrap().status,
+            ProfileApplicationStatus::Unchanged
+        );
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
             before
@@ -1614,6 +1844,296 @@ mod tests {
                 ..
             }]
         ));
+    }
+
+    #[test]
+    fn test_apply_profile_package_applies_a_declared_dependency_before_the_package() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let dependency = package_declaring(&temp, "vendor/base", "base", &[]);
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
+
+        let applied = executor.apply_profile_package(&dependant).unwrap();
+
+        // The set is the answer, in the order it was applied: the dependency,
+        // then the package that declared it.
+        assert_eq!(
+            applied
+                .profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["base", "workflow"]
+        );
+        assert_eq!(applied.count, applied.profiles.len());
+        assert_eq!(applied.requested().unwrap().id, "workflow");
+        assert!(applied
+            .profiles
+            .iter()
+            .all(|profile| profile.status == ProfileApplicationStatus::Applied));
+        // What each package publishes is in the repository, and the audit log
+        // states the same order.
+        assert!(temp.path().join("docs/base.txt").is_file());
+        assert!(temp.path().join("docs/workflow.txt").is_file());
+        assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
+        // One record per package, each addressing its own package's bytes.
+        assert_eq!(record_for(&temp, "base").package_hash, dependency.hashes().package);
+        assert_eq!(
+            record_for(&temp, "workflow").package_hash,
+            dependant.hashes().package
+        );
+        assert_ne!(dependency.hashes().package, dependant.hashes().package);
+    }
+
+    #[test]
+    fn test_apply_profile_package_applies_a_transitive_dependency_chain_deepest_first() {
+        let (temp, storage, executor, _fixture) = fixture();
+        package_declaring(&temp, "vendor/vocabulary", "vocabulary", &[]);
+        package_declaring(&temp, "vendor/base", "base", &["vocabulary"]);
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
+
+        let applied = executor.apply_profile_package(&dependant).unwrap();
+
+        // `workflow` never names `vocabulary`; reaching it is what "transitively"
+        // means, and it is applied before the package that reaches it.
+        assert_eq!(
+            applied
+                .profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["vocabulary", "base", "workflow"]
+        );
+        assert_eq!(
+            applied_event_ids(&storage),
+            vec!["vocabulary", "base", "workflow"]
+        );
+        for id in ["vocabulary", "base", "workflow"] {
+            assert_eq!(record_for(&temp, id).id, id);
+        }
+    }
+
+    #[test]
+    fn test_apply_profile_package_applies_a_shared_dependency_once() {
+        let (temp, storage, executor, _fixture) = fixture();
+        package_declaring(&temp, "vendor/shared", "shared", &[]);
+        package_declaring(&temp, "vendor/left", "left", &["shared"]);
+        package_declaring(&temp, "vendor/right", "right", &["shared"]);
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["left", "right"]);
+
+        let applied = executor.apply_profile_package(&dependant).unwrap();
+
+        let order: Vec<&str> = applied
+            .profiles
+            .iter()
+            .map(|profile| profile.id.as_str())
+            .collect();
+        assert_eq!(
+            order.iter().filter(|id| **id == "shared").count(),
+            1,
+            "a dependency two packages declare is applied once: {order:?}"
+        );
+        let position = |id: &str| order.iter().position(|candidate| *candidate == id).unwrap();
+        assert!(position("shared") < position("left"));
+        assert!(position("shared") < position("right"));
+        assert!(position("left") < position("workflow"));
+        assert!(position("right") < position("workflow"));
+        assert_eq!(
+            applied_event_ids(&storage).iter().filter(|id| *id == "shared").count(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_rejects_a_dependency_cycle_before_applying_anything() {
+        let (temp, storage, executor, _fixture) = fixture();
+        package_declaring(&temp, "vendor/base", "base", &["workflow"]);
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
+
+        let error = executor.apply_profile_package(&dependant).unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::DependencyCycle { cycle })
+                    if cycle.first() == cycle.last()
+                        && cycle.iter().any(|id| id == "base")
+                        && cycle.iter().any(|id| id == "workflow")
+            ),
+            "the refusal must name the cycle: {error:#}"
+        );
+        // Neither package of the cycle reached the repository.
+        assert!(!temp.path().join("docs/base.txt").exists());
+        assert!(!temp.path().join("docs/workflow.txt").exists());
+        assert!(!temp.path().join(".jit/profiles").exists());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_package_reports_a_dependency_that_cannot_be_resolved() {
+        let (temp, storage, executor, _fixture) = fixture();
+        // Nothing sits beside the package under that name, this repository has
+        // no record for it, and this binary does not carry it.
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["absent-base"]);
+
+        let error = executor.apply_profile_package(&dependant).unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                    if package == "workflow" && dependency == "absent-base"
+            ),
+            "the refusal must name both packages: {error:#}"
+        );
+        // Naming both is what distinguishes this from an absent profile the
+        // adopter asked for by name.
+        let message = format!("{error:#}");
+        assert!(message.contains("workflow"), "{message}");
+        assert!(message.contains("absent-base"), "{message}");
+        assert!(!temp.path().join("docs/workflow.txt").exists());
+        assert!(!temp.path().join(".jit/profiles").exists());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_package_reports_no_work_for_an_applied_unchanged_closure() {
+        let (temp, storage, executor, _fixture) = fixture();
+        package_declaring(&temp, "vendor/base", "base", &[]);
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
+        executor.apply_profile_package(&dependant).unwrap();
+        let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+        let records = ["base", "workflow"].map(|id| record_for(&temp, id));
+
+        let reapplied = executor.apply_profile_package(&dependant).unwrap();
+
+        // No work anywhere in the set: the dependency is unchanged too, not
+        // only the package that was named.
+        assert!(
+            reapplied
+                .profiles
+                .iter()
+                .all(|profile| profile.status == ProfileApplicationStatus::Unchanged),
+            "{:?}",
+            reapplied.profiles
+        );
+        assert!(reapplied
+            .profiles
+            .iter()
+            .all(|profile| profile.transaction_id.is_none()));
+        assert_eq!(
+            fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
+            events
+        );
+        assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
+        assert_eq!(["base", "workflow"].map(|id| record_for(&temp, id)), records);
+    }
+
+    #[test]
+    fn test_apply_profile_package_resolves_a_dependency_from_the_record_when_none_sits_beside_it() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let dependency = package_declaring(&temp, "vendor/base", "base", &[]);
+        executor.apply_profile_package(&dependency).unwrap();
+        // A dependant elsewhere in the worktree, with no `base` beside it: what
+        // answers is this repository's own record for the dependency.
+        let dependant = package_declaring(&temp, "elsewhere/workflow", "workflow", &["base"]);
+        assert!(!temp.path().join("elsewhere/base").exists());
+
+        let applied = executor.apply_profile_package(&dependant).unwrap();
+
+        assert_eq!(
+            applied
+                .profiles
+                .iter()
+                .map(|profile| (profile.id.as_str(), profile.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("base", ProfileApplicationStatus::Unchanged),
+                ("workflow", ProfileApplicationStatus::Applied),
+            ]
+        );
+        assert_eq!(record_for(&temp, "base").package_hash, dependency.hashes().package);
+    }
+
+    #[test]
+    fn test_resolve_profile_closure_reads_a_dependency_from_beside_the_declaring_package() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        // Two copies of the dependency, distinguishable by their bytes alone.
+        // The one beside the declaring package is the one its declaration means.
+        package_declaring(&temp, "elsewhere/base", "base", &[]);
+        let recorded = repackage(&temp, "elsewhere/base", "assets/profile.txt", "elsewhere\n");
+        executor.apply_profile_package(&recorded).unwrap();
+        let beside = package_declaring(&temp, "vendor/base", "base", &[]);
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
+        assert_ne!(beside.hashes(), recorded.hashes());
+
+        let closure = executor.resolve_profile_closure(&dependant).unwrap();
+
+        assert_eq!(
+            closure
+                .iter()
+                .map(|package| package.hashes())
+                .collect::<Vec<_>>(),
+            vec![beside.hashes(), dependant.hashes()]
+        );
+    }
+
+    #[test]
+    fn test_resolve_profile_closure_reports_an_unreadable_package_beside_the_declaring_one() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
+        // A directory that is there under the dependency's name and holds no
+        // readable package: passing over it would answer with bytes the adopter
+        // did not put there.
+        fs::create_dir_all(temp.path().join("vendor/base")).unwrap();
+        fs::write(temp.path().join("vendor/base/manifest.toml"), b"not = [valid").unwrap();
+
+        let error = executor.resolve_profile_closure(&dependant).unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::UnresolvableDependency { package, dependency, .. })
+                    if package == "workflow" && dependency == "base"
+            ),
+            "{error:#}"
+        );
+        assert!(format!("{error:#}").contains("vendor/base"), "{error:#}");
+    }
+
+    #[test]
+    fn test_resolve_profile_closure_passes_over_a_neighbour_declaring_another_profile() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        // The directory beside the declarant is named for the dependency but
+        // holds a different package, so it is not that dependency and nothing
+        // else answers either.
+        package_declaring(&temp, "vendor/base", "impostor", &[]);
+        let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["base"]);
+
+        let error = executor.resolve_profile_closure(&dependant).unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::UnresolvableDependency { dependency, .. })
+                    if dependency == "base"
+            ),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn test_resolve_profile_closure_of_a_package_declaring_nothing_is_that_package() {
+        let (_temp, _storage, executor, package) = fixture();
+
+        let closure = executor.resolve_profile_closure(&package).unwrap();
+
+        assert_eq!(
+            closure
+                .iter()
+                .map(|package| package.hashes())
+                .collect::<Vec<_>>(),
+            vec![package.hashes()]
+        );
     }
 
     #[test]

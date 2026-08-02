@@ -2,7 +2,8 @@ use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
-    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfilePackage,
+    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult,
+    ProfileComposedApplyResult, ProfilePackage,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
@@ -16,8 +17,9 @@ use std::path::Path;
 /// Result of publishing a fresh repository scaffold.
 #[derive(Debug)]
 pub struct FreshInitResult {
-    /// Applied profile result when initialization included one.
-    pub profile: Option<ProfileApplyResult>,
+    /// Applied profile results when initialization included a profile, one per
+    /// package of its dependency closure.
+    pub profile: Option<ProfileComposedApplyResult>,
     /// Outcome of the worktree `.gitattributes` merge-driver claim.
     pub gitattributes: GitattributesStatus,
     /// Files whose canonical plan preimage was absent.
@@ -74,22 +76,37 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Capture the base under one recovered session, validate the proposed
     /// scaffold/profile overlay, and publish the complete initialization delta.
+    ///
+    /// A selected profile is resolved into its complete dependency closure
+    /// before anything is published, so an unresolvable id, an unresolvable
+    /// dependency, or a dependency cycle fails before a repository is created.
+    /// The first package of that closure — the one nothing else in it depends
+    /// on — is published together with the scaffold, because a package needs a
+    /// repository to be applied to; the rest follow in closure order through
+    /// the ordinary application, each with its own record and event.
     fn run_initialization(
         &self,
         repo_dir: &Path,
         template: &HierarchyTemplate,
         profile: Option<ProfileSelection<'_>>,
     ) -> Result<FreshInitResult> {
-        let package = profile
-            .map(|profile| self.resolve_profile_package(profile.id, profile.location))
+        let closure = profile
+            .map(|profile| {
+                let package = self.resolve_profile_package(profile.id, profile.location)?;
+                self.resolve_profile_closure(&package)
+            })
             .transpose()?;
+        let (package, dependants) = match closure.as_deref() {
+            Some([scaffolded, dependants @ ..]) => (Some(scaffolded.clone()), dependants),
+            Some([]) | None => (None, &[][..]),
+        };
         let layout = self.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so a composed ProfileApplied event's id/timestamp stay stable.
         let context = crate::repository_state::MutationContext::production();
-        with_mutation_session(
+        let mut result = with_mutation_session(
             self.storage(),
             &layout,
             "repository initialization",
@@ -211,15 +228,17 @@ impl CommandExecutor<JsonFileStorage> {
 
                 let profile = profile_status
                     .zip(package.as_ref())
-                    .map(|(status, package)| ProfileApplyResult {
-                        id: package.manifest().profile.id.to_string(),
-                        version: package.manifest().profile.version.clone(),
-                        status,
-                        plan_hash: plan.hash().to_string(),
-                        // The applied transaction hash is the plan hash by construction.
-                        transaction_id: (status == ProfileApplicationStatus::Applied)
-                            .then(|| plan.hash().to_string()),
-                        warnings: Vec::new(),
+                    .map(|(status, package)| {
+                        ProfileComposedApplyResult::new(vec![ProfileApplyResult {
+                            id: package.manifest().profile.id.to_string(),
+                            version: package.manifest().profile.version.clone(),
+                            status,
+                            plan_hash: plan.hash().to_string(),
+                            // The applied transaction hash is the plan hash by construction.
+                            transaction_id: (status == ProfileApplicationStatus::Applied)
+                                .then(|| plan.hash().to_string()),
+                            warnings: Vec::new(),
+                        }])
                     });
                 Ok(SessionStep::Apply(
                     plan,
@@ -231,7 +250,20 @@ impl CommandExecutor<JsonFileStorage> {
                     },
                 ))
             },
-        )
+        )?;
+
+        // The published repository is what the remaining packages of the
+        // closure are applied to, in the order the closure fixed.
+        let applied = dependants
+            .iter()
+            .map(|package| self.apply_one_profile_package(package))
+            .collect::<Result<Vec<_>>>()?;
+        result.profile = result.profile.map(|scaffolded| {
+            ProfileComposedApplyResult::new(
+                scaffolded.profiles.into_iter().chain(applied).collect(),
+            )
+        });
+        Ok(result)
     }
 
     /// Resolve the effective configuration bytes and project identity: an existing
@@ -657,7 +689,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            result.profile.unwrap().status,
+            result.profile.unwrap().requested().unwrap().status,
             ProfileApplicationStatus::Applied
         );
         assert!(repo.path().join(".jit/index.json").is_file());
@@ -731,7 +763,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            again.profile.unwrap().status,
+            again.profile.unwrap().requested().unwrap().status,
             ProfileApplicationStatus::Unchanged
         );
         assert_eq!(
