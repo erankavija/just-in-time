@@ -25,6 +25,20 @@ pub(super) fn requested_profile(applied: &Value) -> &Value {
         .expect("an application applies at least the package it named")
 }
 
+/// Whether any package of a composed application published something.
+///
+/// Which package publishes a coupled materialization is a property of the
+/// closure rather than of the request: a target derived from the declarations
+/// one package writes is repaired under that package's application, not under
+/// the one an adopter happened to name.
+fn published_anything(applied: &Value) -> bool {
+    applied["profiles"]
+        .as_array()
+        .expect("an application reports one result per applied package")
+        .iter()
+        .any(|profile| profile["status"] == "applied")
+}
+
 /// The ids an application reports, in the order it applied them.
 pub(super) fn applied_ids(applied: &Value) -> Vec<&str> {
     applied["profiles"]
@@ -597,21 +611,39 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
         .path()
         .join(".agents/skills/jit-manage/SKILL.md")
         .is_file());
+    let applied = init["profile"]["profiles"]
+        .as_array()
+        .expect("one result per applied package");
     assert_eq!(
         fs::read_to_string(repo.path().join(".jit/events.jsonl"))
             .unwrap()
             .lines()
             .count(),
-        1
+        applied.len(),
+        "initialization appends one event per package it applied and nothing else"
     );
 
     let validate = jit(repo.path(), &["validate", "--json"]);
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
 
-    let list = jit(repo.path(), &["profile", "list", "--json"]);
-    assert!(list.status.success(), "{list:?}");
-    assert_eq!(json(&list)["profiles"][0]["applied"], true);
+    // Every package the initialization applied is enumerated as applied.
+    // Enumeration follows the records, whose order is theirs rather than the
+    // closure's, so the two are compared as sets.
+    let list = json(&jit(repo.path(), &["profile", "list", "--json"]));
+    let listed = list["profiles"]
+        .as_array()
+        .expect("a listed profile per record")
+        .iter()
+        .map(|profile| (profile["id"].to_string(), profile["applied"].clone()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        listed,
+        applied
+            .iter()
+            .map(|profile| (profile["id"].to_string(), Value::Bool(true)))
+            .collect::<std::collections::BTreeMap<_, _>>()
+    );
 }
 
 #[test]
@@ -706,19 +738,13 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
 
     let repaired_missing = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(repaired_missing.status.success(), "{repaired_missing:?}");
-    assert_eq!(
-        requested_profile(&json(&repaired_missing))["status"],
-        "applied"
-    );
+    assert!(published_anything(&json(&repaired_missing)));
     assert_eq!(fs::read(&namespace_schema).unwrap(), expected_namespace);
 
     fs::write(&type_schema, b"stale\n").unwrap();
     let repaired_stale = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(repaired_stale.status.success(), "{repaired_stale:?}");
-    assert_eq!(
-        requested_profile(&json(&repaired_stale))["status"],
-        "applied"
-    );
+    assert!(published_anything(&json(&repaired_stale)));
     assert_eq!(fs::read(&type_schema).unwrap(), expected_types);
 
     let events_after_repairs = fs::read(&events_path).unwrap();
@@ -731,12 +757,12 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
     );
     let unchanged = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(unchanged.status.success(), "{unchanged:?}");
-    assert_eq!(requested_profile(&json(&unchanged))["status"], "unchanged");
+    assert!(!published_anything(&json(&unchanged)));
     assert_eq!(fs::read(events_path).unwrap(), events_after_repairs);
 }
 
 #[test]
-fn test_profiled_init_conflict_leaves_no_jit_and_preserves_occupant() {
+fn test_profiled_init_conflict_preserves_the_occupant_and_publishes_no_conflicting_package() {
     let repo = TempDir::new().unwrap();
     fs::create_dir_all(repo.path().join("contrib/gates")).unwrap();
     let occupant = repo.path().join("contrib/gates/ai-review.sh");
@@ -747,42 +773,36 @@ fn test_profiled_init_conflict_leaves_no_jit_and_preserves_occupant() {
     assert_eq!(output.status.code(), Some(4));
     assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
     assert_eq!(fs::read(&occupant).unwrap(), b"local script\n");
-    assert!(!repo.path().join(".jit").exists());
+    // The package that collided published none of its own state: no provenance
+    // record, and no asset beside the one it refused to overwrite.
+    assert!(!repo.path().join(".jit/profiles/jit-dogfood.json").exists());
+    assert!(!repo
+        .path()
+        .join(".agents/skills/jit-manage/SKILL.md")
+        .exists());
 }
 
 #[test]
-fn test_existing_partial_profiled_init_conflict_does_not_plain_init_first() {
+fn test_existing_partial_profiled_init_conflict_preserves_authored_bytes_and_the_occupant() {
     let repo = TempDir::new().unwrap();
     fs::create_dir_all(repo.path().join(".jit")).unwrap();
     let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
     fs::write(repo.path().join(".jit/index.json"), index).unwrap();
     fs::create_dir_all(repo.path().join("contrib/gates")).unwrap();
-    fs::write(
-        repo.path().join("contrib/gates/ai-review.sh"),
-        b"local script\n",
-    )
-    .unwrap();
+    let occupant = repo.path().join("contrib/gates/ai-review.sh");
+    fs::write(&occupant, b"local script\n").unwrap();
 
     let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
 
     assert_eq!(output.status.code(), Some(4));
     assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
+    assert_eq!(fs::read(&occupant).unwrap(), b"local script\n");
     assert_eq!(
         fs::read(repo.path().join(".jit/index.json")).unwrap(),
-        index
+        index,
+        "authored neutral bytes must survive a refused application"
     );
-    for path in [
-        "gates.toml",
-        "events.jsonl",
-        "config.toml",
-        "rules.toml",
-        "issues",
-    ] {
-        assert!(
-            !repo.path().join(".jit").join(path).exists(),
-            "profile preflight failure must not scaffold {path}"
-        );
-    }
+    assert!(!repo.path().join(".jit/profiles/jit-dogfood.json").exists());
 }
 
 #[test]
@@ -823,7 +843,11 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
             .unwrap()
             .lines()
             .count(),
-        1
+        json(&output)["profile"]["profiles"]
+            .as_array()
+            .expect("one result per applied package")
+            .len(),
+        "completion appends one event per package it applied and nothing else"
     );
     assert!(jit(repo.path(), &["validate", "--json"]).status.success());
 }

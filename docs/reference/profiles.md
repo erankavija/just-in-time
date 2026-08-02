@@ -3,9 +3,11 @@
 > **Diátaxis Type:** Reference
 
 Repository profiles install a coherent JIT workflow as one explicit operation.
-JIT v1.0 exposes one immutable profile embedded in the binary:
-`jit-dogfood`. Applying it needs no Git repository, network access, `jq`, or JIT
-source checkout.
+JIT v1.0 embeds two immutable packages in the binary: `jit-dogfood`, the
+workflow package an adopter names, and `jit-default`, the generic vocabulary it
+declares a dependency on. Applying `jit-dogfood` applies both, so the
+dependency is never named. Either needs no Git repository, network access,
+`jq`, or JIT source checkout.
 
 For a new repository, this is the preferred setup:
 
@@ -85,17 +87,17 @@ tools.
 
 The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
-run `jit profile show jit-dogfood --json` for the exact version, contributions,
-assets, managed regions, hashes, and executable declarations carried by the
-running binary. It also declares the repository roots from which packaged live
-assets are drawn, so any repository file under a declared root that is neither
-claimed by a packaged asset nor matched by a declared exclusion is caught
-rather than silently left out of the package.
+run `jit profile show jit-dogfood --json` for the exact version, dependencies,
+contributions, assets, managed regions, hashes, and executable declarations
+carried by the running binary. It also declares the repository roots from which
+packaged live assets are drawn, so any repository file under a declared root
+that is neither claimed by a packaged asset nor matched by a declared exclusion
+is caught rather than silently left out of the package.
 
-The package installs:
+Applying it installs:
 
-- a repository-neutral issue taxonomy and the namespaces needed by its
-  workflow;
+- the repository-neutral vocabulary its `jit-default` dependency declares, plus
+  the types and namespaces its own workflow adds;
 - an epic-only plan-before-fan-out template, advisory content standards, and
   enforced epic completion coverage;
 - plan, breakdown, code-review, coverage, issue-validation, and

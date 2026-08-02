@@ -916,8 +916,11 @@ mod tests {
             )
             .unwrap();
 
+        let applied = result
+            .profile
+            .expect("a profiled initialization reports it");
         assert_eq!(
-            result.profile.unwrap().requested().unwrap().status,
+            applied.requested().unwrap().status,
             ProfileApplicationStatus::Applied
         );
         assert!(repo.path().join(".jit/index.json").is_file());
@@ -931,7 +934,8 @@ mod tests {
                 .unwrap()
                 .lines()
                 .count(),
-            1
+            applied.profiles.len(),
+            "initialization appends one event per package it applied and nothing else"
         );
         assert!(fs::read_to_string(repo.path().join(".jit/rules.toml"))
             .unwrap()
@@ -1154,10 +1158,23 @@ assert = { require-section = { heading = \"Goals\" } }\n";
             .map(|handle| handle.join().unwrap())
             .collect::<Vec<_>>();
 
-        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        let winner = results
+            .iter()
+            .filter_map(|result| result.as_ref().ok())
+            .collect::<Vec<_>>();
+        assert_eq!(winner.len(), 1);
         assert_eq!(results.iter().filter(|result| result.is_err()).count(), 1);
         assert_repo_valid(repo.path());
         let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
-        assert_eq!(events.lines().count(), 1);
+        assert_eq!(
+            events.lines().count(),
+            winner[0]
+                .profile
+                .as_ref()
+                .expect("a profiled initialization reports it")
+                .profiles
+                .len(),
+            "only the winning initialization's packages reached the event log"
+        );
     }
 }

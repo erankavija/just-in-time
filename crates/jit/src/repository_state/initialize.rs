@@ -368,7 +368,7 @@ impl InitializationScaffold {
             paths.push(profile.record_path.clone());
             paths.push(VirtualPath::PROFILES);
             paths.extend(profile.claims.target_paths()?);
-            if profile_owns_default_rule_authority(profile) {
+            if profile.owns_default_rule_authority() {
                 paths.push(VirtualPath::SCHEMAS);
             }
         }
@@ -445,7 +445,7 @@ pub(super) fn derive_initialization(
     let profile_changes_rules_authority = scaffold
         .profile
         .as_ref()
-        .is_some_and(profile_owns_default_rule_authority);
+        .is_some_and(ProfileApplicationInput::owns_default_rule_authority);
     let compose_rules = existing_rules || profile_changes_rules_authority;
     let generated_paths: std::collections::BTreeSet<VirtualPath> = scaffold
         .schemas
@@ -896,16 +896,6 @@ fn dedup_last_wins(files: Vec<DesiredFile>) -> Vec<DesiredFile> {
         ordered.insert(file.path.clone(), file);
     }
     ordered.into_values().collect()
-}
-
-/// The profile's asset targets (the planner pre-filtered unchanged ones). The
-/// audit log and provenance record are handled by their own policies at the call
-/// sites, so they are not included here.
-/// Whether the profile package contributes either authored input of the coupled
-/// default-rule/schema materialization.
-fn profile_owns_default_rule_authority(profile: &ProfileApplicationInput) -> bool {
-    profile.target_hashes.contains_key(".jit/config.toml")
-        || profile.target_hashes.contains_key(".jit/rules.toml")
 }
 
 /// Emit the provenance-record write only when the command proved it changed.
