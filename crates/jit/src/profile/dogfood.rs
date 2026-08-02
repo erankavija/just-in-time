@@ -123,7 +123,7 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::GateRegistry;
     use crate::hierarchy_templates::HierarchyTemplate;
-    use crate::profile::LiveSourceDeclaration;
+    use crate::profile::{ExclusionPattern, LiveSourceDeclaration};
     use crate::repository_state::{
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
     };
@@ -667,6 +667,90 @@ mod tests {
                 declaration.root
             );
         }
+    }
+
+    /// The walk consults a declaration's patterns only for paths that
+    /// declaration's own root contains, so an exclusion cannot reach across
+    /// into another root.
+    ///
+    /// Membership and coverage are separate terms of one conjunction:
+    /// `relative_path(path).is_some() && excludes(path)`. Since matching moved
+    /// to repository-relative paths, a pattern's text can name a location
+    /// outside the root that declares it, which is what makes the membership
+    /// term load-bearing rather than decorative — [`LiveSourceDeclaration::excludes`]
+    /// alone would match such a path. Package validation rejects a root
+    /// declared twice or nested inside another
+    /// ([`ProfilePackageError::DuplicateLiveSourceRoot`],
+    /// [`ProfilePackageError::NestedLiveSourceRoot`]), so every repository path
+    /// lies under exactly one declared root; that is what makes the conjunction
+    /// sufficient rather than merely conventional, since there is never a
+    /// second declaration whose patterns could also claim the path.
+    #[test]
+    fn test_unpackaged_files_under_declared_roots_consults_only_the_declaration_owning_the_path() {
+        let package = jit_dogfood_package().unwrap();
+        let declared = &package.manifest().live_sources;
+        assert!(
+            declared.len() >= 2,
+            "the package declares two roots to reach between"
+        );
+        let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
+
+        // An unpackaged consumer under the last declared root, and a pattern
+        // naming everything under that root. Whichever declaration carries the
+        // pattern, its text matches the path.
+        let owner = declared.last().expect("a declared root");
+        let added = format!("{}/a-new-consumer/SKILL.md", owner.root);
+        let tracked: Vec<String> = packaged
+            .iter()
+            .map(|target| (*target).to_string())
+            .chain([added.clone()])
+            .collect();
+        let reaching =
+            ExclusionPattern::try_from(format!("{}/**", owner.root)).expect("a compilable pattern");
+        assert!(
+            reaching.matches(&added),
+            "the pattern must match the added path for this test to say anything"
+        );
+
+        // Carried by a declaration whose root does not contain the path, the
+        // pattern is never consulted and the path is still reported.
+        let reaching_across: Vec<LiveSourceDeclaration> = declared
+            .iter()
+            .enumerate()
+            .map(|(position, declaration)| {
+                let mut declaration = declaration.clone();
+                if position == 0 {
+                    declaration.exclude.push(reaching.clone());
+                }
+                declaration
+            })
+            .collect();
+        assert_eq!(
+            unpackaged_files_under_declared_roots(&reaching_across, &packaged, &tracked),
+            vec![added.as_str()],
+            "a pattern declared under {} suppressed a path under {}",
+            reaching_across[0].root,
+            owner.root
+        );
+
+        // Carried by the declaration that does contain it, the same pattern
+        // covers it. The walk's silence turns on which declaration owns the
+        // path, not on which one spells a matching pattern.
+        let owning: Vec<LiveSourceDeclaration> = declared
+            .iter()
+            .map(|declaration| {
+                let mut declaration = declaration.clone();
+                if declaration.root == owner.root {
+                    declaration.exclude.push(reaching.clone());
+                }
+                declaration
+            })
+            .collect();
+        assert_eq!(
+            unpackaged_files_under_declared_roots(&owning, &packaged, &tracked),
+            Vec::<&str>::new(),
+            "the owning root's own exclusion did not cover the path"
+        );
     }
 
     /// The exclusions describe categories rather than files: they cover more
