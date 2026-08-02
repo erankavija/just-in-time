@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fec4d4ea4143b41c28e5bd1605d04d5b94354380",
+  "completed_at": "2026-08-02T18:53:06.078866729Z",
+  "duration_ms": 343289,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 704,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7835fdc0/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "Validation resolves recorded profiles only as embedded packages, preventing dependency attribution for directory-owned packages."
+      }
+    ],
+    "summary": "Recorded package validation bypasses provenance origins, so it can omit the declaring package required by REQ-05.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7835fdc0-bd54-473c-a6fc-bd8c55dc390b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0f0431b9-6b2b-4381-9d10-a0f3ed3efcbb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T18:47:22.789750686Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 15 of 6837 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\n2026-08-02T18:47:27.992881Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit\n2026-08-02T18:47:28.017529Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc3cd-6e12-7d03-bc7c-f81e1facbaf9\n--------\nuser\n--- 6822 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0cdcab54, 7f523c83, 82c389e5, 4133b83, e652e33, d279ab40, 61b5ee82 (`jit:7835fdc0`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/requirement/REQ-08 and @/issue/e204e63d/decision/D-14 (issue source); @/issue/7835fdc0/requirement/REQ-05 (issue source); @/invariant/derived-state-coherence (invariants registry); @/gate/jit-validate (gates registry)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T18:38:09Z)\nTruncation recovery: split tagged patches by commit/path; reread current profile, initialization, graph, and validation ranges\n\n1. **F1 — high — blocking, issue-impact.** Validation never resolves recorded packages through their recorded origin: [`resolve_recorded_packages`](crates/jit/src/commands/validate.rs:704) calls `embedded_profile(id)`, which only supports the compiled-in package, instead of resolving the provenance record’s directory. For an applied directory-owned `workflow` package declaring directory-owned `base`, both attempts fail; `declaring_records` has no readable `workflow` manifest, and validation reports `base` without stating that `workflow` declared it. The unit test injects an already-resolved package directly, bypassing this production path. This fails hard REQ-05. References: `@/issue/7835fdc0/requirement/REQ-05`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Recorded package validation bypasses provenance origins, so it can omit the declaring package required by REQ-05.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Validation resolves recorded profiles only as embedded packages, preventing dependency attribution for directory-owned packages.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":704,\"references\":[\"@/issue/7835fdc0/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
