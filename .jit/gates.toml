@@ -38,14 +38,19 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the whole tracked repository surface, minus the tracker's own
-# records. The Rust suites this gate runs read the repository itself —
-# the profile package's live-source conformance walks the worktree, the
-# build-provenance fixture seeds from every repository input, and the
-# documentation projections compare against docs/ — so the footprint is
-# the tree, not the workspace alone. The issue records, event log, run
-# records and index are excluded: nothing this gate runs opens them, and
-# every evaluation rewrites them.
+# Inputs: the whole tracked repository surface. The Rust suites this gate runs
+# read the repository itself — the profile package's live-source conformance
+# walks the worktree, the build-provenance fixture seeds from every repository
+# input, and the documentation projections compare against docs/ — so the
+# footprint is the tree, not the workspace alone.
+#
+# Every exclusion below is material no step of this gate opens. Generated trees
+# (agent worktrees, node_modules, the web bundle, the tracker's scratch dir) are
+# named because the walk consults no ignore rule: a file beneath a declared root
+# is an input unless a pattern here says otherwise. The tracker's records and
+# machine-local state are named because every evaluation rewrites them. This
+# gate's own build output is not named: `target/` is not a declared root, and a
+# checker's output is a function of its inputs rather than one of them.
 [gates.inputs]
 roots = [
   ".agents",
@@ -76,10 +81,19 @@ roots = [
   "web",
 ]
 exclude = [
+  ".agents/worktrees",
+  ".jit/*.lock",
   ".jit/events.jsonl",
-  ".jit/gate-runs/**",
+  ".jit/gate-runs",
   ".jit/index.json",
-  ".jit/issues/**",
+  ".jit/issues",
+  ".jit/server.log",
+  ".jit/server.pid.json",
+  ".jit/tmp",
+  ".jit/worktree.json",
+  "mcp-server/node_modules",
+  "web/dist",
+  "web/node_modules",
 ]
 
 [gates.reserved]
@@ -102,9 +116,9 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the same tree-wide footprint as cargo-ci — the feature-enabled
-# run compiles and tests the same crate over the same repository.
-# See the cargo-ci declaration for why the footprint is the tree.
+# Inputs: the same tree-wide footprint as cargo-ci — the feature-enabled run
+# compiles and tests the same crate over the same repository. See the cargo-ci
+# declaration for why the footprint is the tree and what the exclusions are.
 [gates.inputs]
 roots = [
   ".agents",
@@ -135,10 +149,19 @@ roots = [
   "web",
 ]
 exclude = [
+  ".agents/worktrees",
+  ".jit/*.lock",
   ".jit/events.jsonl",
-  ".jit/gate-runs/**",
+  ".jit/gate-runs",
   ".jit/index.json",
-  ".jit/issues/**",
+  ".jit/issues",
+  ".jit/server.log",
+  ".jit/server.pid.json",
+  ".jit/tmp",
+  ".jit/worktree.json",
+  "mcp-server/node_modules",
+  "web/dist",
+  "web/node_modules",
 ]
 
 [gates.reserved]
@@ -161,9 +184,10 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the compilation inputs of the jit library — the workspace
-# manifests and sources, plus the profile package and hook files
-# production code embeds.
+# Inputs: the compilation inputs of the jit library — the workspace manifests
+# and sources, plus the profile package and hook files production code embeds.
+# No exclusions: none of these roots carries generated material, and the build
+# directory is not among them.
 [gates.inputs]
 roots = [
   "Cargo.lock",
@@ -282,11 +306,12 @@ pass_context = false
 # citation scanning and archival permanence are separate configured contracts.
 DOCS_FOOTPRINT = "docs/"
 
-# Inputs: the tree-wide footprint. The citation checker scans every
-# tracked file and resolves `@/` items through the repository's
-# registries; the projection checker re-renders through a jit binary
-# built from the workspace. The tracker's records are excluded: no
-# checker here opens them, and every evaluation rewrites them.
+# Inputs: the tree-wide footprint. The citation checker derives its comparison
+# from every tracked file and resolves `@/` items through the repository's
+# registries; the projection checker re-renders through a jit binary built from
+# the workspace; the shipped-policy checker clones the repository and runs
+# `jit init`. The exclusions name generated trees no checker opens and the
+# tracker records every evaluation rewrites.
 [gates.inputs]
 roots = [
   ".agents",
@@ -317,10 +342,19 @@ roots = [
   "web",
 ]
 exclude = [
+  ".agents/worktrees",
+  ".jit/*.lock",
   ".jit/events.jsonl",
-  ".jit/gate-runs/**",
+  ".jit/gate-runs",
   ".jit/index.json",
-  ".jit/issues/**",
+  ".jit/issues",
+  ".jit/server.log",
+  ".jit/server.pid.json",
+  ".jit/tmp",
+  ".jit/worktree.json",
+  "mcp-server/node_modules",
+  "web/dist",
+  "web/node_modules",
 ]
 
 [gates.reserved]
@@ -343,8 +377,9 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the Rust sources the formatter reads, and the manifest it
-# resolves the workspace targets through.
+# Inputs: the Rust sources the formatter reads, and the manifest it resolves the
+# workspace targets through. No exclusions: neither root carries generated
+# material.
 [gates.inputs]
 roots = [
   "Cargo.toml",
@@ -414,8 +449,11 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the bridge workspace, plus the sources of the jit binary its
-# suite generates the tool schema from (it resolves `jit` from PATH).
+# Inputs: the bridge workspace, plus the sources of the jit binary its suite
+# generates the tool schema from (it resolves `jit` from PATH). The installed
+# dependency tree is excluded by declaration rather than digested: it is 27 MB
+# that would be walked on every evaluation, and mcp-server/package-lock.json —
+# tracked, and inside the digest — is what moves when those versions change.
 [gates.inputs]
 roots = [
   "Cargo.lock",
@@ -425,7 +463,9 @@ roots = [
   "profiles",
   "scripts/hooks",
 ]
-exclude = []
+exclude = [
+  "mcp-server/node_modules",
+]
 
 [gates.reserved]
 
@@ -447,13 +487,20 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the web workspace, which is the whole of what this gate
-# tests, lints and builds.
+# Inputs: the web workspace, which is the whole of what this gate tests, lints
+# and builds. Two exclusions, both stated rather than inherited from an ignore
+# rule: `web/dist` is this gate's own build output, and `web/node_modules` is
+# 339 MB that would be walked on every evaluation. The installed tree is not
+# digested; web/package-lock.json is, and it is what moves when a dependency
+# version changes.
 [gates.inputs]
 roots = [
   "web",
 ]
-exclude = []
+exclude = [
+  "web/dist",
+  "web/node_modules",
+]
 
 [gates.reserved]
 
@@ -517,10 +564,11 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: every tracked file, the tracker's own records included —
-# scripts/secret-scan.sh copies the working-tree version of all of
-# them into the scan. Nothing is excluded, so a secret committed to an
-# issue record is a finding rather than a path outside the digest.
+# Inputs: every tracked file, the tracker's records included —
+# scripts/secret-scan.sh copies the working-tree version of all of them into the
+# scan, so a secret committed to an issue record is a finding rather than a path
+# outside the digest. Only generated trees and machine-local state are excluded:
+# `git ls-files` never lists them, so the scan never reads them.
 [gates.inputs]
 roots = [
   ".agents",
@@ -550,7 +598,17 @@ roots = [
   "test-vectors",
   "web",
 ]
-exclude = []
+exclude = [
+  ".agents/worktrees",
+  ".jit/*.lock",
+  ".jit/server.log",
+  ".jit/server.pid.json",
+  ".jit/tmp",
+  ".jit/worktree.json",
+  "mcp-server/node_modules",
+  "web/dist",
+  "web/node_modules",
+]
 
 [gates.reserved]
 
@@ -597,8 +655,9 @@ pass_context = false
 [gates.checker.env]
 
 # Inputs: the tree-wide footprint. `cargo test --lib` reaches the same
-# repository-walking suites cargo-ci does (profile live sources,
-# documentation projections, the repository's own registries).
+# repository-walking suites cargo-ci does (profile live sources, documentation
+# projections, the repository's own registries), so it reads the same tree and
+# excludes the same generated and rewritten material.
 [gates.inputs]
 roots = [
   ".agents",
@@ -629,10 +688,19 @@ roots = [
   "web",
 ]
 exclude = [
+  ".agents/worktrees",
+  ".jit/*.lock",
   ".jit/events.jsonl",
-  ".jit/gate-runs/**",
+  ".jit/gate-runs",
   ".jit/index.json",
-  ".jit/issues/**",
+  ".jit/issues",
+  ".jit/server.log",
+  ".jit/server.pid.json",
+  ".jit/tmp",
+  ".jit/worktree.json",
+  "mcp-server/node_modules",
+  "web/dist",
+  "web/node_modules",
 ]
 
 [gates.reserved]

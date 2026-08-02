@@ -18,10 +18,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   roots with glob exclusions — the same root-and-exclusion shape a profile
   manifest states its live sources in, and the same one the binary's own
   build-input inventory is now expressed as. Evaluating a gate that declares
-  inputs digests their content first, covering files the repository does not
-  track (an uncommitted source file changes what a compiler reads) while
-  leaving ignored build artefacts out, and taking content rather than
-  modification times. When a prior run of that gate recorded the same digest,
+  inputs digests their content first, over every file beneath a declared root
+  that no declared pattern removes — an uncommitted source file changes what a
+  compiler reads, and so does a file the ignore rules name, so both change the
+  digest — and over content rather than modification times. The ignore rules
+  are deliberately not consulted: they describe what a project declines to
+  version, not what a checker reads, and material a checker really does read is
+  routinely ignored, so letting them drop a path would leave the digest still
+  while the checker's inputs moved. Generated material leaves a gate's inputs by
+  being declared out, and naming a directory skips it whole. When a prior run of that gate recorded the same digest,
   the evaluation carries that run's verdict — passed or failed — instead of
   executing the checker. The reuse stays visible: the record names the run it
   was taken from, and `jit gate status --json` reports `inputs_digest` and an

@@ -1049,6 +1049,71 @@ fn test_repo_gates_toml_declares_inputs_for_tree_scoped_gates_only() {
     );
 }
 
+/// REQ-02 (issue 32779829): the digest consults no ignore rule, so every
+/// generated tree a gate does not read leaves its inputs because this
+/// repository's registry says so. Each assertion below fails if the pattern
+/// that removes it is dropped, and the `excludes_directory` half is what keeps
+/// the walk from traversing what it would only discard.
+#[test]
+fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
+    let gates_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.jit/gates.toml");
+    let raw = std::fs::read(&gates_path)
+        .unwrap_or_else(|error| panic!("reading {}: {error}", gates_path.display()));
+    let registry = jit::declarations::parse_gate_registry(&raw)
+        .expect("this repository's gate registry parses");
+    let inputs = |key: &str| {
+        registry
+            .gates
+            .get(key)
+            .unwrap_or_else(|| panic!(".jit/gates.toml must declare the `{key}` gate"))
+            .inputs
+            .as_ref()
+            .unwrap_or_else(|| panic!("gate `{key}` must declare its inputs"))
+    };
+
+    // The web workspace's installed dependency tree is what the ignore rules
+    // used to drop silently. It leaves the digest by declaration now, and the
+    // lockfile that pins it stays in.
+    let web = inputs("npm-ci");
+    assert!(!web.covers("web/node_modules/react/index.js"));
+    assert!(web.excludes_directory("web/node_modules"));
+    assert!(!web.covers("web/dist/index.html"));
+    assert!(
+        web.covers("web/package-lock.json"),
+        "the lockfile pinning the excluded tree must stay in the digest"
+    );
+    assert!(web.covers("web/src/App.tsx"));
+
+    let bridge = inputs("mcp-ci");
+    assert!(!bridge.covers("mcp-server/node_modules/express/index.js"));
+    assert!(bridge.covers("mcp-server/package-lock.json"));
+
+    // The tree-wide gates prune the agent worktrees, which are checkouts of
+    // this repository and dwarf it.
+    for key in ["cargo-ci", "cargo-ci-features", "tests", "docs-mechanical"] {
+        let declared = inputs(key);
+        assert!(
+            declared.excludes_directory(".agents/worktrees"),
+            "gate `{key}` must skip the agent worktrees rather than walk them"
+        );
+        assert!(
+            !declared.covers(".jit/gate-runs/some-run/result.json"),
+            "gate `{key}` must exclude the records every evaluation rewrites"
+        );
+        assert!(
+            declared.covers(".agents/skills/jit-manage/SKILL.md"),
+            "gate `{key}` must keep the packaged skills its suites read"
+        );
+    }
+
+    // The secret scan reads every tracked file, records included; only
+    // generated trees `git ls-files` never lists are excluded.
+    let secrets = inputs("secret-detection");
+    assert!(secrets.covers(".jit/issues/some-issue.json"));
+    assert!(secrets.excludes_directory(".agents/worktrees"));
+    assert!(!secrets.covers("web/node_modules/react/index.js"));
+}
+
 #[test]
 fn test_apply_rejects_invalid_node_label_before_creating_any_node() {
     let h = TestHarness::new();

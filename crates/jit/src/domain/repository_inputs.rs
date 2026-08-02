@@ -282,13 +282,41 @@ impl RepositoryInputs {
     }
 
     /// Whether `repository_path` belongs to this set: some root covers it and
-    /// no exclusion matches it.
+    /// no exclusion removes it.
+    ///
+    /// An exclusion removes a path when a declared pattern matches the path
+    /// itself or any directory above it, so naming a directory takes its whole
+    /// subtree out of the set. Nothing else removes a path: a file present
+    /// beneath a declared root is a member unless the declaration says
+    /// otherwise, whatever any ignore rule says about it.
     pub fn covers(&self, repository_path: &str) -> bool {
         self.roots.iter().any(|root| root.covers(repository_path))
-            && !self
-                .exclude
+            && !self.is_excluded(repository_path)
+    }
+
+    /// Whether no path at or beneath `directory` can belong to this set, so a
+    /// walk may skip it whole.
+    ///
+    /// True exactly when a declared pattern matches `directory` or a directory
+    /// above it — the case where every descendant inherits the exclusion. A
+    /// pattern that reaches only *into* the directory (`build/**`) is not this
+    /// case and does not skip it: the walk descends and removes the matching
+    /// paths one by one, which costs a traversal rather than a wrong answer.
+    pub fn excludes_directory(&self, directory: &str) -> bool {
+        self.is_excluded(directory)
+    }
+
+    /// Whether a declared pattern matches `repository_path` or any directory
+    /// above it.
+    fn is_excluded(&self, repository_path: &str) -> bool {
+        std::iter::successors(Some(repository_path), |path| {
+            path.rsplit_once('/').map(|(parent, _)| parent)
+        })
+        .any(|candidate| {
+            self.exclude
                 .iter()
-                .any(|pattern| pattern.matches(repository_path))
+                .any(|pattern| pattern.matches(candidate))
+        })
     }
 }
 
@@ -561,6 +589,34 @@ mod tests {
         assert!(declared.covers("crates/jit/src/lib.rs"));
         assert!(!declared.covers("crates/jit/fixtures/sample.json"));
         assert!(!declared.covers("docs/index.md"));
+    }
+
+    /// An exclusion naming a directory removes its whole subtree, and says so
+    /// to a walk, which is what lets a large generated tree leave a gate's
+    /// inputs for one declared pattern and no traversal.
+    #[test]
+    fn test_repository_inputs_exclusion_of_a_directory_removes_its_subtree() {
+        let declared = inputs(&["web"], &["web/node_modules"]);
+
+        assert!(declared.excludes_directory("web/node_modules"));
+        assert!(!declared.covers("web/node_modules/react/index.js"));
+        assert!(!declared.covers("web/node_modules"));
+        assert!(declared.covers("web/src/App.tsx"));
+        assert!(!declared.excludes_directory("web/src"));
+    }
+
+    /// A pattern that reaches only into a directory removes the paths it
+    /// matches without claiming the directory itself, so the walk still
+    /// descends. Over-traversal costs time; it never removes an input.
+    #[test]
+    fn test_repository_inputs_exclusion_reaching_into_a_directory_keeps_the_walk() {
+        let declared = inputs(&["web"], &["web/build/**"]);
+
+        assert!(!declared.covers("web/build/bundle.js"));
+        assert!(
+            !declared.excludes_directory("web/build"),
+            "a pattern that does not claim the directory must not skip it"
+        );
     }
 
     #[test]
