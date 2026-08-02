@@ -9,6 +9,7 @@
   ],
   "description": "The package manifest states which repository roots its live assets are drawn from, so the set anything else has to walk or watch is declared data rather than a fact inferred from an inventory.\n\n## Background\n\nThe packaged live assets are drawn from a small number of repository roots: the agent skill tree, the contributed-gate directory, and the tracker's reference directory. Nothing says so. The information exists only implicitly, in the shape of sixty declared asset paths, so anything needing the root set — a build step deciding which directories to watch, a check asking whether every live consumer was packaged — has to infer it or restate it.\n\nThe roots are not usable as bare directories. Fifty-two files under the skill tree and four under the contributed-gate directory are deliberately not packaged: evaluation harnesses, fixtures, transcripts, trigger records, and contributed example prompts. A literal list of those paths would itself be a hand-maintained inventory that goes stale, so exclusions are patterns rather than path literals, and each pattern describes a category rather than a file.\n\nUnknown keys are rejected where the manifest is parsed, so the declaration has to be additive: a manifest without it still parses, and no existing key changes meaning. Keeping the declaration in the manifest rather than in engine code also keeps a repository-local fact inside the package where it belongs.\n\nRoots and patterns are constrained tokens rather than free strings: a malformed entry is rejected at parse time, not discovered later by whatever consumes it. Rejecting a malformed pattern there means compiling it there, so the pattern matcher this work needs is introduced by the type that owns pattern validity rather than by whichever consumer happens to match first.\n\n## Success Criteria\n\n- [hard] REQ-01: The manifest declares one entry per repository root the packaged live assets are drawn from, each carrying its own exclusion-pattern list; a list may be empty, since what belongs in it is measured elsewhere.\n- [hard] REQ-02: A root and an exclusion pattern are constrained types rejected at parse time when malformed, rather than strings passed through untouched.\n- [hard] REQ-03: The addition is additive: a manifest carrying no such declaration still parses, and no existing key changes meaning.\n- [hard] REQ-04: The declaration is carried in the value the package's machine-readable inspection output reports.\n- [hard] REQ-05: Every repository root the packaged live assets are drawn from is declared, and every live asset's target falls under exactly one declared root.\n- [hard] REQ-06: The managed-region source and every install-only asset source fall outside every declared root, so no root claims a package-authored file as a live consumer.\n\n## Notes\n\nPopulating the exclusion lists is measurement work: only a walk over the roots can tell whether a pattern set is sufficient, so the lists are filled by the work that performs that walk.\n\nOne install-only asset's target path lies inside a declared root, unlike its source. It is absent from this repository, which projects that content elsewhere, so the walk does not meet it here; where it does appear it is unpackaged material like any other and a declared exclusion covers it.\n",
   "documents": [],
+  "done_at": "2026-08-02T10:24:17.572601938Z",
   "first_ready_at": "2026-07-28T12:17:11.984851016Z",
   "gates_required": [
     "cargo-ci",
@@ -17,18 +18,18 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-02T09:15:24.576545473Z",
+      "status": "passed",
+      "updated_at": "2026-08-02T10:19:51.219153779Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-02T09:18:12.032686984Z",
+      "status": "passed",
+      "updated_at": "2026-08-02T10:23:04.096470221Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-08-02T09:18:15.256843312Z",
+      "updated_at": "2026-08-02T10:23:07.481757929Z",
       "updated_by": "auto:executor"
     }
   },
@@ -45,7 +46,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Declare the repository roots the packaged live assets are drawn from",
-  "updated_at": "2026-08-02T09:18:15.256843312Z"
+  "updated_at": "2026-08-02T10:24:17.572601938Z"
 }

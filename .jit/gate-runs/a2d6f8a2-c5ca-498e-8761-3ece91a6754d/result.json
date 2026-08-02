@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dcaa4e903439379b5b553ecfc709b3bf49cc9843",
+  "completed_at": "2026-08-02T10:40:59.275686361Z",
+  "duration_ms": 184337,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All seven hard criteria are met by the attributable implementation and its tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0cf1f351-ee24-4b2f-a38c-f9c318a569f9",
+  "message": null,
+  "run_id": "a2d6f8a2-c5ca-498e-8761-3ece91a6754d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T10:37:54.937948272Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 079c63db, 5a9e7f45, 46444356, 4803c7d5, dcaa4e90\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-6 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/single-source-prose (.jit/invariants.toml); @/issue/0cf1f351/requirement/REQ-05 (.jit/issues/0cf1f351-ee24-4b2f-a38c-f9c318a569f9.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-02T10:30:32Z)\nTruncation recovery: narrowed 079c63db/5a9e7f45 patches, 4803c7d5 per-parent patch, and affected current source and registry reads.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All seven hard criteria are met by the attributable implementation and its tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

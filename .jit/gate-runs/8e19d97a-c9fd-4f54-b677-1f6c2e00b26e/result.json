@@ -1,0 +1,35 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "da6a73d61809db09a8edd0330982e0491f824296",
+  "completed_at": "2026-08-02T10:23:03.803252689Z",
+  "duration_ms": 191480,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "CHANGELOG.md",
+        "id": "F1",
+        "line": 22,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "Changelog describes root-relative matching, while the implementation matches repository-relative paths."
+      }
+    ],
+    "summary": "All issue criteria and the prior completeness-walk finding are satisfied in the current tree; one unrelated changelog drift remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "39c34568-98ee-47d6-ba5f-875b06c59285",
+  "message": null,
+  "run_id": "8e19d97a-c9fd-4f54-b677-1f6c2e00b26e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-02T10:19:52.322569515Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 953845eb, 2b98eaf2, 46cfae8e, ab55c464, 6c0037d6 (merge), a89586ec (`jit:39c34568`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; issue e204e63d Markdown description\nResolved items: @/issue/e204e63d/decision/D-2 and D-6 (issue description); @/invariant/semantic-types, canonical-cutover, convention-convergence, bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0, 2026-08-02T10:10:12Z); mcp-ci passed (0, 2026-08-02T09:18:13Z); code-review failed (1, prior run, superseded behavior inspected)\nTruncation recovery: narrowed reads of config, registry, gate, manifest, and dogfood-test ranges after truncated broad output\n\n1. [advisory][pre-existing] [CHANGELOG.md:22](/home/vkaskivuo/Projects/just-in-time/CHANGELOG.md:22) says exclusions match root-relative paths, but the current implementation matches repository-relative paths ([manifest.rs:162](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/profile/manifest.rs:162)). This drift was introduced by unrelated `jit:0cf1f351` work.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue criteria and the prior completeness-walk finding are satisfied in the current tree; one unrelated changelog drift remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Changelog describes root-relative matching, while the implementation matches repository-relative paths.\",\"file\":\"CHANGELOG.md\",\"line\":22,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

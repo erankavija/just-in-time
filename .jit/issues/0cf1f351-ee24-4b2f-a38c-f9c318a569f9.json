@@ -7,12 +7,24 @@
   ],
   "description": "A repository file beneath a declared live-source root that is neither a packaged asset nor matched by a declared exclusion fails the suite, so a new live consumer cannot be left out of adopter installs unnoticed.\n\n## Background\n\nThe existing drift assertion walks one direction only. For each declared asset it reads the repository file it mirrors and compares bytes; nothing enumerates repository files and asks whether each was declared. A new consumer added under a packaged root is therefore absent from every adopter install with nothing reporting it, and the nearest existing guard is a hand-written four-path spot check — a sample, and itself a hand-maintained list.\n\nThe reverse direction is already closed inside the package: package validation rejects a file present in the package directory that the manifest does not declare. That says nothing about the repository tree, which is the gap here.\n\nTwo properties shape the walk. Exclusions have to be patterns, because the non-packaged material under the declared roots runs to dozens of files — evaluation harnesses, fixtures, transcripts, this repository's own scripts, review prompts — and enumerating them as literals reproduces the hand-maintained inventory the check exists to eliminate. And the walk has to consider only files the repository tracks, so a contributor's scratch file under a packaged root is not reported as a packaging defect; a run that cannot obtain that listing has to fail rather than pass on an empty set.\n\n## Success Criteria\n\n- [hard] REQ-01: A test walks each declared live-source root and reports a file that is neither a declared packaged asset nor matched by a declared exclusion.\n- [hard] REQ-02: The report names the offending path, so the reader can decide between packaging it and excluding it.\n- [hard] REQ-03: Exclusion patterns are globs matched against repository-relative paths, so a directory of unpackaged material costs one entry rather than one per file.\n- [hard] REQ-04: The declared exclusions cover the unpackaged material present under those roots today, and the test passes against the current tree.\n- [hard] REQ-05: An unpackaged file added under a declared root that no exclusion matches fails the test.\n- [hard] REQ-06: The walk considers only paths the repository tracks, and a run that cannot obtain that listing fails rather than passing on an empty set.\n- [hard] REQ-07: Every packaged live asset is covered by some declared root, so no packaged file escapes the check.\n\n## Notes\n\nExclusion patterns are chosen to describe categories of material rather than individual files, so that a further evaluation harness or review prompt of the same shape needs no new entry. The script root is the case where this matters most: it already holds this repository's own documentation-generation and check scripts, more of them are being written in parallel with this work, and a pattern covering that category keeps the declaration correct whichever order those land in.\n\nThe workspace's established repository-inventory idiom lists untracked non-ignored paths alongside tracked ones, which is the opposite of the property this walk needs. Copying that flag set would report a contributor's scratch file as a packaging defect; the listing here is the tracked-only one.\n\nThe pattern matcher is already available through the type that validates the declared patterns, so this work adds no dependency of its own.\n",
   "documents": [],
+  "done_at": "2026-08-02T10:42:13.315135305Z",
   "first_ready_at": "2026-07-31T16:09:58.865893301Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-02T10:37:53.864047944Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-02T10:40:59.588706875Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0cf1f351-ee24-4b2f-a38c-f9c318a569f9",
   "labels": [
     "epic:derived-package-sources",
@@ -25,7 +37,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Fail on a repository file under a declared root that no packaged asset claims",
-  "updated_at": "2026-07-31T16:39:18.767530001Z"
+  "updated_at": "2026-08-02T10:42:13.315135305Z"
 }

@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
   "dependencies": [
+    "32779829-319f-40b0-bd41-fe213f4885fc",
     "5dd0df5b-bd5d-44d5-9aa8-b94228c7fe55",
     "c7058cac-cd23-4692-9b4b-01059cdedf8b"
   ],
@@ -28,5 +29,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Reduce the workflow package to its delta over the default",
-  "updated_at": "2026-07-31T17:58:48.587041590Z"
+  "updated_at": "2026-08-02T10:53:10.957097043Z"
 }
