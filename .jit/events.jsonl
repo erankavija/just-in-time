@@ -12417,3 +12417,5 @@
 {"fields":["dependencies"],"id":"4528343f-c39a-481a-990d-4ac59aeddc55","issue_id":"0db28190-29bf-4a52-8c47-804f7842a815","timestamp":"2026-08-02T10:53:05.829298961Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"6c05c460-2b98-482a-880b-288a1b867491","issue_id":"e4ba28c5-c95b-4e28-add0-b7853826c9f6","timestamp":"2026-08-02T10:53:10.957097043Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"c1c941b3-b004-4578-98ff-b50c5adfe68a","issue_id":"5d12a79f-c29e-43ba-b14c-1f030790c01e","timestamp":"2026-08-02T10:53:16.097221925Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"0511986e-9c9f-4d58-aa5d-d3ce2511aa69","issue_id":"32779829-319f-40b0-bd41-fe213f4885fc","timestamp":"2026-08-02T10:54:19.579801929Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"17754173-3daf-4250-a6a9-103d8764b4c1","issue_id":"32779829-319f-40b0-bd41-fe213f4885fc","timestamp":"2026-08-02T10:54:19.579801929Z","type":"issue_claimed"}
