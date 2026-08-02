@@ -1,21 +1,23 @@
-//! Embedded production package for jit's repository-neutral dogfood workflow.
+//! Compiled-in production packages for jit's repository-neutral profiles.
 
 use super::{ProfilePackage, ProfilePackageError};
 use crate::declarations::GateDefinition;
 use crate::repository_state::{Contribution, KeyedArrayTarget};
 use include_dir::{include_dir, Dir};
 
+static JIT_DEFAULT_DIRECTORY: Dir<'_> =
+    include_dir!("$CARGO_MANIFEST_DIR/../../profiles/jit-default");
 static JIT_DOGFOOD_DIRECTORY: Dir<'_> =
     include_dir!("$CARGO_MANIFEST_DIR/../../profiles/jit-dogfood");
 
 /// Package-source prefix identifying assets that also project into this source tree.
 pub const JIT_DOGFOOD_LIVE_SOURCE_PREFIX: &str = "assets/live/";
 
-/// Failures loading or projecting the embedded dogfood workflow.
+/// Failures loading or projecting a compiled-in profile package.
 #[derive(Debug, thiserror::Error)]
-pub enum DogfoodProfileError {
-    /// The production package failed immutable package validation.
-    #[error("invalid embedded jit-dogfood package: {0}")]
+pub enum EmbeddedProfileError {
+    /// A compiled-in package failed immutable package validation.
+    #[error("invalid embedded profile package: {0}")]
     Package(#[from] ProfilePackageError),
     /// A requested gate is absent from the package.
     #[error("jit-dogfood package does not declare gate '{0}'")]
@@ -33,13 +35,18 @@ pub enum DogfoodProfileError {
     },
 }
 
+/// Load the recursively embedded, immutable `jit-default` package.
+pub fn jit_default_package() -> Result<ProfilePackage, EmbeddedProfileError> {
+    ProfilePackage::from_embedded_dir(&JIT_DEFAULT_DIRECTORY).map_err(Into::into)
+}
+
 /// Load the recursively embedded, immutable `jit-dogfood` package.
-pub fn jit_dogfood_package() -> Result<ProfilePackage, DogfoodProfileError> {
+pub fn jit_dogfood_package() -> Result<ProfilePackage, EmbeddedProfileError> {
     ProfilePackage::from_embedded_dir(&JIT_DOGFOOD_DIRECTORY).map_err(Into::into)
 }
 
 /// Deserialize one gate definition from the package's authored gate inventory.
-pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, DogfoodProfileError> {
+pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, EmbeddedProfileError> {
     let package = jit_dogfood_package()?;
     let value = package
         .manifest()
@@ -55,9 +62,9 @@ pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, DogfoodProfileError
             }
             _ => None,
         })
-        .ok_or_else(|| DogfoodProfileError::MissingGate(key.to_string()))?;
+        .ok_or_else(|| EmbeddedProfileError::MissingGate(key.to_string()))?;
 
-    serde_json::from_value(value).map_err(|source| DogfoodProfileError::InvalidGate {
+    serde_json::from_value(value).map_err(|source| EmbeddedProfileError::InvalidGate {
         key: key.to_string(),
         source,
     })
@@ -67,7 +74,7 @@ pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, DogfoodProfileError
 ///
 /// Anchor-only gates are excluded, so this is also the compatibility preset
 /// inventory used by [`crate::gate_presets::BuiltinPresets`].
-pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, DogfoodProfileError> {
+pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, EmbeddedProfileError> {
     let package = jit_dogfood_package()?;
     let template = package
         .manifest()
@@ -82,13 +89,13 @@ pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, DogfoodProfileErr
             _ => None,
         })
         .ok_or_else(|| {
-            DogfoodProfileError::InvalidPlanningTemplate("missing 'plan' template".to_string())
+            EmbeddedProfileError::InvalidPlanningTemplate("missing 'plan' template".to_string())
         })?;
     let nodes = template
         .get("nodes")
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| {
-            DogfoodProfileError::InvalidPlanningTemplate(
+            EmbeddedProfileError::InvalidPlanningTemplate(
                 "'plan' template has no node array".to_string(),
             )
         })?;
@@ -98,13 +105,13 @@ pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, DogfoodProfileErr
             .get("gates")
             .and_then(serde_json::Value::as_array)
             .ok_or_else(|| {
-                DogfoodProfileError::InvalidPlanningTemplate(
+                EmbeddedProfileError::InvalidPlanningTemplate(
                     "a 'plan' template node has no gate array".to_string(),
                 )
             })?;
         for gate in gates {
             let key = gate.as_str().ok_or_else(|| {
-                DogfoodProfileError::InvalidPlanningTemplate(
+                EmbeddedProfileError::InvalidPlanningTemplate(
                     "a 'plan' template gate is not a string".to_string(),
                 )
             })?;
