@@ -50,30 +50,9 @@ Schema version. Required for newer features like namespace registry and document
 [documentation]
 development_root = "dev"
 archive_root = "dev/archive"
-managed_paths = [
-  "dev/active",
-  "dev/studies",
-  "dev/sessions",
-  "dev/plans",
-  "dev/presentations",
-  "dev/design",
-  "dev/benchmarks",
-  "dev/experiments",
-]
-permanent_paths = [
-  "dev/architecture",
-  "dev/eval",
-  "dev/vision",
-  "dev/index.md",
-  "dev/TESTING.md",
-  "dev/authoring-conventions.md",
-]
-issue_scoped_areas = [
-  "dev/active",
-  "dev/studies",
-  "dev/plans",
-  "dev/presentations",
-]
+managed_paths = ["dev/active", "dev/studies", "dev/sessions", "dev/plans", "dev/presentations", "dev/design", "dev/benchmarks", "dev/experiments"]
+permanent_paths = ["dev/architecture", "dev/eval", "dev/vision", "dev/index.md", "dev/TESTING.md", "dev/authoring-conventions.md"]
+issue_scoped_areas = ["dev/active", "dev/studies", "dev/plans", "dev/presentations"]
 ```
 <!-- jit:shipped-documentation-policy:end -->
 
