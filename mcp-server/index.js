@@ -46,7 +46,7 @@ Key concepts:
 
 Containment is DAG-authoritative:
 - Dependency edges define containment: a container issue depends on the issues it contains, so a container's outgoing dependencies are its contents
-- Membership labels (grouping tags such as an epic or milestone label) are advisory only; resolving structure never consults an issue's claimed group
+- Membership labels (grouping tags in the namespaces this repository's configuration associates with types) are advisory only; resolving structure never consults an issue's claimed group
 - Because containment follows dependency, blocking follows the same edges: a container reaches a workable state only once its whole contained subtree is terminal
 - Read structure from jit_graph_tree, the resolved parent/child hierarchy, instead of inferring it from label prefixes
 - Run jit_query_divergence to find issues whose membership label disagrees with the DAG. When they disagree, trust the DAG: fix the label or the dependency edges, not the resolved structure
