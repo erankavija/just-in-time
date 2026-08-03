@@ -278,8 +278,9 @@ pub enum Commands {
     /// Items are structured lines in issue descriptions (e.g. requirements) that
     /// carry a self-id and are addressable by a uniform kind-segmented qualified id
     /// (`@/issue/<short-id>/<kind>/<self-id>` for an issue item, `@/<kind>/<self-id>`
-    /// for a project item). Kinds are declared in `[item_kinds]` config; with no such table no kinds
-    /// are declared (`jit init` scaffolds the table). Markdown stays the source of
+    /// for a project item). Kinds are declared in `[item_kinds]` config; a profile
+    /// package or repository author can supply the table, and with no table no kinds
+    /// exist. Markdown stays the source of
     /// truth — the index is a projection. A kind may declare `aliases` in config;
     /// an alias is accepted anywhere a kind name is (the kind segment of an address,
     /// and `--kind` filters), e.g. `@/inv/<self-id>` for the `invariant` kind, while

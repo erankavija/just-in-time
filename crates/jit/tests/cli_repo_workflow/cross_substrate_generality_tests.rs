@@ -1,13 +1,13 @@
 //! Acceptance test for cross-substrate generality across four representative item
-//! kinds among those `jit init` scaffolds (JIT issue 72cdf315, REQ-04). Two more
-//! scaffolded kinds, `rule` (jit:cdc33a0f, registry-first over `.jit/rules.toml`)
+//! kinds among those supplied by the `jit-default` package (JIT issue 72cdf315,
+//! REQ-04). Two more package-supplied kinds, `rule` (jit:cdc33a0f, registry-first over `.jit/rules.toml`)
 //! and `gate` (jit:bb7d57a2, registry-first over `.jit/gates.toml`), are each
 //! covered by their own resolution test and are not this fixture's concern.
 //!
 //! ## What this file proves
 //!
-//! These four item kinds are declared by the `[item_kinds]` table `jit init`
-//! emits (the engine bakes in none) and route through ONE generic engine
+//! These four item kinds are declared by the `jit-default` package's
+//! `[item_kinds]` table (the engine bakes in none) and route through ONE generic engine
 //! (`list_items` / `search_items` / `show_item` in `commands/item.rs`):
 //!
 //! - **issue-scope, markdown-first** — `requirement` (`## Success Criteria`,

@@ -122,8 +122,9 @@ them in `.jit/templates.toml`'s top-level `[roles]` and `[anchors]` tables — s
 > built-in default) derives its allowed-type enum from `[type_hierarchy]` in
 > memory at load, so adding `planning` / `breakdown` to config recognizes them on
 > the next command with no regeneration step. The `schemas/default-*.json` files
-> `jit init` scaffolds are regenerated projections for external consumers, not the
-> validation authority.
+> The schemas are regenerated projections for external consumers, not the
+> validation authority. Their contents follow the registries declared by the
+> repository or supplied by the profile package it applies.
 
 Declare the `brackets:` namespace so `B`'s container pointer validates cleanly:
 

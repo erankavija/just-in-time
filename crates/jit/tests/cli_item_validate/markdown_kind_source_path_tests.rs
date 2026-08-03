@@ -9,7 +9,7 @@
 //! source path.
 //!
 //! The fixture:
-//! - A fresh, isolated temp repo (`jit init`).
+//! - A fresh, isolated temp repo initialized with the default package.
 //! - A custom `[item_kinds.policy]` table written into that repo's
 //!   `.jit/config.toml`, naming an arbitrary source file (`policies.md`).
 //! - A `policies.md` created at the repo root with two items (`POL-01`,
@@ -176,7 +176,7 @@ fn test_config_declared_markdown_kind_indexes_project_items() {
 
     // -----------------------------------------------------------------------
     // Part 2: `--kind policy` returns exactly the two policy items and nothing
-    // else (no issue-scope items from built-in kinds bleed into the result).
+    // else (no issue-scope items from the package-supplied kinds bleed into the result).
     // -----------------------------------------------------------------------
     let by_kind = item_list(temp.path(), Some("policy"));
     assert_eq!(

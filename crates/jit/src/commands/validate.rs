@@ -3623,8 +3623,8 @@ statement = \"Every dependency edge stays acyclic.\"
 kind = \"enforced\"
 ";
 
-    /// The complete `[item_kinds]` table `jit init` authors. The engine bakes in no
-    /// kinds, so the dangling-link pass (which owns a label's namespace only when a
+    /// The complete `[item_kinds]` table supplied by the package. The engine bakes
+    /// in no kinds, so the dangling-link pass (which owns a label's namespace only when a
     /// declared kind claims it) needs the table to recognize the test labels.
     const CANONICAL_ITEM_KINDS: &str = "\
 [item_kinds.requirement]

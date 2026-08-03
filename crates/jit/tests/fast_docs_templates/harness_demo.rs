@@ -314,7 +314,7 @@ fn test_harness_item_list_and_resolve() {
 fn test_harness_item_kind_compatible_with_label_coverage() {
     use jit::domain::item::ItemKind;
 
-    // REQ-05: the canonical requirement kind (as `jit init` authors it) expands to
+    // REQ-05: the canonical requirement kind (as supplied by the package) expands to
     // exactly the (section, marker, id-pattern) triple the label-coverage rule
     // consumes by default, so the coverage machinery is compatible with the item
     // model without rewriting any rule.

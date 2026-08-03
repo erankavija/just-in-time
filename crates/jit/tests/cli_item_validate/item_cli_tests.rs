@@ -42,7 +42,8 @@ fn test_item_list_indexes_requirements() {
     let short = create_issue(temp.path(), "Foundational", body);
 
     // Scoped to `requirement`: an unfiltered list also carries the project-scope
-    // `rule` items `jit init` scaffolds via `.jit/rules.toml` (jit:cdc33a0f).
+    // `rule` items the applied package contributes via `.jit/rules.toml`
+    // (jit:cdc33a0f).
     let output = Command::new(jit_binary())
         .args(["item", "list", "--kind", "requirement", "--json"])
         .current_dir(temp.path())
@@ -71,7 +72,7 @@ fn test_item_list_kind_filter() {
         "## Success Criteria\n\n- [hard] REQ-01: a\n",
     );
 
-    // The built-in kind name matches.
+    // The package-supplied kind name matches.
     let output = Command::new(jit_binary())
         .args(["item", "list", "--kind", "requirement", "--json"])
         .current_dir(temp.path())
@@ -80,7 +81,7 @@ fn test_item_list_kind_filter() {
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["count"].as_u64().unwrap(), 1);
 
-    // `decision` is now a shipped built-in kind, so it is recognized; this issue
+    // `decision` is supplied by the applied package, so it is recognized; this issue
     // has no `## Decisions` section, so the recognized kind yields 0 items (not an
     // error). (Decision indexing is covered in decision_kind_tests.rs.)
     let output = Command::new(jit_binary())
@@ -111,7 +112,8 @@ fn test_item_graceful_degradation() {
     create_issue(temp.path(), "Mixed", body);
 
     // Scoped to `requirement`: an unfiltered list also carries the project-scope
-    // `rule` items `jit init` scaffolds via `.jit/rules.toml` (jit:cdc33a0f).
+    // `rule` items the applied package contributes via `.jit/rules.toml`
+    // (jit:cdc33a0f).
     let output = Command::new(jit_binary())
         .args(["item", "list", "--kind", "requirement", "--json"])
         .current_dir(temp.path())
@@ -190,7 +192,7 @@ fn test_item_search_by_text() {
 fn test_item_custom_kind_from_config() {
     let temp = setup_test_repo();
     // Declare a domain-agnostic custom kind in config (a name JIT does NOT ship as
-    // a built-in); the engine indexes it purely from its tuple, never from its
+    // a package-supplied kind); the engine indexes it purely from its tuple, never from its
     // name (REQ-01). An explicit declaration sets all six required fields.
     let config_path = temp.path().join(".jit").join("config.toml");
     let mut config = std::fs::read_to_string(&config_path).unwrap_or_default();
@@ -305,7 +307,7 @@ fn test_item_command_failure_emits_json() {
 }
 
 /// Append to `.jit/config.toml` a markdown-first project-scope `glossary` kind
-/// sourced from `project-items.md` (preserving any config `jit init` wrote), and
+/// sourced from `project-items.md` (preserving the existing config), and
 /// optionally write that source file.
 ///
 /// Uses the name `glossary` to exercise generic markdown-first project-scope
@@ -426,8 +428,8 @@ fn test_item_show_project_scope_absent_source_is_graceful() {
 #[test]
 fn test_item_list_kind_invariant_registry_first_through_real_cli() {
     // REQ-01 + Finding 1/2 (rework): the SHIPPED CLI returns each invariant from
-    // `.jit/invariants.toml` as `@/<kind>/<self-id>`, with NO `[item_kinds]` config (the
-    // built-in registry-first invariant kind), and NO markdown source involved.
+    // `.jit/invariants.toml` as `@/<kind>/<self-id>`, with the package-supplied
+    // registry-first invariant kind and NO markdown source involved.
     let temp = setup_test_repo();
     std::fs::write(
         temp.path().join(".jit").join("invariants.toml"),
@@ -511,7 +513,7 @@ fn test_item_list_kind_invariant_registry_first_through_real_cli() {
 
 #[test]
 fn test_item_kind_alias_resolves_through_real_cli() {
-    // REQ-01/REQ-03: the SHIPPED `jit init` scaffold declares `aliases = ["inv"]`
+    // REQ-01/REQ-03: the shipped package declares `aliases = ["inv"]`
     // on the invariant kind. The alias is accepted anywhere the registry name is
     // (the `--kind` filter and the kind segment of a project-scope address), and
     // canonical output still uses the registry name `invariant`.
@@ -574,7 +576,7 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
     // source like any other markdown-first project kind.
     let temp = setup_test_repo();
     let config_path = temp.path().join(".jit").join("config.toml");
-    // REPLACE the init-emitted (registry-first) `invariant` kind with a
+    // REPLACE the package-supplied (registry-first) `invariant` kind with a
     // markdown-first one: the `invariant` name carries no reserved routing, so a
     // markdown-first project `invariant` kind (once rejected) now resolves as
     // ordinary config and indexes from its declared markdown source.
@@ -621,8 +623,8 @@ fn test_invariant_name_is_no_longer_reserved_through_real_cli() {
 fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
     // REQ-02, REQ-03 (jit:42898915): the SHIPPED CLI addresses gates from
     // `.jit/gates.toml` as `@/gate/<key>`, a project-scoped registry-first kind
-    // mirroring `invariant`/`rule`. `[item_kinds.gate]` is part of the `jit init`
-    // scaffold (jit:bb7d57a2), so a default-initialized repo already declares it;
+    // mirroring `invariant`/`rule`. `[item_kinds.gate]` is supplied by the applied
+    // package (jit:bb7d57a2), so a profiled repo already declares it;
     // this test only needs to seed a gate entry in `.jit/gates.toml`.
     let temp = setup_test_repo();
 
@@ -679,7 +681,7 @@ fn test_item_list_and_show_kind_gate_registry_first_through_real_cli() {
 /// Append a `config.toml` namespace registration so the `satisfies` link-namespace
 /// label passes the default namespace-registry check, leaving the
 /// dangling-item-link finding as the only validation error under test.
-/// `enforces` is NOT appended here: `jit init` already declares
+/// `enforces` is NOT appended here: the applied package already declares
 /// `[namespaces.enforces]` (jit:d30695e4), so appending it again would define the
 /// same TOML table twice and fail to parse.
 fn register_link_namespaces(dir: &std::path::Path) {
@@ -819,13 +821,13 @@ fn test_validate_passes_with_enforces_rule_and_gate_links_through_real_cli() {
     // `link-namespaces = ["enforces"]`, so an authored `enforces:@/rule/<name>`
     // and `enforces:@/gate/<key>` label both resolve through the shipped `jit
     // item show`, AND `jit validate` reports neither a dangling-item-link finding
-    // (the labels resolve) nor a namespace-registry finding (`jit init` now
+    // (the labels resolve) nor a namespace-registry finding (the applied package
     // declares `[namespaces.enforces]`) — no `register_link_namespaces` helper
     // needed here, unlike the `satisfies` tests above.
     let temp = setup_test_repo();
 
-    // `jit init` scaffolds `.jit/rules.toml` with a default `label-format` rule
-    // but leaves `.jit/gates.toml` empty; define a gate so `@/gate/cargo-ci`
+    // Bare init writes `.jit/rules.toml` with the default `label-format` rule
+    // and leaves `.jit/gates.toml` empty; define a gate so `@/gate/cargo-ci`
     // resolves.
     let define_output = Command::new(jit_binary())
         .args([
@@ -930,7 +932,7 @@ fn test_validate_passes_with_enforces_rule_and_gate_links_through_real_cli() {
         !findings
             .iter()
             .any(|f| f["rule"].as_str() == Some("namespace-registry")),
-        "jit init must register the enforces namespace: {json}"
+        "the applied package must register the enforces namespace: {json}"
     );
 }
 
@@ -938,7 +940,7 @@ fn test_validate_passes_with_enforces_rule_and_gate_links_through_real_cli() {
 fn test_item_list_qualified_ids_round_trip_through_show() {
     // REQ-01/REQ-04: every qualified id `jit item list --json` prints is itself a
     // canonical kind-segmented address that resolves through `jit item show`,
-    // yielding the SAME id back. Exercises both substrates the `jit init` scaffold
+    // yielding the SAME id back. Exercises both substrates the applied package
     // populates: issue-scope items (from the created issue's markdown) and
     // project-scope registry-first items (the seeded `.jit/rules.toml` rules).
     let temp = setup_test_repo();
@@ -958,7 +960,7 @@ fn test_item_list_qualified_ids_round_trip_through_show() {
     let items = list["items"].as_array().unwrap();
     assert!(
         !items.is_empty(),
-        "the init scaffold must list at least the created issue's requirements"
+        "the applied package must list at least the created issue's requirements"
     );
 
     let mut saw_issue_scope = false;
@@ -1005,7 +1007,7 @@ fn test_item_list_qualified_ids_round_trip_through_show() {
     );
     assert!(
         saw_project_scope,
-        "the init-scaffolded rules registry must appear as project-scope items"
+        "the package-contributed rules registry must appear as project-scope items"
     );
 }
 
@@ -1016,7 +1018,8 @@ fn test_item_show_rule_renders_description_and_name_fallback() {
     // `description`), and a description-less rule falls back to its NAME.
     let temp = setup_test_repo();
 
-    // `jit init` seeds `.jit/rules.toml` with described default rules; append a
+    // The applied package contributes described default rules to `.jit/rules.toml`;
+    // append a
     // hand-authored rule that deliberately omits `description` to exercise the
     // name fallback on the same registry.
     let rules_path = temp.path().join(".jit").join("rules.toml");

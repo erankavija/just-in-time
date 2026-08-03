@@ -100,7 +100,8 @@ structured item inside another issue's description:
 - `satisfies:56ab0224/REQ-01` — `<short-id>/<self-id>`, an item inside an issue
 
 The `satisfies:` namespace above is this repository's own configuration, not a
-`jit init` default; the address *form* of a value is part of the shipped format.
+generic package declaration; the address *form* of a value is part of the
+shipped format.
 
 ### Enforcement
 
@@ -119,13 +120,15 @@ The command exits 4 (validation failure) and the issue is left untouched.
 
 ## Standard Namespaces (Registry)
 
-### Core Namespaces (Built-in)
+### Core Namespace Examples
 
 Namespaces are declared in `.jit/config.toml` under `[namespaces.<name>]` tables.
-`jit init` seeds a starter registry directly in the generated `config.toml`, ready
-to customize. To see what the current repository declares, run `jit label namespaces`.
+A profile package can contribute a starter registry, and a repository author can
+declare one directly; a bare initialization declares no namespaces. To see what
+the current repository declares, run `jit label namespaces`.
 
-For example, the built-in `type` and `priority` namespaces both set `unique`:
+For example, the `jit-default` package's `type` and `priority` namespaces both
+set `unique`:
 
 ```toml
 [namespaces.type]
@@ -235,9 +238,9 @@ issue. A type label is not universally required.
 
 The `type:*` namespace defines the kind of work an issue represents. The set of
 valid type values is not built in: it is whatever `[type_hierarchy].types`
-declares in `.jit/config.toml` (`@/inv/domain-agnostic`). The `jit init` scaffold
+declares in `.jit/config.toml` (`@/inv/domain-agnostic`). The `jit-default` package
 declares a four-level `milestone → epic → story → task` hierarchy; a project that
-needs `bug`, `research`, or `theme` types adds them there. See
+needs `bug`, `research`, or `theme` types adds them to its own declaration. See
 [Configuration](#configuration) below.
 
 Write the type with `--type <kind>`, which is validated against the declared
@@ -740,7 +743,8 @@ jit issue create \
 ### Namespace Reference Table
 
 The registry is per-repository; `jit label namespaces` is authoritative for yours.
-The namespaces `jit init` scaffolds behave as follows.
+The following table describes the declarations in the `jit-default` package; a
+bare repository has none until it applies a package or authors its own registry.
 
 **Carried by every issue:**
 

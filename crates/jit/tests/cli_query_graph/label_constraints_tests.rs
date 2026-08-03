@@ -115,7 +115,8 @@ unique = true
 
 // ------------------------------------------------------------------
 // CLI: `jit config show --json` surfaces the namespace registry, and
-// `jit init` scaffolds only the fixed default rules (no value/pattern/required)
+// The applied taxonomy fixture contributes only the fixed default rules (no
+// value/pattern/required rules)
 // ------------------------------------------------------------------
 
 #[test]
@@ -154,26 +155,26 @@ fn test_config_show_json_includes_namespace_registry() {
     assert_eq!(type_ns["unique"], serde_json::json!(true));
     assert!(namespaces.get(membership_namespace).is_some());
 
-    // The scaffolded rules.toml carries the FIXED default rules only: the
+    // The applied taxonomy fixture's rules.toml carries the FIXED default rules:
     // canonical format, the namespace registry, type-hierarchy-known, the
     // per-unique-namespace uniqueness rules, and the two graph warnings. The
     // removed `values` / `pattern` / `required` rules are NOT present.
     let rules_toml = std::fs::read_to_string(temp.path().join(".jit/rules.toml"))
-        .expect("rules.toml scaffolded");
+        .expect("rules.toml written by the fixture");
     assert!(
         rules_toml.contains("namespace-unique-type"),
-        "uniqueness rule must be scaffolded: {rules_toml}"
+        "uniqueness rule must be registry-derived: {rules_toml}"
     );
     assert!(
         !rules_toml.contains("namespace-values-"),
-        "namespace-values rules must NOT be scaffolded: {rules_toml}"
+        "namespace-values rules must NOT be registry-derived: {rules_toml}"
     );
     assert!(
         !rules_toml.contains("namespace-required-"),
-        "namespace-required rules must NOT be scaffolded"
+        "namespace-required rules must NOT be registry-derived"
     );
     assert!(
         !rules_toml.contains("namespace-pattern-"),
-        "namespace-pattern rules must NOT be scaffolded"
+        "namespace-pattern rules must NOT be registry-derived"
     );
 }

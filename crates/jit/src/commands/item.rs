@@ -67,7 +67,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Resolve the effective item kinds from the cached `[item_kinds]` registry.
     ///
     /// The engine bakes in no kinds: with no `[item_kinds]` table the result is
-    /// empty (see [`resolve_item_kinds`]). `jit init` scaffolds the table.
+    /// empty (see [`resolve_item_kinds`]). A profile package or repository-authored
+    /// config can supply the table.
     pub(crate) fn item_kinds(&self) -> Result<Vec<ItemKind>> {
         let config = self.cached_config()?;
         resolve_item_kinds(config.item_kinds.as_ref()).map_err(|err| {
@@ -553,8 +554,8 @@ mod tests {
     use super::*;
     use crate::storage::InMemoryStorage;
 
-    /// The five markdown/registry kinds from the `[item_kinds]` table `jit init`
-    /// authors. The scaffold also declares `gate` (jit:bb7d57a2), omitted here
+    /// The five markdown/registry kinds from the package-supplied `[item_kinds]`
+    /// table. The package also declares `gate` (jit:bb7d57a2), omitted here
     /// because its registry-first source starts empty on a fresh init and these
     /// synthetic-root tests have no gate registry to index — gate resolution is
     /// exercised via [`GATE_ITEM_KIND`] below. The engine bakes in no kinds, so
@@ -1199,8 +1200,8 @@ statement = \"Every dependency edge stays acyclic.\"
     }
 
     /// Build an executor whose synthetic repo carries `.jit/invariants.toml` with
-    /// `invariants_toml` and the canonical `[item_kinds]` table (the set `jit init`
-    /// authors), exercising the registry-first invariant path.
+    /// `invariants_toml` and the canonical `[item_kinds]` table (the package-supplied
+    /// set), exercising the registry-first invariant path.
     ///
     /// The registry is served through the storage boundary (the in-memory repo-file
     /// map) at the `.jit/invariants.toml` path the invariant kind's toml descriptor
@@ -1220,8 +1221,8 @@ statement = \"Every dependency edge stays acyclic.\"
     }
 
     /// Build an executor whose synthetic repo carries `.jit/rules.toml` with
-    /// `rules_toml` and the canonical `[item_kinds]` table (the set `jit init`
-    /// authors, now including `rule`), exercising the registry-first rule path —
+    /// `rules_toml` and the canonical `[item_kinds]` table (the package-supplied
+    /// set, now including `rule`), exercising the registry-first rule path —
     /// the same pattern [`registry_exec`] establishes for invariants.
     fn registry_exec_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
         let storage = InMemoryStorage::new();
@@ -1321,10 +1322,10 @@ enforce = true
     }
 
     /// A standalone `[item_kinds.gate]` declaration sourced from `.jit/gates.toml`
-    /// (jit:42898915), mirroring the live repo's config. `gate` IS part of the
-    /// `jit init` scaffold (jit:bb7d57a2), but stays out of [`CANONICAL_ITEM_KINDS`]
-    /// in these tests: a freshly-scaffolded `.jit/gates.toml` starts empty (`jit
-    /// init` seeds no default gates the way it seeds default rules), so canonical-set
+    /// (jit:42898915), mirroring the live repo's config. `gate` is supplied by the
+    /// package (jit:bb7d57a2), but stays out of [`CANONICAL_ITEM_KINDS`] in these
+    /// tests: a freshly initialized `.jit/gates.toml` starts empty (bare init
+    /// seeds no default gates), so canonical-set
     /// tests would have nothing to index. This mirrors [`policy_exec`]'s
     /// standalone-config pattern rather than extending `CANONICAL_ITEM_KINDS`.
     const GATE_ITEM_KIND: &str = "\

@@ -16,8 +16,8 @@ pub struct JitConfig {
     /// Project identity configuration (optional `[project]` table).
     ///
     /// Declares the project's canonical, human-editable name: the `@<project>`
-    /// scope token used by the multi-jit addressing scheme. `jit init` seeds
-    /// this with a slug of the repository directory's basename when
+    /// scope token used by the multi-jit addressing scheme. `jit init` derives
+    /// this from a slug of the repository directory's basename when
     /// `.jit/config.toml` does not already exist, and never touches an
     /// existing `[project]` table on a later `init`. See [`ProjectConfig`].
     pub project: Option<ProjectConfig>,
