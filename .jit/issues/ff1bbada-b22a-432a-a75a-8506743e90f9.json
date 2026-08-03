@@ -14,9 +14,16 @@
   "gates_required": [
     "cargo-ci",
     "code-review",
-    "docs-mechanical"
+    "docs-mechanical",
+    "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "mcp-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T17:04:35.993818082Z",
+      "updated_by": null
+    }
+  },
   "id": "ff1bbada-b22a-432a-a75a-8506743e90f9",
   "labels": [
     "type:task",
@@ -32,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Take the workflow profile and its presets out of the binary",
-  "updated_at": "2026-08-03T15:54:22.112666027Z"
+  "updated_at": "2026-08-03T17:04:35.993818082Z"
 }
