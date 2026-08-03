@@ -1,7 +1,7 @@
 {
   "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
   "epic_short_id": "e204e63d",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 0,
@@ -330,44 +330,81 @@
     },
     {
       "wave": 3,
-      "status": "in progress",
+      "status": "closed",
       "dispatched": "2026-08-03",
       "issues": [
         {
           "short_id": "2ce8ce1b",
           "worker": "codex gpt-5.6-luna",
-          "status": "reviewed PASS at round 2; committed on its branch, awaiting merge+gates",
+          "status": "done (2 review rounds)",
           "title": "Describe the supplied-location form in the command reference"
         },
         {
           "short_id": "ebbb254f",
           "worker": "codex gpt-5.6-luna",
-          "status": "reviewed PASS at round 1; merged, gates running",
+          "status": "done (1 round)",
           "title": "Two assemblies of the package report the same hashes"
         },
         {
           "short_id": "590ff4db",
           "worker": "codex gpt-5.6-luna",
-          "status": "reviewed FAIL at round 1 (deleted negative assertions); rework dispatched",
+          "status": "done (2 rounds)",
           "title": "Move the two workflow rules into the workflow package"
         },
         {
           "short_id": "d54f8f83",
           "worker": "codex gpt-5.6-luna",
-          "status": "dispatched",
+          "status": "done (2 rounds, merge conflict resolved by the lead)",
           "title": "Name the declaring package when two packages collide"
         },
         {
           "short_id": "959274b6",
           "worker": "Opus",
-          "status": "dispatched after the resequencing ruling",
+          "status": "merged, cargo-ci passed, one blocking code-review finding open; fix dispatched on worktree-agent-959274b6-fix",
           "title": "Resolve this repository's own package from its checkout"
         },
         {
           "short_id": "9de22aa7",
           "worker": "codex gpt-5.6-luna",
-          "status": "dispatched after the resequencing ruling",
+          "status": "done (2 rounds; code-review failure resolved by landing 6013cd81)",
           "title": "Carry the assembled package in the release archive"
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "status": "in progress",
+      "dispatched": "2026-08-03",
+      "issues": [
+        {
+          "short_id": "6013cd81",
+          "worker": "codex gpt-5.6-luna",
+          "status": "done — pulled forward beside 9de22aa7",
+          "title": "Carry the default package in the release archive too"
+        },
+        {
+          "short_id": "59f12ba7",
+          "worker": "codex gpt-5.6-luna",
+          "status": "dispatched",
+          "title": "Say which rules a repository is actually scaffolded with"
+        },
+        {
+          "short_id": "25a33a83",
+          "worker": "codex gpt-5.6-luna",
+          "status": "dispatched",
+          "title": "Say what the release archive carries"
+        },
+        {
+          "short_id": "daddfc0b",
+          "worker": "Opus",
+          "status": "dispatched",
+          "title": "Remove the configuration template the binary writes"
+        },
+        {
+          "short_id": "1c0eb82e",
+          "worker": "lead",
+          "status": "story checkpoint; pitfalls reconciled against its six criteria, gates running",
+          "title": "A profile package is read from disk, and packages compose"
         }
       ]
     }
@@ -622,7 +659,11 @@
     "0db28190": 2,
     "5d12a79f": 1,
     "7d038e97": 1,
-    "9de22aa7": 1
+    "9de22aa7": 1,
+    "d54f8f83": 1,
+    "2ce8ce1b": 1,
+    "590ff4db": 1,
+    "959274b6": 1
   },
   "started_at": "2026-07-31",
   "owner_rulings": [
@@ -1055,7 +1096,7 @@
       "note": "Ten issues closed (42 -> 51 of 78; d35cc3f2 filed mid-session). Wave 2 is closed. The resequencing pattern — land the issue that makes a reviewer's claim true, then re-review — was used five times and worked every time: 39c34568 and 6c47b99a in earlier sessions, then 5d12a79f, 7835fdc0 and d35cc3f2 here. d35cc3f2 and e4ba28c5 are mutually entangled: d35cc3f2's reviewer wanted the dependency declaration that e4ba28c5 provides, while e4ba28c5 needed d35cc3f2's embed to work at all. Merging both and re-reviewing d35cc3f2 afterwards resolved it."
     }
   ],
-  "handoff": "handoff-6.md",
+  "handoff": "handoff-7.md",
   "owner_preferences": [
     {
       "at": "2026-08-02",
