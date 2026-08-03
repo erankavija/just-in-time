@@ -60,7 +60,7 @@ kind = "advisory"
 
 [[invariants]]
 id = "domain-agnostic"
-statement = "Engine logic is domain-agnostic: type names, label vocabularies, gate keys, templates, and workflow shapes come from repository configuration (.jit/), never from hardcoded domain assumptions. The one sanctioned exception is the planning-bracket preset trio (plan-review, coverage-preview, breakdown-review): it encodes jit's own plan-before-fan-out workflow (@/charter/D-3), not an adopter domain, so it is retained as the single binary-shipped preset bundle."
+statement = "Engine logic is domain-agnostic: type names, label vocabularies, gate keys, item kinds, templates, workflow shapes, and the paths at which the engine writes its own projections come from repository configuration (.jit/) or from an applied profile package, never from hardcoded domain assumptions. A site is mechanism when its assertion and its membership both derive from what the repository declares and it produces nothing when the repository declares nothing; a site producing content the repository did not declare is an instance, and a specific workflow — its gates, its templates, and the rules carrying its sequencing opinion — reaches a repository as a profile package. Two classes are mechanism vocabulary: a name a mechanism resolves through declared bindings is part of the mechanism, default included, since an unoverridden default only names one parameter of a mechanism that runs regardless; and a rule deriving both its assertion and its membership from the repository's own registry, emitting nothing for an empty one, is mechanism over that registry. A declaration naming a particular gate, template, or node type is an instance."
 kind = "advisory"
 
 [[invariants]]
