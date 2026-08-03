@@ -8,6 +8,7 @@
   ],
   "description": "This repository's own tests and scaffolding obtain its profile package by assembling it from the checkout, so none of them depends on the package being compiled in.\n\n## Background\n\nSeveral places here read the compiled-in package for reasons that have nothing to do with an adopter: the render that keeps this repository's template registry in agreement with the packaged declaration, the assertions over packaged asset content and modes, the initialization and profile command tests, the derived-state repair tests, and the provenance fixture that seeds an isolated repository. All of them want this repository's package; the embed is merely how they have been getting it.\n\nAssembling it from the checkout is now the direct answer, and it is the only one that survives the package leaving the binary. One entry point resolves the checkout from the crate's own manifest directory, so it does not depend on which directory a test process runs in, and returns the assembled package.\n\nThe provenance fixture is the one caller whose reason disappears rather than moves. It carves packaged sources under the tracker's data root into the repository it seeds so that a build inside that repository could read them. No build reads them any more, so the carve-out goes rather than being retargeted.\n\n## Success Criteria\n\n- [hard] REQ-01: One test-support entry point returns this repository's profile package, assembled from its checkout.\n- [hard] REQ-02: Every test and test-support caller that read the compiled-in package reads it through that entry point.\n- [hard] REQ-03: The entry point resolves the checkout from the crate's own manifest directory, so it is independent of the process working directory.\n- [hard] REQ-04: The provenance fixture no longer carves packaged sources into the repository it seeds, and its documentation states the inventory it seeds without them.\n\n## Notes\n\nThis changes what those callers read, not what they assert; every existing assertion over the package holds afterwards.\n",
   "documents": [],
+  "done_at": "2026-08-03T07:48:33.812428743Z",
   "first_ready_at": "2026-08-03T05:36:46.605843445Z",
   "gates_required": [
     "cargo-ci",
@@ -16,12 +17,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-03T07:13:38.545898262Z",
+      "updated_at": "2026-08-03T07:45:28.232204244Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T07:16:12.324262771Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T07:48:12.378328558Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,7 +36,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Resolve this repository's own package from its checkout",
-  "updated_at": "2026-08-03T07:16:12.324262771Z"
+  "updated_at": "2026-08-03T07:48:33.812428743Z"
 }

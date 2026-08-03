@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6f3df9b1e0091e5aae6f61d18a1386e2ae4c4d2",
+  "completed_at": "2026-08-03T07:52:40.762446845Z",
+  "duration_ms": 112113,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue accurately documents bare initialization and workflow-package rule contributions with one canonical statement and one citation.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "59f12ba7-1e5d-40b2-bdcf-f03bf17be9d0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cb3a285c-a913-415a-8c02-9912f7011327",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T07:50:48.648536148Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf `task` 59f12ba7 has no resolved children. I inspected both reachable `jit:59f12ba7` commits individually; their union changes only the two references. Current sources confirm the stated bare-init and workflow-package behavior. No prior review findings exist.\n\nThe canonical statement is accurate in [Configuration Reference](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:271), and [Labels](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:205) cites it without duplication. The projected rules-and-gates page was not changed.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue accurately documents bare initialization and workflow-package rule contributions with one canonical statement and one citation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

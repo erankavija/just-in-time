@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6f3df9b1e0091e5aae6f61d18a1386e2ae4c4d2",
+  "completed_at": "2026-08-03T07:48:12.068284349Z",
+  "duration_ms": 162783,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met and the prior CWD-concurrency finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "959274b6-c255-47e2-8b0a-34478a7ee95a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "be4cdf16-6419-460d-8589-c11f16b439f2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T07:45:29.285114629Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8d318252, 1df47ef4, 079819e2, 74972b65, a4318a78, aa45862c, plus merge commits 96696b01 and 6d7a3fb6\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/canonical-cutover, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/architecture-dependency-direction — .jit/invariants.toml; @/gate/cargo-ci, @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-08-03T07:35:54Z); prior code-review failed (exit 1, 2026-08-03T07:16:12Z), and its CWD-concurrency finding is addressed\nTruncation recovery: narrowed searches for compiled-package loaders and process-CWD changes, then inspected the relevant current-file ranges\n\n1. No findings. The checkout assembly entry point, its CWD-independent test, all affected test callers, provenance fixture removal, and panic-safe serialized CWD guard satisfy the issue criteria.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met and the prior CWD-concurrency finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

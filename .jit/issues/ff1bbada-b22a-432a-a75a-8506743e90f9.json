@@ -9,6 +9,7 @@
   ],
   "description": "The binary compiles in no profile package and no workflow preset, so nothing in it names one project's workflow.\n\n## Background\n\nTwo things carry this repository's workflow inside the binary. The whole package directory is compiled in, and three gate presets are derived from it: the preset names come from the packaged plan template's node gates, and each preset's shape is deserialized from a packaged gate contribution. By the criterion separating engine capability from a specific application, both are applications: a preset named for one project's review gate is a named instance, and the package is that project's whole workflow.\n\nThey are one removal, not two. Removing the package alone leaves the preset constructors reading gate definitions from nothing; removing the presets alone leaves a package compiled in for no consumer that needs it there. The compiled-in origin the applied-profile record can carry goes with them, and so does the last-resort resolution branch behind the two better answers that already exist.\n\nThe generated preset reference is part of the same change for a mechanical reason: it is a projection of the built-in presets with a conformance assertion comparing the committed copy against the projection, so it fails in any revision where the presets are gone and it is not regenerated. What the page then projects is the portable checker syntax it also carries.\n\nNothing this removes takes a capability away from a repository. A gate key resolves through the repository's own registry when no preset supplies it, and a preset never overwrote an authored gate, so the removal changes only which branch resolves the same names.\n\n## Success Criteria\n\n- [hard] REQ-01: No profile package is compiled into the binary, and the compile-time inclusion and the dependency that provided it are gone.\n- [hard] REQ-02: The built-in gate presets are gone; a repository's own presets still load, and a template naming a gate no preset and no registry entry supplies reports that gate.\n- [hard] REQ-03: The applied-profile origin naming a compiled-in package is gone, and resolution has no compiled-in last resort.\n- [hard] REQ-04: The committed preset reference equals the projection of what remains, in the same revision.\n- [hard] REQ-05: No production or test path resolves a compiled-in package.\n\n## Notes\n\nThis repository's own gate registry needs no edit: all its workflow gate keys are hand-authored with repository-script checkers, and none was supplied by a preset.\n",
   "documents": [],
+  "first_ready_at": "2026-08-03T07:48:38.972903508Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -28,7 +29,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Take the workflow profile and its presets out of the binary",
-  "updated_at": "2026-07-31T18:30:47.841884191Z"
+  "updated_at": "2026-08-03T07:48:38.972903508Z"
 }
