@@ -110,13 +110,14 @@ status=0
 grc=0
 # Generated skill evaluation evidence and package-delivered content are not
 # live repository prose. Evaluation fixtures preserve disposable paths. A
-# package's `assets/` subtree is the content its manifest ships into an adopter
-# repository, so the item ids and repository paths written there name the
-# destination once the package is applied, not this tree; the manifest beside
-# that subtree is authored and read here, so it stays scanned and its citations
-# must resolve. `git ls-files profiles` lists the package files this split
-# sorts. Match their complete structural paths rather than suppressing every
-# directory with a common basename.
+# package's `assets/` subtree is what its manifest ships elsewhere, so nothing
+# in it answers here: an install file or a managed-region body names ids and
+# paths that exist at the destination once the package is applied, and a staged
+# copy of a repository file is answerable at the original, which is scanned
+# where it lives. The manifest beside that subtree is authored and read here,
+# so it stays scanned and its citations must resolve. `git ls-files profiles`
+# lists the package files this split sorts. Match their complete structural
+# paths rather than suppressing every directory with a common basename.
 scan_matches() {
   local regex=$1 raw line path match
   shift
