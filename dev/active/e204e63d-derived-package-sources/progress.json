@@ -621,7 +621,8 @@
     "60c211d6": 1,
     "0db28190": 2,
     "5d12a79f": 1,
-    "7d038e97": 1
+    "7d038e97": 1,
+    "9de22aa7": 1
   },
   "started_at": "2026-07-31",
   "owner_rulings": [
@@ -810,6 +811,12 @@
       "ruling": "Resequence with no criteria change. Dropped the edges d94f6849->959274b6 and d94f6849->9de22aa7; added ff1bbada->d94f6849. New order: 959274b6, 9de22aa7 -> ff1bbada -> d94f6849 -> 26f503cc.",
       "evidence": "crates/jit/src/profile/dogfood.rs:11 embeds profiles/jit-dogfood via include_dir!; crates/jit/src/profile/package.rs:645 raises MissingContent when a declared source has no file. Deleting the 60 checked-in live copies therefore makes jit_dogfood_package() fail, breaking gate_presets/planning.rs:101 (the plan/coverage/breakdown presets), commands/profile.rs:847, profiled initialization, and profile/template_region.rs:75. assemble_package_tree draws live bytes from repository_root.join(asset.target) (package_assembly.rs:214) so the assembly is unaffected; only the embed is.",
       "rejected": "Folding the embed removal into d94f6849, which contradicts D-11 because 9de22aa7 has not published the package yet; amending d94f6849 REQ-01, which leaves the duplicate the epic exists to remove."
+    },
+    {
+      "session": 8,
+      "subject": "6013cd81 pulled forward beside 9de22aa7 (lead decision, no criteria change)",
+      "ruling": "9de22aa7's code-review failed with one blocking finding: the archive carries only packages/jit-dogfood while that package declares jit-default as a dependency, so the release smoke resolves the dependency from the compiled-in copy rather than from published bytes. The reviewer cited @/charter/D-8 and @/issue/e204e63d/decision/D-16. Satisfying it literally is 6013cd81's entire content, so the edge 9de22aa7 -> 6013cd81 was dropped and 6013cd81 dispatched immediately; 9de22aa7's code-review re-runs once it lands.",
+      "rejected": "Absorbing 6013cd81's criteria into 9de22aa7, which empties a reviewed issue; arguing the finding, which the No-argue discipline forbids."
     }
   ],
   "halted": {
