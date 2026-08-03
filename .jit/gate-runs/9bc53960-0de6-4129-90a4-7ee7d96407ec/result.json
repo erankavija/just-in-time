@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "13ddc0a24c5c6ba48bcc43e1672880ed9f74e099",
+  "completed_at": "2026-08-03T06:42:26.498898095Z",
+  "duration_ms": 126418,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The release archive stages and verifies both package directories, preserves the published asset/checksum contract, and smoke-tests resolved default-package application from extracted bytes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6013cd81-1d9a-4952-a3a2-8739b77c1cba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9bc53960-0de6-4129-90a4-7ee7d96407ec",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T06:40:20.080892807Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 206ce154, 06d6c997\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-14 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, Decisions); @/issue/e204e63d/decision/D-16 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, Decisions)\nGate evidence: none\nTruncation recovery: bounded re-reads of the workflow, release publication, manifests, package resolver, diffs, and documentation\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The release archive stages and verifies both package directories, preserves the published asset/checksum contract, and smoke-tests resolved default-package application from extracted bytes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
