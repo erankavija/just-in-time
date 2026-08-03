@@ -17,7 +17,33 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:47:11.696590200Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:53:25.826396975Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T20:49:38.058530043Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:54:06.956892358Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:47:11.097284735Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6df7e456-d845-4a0e-b1f4-38a727285bba",
   "labels": [
     "epic:derived-package-sources",
@@ -32,5 +58,5 @@
   "priority": "high",
   "state": "ready",
   "title": "The binary carries no workflow instance",
-  "updated_at": "2026-08-03T19:26:44.977697311Z"
+  "updated_at": "2026-08-03T20:54:06.956892358Z"
 }

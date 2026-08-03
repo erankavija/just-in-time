@@ -6,6 +6,7 @@
   "dependencies": [
     "1c0eb82e-b42b-4cfe-9351-78880b415f79",
     "25bdda50-640b-44d4-80cc-da4f872de058",
+    "65280aff-344d-4c8a-854b-d4160126a0b4",
     "65ff0f38-fe0e-40bf-8ac6-75e411758142",
     "6df7e456-d845-4a0e-b1f4-38a727285bba",
     "6f8f02ba-8cb3-4aea-b0f6-868deeec6a83",
@@ -62,5 +63,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Derived profile assets and projected policy documentation",
-  "updated_at": "2026-08-03T18:50:47.604058390Z"
+  "updated_at": "2026-08-03T20:54:25.973280941Z"
 }
