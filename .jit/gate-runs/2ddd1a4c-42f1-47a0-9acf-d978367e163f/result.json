@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d00197384f4adb1ec9e64333f70e2e7ee95793de",
+  "completed_at": "2026-08-03T09:44:23.646616659Z",
+  "duration_ms": 164939,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable package declaration matches the current repository policy; prior blocking initialization and documentation findings are addressed in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "93fef456-ac33-4525-bbe4-3a170de0b253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2ddd1a4c-42f1-47a0-9acf-d978367e163f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T09:41:38.706754858Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a1fb4e4f7c81b986215e01144fc562a203962a31 (`jit:93fef456`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 and D-14 (issue Markdown); @/invariant/domain-agnostic, @/invariant/single-source-prose, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); jit-validate passed (0); docs-mechanical passed (0); doc-review passed (0)\nTruncation recovery: reread bounded manifest, initialization, release-workflow, test-fixture, documentation, and package-dependency ranges after broad scans truncated\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable package declaration matches the current repository policy; prior blocking initialization and documentation findings are addressed in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

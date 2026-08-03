@@ -18,17 +18,17 @@
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-07-31T12:59:32.077039909Z",
+      "updated_at": "2026-08-03T09:49:28.023289010Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_at": "2026-07-31T13:01:39.747552672Z",
+      "updated_at": "2026-08-03T09:46:34.984154404Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-07-31T12:54:24.465661473Z",
+      "updated_at": "2026-08-03T09:44:24.825415957Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,7 +42,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "The shipped area classification reaches adopter configuration by generation",
-  "updated_at": "2026-07-31T17:29:54.818311657Z"
+  "updated_at": "2026-08-03T09:49:55.653854396Z"
 }

@@ -20,6 +20,7 @@
   ],
   "description": "The vocabulary a repository needs to be usable is declared in a package an adopter applies, and a repository that applies none receives none.\n\n## Background\n\nA fresh repository today receives a four-level type hierarchy, seven label namespaces, six item kinds, validation defaults and a documentation-area classification, none of which it declared and all of which are rendered from a compiled template. A repository that declares no registry at all receives one anyway, from default implementations reached through fallback branches — so even an adopter who writes their own configuration cannot decline the engine's.\n\nBoth routes close here. The compiled defaults go, so a repository receives what it declared and nothing else. The vocabulary itself becomes a package, and the workflow package declares a dependency on it rather than restating it. Both packages then ride in the release archive, so obtaining them costs no second download.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository declaring no namespaces and no type hierarchy receives neither, and still validates.\n- [hard] REQ-02: A package declares the generic vocabulary a repository needs to be usable, carrying no workflow content.\n- [hard] REQ-03: The workflow package declares a dependency on it and only the vocabulary it adds.\n- [hard] REQ-04: The release archive carries both package directories, and the release smoke path applies the workflow package from the extracted archive.\n- [hard] REQ-05: The suite's assertions about type names rest on a fixture that declares its own taxonomy rather than on any shipped default.\n\n## Notes\n\nThe compiled template that renders today's configuration is deleted by the work that can prove these packages replace it.\n",
   "documents": [],
+  "done_at": "2026-08-03T09:44:50.675608848Z",
   "first_ready_at": "2026-08-03T07:55:41.745893766Z",
   "gates_required": [
     "cargo-ci",
@@ -30,28 +31,28 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-03T08:24:25.542990822Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T09:38:20.150380237Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T08:31:56.983387305Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T09:44:23.966039203Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T08:28:22.084024523Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T09:41:37.635677944Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-03T08:24:40.460273349Z",
+      "updated_at": "2026-08-03T09:38:34.562647271Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_at": "2026-08-03T08:24:28.829593371Z",
+      "updated_at": "2026-08-03T09:38:23.482745840Z",
       "updated_by": "auto:executor"
     }
   },
@@ -68,7 +69,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "The generic domain vocabulary reaches a repository as a package",
-  "updated_at": "2026-08-03T08:31:56.983387305Z"
+  "updated_at": "2026-08-03T09:44:50.675608848Z"
 }

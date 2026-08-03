@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d00197384f4adb1ec9e64333f70e2e7ee95793de",
+  "completed_at": "2026-08-03T09:41:37.298762762Z",
+  "duration_ms": 181759,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The container-level package, initialization, and release documentation contract is accurate and complete.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "93fef456-ac33-4525-bbe4-3a170de0b253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "00ea70a5-1b45-4f3e-bb63-cfde7a90a8d3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T09:38:35.539713613Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: this level-3 `story` has 15 resolved, done children. I inspected the 53 reachable `jit:<short-id>` commits individually with rename detection, plus the current source and docs.\n\nThe combined contract is accurate and discoverable: profiles own package behavior, CLI reference covers plain versus profiled init, and release policy covers both archived packages. The prior five blocking claims are resolved.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The container-level package, initialization, and release documentation contract is accurate and complete.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

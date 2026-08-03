@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d00197384f4adb1ec9e64333f70e2e7ee95793de",
+  "completed_at": "2026-08-03T09:46:34.670604289Z",
+  "duration_ms": 128947,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The container’s generated shipped-policy documentation and related package, release, and check documentation are accurate and current.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "6f8f02ba-8cb3-4aea-b0f6-868deeec6a83",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a992c43a-2f33-48e4-bd8e-5b5b96010af2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T09:44:25.722999341Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution used the container’s eight delivered DAG children plus the story’s intent; the story has no `jit:6f8f02ba` commit, so its fallback was limited to the supplied issue context. All descendant tagged commits were inspected separately. The combined documentation contract is accurate and discoverable; mechanical documentation checks pass.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The container’s generated shipped-policy documentation and related package, release, and check documentation are accurate and current.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

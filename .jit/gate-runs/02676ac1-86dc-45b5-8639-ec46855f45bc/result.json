@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d00197384f4adb1ec9e64333f70e2e7ee95793de",
+  "completed_at": "2026-08-03T09:49:27.714483973Z",
+  "duration_ms": 171534,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No issue-impact defects found; the current generated documentation regions and deterministic freshness check satisfy the stated criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6f8f02ba-8cb3-4aea-b0f6-868deeec6a83",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "02676ac1-86dc-45b5-8639-ec46855f45bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T09:46:36.180223179Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback — no `jit:6f8f02ba` commits reachable from HEAD  \nPolicy sources: AGENTS.md  \nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)  \nGate evidence: docs-mechanical passed (exit code none); doc-review passed (exit 0); prior structured code review passed with no findings  \nTruncation recovery: narrowed reads of generator, package contributions, generated regions, checker, and self-tests  \n\n1. No findings. The two generated regions match the `jit-default` package classification; the generator applies that package in a throwaway repository and preserves bytes outside markers, while M7 detects regenerated-tree drift and is covered by focused self-tests.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No issue-impact defects found; the current generated documentation regions and deterministic freshness check satisfy the stated criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
