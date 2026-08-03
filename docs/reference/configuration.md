@@ -119,9 +119,11 @@ plan ineligible and make `--execute` refuse mutation. Explicit empty
 arrays still count as authored fields; their policy meaning is deliberately
 different from an omitted key.
 
-The `DocumentationConfig` accessors retain fallback values for display callers,
-but archive planning and execution never use those fallbacks to claim
-eligibility. This prevents a partial policy from silently authorizing mutation.
+The `DocumentationConfig` accessors return only declared values, except that
+`citation_scan_roots` derives its absent-key fallback from the same table's
+declared development root and permanent paths. Archive planning and execution
+never use an unauthored policy to claim eligibility. This prevents a partial
+policy from silently authorizing mutation.
 
 #### Issue artifact directories
 
@@ -129,9 +131,9 @@ eligibility. This prevents a partial policy from silently authorizing mutation.
 per issue; every other area keeps its artifacts flat. An area is named whole:
 membership is exact-area equality under lexical path normalization, so `<area>`,
 `./<area>`, and `<area>/` name the same area while a path *inside* a declared
-area is not itself one. An absent key resolves to the shipped declaration shown
-above; an authored list replaces that declaration whole, so an empty list opts
-every area out of the convention. Adoption is independent of the archival
+area is not itself one. An absent key declares no issue-scoped areas; an authored
+list replaces that empty declaration whole, so an empty list also opts every area
+out of the convention. Adoption is independent of the archival
 classification — an area may be managed and issue-scoped, managed and flat,
 permanent and issue-scoped, or neither — and the two shapes classify the same
 way. During container archival, a matching owner directory immediately beneath
@@ -182,11 +184,12 @@ inline code span, or a markdown link target alike — and passes over text namin
 a longer path that ends with it, such as the archived destination a repointed
 citation names. Each entry is a directory, reaching every file beneath it, or
 an individual file, reaching exactly that path, matched the same way as
-`managed_paths` and `permanent_paths` above. The key is optional;
-`jit init` does not scaffold it, so a fresh repository's `[documentation]`
-table omits it, and an absent key resolves to the development root together
-with `permanent_paths` (both shown above). An authored list replaces that
-default outright rather than extending it, and its entries need not lie under
+`managed_paths` and `permanent_paths` above. The key is optional; a bare
+repository has no `[documentation]` table, so this key is absent until a
+profile package or repository-authored declaration supplies it. An absent key
+resolves to the development root together with `permanent_paths` (both shown
+above). An authored list replaces that default outright rather than extending it,
+and its entries need not lie under
 the development root, since a citation a move can break may live wherever the
 repository writes it. Like `issue_scoped_areas`, the key is not part of the
 three-key completeness that authorizes archival mutation, so omitting it

@@ -3,12 +3,12 @@
 //! This is a STORY-LEVEL test file whose distinct contribution is exercising
 //! decision and risk kinds TOGETHER — both present in ONE issue description,
 //! sharing ONE generic code path — in a repo whose `[item_kinds]` table declares
-//! both (the `jit init`-emitted shape). The unit-kind files
+//! both (the package-supplied shape). The unit-kind files
 //! (`decision_kind_tests.rs`, `risk_kind_tests.rs`) test each kind in isolation;
 //! this file proves they coexist correctly and that the shared projection
 //! mechanism handles them both without interference.
 //!
-//! ## Kind tuples exercised (as `jit init` emits them)
+//! ## Kind tuples exercised (as supplied by the package)
 //!
 //! ```text
 //! decision:
@@ -28,7 +28,7 @@
 //! ## Coverage of the story's `[hard]` success criteria
 //!
 //! All tests run against a repo whose `[item_kinds]` table declares decision and
-//! risk (the `jit init`-emitted shape).
+//! risk (the package-supplied shape).
 //!
 //! - REQ-01: [`test_story_item_list_decision_and_risk_coexist`] — `jit item list
 //!   --kind decision` returns only decisions; `jit item list --kind risk` returns
@@ -114,7 +114,7 @@ const STORY_BODY: &str = "\
 /// in insertion order.
 ///
 /// The declared `decision` (namespace `per`) and `risk` (namespaces `mitigates`,
-/// `resolves`) kinds mirror the ones `jit init` emits, so this exercises the
+/// `resolves`) kinds mirror the ones the package supplies, so this exercises the
 /// shipped kind shapes, not arbitrary overrides.
 fn default_executor_with(
     repo: &Path,

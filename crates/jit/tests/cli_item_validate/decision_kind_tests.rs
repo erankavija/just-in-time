@@ -1,14 +1,14 @@
 //! Integration tests for the markdown-first `decision` item kind (issue
 //! `b629686b`).
 //!
-//! `jit init` scaffolds a `[item_kinds]` table that declares `decision` alongside
-//! `requirement`, so a freshly initialized repo indexes decisions authored as list
+//! The `jit-default` package supplies a `[item_kinds]` table that declares
+//! `decision` alongside `requirement`, so a profiled repo indexes decisions authored as list
 //! entries under a `## Decisions` section of an issue description. Decisions become
 //! addressable, queryable items through the SAME generic triple-driven parse path
 //! `requirement` uses; no engine code special-cases the kind (the engine bakes in
 //! no kinds — the tuple is authored entirely in the emitted config table).
 //!
-//! The `decision` tuple `jit init` emits is:
+//! The `decision` tuple supplied by the package is:
 //!
 //! ```text
 //! section          = "decisions"          # authored under a `## Decisions` heading
@@ -158,7 +158,7 @@ fn test_default_repo_item_show_resolves_decision_by_qualified_id() {
 /// order.
 ///
 /// The declared `decision` kind brings the `per` link namespace; this declaration
-/// mirrors the one `jit init` emits, so the test exercises the shipped kind shape,
+/// mirrors the one the package supplies, so the test exercises the shipped kind shape,
 /// not an arbitrary override.
 fn default_executor_with(
     repo: &Path,

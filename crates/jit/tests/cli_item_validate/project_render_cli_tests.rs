@@ -30,8 +30,8 @@ statement = "Issues prefer functional style."
 kind = "advisory"
 "#;
 
-/// Append a `[projection.<name>]` table to the init-scaffolded config (which
-/// already declares `[item_kinds.invariant]`), preserving the scaffolded kinds.
+/// Append a `[projection.<name>]` table to the package-provided config (which
+/// already declares `[item_kinds.invariant]`), preserving the package kinds.
 fn append_projection(temp: &TempDir, table: &str) {
     let path = temp.path().join(".jit/config.toml");
     let mut config = std::fs::read_to_string(&path).unwrap();

@@ -677,7 +677,7 @@ assert = { require-section = { heading = "Goals" } }
     #[test]
     fn test_default_ruleset_seeds_descriptions() {
         // REQ-02: every rule the fixed default emits carries a description, so a
-        // fresh `jit init` scaffolds a fully-described rules.toml.
+        // a declared registry produces a fully-described rules.toml.
         let set = default_ruleset(&registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             (
@@ -909,8 +909,8 @@ assert = { json-schema = "schemas/second.json" }
     fn test_render_rule_block_matches_full_serialization() {
         // Rendering ONE rule standalone must produce byte-identical text to that
         // same rule's block inside a full `serialize_ruleset` output, so the
-        // membership write-through (jit:d74a9ed1) never diverges from what
-        // `jit init` would have scaffolded.
+        // membership write-through (jit:d74a9ed1) never diverges from the
+        // registry-derived output.
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             ("team", LabelNamespace::new("Team", true)),

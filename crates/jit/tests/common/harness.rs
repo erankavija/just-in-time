@@ -41,7 +41,7 @@ impl TestHarness {
         Self { executor, storage }
     }
 
-    /// Declare the canonical `[item_kinds]` table (the set `jit init` authors) in
+    /// Declare the canonical `[item_kinds]` table (the package-supplied set) in
     /// this harness's repo, so item indexing and link resolution recognize the
     /// shipped kinds. The engine bakes in no kinds, so tests that exercise
     /// addressable items must opt in. Call before creating issues.

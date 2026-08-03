@@ -1,14 +1,14 @@
 //! Integration tests for the markdown-first `risk` item kind (issue `be3eb6ca`).
 //!
-//! `jit init` scaffolds a `[item_kinds]` table that declares `risk` alongside
-//! `requirement` and `decision`, so a freshly initialized repo indexes risks
+//! The `jit-default` package supplies a `[item_kinds]` table that declares `risk`
+//! alongside `requirement` and `decision`, so a profiled repo indexes risks
 //! authored as list entries under a `## Risks` section of an issue description.
 //! Risks become addressable, queryable items through the SAME generic
 //! triple-driven parse path `requirement` and `decision` use; no engine code
 //! special-cases the kind (the engine bakes in no kinds — the tuple is authored
 //! entirely in the emitted config table).
 //!
-//! The `risk` tuple `jit init` emits is:
+//! The `risk` tuple supplied by the package is:
 //!
 //! ```text
 //! section          = "risks"              # authored under a `## Risks` heading
@@ -124,7 +124,7 @@ fn test_default_repo_item_list_kind_risk_returns_risks() {
 /// order.
 ///
 /// The declared `risk` kind brings the `mitigates` and `resolves` link namespaces;
-/// this declaration mirrors the one `jit init` emits, so the test exercises the
+/// this declaration mirrors the one the package supplies, so the test exercises the
 /// shipped kind shape, not an arbitrary override.
 fn default_executor_with(
     repo: &Path,

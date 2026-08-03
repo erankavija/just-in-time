@@ -3294,8 +3294,9 @@ kind-segmented qualified id:
 Kinds and their aliases are declared in `[item_kinds]` in `.jit/config.toml`. An
 alias is accepted anywhere a kind name is, so `@/inv/dag-acyclic` resolves the
 same item as `@/invariant/dag-acyclic`; output always prints the registry name.
-`jit init` scaffolds the table, and a repository with no `[item_kinds]` table
-declares no kinds.
+The `jit-default` package supplies the generic item-kind table, while a repository
+may author its own; a bare repository with no `[item_kinds]` table declares no
+kinds.
 
 ### `jit item list`
 

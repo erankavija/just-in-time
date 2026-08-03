@@ -24,8 +24,8 @@
 //! `(section, id-pattern, marker(s), link-namespace(s), scope, source-of-truth)`
 //! that says which entries are addressable and how. The model is generic: no kind
 //! NAME is interpreted by this module, only the tuple (REQ-01). Kinds are authored
-//! entirely in the `[item_kinds]` config table (scaffolded by `jit init`); this
-//! module bakes in no domain defaults. With no `[item_kinds]` table the kind set
+//! entirely in the `[item_kinds]` config table (which a profile package may
+//! contribute); this module bakes in no domain defaults. With no `[item_kinds]` table the kind set
 //! is empty (single-consumer design, no backward-compat layer — see
 //! [`resolve_item_kinds`]). A kind's tuple is chosen to align with the
 //! `label-coverage` rule's own defaults, so the coverage machinery is compatible
@@ -1441,8 +1441,8 @@ fn toml_link_labels(
 /// The engine bakes in no domain defaults: when the registry is `None` (no
 /// `[item_kinds]` table) the kind set is EMPTY (per design D4, single consumer,
 /// no backward-compat layer). Kinds are authored entirely in the `[item_kinds]`
-/// config table, which `jit init` scaffolds with a complete, editable set. When
-/// the registry is present it is used verbatim (each entry resolved through
+/// config table, which a profile package may contribute as a complete, editable
+/// set. When the registry is present it is used verbatim (each entry resolved through
 /// [`ItemKind::from_config`]); the caller opts in to every kind it wants.
 ///
 /// Kinds are returned in name order for deterministic output.
@@ -1560,11 +1560,10 @@ mod tests {
     use super::*;
     use crate::document::MarkdownContentParser;
 
-    // The canonical kinds `jit init` authors into the `[item_kinds]` table, rebuilt
-    // here from their exact field shape so the domain layer can pin that those
-    // fields project as expected. They are no longer baked into the engine (a repo
-    // with no `[item_kinds]` table has no kinds); these helpers stand in for the
-    // config-authored table.
+    // The canonical kinds supplied by the package, rebuilt here from their exact
+    // field shape so the domain layer can pin that those fields project as
+    // expected. They are not baked into the engine (a repo with no `[item_kinds]`
+    // table has no kinds); these helpers stand in for the config-authored table.
     fn req_cfg() -> ItemKindConfig {
         ItemKindConfig {
             section: Some("success_criteria".to_string()),
@@ -1639,7 +1638,7 @@ mod tests {
         ItemKind::from_config("invariant", &invariant_cfg()).unwrap()
     }
 
-    /// The four canonical kinds, in name order (the set `jit init` authors).
+    /// The four canonical kinds, in name order (the package-supplied set).
     fn canonical_kinds() -> Vec<ItemKind> {
         vec![decision_kind(), invariant_kind(), req_kind(), risk_kind()]
     }
@@ -1923,14 +1922,14 @@ mod tests {
     fn test_resolve_item_kinds_empty_when_absent() {
         // No `[item_kinds]` table -> no kinds. The engine bakes in no domain
         // defaults (D4: single consumer, no backward-compat layer); kinds are
-        // authored entirely in config (scaffolded by `jit init`).
+        // authored entirely in config (for example, by an applied profile package).
         assert!(resolve_item_kinds(None).unwrap().is_empty());
     }
 
     #[test]
     fn test_resolve_item_kinds_canonical_table_resolves_all_four() {
-        // The complete table `jit init` authors resolves to the four canonical
-        // kinds, in name order — each through the generic `from_config` path.
+        // The complete fixture table resolves to the four canonical kinds, in
+        // name order — each through the generic `from_config` path.
         let map: HashMap<String, ItemKindConfig> = [
             ("requirement", req_cfg()),
             ("decision", decision_cfg()),
@@ -2297,7 +2296,7 @@ name = \"bare\"
 
     #[test]
     fn test_index_items_projects_decisions_with_canonical_kinds() {
-        // The canonical kind set (as `jit init` authors it) indexes a `## Decisions`
+        // The canonical kind set indexes a `## Decisions`
         // section's D-NN lines through the same generic parse path as requirements.
         let issue = crate::domain::types::fixture_issue(
             "T".to_string(),
