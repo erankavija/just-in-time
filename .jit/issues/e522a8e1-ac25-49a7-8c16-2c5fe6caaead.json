@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T19:42:12.848069084Z",
   "context": {},
   "created_at": "2026-08-03T19:40:39.771483014Z",
   "dependencies": [],
@@ -33,7 +34,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Take the remaining hierarchy type names out of the bridge's instructions",
-  "updated_at": "2026-08-03T19:41:07.608568062Z"
+  "updated_at": "2026-08-03T19:42:12.848069084Z"
 }
