@@ -14,6 +14,16 @@ const PROFILE_ASSET: &str = ".agents/skills/jit-manage/SKILL.md";
 const EXECUTABLE_ASSET: &str = "contrib/gates/ai-review.sh";
 const PROFILE_RECORD: &str = ".jit/profiles/jit-dogfood.json";
 
+/// This repository's workflow package, assembled from its checkout, with the
+/// directory holding the assembled tree.
+///
+/// What these fixtures need from it is what the checkout declares — the targets
+/// an application owns and the executable bits it publishes — so the package is
+/// drawn from there rather than from a copy compiled into the test binary.
+fn shipped_workflow_package() -> (tempfile::TempDir, jit::profile::ProfilePackage) {
+    jit::test_utils::temporary_repository_package("jit-dogfood")
+}
+
 fn read(harness: &TestHarness, path: &str) -> String {
     harness.storage.read_repo_file(path).unwrap().unwrap()
 }
@@ -151,7 +161,7 @@ fn repository_image(
     for listing in &closure.listings {
         spec.discover_listing(listing.clone()).unwrap();
     }
-    let package = jit::profile::jit_dogfood_package().unwrap();
+    let (_workspace, package) = shipped_workflow_package();
     spec.discover_paths(
         package
             .hashes()
@@ -217,7 +227,7 @@ fn repair_target_path_strings() -> Vec<String> {
                 gates: &gates,
                 rules: &rules,
             };
-            let package = jit::profile::jit_dogfood_package().unwrap();
+            let (_workspace, package) = shipped_workflow_package();
             let profiles = match image.entry(&record_path).unwrap() {
                 RepositoryEntry::Absent => Vec::new(),
                 _ => vec![jit::profile::build_profile_claims(&package, image.layout()).unwrap()],
@@ -749,8 +759,8 @@ fn test_harness_validate_fix_repairs_each_owned_class_and_preserves_authored_byt
 #[test]
 fn test_harness_validate_fix_repairs_mode_only_profile_drift() {
     let mut harness = profiled_harness(false);
-    let executable = jit::profile::jit_dogfood_package()
-        .unwrap()
+    let (_workspace, package) = shipped_workflow_package();
+    let executable = package
         .manifest()
         .assets
         .iter()

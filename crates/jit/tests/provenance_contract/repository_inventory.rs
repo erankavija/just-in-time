@@ -18,13 +18,11 @@
 //! In this repository `.gitignore` already keeps most of them out of the
 //! `git ls-files` listing, but that is an optimization, not the guarantee:
 //! even force-added (`git add -f`) or unignored content in a banned category
-//! never reaches the seeded copy. The tracker data root keeps the sources the
-//! profile package declares beneath it ([`packaged_tracker_data_sources`]), so
-//! a build inside the seeded fixture can read every source the package is drawn
-//! from while the issue data beside them stays out.
+//! never reaches the seeded copy. The tracker data root is banned whole: what
+//! it holds is this repository's issue data, which would otherwise make every
+//! issue mutation an input to a build-stability measurement, and no build
+//! inside the seeded fixture reads anything beneath it.
 
-use jit::profile::{jit_dogfood_package, JIT_DOGFOOD_LIVE_SOURCE_PREFIX};
-use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -39,23 +37,6 @@ pub(crate) fn workspace_root() -> PathBuf {
         .and_then(Path::parent)
         .expect("workspace root is two levels above the jit crate manifest")
         .to_path_buf()
-}
-
-/// The paths under [`TRACKER_DATA_ROOT`] that the profile package draws from:
-/// every live-asset target it declares there.
-///
-/// Read from the package's own declarations rather than named as a path, so a
-/// second packaged source under that root is admitted with no edit here.
-pub(crate) fn packaged_tracker_data_sources() -> BTreeSet<PathBuf> {
-    jit_dogfood_package()
-        .expect("the embedded jit-dogfood package parses")
-        .manifest()
-        .assets
-        .iter()
-        .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
-        .map(|asset| PathBuf::from(&asset.target))
-        .filter(|target| target.starts_with(TRACKER_DATA_ROOT))
-        .collect()
 }
 
 /// List `source_root`'s repository-input inventory via
@@ -74,12 +55,11 @@ pub(crate) fn repository_inputs(source_root: &Path) -> Vec<PathBuf> {
         source_root.display()
     );
 
-    let packaged_sources = packaged_tracker_data_sources();
     String::from_utf8(output.stdout)
         .expect("repository-input paths are valid UTF-8")
         .lines()
         .map(PathBuf::from)
-        .filter(|path| !is_banned_input(path, &packaged_sources))
+        .filter(|path| !is_banned_input(path))
         .collect()
 }
 
@@ -88,26 +68,20 @@ pub(crate) fn repository_inputs(source_root: &Path) -> Vec<PathBuf> {
 /// checkout's git or ignore state says about them.
 ///
 /// Git metadata, other agents' worktrees, and generated trees are banned
-/// outright. The tracker data root is banned for its issue data, which would
-/// otherwise make every issue mutation an input to a build-stability
-/// measurement. It admits one derived exception: `packaged_sources`, the
-/// live-asset targets the package declares under that root. The package's live
-/// assets are the repository files at those targets, so a build hosted by a
-/// fixture that omits them cannot read every source the package is drawn from.
-/// The exception is therefore as wide as what the package declares and no
-/// wider — packaging a further source under that root admits it, and a path the
-/// package does not declare stays out.
+/// outright, and so is the tracker data root: what it holds is this
+/// repository's issue data, which would otherwise make every issue mutation an
+/// input to a build-stability measurement.
 ///
 /// `Path::starts_with` matches whole components, so `.gitignore` and
 /// `.gitattributes` are not caught by the `.git` prefix and stay in the
 /// inventory.
-fn is_banned_input(path: &Path, packaged_sources: &BTreeSet<PathBuf>) -> bool {
+fn is_banned_input(path: &Path) -> bool {
     path.starts_with(".git")
         || path.starts_with(".agents/worktrees")
         || path
             .components()
             .any(|c| matches!(c.as_os_str().to_str(), Some("target" | "node_modules")))
-        || (path.starts_with(TRACKER_DATA_ROOT) && !packaged_sources.contains(path))
+        || path.starts_with(TRACKER_DATA_ROOT)
 }
 
 /// Seed `dest` as an isolated, independent Git repository built from

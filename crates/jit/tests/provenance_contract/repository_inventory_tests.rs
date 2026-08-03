@@ -6,15 +6,14 @@
 //! reimplementation of it. Fast: no cargo build, so plain `cargo test` runs
 //! this unlike its `#[ignore]`d siblings.
 //!
-//! The same fixture carries the tracker data root's split (jit:c7a548c3): the
-//! sources the profile package draws from there are seeded, so the cold build
-//! the fixture hosts can read them, and the issue data beside them is not. The
-//! last test observes that split against this repository's own inventory,
-//! which is the checkout the cold-build fixture seeds from.
+//! The same fixture carries the tracker data root: it is banned whole, so
+//! nothing beneath it is seeded and no issue mutation is an input to a build
+//! measured inside the fixture. The last test observes that against this
+//! repository's own inventory, which is the checkout the cold-build fixture
+//! seeds from.
 
 use crate::repository_inventory::{
-    packaged_tracker_data_sources, repository_inputs, seed_isolated_repository, workspace_root,
-    TRACKER_DATA_ROOT,
+    repository_inputs, seed_isolated_repository, workspace_root, TRACKER_DATA_ROOT,
 };
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -23,13 +22,12 @@ use std::process::Command;
 /// Build a standalone Git repository under `root`: tracked repository inputs
 /// representative of every category REQ-02 requires to survive seeding (Rust
 /// source, web build input, manifest, lock file), plus a tracked tracker-data
-/// tree mirroring this repository's dogfooding setup — issue data, which is
-/// banned, alongside every path the package declares as a live-asset target
-/// there, which a build inside the fixture reads (jit:c7a548c3). Then untracked
-/// generated/worktree junk matching every category REQ-01 bans: a nested
-/// agent worktree with its own `target/`, a top-level `target/`, and Node
-/// `node_modules` trees. The junk is created after the commit so it stays
-/// untracked and gitignored, exactly as it does in a live checkout.
+/// tree mirroring this repository's dogfooding setup, every path of which is
+/// banned. Then untracked generated/worktree junk matching every category
+/// REQ-01 bans: a nested agent worktree with its own `target/`, a top-level
+/// `target/`, and Node `node_modules` trees. The junk is created after the
+/// commit so it stays untracked and gitignored, exactly as it does in a live
+/// checkout.
 fn seed_fixture_repo(root: &Path) {
     std::fs::create_dir_all(root.join("src")).unwrap();
     std::fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
@@ -45,11 +43,12 @@ fn seed_fixture_repo(root: &Path) {
 
     std::fs::create_dir_all(root.join(".jit/issues")).unwrap();
     std::fs::write(root.join(".jit/issues/example.json"), "{}\n").unwrap();
-    for target in packaged_tracker_data_sources() {
-        let path = root.join(&target);
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, "packaged source\n").unwrap();
-    }
+    std::fs::create_dir_all(root.join(".jit/reference")).unwrap();
+    std::fs::write(
+        root.join(".jit/reference/content-standards.md"),
+        "# Content standards\n",
+    )
+    .unwrap();
 
     // Deliberately NO ignore rules for the banned categories: the exclusion
     // under test is the inventory's own path filter, not this fixture's (or any
@@ -209,56 +208,50 @@ fn relative_files(root: &Path) -> BTreeSet<PathBuf> {
 }
 
 #[test]
-fn test_seed_isolated_repository_keeps_only_the_packaged_sources_under_the_tracker_data_root() {
+fn test_seed_isolated_repository_seeds_nothing_under_the_tracker_data_root() {
     let temp = tempfile::tempdir().unwrap();
     let source = temp.path().join("source");
     let dest = temp.path().join("dest");
     std::fs::create_dir_all(&source).unwrap();
     seed_fixture_repo(&source);
 
-    seed_isolated_repository(&source, &dest);
-
-    // Without a packaged source under that root the equality below would hold
-    // vacuously, and the fixture would prove nothing about what a build inside
-    // it can read.
-    let packaged = packaged_tracker_data_sources();
+    // What the fixture tracks beneath that root, so the emptiness below is a
+    // statement about content the seeding dropped rather than content that was
+    // never there.
+    let tracked = relative_files(&source.join(TRACKER_DATA_ROOT));
     assert!(
-        !packaged.is_empty(),
-        "the package must declare at least one live-asset target under the tracker data root"
+        tracked.len() > 1,
+        "the fixture must track more than one path beneath the tracker data root: {tracked:?}"
     );
 
-    // The packaged sources reach the fixture, so a build inside it finds every
-    // source the package is assembled from; nothing else under that root does,
-    // so issue data is not an input to a build-stability measurement.
-    let seeded: BTreeSet<PathBuf> = relative_files(&dest.join(TRACKER_DATA_ROOT))
-        .into_iter()
-        .map(|path| Path::new(TRACKER_DATA_ROOT).join(path))
-        .collect();
+    seed_isolated_repository(&source, &dest);
+
     assert_eq!(
-        seeded, packaged,
-        "the seeded tracker data root must carry exactly the packaged live-asset targets"
+        relative_files(&dest.join(TRACKER_DATA_ROOT)),
+        BTreeSet::new(),
+        "each entry names a tracker-data path the seeding carried into the fixture"
     );
 }
 
 #[test]
-fn test_repository_inputs_carry_the_packaged_tracker_data_sources_of_this_repository() {
-    let inputs: BTreeSet<PathBuf> = repository_inputs(&workspace_root()).into_iter().collect();
-    let packaged = packaged_tracker_data_sources();
+fn test_repository_inputs_carry_nothing_from_this_repositorys_tracker_data_root() {
+    // This repository tracks its own issue data beneath that root, so the
+    // emptiness below is what the filter drops rather than what the checkout
+    // lacks.
+    let tracked_there = relative_files(&workspace_root().join(TRACKER_DATA_ROOT));
     assert!(
-        !packaged.is_empty(),
-        "the package must declare at least one live-asset target under the tracker data root"
+        !tracked_there.is_empty(),
+        "this repository carries no tracker data, so the filter is unobserved"
     );
 
-    // Same property as the fixture test above, observed against this
-    // repository's own inventory: the sources the package draws from are
-    // inputs, and the issue data beside them is not.
-    let from_tracker_data: BTreeSet<PathBuf> = inputs
+    let from_tracker_data: BTreeSet<PathBuf> = repository_inputs(&workspace_root())
         .into_iter()
         .filter(|path| path.starts_with(TRACKER_DATA_ROOT))
         .collect();
+
     assert_eq!(
-        from_tracker_data, packaged,
-        "this repository's inventory must carry exactly the packaged live-asset targets \
-         from its tracker data root"
+        from_tracker_data,
+        BTreeSet::new(),
+        "each entry names a tracker-data path this repository's inventory admits"
     );
 }
