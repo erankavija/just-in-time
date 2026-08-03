@@ -63,7 +63,7 @@
   "gates_status": {
     "holistic-review": {
       "status": "passed",
-      "updated_at": "2026-08-03T21:17:01.354433367Z",
+      "updated_at": "2026-08-03T21:23:13.107660328Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -82,5 +82,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Derived profile assets and projected policy documentation",
-  "updated_at": "2026-08-03T21:18:49.238934418Z"
+  "updated_at": "2026-08-03T21:23:13.107660328Z"
 }

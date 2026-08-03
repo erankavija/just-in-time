@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5f36dc10c37dec9e513eb213f2101b712dc9bda0",
+  "completed_at": "2026-08-03T21:23:12.624153390Z",
+  "duration_ms": 182270,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "scripts/docs-check-shipped-policy.sh",
+        "id": "F1",
+        "line": 28,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-15",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "The shipped-policy freshness checker says its classification comes from the installed binary, although its generator obtains it by applying the packaged jit-default profile."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/e204e63d-derived-package-sources/e204e63d-completion-report.md",
+        "id": "F2",
+        "line": 21,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "Linked handoffs and the completion report state quantitative operational metrics without a cited reproducible command or independent recorded measurement."
+      }
+    ],
+    "summary": "All hard criteria are verifiably met; two advisory documentation-evidence findings remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ba91fbb8-4137-408a-af99-27a02c32bdfb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T21:20:10.354056728Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. F1 — advisory, low: `scripts/docs-check-shipped-policy.sh:28` falsely says the classification comes from the installed binary; the generator actually obtains it by applying `profiles/jit-default` in a throwaway repository. The behavior meets REQ-01, but the explanation contradicts it.\n\n2. F2 — advisory, low: linked handoffs and the completion report contain self-attested quantitative metrics without cited reproducible commands or independent recorded measurements, including the report’s metrics table (`e204e63d-completion-report.md:21`) and timing/disk-reclamation claims in handoffs 5, 7, and 8.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met; two advisory documentation-evidence findings remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The shipped-policy freshness checker says its classification comes from the installed binary, although its generator obtains it by applying the packaged jit-default profile.\",\"file\":\"scripts/docs-check-shipped-policy.sh\",\"line\":28,\"references\":[\"@/issue/e204e63d/decision/D-15\",\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Linked handoffs and the completion report state quantitative operational metrics without a cited reproducible command or independent recorded measurement.\",\"file\":\"dev/active/e204e63d-derived-package-sources/e204e63d-completion-report.md\",\"line\":21,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

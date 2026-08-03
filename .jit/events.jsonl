@@ -12875,3 +12875,4 @@
 {"from":"ready","id":"116b3bac-9342-45de-9ef1-10d39f32bf6e","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-08-03T21:18:47.192586095Z","to":"done","type":"issue_state_changed"}
 {"id":"3f88f6b7-9144-4fac-a7f0-6ba68260f2fa","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-08-03T21:18:47.192586095Z","type":"issue_completed"}
 {"fields":["documents"],"id":"22a4160b-5d18-47c4-aa03-e28c55075621","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-08-03T21:18:49.238934418Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"holistic-review","id":"bf0ecde5-4714-4f41-95d1-923183736daa","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-08-03T21:23:13.107660328Z","type":"gate_passed","updated_by":"auto:executor"}
