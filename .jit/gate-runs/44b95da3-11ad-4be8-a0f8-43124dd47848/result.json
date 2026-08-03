@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e9b14468fc93830dc81341a4512be4eddd63ec28",
+  "completed_at": "2026-08-03T19:07:18.370334293Z",
+  "duration_ms": 75304,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s profile-command reference update accurately matches the current package-location CLI surface.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "62ef09b6-d51c-4f85-8748-c718ac705211",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "44b95da3-11ad-4be8-a0f8-43124dd47848",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T19:06:03.066164574Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf at the maximum configured hierarchy level and has no resolved children. I inspected both `jit:62ef09b6` commits individually; their union is the profile-command reference update. Uncommitted gate artifacts were not attributed.\n\nThe revised command reference matches current CLI help and source wording. Its location and cross-reference to Repository Profiles are appropriate, and no adopter-facing page describes a profile as embedded in or carried by the binary.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s profile-command reference update accurately matches the current package-location CLI surface.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

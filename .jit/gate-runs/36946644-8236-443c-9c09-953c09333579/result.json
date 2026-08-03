@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e9b14468fc93830dc81341a4512be4eddd63ec28",
+  "completed_at": "2026-08-03T19:09:12.219902734Z",
+  "duration_ms": 112483,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable command-reference update matches the current profile command help, removes embedded-package vocabulary, and recorded documentation gates pass.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "62ef09b6-d51c-4f85-8748-c718ac705211",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "36946644-8236-443c-9c09-953c09333579",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T19:07:19.735909611Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `55ecf5c8` and merge `2bc5eccc` (`jit:62ef09b6`); union: `docs/reference/cli-commands.md`\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-13` — `dev/vision/9db27a3a-charter.md`; `@/invariant/canonical-cutover` — `.jit/invariants.toml`\nGate evidence: `docs-mechanical` passed (exit 0, 2026-08-03T19:05:51Z); `doc-review` passed (exit 0, 2026-08-03T19:06:03Z)\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable command-reference update matches the current profile command help, removes embedded-package vocabulary, and recorded documentation gates pass.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
