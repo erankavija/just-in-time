@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T15:54:22.112666027Z",
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
@@ -29,7 +30,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Take the workflow profile and its presets out of the binary",
-  "updated_at": "2026-08-03T07:48:38.972903508Z"
+  "updated_at": "2026-08-03T15:54:22.112666027Z"
 }
