@@ -8,10 +8,12 @@
  * — that is covered by the Rust test suite.
  */
 
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { fileURLToPath } from 'url';
+import { promisify } from 'node:util';
 import { strict as assert } from 'node:assert';
 import { CURATION, getCommandByPath } from './lib/tool-generator.js';
 import { loadSchema } from './lib/schema-loader.js';
@@ -50,6 +52,38 @@ function presentsConfiguredKindVocabulary(text) {
     [...text.matchAll(itemKindTerm)].map(([term]) => itemKindForms.get(term.toLowerCase()))
   );
   return mentionedKinds.size >= 2 && itemKindEnumeration.test(text);
+}
+
+// A type hierarchy is repository configuration too. It is declared as an inline
+// table, so this guard reads it back through jit's own config parser rather
+// than depending on how the declaration is spelled, and derives the type names
+// from whatever the repository declares instead of naming this project's.
+const declaredHierarchyTypes = Object.keys(
+  JSON.parse(
+    (await promisify(execFile)('jit', ['config', 'get', 'type_hierarchy.types', '--json'], {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      timeout: TIMEOUT,
+    })).stdout
+  ).value
+);
+// Prose names a type in either number, so each declared name is matched in its
+// singular and plural forms, `y` → `ies` included.
+const hierarchyTypeTerm = new RegExp(
+  `\\b(?:${declaredHierarchyTypes
+    .flatMap(type => [
+      type,
+      `${type}s`,
+      ...(type.endsWith('y') ? [`${type.slice(0, -1)}ies`] : []),
+    ])
+    .map(escapeRegex)
+    .join('|')})\\b`,
+  'gi'
+);
+
+function namesConfiguredHierarchyTypes(text) {
+  return [...new Set(
+    [...text.matchAll(hierarchyTypeTerm)].map(([term]) => term.toLowerCase())
+  )].sort();
 }
 
 // A profile package reaches jit as files in a repository; nothing about one
@@ -283,6 +317,17 @@ async function main() {
       const instructions = resp.result.instructions;
       assert.match(instructions, /Gates are quality checkpoints.*repository's configuration/);
       assert.doesNotMatch(instructions, /\(tests, clippy, fmt, code-review\)/);
+
+      // Every connected agent reads the instruction block before it reads any
+      // repository's declarations, so the block itself may name no type from a
+      // hierarchy. A tool description is held instead to the command it
+      // describes, whose own text names the work that command performs.
+      assert.ok(declaredHierarchyTypes.length > 0,
+        'this repository must declare a type hierarchy for the guard to derive names from');
+      assert.deepStrictEqual(
+        namesConfiguredHierarchyTypes(instructions), [],
+        'SERVER_INSTRUCTIONS must name no type from a declared hierarchy'
+      );
 
       const listed = await tester.request('tools/list');
       const descriptionSources = [
