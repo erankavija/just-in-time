@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bb51bface4b24443b0b2df5f4f7d8fa94cd13f62",
+  "completed_at": "2026-08-03T19:59:10.100595922Z",
+  "duration_ms": 100801,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped profile-initialization documentation is accurate and complete.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "cd9a17f0-601f-4cec-a9e8-ced2a0cad98c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fb63c7f0-4a5e-4f9b-8498-b76e50c1be38",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T19:57:29.299415260Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children; reviewed its two reachable tagged commits individually. The merge adds no distinct current documentation change. The current command reference matches the profile-resolution contract.\n\nDocumentation impact: the first-time initialization command is runnable as presented, and the linked profile lifecycle reference consistently documents `--from` for first application.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped profile-initialization documentation is accurate and complete.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

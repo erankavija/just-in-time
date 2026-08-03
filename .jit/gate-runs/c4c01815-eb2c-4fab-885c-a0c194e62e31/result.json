@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bb51bface4b24443b0b2df5f4f7d8fa94cd13f62",
+  "completed_at": "2026-08-03T20:01:55.738090426Z",
+  "duration_ms": 164298,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The first-time profile initialization reference now matches the resolver contract and its explanatory prose.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cd9a17f0-601f-4cec-a9e8-ced2a0cad98c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c4c01815-eb2c-4fab-885c-a0c194e62e31",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T19:59:11.439623486Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e534619a and f5592515 (identical three-file patch via merge)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml); @/issue/e204e63d/requirement/REQ-08 (issue description)\nGate evidence: docs-mechanical passed (exit 0); doc-review passed (exit 0); code-review pending (this run)\nTruncation recovery: narrowed source, command-reference, profile-lifecycle, requirement, and policy reads after broad-search truncation\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The first-time profile initialization reference now matches the resolver contract and its explanatory prose.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

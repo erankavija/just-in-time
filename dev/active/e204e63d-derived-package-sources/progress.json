@@ -25,7 +25,7 @@
      "batch": "A",
      "base": "56cc6c0f",
      "lead_review": "pass",
-     "note": "Fixture declares objective/initiative/deliverable/action and its own namespaces — deliberately not a copy of any package's vocabulary — and returns TestTaxonomy so consumers assert against what they were given. Self-verifying test proves the built repository carries exactly the declaration. Binds the 11 wave-1 adoptions.",
+     "note": "Fixture declares objective/initiative/deliverable/action and its own namespaces \u2014 deliberately not a copy of any package's vocabulary \u2014 and returns TestTaxonomy so consumers assert against what they were given. Self-verifying test proves the built repository carries exactly the declaration. Binds the 11 wave-1 adoptions.",
      "gates": "all passed"
     },
     {
@@ -232,7 +232,7 @@
      "short_id": "f9cab4c2",
      "title": "Stop naming this checkout's paths in the domain and storage layers",
      "classification": "implementation",
-     "status": "done — cargo-ci and code-review passed on merged main",
+     "status": "done \u2014 cargo-ci and code-review passed on merged main",
      "worker": "opus-agent",
      "base": "da174a6b"
     },
@@ -256,7 +256,7 @@
      "short_id": "fd61b44f",
      "title": "Observe the drain assertions the graceful-shutdown test makes",
      "classification": "implementation",
-     "status": "ready, deliberately undispatched — conflicts with a53a6f09's footprint and its REQ-03 evidence needs a quiet host",
+     "status": "ready, deliberately undispatched \u2014 conflicts with a53a6f09's footprint and its REQ-03 evidence needs a quiet host",
      "worker": null
     }
    ]
@@ -379,7 +379,7 @@
     {
      "short_id": "6013cd81",
      "worker": "codex gpt-5.6-luna",
-     "status": "done — pulled forward beside 9de22aa7",
+     "status": "done \u2014 pulled forward beside 9de22aa7",
      "title": "Carry the default package in the release archive too"
     },
     {
@@ -397,7 +397,7 @@
     {
      "short_id": "daddfc0b",
      "worker": "Opus",
-     "status": "done — merged at 30b7d75e, documentation sweep at 2789d281, one lead fix at d310175f; all four gates passed",
+     "status": "done \u2014 merged at 30b7d75e, documentation sweep at 2789d281, one lead fix at d310175f; all four gates passed",
      "title": "Remove the configuration template the binary writes"
     },
     {
@@ -425,7 +425,7 @@
    "issues": [
     {
      "short_id": "aa258222",
-     "status": "done — resequenced as a PREDECESSOR of ff1bbada",
+     "status": "done \u2014 resequenced as a PREDECESSOR of ff1bbada",
      "title": "State the engine-vocabulary boundary in the invariant"
     },
     {
@@ -487,8 +487,8 @@
   {
    "short_id": "65ff0f38",
    "title": "Regenerating a checked-in generated artifact has one invocation form",
-   "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that — six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) — so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
-   "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label — the work is cross-cutting)"
+   "reason": "Owner-directed (2026-07-31). The lead's rework verdict on e1a18372 banned a `#[test]` outright when the real requirement was only that no generator write during a default test run. The repository already had an established form for that \u2014 six `#[ignore]`d regenerate-twins beside asserting siblings (gate_presets/reference.rs:377, runtime_defaults.rs:127, domain/event_catalog.rs:786, output.rs:3585, storage/reference.rs:786, env-gated schema.rs:1586) \u2014 so the verdict created a second convention for one job, which @/invariant/convention-convergence calls a defect. The e1a18372 worker surfaced this itself after running the sweep. Owner ruled convergence mandatory inside this epic rather than excepted with a tracked follow-up, so the invariant holds without an exception.",
+   "wired": "65ff0f38 depends on e1a18372; e204e63d depends on 65ff0f38 (direct child of the epic, no story label \u2014 the work is cross-cutting)"
   },
   {
    "short_id": "7cbefe7c",
@@ -500,21 +500,21 @@
  "escalations": [
   {
    "at": "2026-07-31",
-   "category": "4 — issue scope change (criteria)",
+   "category": "4 \u2014 issue scope change (criteria)",
    "issue": "779ea308",
-   "situation": "The plan required ~60 hand-written path literals in the BINARY_BUILD_INPUTS constant plus a reconciliation test against the packaged targets. That is a hand-maintained copy held correct by an assertion — the defect class this container removes — and it ships ~60 of this repository's paths inside every adopter binary. dogfood::jit_dogfood_package() already exposes the parsed embedded manifest and dogfood.rs:386 already filters live assets by the assets/live/ prefix; every live asset's target IS its repository path; and the caller at commands/gate_check.rs:672 sits in a layer that can reach the package.",
+   "situation": "The plan required ~60 hand-written path literals in the BINARY_BUILD_INPUTS constant plus a reconciliation test against the packaged targets. That is a hand-maintained copy held correct by an assertion \u2014 the defect class this container removes \u2014 and it ships ~60 of this repository's paths inside every adopter binary. dogfood::jit_dogfood_package() already exposes the parsed embedded manifest and dogfood.rs:386 already filters live assets by the assets/live/ prefix; every live asset's target IS its repository path; and the caller at commands/gate_check.rs:672 sits in a layer that can reach the package.",
    "resolution": "Owner approved rewriting 779ea308 to derive the set from the packaged live-asset targets at the changed-path comparison boundary. REQ-02/REQ-05 (the literals + reconciliation test) replaced; domain-layer purity criterion retained and strengthened."
   },
   {
    "at": "2026-07-31",
-   "category": "4 — issue scope change (criteria) + 1 — new work item",
+   "category": "4 \u2014 issue scope change (criteria) + 1 \u2014 new work item",
    "issue": "39c34568",
    "situation": "D-6 requires glob-category exclusions rather than path literals. Measured at execution time: .agents/ is 55 packaged / 52 unpackaged with cleanly categorical exclusions; contrib/ is 1/4; .jit/reference/ is 1/0. But scripts/ is 4 packaged of 45 tracked and no category separates code-review-prompt.md and plan-review-prompt.md (packaged) from doc-review-prompt.md and holistic-review-prompt.md (not), so its exclusion list would be ~41 near-literals and every future unrelated script would fail the walk. Additionally scripts/ai-review.sh and contrib/gates/ai-review.sh are byte-identical and both packaged.",
    "resolution": "Owner approved relocating the four packaged files under contrib/gates/, retiring scripts/ as a declared root, and collapsing the duplicate wrapper. New task 9d451c98 created and wired before 39c34568; 39c34568's REQ-05 no longer fixes a root count."
   },
   {
    "at": "2026-08-02",
-   "category": "3 — epic criteria/decision change + 4 — issue scope change",
+   "category": "3 \u2014 epic criteria/decision change + 4 \u2014 issue scope change",
    "issue": "c7058cac",
    "situation": "REQ-02 (old D-20) required omitting the invariant kind because only jit-dogfood ships .jit/invariants.toml; REQ-04 required the applied configuration to equal the scaffold's apart from one named exception, and the scaffold declares six kinds. The worker delivered the D-20-correct five-kind package and asserted the second difference explicitly rather than hiding it.",
    "resolution": "Owner ruled the exclusion was about the scaffolder rather than the kind, and chose to expand c7058cac now over a follow-up task or deferral. Rework dispatched to the same agent with the amended contract."
@@ -524,7 +524,7 @@
   {
    "at": "2026-07-31",
    "finding": "`.jit/config.toml:9-49` carries a third hand-maintained copy of the managed/permanent/issue-scoped area lists, asserting at :10-11 that it adopts the shipped classification verbatim with nothing binding it. Surfaced by the 67da1d70 worker.",
-   "disposition": "Out of scope by construction. The plan's 'A residual copy this container does not remove' entry and investigation §4.3 both place it outside REQ-01: it is repository-local policy, not adopter documentation. Re-check at the epic gate against REQ-01's exact wording ('The adopter configuration reference and the copyable example configuration'), which names two documents and does not reach this one."
+   "disposition": "Out of scope by construction. The plan's 'A residual copy this container does not remove' entry and investigation \u00a74.3 both place it outside REQ-01: it is repository-local policy, not adopter documentation. Re-check at the epic gate against REQ-01's exact wording ('The adopter configuration reference and the copyable example configuration'), which names two documents and does not reach this one."
   },
   {
    "at": "2026-07-31",
@@ -543,7 +543,7 @@
   },
   {
    "at": "2026-07-31",
-   "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat …)\"` and survive shell quoting.",
+   "finding": "`jit issue create` has no `--description-file` / stdin form, unlike `jit issue update`. Large descriptions must go through `--description \"$(cat \u2026)\"` and survive shell quoting.",
    "disposition": "Dogfooding friction. File as a separate issue at epic close; not in this epic's scope."
   },
   {
@@ -569,28 +569,28 @@
   {
    "at": "2026-07-31",
    "finding": "The 09aea8b3 worker wrote its conflict resolution into the PARENT checkout's crates/jit/src/profile/package.rs instead of its worktree. Its shell commands were correctly prefixed with an absolute cd, but its file-editing tool resolves relative paths against the parent checkout, which the shell prefix does not affect.",
-   "disposition": "Detected by check-leak-into-main.sh, reverted with git restore, worker instructed to use the absolute worktree path in every file-editing call. Dispatch briefs should state the path rule for FILE-EDITING TOOLS specifically, not only for shell commands — the current wording only covers the shell."
+   "disposition": "Detected by check-leak-into-main.sh, reverted with git restore, worker instructed to use the absolute worktree path in every file-editing call. Dispatch briefs should state the path rule for FILE-EDITING TOOLS specifically, not only for shell commands \u2014 the current wording only covers the shell."
   },
   {
    "at": "2026-07-31",
    "finding": "scripts/verify-commit-builds.sh reports a cold `cargo build --workspace` of a fresh git-archive extraction as passing in 24-30 seconds, with no sccache, no RUSTC_WRAPPER, no VERIFY_COMMIT_TARGET_DIR, and an empty cache directory. A genuine cold build of this workspace's 260 dependencies cannot complete in that time, so the merge-integrity guard may be reporting a vacuous PASS.",
-   "disposition": "Not investigated further inside this container: main's compile integrity is independently evidenced by cargo-ci, which runs `cargo test --workspace` per issue and demonstrably fails on real defects (it caught the 510297e4 regression). Worth a standalone issue at epic close — a guard that cannot fail is worse than no guard, because the protocol relies on it."
+   "disposition": "Not investigated further inside this container: main's compile integrity is independently evidenced by cargo-ci, which runs `cargo test --workspace` per issue and demonstrably fails on real defects (it caught the 510297e4 regression). Worth a standalone issue at epic close \u2014 a guard that cannot fail is worse than no guard, because the protocol relies on it."
   },
   {
    "at": "2026-07-31",
    "finding": "cargo-ci is not deterministic under host load. crates/server/tests/server_integration/graceful_shutdown_tests.rs::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero failed the gate for 3e340587 with 'the stalled connection was dropped before the drain deadline' at load average 6-10 (a worker build running beside the gate). It passes 5/5 in isolation on the same commit. The assertion is that a stalled connection SURVIVES to a drain deadline, which is precisely what CPU contention breaks.",
-   "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close — a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests.",
-   "correction": "Superseded: the failure is NOT load-induced flakiness. The test spends up to three consecutive 2s wait_for_close budgets after SIGTERM before asserting the stalled connection is still open, while GRACEFUL_DRAIN_TIMEOUT is 5s — so once those waits exceed 5s a CORRECT server has already force-closed the survivor and the assertion fails on conforming behaviour. It failed 2/2 whole-workspace runs including one on an idle host, and passes 10/10 in isolation. Fixed lead-direct at owner direction. The earlier 'do not run worker builds beside the gate' advice still stands on its own merits but was not the cause here."
+   "disposition": "Not attributed to any wave-0 diff. Operationally: do not run worker builds concurrently with the gate pipeline for the rest of this container, and re-evaluate the affected gate on a quiet host rather than accepting or bypassing the failure. Worth a standalone issue at epic close \u2014 a timing-sensitive test inside the authoritative whole-workspace gate makes every issue's verdict load-dependent. Related to the known env-sensitivity of the commands::gate* lib tests.",
+   "correction": "Superseded: the failure is NOT load-induced flakiness. The test spends up to three consecutive 2s wait_for_close budgets after SIGTERM before asserting the stalled connection is still open, while GRACEFUL_DRAIN_TIMEOUT is 5s \u2014 so once those waits exceed 5s a CORRECT server has already force-closed the survivor and the assertion fails on conforming behaviour. It failed 2/2 whole-workspace runs including one on an idle host, and passes 10/10 in isolation. Fixed lead-direct at owner direction. The earlier 'do not run worker builds beside the gate' advice still stands on its own merits but was not the cause here."
   },
   {
    "at": "2026-07-31",
    "finding": "a30d704d introduced a SECOND shared test taxonomy: HierarchyConfig::test_vocabulary() (domain/type_taxonomy.rs, milestone/epic/story/task) and declared_test_taxonomy() (commands/test_helpers.rs), alongside ae435979's setup_test_repo_with_taxonomy()/test_taxonomy() (objective/initiative/deliverable/action) which landed on main during a30d704d's run. Both were dispatched in the same batch from the same base, so the worker could not have consumed a fixture that did not yet exist. ae435979's own description rejects per-family fixtures as 'the near-duplicate setup the shared-contract rule exists to prevent'.",
-   "disposition": "Convergence is already planned rather than missing: wave-1 issues a53a6f09 (server crate) and 76b16af0 (modules that seed a repository directly) migrate exactly these call sites onto the shared fixture. Brief BOTH workers explicitly to delete declared_test_taxonomy() and HierarchyConfig::test_vocabulary() rather than adopt the fixture beside them — an adoption that leaves the parallel variant standing satisfies the criterion's letter and violates @/invariant/convention-convergence. Precedent: the owner ruled convergence mandatory inside this epic when the same class arose in session 1 (65ff0f38)."
+   "disposition": "Convergence is already planned rather than missing: wave-1 issues a53a6f09 (server crate) and 76b16af0 (modules that seed a repository directly) migrate exactly these call sites onto the shared fixture. Brief BOTH workers explicitly to delete declared_test_taxonomy() and HierarchyConfig::test_vocabulary() rather than adopt the fixture beside them \u2014 an adoption that leaves the parallel variant standing satisfies the criterion's letter and violates @/invariant/convention-convergence. Precedent: the owner ruled convergence mandatory inside this epic when the same class arose in session 1 (65ff0f38)."
   },
   {
    "at": "2026-07-31",
    "finding": "0439da41's REQ-05 assertion `assert!(data.icons.is_empty())` in crates/server/src/routes.rs passed vacuously: the server test fixture declared no type hierarchy, so there were no types to resolve icons for and the endpoint's icon behaviour was never observed. a30d704d's fixture change (declaring a taxonomy, required once the compiled defaults are gone) exposed it as a cargo-ci failure on merged main.",
-   "disposition": "Lead-direct fix committed as fix(jit:0439da41): the assertion now states the level-keying property — one icon per declared type, two types sharing an icon exactly when they share a level — which holds for any taxonomy the fixture declares and actually observes REQ-05. Worth carrying to the epic's holistic review as evidence for @/invariant/semantic-test-assertions: an assertion that passes because its fixture is empty is not coverage."
+   "disposition": "Lead-direct fix committed as fix(jit:0439da41): the assertion now states the level-keying property \u2014 one icon per declared type, two types sharing an icon exactly when they share a level \u2014 which holds for any taxonomy the fixture declares and actually observes REQ-05. Worth carrying to the epic's holistic review as evidence for @/invariant/semantic-test-assertions: an assertion that passes because its fixture is empty is not coverage."
   },
   {
    "at": "2026-08-01",
@@ -600,17 +600,17 @@
   {
    "at": "2026-08-01",
    "finding": "The dogfood-guidance region has two carriers with nothing binding them: profiles/jit-dogfood/assets/regions/agents-jit-guidance.md (the package's authority) and the rendered region in AGENTS.md. `jit project render` does not touch it (only the charter, invariants and rules-and-gates projections are declared), and `jit profile apply` would materialise it from the compiled-in embed rather than the working file, so a source edit reaches AGENTS.md only by hand or by a rebuild-plus-apply. This repository has no .jit/profiles/ record at all, so nothing validates the pair.",
-   "disposition": "Both carriers edited together at c250dbcf. Not a criterion violation as written: no [hard] criterion names the region pair. Recheck at epic close against REQ-03 — 'the packaged live-asset tree is derived from the repository files it mirrors' — since assets/regions/ sits outside assets/live/ and may fall outside that criterion's reach by construction."
+   "disposition": "Both carriers edited together at c250dbcf. Not a criterion violation as written: no [hard] criterion names the region pair. Recheck at epic close against REQ-03 \u2014 'the packaged live-asset tree is derived from the repository files it mirrors' \u2014 since assets/regions/ sits outside assets/live/ and may fall outside that criterion's reach by construction."
   },
   {
    "at": "2026-08-01",
-   "finding": "The ten taxonomy adoptions are contracted to consume ae435979's fixture 'as authored', but setup_test_repo_with_taxonomy() writes the whole .jit/config.toml from its own vocabulary and TestTaxonomy::config_toml() is private, so a suite that must declare item kinds, gates or rules in the same file cannot use it. Measured: cli_item_validate (3 sites), cli_query_graph/scope_validation_tests.rs and fast_docs_templates/template_apply_atomicity_tests.rs write extra tables; the remaining sites do not. Both workers back before the finding reached for declared_test_taxonomy() instead — the parallel helper the session-3 handoff had already flagged.",
+   "finding": "The ten taxonomy adoptions are contracted to consume ae435979's fixture 'as authored', but setup_test_repo_with_taxonomy() writes the whole .jit/config.toml from its own vocabulary and TestTaxonomy::config_toml() is private, so a suite that must declare item kinds, gates or rules in the same file cannot use it. Measured: cli_item_validate (3 sites), cli_query_graph/scope_validation_tests.rs and fast_docs_templates/template_apply_atomicity_tests.rs write extra tables; the remaining sites do not. Both workers back before the finding reached for declared_test_taxonomy() instead \u2014 the parallel helper the session-3 handoff had already flagged.",
    "disposition": "Root cause on the lead's side: session 3's handoff named this trap and required a53a6f09 and 76b16af0 to be briefed to delete the parallel helpers; the wave-1 briefs did not carry it. Resolved structurally by 06b736c7 rather than per issue. Brief-composition step must read the prior handoff's trap list against the dispatch set, not only the issue descriptions."
   },
   {
    "at": "2026-08-02",
    "finding": "Merging 39c34568, 06b736c7 and 6c47b99a produced a tree that does not compile: 6c47b99a gave ProfilePackage::from_files a second `source` argument while 39c34568 added a test helper calling the one-argument form. The edits do not overlap textually, so git merged all three cleanly. scripts/verify-commit-builds.sh reported the merge commit as building and was right to: its contract is `cargo build --workspace`, which never compiles #[cfg(test)] code, and the broken call site is inside a `mod tests`. cargo-ci caught it one gate cycle later. Separately, 6c47b99a's tagged ProfileOrigin encoding broke mcp-server/test-integration.js:456, which asserted the bare string; the mcp-ci gate the lead added to that issue caught it.",
-   "disposition": "Both fixed lead-direct on main with per-issue attribution (a89586ec, b558fa4f) so each lands in its own issue's review footprint. The verify-commit-builds gap is real and unfiled: a merge that breaks only test targets passes the guard. `cargo test --workspace --no-run` would close it. The session-3 handoff's stronger claim — that the guard is vacuous because a cold build cannot finish in 24-30s — is NOT what this incident shows and remains unverified."
+   "disposition": "Both fixed lead-direct on main with per-issue attribution (a89586ec, b558fa4f) so each lands in its own issue's review footprint. The verify-commit-builds gap is real and unfiled: a merge that breaks only test targets passes the guard. `cargo test --workspace --no-run` would close it. The session-3 handoff's stronger claim \u2014 that the guard is vacuous because a cold build cannot finish in 24-30s \u2014 is NOT what this incident shows and remains unverified."
   },
   {
    "at": "2026-08-02",
@@ -646,12 +646,12 @@
   {
    "at": "2026-08-02",
    "session": 6,
-   "text": "The lead chose a reading of a criteria conflict instead of escalating, exactly as session 3's trap forbids, and briefed ten workers with it. The gate ruled the other way and two issues lost a round. A criteria conflict noticed at DISPATCH time is the same escalation as one noticed at review time — the trap is not limited to lead review."
+   "text": "The lead chose a reading of a criteria conflict instead of escalating, exactly as session 3's trap forbids, and briefed ten workers with it. The gate ruled the other way and two issues lost a round. A criteria conflict noticed at DISPATCH time is the same escalation as one noticed at review time \u2014 the trap is not limited to lead review."
   },
   {
    "at": "2026-08-02",
    "session": 6,
-   "text": "Sharpening [namespaces.per] and the review prompt fixed 39c34568's label over-reach but NOT 6c47b99a's: that reviewer stopped citing the label and cited the decision text directly. The amendment addressed a narrower thing than the pattern. Resequencing — landing the issue that actually delivers the decision — is what has worked both times."
+   "text": "Sharpening [namespaces.per] and the review prompt fixed 39c34568's label over-reach but NOT 6c47b99a's: that reviewer stopped citing the label and cited the decision text directly. The amendment addressed a narrower thing than the pattern. Resequencing \u2014 landing the issue that actually delivers the decision \u2014 is what has worked both times."
   },
   {
    "at": "2026-08-02",
@@ -671,7 +671,7 @@
   {
    "at": "2026-08-02",
    "session": 7,
-   "text": "code-review reads an issue's RECORDED GATE EVIDENCE, not only its diff, so gate order inside the pipeline changes the verdict. Running it first cost two review rounds: 0db28190's REQ-04 ('the mechanical documentation checks pass') was failed while docs-mechanical sat queued behind the reviewer and passed twelve seconds later, and fd61b44f's REQ-03 was failed for having one cargo-ci execution on record. merge-and-gate.sh now sorts code-review last. Corollary: evidence the lead gathers in its own terminal does not exist as far as the reviewer is concerned — 32779829's verdict reuse means a second `jit gate evaluate` will NOT produce a second execution record unless --force is passed."
+   "text": "code-review reads an issue's RECORDED GATE EVIDENCE, not only its diff, so gate order inside the pipeline changes the verdict. Running it first cost two review rounds: 0db28190's REQ-04 ('the mechanical documentation checks pass') was failed while docs-mechanical sat queued behind the reviewer and passed twelve seconds later, and fd61b44f's REQ-03 was failed for having one cargo-ci execution on record. merge-and-gate.sh now sorts code-review last. Corollary: evidence the lead gathers in its own terminal does not exist as far as the reviewer is concerned \u2014 32779829's verdict reuse means a second `jit gate evaluate` will NOT produce a second execution record unless --force is passed."
   },
   {
    "at": "2026-08-02",
@@ -691,7 +691,7 @@
   {
    "at": "2026-08-02",
    "session": 7,
-   "text": "setsid nohup codex workers notify nothing — no idle ping, no exit notification. Two ran unwatched this session and one failed instantly against a nonexistent worktree without anyone noticing. Attach a completion watcher at dispatch time."
+   "text": "setsid nohup codex workers notify nothing \u2014 no idle ping, no exit notification. Two ran unwatched this session and one failed instantly against a nonexistent worktree without anyone noticing. Attach a completion watcher at dispatch time."
   },
   {
    "at": "2026-08-02",
@@ -713,7 +713,7 @@
    "at": "2026-08-03",
    "session": 8,
    "finding": "test_live_assets_match_every_declared_source_tree_consumer (crates/jit/src/profile/dogfood.rs:955) has a tautological half after 959274b6. Against an assembled package, package.source_bytes(&asset.source) resolves to the same fs::read(root.join(&asset.target)) the comparison's other side performs, so the asset-bytes assertion can no longer fail. Surfaced by the 959274b6 worker, which correctly declined to delete it.",
-   "disposition": "Not a 959274b6 criterion violation: its criteria say every existing assertion holds afterwards, and it does — it just stops discriminating. Do NOT delete it now: d94f6849 REQ-02 is exactly 'The assertion comparing a packaged copy against its repository counterpart is gone, along with the copies it compared', so deleting it here would pre-empt that criterion's subject. The property meanwhile lives in test_assemble_package_tree_produces_the_checked_in_tree_file_for_file (package_assembly.rs:546); the executable-mode half and the region half of the flagged test both stay real. Verify at d94f6849 that its removal is the one that lands."
+   "disposition": "Not a 959274b6 criterion violation: its criteria say every existing assertion holds afterwards, and it does \u2014 it just stops discriminating. Do NOT delete it now: d94f6849 REQ-02 is exactly 'The assertion comparing a packaged copy against its repository counterpart is gone, along with the copies it compared', so deleting it here would pre-empt that criterion's subject. The property meanwhile lives in test_assemble_package_tree_produces_the_checked_in_tree_file_for_file (package_assembly.rs:546); the executable-mode half and the region half of the flagged test both stay real. Verify at d94f6849 that its removal is the one that lands."
   },
   {
    "at": "2026-08-03",
@@ -725,13 +725,49 @@
    "at": "2026-08-03",
    "session": 8,
    "finding": "93fef456's REQ-01 ('A repository declaring no namespaces and no type hierarchy receives neither, and still validates') is not satisfiable until daddfc0b lands, and daddfc0b is NOT one of its 13 declared predecessors. The lead gated the story on that graph readiness and it failed three gates. code-review finding 1 is correct and decisive: plain `jit init` still selects HierarchyTemplate::default() (crates/jit/src/main.rs:2165), whose template hardcodes the four-type hierarchy and namespace registry (crates/jit/src/hierarchy_templates.rs:351). Verified independently by running `jit init` in a temp directory on main: it writes [type_hierarchy] with milestone/epic/story/task and seven namespaces.",
-   "disposition": "Lead error, not a worker defect and not a reviewer false positive. 93fef456 stays in_progress with its failed gate records intact; re-gate it after daddfc0b merges. doc-review's five findings are the same dependency seen from the documentation side — they describe pages that are accurate TODAY and become false when daddfc0b lands, which is why daddfc0b's own brief carries the documentation sweep. cargo-ci failed only on incremental-state (4360 tests, fmt, clippy and budget all passed) because a concurrent worker build wrote target/debug/incremental during the run; re-run it when no worker is building."
+   "disposition": "Lead error, not a worker defect and not a reviewer false positive. 93fef456 stays in_progress with its failed gate records intact; re-gate it after daddfc0b merges. doc-review's five findings are the same dependency seen from the documentation side \u2014 they describe pages that are accurate TODAY and become false when daddfc0b lands, which is why daddfc0b's own brief carries the documentation sweep. cargo-ci failed only on incremental-state (4360 tests, fmt, clippy and budget all passed) because a concurrent worker build wrote target/debug/incremental during the run; re-run it when no worker is building."
   },
   {
    "at": "2026-08-03",
    "session": 9,
    "finding": "profiles/jit-dogfood/manifest.toml carries a [[contribution]] whose value duplicates the .jit/invariants.toml domain-agnostic statement verbatim, and nothing binds the two. aa258222 changed all three carriers by hand.",
    "disposition": "Closed for this statement, but the SHAPE is unguarded and general: any packaged contribution duplicating a repository registry entry can go stale and be written over on re-apply. Second instance in this container after the session-8 [namespaces.satisfies] drift. Worth a standalone issue at epic close."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 10,
+   "finding": "A worker ran ./scripts/install-jit.sh three times from its own worktree (cd9a17f0), replacing the host-global jit on PATH with a binary built from that worktree, while a concurrent worker's npm test resolved jit from PATH. The dispatch brief's build-discipline list forbids cargo-ci.sh, verify-commit-builds.sh and jit gate evaluate but NOT install-jit.sh, so the worker complied with the letter and still swapped a shared resource.",
+   "status": "Brief defect on the lead's side. Add install-jit.sh to the forbidden list: installing is a host-global write, not a targeted check. The lead reinstalls from main after merge, which is what makes a gate verdict evidence about main."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 10,
+   "finding": "scripts/assemble-package.sh takes one positional destination and has no --help; `./scripts/assemble-package.sh --help` assembled a 64-file tree into ./--help inside the main checkout. Removed by hand.",
+   "status": "Dogfooding friction, unfiled. Worth a standalone issue at epic close alongside the other tooling gaps."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 10,
+   "finding": "The stale-binary guard prints 'built from commit X, but the repository's current HEAD is X' \u2014 the same commit on both sides \u2014 when the working tree is merely dirty in a build-input path. The message names no dirty file, so it reads as a contradiction.",
+   "status": "Recorded. The guard is correct (a dirty build input invalidates provenance); only its message is misleading. Worth a standalone issue at epic close."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 10,
+   "finding": "check-leak-into-main.sh reports the lead's own gate-run records and issue-state writes as worker leaks, because the pre-dispatch snapshot predates any gate the lead evaluates during the wave.",
+   "status": "Operational: read the reported entries before acting. .jit/gate-runs/**, .jit/events.jsonl and .jit/issues/*.json written after the snapshot are lead state, not leaks."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 10,
+   "finding": "An Opus worker (26f503cc) delivered three idle notifications and never a final report, despite two explicit SendMessage requests naming the report format. Its work was correct; the lead verified every criterion independently instead.",
+   "status": "The lead's own verification is the fallback and it worked. Budget for it: a worker that idles without reporting costs a full independent review, not a re-dispatch."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 10,
+   "finding": "zsh does not word-split unquoted variables, so `for pair in \"a b\"; do set -- $pair` passes the whole pair as $1. Five gate evaluations silently no-opped with 'Issue not found: cd9a17f0 docs-mechanical'.",
+   "status": "Use a shell function taking two named arguments, or an explicit array. The failure is loud but reads like a jit error rather than a shell error."
   }
  ],
  "rework_counts": {
@@ -771,7 +807,7 @@
   {
    "at": "2026-07-31",
    "ruling": "No contributed profiles in .jit by default. Our repo shall contain the dogfooding profile, but it shall be disjoint from jit proper. It should be just like an externally contributed profile.",
-   "effect": "Rejects the investigation's recommended repository-local package location (.jit/profiles/packages/). profiles/jit-dogfood/ stays in this repository, outside crates/jit/, consumed as a third-party contribution would be. OPEN: how `jit validate --fix` re-resolves the package on a later run without package bytes in .jit/ — the provenance record at .jit/profiles/<id>.json could carry the source path. Must be settled before extraction step 2 builds the resolver. Step 1 (229e7389) REQ-04 fails loudly on an unresolvable package rather than degrading, keeping the decision open."
+   "effect": "Rejects the investigation's recommended repository-local package location (.jit/profiles/packages/). profiles/jit-dogfood/ stays in this repository, outside crates/jit/, consumed as a third-party contribution would be. OPEN: how `jit validate --fix` re-resolves the package on a later run without package bytes in .jit/ \u2014 the provenance record at .jit/profiles/<id>.json could carry the source path. Must be settled before extraction step 2 builds the resolver. Step 1 (229e7389) REQ-04 fails loudly on an unresolvable package rather than degrading, keeping the decision open."
   },
   {
    "at": "2026-07-31",
@@ -786,7 +822,7 @@
   {
    "at": "2026-07-31",
    "ruling": "Epic REQ-04 is restated over the produced package (identical package hash + identical provenance across two assemblies); REQ-06 is struck as covered by REQ-03.",
-   "effect": "Epic description amended. REQ-06's number is retired rather than reused, so findings.md §8's per-criterion table keeps its referents. Recorded as @/issue/e204e63d/decision/D-7."
+   "effect": "Epic description amended. REQ-06's number is retired rather than reused, so findings.md \u00a78's per-criterion table keeps its referents. Recorded as @/issue/e204e63d/decision/D-7."
   },
   {
    "at": "2026-07-31",
@@ -811,7 +847,7 @@
   {
    "at": "2026-07-31",
    "ruling": "DEFAULT_PLANNING_ROLE / DEFAULT_BREAKDOWN_ROLE / DEFAULT_CONTAINER_ANCHOR stay in the engine; the amended @/invariant/domain-agnostic admits mechanism-parameter defaults as engine vocabulary while excluding workflow shapes, presets and gate bundles.",
-   "effect": "Binds the invariant amendment's wording at extraction step 5. Answers findings.md §11 question 5. Recorded as @/issue/e204e63d/decision/D-12."
+   "effect": "Binds the invariant amendment's wording at extraction step 5. Answers findings.md \u00a711 question 5. Recorded as @/issue/e204e63d/decision/D-12."
   },
   {
    "at": "2026-07-31",
@@ -888,7 +924,7 @@
    "session": 6,
    "question": "39c34568's code-review reads per:@/issue/e204e63d/decision/D-6 as a claim to deliver D-6's completeness walk, which 0cf1f351 owns.",
    "ruling": "Sharpen [namespaces.per] only; add no verbosity elsewhere.",
-   "applied": "a3291826 — the namespace now says the label denotes conformance, not delivery of the decision whole.",
+   "applied": "a3291826 \u2014 the namespace now says the label denotes conformance, not delivery of the decision whole.",
    "outcome": "Did NOT bind the reviewer. Round 2 failed on the same finding, now citing D-2 and D-6 and 39c34568's own REQ-05. Lead resequenced instead of escalating again: 0cf1f351 delivers the walk and is dispatched ahead of 39c34568's close, so the claim the reviewer tests becomes true in the tree."
   },
   {
@@ -902,13 +938,13 @@
    "at": "2026-08-02",
    "session": 6,
    "question": "6c47b99a failed code-review twice demanding jit validate --fix re-resolve a directory-origin package, which is 8371bd46's job.",
-   "ruling": "Pull 8371bd46's chain forward — 32779829 then 5d12a79f then 8371bd46 — and re-run 6c47b99a's review afterwards.",
+   "ruling": "Pull 8371bd46's chain forward \u2014 32779829 then 5d12a79f then 8371bd46 \u2014 and re-run 6c47b99a's review afterwards.",
    "outcome": "Same resequencing that resolved 39c34568. 6c47b99a stays open meanwhile."
   },
   {
    "at": "2026-08-02",
    "session": 6,
-   "question": "cargo-ci re-ran a whole-workspace suite once per issue over one unchanged tree — about 112 minutes for a fifteen-issue wave.",
+   "question": "cargo-ci re-ran a whole-workspace suite once per issue over one unchanged tree \u2014 about 112 minutes for a fifteen-issue wave.",
    "ruling": "File gate-verdict input provenance as an issue inside this epic, to be completed next; no further work proceeds without it.",
    "outcome": "32779829 created and delivered. Measured in production: 06b736c7's cargo-ci reused 32779829's verdict in 0ms against 411s executed, origin.derivation='reused' naming the source run. Pipeline 4 gated fourteen issues in ~50 minutes."
   },
@@ -972,7 +1008,7 @@
  ],
  "halted": {
   "story": "cc75b4e6",
-  "reason": "Owner ruling: the profile leaves the binary, so deriving the packaged tree into it targets a structure being removed. Per investigation §8, three tasks are superseded and seven survive retargeted from a build-output tree to a publishable distribution artefact.",
+  "reason": "Owner ruling: the profile leaves the binary, so deriving the packaged tree into it targets a structure being removed. Per investigation \u00a78, three tasks are superseded and seven survive retargeted from a build-output tree to a publishable distribution artefact.",
   "superseded": [
    "1d2f454e (the embed is deleted, not re-rooted)",
    "ce0172c3 (retargets to the produced tree)",
@@ -991,13 +1027,13 @@
   ],
   "epic_criteria": {
    "REQ-03": "survives unchanged, gains value",
-   "REQ-04": "superseded — 'embed' loses its referent",
+   "REQ-04": "superseded \u2014 'embed' loses its referent",
    "REQ-05": "survives unchanged, matters more",
    "REQ-06": "meaningless after extraction"
   }
  },
  "blocked": null,
- "session": 9,
+ "session": 10,
  "open_findings": [
   {
    "at": "2026-07-31",
@@ -1071,7 +1107,7 @@
      "severity": "high",
      "status": "resequenced",
      "text": "The root test checks declared assets only and never walks declared roots to reject files absent from the asset inventory and exclusions (crates/jit/src/profile/dogfood.rs:426), citing D-2 and D-6.",
-     "resolution": "Not a defect in 39c34568, whose REQ-01 states the exclusion lists may be empty because what belongs in them is measured elsewhere. Sharpening [namespaces.per] did not bind the reviewer across two rounds. 0cf1f351 — which owns the walk and depends only on 39c34568, whose code is on main — was dispatched ahead of 39c34568's close so the claim the reviewer tests becomes true in the tree. Re-run 39c34568's code-review after 0cf1f351 lands."
+     "resolution": "Not a defect in 39c34568, whose REQ-01 states the exclusion lists may be empty because what belongs in them is measured elsewhere. Sharpening [namespaces.per] did not bind the reviewer across two rounds. 0cf1f351 \u2014 which owns the walk and depends only on 39c34568, whose code is on main \u2014 was dispatched ahead of 39c34568's close so the claim the reviewer tests becomes true in the tree. Re-run 39c34568's code-review after 0cf1f351 lands."
     }
    ]
   },
@@ -1115,7 +1151,7 @@
    "round": 2,
    "verdict": "fail",
    "findings": 4,
-   "summary": "Graph not reconciled to the manifest (lead); D-13/D-14 cited but not decomposed (sequencing — the audit had not landed); accumulation rows; unordered footprint overlaps."
+   "summary": "Graph not reconciled to the manifest (lead); D-13/D-14 cited but not decomposed (sequencing \u2014 the audit had not landed); accumulation rows; unordered footprint overlaps."
   },
   {
    "gate": "plan-review",
@@ -1207,7 +1243,7 @@
   {
    "at": "2026-08-02",
    "session": 6,
-   "note": "Wave-1 tail: c7058cac merged (one additive conflict in commands/profile.rs; both sides' test helpers kept). Its merge with 6c47b99a is a cross-branch regression — c7058cac's test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration applies profiles/jit-default read from the real checkout, and 6c47b99a's apply now refuses a package directory outside the TARGET repository's worktree. `cargo test --workspace --no-run` passed on the merged tree and did not catch it: the pair compiles, it fails at run time. Lead fixes the one call site on main. The ten adoptions were re-dispatched on fresh -r1 worktrees off a3291826; their old branches hold one superseded commit each (SHAs in the session scratchpad's discarded-wip-sha.txt) because branch deletion is blocked in this harness."
+   "note": "Wave-1 tail: c7058cac merged (one additive conflict in commands/profile.rs; both sides' test helpers kept). Its merge with 6c47b99a is a cross-branch regression \u2014 c7058cac's test_apply_embedded_profile_jit_default_reproduces_the_scaffolded_configuration applies profiles/jit-default read from the real checkout, and 6c47b99a's apply now refuses a package directory outside the TARGET repository's worktree. `cargo test --workspace --no-run` passed on the merged tree and did not catch it: the pair compiles, it fails at run time. Lead fixes the one call site on main. The ten adoptions were re-dispatched on fresh -r1 worktrees off a3291826; their old branches hold one superseded commit each (SHAs in the session scratchpad's discarded-wip-sha.txt) because branch deletion is blocked in this harness."
   },
   {
    "at": "2026-08-02",
@@ -1227,7 +1263,7 @@
   {
    "at": "2026-08-02",
    "session": 7,
-   "note": "Ten issues closed (42 -> 51 of 78; d35cc3f2 filed mid-session). Wave 2 is closed. The resequencing pattern — land the issue that makes a reviewer's claim true, then re-review — was used five times and worked every time: 39c34568 and 6c47b99a in earlier sessions, then 5d12a79f, 7835fdc0 and d35cc3f2 here. d35cc3f2 and e4ba28c5 are mutually entangled: d35cc3f2's reviewer wanted the dependency declaration that e4ba28c5 provides, while e4ba28c5 needed d35cc3f2's embed to work at all. Merging both and re-reviewing d35cc3f2 afterwards resolved it."
+   "note": "Ten issues closed (42 -> 51 of 78; d35cc3f2 filed mid-session). Wave 2 is closed. The resequencing pattern \u2014 land the issue that makes a reviewer's claim true, then re-review \u2014 was used five times and worked every time: 39c34568 and 6c47b99a in earlier sessions, then 5d12a79f, 7835fdc0 and d35cc3f2 here. d35cc3f2 and e4ba28c5 are mutually entangled: d35cc3f2's reviewer wanted the dependency declaration that e4ba28c5 provides, while e4ba28c5 needed d35cc3f2's embed to work at all. Merging both and re-reviewing d35cc3f2 afterwards resolved it."
   },
   {
    "session": 9,

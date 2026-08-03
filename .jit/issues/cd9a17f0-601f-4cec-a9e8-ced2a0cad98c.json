@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The command reference's first-time profile initialization works as written, so an adopter who runs it reaches an initialized repository.\n\n## Background\n\nThe reference presents one command as the preferred setup for this project's portable workflow. Run verbatim in a fresh repository it fails: a first application has no applied-profile record to read, so the package location must be supplied. The paragraph immediately below the command says exactly that, which makes the example contradict its own explanation rather than merely omit an option.\n\nThe affordance is the point of the surrounding section, so the fix is to make the presented command the one an adopter can run, not to add a caveat beside a command that does not work.\n\n## Success Criteria\n\n- [hard] REQ-01: Every profile-initialization command the reference presents as runnable succeeds when run verbatim in a fresh repository, or is presented as an explicit non-first-application case.\n- [hard] REQ-02: The presented first-time form and the paragraph explaining when a location must be supplied agree.\n- [hard] REQ-03: The mechanical documentation checks pass over the changed pages.",
   "documents": [],
+  "done_at": "2026-08-03T20:04:16.800949941Z",
   "first_ready_at": "2026-08-03T19:40:57.723950495Z",
   "gates_required": [
     "code-review",
@@ -14,19 +15,19 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T19:41:07.865900847Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-03T20:01:56.053597413Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T19:41:08.366350092Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-03T19:59:10.413976696Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-03T19:41:08.109471499Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-03T19:57:28.454957531Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "cd9a17f0-601f-4cec-a9e8-ced2a0cad98c",
@@ -41,7 +42,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Make the reference's first-time profile initialization runnable as written",
-  "updated_at": "2026-08-03T19:42:07.683210322Z"
+  "updated_at": "2026-08-03T20:04:16.800949941Z"
 }

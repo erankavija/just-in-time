@@ -76,7 +76,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "The binary carries no configuration it writes for a repository",
-  "updated_at": "2026-08-03T19:41:11.922665795Z"
+  "updated_at": "2026-08-03T20:04:28.806825523Z"
 }
