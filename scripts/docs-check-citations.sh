@@ -108,10 +108,15 @@ status=0
 # during recursion) is an environment error; surface it as exit 2 rather than
 # letting the checker go false-green.
 grc=0
-# Generated skill evaluation evidence and profile install-time projection
-# inputs are not live repository prose. Evaluation fixtures preserve
-# disposable paths; install assets contain destination-scoped item ids that
-# resolve only after the package is applied. Match their complete structural
+# Generated skill evaluation evidence and package-delivered content are not
+# live repository prose. Evaluation fixtures preserve disposable paths. A
+# package's `assets/` subtree is what its manifest ships elsewhere, so nothing
+# in it answers here: an install file or a managed-region body names ids and
+# paths that exist at the destination once the package is applied, and a staged
+# copy of a repository file is answerable at the original, which is scanned
+# where it lives. The manifest beside that subtree is authored and read here,
+# so it stays scanned and its citations must resolve. `git ls-files profiles`
+# lists the package files this split sorts. Match their complete structural
 # paths rather than suppressing every directory with a common basename.
 scan_matches() {
   local regex=$1 raw line path match
@@ -124,7 +129,7 @@ scan_matches() {
     path=${line%%:*}
     match=${line#*:}
     case "/$path/" in
-      */.agents/skills/*/evals/* | */profiles/*/assets/install/*) continue ;;
+      */.agents/skills/*/evals/* | */profiles/*/assets/*) continue ;;
     esac
     printf '%s\n' "$match"
   done <<<"$raw"
