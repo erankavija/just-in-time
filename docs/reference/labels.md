@@ -202,18 +202,18 @@ maintains, so the mechanism and the work that backs it cross-reference by a
 stable id rather than by copied text. The namespace is non-unique: one issue may
 enforce several items.
 
-> **Enforcement lives in `.jit/rules.toml`.** The canonical label format, the
-> namespace registry, and per-namespace uniqueness are declarative rules there
-> (scaffolded by `jit init`). The workflow profile contributes the orphan-leaf /
-> strategic-consistency warnings. The scaffolded rules are `origin = "default"`:
+> **Enforcement lives in `.jit/rules.toml`.** The [Validation section of the
+> Configuration Reference](configuration.md#validation) is the canonical
+> statement of the rules a bare repository receives and the workflow package's
+> contributions. The built-in rules described there are `origin = "default"`:
 > they derive their
 > assertion — and the family's membership — from the
 > `[namespaces]` / `[type_hierarchy]` registry in `config.toml` at load, so a
 > `[namespaces.<name>]` table's `unique` flag and its membership drive them
 > directly (declaring a namespace enforces it on the next command, no
 > regeneration; the next jit-driven config write also syncs the matching
-> rows into `rules.toml` for addressability), and a repository declaring neither
-> table receives `label-format` alone. To add constraints the defaults do not cover — allowed values,
+> rows into `rules.toml` for addressability). To add constraints the defaults do
+> not cover — allowed values,
 > value patterns, required namespaces — author a custom rule in `rules.toml`,
 > e.g.:
 

@@ -237,9 +237,7 @@ repository's dogfood configuration additionally declares `bug` and
 
 Omit the table and the repository has no hierarchy: no type name is known, the
 queries that resolve tiers resolve none, and neither the `type-hierarchy-known`
-rule nor any workflow profile's type-hierarchy warnings have a subject. The
-workflow profile contributes `orphan-leaf` / `strategic-consistency` when
-installed; a plain repository receives neither rule.
+rule nor any workflow profile's type-hierarchy warnings have a subject.
 
 ### `[validation]`
 
@@ -270,11 +268,13 @@ only the block/allow decision:
 An unrecognized value is rejected. Under `--force`, a blocked write or transition
 proceeds and the bypass is logged, at every level.
 
-> **Validation enforcement lives in `.jit/rules.toml`.** The ruleset `jit
-> validate` and write-validation enforce is declared there, scaffolded by `jit
-> init`: label/type format, the namespace registry, per-namespace uniqueness, and
-> any custom rules you author. The workflow profile contributes the
-> orphan-leaf / strategic-consistency warnings when installed.
+> **Validation enforcement lives in `.jit/rules.toml`.** A bare `jit init`
+> receives only the `label-format` rule. Registry-derived rules for the
+> namespace registry, type-hierarchy membership, and per-namespace uniqueness
+> appear when the repository declares the corresponding `[namespaces]` or
+> `[type_hierarchy]` tables; custom rules are authored there as well. The
+> `orphan-leaf` and `strategic-consistency` workflow warnings arrive with the
+> workflow package when it is installed.
 > The built-in rules marked `origin = "default"` derive their assertion — and
 > the family's membership — from the `[namespaces]` /
 > `[type_hierarchy]` registry in `config.toml`, in memory at load; the
@@ -285,9 +285,6 @@ proceeds and the bypass is logged, at every level.
 > the matching rows through to `rules.toml` so each `@/rule/<name>` address
 > resolves), and author new conventions as custom rules
 > in `rules.toml`. `strictness` tunes how all of these gate operations globally.
->
-> Because every default rule but `label-format` is derived from one of those two
-> tables, a repository that declares neither receives `label-format` alone.
 
 ### `[namespaces.*]`
 
