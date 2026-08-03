@@ -119,8 +119,9 @@ jobs:
             --target x86_64-unknown-linux-musl \
             --bin jit --bin jit-server
 
-      # The archive is flat: the binaries land wherever it is extracted, and
-      # both license texts travel with them.
+      # The binaries and license texts land at the extraction root. The
+      # assembled workflow package travels under one package directory so the
+      # extracted archive is sufficient for offline profile application.
       - name: Assemble the archive
         run: |
           mkdir -p stage dist
@@ -128,8 +129,16 @@ jobs:
           cp target/x86_64-unknown-linux-musl/release/jit-server stage/jit-server
           strip stage/jit stage/jit-server
           cp LICENSE-MIT LICENSE-APACHE stage/
+          scripts/assemble-package.sh stage/packages/jit-dogfood
+          archive_members=(
+            jit
+            jit-server
+            LICENSE-MIT
+            LICENSE-APACHE
+            packages/jit-dogfood
+          )
           tar -czf dist/jit-linux-x64.tar.gz -C stage \
-            jit jit-server LICENSE-MIT LICENSE-APACHE
+            "${archive_members[@]}"
           tar -tzf dist/jit-linux-x64.tar.gz
 
       - name: Upload the native archive
@@ -207,6 +216,11 @@ jobs:
               exit 1
             fi
           done
+          if [ ! -d "$prefix/packages/jit-dogfood" ] || \
+             [ ! -s "$prefix/packages/jit-dogfood/manifest.toml" ]; then
+            echo "the archive carries no assembled jit-dogfood package"
+            exit 1
+          fi
 
       - name: Verify the version, target, and profile the binaries report
         env:
@@ -230,19 +244,35 @@ jobs:
 
       - name: Initialize a repository through the profile quickstart
         run: |
-          workspace="${RUNNER_TEMP}/smoke-repo"
-          mkdir -p "$workspace"
+          prefix="${RUNNER_TEMP}/prefix"
+          # The package location must be inside the repository worktree. The
+          # extracted prefix is therefore the smoke repository itself, so the
+          # resolver reads the published package bytes in place.
+          workspace="$prefix"
           cd "$workspace"
-          jit init --profile jit-dogfood
+          jit init --profile jit-dogfood \
+            --from "$prefix/packages/jit-dogfood" --json > init.json
           jit validate
           jit profile list --json > profiles.json
           jit profile apply jit-dogfood --dry-run --json > plan.json
           python3 - <<'PY'
           import json
 
+          initialization = json.load(open("init.json"))
+          applied = initialization["profile"]["profiles"]
+          ids = {profile["id"] for profile in applied}
+          assert "jit-dogfood" in ids, applied
+
           listing = json.load(open("profiles.json"))
           assert listing["count"] == len(listing["profiles"]), listing
-          assert "jit-dogfood" in {profile["id"] for profile in listing["profiles"]}, listing
+          assert ids == {profile["id"] for profile in listing["profiles"]}, listing
+          dogfood = next(
+              profile for profile in listing["profiles"] if profile["id"] == "jit-dogfood"
+          )
+          assert dogfood["origin"] == {
+              "source": "directory",
+              "location": "packages/jit-dogfood",
+          }, dogfood
 
           # Re-planning an exact installation reports no work, which is what
           # makes the quickstart's result observable rather than merely quiet.
@@ -252,7 +282,8 @@ jobs:
 
       - name: Verify the machine contract the archive carries
         run: |
-          cd "${RUNNER_TEMP}/smoke-repo"
+          prefix="${RUNNER_TEMP}/prefix"
+          cd "$prefix"
           description=$(printf '%s\n' \
             "Created by the release smoke test." \
             "" \
@@ -280,7 +311,8 @@ jobs:
       # The served document is what tells the two apart.
       - name: Serve the repository from the archived server
         run: |
-          cd "${RUNNER_TEMP}/smoke-repo"
+          prefix="${RUNNER_TEMP}/prefix"
+          cd "$prefix"
           jit-server --data-dir .jit --bind 127.0.0.1:3000 &
           server=$!
           ready=""

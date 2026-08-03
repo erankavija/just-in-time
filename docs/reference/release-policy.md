@@ -49,7 +49,7 @@ The release carries these assets:
 
 | Asset | Contents | Installed by |
 | --- | --- | --- |
-| native archive | the `jit` CLI, the `jit-server` binary, and both license texts, built for Linux x86_64 against musl | [Installation Guide](../../INSTALL.md#pre-built-binaries) |
+| native archive | the `jit` CLI, the `jit-server` binary, both license texts, and the assembled `jit-dogfood` workflow package under `packages/jit-dogfood/`, built for Linux x86_64 against musl | [Installation Guide](../../INSTALL.md#pre-built-binaries) |
 | MCP server tarball | the packaged MCP server | [MCP Integration](../how-to/mcp-integration.md) |
 | checksum file | SHA-256 sums covering both archives, computed where the assets are assembled | [Installation Guide](../../INSTALL.md#download-and-verify) |
 | license texts | the two texts the manifest expression names, published beside the archives that also carry them | downloaded from the release page |
