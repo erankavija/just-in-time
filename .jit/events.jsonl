@@ -12704,3 +12704,4 @@
 {"gate_key":"code-review","id":"1d60428f-6cb9-4ac1-91ab-5c8d870ea2af","issue_id":"6f8f02ba-8cb3-4aea-b0f6-868deeec6a83","timestamp":"2026-08-03T09:49:28.023289010Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"4fc2f95d-eb15-469e-a2c2-3b8978b54dac","issue_id":"6f8f02ba-8cb3-4aea-b0f6-868deeec6a83","timestamp":"2026-08-03T09:49:55.653854396Z","to":"done","type":"issue_state_changed"}
 {"id":"9c69e05a-3540-447f-b9af-888769e0170a","issue_id":"6f8f02ba-8cb3-4aea-b0f6-868deeec6a83","timestamp":"2026-08-03T09:49:55.653854396Z","type":"issue_completed"}
+{"assignee":"agent:jit-execution-lead","id":"06431f56-7d57-45bf-92cf-b74b3cae6f0c","issue_id":"e204e63d-60de-4fc5-a1b7-933cb41d1695","timestamp":"2026-08-03T15:52:29.437008086Z","type":"issue_claimed"}
