@@ -110,19 +110,19 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     },
     GeneratedArtifact {
         name: "gate-presets-reference",
-        generator: crate::gate_presets::reference::REFERENCE_GENERATOR,
+        generator: crate::gate_presets::reference::test_support::REFERENCE_GENERATOR,
         holds: "the preset contract and portable checker syntax in `jit::gate_presets`",
         render: ArtifactRender::InCrate {
-            target: crate::gate_presets::reference::REFERENCE_PATH,
+            target: crate::gate_presets::reference::test_support::REFERENCE_PATH,
             render: render_gate_presets_reference,
         },
     },
     GeneratedArtifact {
         name: "runtime-defaults-reference",
-        generator: crate::runtime_defaults::REFERENCE_GENERATOR,
+        generator: crate::runtime_defaults::test_support::REFERENCE_GENERATOR,
         holds: "the defaults declared in `jit::runtime_defaults`",
         render: ArtifactRender::InCrate {
-            target: crate::runtime_defaults::REFERENCE_PATH,
+            target: crate::runtime_defaults::test_support::REFERENCE_PATH,
             render: render_runtime_defaults_reference,
         },
     },

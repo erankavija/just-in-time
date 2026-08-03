@@ -9,7 +9,7 @@
 //! `.jit/config/gate-presets/`, where gate keys, titles, and checkers belong
 //! (`@/inv/domain-agnostic`, `@/charter/D-2`). The [`reference`] submodule
 //! projects the preset contract and the portable checker syntax into the
-//! committed markdown reference [`REFERENCE_PATH`].
+//! committed markdown reference.
 
 mod manager;
 mod planning;
@@ -17,7 +17,7 @@ pub mod reference;
 
 pub use manager::PresetManager;
 pub use planning::preview_coverage_rule;
-pub use reference::{render_reference_markdown, REFERENCE_PATH};
+pub use reference::render_reference_markdown;
 
 use crate::declarations::GateDefinition;
 use crate::declarations::{GateChecker, GateMode, GateStage};
