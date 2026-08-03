@@ -111,7 +111,7 @@ pub const GENERATED_ARTIFACTS: &[GeneratedArtifact] = &[
     GeneratedArtifact {
         name: "gate-presets-reference",
         generator: crate::gate_presets::reference::REFERENCE_GENERATOR,
-        holds: "the presets declared in `jit::gate_presets`",
+        holds: "the preset contract and portable checker syntax in `jit::gate_presets`",
         render: ArtifactRender::InCrate {
             target: crate::gate_presets::reference::REFERENCE_PATH,
             render: render_gate_presets_reference,
@@ -177,9 +177,7 @@ fn render_exit_code_reference(_committed: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 fn render_gate_presets_reference(_committed: &[u8]) -> Result<Vec<u8>, String> {
-    crate::gate_presets::reference::render_reference_markdown()
-        .map(String::into_bytes)
-        .map_err(|error| error.to_string())
+    Ok(crate::gate_presets::reference::render_reference_markdown().into_bytes())
 }
 
 fn render_runtime_defaults_reference(_committed: &[u8]) -> Result<Vec<u8>, String> {

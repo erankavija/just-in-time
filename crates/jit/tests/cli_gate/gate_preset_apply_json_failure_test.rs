@@ -11,9 +11,35 @@ fn jit(temp: &TempDir) -> Command {
     command
 }
 
+/// The project-defined preset every case below applies.
+const PRESET: &str = "review";
+
+/// A repository declaring one gate and capturing it into the project's own
+/// preset [`PRESET`], which is the only place a preset comes from.
 fn setup_repo() -> TempDir {
     let temp = TempDir::new().expect("temporary repository");
     jit(&temp).arg("init").assert().success();
+    jit(&temp)
+        .args([
+            "gate",
+            "define",
+            "team-review",
+            "--title",
+            "Team review",
+            "--description",
+            "A reviewer signs off",
+        ])
+        .assert()
+        .success();
+    let reference = create_issue(&temp, "Preset source");
+    jit(&temp)
+        .args(["gate", "add", &reference, "team-review"])
+        .assert()
+        .success();
+    jit(&temp)
+        .args(["gate", "preset", "create", &reference, PRESET])
+        .assert()
+        .success();
     temp
 }
 
@@ -44,7 +70,7 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
             "gate",
             "preset",
             "apply",
-            "plan-review",
+            PRESET,
             &valid_issue,
             missing_issue,
             "--json",
@@ -62,14 +88,14 @@ fn test_gate_preset_apply_json_partial_batch_emits_error_envelope() {
     assert!(
         error["message"]
             .as_str()
-            .is_some_and(|message| message.contains("Failed to apply preset 'plan-review'")),
+            .is_some_and(|message| message.contains(&format!("Failed to apply preset '{PRESET}'"))),
         "failure message should identify the preset: {response}"
     );
 
     let details = error["details"]
         .as_object()
         .expect("error envelope must retain batch details");
-    assert_eq!(details["preset"], "plan-review");
+    assert_eq!(details["preset"], PRESET);
     assert!(
         details["success"]
             .as_array()
@@ -98,7 +124,7 @@ fn test_gate_preset_apply_plain_partial_batch_matches_registered_json_status() {
             "gate",
             "preset",
             "apply",
-            "plan-review",
+            PRESET,
             "00000000-0000-0000-0000-000000000000",
         ])
         .output()
@@ -118,7 +144,7 @@ fn test_gate_preset_apply_json_all_success_retains_success_payload() {
     let issue = create_issue(&temp, "Preset target");
 
     let output = jit(&temp)
-        .args(["gate", "preset", "apply", "plan-review", &issue, "--json"])
+        .args(["gate", "preset", "apply", PRESET, &issue, "--json"])
         .assert()
         .success()
         .get_output()
@@ -127,7 +153,7 @@ fn test_gate_preset_apply_json_all_success_retains_success_payload() {
     let response: serde_json::Value =
         serde_json::from_slice(&output).expect("success must emit JSON");
 
-    assert_eq!(response["preset"], "plan-review");
+    assert_eq!(response["preset"], PRESET);
     assert!(
         response.get("error").is_none(),
         "success must not be an error envelope"

@@ -953,7 +953,10 @@ kind = "advisory"
             version: "1.0.0".into(),
             package_hash: "package-hash".into(),
             target_hashes: BTreeMap::new(),
-            origin: ProfileOrigin::Embedded,
+            origin: ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/identity-test")
+                    .expect("a canonical package location"),
+            ),
             claims: ProfileClaims {
                 package_id: ProfilePackageId::new("identity-test"),
                 contributions: Vec::new(),

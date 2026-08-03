@@ -1,9 +1,9 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
-    build_profile_claims, jit_default_package, jit_dogfood_package, ProfileApplicationStatus,
-    ProfileApplyResult, ProfileComposedApplyResult, ProfileId, ProfileListResult, ProfileOrigin,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanResult,
-    ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
+    ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
+    ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -20,12 +20,11 @@ use std::path::Path;
 /// Failure resolving which package bytes a command reads.
 ///
 /// Resolution takes the first route that answers — a location the caller
-/// supplied, the location this repository's applied-profile record names, the
-/// package compiled into this binary — and each variant names the route that
-/// failed together with what it addressed. A recorded location that no longer
-/// resolves is one of these rather than an absent profile: a deleted directory
-/// is a repository whose record outlived its package, not a repository that
-/// never applied one.
+/// supplied, then the location this repository's applied-profile record names —
+/// and each variant names the route that failed together with what it
+/// addressed. A recorded location that no longer resolves is one of these
+/// rather than an absent profile: a deleted directory is a repository whose
+/// record outlived its package, not a repository that never applied one.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileResolutionError {
     /// A supplied location holds no readable package.
@@ -58,17 +57,6 @@ pub enum ProfileResolutionError {
         location: String,
         /// Package-reader failure.
         source: ProfilePackageError,
-    },
-    /// A record names package bytes this binary does not carry.
-    #[error(
-        "applied profile record '{record}' names profile '{id}' as compiled into \
-         this binary, which does not carry it"
-    )]
-    UnresolvableRecordedEmbedding {
-        /// Repository-relative applied-record path.
-        record: String,
-        /// Profile the record names.
-        id: String,
     },
 }
 
@@ -149,11 +137,12 @@ impl CommandExecutor<JsonFileStorage> {
     ///
     /// The routes are tried in a fixed order and the first that answers wins:
     /// `location` when the caller supplies one, then the location this
-    /// repository's applied-profile record for `id` names, then the package
-    /// compiled into this binary. A supplied location answers the first
-    /// application, when the repository has obtained a package and recorded
-    /// nothing yet; the record answers every run after it, so a caller need not
-    /// remember where the bytes came from.
+    /// repository's applied-profile record for `id` names. A supplied location
+    /// answers the first application, when the repository has obtained a
+    /// package and recorded nothing yet; the record answers every run after it,
+    /// so a caller need not remember where the bytes came from. A repository
+    /// that has neither is not carrying that profile, which is a
+    /// [`NotFoundError`](crate::errors::NotFoundError).
     ///
     /// A supplied location must hold a package declaring `id`, and a recorded
     /// location that no longer holds a readable package is a
@@ -170,7 +159,9 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(record) => {
                     recorded_package(&record, &applied_record_path(id)?, &self.require_layout()?)
                 }
-                None => embedded_profile(id),
+                None => Err(
+                    crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into(),
+                ),
             },
         }
     }
@@ -325,21 +316,18 @@ impl CommandExecutor<JsonFileStorage> {
     ///
     /// A directory that is not there, or that holds a package declaring another
     /// profile, is not that dependency, so resolution continues through the
-    /// routes every other command takes
+    /// route every other command takes
     /// ([`resolve_profile_package`](Self::resolve_profile_package) without a
-    /// location): this repository's own applied-profile record, then the
-    /// package compiled into this binary. A directory that is there and cannot
-    /// be read as a package is reported rather than passed over, because
-    /// falling through would answer with a package the adopter did not put
-    /// there.
+    /// location): this repository's own applied-profile record. A directory
+    /// that is there and cannot be read as a package is reported rather than
+    /// passed over, because falling through would answer with a package the
+    /// adopter did not put there.
     fn resolve_dependency_package(
         &self,
         declaring: &ProfilePackage,
         dependency: &str,
     ) -> Result<ProfilePackage> {
-        let ProfilePackageSource::Directory(directory) = declaring.source() else {
-            return self.resolve_profile_package(dependency, None);
-        };
+        let ProfilePackageSource::Directory(directory) = declaring.source();
         let Some(location) = directory.parent().map(|parent| parent.join(dependency)) else {
             return self.resolve_profile_package(dependency, None);
         };
@@ -714,11 +702,10 @@ fn supplied_package(location: &Path, id: &str) -> Result<ProfilePackage> {
 
 /// Read the package one applied-profile record names.
 ///
-/// The record's origin is the whole answer: a worktree-relative location is
-/// resolved against this repository's worktree root, and bytes the record says
-/// were compiled in are read from this binary. Either route failing names the
-/// record, so a repository whose package moved or was deleted reports the
-/// record that outlived it rather than an absent profile.
+/// The record's origin is the whole answer: the worktree-relative location it
+/// names is resolved against this repository's worktree root. A failure there
+/// names the record, so a repository whose package moved or was deleted reports
+/// the record that outlived it rather than an absent profile.
 ///
 /// Validation and repair resolve a recorded profile through this same route,
 /// which is why it is reachable from the whole command layer rather than
@@ -728,26 +715,17 @@ pub(super) fn recorded_package(
     record_path: &VirtualPath,
     layout: &RepositoryLayout,
 ) -> Result<ProfilePackage> {
-    match &record.origin {
-        ProfileOrigin::Directory(location) => {
-            ProfilePackage::from_directory(&layout.worktree_root().join(location.as_path()))
-                .map_err(|source| {
-                    ProfileResolutionError::UnresolvableRecordedLocation {
-                        record: record_path.repository_relative(),
-                        location: location.as_path().display().to_string(),
-                        source,
-                    }
-                    .into()
-                })
-        }
-        ProfileOrigin::Embedded => embedded_profile(&record.id).map_err(|_| {
-            ProfileResolutionError::UnresolvableRecordedEmbedding {
+    let ProfileOrigin::Directory(location) = &record.origin;
+    ProfilePackage::from_directory(&layout.worktree_root().join(location.as_path())).map_err(
+        |source| {
+            ProfileResolutionError::UnresolvableRecordedLocation {
                 record: record_path.repository_relative(),
-                id: record.id.clone(),
+                location: location.as_path().display().to_string(),
+                source,
             }
             .into()
-        }),
-    }
+        },
+    )
 }
 
 /// Summarize one recorded profile from the package its record resolves to.
@@ -793,9 +771,7 @@ pub(super) fn package_origin(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
 ) -> Result<ProfileOrigin> {
-    let ProfilePackageSource::Directory(directory) = package.source() else {
-        return Ok(ProfileOrigin::Embedded);
-    };
+    let ProfilePackageSource::Directory(directory) = package.source();
     layout
         .classify_and_canonicalize(directory)
         .ok()
@@ -840,14 +816,6 @@ fn profile_application_input(
         claims: build_profile_claims(package, layout)?,
         record_path,
     })
-}
-
-/// Resolve one embedded profile package by stable id.
-fn embedded_profile(id: &str) -> Result<ProfilePackage> {
-    [jit_default_package()?, jit_dogfood_package()?]
-        .into_iter()
-        .find(|package| package.manifest().profile.id.as_str() == id)
-        .ok_or_else(|| crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
 }
 
 /// Read the captured installed record, or `None` when absent.
@@ -908,7 +876,6 @@ mod tests {
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
-    use include_dir::{include_dir, Dir};
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
@@ -994,11 +961,20 @@ mod tests {
         }
     }
 
-    static PACKAGE: Dir<'_> =
-        include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only");
+    /// The checked-in fixture tree every case below stages a copy of.
+    fn fixture_package_tree() -> std::path::PathBuf {
+        crate::test_utils::profile_package_fixture("planner-asset-only")
+    }
+
+    /// Worktree-relative location [`fixture`] stages its package at.
+    ///
+    /// A package is applied from inside the repository it is applied to,
+    /// because the applied-profile record names its worktree-relative location.
+    const FIXTURE_LOCATION: &str = "packages/planner";
 
     /// A file-backed executor over a canonically initialized repository carrying
-    /// its canonical layout.
+    /// its canonical layout, with the fixture package staged inside its
+    /// worktree.
     fn fixture() -> (
         TempDir,
         JsonFileStorage,
@@ -1014,14 +990,17 @@ mod tests {
             .unwrap();
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        let package = ProfilePackage::from_embedded_dir(&PACKAGE).unwrap();
+        let package = package_read_from(&temp, FIXTURE_LOCATION);
         (temp, storage, executor, package)
     }
 
     /// The fixture package, written into the repository at `relative` and read
     /// back from there.
     fn package_read_from(temp: &TempDir, relative: &str) -> ProfilePackage {
-        let root = crate::test_utils::write_package_tree(&PACKAGE, &temp.path().join(relative));
+        let root = crate::test_utils::copy_package_tree(
+            &fixture_package_tree(),
+            &temp.path().join(relative),
+        );
         ProfilePackage::from_directory(&root).expect("a valid package tree")
     }
 
@@ -1044,8 +1023,8 @@ mod tests {
 
     /// The fixture package's id, which its manifest declares.
     fn fixture_id() -> String {
-        ProfilePackage::from_embedded_dir(&PACKAGE)
-            .unwrap()
+        ProfilePackage::from_directory(&fixture_package_tree())
+            .expect("the checked-in fixture tree is a valid package")
             .manifest()
             .profile
             .id
@@ -1067,7 +1046,7 @@ mod tests {
         dependencies: &[&str],
     ) -> ProfilePackage {
         crate::test_utils::write_package_declaring(
-            &PACKAGE,
+            &fixture_package_tree(),
             &temp.path().join(relative),
             id,
             dependencies,
@@ -1112,7 +1091,10 @@ mod tests {
         content: &str,
         contributions: &str,
     ) -> ProfilePackage {
-        let tree = crate::test_utils::write_package_tree(&PACKAGE, &temp.path().join(relative));
+        let tree = crate::test_utils::copy_package_tree(
+            &fixture_package_tree(),
+            &temp.path().join(relative),
+        );
         let manifest_path = tree.join(crate::profile::MANIFEST_FILE_NAME);
         let authored = fs::read_to_string(&manifest_path).expect("read the package manifest");
         let source = ProfilePackage::parse_manifest(authored.as_bytes())
@@ -1208,7 +1190,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let supplied = package_read_from(&temp, "vendor/supplied");
 
         let resolved = executor
@@ -1224,7 +1206,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_prefers_a_supplied_location_over_the_recorded_one() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let recorded = package_read_from(&temp, "vendor/recorded");
         executor.apply_profile_package(&recorded).unwrap();
         // A second copy the record does not name, distinguishable from the
@@ -1247,7 +1229,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_reads_the_location_the_record_names() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let applied = package_read_from(&temp, "vendor/recorded");
         executor.apply_profile_package(&applied).unwrap();
 
@@ -1272,7 +1254,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_prefers_the_record_over_the_compiled_in_package() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let (_workspace, shipped) = crate::test_utils::temporary_repository_package("jit-dogfood");
         let id = shipped.manifest().profile.id.to_string();
 
@@ -1305,44 +1287,27 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_profile_package_falls_back_to_each_compiled_in_package_without_a_record() {
-        let (temp, _storage, executor, _embedded) = fixture();
+    fn test_resolve_profile_package_reports_not_found_without_a_location_or_a_record() {
+        let (temp, _storage, executor, _package) = fixture();
         assert!(!temp.path().join(".jit/profiles").exists());
-        let (_default_workspace, default) =
-            crate::test_utils::temporary_repository_package("jit-default");
-        let (_workflow_workspace, workflow) =
-            crate::test_utils::temporary_repository_package("jit-dogfood");
-        for shipped in [&default, &workflow] {
-            let resolved = executor
-                .resolve_profile_package(shipped.manifest().profile.id.as_str(), None)
-                .unwrap();
+        // The ids this repository authors are named beside an id it does not,
+        // because a resolution that answered from the binary would answer for
+        // exactly those.
+        for id in ["jit-default", "jit-dogfood", "no-such-profile"] {
+            let error = executor.resolve_profile_package(id, None).unwrap_err();
 
-            assert_eq!(resolved.hashes(), shipped.hashes());
-            assert_eq!(
-                package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
-                ProfileOrigin::Embedded
+            assert!(
+                error
+                    .downcast_ref::<crate::errors::NotFoundError>()
+                    .is_some(),
+                "resolving '{id}' with no location and no record must report \
+                 profile-not-found: {error:#}"
             );
         }
     }
 
     #[test]
-    fn test_resolve_profile_package_reports_an_id_absent_from_compiled_packages() {
-        let (_temp, _storage, executor, _embedded) = fixture();
-
-        let error = executor
-            .resolve_profile_package("not-compiled-in", None)
-            .unwrap_err();
-
-        assert!(
-            error
-                .downcast_ref::<crate::errors::NotFoundError>()
-                .is_some(),
-            "an unknown compiled package remains a profile-not-found error: {error:#}"
-        );
-    }
-
-    #[test]
-    fn test_apply_profile_package_resolves_a_compiled_in_default_dependency_for_a_workflow() {
+    fn test_apply_profile_package_resolves_a_declared_dependency_beside_the_declaring_package() {
         let (temp, _storage, executor, _fixture) = fixture();
         let config_path = temp.path().join(".jit/config.toml");
         let scaffolded = fs::read_to_string(&config_path).unwrap();
@@ -1351,6 +1316,11 @@ mod tests {
             .retain(|key, _| matches!(key, "version" | "project"));
         fs::write(&config_path, bare.to_string()).unwrap();
 
+        crate::test_utils::assemble_repository_package(
+            "jit-default",
+            &temp.path().join("vendor/jit-default"),
+        )
+        .expect("this repository's jit-default package assembles");
         let workflow = package_declaring(&temp, "vendor/workflow", "workflow", &["jit-default"]);
         let applied = executor.apply_profile_package(&workflow).unwrap();
 
@@ -1364,7 +1334,7 @@ mod tests {
         );
         assert_eq!(
             record_for(&temp, "jit-default").origin,
-            ProfileOrigin::Embedded
+            ProfileOrigin::Directory(RootRelativePath::parse("vendor/jit-default").unwrap())
         );
     }
 
@@ -1392,9 +1362,14 @@ mod tests {
                 )
             });
         fs::write(&rules_path, rules.to_string()).unwrap();
+        // The workflow package and the package it depends on, side by side
+        // inside the worktree, which is where a declared dependency is
+        // looked for.
+        shipped_package_in(temp.path(), "jit-default");
+        let workflow = shipped_package_in(temp.path(), "jit-dogfood");
 
         executor
-            .apply_profile("jit-dogfood", None)
+            .apply_profile_package(&workflow)
             .unwrap_or_else(|error| panic!("{error:#}"));
 
         let rules: toml::Value =
@@ -1414,7 +1389,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_reports_a_recorded_location_that_no_longer_resolves() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let applied = package_read_from(&temp, "vendor/recorded");
         executor.apply_profile_package(&applied).unwrap();
         fs::remove_dir_all(temp.path().join("vendor/recorded")).unwrap();
@@ -1446,7 +1421,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_refuses_a_supplied_location_declaring_another_profile() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         package_read_from(&temp, "vendor/supplied");
 
         let error = executor
@@ -1465,7 +1440,7 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_package_reports_a_supplied_location_holding_no_package() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
 
         let error = executor
             .resolve_profile_package(&fixture_id(), Some(&temp.path().join("vendor/absent")))
@@ -1483,7 +1458,7 @@ mod tests {
 
     #[test]
     fn test_list_recorded_profiles_names_no_profile_until_a_record_does() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
 
         let before = executor.list_recorded_profiles().unwrap();
         assert_eq!(before.count, 0);
@@ -1511,7 +1486,7 @@ mod tests {
 
     #[test]
     fn test_list_recorded_profiles_resolves_each_record_from_the_location_it_names() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let applied = package_read_from(&temp, "vendor/recorded");
         executor.apply_profile_package(&applied).unwrap();
         let recorded_version = stored_record(&temp).version;
@@ -1544,7 +1519,7 @@ mod tests {
 
     #[test]
     fn test_list_recorded_profiles_reports_a_recorded_location_that_no_longer_resolves() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let applied = package_read_from(&temp, "vendor/recorded");
         executor.apply_profile_package(&applied).unwrap();
         fs::remove_dir_all(temp.path().join("vendor/recorded")).unwrap();
@@ -1563,35 +1538,8 @@ mod tests {
     }
 
     #[test]
-    fn test_list_recorded_profiles_reports_a_record_naming_a_package_this_binary_lacks() {
-        let (temp, _storage, executor, _embedded) = fixture();
-        store_record(
-            &temp,
-            &AppliedProfileRecord::new(
-                "absent-from-this-binary",
-                "1.0.0",
-                ProfileOrigin::Embedded,
-                "package-hash",
-                BTreeMap::new(),
-            ),
-        );
-
-        let error = executor.list_recorded_profiles().unwrap_err();
-
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileResolutionError>(),
-                Some(ProfileResolutionError::UnresolvableRecordedEmbedding { record, id })
-                    if record == ".jit/profiles/absent-from-this-binary.json"
-                        && id == "absent-from-this-binary"
-            ),
-            "{error:#}"
-        );
-    }
-
-    #[test]
     fn test_apply_profile_package_records_the_worktree_location_it_read_the_package_from() {
-        let (temp, _storage, executor, _embedded) = fixture();
+        let (temp, _storage, executor, _package) = fixture();
         let package = package_read_from(&temp, "vendor/profiles/planner");
 
         executor.apply_profile_package(&package).unwrap();
@@ -1599,9 +1547,7 @@ mod tests {
         // The stored location resolves, from the worktree root alone, back to
         // the directory whose bytes were applied — which is the whole point of
         // recording it.
-        let ProfileOrigin::Directory(location) = stored_record(&temp).origin else {
-            panic!("a package read from a directory must record that directory");
-        };
+        let ProfileOrigin::Directory(location) = stored_record(&temp).origin;
         assert_eq!(
             ProfilePackage::from_directory(&temp.path().join(location.as_path()))
                 .expect("the recorded location names a readable package")
@@ -1615,8 +1561,8 @@ mod tests {
         // Two directories inside the worktree hold byte-identical packages.
         // Nothing but the directory a package was read through distinguishes
         // them, so the recorded location must follow that and only that.
-        let (first_temp, _first_storage, first_executor, _embedded) = fixture();
-        let (second_temp, _second_storage, second_executor, _embedded) = fixture();
+        let (first_temp, _first_storage, first_executor, _package) = fixture();
+        let (second_temp, _second_storage, second_executor, _package) = fixture();
         let first = package_read_from(&first_temp, "vendor/first");
         let second = package_read_from(&second_temp, "packages/second/tree");
         assert_eq!(first.hashes(), second.hashes());
@@ -1636,9 +1582,12 @@ mod tests {
 
     #[test]
     fn test_apply_profile_package_refuses_a_package_read_from_outside_the_worktree() {
-        let (temp, storage, executor, _embedded) = fixture();
+        let (temp, storage, executor, _package) = fixture();
         let elsewhere = TempDir::new().unwrap();
-        let root = crate::test_utils::write_package_tree(&PACKAGE, &elsewhere.path().join("pkg"));
+        let root = crate::test_utils::copy_package_tree(
+            &fixture_package_tree(),
+            &elsewhere.path().join("pkg"),
+        );
         let package = ProfilePackage::from_directory(&root).expect("a valid package tree");
 
         let error = executor.apply_profile_package(&package).unwrap_err();
@@ -1660,7 +1609,7 @@ mod tests {
     fn test_apply_profile_package_refuses_a_package_read_from_the_data_root() {
         // The selected data root is not a worktree location, so a package
         // placed under it has no worktree-relative location to record.
-        let (temp, storage, executor, _embedded) = fixture();
+        let (temp, storage, executor, _package) = fixture();
         let package = package_read_from(&temp, ".jit/vendored");
 
         let error = executor.apply_profile_package(&package).unwrap_err();
@@ -2224,7 +2173,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(record.id, "planner-asset-only");
-        assert_eq!(record.origin, ProfileOrigin::Embedded);
+        assert_eq!(
+            record.origin,
+            ProfileOrigin::Directory(RootRelativePath::parse(FIXTURE_LOCATION).unwrap())
+        );
         assert_eq!(storage.read_events().unwrap().len(), 1);
 
         let before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
@@ -2845,7 +2797,7 @@ mod tests {
         let prior_event = Event::draft_profile_applied(
             "prior".to_string(),
             "1.0.0".to_string(),
-            ProfileOrigin::Embedded,
+            ProfileOrigin::Directory(RootRelativePath::parse("vendor/prior").unwrap()),
             "prior-package".to_string(),
             BTreeMap::new(),
             false,

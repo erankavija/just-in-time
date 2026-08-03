@@ -886,12 +886,8 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
 fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
-    match origin {
-        jit::profile::ProfileOrigin::Embedded => "embedded".to_string(),
-        jit::profile::ProfileOrigin::Directory(location) => {
-            format!("directory {}", location.as_path().display())
-        }
-    }
+    let jit::profile::ProfileOrigin::Directory(location) = origin;
+    format!("directory {}", location.as_path().display())
 }
 
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
@@ -4663,19 +4659,13 @@ fn run() -> Result<()> {
                                 println!("No gate presets available");
                             } else {
                                 for preset in presets {
-                                    let source = if preset.builtin {
-                                        "[builtin]"
-                                    } else {
-                                        "[custom]"
-                                    };
                                     let gate_word = if preset.gate_count == 1 {
                                         "gate"
                                     } else {
                                         "gates"
                                     };
                                     println!(
-                                        "{} {} - {} ({} {})",
-                                        source,
+                                        "{} - {} ({} {})",
                                         preset.name,
                                         preset.description,
                                         preset.gate_count,

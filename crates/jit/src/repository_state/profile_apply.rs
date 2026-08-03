@@ -1103,7 +1103,10 @@ mod tests {
         let record = AppliedProfileRecord::new(
             "base-package",
             "1.0.0",
-            ProfileOrigin::Embedded,
+            ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/base-package")
+                    .expect("a canonical package location"),
+            ),
             "package-hash",
             target_hashes,
         );

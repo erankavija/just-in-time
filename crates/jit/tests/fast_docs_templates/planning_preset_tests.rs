@@ -1,201 +1,54 @@
-//! Integration tests for the planning-bracket gate presets (T6).
+//! Integration tests for a project's own gate presets.
 //!
-//! Exercises `apply_gate_preset` end-to-end via the in-process harness:
-//! applying `plan-review` attaches the visible review placeholder to a planning node, and
-//! applying `coverage-preview` attaches the deterministic scoped-validate gate
-//! to a breakdown node.
+//! Every preset is declared by the project under `.jit/config/gate-presets/`:
+//! these cases exercise capturing one, listing it, showing it, and applying it,
+//! and the audit events an application that writes the gate registry appends.
 
-use crate::harness::TestHarness;
-use jit::declarations::{GateChecker, GateMode, GateStage};
+use jit::declarations::GateStage;
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
 use tempfile::TempDir;
 
-#[test]
-fn test_apply_plan_review_attaches_agent_gate_to_planning_node() {
-    let h = TestHarness::new();
-    // The planning node P (type label is illustrative; the preset is type-agnostic).
-    let planning = h.create_issue("Plan the auth epic");
-    h.executor
-        .add_label(&planning, "type:planning")
-        .expect("label P");
-
-    let (result, _warnings) = h
-        .executor
-        .apply_gate_preset(&planning, "plan-review", None, false, false, &[])
-        .expect("apply plan-review preset");
-
-    assert!(
-        result.added.contains(&"plan-review".to_string()),
-        "plan-review gate attached to the planning node, got {:?}",
-        result.added
-    );
-
-    // The issue now requires the plan-review gate, and the registered gate is
-    // the explicit review placeholder supplied by the production package.
-    let issue = h.get_issue(&planning);
-    assert!(issue.gates_required.contains(&"plan-review".to_string()));
-
-    let registry = h.storage.load_gate_registry().expect("load registry");
-    let gate = registry.gates.get("plan-review").expect("gate registered");
-    assert_eq!(gate.mode, GateMode::Auto);
-    assert_eq!(gate.checker, Some(GateChecker::ReviewPlaceholder));
-}
-
-#[test]
-fn test_apply_coverage_preview_attaches_scoped_validate_gate_to_breakdown_node() {
-    let h = TestHarness::new();
-    // The breakdown node B, carrying a brackets: pointer to its container.
-    let breakdown = h.create_issue("Breakdown of the auth epic");
-    h.executor
-        .add_label(&breakdown, "type:breakdown")
-        .expect("label B");
-    h.executor
-        .add_label(&breakdown, "brackets:abc12345")
-        .expect("brackets label");
-
-    let (result, _warnings) = h
-        .executor
-        .apply_gate_preset(&breakdown, "coverage-preview", None, false, false, &[])
-        .expect("apply coverage-preview preset");
-
-    assert!(
-        result.added.contains(&"coverage-preview".to_string()),
-        "coverage-preview gate attached to the breakdown node, got {:?}",
-        result.added
-    );
-
-    let issue = h.get_issue(&breakdown);
-    assert!(issue
-        .gates_required
-        .contains(&"coverage-preview".to_string()));
-
-    // The registered native checker resolves the container from the brackets:
-    // label and runs scoped validation in-process.
-    let registry = h.storage.load_gate_registry().expect("load registry");
-    let gate = registry
-        .gates
-        .get("coverage-preview")
-        .expect("gate registered");
-    assert_eq!(gate.mode, GateMode::Auto);
-    match gate.checker.as_ref().expect("coverage gate has a checker") {
-        GateChecker::LabelTargetValidation { label_namespace } => {
-            assert_eq!(label_namespace, "brackets")
-        }
-        other => panic!("expected label-target checker, got {other:?}"),
-    }
-}
-
-/// @/inv/event-log (jit:bb7d57a2): a preset application that WRITES the gate
-/// registry appends a registry-scoped audit event per definition write —
-/// `gate_definition_created` for a new key, `gate_definition_updated` for a
-/// timeout-override overwrite — and a no-write re-application appends none.
-#[test]
-fn test_apply_gate_preset_appends_definition_events() {
-    let h = TestHarness::new();
-    let planning = h.create_issue("Plan the auth epic");
-    h.executor
-        .add_label(&planning, "type:planning")
-        .expect("label P");
-
-    h.executor
-        .apply_gate_preset(&planning, "plan-review", None, false, false, &[])
-        .expect("apply plan-review preset");
-
-    let created = |events: &[jit::domain::Event]| {
-        events
-            .iter()
-            .filter(|e| e.get_type() == "gate_definition_created")
-            .count()
-    };
-    let updated = |events: &[jit::domain::Event]| {
-        events
-            .iter()
-            .filter(|e| e.get_type() == "gate_definition_updated")
-            .count()
-    };
-
-    let events = h.storage.read_events().unwrap();
-    assert_eq!(
-        created(&events),
-        1,
-        "first application defines the preset gate -> one created event"
-    );
-    assert_eq!(updated(&events), 0);
-
-    // Re-apply without an override: the key exists, nothing is written, no event.
-    let second = h.create_issue("Another planning node");
-    h.executor
-        .apply_gate_preset(&second, "plan-review", None, false, false, &[])
-        .expect("re-apply preset");
-    let events = h.storage.read_events().unwrap();
-    assert_eq!(
-        created(&events),
-        1,
-        "no-write re-application appends nothing"
-    );
-    assert_eq!(updated(&events), 0);
-
-    // Re-apply WITH a timeout override: the existing definition is overwritten.
-    let third = h.create_issue("Overridden planning node");
-    h.executor
-        .apply_gate_preset(&third, "plan-review", Some(120), false, false, &[])
-        .expect("re-apply preset with timeout override");
-    let events = h.storage.read_events().unwrap();
-    assert_eq!(created(&events), 1);
-    assert_eq!(
-        updated(&events),
-        1,
-        "timeout-override overwrite of an existing definition -> one updated event"
-    );
-}
-
-/// REQ-02: the full lifecycle of a PROJECT-DEFINED preset — save, list, show,
-/// apply — exercised in-process end to end. The bundle here is a project's own
-/// gate collection (a test runner plus a review gate), the kind that used to be
-/// a compiled-in language bundle and is now declared by the project alone; no
-/// removed builtin is involved. This runs over a real `JsonFileStorage` because
-/// the in-memory `TestHarness` does not persist custom presets under
-/// `.jit/config/gate-presets/` (its store is builtin-only), so the save/list/show
-/// path is only observable against the file-backed store.
-#[test]
-fn test_project_defined_preset_save_list_show_apply_in_process() {
+/// A file-backed executor over a repository whose gate-preset directory is the
+/// one a project declares its presets in.
+///
+/// A project-defined preset lives under `.jit/config/gate-presets/`, which the
+/// in-memory harness does not model, so these cases run over a real store.
+fn file_backed_executor(temp: &TempDir) -> CommandExecutor<JsonFileStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
-    let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
     std::fs::write(storage.root().join("config.toml"), "").unwrap();
     let layout =
         jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
             .unwrap();
-    let executor = CommandExecutor::new(storage).with_layout(layout);
+    CommandExecutor::new(storage).with_layout(layout)
+}
 
-    // Two project-declared gates standing in for a language-specific CI bundle.
+/// Define `key` as a manual postcheck gate in the repository's own registry.
+fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &str) {
     executor
         .add_gate_definition(
-            "tests".to_string(),
-            "All tests pass".to_string(),
-            "run the test suite".to_string(),
+            key.to_string(),
+            format!("{key} gate"),
+            format!("Repository-declared {key} gate"),
             false,
             None,
             GateStage::Postcheck,
         )
-        .expect("define tests gate");
-    executor
-        .add_gate_definition(
-            "code-review".to_string(),
-            "Code review".to_string(),
-            "human review".to_string(),
-            false,
-            None,
-            GateStage::Postcheck,
-        )
-        .expect("define code-review gate");
+        .unwrap_or_else(|error| panic!("define the {key} gate: {error}"));
+}
 
-    // A reference issue carrying both gates, from which the preset is captured.
+/// Create an issue carrying `gates`, and capture those gates into the
+/// project-defined preset `preset`.
+fn preset_captured_from_gates(
+    executor: &CommandExecutor<JsonFileStorage>,
+    preset: &str,
+    gates: &[&str],
+) -> std::path::PathBuf {
     let (reference, _) = executor
         .create_issue(
-            "Reference issue".to_string(),
+            format!("Reference issue for {preset}"),
             String::new(),
             Priority::Normal,
             vec![],
@@ -205,16 +58,113 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
             false,
         )
         .expect("create reference issue");
-    executor.add_gate(&reference, "tests".to_string()).unwrap();
+    for gate in gates {
+        define_gate(executor, gate);
+        executor.add_gate(&reference, (*gate).to_string()).unwrap();
+    }
     executor
-        .add_gate(&reference, "code-review".to_string())
-        .unwrap();
+        .create_gate_preset(preset, &reference)
+        .expect("save project-defined preset")
+}
 
-    // SAVE: capture the reference issue's gates into a project-defined preset,
+/// @/inv/event-log (jit:bb7d57a2): a preset application that WRITES the gate
+/// registry appends a registry-scoped audit event per definition write —
+/// `gate_definition_created` for a new key, `gate_definition_updated` for a
+/// timeout-override overwrite — and a no-write re-application appends none.
+#[test]
+fn test_apply_gate_preset_appends_definition_events() {
+    let temp = TempDir::new().unwrap();
+    let executor = file_backed_executor(&temp);
+    // Captured from a definition the project authors, then removed from the
+    // registry, so the first application is the write that defines its key.
+    preset_captured_from_gates(&executor, "review", &["team-review"]);
+    executor.remove_gate_definition("team-review").unwrap();
+
+    let issue_with = |title: &str| {
+        executor
+            .create_issue(
+                title.to_string(),
+                String::new(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .expect("create issue")
+            .0
+    };
+    // Authoring the definition to capture it appended events of its own, so
+    // every count below is relative to the log the applications start from.
+    let logged = |kind: &str| {
+        executor
+            .storage()
+            .read_events()
+            .unwrap()
+            .iter()
+            .filter(|event| event.get_type() == kind)
+            .count()
+    };
+    let baseline = (
+        logged("gate_definition_created"),
+        logged("gate_definition_updated"),
+    );
+    let counted = |kind: &str| {
+        logged(kind)
+            - match kind {
+                "gate_definition_created" => baseline.0,
+                _ => baseline.1,
+            }
+    };
+
+    let first = issue_with("First gated issue");
+    executor
+        .apply_gate_preset(&first, "review", None, false, false, &[])
+        .expect("apply the project-defined preset");
+    assert_eq!(
+        counted("gate_definition_created"),
+        1,
+        "first application defines the preset gate -> one created event"
+    );
+    assert_eq!(counted("gate_definition_updated"), 0);
+
+    // Re-apply without an override: the key exists, nothing is written, no event.
+    let second = issue_with("Second gated issue");
+    executor
+        .apply_gate_preset(&second, "review", None, false, false, &[])
+        .expect("re-apply preset");
+    assert_eq!(
+        counted("gate_definition_created"),
+        1,
+        "no-write re-application appends nothing"
+    );
+    assert_eq!(counted("gate_definition_updated"), 0);
+
+    // Re-apply WITH a timeout override: the existing definition is overwritten.
+    let third = issue_with("Overridden gated issue");
+    executor
+        .apply_gate_preset(&third, "review", Some(120), false, false, &[])
+        .expect("re-apply preset with timeout override");
+    assert_eq!(counted("gate_definition_created"), 1);
+    assert_eq!(
+        counted("gate_definition_updated"),
+        1,
+        "timeout-override overwrite of an existing definition -> one updated event"
+    );
+}
+
+/// REQ-02: the full lifecycle of a project's own preset — save, list, show,
+/// apply — exercised in-process end to end, over a real `JsonFileStorage`
+/// because the save/list/show path reads `.jit/config/gate-presets/`.
+#[test]
+fn test_project_defined_preset_save_list_show_apply_in_process() {
+    let temp = TempDir::new().unwrap();
+    let executor = file_backed_executor(&temp);
+
+    // SAVE: capture a reference issue's gates into a project-defined preset,
     // written under the project's gate-presets directory.
-    let saved_path = executor
-        .create_gate_preset("ci", &reference)
-        .expect("save project-defined preset");
+    let saved_path = preset_captured_from_gates(&executor, "ci", &["tests", "code-review"]);
     assert!(
         saved_path.exists(),
         "preset should be written to disk at {saved_path:?}"
@@ -224,25 +174,23 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
         "project-defined preset should live under .jit/config/gate-presets/"
     );
 
-    // LIST: the preset surfaces as project-defined (non-builtin) alongside the
-    // planning-bracket builtins, and none of the removed language bundles appear.
+    // LIST: the answer is exactly what the project declares. The
+    // planning-bracket names are checked beside it because a listing that
+    // carried presets from the binary would carry those.
     let presets = executor.list_gate_presets().expect("list presets");
-    let ci = presets
-        .iter()
-        .find(|p| p.name == "ci")
-        .expect("ci preset listed");
-    assert!(!ci.builtin, "ci is project-defined, not builtin");
-    assert_eq!(ci.gate_count, 2);
-    for removed in [
-        "rust-tdd",
-        "python-tdd",
-        "js-tdd",
-        "minimal",
-        "security-audit",
-    ] {
+    assert_eq!(
+        presets
+            .iter()
+            .map(|preset| preset.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["ci"],
+        "the listing reports the project's own presets and nothing else"
+    );
+    assert_eq!(presets[0].gate_count, 2);
+    for absent in ["plan-review", "coverage-preview", "breakdown-review"] {
         assert!(
-            !presets.iter().any(|p| p.name == removed),
-            "removed builtin {removed} must not be listed"
+            executor.show_gate_preset(absent).is_err(),
+            "{absent} must not resolve as a preset the project never declared"
         );
     }
 

@@ -3809,7 +3809,10 @@ fn provenance_event() -> Event {
         timestamp: req01_instant(),
         profile_id: "example".into(),
         version: "1.0".into(),
-        origin: crate::domain::ProfileOrigin::Embedded,
+        origin: crate::domain::ProfileOrigin::Directory(
+            crate::repository_state::RootRelativePath::parse("packages/example")
+                .expect("a canonical package location"),
+        ),
         package_hash: "hash".into(),
         target_hashes: std::collections::BTreeMap::new(),
         isolated_torn_tail: false,

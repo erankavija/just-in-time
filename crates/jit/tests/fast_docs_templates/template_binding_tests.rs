@@ -109,6 +109,17 @@ fn executor_with_templates(templates_toml: &str) -> CommandExecutor<InMemoryStor
     let storage = InMemoryStorage::new();
     crate::seed_memory_data_file(&storage, "config.toml", "");
     crate::seed_memory_data_file(&storage, "templates.toml", templates_toml);
+    // A template's gate entries resolve against the repository's own presets
+    // and its own gate registry, so the keys this registry names are declared
+    // in that registry too.
+    let unchecked_hierarchy: [&str; 0] = [];
+    for template in
+        jit::templates::TemplateRegistry::from_toml_str(templates_toml, &unchecked_hierarchy)
+            .expect("the seeded template registry parses")
+            .templates
+    {
+        crate::harness::seed_memory_template_gates(&storage, &template);
+    }
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }

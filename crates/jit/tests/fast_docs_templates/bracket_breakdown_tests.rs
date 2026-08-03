@@ -76,6 +76,17 @@ applies_to  = ["epic"]
         .clone()
 }
 
+/// A harness whose repository declares every gate key the plan template names.
+///
+/// A template's gate entries resolve against the repository's own presets and
+/// its own gate registry, so the bracket cases declare what their template asks
+/// for before applying it.
+fn harness() -> TestHarness {
+    let h = TestHarness::new();
+    crate::harness::seed_memory_template_gates(&h.storage, &plan_template());
+    h
+}
+
 /// The `type:*` value of an issue, if any.
 fn type_of(issue: &Issue) -> Option<String> {
     issue.labels.iter().find_map(|l| {
@@ -143,7 +154,7 @@ fn child(title: &str) -> BracketChild {
 
 #[test]
 fn test_bracket_breakdown_consumes_pre_created_breakdown_node() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -179,7 +190,7 @@ fn test_bracket_breakdown_consumes_pre_created_breakdown_node() {
 
 #[test]
 fn test_bracket_breakdown_node_typed_breakdown() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -194,7 +205,7 @@ fn test_bracket_breakdown_node_typed_breakdown() {
 
 #[test]
 fn test_bracket_breakdown_node_carries_brackets_short_id_label() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -216,7 +227,7 @@ fn test_bracket_breakdown_node_carries_brackets_short_id_label() {
 
 #[test]
 fn test_bracket_breakdown_finds_plan_through_breakdown_node() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -237,7 +248,7 @@ fn test_bracket_breakdown_finds_plan_through_breakdown_node() {
 
 #[test]
 fn test_bracket_breakdown_reports_breakdown_node_gate_presets() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -269,7 +280,7 @@ fn test_bracket_breakdown_reports_breakdown_node_gate_presets() {
 
 #[test]
 fn test_bracket_breakdown_drafts_children_in_backlog() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -295,7 +306,7 @@ fn test_bracket_breakdown_drafts_children_in_backlog() {
 
 #[test]
 fn test_bracket_breakdown_children_carry_membership_not_bracket_types() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     // Container carries a membership label children should inherit.
     let (c, _) = h
@@ -337,7 +348,7 @@ fn test_bracket_breakdown_children_carry_membership_not_bracket_types() {
 
 #[test]
 fn test_bracket_breakdown_source_children_depend_on_breakdown_node() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -369,7 +380,7 @@ fn test_bracket_breakdown_source_children_depend_on_breakdown_node() {
 
 #[test]
 fn test_bracket_breakdown_container_depends_on_sinks_only() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -398,7 +409,7 @@ fn test_bracket_breakdown_container_depends_on_sinks_only() {
 
 #[test]
 fn test_bracket_breakdown_internal_edges_preserved() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -421,7 +432,7 @@ fn test_bracket_breakdown_internal_edges_preserved() {
 
 #[test]
 fn test_bracket_breakdown_removes_direct_container_to_breakdown_edge() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -459,7 +470,7 @@ fn test_bracket_breakdown_removes_direct_container_to_breakdown_edge() {
 
 #[test]
 fn test_bracket_breakdown_does_not_use_parent_centric_wiring() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -496,7 +507,7 @@ fn test_bracket_breakdown_does_not_use_parent_centric_wiring() {
 
 #[test]
 fn test_bracket_breakdown_logs_no_breakdown_node_creation_event() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -520,7 +531,7 @@ fn test_bracket_breakdown_logs_no_breakdown_node_creation_event() {
 
 #[test]
 fn test_bracket_breakdown_rejects_non_breakable_container() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (task, _) = h
         .executor
@@ -548,7 +559,7 @@ fn test_bracket_breakdown_rejects_non_breakable_container() {
 
 #[test]
 fn test_bracket_breakdown_errors_when_bracket_absent_points_at_apply_plan() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     // Breakable container that was NEVER scaffolded (no B, no P).
     let (c, _) = h
@@ -591,7 +602,7 @@ fn test_bracket_breakdown_errors_when_bracket_absent_points_at_apply_plan() {
 
 #[test]
 fn test_bracket_breakdown_rejects_empty_children() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -646,6 +657,14 @@ fn executor_with_templates() -> CommandExecutor<InMemoryStorage> {
     let storage = InMemoryStorage::new();
     crate::seed_memory_data_file(&storage, "config.toml", CONFIG_TOML);
     crate::seed_memory_data_file(&storage, "templates.toml", TEMPLATES_TOML);
+    // The declarations on disk are the ones applied here, so the gate keys the
+    // repository declares are read from that same registry.
+    for template in TemplateRegistry::from_toml_str(TEMPLATES_TOML, &HIERARCHY)
+        .expect("the on-disk template registry parses")
+        .templates
+    {
+        crate::harness::seed_memory_template_gates(&storage, &template);
+    }
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }
@@ -688,7 +707,7 @@ fn test_bracket_breakdown_reads_template_from_disk() {
 
 #[test]
 fn test_bracket_breakdown_rejected_when_plan_gate_not_passed() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     // Scaffold a container WITHOUT approving its plan (do not use the helper,
     // which auto-approves).
@@ -742,7 +761,7 @@ fn test_bracket_breakdown_rejected_when_plan_gate_not_passed() {
 
 #[test]
 fn test_bracket_breakdown_rejects_cyclic_child_plan() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
@@ -794,7 +813,7 @@ fn child_satisfying(title: &str, req_id: &str) -> BracketChild {
 
 #[test]
 fn test_bracket_breakdown_leaves_coverage_gate_pending_and_forwards_credit() {
-    let h = TestHarness::new();
+    let h = harness();
     let template = plan_template();
     // Container declares [hard] REQ-01 (scaffold_container's body), covered by
     // the child's satisfies:REQ-01 label.

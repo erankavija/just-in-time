@@ -5,25 +5,18 @@
 //! repeated gate set (a project's CI bundle, a review workflow) so it attaches in
 //! one command instead of gate-by-gate.
 //!
-//! [`BuiltinPresets`] carries the presets the binary ships — only the
-//! planning-bracket trio, which is workflow infrastructure of the plan bracket
-//! rather than domain vocabulary. [`PresetManager`] loads those plus a project's
-//! own presets from `.jit/config/gate-presets/`, where domain-specific bundles
-//! belong (`@/inv/domain-agnostic`, `@/charter/D-2`).
-//! The [`reference`] submodule projects the built-in definitions into the
+//! Every preset is a project's own: [`PresetManager`] loads them from
+//! `.jit/config/gate-presets/`, where gate keys, titles, and checkers belong
+//! (`@/inv/domain-agnostic`, `@/charter/D-2`). The [`reference`] submodule
+//! projects the preset contract and the portable checker syntax into the
 //! committed markdown reference [`REFERENCE_PATH`].
 
-mod builtin;
 mod manager;
 mod planning;
 pub mod reference;
 
-pub use builtin::BuiltinPresets;
 pub use manager::PresetManager;
-pub use planning::{
-    breakdown_review_preset, coverage_preview_preset, plan_review_preset, preview_coverage_rule,
-    BREAKDOWN_REVIEW_PRESET, COVERAGE_PREVIEW_GATE, COVERAGE_PREVIEW_PRESET, PLAN_REVIEW_PRESET,
-};
+pub use planning::preview_coverage_rule;
 pub use reference::{render_reference_markdown, REFERENCE_PATH};
 
 use crate::declarations::GateDefinition;
@@ -61,8 +54,9 @@ impl GateTemplate {
             stage: self.stage,
             mode: self.mode,
             checker: self.checker.clone(),
-            // A shipped preset declares no inputs: its checker's footprint is
-            // the adopting repository's, which the preset cannot know.
+            // A preset declares no inputs: a captured bundle carries the gate
+            // shapes, and a checker's footprint is stated in the repository's
+            // own gate registry.
             inputs: None,
             priority: 100,
             reserved: HashMap::new(),
@@ -158,24 +152,16 @@ pub fn validate_preset_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Parse the binary-shipped presets plus a captured set of custom JSON files.
+/// Parse a captured set of a project's preset JSON files.
 ///
 /// This is the single pure policy boundary shared by filesystem and captured
-/// readers: canonical names, filename/name agreement, builtin collision
-/// rejection, and deterministic file-order diagnostics.
+/// readers: canonical names, filename/name agreement, and deterministic
+/// file-order diagnostics.
 pub(crate) fn load_presets_from_custom_files(
     mut files: Vec<(String, Vec<u8>)>,
-) -> Result<(
-    HashMap<String, GatePresetDefinition>,
-    std::collections::HashSet<String>,
-)> {
+) -> Result<HashMap<String, GatePresetDefinition>> {
     files.sort_by(|left, right| left.0.cmp(&right.0));
-    let mut presets = BuiltinPresets::load()?;
-    let builtin_names = presets
-        .keys()
-        .cloned()
-        .collect::<std::collections::HashSet<_>>();
-    let mut custom_names = std::collections::HashSet::new();
+    let mut presets = HashMap::new();
     for (filename, bytes) in files {
         let preset: GatePresetDefinition = serde_json::from_slice(&bytes)
             .with_context(|| format!("Failed to parse custom gate preset file '{filename}'"))?;
@@ -195,17 +181,9 @@ pub(crate) fn load_presets_from_custom_files(
             ))
             .into());
         }
-        if builtin_names.contains(&preset.name) {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "Custom preset '{}' collides with a builtin preset",
-                preset.name
-            ))
-            .into());
-        }
-        custom_names.insert(preset.name.clone());
         presets.insert(preset.name.clone(), preset);
     }
-    Ok((presets, custom_names))
+    Ok(presets)
 }
 
 /// Preset metadata for listing
@@ -217,8 +195,6 @@ pub struct PresetInfo {
     pub description: String,
     /// Number of gates
     pub gate_count: usize,
-    /// Whether this is a builtin preset
-    pub builtin: bool,
 }
 
 #[cfg(test)]

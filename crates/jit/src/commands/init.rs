@@ -711,9 +711,11 @@ source-of-truth = \"registry-first\"\n";
         assert_repo_valid(repo.path());
     }
 
-    static COMPOSITION_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
-        "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
-    );
+    /// The checked-in fixture tree every composition case below stages copies
+    /// of, each under a rewritten manifest declaring its own id.
+    fn composition_package() -> std::path::PathBuf {
+        crate::test_utils::profile_package_fixture("planner-asset-only")
+    }
 
     #[test]
     fn test_fresh_profile_init_applies_the_packages_the_named_one_depends_on() {
@@ -722,13 +724,13 @@ source-of-truth = \"registry-first\"\n";
         // Two packages beside each other inside the worktree the repository is
         // created in, which is where an adopter puts an obtained set.
         crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &repo.path().join("packages/base"),
             "base",
             &[],
         );
         crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &repo.path().join("packages/workflow"),
             "workflow",
             &["base"],
@@ -766,16 +768,15 @@ source-of-truth = \"registry-first\"\n";
     }
 
     #[test]
-    fn test_fresh_profile_init_records_every_package_of_the_embedded_closure() {
+    fn test_fresh_profile_init_records_every_package_of_the_selected_closure() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
-        // What the binary answers with before a repository exists: nothing is
-        // supplied and there is no record to read, so the compiled-in packages
-        // are the whole set initialization has to apply. The set is named from
-        // this repository's own package, so the two sides reach it by
-        // different routes.
-        let (_workspace, workflow) = crate::test_utils::temporary_repository_package("jit-dogfood");
+        // The set initialization has to apply is the selected package's whole
+        // dependency closure. It is named from the staged package itself, so
+        // the two sides reach it by different routes.
+        let location = crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood");
+        let workflow = crate::profile::ProfilePackage::from_directory(&location).unwrap();
         let closure = executor.resolve_profile_closure(&workflow).unwrap();
 
         let result = executor
@@ -783,7 +784,7 @@ source-of-truth = \"registry-first\"\n";
                 repo.path(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&location),
                 }),
             )
             .unwrap();
@@ -821,14 +822,19 @@ source-of-truth = \"registry-first\"\n";
     }
 
     #[test]
-    fn test_fresh_profile_init_applies_a_compiled_in_dependency_under_a_retained_session() {
+    fn test_fresh_profile_init_applies_a_declared_dependency_under_a_retained_session() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        // The dependency is named and nothing says where it is: no location is
-        // supplied for it and a repository being created has no record, so the
-        // package this binary carries is the only route left.
+        // The dependency is named and no location is supplied for it, so it is
+        // resolved from the directory beside the package declaring it — the
+        // shape an obtained set of packages arrives in.
+        let dependency = crate::test_utils::assemble_repository_package(
+            "jit-default",
+            &repo.path().join("packages/jit-default"),
+        )
+        .expect("this repository's jit-default package assembles");
         crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &repo.path().join("packages/workflow"),
             "workflow",
             &["jit-default"],
@@ -870,7 +876,12 @@ source-of-truth = \"registry-first\"\n";
             &fs::read(repo.path().join(".jit/profiles/jit-default.json")).unwrap(),
         )
         .unwrap();
-        assert_eq!(record.origin, ProfileOrigin::Embedded);
+        assert_eq!(
+            record.origin,
+            ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/jit-default").unwrap()
+            )
+        );
         assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
         assert!(repo.path().join("docs/workflow.txt").is_file());
         let published = fs::read(repo.path().join(".jit/config.toml")).unwrap();
@@ -879,8 +890,6 @@ source-of-truth = \"registry-first\"\n";
             .hierarchy
             .expect("the published configuration declares a type hierarchy")
             .types;
-        let (_workspace, dependency) =
-            crate::test_utils::temporary_repository_package("jit-default");
         let missing = dependency
             .manifest()
             .contributions
@@ -909,7 +918,7 @@ source-of-truth = \"registry-first\"\n";
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &repo.path().join("packages/workflow"),
             "workflow",
             &["absent-base"],
@@ -945,7 +954,10 @@ source-of-truth = \"registry-first\"\n";
                 repo.path(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&crate::test_utils::stage_repository_packages(
+                        repo.path(),
+                        "jit-dogfood",
+                    )),
                 }),
             )
             .unwrap();
@@ -994,7 +1006,10 @@ source-of-truth = \"registry-first\"\n";
                 repo.path(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&crate::test_utils::stage_repository_packages(
+                        repo.path(),
+                        "jit-dogfood",
+                    )),
                 }),
             )
             .unwrap();
@@ -1179,10 +1194,17 @@ assert = { require-section = { heading = \"Goals\" } }\n";
     #[test]
     fn test_concurrent_fresh_profile_init_publishes_one_coherent_repository() {
         let repo = Arc::new(TempDir::new().unwrap());
+        // Staged once, before either initialization starts: the race under test
+        // is between two initializations, not between two stagings.
+        let location = Arc::new(crate::test_utils::stage_repository_packages(
+            repo.path(),
+            "jit-dogfood",
+        ));
         let barrier = Arc::new(Barrier::new(2));
         let handles = (0..2)
             .map(|_| {
                 let repo = Arc::clone(&repo);
+                let location = Arc::clone(&location);
                 let barrier = Arc::clone(&barrier);
                 thread::spawn(move || {
                     let storage = JsonFileStorage::new(repo.path().join(".jit"));
@@ -1192,7 +1214,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                         repo.path(),
                         Some(ProfileSelection {
                             id: "jit-dogfood",
-                            location: None,
+                            location: Some(location.as_path()),
                         }),
                     )
                 })

@@ -114,8 +114,16 @@ fn test_nested_profile_init_keeps_data_and_assets_in_child() {
 
     let child = parent.path().join("child");
     fs::create_dir(&child).unwrap();
+    let location = crate::repository_package_at(&child, "jit-dogfood");
     let child_init = jit_cmd(&child)
-        .args(["init", "--profile", "jit-dogfood", "--json"])
+        .args([
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &location,
+            "--json",
+        ])
         .output()
         .expect("nested init failed to spawn");
 
@@ -151,11 +159,19 @@ fn test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd() {
     fs::create_dir(&child).unwrap();
     let external = TempDir::new().unwrap();
     let data_root = external.path().join("jit-data");
+    let location = crate::repository_package_at(&child, "jit-dogfood");
 
     let output = Command::new(jit_binary())
         .current_dir(&child)
         .env("JIT_DATA_DIR", &data_root)
-        .args(["init", "--profile", "jit-dogfood", "--json"])
+        .args([
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &location,
+            "--json",
+        ])
         .output()
         .expect("explicit-root init failed to spawn");
 
@@ -180,11 +196,23 @@ fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
     assert!(jit_init(repo.path()).status.success());
     let child = repo.path().join("child");
     fs::create_dir(&child).unwrap();
+    // Staged in the worktree the application targets, which the child's data
+    // root override resolves to, not in the child the command runs from.
+    let location = repo
+        .path()
+        .join(crate::repository_package_at(repo.path(), "jit-dogfood"));
 
     let output = Command::new(jit_binary())
         .current_dir(&child)
         .env("JIT_DATA_DIR", "../.jit")
-        .args(["profile", "apply", "jit-dogfood", "--json"])
+        .args([
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &location.to_string_lossy(),
+            "--json",
+        ])
         .output()
         .expect("relative-root profile apply failed to spawn");
 

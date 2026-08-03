@@ -144,6 +144,23 @@ fn setup_repo(templates_toml: &str) -> TempDir {
     std::fs::write(jit_dir.join("config.toml"), CONFIG_TOML).unwrap();
     jit(&temp).arg("init").assert().success();
     std::fs::write(jit_dir.join("templates.toml"), templates_toml).unwrap();
+    // A template's gate entries resolve against the repository's own presets
+    // and its own gate registry, so the repository declares every key the
+    // registry it just received names.
+    for key in crate::apply_cli_tests::template_gate_keys(templates_toml) {
+        jit(&temp)
+            .args([
+                "gate",
+                "define",
+                &key,
+                "--title",
+                &format!("{key} gate"),
+                "--description",
+                &format!("Repository-declared {key} gate"),
+            ])
+            .assert()
+            .success();
+    }
     temp
 }
 

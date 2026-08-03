@@ -758,7 +758,7 @@ fn parse_template_presets(
             Ok((path.relative().as_str().to_string(), bytes.to_vec()))
         })
         .collect::<Result<Vec<_>>>()?;
-    crate::gate_presets::load_presets_from_custom_files(files).map(|(presets, _)| presets)
+    crate::gate_presets::load_presets_from_custom_files(files)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -190,6 +190,13 @@ mod tests {
     use super::*;
     use crate::repository_state::RootRelativePath;
 
+    /// A record naming the package at the worktree-relative `location`.
+    fn record_at(location: &str) -> AppliedProfileRecord {
+        record(ProfileOrigin::Directory(
+            RootRelativePath::parse(location).expect("a canonical package location"),
+        ))
+    }
+
     fn record(origin: ProfileOrigin) -> AppliedProfileRecord {
         AppliedProfileRecord::new(
             "example",
@@ -203,7 +210,7 @@ mod tests {
     /// A record whose `origin` is replaced by `origin`, as stored bytes.
     fn stored_with_origin(origin: serde_json::Value) -> Vec<u8> {
         let mut value: serde_json::Value =
-            serde_json::from_slice(&record(ProfileOrigin::Embedded).to_bytes().unwrap()).unwrap();
+            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
         value["origin"] = origin;
         serde_json::to_vec(&value).unwrap()
     }
@@ -211,7 +218,7 @@ mod tests {
     #[test]
     fn test_installed_record_is_minimal_stable_json() {
         let value: serde_json::Value =
-            serde_json::from_slice(&record(ProfileOrigin::Embedded).to_bytes().unwrap()).unwrap();
+            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
         assert_eq!(
             value
                 .as_object()
@@ -226,20 +233,17 @@ mod tests {
     #[test]
     fn test_installed_record_round_trips_the_location_a_directory_origin_names() {
         // The location survives the round trip through stored bytes, which is
-        // what a later run reads to find the package again, and the two origins
-        // are distinguishable in the stored image.
+        // what a later run reads to find the package again, and two records
+        // naming different locations are distinguishable in the stored image.
         let location = RootRelativePath::parse("profiles/example").unwrap();
-        let stored = record(ProfileOrigin::Directory(location.clone()))
-            .to_bytes()
-            .unwrap();
+        let stored = record_at("profiles/example").to_bytes().unwrap();
 
         let read: AppliedProfileRecord = serde_json::from_slice(&stored).unwrap();
         assert_eq!(read.origin, ProfileOrigin::Directory(location));
-        assert_ne!(read.origin, ProfileOrigin::Embedded);
         assert_ne!(
             stored,
-            record(ProfileOrigin::Embedded).to_bytes().unwrap(),
-            "the two origins must not store the same image"
+            record_at("vendor/elsewhere").to_bytes().unwrap(),
+            "records naming different locations must not store the same image"
         );
     }
 
