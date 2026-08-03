@@ -2872,14 +2872,14 @@ pub enum HooksCommands {
 /// Repository profile commands.
 #[derive(Debug, Subcommand)]
 pub enum ProfileCommands {
-    /// List the profiles this repository's own records name
+    /// List the profiles this repository records from repository package locations
     List {
         /// Output as JSON
         #[arg(long)]
         json: bool,
     },
 
-    /// Show one profile manifest and package identity
+    /// Show one profile manifest and package identity from a repository package
     Show {
         /// Stable profile ID
         id: String,
@@ -2894,7 +2894,7 @@ pub enum ProfileCommands {
         json: bool,
     },
 
-    /// Apply a profile through one recoverable multi-target transaction
+    /// Apply a profile package read from a repository location through one recoverable multi-target transaction
     Apply {
         /// Stable profile ID
         id: String,

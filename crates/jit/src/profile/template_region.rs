@@ -11,10 +11,10 @@
 //! declarations, and read nothing from the filesystem. The package arrives as
 //! an argument, and the two callers supply the I/O around it —
 //! [`crate::generated_artifacts`] declares the render the `regenerate` example
-//! publishes the registry file through, and the dogfood module's drift
-//! assertions read it. The module compiles only for the crate's own tests and
-//! for the dev-dependency-active builds those two need, so an adopter build
-//! carries none of it.
+//! publishes the registry file through, and the repository package module's
+//! drift assertions read it. The module compiles only for the crate's own tests
+//! and dev-dependency-active builds those two need, so an adopter build carries
+//! none of it.
 
 use crate::profile::ProfilePackage;
 use crate::repository_state::{

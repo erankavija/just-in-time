@@ -260,7 +260,7 @@ mod tests {
             serde_json::json!({ "source": "directory", "location": 7 }),
             // A source the origin vocabulary does not carry is refused
             // outright rather than read past to its location.
-            serde_json::json!({ "source": "embedded", "location": "profiles/example" }),
+            serde_json::json!({ "source": "unsupported", "location": "profiles/example" }),
             serde_json::json!({ "source": "unknown", "location": "profiles/example" }),
         ] {
             let stored = stored_with_origin(origin.clone());

@@ -102,6 +102,23 @@ fn test_doc_remove_help_mentions_events_verification() {
     );
 }
 
+#[test]
+fn test_profile_help_describes_repository_package_locations() {
+    let list = help_text(&["profile", "list", "--help"]);
+    assert!(
+        list.contains("repository package locations"),
+        "profile list --help should describe repository package locations, got: {list}"
+    );
+
+    for command in ["show", "apply"] {
+        let help = help_text(&["profile", command, "--help"]);
+        assert!(
+            help.contains("Repository directory holding the package"),
+            "profile {command} --help should describe the repository package directory, got: {help}"
+        );
+    }
+}
+
 // ============================================================================
 // REQ-01 + REQ-02 (jit:6ad894cb): `issue create --help` describes `-d`/
 // `--description` as the initial issue description/body, and states its
