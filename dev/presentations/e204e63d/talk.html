@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Repository profiles in JIT v1.0</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Source+Code+Pro:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- reveal.js core only (no reveal theme — base.css + the theme token file own all appearance) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+
+<!-- KaTeX (synchronous math; deterministic heights for the fit-checker) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<!-- Theme system: structure is theme-agnostic; swap the #theme link to retheme -->
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+<!-- ── TITLE ───────────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Repository profiles in JIT v1.0</h1>
+  <p class="tagline">A workflow arrives as a package you can read, preview, and repair</p>
+  <p>For adopters and profile contributors &nbsp;·&nbsp; 2026-08-04</p>
+  <p class="caption">Every command shown was run against jit 1.0.0; every figure was measured.</p>
+</section>
+
+<!-- ── AGENDA ──────────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Outline <span class="num">· 2 / 20</span></span>
+  <h2>Agenda</h2>
+  <ol>
+    <li>What a repository gets before any package</li>
+    <li>Applying a package, and what one is</li>
+    <li>Preview, provenance, repair, conflict</li>
+    <li>Authoring a package</li>
+    <li>The v1.0 boundary</li>
+  </ol>
+  <aside class="notes">
+    Two audiences. Slides 3–13 are for adopters; 14–18 are for contributors.
+  </aside>
+</section>
+
+<!-- ── 3. BARE INIT ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Before a package <span class="num">· 3 / 20</span></span>
+  <h2>A bare init declares nothing</h2>
+<pre><code class="language-bash" data-trim>$ jit init
+Scaffolded .jit/rules.toml
+Initialized jit repository (worktree: wt:f6224909)
+
+$ find .jit -type f | sort
+.jit/config.toml           .jit/invariants.toml
+.jit/events.jsonl          .jit/rules.toml
+.jit/gates.toml            .jit/schemas/default-label-format.json
+.jit/index.json            .jit/worktree.json</code></pre>
+  <p>No type hierarchy, no label namespaces, no item kinds, no gates.
+     <code>gates.toml</code> and <code>invariants.toml</code> are empty registries.</p>
+</section>
+
+<!-- ── 4. THE MINIMUM IS USABLE ────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Before a package <span class="num">· 4 / 20</span></span>
+  <h2>The structural minimum is a working repository</h2>
+<pre><code class="language-toml" data-trim>[version]
+schema = 2
+
+[project]
+name = "demo"          # slugged from the directory; edit freely</code></pre>
+  <p>That is the whole of <code>config.toml</code>. <code>jit validate</code> passes, and
+     issues can be created. One rule is scaffolded — <code>label-format</code> — and its
+     assertion derives from the registries above, so it emits nothing for registries
+     that declare nothing.</p>
+  <div class="note">A vocabulary is a declaration, not a default. What the engine cannot
+    derive from your repository, it does not invent.</div>
+</section>
+
+<!-- ── 5. APPLYING ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Applying <span class="num">· 5 / 20</span></span>
+  <h2>Vocabulary arrives by applying a package</h2>
+<pre><code class="language-bash" data-trim>$ jit init --profile jit-dogfood --from packages/jit-dogfood
+Scaffolded .jit/rules.toml
+Initialized jit repository (worktree: wt:3f8692f9)
+
+$ jit profile list
+jit-default 1.0.0 directory packages/jit-default (applied)
+jit-dogfood 1.0.0 directory packages/jit-dogfood (applied)</code></pre>
+  <p>One package was named; two were applied. <code>jit-dogfood</code> declares a
+     dependency on <code>jit-default</code>, which is looked for beside it under its own
+     ID — so an obtained directory of packages applies as a set.</p>
+</section>
+
+<!-- ── 6. WHAT IT NEEDS ────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Applying <span class="num">· 6 / 20</span></span>
+  <h2>What application requires</h2>
+  <div class="two-col">
+    <div>
+      <h3>Needs</h3>
+      <ul>
+        <li>A directory of bytes, obtained beforehand</li>
+        <li>That directory inside the worktree</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Does not need</h3>
+      <ul>
+        <li>Network access</li>
+        <li>A Git repository</li>
+        <li>A JIT source checkout</li>
+      </ul>
+    </div>
+  </div>
+  <p>Run in an empty directory holding only <code>packages/</code>, with no
+     <code>.git</code>, <code>jit init --profile jit-dogfood --from packages/jit-dogfood</code>
+     initializes and applies both packages.</p>
+  <div class="warning">A package resolving outside the worktree — including under
+    <code>.jit/</code> — is refused by name, so repair never depends on machine state.</div>
+</section>
+
+<!-- ── 7. WHAT A PACKAGE IS ────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The package <span class="num">· 7 / 20</span></span>
+  <h2>A package is a directory</h2>
+<pre><code class="language-bash" data-trim>packages/jit-dogfood/
+  manifest.toml                  # identity, dependencies, every declaration
+  assets/install/...             # files that exist only to be installed
+  assets/regions/...             # sources for managed regions in your files
+  assets/live/...                # files the package mirrors from a repository</code></pre>
+  <p>No archive format, no index, no lockfile. The manifest is the inventory;
+     <code>jit profile show</code> reads it without applying anything.</p>
+  <div class="note">The published <code>jit-dogfood</code> package is 64 files, 432,973 bytes,
+    covering 68 targets.</div>
+</section>
+
+<!-- ── 8. THE MANIFEST ─────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The package <span class="num">· 8 / 20</span></span>
+  <h2>The manifest states identity and dependencies</h2>
+<pre><code class="language-toml" data-trim>dependencies = ["jit-default"]
+
+[profile]
+manifest-version = 1
+id = "jit-dogfood"
+version = "1.0.0"
+jit = ">=1.0.0, &lt;2.0.0"</code></pre>
+  <p>The package version is independent of the JIT version; <code>jit</code> states the
+     range it is built for. v1.0 parses that range and does not match it against the
+     running binary — a package built for a later binary applies cleanly and fails
+     wherever the shape later differs.</p>
+</section>
+
+<!-- ── 9. FOUR DECLARATION KINDS ───────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The package <span class="num">· 9 / 20</span></span>
+  <h2>Four things a manifest declares</h2>
+  <table>
+    <thead><tr><th>declaration</th><th>writes</th><th>in jit-dogfood</th></tr></thead>
+    <tbody>
+      <tr><td><code>[[contribution]]</code></td><td>entries in <code>.jit/</code> registries</td><td>40</td></tr>
+      <tr><td><code>[[asset]]</code></td><td>whole files at declared targets</td><td>62</td></tr>
+      <tr><td><code>[[region]]</code></td><td>a managed region inside your file</td><td>1</td></tr>
+      <tr><td><code>[[live-source]]</code></td><td>nothing — bounds what the package draws from</td><td>3</td></tr>
+    </tbody>
+  </table>
+  <p><code>jit-default</code> declares 44 contributions and no assets: it is vocabulary only.</p>
+</section>
+
+<!-- ── 10. CONTRIBUTION KINDS ──────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">The package <span class="num">· 10 / 20</span></span>
+  <h2>A contribution is typed by how it merges</h2>
+<pre><code class="language-toml" data-trim>[[contribution]]
+kind = "map-entry"                  # one entry of a map
+target = "type-hierarchy-types"
+identity = "milestone"
+value = 1</code></pre>
+  <p>Five kinds: <code>map-entry</code>, <code>set-string</code>, <code>scalar</code>,
+     <code>keyed-array</code>, <code>projection</code>. The kind tells the applier how two
+     packages combine on one target, which is what makes a delta package and a
+     self-contained one produce the same repository.</p>
+</section>
+
+<!-- ── 11. WHAT ARRIVES ────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Applying <span class="num">· 11 / 20</span></span>
+  <h2>What the two packages install together</h2>
+<pre><code class="language-bash" data-trim>$ jit config get type_hierarchy.types --json
+{ "key": "type_hierarchy.types",
+  "value": { "milestone": 1, "epic": 2, "story": 3, "planning": 3,
+             "breakdown": 3, "task": 4, "bug": 4, "enhancement": 4 } }</code></pre>
+  <p>Six gates reach <code>.jit/gates.toml</code>: <code>plan-review</code>,
+     <code>breakdown-review</code>, <code>code-review</code>, <code>coverage-preview</code>,
+     <code>jit-validate</code>, <code>repo-validate</code>. The workflow skills land under
+     <code>.agents/skills/</code>, and a managed region is appended to <code>AGENTS.md</code>.</p>
+</section>
+
+<!-- ── 12. PREVIEW ─────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Operating <span class="num">· 12 / 20</span></span>
+  <h2>Preview the final state, not a best-effort script</h2>
+<pre><code class="language-bash" data-trim>$ jit profile apply jit-dogfood --dry-run --json
+{ "id": "jit-dogfood",
+  "plan_hash": "&lt;64 hex chars&gt;",
+  "status": "unchanged",
+  "targets": [ { "action": "unchanged", "executable": false,
+                 "path": ".agents/skills/jit-breakdown/SKILL.md" }, ... ] }</code></pre>
+  <p>Every target carries <code>create</code>, <code>update</code>, or <code>unchanged</code>
+     and its executable intent. Nothing is written. Exact reapplication reports
+     <code>unchanged</code> throughout — a successful no-op. The plan hash addresses the
+     plan, so it is stable for one repository state and differs between repositories;
+     the package hash on the next slide addresses the bytes, and is the same everywhere.</p>
+</section>
+
+<!-- ── 13. PROVENANCE ──────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Operating <span class="num">· 13 / 20</span></span>
+  <h2>The repository records where the bytes came from</h2>
+<pre><code class="language-bash" data-trim>$ cat .jit/profiles/jit-dogfood.json
+{ "id": "jit-dogfood", "version": "1.0.0",
+  "origin": { "source": "directory", "location": "packages/jit-dogfood" },
+  "package_hash": "db08e61ef0363fca71cb5afed1976bd177f2fe8bdb9a3e0c40b4f0f301c5c45b",
+  "target_hashes": { ... 68 entries ... } }</code></pre>
+  <p>The location is worktree-relative and lives only here — not in
+     <code>config.toml</code>, so there is no second carrier and no precedence question.
+     Leave the package where you applied it from; later commands read it there again.</p>
+</section>
+
+<!-- ── 14. REPAIR ──────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Operating <span class="num">· 14 / 20</span></span>
+  <h2>Repair re-resolves the package, or fails loudly</h2>
+<pre><code class="language-bash" data-trim>$ rm .agents/skills/jit-breakdown/SKILL.md
+$ jit validate --fix
+✓ Repaired derived-state target .agents/skills/jit-breakdown/SKILL.md
+✓ Applied 1 fixes
+✓ Repository is now valid</code></pre>
+  <p>A drifted target is repaired the same way. With the package moved away,
+     <code>--fix</code> refuses by naming the record, the profile, and the location that
+     no longer holds a readable package — rather than restoring what it can still see.</p>
+</section>
+
+<!-- ── 15. CONFLICT ────────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Operating <span class="num">· 15 / 20</span></span>
+  <h2>Your content is not collateral</h2>
+<pre><code class="language-bash" data-trim>$ printf '\nlocal edit\n' &gt;&gt; .agents/skills/jit-breakdown/SKILL.md
+$ jit profile apply jit-dogfood --dry-run --json
+{ "error": { "code": "PROFILE_CONFLICT",
+    "message": "profile package jit-dogfood asset target
+      '.agents/skills/jit-breakdown/SKILL.md' conflicts with package
+      jit-dogfood and contains differing bytes" } }</code></pre>
+  <p>A target holding differing bytes is a conflict reported before anything is written.
+     Application is one recoverable multi-target transaction: it validates the whole final
+     state first, then publishes once.</p>
+</section>
+
+<!-- ── 16. AUTHORING: LIVE SOURCES ─────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authoring <span class="num">· 16 / 20</span></span>
+  <h2>Declare the roots your package draws from</h2>
+<pre><code class="language-toml" data-trim>[[live-source]]
+root = ".agents/skills"
+exclude = [".agents/skills/*/evals/**",
+           ".agents/skills/*/trigger_eval*.json",
+           ".agents/skills/*/scripts/test-*.sh",
+           ".agents/skills/**/.gitkeep"]</code></pre>
+  <p>Most of a workflow package's assets are files the source repository also uses at
+     their working paths. Declaring the root you draw from — with glob exclusions rather
+     than a literal file list — turns an omission into a failure instead of a silent gap
+     in what adopters receive.</p>
+</section>
+
+<!-- ── 17. AUTHORING: COMPLETENESS ─────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authoring <span class="num">· 17 / 20</span></span>
+  <h2>Omission fails the suite</h2>
+  <div class="item-decl">test_unpackaged_files_under_declared_roots_is_empty_across_the_tracked_repository_tree</div>
+  <p>The walk goes both directions. Every declared root must claim each live asset
+     exactly once, and no tracked file under a declared root may be left unclaimed
+     unless a declared pattern excludes it.</p>
+  <div class="note">Add a skill file under a declared root and forget to declare it, and the
+    suite names it — rather than shipping a package that silently lacks it.</div>
+</section>
+
+<!-- ── 18. AUTHORING: ASSEMBLY ─────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Authoring <span class="num">· 18 / 20</span></span>
+  <h2>The tree is produced, not maintained</h2>
+<pre><code class="language-bash" data-trim>$ scripts/assemble-package.sh /tmp/out
+assembled: /tmp/out
+OK: jit-dogfood carries 64 files drawn from profiles/jit-dogfood
+    and the repository files its live assets name</code></pre>
+  <p>Each run publishes a freshly staged tree, so a source the manifest stops declaring is
+     absent from the next one. Two runs from one repository state produce byte-identical
+     trees and identical digests, so a package can be rebuilt and compared rather than
+     trusted.</p>
+</section>
+
+<!-- ── 19. THE BOUNDARY ────────────────────────────────────────────────── -->
+<section>
+  <span class="seclabel">Boundary <span class="num">· 19 / 20</span></span>
+  <h2>v1.0 is apply-only, deliberately</h2>
+  <div class="two-col">
+    <div>
+      <h3>Exists</h3>
+      <ul>
+        <li><code>list</code>, <code>show</code>, <code>apply</code></li>
+        <li>Declared dependencies, resolved</li>
+        <li>Provenance and repair</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Deferred</h3>
+      <ul>
+        <li>Upgrade, removal, detailed diff</li>
+        <li>Variables and sensitive values</li>
+        <li>Reconfiguration, incompatibilities</li>
+      </ul>
+    </div>
+  </div>
+  <p>No search path discovers a package, and nothing is hidden behind the interface: a
+     package is found where the command or the record says it is. For anything beyond
+     applying, edit repository configuration directly.</p>
+</section>
+
+<!-- ── 20. CLOSING ─────────────────────────────────────────────────────── -->
+<section class="title">
+  <h1>Where to read further</h1>
+  <p><code>docs/reference/profiles.md</code> — package, conflict, transaction, recovery,
+     and the lifecycle contract</p>
+  <p><code>docs/reference/cli-commands.md</code> — the profile command surface</p>
+  <p class="caption">A package is a directory you can read, a plan you can preview, and a
+     record you can repair from.</p>
+</section>
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  // fitcheck.py waits on these flags before measuring.
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  // KaTeX scripts are deferred; run once they (and the DOM) are available.
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      // give deferred KaTeX a tick to attach renderMathInElement
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>
