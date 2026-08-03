@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "831bb098d0cab29099fa27dabf340ed2c8f25f44",
+  "completed_at": "2026-08-03T19:39:26.512370736Z",
+  "duration_ms": 194175,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 549,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13",
+          "@/invariant/domain-agnostic"
+        ],
+        "severity": "medium",
+        "summary": "The preferred fresh-repository profile-init command omits the required --from package location."
+      },
+      {
+        "disposition": "blocking",
+        "file": "mcp-server/index.js",
+        "id": "F2",
+        "line": 49,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13",
+          "@/invariant/domain-agnostic"
+        ],
+        "severity": "high",
+        "summary": "Shipped MCP server instructions retain the hard-coded type names epic and milestone."
+      }
+    ],
+    "summary": "The profile-init documentation omits the required package location, and MCP instructions retain hard-coded type names.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7af6eb3d-3f1d-434b-9db7-d66c706a4b1c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "73219537-f23c-457d-9f18-3da166c2953d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T19:36:12.336448254Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10226 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc920-6a13-7310-bbc2-9432bc3087ef\n--------\nuser\n--- 10213 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fallback: no reachable commit contains `jit:7af6eb3d`\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; .jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json\nResolved items: @/issue/e204e63d/decision/D-13, @/issue/e204e63d/decision/D-21, @/issue/e204e63d/decision/D-22 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/domain-agnostic, @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); mcp-ci passed; npm-ci passed (0); jit-validate passed (0); docs-mechanical passed (0); doc-review failed (1); code-review pending\nTruncation recovery: narrowed current reads of initialization, profile documentation, MCP instructions, web rendering, relevant dependency patches, and latest structured doc-review finding after broad-search truncation\n\n1. **[blocking][issue-impact][medium]** [docs/reference/cli-commands.md:549](docs/reference/cli-commands.md:549) calls `jit init --profile jit-dogfood` the preferred fresh-repository setup even though the following text says a first application requires `--from <PATH>`. The advertised command cannot locate the unrecorded package directory, so it fails REQ-05’s usable obtain-and-apply guidance. References: @/issue/e204e63d/decision/D-13, @/invariant/domain-agnostic.\n\n2. **[blocking][issue-impact][high]** [mcp-server/index.js:49](mcp-server/index.js:49) ships the type literals “epic” and “milestone” in `SERVER_INSTRUCTIONS` (“such as an epic or milestone label”). This is agent-facing bridge text and directly violates REQ-02’s removal of type-name literals from shipped bridge instructions. References: @/issue/e204e63d/decision/D-13, @/invariant/domain-agnostic.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The profile-init documentation omits the required package location, and MCP instructions retain hard-coded type names.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The preferred fresh-repository profile-init command omits the required --from package location.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":549,\"references\":[\"@/issue/e204e63d/decision/D-13\",\"@/invariant/domain-agnostic\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Shipped MCP server instructions retain the hard-coded type names epic and milestone.\",\"file\":\"mcp-server/index.js\",\"line\":49,\"references\":[\"@/issue/e204e63d/decision/D-13\",\"@/invariant/domain-agnostic\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

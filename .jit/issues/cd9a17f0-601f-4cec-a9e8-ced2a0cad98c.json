@@ -1,0 +1,46 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T19:40:57.723950495Z",
+  "dependencies": [],
+  "description": "The command reference's first-time profile initialization works as written, so an adopter who runs it reaches an initialized repository.\n\n## Background\n\nThe reference presents one command as the preferred setup for this project's portable workflow. Run verbatim in a fresh repository it fails: a first application has no applied-profile record to read, so the package location must be supplied. The paragraph immediately below the command says exactly that, which makes the example contradict its own explanation rather than merely omit an option.\n\nThe affordance is the point of the surrounding section, so the fix is to make the presented command the one an adopter can run, not to add a caveat beside a command that does not work.\n\n## Success Criteria\n\n- [hard] REQ-01: Every profile-initialization command the reference presents as runnable succeeds when run verbatim in a fresh repository, or is presented as an explicit non-first-application case.\n- [hard] REQ-02: The presented first-time form and the paragraph explaining when a location must be supplied agree.\n- [hard] REQ-03: The mechanical documentation checks pass over the changed pages.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T19:40:57.723950495Z",
+  "gates_required": [
+    "code-review",
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T19:41:07.865900847Z",
+      "updated_by": null
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T19:41:08.366350092Z",
+      "updated_by": null
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_at": "2026-08-03T19:41:08.109471499Z",
+      "updated_by": null
+    }
+  },
+  "id": "cd9a17f0-601f-4cec-a9e8-ced2a0cad98c",
+  "labels": [
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:configuration-removal",
+    "satisfies:REQ-08",
+    "per:@/charter/D-13",
+    "enforces:@/invariant/single-source-prose",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Make the reference's first-time profile initialization runnable as written",
+  "updated_at": "2026-08-03T19:41:08.366350092Z"
+}

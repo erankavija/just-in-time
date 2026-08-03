@@ -12793,3 +12793,19 @@
 {"from":"in_progress","id":"4f8426e7-6fae-41ac-8e2b-d040d7cc433f","issue_id":"d198030e-e637-444e-b444-e4e82a3d1ccf","timestamp":"2026-08-03T19:26:39.946706564Z","to":"done","type":"issue_state_changed"}
 {"id":"2a8461ba-6bca-480e-ad75-0539e3df8b74","issue_id":"d198030e-e637-444e-b444-e4e82a3d1ccf","timestamp":"2026-08-03T19:26:39.946706564Z","type":"issue_completed"}
 {"from":"backlog","id":"c849d965-ee45-41cf-9746-2e53a9a013ce","issue_id":"6df7e456-d845-4a0e-b1f4-38a727285bba","timestamp":"2026-08-03T19:26:44.977697311Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"jit-validate","id":"35e768e5-419d-4d3b-9bc4-6408b379ff0e","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:27:55.336879012Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"b3f374f0-f153-4702-9094-eefdbe36b6ef","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:28:06.320849878Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"npm-ci","id":"445f39ad-ffcc-4f42-8ae8-2bd7acb71e3e","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:28:22.178773789Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"b170b0c1-cbe7-44d5-a5de-ba5429d0f4b9","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:28:22.477050859Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"d8e9df3d-1861-47cf-906a-fdf533168844","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:34:25.823890681Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"a7a4c15c-9422-4748-ad55-5f892bcf01ad","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:36:10.998724781Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"7208d70d-9f66-4f12-a244-7977dc4ed62c","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:39:26.825413480Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"17dedc20-6d3e-46de-b60a-c37540699668","issue_id":"e522a8e1-ac25-49a7-8c16-2c5fe6caaead","priority":"normal","timestamp":"2026-08-03T19:40:39.771483014Z","title":"Take the remaining hierarchy type names out of the bridge's instructions","type":"issue_created"}
+{"id":"41c346b0-8a6d-4786-a8b5-578397acfe8c","issue_id":"cd9a17f0-601f-4cec-a9e8-ced2a0cad98c","priority":"normal","timestamp":"2026-08-03T19:40:57.723950495Z","title":"Make the reference's first-time profile initialization runnable as written","type":"issue_created"}
+{"gate_key":"mcp-ci","id":"5ff526de-25b5-4765-8dc3-607392d377b4","issue_id":"e522a8e1-ac25-49a7-8c16-2c5fe6caaead","timestamp":"2026-08-03T19:41:07.356549197Z","type":"gate_added"}
+{"gate_key":"code-review","id":"64827e81-2689-45c0-9490-57bca2a7fec9","issue_id":"e522a8e1-ac25-49a7-8c16-2c5fe6caaead","timestamp":"2026-08-03T19:41:07.608568062Z","type":"gate_added"}
+{"gate_key":"code-review","id":"dd9fe3d4-5be8-42c1-a743-350ae4dc69ab","issue_id":"cd9a17f0-601f-4cec-a9e8-ced2a0cad98c","timestamp":"2026-08-03T19:41:07.865900847Z","type":"gate_added"}
+{"gate_key":"docs-mechanical","id":"7a27921f-b1b6-495c-af94-10f4b4df5e19","issue_id":"cd9a17f0-601f-4cec-a9e8-ced2a0cad98c","timestamp":"2026-08-03T19:41:08.109471499Z","type":"gate_added"}
+{"gate_key":"doc-review","id":"420e3eed-1b83-4451-824f-58aea68c5021","issue_id":"cd9a17f0-601f-4cec-a9e8-ced2a0cad98c","timestamp":"2026-08-03T19:41:08.366350092Z","type":"gate_added"}
+{"from":"ready","id":"df4d2ff9-a550-424e-bb2e-a2cf1ce5b2c6","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:41:11.922665795Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"4335f091-24a4-4740-97de-280b56083052","issue_id":"7af6eb3d-3f1d-434b-9db7-d66c706a4b1c","timestamp":"2026-08-03T19:41:11.922665795Z","type":"issue_updated","updated_by":"dependency-add"}

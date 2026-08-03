@@ -1,0 +1,39 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T19:40:39.771483014Z",
+  "dependencies": [],
+  "description": "The agent-facing instruction block names no type from this repository's own hierarchy, so an agent connected to any repository reads vocabulary that repository declares.\n\n## Background\n\nThe bridge's shipped instruction block was rewritten to defer its gate and label vocabulary to the connected repository's configuration. One parenthetical survived that rewrite and still illustrates membership labels with two type names taken from this project's hierarchy, in text every connected agent reads before it sees any repository's own declarations.\n\nThe sentence's point — that membership labels are advisory and containment resolves through the dependency graph — is mechanism and stays. Only the illustration naming particular types is an instance.\n\n## Success Criteria\n\n- [hard] REQ-01: The shipped instruction block names no type from any particular hierarchy, and the containment point the sentence carries survives the change.\n- [hard] REQ-02: The bridge's coverage observes the property over the shipped instruction text, failing when a hierarchy's type name reappears there.\n- [hard] REQ-03: The MCP suite passes with no tool changing name or arguments.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T19:40:39.771483014Z",
+  "gates_required": [
+    "mcp-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T19:41:07.608568062Z",
+      "updated_by": null
+    },
+    "mcp-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T19:41:07.356549197Z",
+      "updated_by": null
+    }
+  },
+  "id": "e522a8e1-ac25-49a7-8c16-2c5fe6caaead",
+  "labels": [
+    "epic:derived-package-sources",
+    "milestone:v1.0",
+    "component:core",
+    "story:configuration-removal",
+    "per:@/issue/e204e63d/decision/D-13",
+    "enforces:@/invariant/domain-agnostic",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Take the remaining hierarchy type names out of the bridge's instructions",
+  "updated_at": "2026-08-03T19:41:07.608568062Z"
+}

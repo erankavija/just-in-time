@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "831bb098d0cab29099fa27dabf340ed2c8f25f44",
+  "completed_at": "2026-08-03T19:36:10.677139504Z",
+  "duration_ms": 103863,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 549,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The preferred fresh-repository profile-init command omits required --from."
+      }
+    ],
+    "summary": "The CLI reference's preferred first-time profile-init command omits the required --from location.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "7af6eb3d-3f1d-434b-9db7-d66c706a4b1c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dd25d02d-1990-483b-85d1-4c1ea13108ed",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T19:34:26.813232693Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.DhGQQC7YTH: binary file matches\n--- agent stderr (first 12 of 24706 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc91e-cde3-7332-9a34-22e859d982c7\n--------\n--- 24694 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: configured hierarchy makes this story a container; its nine resolved children are all done. I individually inspected the 27 reachable `jit:<child-id>` commits with rename detection. No `jit:7af6eb3d` commit exists, so the story itself uses the stated criteria as fallback.\n\nThe combined documentation contract accurately explains package acquisition, `--from`, bare initialization, removed icon presets, and workflow-package warnings. One CLI-reference omission remains.\n\n1. **F1 — blocking, issue-impact (medium):** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:549) presents `jit init --profile jit-dogfood` as the preferred setup, but a fresh repository has no recorded package location and therefore requires `--from`. Replace it with `jit init --profile jit-dogfood --from packages/jit-dogfood` (or explicitly link to the obtaining step) so the recommended command is executable.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The CLI reference's preferred first-time profile-init command omits the required --from location.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The preferred fresh-repository profile-init command omits required --from.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":549}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
