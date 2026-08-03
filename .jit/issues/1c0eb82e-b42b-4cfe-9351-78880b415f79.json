@@ -8,6 +8,7 @@
   ],
   "description": "The engine reads, verifies, applies, composes, and repairs profile packages that live in repository directories, so a profile no longer has to be compiled in to exist and a package can carry a delta over another.\n\n## Background\n\nA profile can presently exist only as bytes compiled into the binary: one constructor walks a compiled-in directory, one resolver compares a requested id against one compiled-in package, and the applied-profile record's origin has a single value meaning exactly that. Everything else about the package model already treats its bytes as untrusted external data, and provenance is already one record per package id, so repair over several applied packages needs no change.\n\nWhat is missing is a reader, somewhere to record where a package came from, a resolver that uses it, a way for one package to declare a dependency on another, and the ordering that applies them. Two tables the configuration needs — the documentation-area classification and the validation defaults — have no contribution target at all, so a package cannot yet carry the configuration a repository receives.\n\nOne thing deliberately stays missing. A package declares which jit versions it is written for, and that declaration is parsed and not matched against the running binary; a package built for a later binary applies cleanly and fails wherever the shape later differs. Matching it belongs to the profile lifecycle the charter defers (`@/issue/e204e63d/decision/D-19`).\n\n## Success Criteria\n\n- [hard] REQ-01: A profile package is constructed from a repository directory, with every existing package defence applying to it.\n- [hard] REQ-02: The applied-profile record carries the worktree-relative location the package was read from.\n- [hard] REQ-03: Profile inspection, application, and initialization read their package from a given location or from the recorded one.\n- [hard] REQ-04: A package declares the packages it depends on, and applying it applies those first, each with its own record and event.\n- [hard] REQ-05: A package contributes the documentation-area keys and the validation defaults, and a collision between two packages names both.\n- [hard] REQ-06: Derived-state repair recomputes expected targets from the package read at the recorded location, and fails loudly when it cannot.\n\n## Notes\n\nNothing here removes the compiled-in package; it becomes the last resort behind two better answers, and leaves when the work that puts the packages in the release archive has landed.\n",
   "documents": [],
+  "first_ready_at": "2026-08-03T07:02:35.599810388Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -35,7 +36,7 @@
     "type:story"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "A profile package is read from disk, and packages compose",
-  "updated_at": "2026-07-31T17:57:07.897459998Z"
+  "updated_at": "2026-08-03T07:02:35.599810388Z"
 }
