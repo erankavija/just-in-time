@@ -1,0 +1,40 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "61e8c45445d98de5de2ae95e868cafdd04478924",
+  "completed_at": "2026-08-03T06:04:12.546331184Z",
+  "duration_ms": 141347,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/rules-and-gates.md",
+        "id": "F1",
+        "origin": "pre-existing",
+        "references": [
+          "@/gate/docs-mechanical"
+        ],
+        "severity": "low",
+        "summary": "The latest docs-mechanical failure is stale projected content outside this issue's attributable documentation footprint."
+      }
+    ],
+    "summary": "The attributable command-reference and profile-reference updates satisfy the issue criteria; one unrelated pre-existing projection-drift advisory remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2ce8ce1b-b75c-4ffd-b598-354237add0e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dd27b2d7-54a4-4629-86a8-ae5148a4c767",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T06:01:51.199264711Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `d8262134`, `60066769` (`jit:2ce8ce1b`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-13` (dev/vision/9db27a3a-charter.md); `@/invariant/single-source-prose` (.jit/invariants.toml); `@/issue/e204e63d/decision/D-8` (issue description); `@/gate/docs-mechanical`, `@/gate/doc-review` (.jit/gates.toml)\nGate evidence: docs-mechanical failed (exit 1, 2026-08-03T06:00:04Z); doc-review passed (exit 0, 2026-08-03T06:00:16Z)\nTruncation recovery: individually re-read both patches, current command/profile sections, merge diff, policy sources, and both latest gate records\n\n1. Advisory · pre-existing — The failed `docs-mechanical` run identifies stale projected content in `docs/reference/rules-and-gates.md`, at the parent commit before this issue’s documentation patch. Its link, citation, canonical-home, and shipped-policy checks passed; this unrelated drift does not affect the documented `--from` behavior. References: `@/gate/docs-mechanical`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable command-reference and profile-reference updates satisfy the issue criteria; one unrelated pre-existing projection-drift advisory remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The latest docs-mechanical failure is stale projected content outside this issue's attributable documentation footprint.\",\"file\":\"docs/reference/rules-and-gates.md\",\"references\":[\"@/gate/docs-mechanical\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

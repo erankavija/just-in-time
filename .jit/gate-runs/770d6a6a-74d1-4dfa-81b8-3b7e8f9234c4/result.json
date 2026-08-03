@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "61e8c45445d98de5de2ae95e868cafdd04478924",
+  "completed_at": "2026-08-03T06:00:15.499333839Z",
+  "duration_ms": 11453,
+  "exit_code": 1,
+  "gate_key": "docs-mechanical",
+  "inputs_digest": "9ce231497e641a7f8d904a923fc500f0796ed09100a0aaa9a988e315b698dfcb",
+  "issue_id": "2ce8ce1b-b75c-4ffd-b598-354237add0e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "770d6a6a-74d1-4dfa-81b8-3b7e8f9234c4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T06:00:04.046196677Z",
+  "status": "failed",
+  "stderr": "DRIFT: projected region(s) are stale — the committed copy does not match\n       'jit project render'. Re-render and commit:\n docs/reference/rules-and-gates.md | 2 --\n 1 file changed, 2 deletions(-)\n",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\n\n== M6 canonical homes ==\nOK: canonical homes resolve, and each fact is live and unique\n\n== M7 shipped policy ==\nOK: shipped-policy regions carry the shipped classification\n\n",
+  "tree_dirty": false
+}

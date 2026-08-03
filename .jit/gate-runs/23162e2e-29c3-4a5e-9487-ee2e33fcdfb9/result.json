@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "61e8c45445d98de5de2ae95e868cafdd04478924",
+  "completed_at": "2026-08-03T06:19:33.619312608Z",
+  "duration_ms": 167183,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented and covered by focused tests; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "590ff4db-b549-43cb-a4bb-6e7b8521ff6b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "23162e2e-29c3-4a5e-9487-ee2e33fcdfb9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T06:16:46.435332615Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9eff722f, 61e8c454 (jit:590ff4db)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-17 and REQ-08 (issue description); @/issue/e204e63d/decision/D-14, D-20 (issue description); @/invariant/domain-agnostic, single-source-prose, architecture-dependency-direction, semantic-test-assertions, shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-03T06:04:14Z)\nTruncation recovery: focused rereads of current default-rule code, workflow manifest, bare-repository tests, documentation, and exact resolved items after broad search output truncated\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and covered by focused tests; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

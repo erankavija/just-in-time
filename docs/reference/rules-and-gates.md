@@ -31,8 +31,6 @@ names, gate keys, and checkers your project declares.
 - **@/rule/namespace-unique-type** — At most one `type:` label per issue: `type` is a unique namespace. Blocks the write and fails validation. (error, enforced)
 - **@/rule/namespace-unique-brackets** — At most one `brackets:` label per issue: `brackets` is a unique namespace. Blocks the write and fails validation. (error, enforced)
 - **@/rule/coverage-preview** — On a breakdown node, assert every [hard] REQ-id in the bracketed container's Success Criteria is credited by some issue in its dependency closure via a satisfies:<id> label. A plan-time coverage preview; fires once breakdown is underway. (error, enforced)
-- **@/rule/orphan-leaf** — Warn when a leaf-level-typed issue (a type at the deepest hierarchy level, e.g. task) carries no parent-membership label (e.g. `epic:*`), leaving it unattached to any strategic container. Advisory: never blocks a write. (warn, advisory)
-- **@/rule/strategic-consistency** — Warn when a strategic-typed issue (a type with a membership namespace, e.g. epic/milestone) lacks its own identifying membership label, such as a `type:epic` issue that has no `epic:*` label. Advisory: never blocks a write. (warn, advisory)
 
 ## Gates
 

@@ -14,7 +14,23 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T06:04:12.859056768Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T06:01:49.827756774Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "failed",
+      "updated_at": "2026-08-03T06:00:15.508160633Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2ce8ce1b-b75c-4ffd-b598-354237add0e6",
   "labels": [
     "type:task",
@@ -28,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Describe the supplied-location form in the command reference",
-  "updated_at": "2026-08-03T05:20:45.671531311Z"
+  "updated_at": "2026-08-03T06:04:12.859056768Z"
 }

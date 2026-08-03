@@ -7,6 +7,7 @@
   ],
   "description": "The adopter-facing statements of what a fresh repository's rule set contains describe the rules it now receives, and say where the two that left come from.\n\n## Background\n\nTwo adopter-facing pages describe the scaffolded rule set and name both opinionated rules as part of it. Once those rules are contributed by a package rather than seeded by the engine, both statements are false for any repository that applied no package — which, after this container, is every repository that did not ask for the workflow.\n\nThe correction is small and has to say two things: which rules a bare repository receives, and that the two that left arrive with the workflow package. Without the second, an adopter reads the removal as a regression.\n\nOne page is deliberately not touched. The rules-and-gates reference is a projection of this repository's own registry, which keeps declaring both rules for as long as the workflow package contributes them, so it will keep showing them correctly and hand-editing it would be a projection defect.\n\n## Success Criteria\n\n- [hard] REQ-01: Neither adopter page presents the two opinionated rules as part of what initialization scaffolds.\n- [hard] REQ-02: Both state what a bare repository's rule set contains, and where the two that left arrive from.\n- [hard] REQ-03: The fact has one home; the second page cites the first rather than restating it.\n- [hard] REQ-04: The projected rules-and-gates reference is unedited, and still renders this repository's own registry.\n- [hard] REQ-05: The mechanical documentation checks pass over the changed pages.\n\n## Notes\n\nThis states the surface as it is; a narrative of what it used to contain belongs in the release notes.\n",
   "documents": [],
+  "first_ready_at": "2026-08-03T06:19:54.764782668Z",
   "gates_required": [
     "code-review",
     "docs-mechanical",
@@ -25,7 +26,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Say which rules a repository is actually scaffolded with",
-  "updated_at": "2026-07-31T17:55:01.855466366Z"
+  "updated_at": "2026-08-03T06:19:54.764782668Z"
 }
