@@ -655,6 +655,45 @@ target = "docs/guide.md"
         );
     }
 
+    /// Two assemblies of the same sources produce the same package tree and
+    /// provenance, while changing a declared live source changes the package
+    /// content address.
+    #[test]
+    fn test_assemble_package_tree_produces_stable_content_and_hashes_for_same_sources() {
+        let temp = TempDir::new().unwrap();
+        let (package_source, repository) = synthetic_sources(temp.path(), SYNTHETIC_MANIFEST);
+        let first_destination = temp.path().join("out/first");
+        let second_destination = temp.path().join("out/second");
+
+        let first = assemble_package_tree(&package_source, &repository, &first_destination)
+            .expect("the first synthetic package assembles");
+        let second = assemble_package_tree(&package_source, &repository, &second_destination)
+            .expect("the second synthetic package assembles");
+
+        assert_eq!(
+            tree_files(&first_destination),
+            tree_files(&second_destination),
+            "same sources produced different package paths, bytes, or modes"
+        );
+        assert_eq!(first.hashes().package, second.hashes().package);
+        assert_eq!(first.hashes().targets, second.hashes().targets);
+
+        fs::write(
+            repository.join("docs/guide.md"),
+            b"# Changed synthetic guide\n",
+        )
+        .unwrap();
+        let changed_destination = temp.path().join("out/changed");
+        let changed = assemble_package_tree(&package_source, &repository, &changed_destination)
+            .expect("the changed synthetic package assembles");
+
+        assert_ne!(
+            first.hashes().package,
+            changed.hashes().package,
+            "changing a declared live source did not change the package hash"
+        );
+    }
+
     /// A declared live source whose repository file is absent fails the run
     /// with a message naming that path, and publishes nothing.
     #[test]
