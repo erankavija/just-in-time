@@ -41,6 +41,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `docs/reference/example-config.toml` are rendered from the `jit-default`
   package's own contributions.
 
+- **The compiled-in workflow package and gate presets.** The binary carried the
+  `jit-dogfood` workflow package and three gate presets derived from its plan
+  template, and a profile record could identify a package compiled into the
+  binary; the dependency resolver could use those bytes as a last resort. Those
+  routes are removed. Profile packages are read from directories inside the
+  repository, each applied record retains its worktree-relative location, and a
+  dependency is resolved beside the package that declares it before the
+  repository's own applied-profile records are consulted. The native archive
+  supplies `packages/jit-default/` and `packages/jit-dogfood/`, so an adopter
+  applies the package from the extracted directory, while gate names not
+  supplied by a profile resolve from the repository's own `.jit/gates.toml`.
+
 ### Fixed
 
 - **Installing marks a binary stale only when a path it is built from is
@@ -68,9 +80,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a dependency on, transitively, and applies each before the package that
   declares it, so a delta package and a self-contained one produce the same
   repository. A dependency is looked for beside the declaring package's own
-  directory, under the dependency's own id, before this repository's record and
-  the compiled-in package answer — so one obtained directory of packages applies
-  as a set without every member being named. Each applied package writes its own
+  directory, under the dependency's own id, before this repository's record
+  answers — so one obtained directory of packages applies as a set without every
+  member being named. Each applied package writes its own
   provenance record and appends its own audit event, a package two others depend
   on is applied once, and re-applying a set that is already applied reports no
   work anywhere in it. Declared dependencies that close a cycle are rejected
@@ -111,10 +123,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **The native archive now carries the default vocabulary beside the workflow
   package.** The extracted `jit-dogfood` package can therefore resolve and apply
-  its `jit-default` dependency from `packages/jit-default/` without consulting
-  the binary's compiled-in copy. Both package directories remain inside the
-  existing native archive, so the published asset set and checksum coverage are
-  unchanged.
+  its `jit-default` dependency from `packages/jit-default/`, so one native
+  download contains the complete profile set needed for offline application.
+  Both package directories remain inside the existing native archive, so the
+  published asset set and checksum coverage are unchanged.
 
 - **A gate verdict is reused when its declared inputs are unchanged.** A quality
   gate runs once per issue, so several issues sitting on one repository state
@@ -168,44 +180,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   reports it beside the assets it bounds, and the shipped `jit-dogfood` package
   declares the three roots its live assets come from.
 - **A repository records where an applied profile package came from.** The
-  record beside an applied profile carried an origin with one value, meaning the
-  bytes were compiled into the binary — a vocabulary shaped for a second one but
-  never given it — so a repository that applied a package read from a directory
-  had nowhere to say so, and nothing that ran later had anywhere to look for the
-  bytes. The origin now distinguishes the two cases, and the directory case
-  carries the location the bytes were read from, as a path relative to the
-  worktree root. That location lives in the record and nowhere else: it is
-  repository-local state versioned with the repository that applied the profile,
-  and a configuration key carrying it as well would be a second carrier of one
-  fact plus a precedence question between them. The recorded location is the one
-  the package's own reader anchored its walk at, never a path supplied beside the
-  bytes, so a package read through a relative or link-traversing argument records
-  the directory those resolve to and the record addresses the bytes it describes.
+  record beside an applied profile carries the location of the package directory
+  as a path relative to the worktree root. That location lives in the record and
+  nowhere else: it is repository-local state versioned with the repository that
+  applied the profile, and a configuration key carrying it as well would be a
+  second carrier of one fact plus a precedence question between them. The
+  recorded location is the one the package's own reader anchored its walk at,
+  never a path supplied beside the bytes, so a package read through a relative or
+  link-traversing argument records the directory those resolve to, and the record
+  addresses the bytes it describes.
   Where the location may point is part of the contract: a package whose bytes
   resolve outside the worktree, including under the tracker's data root, is
   refused by name rather than recorded, because a location outside the worktree
   makes a repository's derived-state repair depend on machine state. A stored
-  record whose location is absent, malformed, or attached to bytes that were
-  compiled in fails the read rather than being ignored, so a repository never
-  resolves a package its record does not actually name.
+  record whose location is absent or malformed fails the read rather than being
+  ignored, so a repository never resolves a package its record does not actually
+  name.
 
-- **A profile package is read from a directory on disk.** The package model was
-  already written for untrusted external data — bounded file count and total
-  size, rejected absolute, traversal, platform-prefix, control-character and
+- **A profile package is read from a directory on disk.** The package model
+  validates untrusted external data — bounded file count and total size,
+  rejected absolute, traversal, platform-prefix, control-character and
   backslash paths, a declared source that is absent, a package file no
-  declaration claims, and a content address over the manifest and every path —
-  but the only tree it could read was one embedded at compile time, and it
-  borrowed the byte slices it validated, which a directory read cannot supply
-  without leaking them. `ProfilePackage` (was `EmbeddedProfilePackage`) owns the
-  bytes it validates, and `ProfilePackage::from_directory` walks a directory
-  into the same path-to-bytes map the compile-time route produces: for identical
-  content the two agree in manifest, package hash, and every per-target digest,
-  because one validation sees both. No defence is weakened for the directory
-  route, and two exist only for it, each naming what it refused at read time: a
-  directory entry that is neither a regular file nor a subdirectory, and an
-  entry resolving outside the package root — which is how a symbolic link out of
-  the tree is caught before its content is used. Both are decided against the
-  entry the walk opened rather than against its name, and every entry is opened
+  declaration claims, and a content address over the manifest and every path.
+  `ProfilePackage` owns the bytes it validates, and
+  `ProfilePackage::from_directory` walks a directory into one path-to-bytes map,
+  so packages built from identical content agree in manifest, package hash, and
+  every per-target digest. No defence is weakened for directory packages. The
+  reader rejects a directory entry that is neither a regular file nor a
+  subdirectory, and an entry resolving outside the package root — which is how a
+  symbolic link out of the tree is caught before its content is used. Both are decided against
+  the entry the walk opened rather than against its name, and every entry is opened
   without following links, and without blocking, against the directory handle
   that listed it: a name relinked out of the tree while the package is being
   read fails to open instead of substituting content from outside it, and a name
