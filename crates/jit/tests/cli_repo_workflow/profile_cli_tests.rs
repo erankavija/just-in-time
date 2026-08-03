@@ -119,7 +119,7 @@ fn test_profile_list_and_show_work_without_repository() {
     let repo = TempDir::new().unwrap();
 
     // A directory that is not a repository has recorded no profile, so it names
-    // none; inspection still resolves the package this binary carries.
+    // none.
     let list = jit(repo.path(), &["profile", "list", "--json"]);
     assert!(list.status.success(), "{list:?}");
     let list = json(&list);
@@ -171,8 +171,8 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
-    // Nothing compiled into the binary declares this profile, so reporting it
-    // at all is the location having been read.
+    // Nothing but the supplied location holds a package declaring this
+    // profile, so reporting it at all is that location having been read.
     assert_eq!(show["manifest"]["profile"]["id"], FIXTURE_PROFILE);
     assert_eq!(
         show["origin"],

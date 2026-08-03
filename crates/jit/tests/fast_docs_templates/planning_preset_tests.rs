@@ -175,8 +175,9 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
     );
 
     // LIST: the answer is exactly what the project declares. The
-    // planning-bracket names are checked beside it because a listing that
-    // carried presets from the binary would carry those.
+    // planning-bracket names are checked beside it because they are the ones an
+    // adopter is most likely to expect the engine to answer for, and it answers
+    // for none of them until the repository declares them itself.
     let presets = executor.list_gate_presets().expect("list presets");
     assert_eq!(
         presets

@@ -848,10 +848,9 @@ applies_to  = ["epic"]
 /// REQ-02 (jit:ff1bbada): a template gate that no preset and no registry entry
 /// supplies is reported by name, whatever that name is.
 ///
-/// The names checked are the planning bracket's own, because a resolution that
-/// answered from the binary would answer for exactly those and for nothing else
-/// — which is what makes them the case that distinguishes a repository-supplied
-/// gate registry from a compiled-in one.
+/// The names checked are the planning bracket's own: they are the ones an
+/// adopter is most likely to expect the engine to answer for, and the engine
+/// answers for none of them until the repository declares them itself.
 #[test]
 fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_supplies() {
     for key in ["plan-review", "coverage-preview", "breakdown-review"] {
@@ -1059,7 +1058,7 @@ applies_to  = ["epic"]
 #[test]
 fn test_repo_gates_toml_declares_repo_validate_whole_repo_checker() {
     // REQ-13 (issue 552ff75c): `repo-validate` is CONFIG-DECLARED in the repo's
-    // own `.jit/gates.toml` (not a built-in preset), with a whole-repo checker —
+    // own `.jit/gates.toml`, with a whole-repo checker —
     // `jit validate` with NO issue id — distinct from the per-issue `jit-validate`
     // gate (`jit validate "$JIT_ISSUE_ID"`). Gates persist as a `[[gates]]`
     // array-of-tables (jit:f5d35048), so each entry is found by scanning for its

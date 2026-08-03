@@ -19,7 +19,7 @@ const PROFILE_RECORD: &str = ".jit/profiles/jit-dogfood.json";
 ///
 /// What these fixtures need from it is what the checkout declares — the targets
 /// an application owns and the executable bits it publishes — so the package is
-/// drawn from there rather than from a copy compiled into the test binary.
+/// assembled from the checkout rather than read from a copy of it.
 fn shipped_workflow_package() -> (tempfile::TempDir, jit::profile::ProfilePackage) {
     jit::test_utils::temporary_repository_package("jit-dogfood")
 }
@@ -495,9 +495,7 @@ fn test_validate_fix_restores_a_deleted_or_edited_target_from_the_recorded_locat
 /// so the stored digests describe the rewritten package exactly as well as they
 /// described the applied one. Only the location holds the bytes that tell them
 /// apart, and repair restoring those bytes is a live read of it — a repair that
-/// derived its expectations from the record could not produce them, and one
-/// that read this binary's compiled-in packages could not produce this profile
-/// at all.
+/// derived its expectations from the record could not produce them.
 #[test]
 fn test_validate_fix_restores_the_bytes_the_recorded_location_holds_now() {
     let mut repo = DirectoryPackageRepo::applied();

@@ -562,8 +562,8 @@ fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
 }
 
 /// `jit gate preset apply` exits 3 when a preset target is missing — matching
-/// `gate preset apply`/3. Applying a builtin preset to a well-formed but
-/// nonexistent id fails that id through the ordinary not-found classifier.
+/// `gate preset apply`/3. A well-formed but nonexistent id fails through the
+/// ordinary not-found classifier.
 #[test]
 fn test_command_exit_codes_gate_preset_apply_missing_target_emits_3() {
     let temp = setup();

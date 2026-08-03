@@ -411,10 +411,10 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
 /// A repository that applied a directory package validates, and repairs the
 /// targets that package owns from the location its record names.
 ///
-/// The package is a fixture this binary does not carry, so every fact
-/// validation states about it — that the repository is coherent, and the bytes
-/// it restores to a deleted target — can only have come from reading the
-/// recorded location again.
+/// The recorded location is the only place the package's bytes exist, so every
+/// fact validation states about it — that the repository is coherent, and the
+/// bytes it restores to a deleted target — can only have come from reading that
+/// location again.
 #[test]
 fn test_validate_repairs_a_profile_applied_from_a_directory() {
     const LOCATION: &str = "packages/planner";

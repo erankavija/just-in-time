@@ -624,8 +624,8 @@ planning or writing.
 package to read, which must hold a package declaring the requested profile ID.
 Profiled `jit init` accepts the same form. For each of these commands, a
 supplied location wins. If `--from` is absent, JIT reads the location named by
-the repository's applied-profile record; when no record exists, it uses the
-matching package compiled into the binary. The applied-profile record is
+the repository's applied-profile record; a repository with neither reports
+`PROFILE_NOT_FOUND` (exit 3). The applied-profile record is
 defined in [Repository Profiles](profiles.md#publication-rollback-and-recovery),
 including where it lives and what it stores, so a package obtained from a
 repository directory can be found again on later runs. A recorded location is
@@ -634,8 +634,8 @@ fails naming the record and path; it does not replay stored digests or treat the
 profile as absent.
 
 A package the resolved one declares a dependency on is looked for beside it,
-in a directory named by that dependency's own ID, before the record and the
-binary answer. One obtained directory of packages therefore applies as a set:
+in a directory named by that dependency's own ID, before the record answers.
+One obtained directory of packages therefore applies as a set:
 `jit profile apply <PROFILE_ID> --from packages/<PROFILE_ID>` reaches
 `packages/<DEPENDENCY_ID>` without naming it.
 

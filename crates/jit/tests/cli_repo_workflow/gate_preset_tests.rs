@@ -1,13 +1,11 @@
 //! CLI integration tests for project-defined gate presets (jit:52665a07,
 //! REQ-02).
 //!
-//! The binary ships only the planning-bracket presets; every domain- or
-//! language-specific bundle is a project-defined preset stored under
-//! `.jit/config/gate-presets/`. These tests exercise the whole mechanism against
-//! that surface end-to-end via the real `jit` subprocess: capture an issue's
-//! gates into a preset (`create`), see it in `list`, inspect it with `show`, and
-//! attach it to another issue with `apply` — no built-in language bundle
-//! involved.
+//! Every preset is a project's own, stored under `.jit/config/gate-presets/`.
+//! These tests exercise the whole mechanism against that surface end-to-end via
+//! the real `jit` subprocess: capture an issue's gates into a preset
+//! (`create`), see it in `list`, inspect it with `show`, and attach it to
+//! another issue with `apply`.
 
 use assert_cmd::prelude::*;
 use std::process::Command;
@@ -50,7 +48,7 @@ fn create_issue(temp: &TempDir, title: &str) -> String {
 
 /// REQ-02: a project-defined preset is created from an issue's gates, then
 /// listed, shown, and applied — the full mechanism against a project-declared
-/// bundle, with no built-in language preset in play.
+/// bundle, with no undeclared preset in play.
 #[test]
 fn test_project_defined_preset_create_list_show_apply() {
     let temp = setup_repo();

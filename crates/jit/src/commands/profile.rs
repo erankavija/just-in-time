@@ -2616,8 +2616,8 @@ mod tests {
     #[test]
     fn test_apply_profile_package_reports_a_dependency_that_cannot_be_resolved() {
         let (temp, storage, executor, _fixture) = fixture();
-        // Nothing sits beside the package under that name, this repository has
-        // no record for it, and this binary does not carry it.
+        // Nothing sits beside the package under that name and this repository
+        // has no record for it, so no route resolves the dependency.
         let dependant = package_declaring(&temp, "vendor/workflow", "workflow", &["absent-base"]);
 
         let error = executor.apply_profile_package(&dependant).unwrap_err();
