@@ -34,19 +34,22 @@ pub const TEMP_CLEANUP_THRESHOLD_SECS: u64 = 3600;
 /// and the default extension applied by `jit claim renew` (10 minutes).
 pub const CLAIM_TTL_SECS: u64 = 600;
 
-/// Repo-relative path of the committed reference that projects these defaults.
-pub const REFERENCE_PATH: &str = "docs/reference/runtime-defaults.md";
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) mod test_support {
+    /// Repo-relative path of the committed reference that projects these defaults.
+    pub const REFERENCE_PATH: &str = "docs/reference/runtime-defaults.md";
 
-/// The command that renders [`REFERENCE_PATH`] from these constants, named in
-/// the conformance test's message so a stale reference carries its own repair.
-pub const REFERENCE_GENERATOR: &str = "./scripts/generate-runtime-defaults-reference.sh";
+    /// The command that renders [`REFERENCE_PATH`] from these constants, named in
+    /// the conformance test's message so a stale reference carries its own repair.
+    pub const REFERENCE_GENERATOR: &str = "./scripts/generate-runtime-defaults-reference.sh";
+}
 
 /// Render the runtime coordination defaults as the committed markdown reference.
 ///
-/// The returned string is the full contents of
-/// [`REFERENCE_PATH`]: every value derives from the constants in this module, so
-/// the projection cannot drift from the values the code uses. The conformance
-/// test in this module asserts the committed file equals this output.
+/// The returned string is the full contents of the committed reference: every
+/// value derives from the constants in this module, so the projection cannot
+/// drift from the values the code uses. The conformance test in this module
+/// asserts the committed file equals this output.
 pub fn render_reference_markdown() -> String {
     // (label, value-with-unit, operational scope). Values format the constants
     // so the table is a pure projection of the source of truth above.
@@ -104,7 +107,7 @@ mod tests {
     fn reference_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
-            .join(REFERENCE_PATH)
+            .join(test_support::REFERENCE_PATH)
     }
 
     /// REQ-03 conformance: the committed reference must equal the projection of
@@ -117,8 +120,9 @@ mod tests {
         assert_eq!(
             committed,
             render_reference_markdown(),
-            "{REFERENCE_PATH} is stale — regenerate it from `crate::runtime_defaults` \
-             (run: {REFERENCE_GENERATOR})"
+            "{} is stale — regenerate it from `crate::runtime_defaults` (run: {})",
+            test_support::REFERENCE_PATH,
+            test_support::REFERENCE_GENERATOR,
         );
     }
 

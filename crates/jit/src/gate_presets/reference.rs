@@ -3,17 +3,20 @@
 //! [`render_reference_markdown`] projects the preset contract — how a project
 //! captures, lists, and applies a bundle — together with the canonical
 //! `.jit/gates.toml` syntax for every portable checker type, into the committed
-//! reference [`REFERENCE_PATH`]. A conformance test in this module asserts the
+//! reference. A conformance test in this module asserts the
 //! committed copy equals the projection, so changing the projected syntax
 //! without regenerating the reference fails the test suite
 //! (`@/inv/single-source-prose`).
 
-/// Repo-relative path of the committed gate-preset reference.
-pub const REFERENCE_PATH: &str = "docs/reference/gate-presets.md";
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) mod test_support {
+    /// Repo-relative path of the committed gate-preset reference.
+    pub const REFERENCE_PATH: &str = "docs/reference/gate-presets.md";
 
-/// The command that renders [`REFERENCE_PATH`], named in the conformance test's
-/// message so a stale reference carries its own repair.
-pub const REFERENCE_GENERATOR: &str = "./scripts/generate-gate-presets-reference.sh";
+    /// The command that renders [`REFERENCE_PATH`], named in the conformance test's
+    /// message so a stale reference carries its own repair.
+    pub const REFERENCE_GENERATOR: &str = "./scripts/generate-gate-presets-reference.sh";
+}
 
 /// Canonical `.jit/gates.toml` syntax for every native checker type.
 const PORTABLE_CHECKER_REGISTRY_EXAMPLES: &str = r#"[[gates]]
@@ -71,7 +74,7 @@ type = "review_placeholder""#;
 
 /// Render the gate-preset reference as the committed markdown page.
 ///
-/// The returned string is the full contents of [`REFERENCE_PATH`]. The
+/// The returned string is the full contents of the committed reference. The
 /// portable-checker syntax block is the projected value, read from the same
 /// constant the loader test parses, so the page cannot drift from the syntax
 /// the gate registry accepts. The conformance test in this module asserts the
@@ -144,7 +147,7 @@ mod tests {
     fn reference_path() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
-            .join(REFERENCE_PATH)
+            .join(test_support::REFERENCE_PATH)
     }
 
     /// REQ-03 conformance: the committed reference must equal the projection.
@@ -157,7 +160,9 @@ mod tests {
         assert_eq!(
             committed,
             render_reference_markdown(),
-            "{REFERENCE_PATH} is stale — regenerate it (run: {REFERENCE_GENERATOR})"
+            "{} is stale — regenerate it (run: {})",
+            test_support::REFERENCE_PATH,
+            test_support::REFERENCE_GENERATOR,
         );
     }
 
