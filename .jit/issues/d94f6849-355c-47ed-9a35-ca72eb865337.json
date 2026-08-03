@@ -14,7 +14,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:19:45.280549201Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:22:07.081536754Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d94f6849-355c-47ed-9a35-ca72eb865337",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Retire the checked-in copies of the packaged live assets",
-  "updated_at": "2026-08-03T05:36:56.852899886Z"
+  "updated_at": "2026-08-03T18:22:07.081536754Z"
 }

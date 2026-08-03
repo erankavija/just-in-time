@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c51340b65ec7441751a08125146a561ab3bbaa7",
+  "completed_at": "2026-08-03T18:31:01.950921062Z",
+  "duration_ms": 103845,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Leaf attribution from four individually inspected tagged commits found no issue-impact documentation defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "8d534ee7-23e0-474f-b87f-748bc66a26e8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9c4e7bf2-001a-4a8a-9ac4-251eca9ac74b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T18:29:18.105782471Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue `8d534ee7` only. I inspected four reachable `jit:8d534ee7` commits individually (including the merge), excluded uncommitted changes, and verified the current release layout and profile command contract.\n\nThe updated profile reference, installation guide, and bracket how-to accurately cover package acquisition, offline limits, `--from`, release contents, and both gate-definition routes. No issue-impact documentation defects found.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Leaf attribution from four individually inspected tagged commits found no issue-impact documentation defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

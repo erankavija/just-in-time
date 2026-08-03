@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c51340b65ec7441751a08125146a561ab3bbaa7",
+  "completed_at": "2026-08-03T18:34:16.856320677Z",
+  "duration_ms": 193439,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five success criteria are met by the attributable documentation changes and current shipped behavior.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8d534ee7-23e0-474f-b87f-748bc66a26e8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dcb3cfa4-b867-4db2-a548-4bb0e7c05ea7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T18:31:03.416910991Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: acc785865, b3ce4a25, e1754dae, and merge 0a2954b9\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-2, D-8, D-13 — dev/vision/9db27a3a-charter.md; @/invariant/single-source-prose — .jit/invariants.toml; @/issue/e204e63d/requirement/REQ-08 — issue description\nGate evidence: docs-mechanical passed (exit none, 2026-08-03T18:29:17Z); doc-review passed (exit 0, 2026-08-03T18:29:18Z)\nTruncation recovery: split merge evidence by parent; re-read affected docs, release assembly, CLI, and profile-resolution sources in bounded ranges\n\nNo findings. The current tree supports the documented package flow: release archives contain both packages, commands accept `--from`, and profile application requires a repository-local package directory.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five success criteria are met by the attributable documentation changes and current shipped behavior.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

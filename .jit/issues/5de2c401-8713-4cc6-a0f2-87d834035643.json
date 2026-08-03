@@ -12,7 +12,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:17:11.726435952Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:19:44.562100734Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5de2c401-8713-4cc6-a0f2-87d834035643",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Stop naming this checkout's paths in the defaults and gate modules",
-  "updated_at": "2026-07-31T17:57:13.508383888Z"
+  "updated_at": "2026-08-03T18:19:44.562100734Z"
 }

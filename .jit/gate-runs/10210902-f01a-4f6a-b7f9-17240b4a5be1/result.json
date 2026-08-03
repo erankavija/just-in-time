@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c51340b65ec7441751a08125146a561ab3bbaa7",
+  "completed_at": "2026-08-03T18:17:10.426763981Z",
+  "duration_ms": 164956,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met by the attributable current implementation and tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6fef2d7c-68d7-4eb0-88b2-53bacab4240e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "10210902-f01a-4f6a-b7f9-17240b4a5be1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T18:14:25.469891012Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 84807045 and merge 61e68118 (same three-path change)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/convention-convergence (.jit/invariants.toml); @/issue/e204e63d/requirement/REQ-07 (parent issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-08-03T18:04:27Z); code-review pending\nTruncation recovery: recovered individual patches, merge patch, current predicate/caller/tests, and item sources in narrower reads\n\n1. No findings identified. The inventory omits `profiles/` ([binary_build_inputs.txt](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/binary_build_inputs.txt:22)); focused tests cover package freshness and crate-source staleness ([build_provenance.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/build_provenance.rs:346)); I/O remains in the command layer ([gate_check.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate_check.rs:695)).\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met by the attributable current implementation and tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

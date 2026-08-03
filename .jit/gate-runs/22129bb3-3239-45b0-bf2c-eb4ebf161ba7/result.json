@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c51340b65ec7441751a08125146a561ab3bbaa7",
+  "completed_at": "2026-08-03T18:19:44.247383998Z",
+  "duration_ms": 151491,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard success criteria are satisfied; the default library excludes the checkout-specific constants while test-support retains conformance and regeneration declarations.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5de2c401-8713-4cc6-a0f2-87d834035643",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "22129bb3-3239-45b0-bf2c-eb4ebf161ba7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T18:17:12.755536739Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e9f483f6; 499089d5 merge integration\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-21 (issue Decisions, markdown-first); @/invariant/domain-agnostic, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose, @/invariant/canonical-cutover, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit code unavailable, 2026-08-03T18:17:11Z\nTruncation recovery: narrowed reads of both tagged patches, merge parent diffs, feature boundary, conformance tests, and artifact declaration; unrelated second-parent merge diff excluded from the impact cone\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard success criteria are satisfied; the default library excludes the checkout-specific constants while test-support retains conformance and regeneration declarations.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

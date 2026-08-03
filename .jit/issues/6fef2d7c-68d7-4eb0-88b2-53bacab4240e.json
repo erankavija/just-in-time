@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:14:24.331792880Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:17:10.733732515Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6fef2d7c-68d7-4eb0-88b2-53bacab4240e",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Stop naming the package a build input",
-  "updated_at": "2026-07-31T16:28:27.583411185Z"
+  "updated_at": "2026-08-03T18:17:10.733732515Z"
 }

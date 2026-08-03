@@ -1,13 +1,15 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T18:38:37.628440864Z",
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
-    "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
-    "ff1bbada-b22a-432a-a75a-8506743e90f9"
+    "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4"
   ],
   "description": "The project invariant carries no sanctioned exception for a workflow bundle, and says which names are part of a mechanism, so the rule is decidable where a reviewer will test it.\n\n## Background\n\nThe invariant says engine logic is domain-agnostic and then carves out one exception: the planning-bracket preset trio, retained as the single binary-shipped preset bundle. That carve-out is what the ruling removes, and once the binary carries no preset bundle the sentence describes something that no longer exists.\n\nDeleting the sentence alone would leave the rule ambiguous at its hardest case. Three engine constants name bracket vocabulary — the default planning role, the default breakdown role, and the default container anchor — and each is an overridable default of a generic mechanism, resolved through the repository's own bindings when it declares them. A stricter reading would delete them and force every repository to declare bindings it currently inherits. The amended statement therefore says positively what stays: a name a mechanism resolves through declared bindings is part of the mechanism, while a declaration naming a particular gate, template, or node type is not.\n\nModule documentation asserting that the binary ships the trio goes stale in the same change and is corrected with it.\n\n## Success Criteria\n\n- [hard] REQ-01: The invariant registry entry carries no sanctioned exception for any workflow bundle.\n- [hard] REQ-02: Its statement says that a specific workflow reaches a repository as a profile package, and that a name a mechanism resolves through declared bindings is part of the mechanism.\n- [hard] REQ-03: The projection of the registry into the agent guidance file is regenerated from the registry rather than edited.\n- [hard] REQ-04: No module documentation asserts that the binary ships a workflow preset bundle.\n- [hard] REQ-05: The three template mechanism-parameter defaults remain, and the amended statement is what admits them.\n\n## Notes\n\nThe charter decision recording the bracket workflow needs no amendment: it says the template instantiates the bracket and the gates gate it, and says nothing about where the gate definitions ship.\n",
   "documents": [],
+  "done_at": "2026-08-03T18:38:46.353959666Z",
+  "first_ready_at": "2026-08-03T18:36:59.973470625Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -15,7 +17,33 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:24:38.095678445Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:29:16.415285291Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:26:24.015890704Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:24:52.611623595Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:24:41.198983149Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "aa258222-a3a3-47e6-a9ac-570ef8581d6a",
   "labels": [
     "epic:derived-package-sources",
@@ -29,7 +57,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "State the engine-vocabulary boundary in the invariant",
-  "updated_at": "2026-07-31T17:34:35.946128722Z"
+  "updated_at": "2026-08-03T18:38:46.353959666Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0c51340b65ec7441751a08125146a561ab3bbaa7",
+  "completed_at": "2026-08-03T18:26:23.705607895Z",
+  "duration_ms": 90250,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s invariant and packaged profile contribution accurately define the engine-vocabulary boundary, with no required adopter-documentation update omitted.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "aa258222-a3a3-47e6-a9ac-570ef8581d6a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "66f55882-759a-43d8-b672-b9b707084bf1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T18:24:53.455420913Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `aa258222` is a level-4 leaf task with no resolved children. I inspected both reachable `jit:aa258222` commits individually; the merge’s first-parent patch duplicates the worker commit’s three changed carriers. Uncommitted changes were excluded. The current invariant and profile contribution agree, and the template documentation accurately describes only configurable binding defaults—not a binary-shipped workflow bundle.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s invariant and packaged profile contribution accurately define the engine-vocabulary boundary, with no required adopter-documentation update omitted.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

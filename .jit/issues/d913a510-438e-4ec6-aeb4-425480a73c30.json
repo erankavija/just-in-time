@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:22:07.880355040Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T18:24:37.286554252Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d913a510-438e-4ec6-aeb4-425480a73c30",
   "labels": [
     "epic:derived-package-sources",
@@ -25,5 +36,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Retire the embedded-package vocabulary",
-  "updated_at": "2026-07-31T17:59:11.649658166Z"
+  "updated_at": "2026-08-03T18:24:37.286554252Z"
 }
