@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "30b7d75e7d4b8c1cad181e79f9071f03c73b6358",
+  "completed_at": "2026-08-03T08:52:14.663840276Z",
+  "duration_ms": 124173,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/labels.md",
+        "id": "F1",
+        "line": 125,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The labels reference says bare jit init seeds namespaces and a four-level hierarchy, but the current scaffold declares neither."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F2",
+        "line": 186,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The configuration reference implies a fresh bare repository has a documentation table, but bare init now writes no such table."
+      }
+    ],
+    "summary": "Bare-init documentation remains inaccurate in the labels and configuration references.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "518f7b38-4ee6-49dd-8971-01972f63ddc4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T08:50:10.489944920Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.bcASdITxUV: binary file matches\n--- agent stderr (first 12 of 28009 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc6d0-f57d-7330-9b23-911156983f72\n--------\n--- 27997 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a leaf with no resolved children. I inspected the seven current-branch commits tagged `jit:daddfc0b` individually (including both merge-parent patches); no fallback attribution was needed. The implementation and init help confirm the structural-minimum behavior.\n\nDocumentation impact: fail. Two untouched reference passages remain directly inaccurate after bare initialization stopped writing a taxonomy and documentation policy.\n\n1. **F1 — blocking, issue-impact, high:** [docs/reference/labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:125) says `jit init` seeds namespaces; lines 238–240 and 743 onward likewise say it scaffolds the four-level hierarchy and listed namespaces. Bare init now declares neither. Replace these claims with the `jit-default` package contract and direct readers to Repository Profiles; present the tables as package/example configuration, not bare-init output.\n\n2. **F2 — blocking, issue-impact, medium:** [docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:186) says a fresh repository has a `[documentation]` table that omits `citation_scan_roots`. Bare init now writes no `[documentation]` table. State that `citation_scan_roots` is optional when a repository declares the table (including through `jit-default`), while a bare repository declares no documentation classification.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Bare-init documentation remains inaccurate in the labels and configuration references.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The labels reference says bare jit init seeds namespaces and a four-level hierarchy, but the current scaffold declares neither.\",\"file\":\"docs/reference/labels.md\",\"line\":125},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference implies a fresh bare repository has a documentation table, but bare init now writes no such table.\",\"file\":\"docs/reference/configuration.md\",\"line\":186}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -17,7 +17,28 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T08:49:58.342329241Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T08:56:18.909697506Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T08:52:14.973535684Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-03T08:50:09.500038157Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
   "labels": [
     "type:task",
@@ -34,5 +55,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the configuration template the binary writes",
-  "updated_at": "2026-08-03T07:17:57.755616025Z"
+  "updated_at": "2026-08-03T08:56:18.909697506Z"
 }

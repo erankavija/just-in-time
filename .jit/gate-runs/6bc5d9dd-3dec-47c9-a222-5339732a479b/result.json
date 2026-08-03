@@ -1,0 +1,66 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "30b7d75e7d4b8c1cad181e79f9071f03c73b6358",
+  "completed_at": "2026-08-03T08:56:18.599822528Z",
+  "duration_ms": 242377,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/labels.md",
+        "id": "F1",
+        "line": 125,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13",
+          "@/invariant/domain-agnostic"
+        ],
+        "severity": "high",
+        "summary": "The labels reference says bare jit init seeds namespaces and a four-level hierarchy, but the current scaffold declares neither."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F2",
+        "line": 122,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13"
+        ],
+        "severity": "medium",
+        "summary": "The configuration reference retains removed documentation-policy fallback semantics and implies bare init writes a documentation table."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F3",
+        "line": 3297,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13"
+        ],
+        "severity": "medium",
+        "summary": "The item-command reference and matching CLI/source docs still say jit init scaffolds item kinds, though bare init declares none."
+      }
+    ],
+    "summary": "Bare-init documentation and item-kind help still describe configuration that the initializer no longer writes.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6bc5d9dd-3dec-47c9-a222-5339732a479b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T08:52:16.222590425Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11328 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc6d2-dfdd-79e1-990f-b2e0ebc7e05e\n--------\nuser\n--- 11315 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2641eab7, 9a905caf, 3787f714, fd2338df, b8530b98, 692e4ceb, 30b7d75e (`jit:daddfc0b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/daddfc0b/requirement/REQ-01 (.jit/issues/daddfc0b-79e9-42ed-9a4e-ed64b92bbec4.json); @/issue/e204e63d/decision/D-13 and D-15 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/domain-agnostic and @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); docs-mechanical passed (0); doc-review failed (1, two structured documentation findings); code-review pending\nTruncation recovery: recovered bounded commit/path patches and current-source reads for init, profile, generator, documentation, CLI, and affected tests\n\n1. F1 — blocking, issue-impact, high: [docs/reference/labels.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/labels.md:125) still says bare `jit init` seeds namespaces. The same reference also says it scaffolds the four-level hierarchy (lines 238–240) and presents a table as the namespaces init scaffolds (line 743). Bare init now declares neither; this needs to describe `jit-default` or repository-authored configuration instead. References: @/issue/e204e63d/decision/D-13, @/invariant/domain-agnostic.\n\n2. F2 — blocking, issue-impact, medium: [docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:122) retains the removed fallback semantics for `DocumentationConfig`; lines 132–133 and 186–188 likewise imply omitted keys or a fresh bare repository resolve to the shipped documentation policy. The current accessors return empty values for unauthored fields and bare init writes no `[documentation]` table. References: @/issue/e204e63d/decision/D-13.\n\n3. F3 — blocking, issue-impact, medium: [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3297) says `jit init` scaffolds `[item_kinds]`, contrary to the structural-only initializer. The same stale claim remains in generated item-command help at `crates/jit/src/cli.rs:281–283`, `commands/item.rs:67–71`, and `domain/item.rs:23–29, 1439–1446`; a bare repository has no addressable kinds until it declares them or applies a package. References: @/issue/e204e63d/decision/D-13.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Bare-init documentation and item-kind help still describe configuration that the initializer no longer writes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The labels reference says bare jit init seeds namespaces and a four-level hierarchy, but the current scaffold declares neither.\",\"file\":\"docs/reference/labels.md\",\"line\":125,\"references\":[\"@/issue/e204e63d/decision/D-13\",\"@/invariant/domain-agnostic\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference retains removed documentation-policy fallback semantics and implies bare init writes a documentation table.\",\"file\":\"docs/reference/configuration.md\",\"line\":122,\"references\":[\"@/issue/e204e63d/decision/D-13\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The item-command reference and matching CLI/source docs still say jit init scaffolds item kinds, though bare init declares none.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":3297,\"references\":[\"@/issue/e204e63d/decision/D-13\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
