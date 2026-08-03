@@ -34,7 +34,24 @@ fn json(output: &Output) -> Value {
 
 fn profiled_repo() -> TempDir {
     let repo = TempDir::new().unwrap();
-    let output = run(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+    // Applied from inside the worktree it is applied to, because the
+    // applied-profile record names the package's worktree-relative location.
+    let location = jit::test_utils::stage_repository_packages(repo.path(), "jit-dogfood");
+    let location = location
+        .strip_prefix(repo.path())
+        .unwrap()
+        .to_string_lossy();
+    let output = run(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &location,
+            "--json",
+        ],
+    );
     assert!(
         output.status.success(),
         "{}",

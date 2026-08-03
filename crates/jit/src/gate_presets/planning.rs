@@ -1,117 +1,17 @@
-//! Planning-bracket gate presets (design doc D8/D13, task T6).
+//! The preview coverage rule of the plan-before-fan-out bracket (design doc
+//! D8/D13, task T6).
 //!
-//! Three presets bundle the gates that bracket a breakable container:
-//!
-//! - [`plan_review_preset`] attaches the external-review placeholder to the
-//!   planning node `P` (`type:planning`). It mirrors the `plan-review` gate
-//!   authored by the embedded dogfood profile.
-//! - [`coverage_preview_preset`] attaches the **deterministic** coverage-preview
-//!   gate to the breakdown node `B` (`type:breakdown`). Its checker resolves the
-//!   container `C` from `B`'s `brackets:<C-short-id>` label and runs
-//!   `jit validate --scope <C>` (T2), which exits 4 when a `[hard]` criterion is
-//!   left uncovered.
-//! - [`breakdown_review_preset`] attaches the external-review placeholder to
-//!   the same breakdown node `B` — the quality half of `B`'s quality-vs-coverage
-//!   split. It reviews the decomposition itself (content standards, dependency-DAG
-//!   coherence, right-sized depth) and does not re-check `[hard]` coverage.
-//!
-//! Plus [`preview_coverage_rule`], the pure constructor for the preview
+//! [`preview_coverage_rule`] is the pure constructor for the preview
 //! `label-coverage` rule (D13): it is the closure rule with `child-state`
 //! **omitted** (so drafted Backlog children count at plan time) and keyed on the
-//! breakdown type so it fires only on `B`.
+//! breakdown type so it fires only on the breakdown node `B`.
 //!
-//! Everything here is **domain-agnostic**: no `epic`/`planning`/`breakdown`
-//! literal appears in engine logic. The breakdown type name is read from the
-//! `plan` graph template (`TemplateRegistry`) and threaded in by the caller; the
-//! coverage checker resolves its container generically from whatever issue it
-//! runs on.
+//! It is **domain-agnostic**: no `epic`/`planning`/`breakdown` literal appears
+//! in engine logic. The breakdown type name is read from the `plan` graph
+//! template (`TemplateRegistry`) and threaded in by the caller.
 
-use super::{GatePresetDefinition, GateTemplate};
 use crate::declarations::rules::{Assertion, Rule, Selector};
-use crate::profile::jit_dogfood_gate;
 use anyhow::{anyhow, Result};
-
-/// Preset name for the agent plan-quality gate (planning node `P`).
-pub const PLAN_REVIEW_PRESET: &str = "plan-review";
-
-/// Preset name for the deterministic coverage-preview gate (breakdown node `B`).
-pub const COVERAGE_PREVIEW_PRESET: &str = "coverage-preview";
-
-/// Gate key bundled by [`coverage_preview_preset`].
-pub const COVERAGE_PREVIEW_GATE: &str = "coverage-preview";
-
-/// Preset name for the agent breakdown-review gate (breakdown node `B`).
-pub const BREAKDOWN_REVIEW_PRESET: &str = "breakdown-review";
-
-/// Build the `plan-review` preset: an agent review gate for the planning node.
-///
-/// The gate shape is derived from the embedded `jit-dogfood` package. Its
-/// review-placeholder checker makes an unconfigured external reviewer visible
-/// without making the built-in preset a second authored definition.
-///
-/// # Errors
-///
-/// Returns an error if the embedded dogfood package or its gate definition is
-/// invalid.
-pub fn plan_review_preset() -> Result<GatePresetDefinition> {
-    package_gate_preset(PLAN_REVIEW_PRESET)
-}
-
-/// Build the `coverage-preview` preset: a deterministic coverage gate for the
-/// breakdown node.
-///
-/// The package-authored native checker resolves the container from the gated
-/// breakdown issue's `brackets:<short-id>` label and runs scoped validation
-/// in-process. Nothing here is hardcoded to a particular container type.
-///
-/// # Errors
-///
-/// Returns an error if the embedded dogfood package or its gate definition is
-/// invalid.
-pub fn coverage_preview_preset() -> Result<GatePresetDefinition> {
-    package_gate_preset(COVERAGE_PREVIEW_PRESET)
-}
-
-/// Build the `breakdown-review` preset: an **agent** quality review of the
-/// drafted decomposition, attached to the breakdown node `B`.
-///
-/// It is the front-end counterpart to `coverage-preview`'s **quality-vs-coverage
-/// split** on `B`: where `coverage-preview` (deterministic) answers *"is every
-/// `[hard]` criterion mapped to a child?"*, `breakdown-review` (agent) answers
-/// *"is the decomposition itself any good?"* — content standards per child,
-/// dependency-DAG coherence (both missing prerequisites and over-constraining
-/// false serialization), right-sized depth, and blank-workspace reachability. It
-/// deliberately does **not** re-check `[hard]`-criterion coverage; that is the
-/// deterministic gate's job.
-///
-/// The gate shape is derived from the embedded `jit-dogfood` package and begins
-/// as a visible review placeholder. Because it is an ordinary postcheck gate on
-/// `B`, jit's gate enforcement remains self-guiding after an adopter replaces
-/// the placeholder with its reviewer integration.
-///
-/// # Errors
-///
-/// Returns an error if the embedded dogfood package or its gate definition is
-/// invalid.
-pub fn breakdown_review_preset() -> Result<GatePresetDefinition> {
-    package_gate_preset(BREAKDOWN_REVIEW_PRESET)
-}
-
-pub(crate) fn package_gate_preset(key: &str) -> Result<GatePresetDefinition> {
-    let gate = jit_dogfood_gate(key)?;
-    Ok(GatePresetDefinition {
-        name: key.to_string(),
-        description: gate.description.clone(),
-        gates: vec![GateTemplate {
-            key: gate.key,
-            title: gate.title,
-            description: gate.description,
-            stage: gate.stage,
-            mode: gate.mode,
-            checker: gate.checker,
-        }],
-    })
-}
 
 /// Derive the **preview** coverage rule from a **closure** `label-coverage`
 /// rule (D13).
@@ -238,7 +138,6 @@ pub fn preview_coverage_rule(closure: &Rule, breakdown_type: &str) -> Result<Rul
 mod tests {
     use super::*;
     use crate::declarations::rules::RuleSet;
-    use crate::declarations::{GateMode, GateStage};
 
     fn closure_ruleset() -> RuleSet {
         // Mirrors the SDD/research closure `label-coverage` instance.
@@ -251,61 +150,6 @@ enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-state = "done", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
 "#;
         RuleSet::parse(toml, None, []).unwrap()
-    }
-
-    #[test]
-    fn test_plan_review_preset_attaches_agent_gate() {
-        let preset = plan_review_preset().unwrap();
-        assert_eq!(preset.name, "plan-review");
-        assert_eq!(preset.gates.len(), 1);
-
-        let gate = &preset.gates[0];
-        assert_eq!(gate.key, "plan-review");
-        assert_eq!(gate.stage, GateStage::Postcheck);
-        assert_eq!(gate.mode, GateMode::Auto);
-
-        assert_eq!(
-            gate.checker,
-            Some(crate::declarations::GateChecker::ReviewPlaceholder)
-        );
-        assert!(preset.validate().is_ok());
-    }
-
-    #[test]
-    fn test_breakdown_review_preset_attaches_agent_gate() {
-        let preset = breakdown_review_preset().unwrap();
-        assert_eq!(preset.name, "breakdown-review");
-        assert_eq!(preset.gates.len(), 1);
-
-        let gate = &preset.gates[0];
-        assert_eq!(gate.key, "breakdown-review");
-        assert_eq!(gate.stage, GateStage::Postcheck);
-        assert_eq!(gate.mode, GateMode::Auto);
-
-        assert_eq!(
-            gate.checker,
-            Some(crate::declarations::GateChecker::ReviewPlaceholder)
-        );
-        assert!(preset.validate().is_ok());
-    }
-
-    #[test]
-    fn test_coverage_preview_preset_runs_scoped_validate() {
-        let preset = coverage_preview_preset().unwrap();
-        assert_eq!(preset.name, "coverage-preview");
-        assert_eq!(preset.gates.len(), 1);
-
-        let gate = &preset.gates[0];
-        assert_eq!(gate.key, "coverage-preview");
-        assert_eq!(gate.mode, GateMode::Auto);
-
-        match gate.checker.as_ref().expect("coverage gate has a checker") {
-            crate::declarations::GateChecker::LabelTargetValidation { label_namespace } => {
-                assert_eq!(label_namespace, "brackets");
-            }
-            other => panic!("expected label-target checker, got {other:?}"),
-        }
-        assert!(preset.validate().is_ok());
     }
 
     #[test]

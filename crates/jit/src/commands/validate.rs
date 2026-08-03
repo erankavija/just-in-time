@@ -688,11 +688,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
 /// Resolve one package, and its record's canonical path, per recorded profile.
 ///
-/// Each package is read through the route its own record names
-/// ([`recorded_package`](super::profile::recorded_package)) — a worktree
-/// location, or this binary's compiled-in bytes — so validation reads the
-/// package the repository applied rather than the one this binary happens to
-/// carry. `records` is the capture holding those records.
+/// Each package is read through the worktree location its own record names
+/// ([`recorded_package`](super::profile::recorded_package)), so validation
+/// reads the package the repository applied rather than whatever sits at
+/// another location. `records` is the capture holding those records.
 ///
 /// The first record whose package cannot be obtained is the whole answer:
 /// repairing the profiles that did resolve would narrow what repair restores
@@ -2829,8 +2828,16 @@ mod tests {
     }
 
     /// An in-memory repository seeded from a canonical file-backed `jit init`,
-    /// applying `profile` when one is named.
-    fn memory_fixture(profile: Option<&str>) -> crate::storage::InMemoryStorage {
+    /// applying `profile` when one is named, with the source checkout that
+    /// initialization ran in.
+    ///
+    /// The store's synthetic layout is rooted at that checkout, and the caller
+    /// keeps it alive: a profiled repository's record names the worktree-
+    /// relative directory its package was read from, and resolving the record
+    /// reads the package back from there.
+    fn memory_fixture(
+        profile: Option<&str>,
+    ) -> (tempfile::TempDir, crate::storage::InMemoryStorage) {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::test_taxonomy::test_taxonomy;
 
@@ -2857,6 +2864,10 @@ mod tests {
         let source = tempfile::tempdir().unwrap();
         let source_storage = JsonFileStorage::new(source.path().join(".jit"));
         std::fs::create_dir_all(source_storage.root()).unwrap();
+        // A package is applied from inside the worktree it is applied to, so a
+        // named profile is staged there first and selected by that location.
+        let location =
+            profile.map(|id| crate::test_utils::stage_repository_packages(source.path(), id));
         // A profiled repository takes its vocabulary, item kinds and
         // projections from the packages applied to it, and authors only the
         // schema version an initialization derives from the repository itself.
@@ -2879,18 +2890,21 @@ mod tests {
             .with_layout(source_layout)
             .initialize_fresh_repository(
                 source.path(),
-                profile.map(|id| crate::commands::ProfileSelection { id, location: None }),
+                profile.map(|id| crate::commands::ProfileSelection {
+                    id,
+                    location: location.as_deref(),
+                }),
             )
             .unwrap();
 
-        let storage = crate::storage::InMemoryStorage::new();
+        let storage = crate::storage::InMemoryStorage::rooted_at(source.path());
         seed_tree(&storage, source.path(), source.path());
         // The text-only fixture seeder does not retain executable bits. Exercise
         // the same repair path once to restore those modes before returning.
         memory_executor(storage.clone())
             .validate_with_fix(true, false)
             .unwrap();
-        storage
+        (source, storage)
     }
 
     // Note: validate_leases() and validate_branch_drift() require git repository setup
@@ -3024,7 +3038,10 @@ depends_on = ["planning"]
                 repo.path(),
                 Some(crate::commands::ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&crate::test_utils::stage_repository_packages(
+                        repo.path(),
+                        "jit-dogfood",
+                    )),
                 }),
             )
             .unwrap();
@@ -3115,7 +3132,10 @@ depends_on = ["planning"]
                 repo.path(),
                 Some(crate::commands::ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&crate::test_utils::stage_repository_packages(
+                        repo.path(),
+                        "jit-dogfood",
+                    )),
                 }),
             )
             .unwrap();
@@ -3151,7 +3171,7 @@ depends_on = ["planning"]
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::storage::IssueStore;
 
-        let storage = memory_fixture(Some("jit-dogfood"));
+        let (_source, storage) = memory_fixture(Some("jit-dogfood"));
         let mut executor = memory_executor(storage.clone());
         executor.validate_silent().unwrap();
 
@@ -3221,7 +3241,7 @@ depends_on = ["planning"]
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::storage::IssueStore;
 
-        let storage = memory_fixture(Some("jit-dogfood"));
+        let (_source, storage) = memory_fixture(Some("jit-dogfood"));
         let rules =
             drift_default_assertion(&storage.read_repo_file(".jit/rules.toml").unwrap().unwrap()).0;
         let agents = storage
@@ -3254,7 +3274,10 @@ depends_on = ["planning"]
         serde_json::to_string_pretty(&crate::repository_state::AppliedProfileRecord::new(
             id,
             "1.0.0",
-            crate::profile::ProfileOrigin::Embedded,
+            crate::profile::ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/recorded")
+                    .expect("a canonical package location"),
+            ),
             "0".repeat(64),
             std::collections::BTreeMap::new(),
         ))
@@ -3270,7 +3293,7 @@ depends_on = ["planning"]
         use crate::commands::test_helpers::memory_executor;
         use crate::storage::RepositoryStateStore;
 
-        let executor = memory_executor(memory_fixture(None));
+        let executor = memory_executor(memory_fixture(None).1);
         let layout = executor.require_layout().unwrap();
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
 
@@ -3316,7 +3339,7 @@ depends_on = ["planning"]
 
         const ASSET: &str = ".agents/skills/jit-manage/SKILL.md";
 
-        let storage = memory_fixture(Some("jit-dogfood"));
+        let (_source, storage) = memory_fixture(Some("jit-dogfood"));
         seed_repo_file(&storage, ASSET, "STALE PROFILE ASSET\n");
         let executor = memory_executor(storage);
         let layout = executor.require_layout().unwrap();
@@ -3363,7 +3386,10 @@ depends_on = ["planning"]
                 repo.path(),
                 Some(crate::commands::ProfileSelection {
                     id: "jit-dogfood",
-                    location: None,
+                    location: Some(&crate::test_utils::stage_repository_packages(
+                        repo.path(),
+                        "jit-dogfood",
+                    )),
                 }),
             )
             .unwrap();
@@ -3405,17 +3431,29 @@ depends_on = ["planning"]
     fn test_validate_fails_on_an_applied_record_whose_directory_location_is_absent_or_malformed() {
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
 
-        /// The `jit-dogfood` record with `origin` replaced, as stored text.
-        fn stored_record(origin: serde_json::Value) -> String {
+        /// Validation's diagnosis of a repository whose `jit-dogfood` record
+        /// carries `origin`, with this repository's packages staged inside its
+        /// worktree so that a location naming one addresses real bytes.
+        ///
+        /// Answers with that diagnosis and the worktree-relative location the
+        /// staged package sits at, which is the only origin a control can name.
+        fn diagnosis(origin: impl FnOnce(&str) -> serde_json::Value) -> String {
+            let (source, storage) = memory_fixture(None);
+            let staged = crate::test_utils::stage_repository_packages(source.path(), "jit-dogfood");
+            let location = staged
+                .strip_prefix(source.path())
+                .expect("the package is staged inside the worktree")
+                .to_string_lossy()
+                .into_owned();
+
             let mut record: serde_json::Value =
                 serde_json::from_str(&applied_record_json("jit-dogfood")).unwrap();
-            record["origin"] = origin;
-            serde_json::to_string_pretty(&record).unwrap()
-        }
-
-        fn diagnosis(record: &str) -> String {
-            let storage = memory_fixture(None);
-            seed_repo_file(&storage, ".jit/profiles/jit-dogfood.json", record);
+            record["origin"] = origin(&location);
+            seed_repo_file(
+                &storage,
+                ".jit/profiles/jit-dogfood.json",
+                &serde_json::to_string_pretty(&record).unwrap(),
+            );
             format!(
                 "{:#}",
                 memory_executor(storage).validate_silent().unwrap_err()
@@ -3425,7 +3463,12 @@ depends_on = ["planning"]
         // The control is the same record with an origin that does address its
         // bytes: its package resolves, so validation gets past provenance and
         // fails on the hash mismatch this synthetic record carries instead.
-        let control = diagnosis(&stored_record(serde_json::json!({ "source": "embedded" })));
+        let control = diagnosis(|location| {
+            serde_json::json!({
+                "source": "directory",
+                "location": location,
+            })
+        });
         assert!(
             !control.contains("invalid applied profile provenance"),
             "the control record must read as valid provenance: {control}"
@@ -3436,7 +3479,8 @@ depends_on = ["planning"]
             serde_json::json!({ "source": "directory", "location": "../outside" }),
             serde_json::json!({ "source": "directory", "location": "/absolute" }),
         ] {
-            let error = diagnosis(&stored_record(origin.clone()));
+            let malformed = origin.clone();
+            let error = diagnosis(move |_| malformed);
             assert!(
                 error.contains("invalid applied profile provenance"),
                 "{origin} must fail validation: {error}"
@@ -3454,7 +3498,7 @@ depends_on = ["planning"]
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::storage::IssueStore;
 
-        let storage = memory_fixture(None);
+        let (_source, storage) = memory_fixture(None);
         let (stale_rules, repaired_rules) =
             drift_default_assertion(&storage.read_repo_file(".jit/rules.toml").unwrap().unwrap());
         seed_repo_file(&storage, ".jit/rules.toml", &stale_rules);
@@ -3477,7 +3521,7 @@ depends_on = ["planning"]
             "a repair that cannot account for a recorded profile must restore nothing"
         );
 
-        let control = memory_fixture(None);
+        let (_control_source, control) = memory_fixture(None);
         seed_repo_file(&control, ".jit/rules.toml", &stale_rules);
         let mut control_executor = memory_executor(control.clone());
         assert!(control_executor.validate_with_fix(true, false).unwrap().0 > 0);
@@ -4060,9 +4104,11 @@ description = \"Full Rust CI pipeline must pass.\"
         assert_eq!(by_short.outcomes.len(), by_full.outcomes.len());
     }
 
-    static COMPOSITION_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
-        "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
-    );
+    /// The checked-in fixture tree every composition case below stages copies
+    /// of, each under a rewritten manifest declaring its own id.
+    fn composition_package() -> std::path::PathBuf {
+        crate::test_utils::profile_package_fixture("planner-asset-only")
+    }
 
     /// One attempted resolution of a recorded profile: the record's own id and
     /// canonical path, and the package it resolved to or the failure obtaining
@@ -4087,7 +4133,7 @@ description = \"Full Rust CI pipeline must pass.\"
     fn test_compose_recorded_resolution_names_the_record_that_declared_an_unresolvable_one() {
         let temp = tempfile::TempDir::new().unwrap();
         let dependant = crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &temp.path().join("workflow"),
             "workflow",
             &["base"],
@@ -4111,7 +4157,7 @@ description = \"Full Rust CI pipeline must pass.\"
     fn test_compose_recorded_resolution_reports_an_unresolvable_record_nothing_declared() {
         let temp = tempfile::TempDir::new().unwrap();
         let unrelated = crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &temp.path().join("workflow"),
             "workflow",
             &[],
@@ -4133,13 +4179,13 @@ description = \"Full Rust CI pipeline must pass.\"
     fn test_compose_recorded_resolution_returns_every_record_that_resolved() {
         let temp = tempfile::TempDir::new().unwrap();
         let base = crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &temp.path().join("base"),
             "base",
             &[],
         );
         let workflow = crate::test_utils::write_package_declaring(
-            &COMPOSITION_PACKAGE,
+            &composition_package(),
             &temp.path().join("workflow"),
             "workflow",
             &["base"],

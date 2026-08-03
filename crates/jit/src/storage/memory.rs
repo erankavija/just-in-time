@@ -84,10 +84,22 @@ impl InMemoryStorage {
     pub fn new() -> Self {
         // Generate unique root path for parallel test isolation
         let unique_id = uuid::Uuid::new_v4();
-        let root_path = std::path::PathBuf::from(format!("/tmp/jit-test-{}", unique_id));
+        Self::rooted_at(std::path::PathBuf::from(format!(
+            "/tmp/jit-test-{unique_id}"
+        )))
+    }
 
+    /// An in-memory store whose synthetic layout is rooted at `root_path`.
+    ///
+    /// The aggregate stays in memory; the root only names the layout. A
+    /// repository whose applied-profile record names a worktree-relative
+    /// package location needs that name to reach a real directory, because
+    /// resolving such a record reads the package from the location it names.
+    /// [`new`](Self::new) mints a root that does not exist, which is what every
+    /// other case wants.
+    pub fn rooted_at(root_path: impl Into<std::path::PathBuf>) -> Self {
         Self {
-            root_path,
+            root_path: root_path.into(),
             repo_lock: RepoWriteLock::in_process(),
             repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
@@ -202,10 +214,7 @@ impl InMemoryStorage {
 
     fn gate_presets_from_repository_state(
         &self,
-    ) -> Result<(
-        std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>,
-        std::collections::HashSet<String>,
-    )> {
+    ) -> Result<std::collections::HashMap<String, crate::gate_presets::GatePresetDefinition>> {
         let presets_prefix = format!(
             "{}/",
             crate::repository_state::VirtualPath::GATE_PRESETS
@@ -694,14 +703,13 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn list_gate_presets(&self) -> Result<Vec<crate::gate_presets::PresetInfo>> {
-        let (presets, custom_names) = self.gate_presets_from_repository_state()?;
-        let mut presets = presets
+        let mut presets = self
+            .gate_presets_from_repository_state()?
             .values()
             .map(|preset| crate::gate_presets::PresetInfo {
                 name: preset.name.clone(),
                 description: preset.description.clone(),
                 gate_count: preset.gates.len(),
-                builtin: !custom_names.contains(&preset.name),
             })
             .collect::<Vec<_>>();
         presets.sort_by(|left, right| left.name.cmp(&right.name));
@@ -709,8 +717,7 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn get_gate_preset(&self, name: &str) -> Result<crate::gate_presets::GatePresetDefinition> {
-        let (presets, _) = self.gate_presets_from_repository_state()?;
-        presets
+        self.gate_presets_from_repository_state()?
             .get(name)
             .cloned()
             .ok_or_else(|| PresetNotFoundError::new(name).into())

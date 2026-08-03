@@ -269,7 +269,7 @@ fn parse_captured_gate_presets(
             Ok((path.relative().as_str().to_string(), bytes.to_vec()))
         })
         .collect::<Result<Vec<_>>>()?;
-    crate::gate_presets::load_presets_from_custom_files(files).map(|(presets, _)| presets)
+    crate::gate_presets::load_presets_from_custom_files(files)
 }
 
 fn captured_gate_preset_fixed_paths() -> Vec<crate::repository_state::VirtualPath> {
@@ -1462,12 +1462,6 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         crate::gate_presets::validate_preset_name(preset_name)
             .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
-        if crate::gate_presets::BuiltinPresets::load()?.contains_key(preset_name) {
-            return Err(crate::errors::InvalidArgumentError::new(format!(
-                "Cannot override builtin preset: {preset_name}"
-            ))
-            .into());
-        }
 
         let layout = self.require_layout()?;
         let context = crate::repository_state::MutationContext::production();
@@ -2011,7 +2005,7 @@ enforce_leases = "off"
             .into_iter()
             .find(|preset| preset.name == "team-review")
             .expect("created custom preset is listed");
-        assert!(!listed.builtin);
+        assert_eq!(listed.gate_count, 1);
         let shown = executor.show_gate_preset("team-review").unwrap();
         assert_eq!(shown.gates.len(), 1);
         assert_eq!(shown.gates[0].key, "review");

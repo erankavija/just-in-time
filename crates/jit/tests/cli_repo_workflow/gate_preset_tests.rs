@@ -1,13 +1,11 @@
 //! CLI integration tests for project-defined gate presets (jit:52665a07,
 //! REQ-02).
 //!
-//! The binary ships only the planning-bracket presets; every domain- or
-//! language-specific bundle is a project-defined preset stored under
-//! `.jit/config/gate-presets/`. These tests exercise the whole mechanism against
-//! that surface end-to-end via the real `jit` subprocess: capture an issue's
-//! gates into a preset (`create`), see it in `list`, inspect it with `show`, and
-//! attach it to another issue with `apply` — no built-in language bundle
-//! involved.
+//! Every preset is a project's own, stored under `.jit/config/gate-presets/`.
+//! These tests exercise the whole mechanism against that surface end-to-end via
+//! the real `jit` subprocess: capture an issue's gates into a preset
+//! (`create`), see it in `list`, inspect it with `show`, and attach it to
+//! another issue with `apply`.
 
 use assert_cmd::prelude::*;
 use std::process::Command;
@@ -50,7 +48,7 @@ fn create_issue(temp: &TempDir, title: &str) -> String {
 
 /// REQ-02: a project-defined preset is created from an issue's gates, then
 /// listed, shown, and applied — the full mechanism against a project-declared
-/// bundle, with no built-in language preset in play.
+/// bundle, with no undeclared preset in play.
 #[test]
 fn test_project_defined_preset_create_list_show_apply() {
     let temp = setup_repo();
@@ -109,26 +107,29 @@ fn test_project_defined_preset_create_list_show_apply() {
         "project-defined preset should be written to .jit/config/gate-presets/"
     );
 
-    // `list` surfaces it as a project-defined (non-builtin) preset, alongside the
-    // planning-bracket builtins and none of the removed language bundles.
+    // `list` reports exactly what the project declares. The planning-bracket
+    // names are checked beside it because a listing that carried presets from
+    // the binary would carry those.
     let list = jit_json(&temp, &["gate", "preset", "list", "--json"]);
     let presets = list["presets"].as_array().expect("presets array");
-    let ci = presets
-        .iter()
-        .find(|p| p["name"] == "ci")
-        .expect("ci preset listed");
-    assert_eq!(ci["builtin"], false, "ci is project-defined, not builtin");
-    assert_eq!(ci["gate_count"], 2);
-    for removed in [
-        "rust-tdd",
-        "python-tdd",
-        "js-tdd",
-        "minimal",
-        "security-audit",
-    ] {
+    assert_eq!(
+        presets
+            .iter()
+            .map(|preset| preset["name"].as_str().expect("a named preset"))
+            .collect::<Vec<_>>(),
+        vec!["ci"],
+        "the listing reports the project's own presets and nothing else"
+    );
+    assert_eq!(list["count"], 1);
+    assert_eq!(presets[0]["gate_count"], 2);
+    for absent in ["plan-review", "coverage-preview", "breakdown-review"] {
+        let show = jit(&temp)
+            .args(["gate", "preset", "show", absent, "--json"])
+            .output()
+            .expect("preset show should run");
         assert!(
-            !presets.iter().any(|p| p["name"] == removed),
-            "removed builtin {removed} must not be listed"
+            !show.status.success(),
+            "{absent} must not resolve as a preset the project never declared"
         );
     }
 

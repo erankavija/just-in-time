@@ -3,8 +3,8 @@
 
 One product release version has to reach the CLI, the server, the MCP package,
 the web bundle, their lock metadata, the release tag, and the compatibility
-record, and it has to fall inside the compatible range the embedded profile
-package declares. The same run checks the release's legal and narrative
+record, and it has to fall inside the compatible range this repository's
+workflow profile package declares. The same run checks the release's legal and narrative
 metadata: the license texts the manifest expression names, the changelog entry
 for the declared version, the compatibility-and-upgrade record, and the
 committed release-note source the publication workflow renders.
@@ -52,7 +52,7 @@ RELEASE_NOTES_ROOT = Path("docs/release-notes")
 MARKDOWN_LINK_PATTERN = re.compile(r"\]\(([^)\s]+)\)")
 FENCED_BLOCK_PATTERN = re.compile(r"^```", re.MULTILINE)
 
-# The embedded profile package states which product versions it composes with.
+# The workflow profile package states which product versions it composes with.
 # The binary parses that range for syntax alone, so this is where the range and
 # the version it claims to admit are matched.
 PROFILE_PACKAGE_MANIFEST = Path("profiles/jit-dogfood/manifest.toml")
@@ -462,7 +462,7 @@ def range_admits(declared: str, version: str) -> bool:
 def verify_profile_compatibility(
     root: Path, expected: str, findings: list[str]
 ) -> None:
-    """Check that the embedded profile package admits the derived version."""
+    """Check that the workflow profile package admits the derived version."""
     try:
         declared = nested_string(
             read_toml(root / PROFILE_PACKAGE_MANIFEST), "profile", "jit"
@@ -649,7 +649,7 @@ def main(argv: list[str] | None = None) -> int:
         "release-version-contract: "
         f"product version {expected}; manifests, locks, tag, compatibility and "
         "upgrade record, license texts, changelog entry, release-note source, and "
-        "embedded profile compatibility range agree"
+        "workflow profile compatibility range agree"
     )
     return 0
 

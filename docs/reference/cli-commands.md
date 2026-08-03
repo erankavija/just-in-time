@@ -624,8 +624,8 @@ planning or writing.
 package to read, which must hold a package declaring the requested profile ID.
 Profiled `jit init` accepts the same form. For each of these commands, a
 supplied location wins. If `--from` is absent, JIT reads the location named by
-the repository's applied-profile record; when no record exists, it uses the
-matching package compiled into the binary. The applied-profile record is
+the repository's applied-profile record; a repository with neither reports
+`PROFILE_NOT_FOUND` (exit 3). The applied-profile record is
 defined in [Repository Profiles](profiles.md#publication-rollback-and-recovery),
 including where it lives and what it stores, so a package obtained from a
 repository directory can be found again on later runs. A recorded location is
@@ -634,8 +634,8 @@ fails naming the record and path; it does not replay stored digests or treat the
 profile as absent.
 
 A package the resolved one declares a dependency on is looked for beside it,
-in a directory named by that dependency's own ID, before the record and the
-binary answer. One obtained directory of packages therefore applies as a set:
+in a directory named by that dependency's own ID, before the record answers.
+One obtained directory of packages therefore applies as a set:
 `jit profile apply <PROFILE_ID> --from packages/<PROFILE_ID>` reaches
 `packages/<DEPENDENCY_ID>` without naming it.
 
@@ -2066,21 +2066,19 @@ Gate presets are pre-configured bundles of quality gates that can be quickly app
 
 ### `jit gate preset list`
 
-List all available gate presets (builtin and custom).
+List the gate presets this project declares.
 
 **Usage:**
 ```bash
 jit gate preset list [--json]
 ```
 
-**Output** (line format only — run `jit gate preset list` for the live set, and
-`jit gate preset show <name>` for a preset's actual gate list and count; the
-builtin registry is the source of truth, so the totals below are placeholders):
+**Output** (line format only — run `jit gate preset list` for the project's own
+set, and `jit gate preset show <name>` for a preset's actual gate list and
+count):
 ```
-[builtin] plan-review - External-review placeholder for the linked plan before implementation work fans out. (<N> gates)
-[builtin] breakdown-review - External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. (<N> gates)
-[builtin] coverage-preview - Validate the container named by the breakdown issue's brackets label. (<N> gates)
-[custom] my-workflow - Custom preset created from issue abc123 (<N> gates)
+my-workflow - Custom preset created from issue abc123 (<N> gates)
+rust-ci - The project's Rust CI bundle (<N> gates)
 ```
 
 **Example:**
@@ -2102,7 +2100,7 @@ jit gate preset show <NAME> [--json]
 ```
 
 **Arguments:**
-- `NAME` - Preset name (e.g., the builtin `plan-review`, or a project preset like `rust-ci`)
+- `NAME` - Preset name (e.g. `rust-ci`), as `jit gate preset list` reports it
 
 **Output** (illustrative layout — run the command for a preset's actual gates,
 commands, and timeouts):
@@ -2120,11 +2118,8 @@ Gates:
 
 **Examples:**
 ```bash
-# Show a project preset's details
+# Show a preset's details
 jit gate preset show rust-ci
-
-# Show a builtin preset
-jit gate preset show plan-review
 
 # JSON output
 jit gate preset show rust-ci --json
@@ -2229,32 +2224,23 @@ jit gate preset create abc123 my-workflow --json
 
 **Validation:**
 - Issue must have at least one gate
-- Preset name must be non-empty and must not collide with a builtin preset's name
+- Preset name must be lowercase kebab case, and must not already exist
 
 **Storage:**
-Custom presets are stored in `.jit/config/gate-presets/<name>.json` and are automatically loaded alongside builtin presets. Custom presets with the same name as a builtin preset override the builtin.
+Presets are stored in `.jit/config/gate-presets/<name>.json`, and every JSON file
+in that directory loads as a preset whose name equals its filename stem.
 
-### Builtin Presets
+### Project Presets
 
-The binary embeds exactly the three planning-bracket presets — `plan-review`,
-`coverage-preview`, and `breakdown-review` — which attach to the planning (`P`)
-and breakdown (`B`) nodes when a breakable container is
-[bracketed](../concepts/planning-bracket.md), reviewing the plan and the
-decomposition before fan-out. Their definitions are the source of truth for what
-each one bundles; [Built-in Gate Presets](gate-presets.md) is generated from those
-definitions and lists each gate (key, title, stage, mode, description, checker).
-The live commands introspect the same set: `jit gate preset list` prints every
-preset with a one-line summary, and `jit gate preset show <name>` prints one
-preset's gate list.
+Every preset is declared by the project that uses it; see
+[Declaring a project preset](../how-to/custom-gates.md#declaring-a-project-preset)
+and [Gate Presets](gate-presets.md) for the preset contract and the portable
+checker syntax a bundled gate can use. A template that gates its nodes by name
+resolves those names against the project's presets and then its gate registry,
+so a [planning bracket](../concepts/planning-bracket.md) declares the gate keys
+it brackets with.
 
-Language- and workflow-specific bundles are declared per project, not built in;
-see [Declaring a project preset](../how-to/custom-gates.md#declaring-a-project-preset).
-
-**Note:** Builtin presets can be overridden by creating a custom preset with the same name in `.jit/config/gate-presets/`.
-
-### Custom Presets
-
-Custom presets are stored as JSON files in `.jit/config/gate-presets/`:
+Presets are stored as JSON files in `.jit/config/gate-presets/`:
 
 **File Structure:**
 ```json
@@ -2281,10 +2267,9 @@ Custom presets are stored as JSON files in `.jit/config/gate-presets/`:
 ```
 
 **Management:**
-- Custom presets appear in `jit gate preset list` with `[custom]` indicator
-- Custom presets with the same name override their builtin counterpart
+- Every preset in that directory appears in `jit gate preset list`
 - Edit JSON files directly or recreate with `jit gate preset create`
-- Delete files to remove custom presets
+- Delete files to remove presets
 
 ### Preset Workflow Examples
 

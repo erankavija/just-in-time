@@ -99,7 +99,10 @@ mod tests {
         Event::draft_profile_applied(
             "example".to_string(),
             "1.0.0".to_string(),
-            ProfileOrigin::Embedded,
+            ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/example")
+                    .expect("a canonical package location"),
+            ),
             "package".to_string(),
             BTreeMap::new(),
             isolated_torn_tail,

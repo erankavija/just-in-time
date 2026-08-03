@@ -1,34 +1,27 @@
-//! Preset manager for loading and managing gate presets
+//! Preset manager for loading a project's own gate presets
 
 use super::{GatePresetDefinition, PresetInfo};
 use anyhow::{Context, Result};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Manages gate presets from builtin and custom sources.
+/// Manages the gate presets a project declares for itself.
 pub struct PresetManager {
     jit_root: PathBuf,
     presets: HashMap<String, GatePresetDefinition>,
-    custom_names: std::collections::HashSet<String>,
 }
 
 impl PresetManager {
     /// Create a new preset manager
     pub fn new(jit_root: PathBuf) -> Result<Self> {
-        let (presets, custom_names) = Self::load_presets(&jit_root)?;
+        let presets = Self::load_presets(&jit_root)?;
 
-        Ok(Self {
-            jit_root,
-            presets,
-            custom_names,
-        })
+        Ok(Self { jit_root, presets })
     }
 
     /// Load custom presets from .jit/config/gate-presets/
-    fn load_presets(
-        jit_root: &Path,
-    ) -> Result<(HashMap<String, GatePresetDefinition>, HashSet<String>)> {
+    fn load_presets(jit_root: &Path) -> Result<HashMap<String, GatePresetDefinition>> {
         let presets_dir = jit_root.join("config").join("gate-presets");
 
         match fs::symlink_metadata(&presets_dir) {
@@ -86,7 +79,6 @@ impl PresetManager {
                 name: preset.name.clone(),
                 description: preset.description.clone(),
                 gate_count: preset.gates.len(),
-                builtin: !self.custom_names.contains(&preset.name),
             })
             .collect::<Vec<_>>();
         presets.sort_by(|left, right| left.name.cmp(&right.name));
@@ -183,22 +175,26 @@ mod tests {
     }
 
     #[test]
-    fn test_load_builtin_only() {
+    fn test_load_presets_answers_with_nothing_when_the_project_declares_none() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        fs::create_dir_all(&presets_dir).unwrap();
 
-        assert!(manager.has_preset("plan-review"));
-        assert!(manager.has_preset("coverage-preview"));
-        assert_eq!(manager.presets.len(), 3);
+        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
+        assert!(manager.presets.is_empty());
+        assert!(manager.list_presets().is_empty());
     }
 
     #[test]
     fn test_get_preset() {
         let temp_dir = TempDir::new().unwrap();
+        let presets_dir = temp_dir.path().join("config").join("gate-presets");
+        fs::create_dir_all(&presets_dir).unwrap();
+        create_test_preset_file(&presets_dir, "my-preset").unwrap();
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
 
-        let preset = manager.get_preset("plan-review").unwrap();
-        assert_eq!(preset.name, "plan-review");
+        let preset = manager.get_preset("my-preset").unwrap();
+        assert_eq!(preset.name, "my-preset");
         assert_eq!(preset.gates.len(), 1);
     }
 
@@ -229,49 +225,20 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_preset_cannot_override_builtin() {
+    fn test_list_presets_reports_each_declared_preset_and_its_gate_count() {
         let temp_dir = TempDir::new().unwrap();
         let presets_dir = temp_dir.path().join("config").join("gate-presets");
         fs::create_dir_all(&presets_dir).unwrap();
-
-        create_test_preset_file(&presets_dir, "plan-review").unwrap();
-        let error = PresetManager::new(temp_dir.path().to_path_buf())
-            .err()
-            .expect("builtin collision must be rejected");
-        assert!(error.to_string().contains("collides with a builtin"));
-    }
-
-    #[test]
-    fn test_list_presets() {
-        let temp_dir = TempDir::new().unwrap();
-        let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
-
-        let list = manager.list_presets();
-        assert_eq!(list.len(), 3);
-
-        let plan_review = list.iter().find(|p| p.name == "plan-review").unwrap();
-        assert_eq!(plan_review.gate_count, 1);
-        assert!(plan_review.builtin);
-
-        let coverage = list.iter().find(|p| p.name == "coverage-preview").unwrap();
-        assert_eq!(coverage.gate_count, 1);
-        assert!(coverage.builtin);
-    }
-
-    #[test]
-    fn test_list_includes_custom_presets() {
-        let temp_dir = TempDir::new().unwrap();
-        let presets_dir = temp_dir.path().join("config").join("gate-presets");
-        fs::create_dir_all(&presets_dir).unwrap();
-
-        create_test_preset_file(&presets_dir, "my-custom").unwrap();
+        create_test_preset_file(&presets_dir, "my-preset").unwrap();
 
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
         let list = manager.list_presets();
-
-        assert_eq!(list.len(), 4);
-        let custom = list.iter().find(|p| p.name == "my-custom").unwrap();
-        assert!(!custom.builtin);
+        assert_eq!(list.len(), 1);
+        let listed = list.iter().find(|p| p.name == "my-preset").unwrap();
+        assert_eq!(
+            listed.gate_count,
+            manager.get_preset("my-preset").unwrap().gates.len()
+        );
     }
 
     #[test]
@@ -370,6 +337,6 @@ mod tests {
         // Don't create the presets directory
 
         let manager = PresetManager::new(temp_dir.path().to_path_buf()).unwrap();
-        assert_eq!(manager.presets.len(), 3); // Only builtins
+        assert!(manager.presets.is_empty());
     }
 }

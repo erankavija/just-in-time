@@ -114,7 +114,7 @@ sequenceDiagram
 
 ### Recoverable Profile Publication
 
-Applying an embedded repository profile is a coordinated multi-file operation,
+Applying a repository profile is a coordinated multi-file operation,
 which is a stronger problem than one atomic replacement. JIT validates the
 complete planned repository image before publication and uses a durable
 transaction journal so handled failures roll back exactly and interrupted work

@@ -412,7 +412,10 @@ impl EventTag {
                 timestamp,
                 profile_id: "example".to_string(),
                 version: "1.0.0".to_string(),
-                origin: crate::domain::ProfileOrigin::Embedded,
+                origin: crate::domain::ProfileOrigin::Directory(
+                    crate::repository_state::RootRelativePath::parse("packages/example")
+                        .expect("a canonical package location"),
+                ),
                 package_hash: "package-hash".to_string(),
                 target_hashes: std::collections::BTreeMap::from([(
                     "docs/example.md".to_string(),

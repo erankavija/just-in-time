@@ -1,144 +1,7 @@
-//! Compiled-in production packages for jit's repository-neutral profiles.
-
-use super::{ProfilePackage, ProfilePackageError};
-use crate::declarations::GateDefinition;
-use crate::repository_state::{Contribution, KeyedArrayTarget};
-use include_dir::{include_dir, Dir};
-
-static JIT_DEFAULT_DIRECTORY: Dir<'_> =
-    include_dir!("$CARGO_MANIFEST_DIR/../../profiles/jit-default");
-static JIT_DOGFOOD_DIRECTORY: Dir<'_> =
-    include_dir!("$CARGO_MANIFEST_DIR/../../profiles/jit-dogfood");
+//! Package-source conventions this repository's own workflow package follows.
 
 /// Package-source prefix identifying assets that also project into this source tree.
 pub const JIT_DOGFOOD_LIVE_SOURCE_PREFIX: &str = "assets/live/";
-
-/// Failures loading or projecting a compiled-in profile package.
-#[derive(Debug, thiserror::Error)]
-pub enum EmbeddedProfileError {
-    /// A compiled-in package failed immutable package validation.
-    #[error("invalid embedded profile package: {0}")]
-    Package(#[from] ProfilePackageError),
-    /// A requested gate is absent from the package.
-    #[error("the profile package does not declare gate '{0}'")]
-    MissingGate(String),
-    /// The planning template is absent or structurally invalid.
-    #[error("the profile package's planning template is invalid: {0}")]
-    InvalidPlanningTemplate(String),
-    /// A package gate does not match the runtime gate wire type.
-    #[error("profile package gate '{key}' is invalid: {source}")]
-    InvalidGate {
-        /// Requested package gate key.
-        key: String,
-        /// Runtime wire-format error.
-        source: serde_json::Error,
-    },
-}
-
-/// Load the recursively embedded, immutable `jit-default` package.
-pub fn jit_default_package() -> Result<ProfilePackage, EmbeddedProfileError> {
-    ProfilePackage::from_embedded_dir(&JIT_DEFAULT_DIRECTORY).map_err(Into::into)
-}
-
-/// Load the recursively embedded, immutable `jit-dogfood` package.
-pub fn jit_dogfood_package() -> Result<ProfilePackage, EmbeddedProfileError> {
-    ProfilePackage::from_embedded_dir(&JIT_DOGFOOD_DIRECTORY).map_err(Into::into)
-}
-
-/// Deserialize one gate definition from the compiled-in package's authored gate
-/// inventory.
-pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, EmbeddedProfileError> {
-    packaged_gate(&jit_dogfood_package()?, key)
-}
-
-/// Deserialize one gate definition from `package`'s authored gate inventory.
-pub(super) fn packaged_gate(
-    package: &ProfilePackage,
-    key: &str,
-) -> Result<GateDefinition, EmbeddedProfileError> {
-    let value = package
-        .manifest()
-        .contributions
-        .iter()
-        .find_map(|contribution| match contribution {
-            Contribution::KeyedArray {
-                target: KeyedArrayTarget::Gates,
-                value,
-                ..
-            } if value.get("key").and_then(serde_json::Value::as_str) == Some(key) => {
-                Some(value.clone())
-            }
-            _ => None,
-        })
-        .ok_or_else(|| EmbeddedProfileError::MissingGate(key.to_string()))?;
-
-    serde_json::from_value(value).map_err(|source| EmbeddedProfileError::InvalidGate {
-        key: key.to_string(),
-        source,
-    })
-}
-
-/// Gate keys attached to nodes of the compiled-in package's authored `plan`
-/// template.
-///
-/// Anchor-only gates are excluded, so this is also the compatibility preset
-/// inventory used by [`crate::gate_presets::BuiltinPresets`].
-pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, EmbeddedProfileError> {
-    packaged_planning_gate_keys(&jit_dogfood_package()?)
-}
-
-/// Gate keys attached to nodes of `package`'s authored `plan` template.
-///
-/// Anchor-only gates are excluded; see [`jit_dogfood_planning_gate_keys`].
-pub(crate) fn packaged_planning_gate_keys(
-    package: &ProfilePackage,
-) -> Result<Vec<String>, EmbeddedProfileError> {
-    let template = package
-        .manifest()
-        .contributions
-        .iter()
-        .find_map(|contribution| match contribution {
-            Contribution::KeyedArray {
-                target: KeyedArrayTarget::Templates,
-                identity,
-                value,
-            } if identity == "plan" => Some(value),
-            _ => None,
-        })
-        .ok_or_else(|| {
-            EmbeddedProfileError::InvalidPlanningTemplate("missing 'plan' template".to_string())
-        })?;
-    let nodes = template
-        .get("nodes")
-        .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| {
-            EmbeddedProfileError::InvalidPlanningTemplate(
-                "'plan' template has no node array".to_string(),
-            )
-        })?;
-    let mut keys = Vec::new();
-    for node in nodes {
-        let gates = node
-            .get("gates")
-            .and_then(serde_json::Value::as_array)
-            .ok_or_else(|| {
-                EmbeddedProfileError::InvalidPlanningTemplate(
-                    "a 'plan' template node has no gate array".to_string(),
-                )
-            })?;
-        for gate in gates {
-            let key = gate.as_str().ok_or_else(|| {
-                EmbeddedProfileError::InvalidPlanningTemplate(
-                    "a 'plan' template gate is not a string".to_string(),
-                )
-            })?;
-            if !keys.iter().any(|existing| existing == key) {
-                keys.push(key.to_string());
-            }
-        }
-    }
-    Ok(keys)
-}
 
 #[cfg(test)]
 mod tests {
@@ -147,7 +10,7 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
-    use crate::profile::{ExclusionPattern, LiveSourceDeclaration};
+    use crate::profile::{ExclusionPattern, LiveSourceDeclaration, ProfilePackage};
     use crate::repository_state::{
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
     };
@@ -166,11 +29,37 @@ mod tests {
     /// This repository's workflow package, assembled from its checkout, with
     /// the directory holding the assembled tree.
     ///
-    /// Every assertion here is about the package this repository ships, so it
-    /// is read from the checkout it is drawn from rather than from a copy
-    /// compiled into the test binary.
+    /// Every assertion here is about the package this repository authors, so
+    /// it is assembled from the checkout it is drawn from rather than read from
+    /// a copy of it.
     fn assembled_package() -> (TempDir, ProfilePackage) {
         crate::test_utils::temporary_repository_package(PACKAGE_ID)
+    }
+
+    /// The runtime gate definition `package`'s manifest declares under `key`.
+    ///
+    /// Deserializing the declaration through the runtime wire type is the
+    /// assertion these callers make about it, so a declaration that is absent
+    /// or does not match that type panics naming the key.
+    fn declared_gate(package: &ProfilePackage, key: &str) -> crate::declarations::GateDefinition {
+        let value = package
+            .manifest()
+            .contributions
+            .iter()
+            .find_map(|contribution| match contribution {
+                Contribution::KeyedArray {
+                    target: KeyedArrayTarget::Gates,
+                    value,
+                    ..
+                } if value.get("key").and_then(serde_json::Value::as_str) == Some(key) => {
+                    Some(value.clone())
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("the package declares gate '{key}'"));
+
+        serde_json::from_value(value)
+            .unwrap_or_else(|error| panic!("package gate '{key}' is a runtime gate: {error}"))
     }
 
     #[test]
@@ -934,7 +823,7 @@ mod tests {
             "jit-validate",
             "repo-validate",
         ] {
-            let gate = packaged_gate(&package, key).unwrap();
+            let gate = declared_gate(&package, key);
             assert_eq!(gate.key, key);
             assert!(
                 matches!(
@@ -1311,7 +1200,14 @@ mod tests {
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         // Applied from inside the worktree it is applied to, because an
-        // application records the package's worktree-relative location.
+        // application records the package's worktree-relative location, and
+        // beside the package it declares a dependency on, which is where that
+        // dependency is looked for.
+        crate::test_utils::assemble_repository_package(
+            "jit-default",
+            &temp.path().join("profiles/jit-default"),
+        )
+        .unwrap();
         let package = crate::test_utils::assemble_repository_package(
             PACKAGE_ID,
             &temp.path().join("profiles").join(PACKAGE_ID),
@@ -1427,7 +1323,7 @@ mod tests {
         ] {
             gates
                 .gates
-                .insert(key.to_string(), packaged_gate(&package, key).unwrap());
+                .insert(key.to_string(), declared_gate(&package, key));
         }
         let expected = render_rules_and_gates_markdown(&rules, &gates, ProjectionStyle::Full);
         assert_eq!(

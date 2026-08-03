@@ -2,18 +2,17 @@
 set -euo pipefail
 
 # generate-gate-presets-reference — render the committed gate-preset reference
-# from the presets the binary ships.
+# from the preset contract and the portable checker syntax the crate carries.
 #
 # Target:
 #   docs/reference/gate-presets.md
 #
-# WHERE THE VALUES COME FROM. The preset definitions are the authority: the
-# built-in presets loaded in crates/jit/src/gate_presets/ supply each preset's
-# name and description and each bundled gate's key, title, stage, mode,
-# description, and checker configuration (`@/inv/single-source-prose`). The
-# render sorts presets by name and checker environment variables by key, so no
-# map iteration order reaches the page. The conformance test beside the render
-# asserts the committed page equals it and names this script.
+# WHERE THE VALUES COME FROM. The render in
+# crates/jit/src/gate_presets/reference.rs is the authority: the projected
+# `.jit/gates.toml` syntax block is the constant the loader test parses, so the
+# page cannot state a syntax the gate registry would reject
+# (`@/inv/single-source-prose`). The conformance test beside the render asserts
+# the committed page equals it and names this script.
 #
 # Usage:
 #   generate-gate-presets-reference.sh    (takes no arguments — the target is named above)

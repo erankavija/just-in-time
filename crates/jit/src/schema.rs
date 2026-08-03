@@ -474,7 +474,7 @@ impl CommandSchema {
             // Status command
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
-            // Embedded profile commands.
+            // Profile commands.
             "profile_list" => (
                 Some(schema_to_value::<crate::profile::ProfileListResult>()),
                 "ProfileListResult",

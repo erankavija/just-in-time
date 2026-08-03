@@ -343,8 +343,8 @@ pub enum MutationIntent {
         registry: Box<GateRegistry>,
     },
     /// Create one project-defined gate preset at its canonical path. The target
-    /// must be absent in the captured image; custom presets never overwrite one
-    /// another or shadow a builtin preset.
+    /// must be absent in the captured image, so a preset never overwrites
+    /// another.
     CreateGatePreset {
         /// Validated semantic preset whose name determines the filename stem.
         preset: Box<crate::gate_presets::GatePresetDefinition>,
@@ -438,13 +438,10 @@ pub enum MutationError {
          ProfileApplied marker to certify it; refusing to append (@/inv/event-log)"
     )]
     UncertifiedTornTail,
-    /// A custom preset failed structural validation, or the builtin preset set
-    /// could not be loaded; carries the underlying validator's forwarded message.
+    /// A custom preset failed structural validation; carries the underlying
+    /// validator's forwarded message.
     #[error("invalid custom gate preset: {0}")]
     InvalidGatePreset(String),
-    /// A custom preset name collides with a builtin preset.
-    #[error("invalid custom gate preset: '{0}' collides with a builtin preset")]
-    GatePresetCollidesWithBuiltin(String),
     /// A custom-preset ancestor path is occupied by a non-directory.
     #[error("invalid custom gate preset: custom preset parent '{0}' is not a directory")]
     GatePresetParentNotDirectory(String),
@@ -962,14 +959,6 @@ pub(super) fn finalize_delta(
             preset
                 .validate()
                 .map_err(|error| MutationError::InvalidGatePreset(error.to_string()))?;
-            if crate::gate_presets::BuiltinPresets::load()
-                .map_err(|error| MutationError::InvalidGatePreset(error.to_string()))?
-                .contains_key(&preset.name)
-            {
-                return Err(MutationError::GatePresetCollidesWithBuiltin(
-                    preset.name.clone(),
-                ));
-            }
             // Nearest-root-first, so each parent exists before its child.
             for parent in [VirtualPath::CONFIG_DIR, VirtualPath::GATE_PRESETS] {
                 match image.entry(&parent)? {
@@ -2095,7 +2084,10 @@ mod tests {
             timestamp: sentinel_time(),
             profile_id: "example".into(),
             version: "1.0".into(),
-            origin: ProfileOrigin::Embedded,
+            origin: ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/example")
+                    .expect("a canonical package location"),
+            ),
             package_hash: "hash".into(),
             target_hashes: BTreeMap::new(),
             isolated_torn_tail: false,

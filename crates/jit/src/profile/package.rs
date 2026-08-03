@@ -6,7 +6,6 @@ use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry, OpenOptions as CapOpenOptions};
-use include_dir::Dir;
 use semver::{Version, VersionReq};
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -14,7 +13,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Read;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 const TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-target-v1\0";
 const PACKAGE_HASH_DOMAIN: &[u8] = b"jit-profile-package-v1\0";
@@ -39,26 +38,23 @@ pub struct ProfilePackageHashes {
 
 /// Where a validated package's bytes came from.
 ///
-/// Minted only by the two constructors of [`ProfilePackage`], each from the
-/// route it took, so the source a package reports is the source its own bytes
-/// were read through rather than a claim made about them.
+/// Minted only by the constructor of [`ProfilePackage`], from the route it
+/// took, so the source a package reports is the source its own bytes were read
+/// through rather than a claim made about them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProfilePackageSource {
-    /// Bytes compiled into the running binary.
-    Embedded,
     /// Bytes read from this absolute, symlink-resolved directory.
     Directory(PathBuf),
 }
 
 /// A validated immutable package owning the bytes it validated.
 ///
-/// A package comes either from a directory tree on disk
-/// ([`from_directory`](Self::from_directory)) or from a directory embedded at
-/// compile time ([`from_embedded_dir`](Self::from_embedded_dir)). Both routes
-/// own their bytes and run one validation over one path-to-bytes map, so
-/// packages built from identical content are indistinguishable in manifest,
-/// package hash, and target digests. They differ in exactly one observable:
-/// the [`source`](Self::source) each records for the bytes it admitted.
+/// A package comes from a directory tree on disk
+/// ([`from_directory`](Self::from_directory)), owns the bytes it read, and runs
+/// one validation over one path-to-bytes map, so packages built from identical
+/// content are indistinguishable in manifest, package hash, and target digests.
+/// They differ in exactly one observable: the [`source`](Self::source) each
+/// records for the bytes it admitted.
 #[derive(Debug, Clone)]
 pub struct ProfilePackage {
     manifest: ProfileManifest,
@@ -89,16 +85,11 @@ impl ProfilePackage {
         Self::from_files(files, ProfilePackageSource::Directory(root))
     }
 
-    /// Parse and validate a recursively embedded directory.
-    pub fn from_embedded_dir(directory: &Dir<'_>) -> Result<Self, ProfilePackageError> {
-        Self::from_files(embedded_files(directory), ProfilePackageSource::Embedded)
-    }
-
     /// Parse manifest bytes and validate everything they declare about
     /// themselves.
     ///
-    /// This is the crate's only manifest parse. Both constructors run it over
-    /// the bytes their package carries, and the repository's package assembly
+    /// This is the crate's only manifest parse. The constructor runs it over
+    /// the bytes its package carries, and the repository's package assembly
     /// runs it over the checked-in sources' manifest to learn which files to
     /// draw, so a manifest key means one thing wherever it is read.
     ///
@@ -108,7 +99,7 @@ impl ProfilePackage {
     /// roots. A returned manifest therefore declares only safe relative paths,
     /// which is what lets a caller join one onto a directory. The cross-check
     /// against the files a package actually holds needs those files and stays
-    /// with the constructors.
+    /// with the constructor.
     pub(crate) fn parse_manifest(
         manifest_bytes: &[u8],
     ) -> Result<ProfileManifest, ProfilePackageError> {
@@ -305,22 +296,6 @@ pub enum ProfilePackageError {
     },
 }
 
-fn embedded_files(directory: &Dir<'_>) -> BTreeMap<String, Vec<u8>> {
-    fn visit(directory: &Dir<'_>, files: &mut BTreeMap<String, Vec<u8>>) {
-        directory.files().for_each(|file| {
-            files.insert(
-                normalize_package_path(file.path()),
-                file.contents().to_vec(),
-            );
-        });
-        directory.dirs().for_each(|child| visit(child, files));
-    }
-
-    let mut files = BTreeMap::new();
-    visit(directory, &mut files);
-    files
-}
-
 /// Walk the package tree rooted at `root` into its resolved root and a
 /// package-relative byte map.
 ///
@@ -506,16 +481,6 @@ fn package_child_path(prefix: &str, name: &std::ffi::OsStr) -> String {
     } else {
         format!("{prefix}/{name}")
     }
-}
-
-fn normalize_package_path(path: &Path) -> String {
-    path.components()
-        .filter_map(|component| match component {
-            Component::Normal(value) => Some(value.to_string_lossy()),
-            _ => None,
-        })
-        .collect::<Vec<_>>()
-        .join("/")
 }
 
 fn validate_package_bounds(files: &BTreeMap<String, Vec<u8>>) -> Result<(), ProfilePackageError> {
@@ -924,46 +889,39 @@ mod tests {
     use crate::repository_state::{
         Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
     };
-    use include_dir::{include_dir, Dir};
     use std::path::PathBuf;
     use tempfile::TempDir;
 
-    static VALID_PACKAGE: Dir<'_> =
-        include_dir!("$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/synthetic-valid");
+    /// The checked-in synthetic fixture tree every case below is read from.
+    fn fixture_tree() -> PathBuf {
+        crate::test_utils::profile_package_fixture("synthetic-valid")
+    }
 
+    /// The synthetic fixture package, read from its checked-in tree.
     fn package() -> ProfilePackage {
-        ProfilePackage::from_embedded_dir(&VALID_PACKAGE).expect("valid synthetic package")
+        ProfilePackage::from_directory(&fixture_tree()).expect("valid synthetic package")
     }
 
     /// Run the shared package validation over a synthetic path-to-bytes map.
     ///
-    /// The map is authored here rather than read from anywhere, so it enters
-    /// through the compiled-in source; every caller asserts about validation
-    /// outcomes, which the two routes share.
+    /// The map is authored here rather than read from anywhere; the recorded
+    /// source names the fixture the authored bytes were mutated from, which no
+    /// caller asserts about. Every caller asserts about validation outcomes,
+    /// which are decided by the map alone.
     fn validated_package(
         files: BTreeMap<String, Vec<u8>>,
     ) -> Result<ProfilePackage, ProfilePackageError> {
-        ProfilePackage::from_files(files, ProfilePackageSource::Embedded)
-    }
-
-    /// The checked-in tree the compile-time fixture embeds.
-    fn fixture_tree() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/profile-packages/synthetic-valid")
+        ProfilePackage::from_files(files, ProfilePackageSource::Directory(fixture_tree()))
     }
 
     /// A writable copy of the fixture tree, rooted inside `temp`.
-    ///
-    /// Written from the compile-time fixture rather than copied from the
-    /// checkout, so both construction routes read one authored source
-    /// (`@/invariant/shared-test-contracts`).
     fn writable_package_tree(temp: &TempDir) -> PathBuf {
         writable_package_tree_at(&temp.path().join("package"))
     }
 
     /// A writable copy of the fixture tree at the given root, created.
     fn writable_package_tree_at(root: &Path) -> PathBuf {
-        crate::test_utils::write_package_tree(&VALID_PACKAGE, root)
+        crate::test_utils::copy_package_tree(&fixture_tree(), root)
     }
 
     /// Replace the package manifest under `root` with `manifest_text()` mutated.
@@ -976,12 +934,8 @@ mod tests {
     }
 
     fn manifest_text() -> String {
-        VALID_PACKAGE
-            .get_file(MANIFEST_FILE_NAME)
-            .expect("fixture manifest")
-            .contents_utf8()
-            .expect("UTF-8 manifest")
-            .to_string()
+        std::fs::read_to_string(fixture_tree().join(MANIFEST_FILE_NAME))
+            .expect("the fixture manifest is readable UTF-8")
     }
 
     fn parse_modified(old: &str, new: &str) -> Result<ProfileManifest, toml::de::Error> {
@@ -1007,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    fn test_embedded_package_recurses_and_preserves_manifest_order() {
+    fn test_from_directory_recurses_and_preserves_manifest_order() {
         let package = package();
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         assert_eq!(package.file_count(), 4);
@@ -1521,19 +1475,6 @@ value = "workspace/active"
         ));
     }
 
-    #[test]
-    fn test_embedding_dependency_contract_has_no_optional_features_and_production_tree() {
-        let manifest = include_str!("../../Cargo.toml");
-        assert!(
-            manifest.contains("include_dir = { version = \"0.7.4\", default-features = false }"),
-            "embedding dependency must remain pinned without optional features"
-        );
-        let production_tree =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood");
-        assert!(production_tree.join(MANIFEST_FILE_NAME).is_file());
-        assert!(!manifest_text().contains("jit-dogfood"));
-    }
-
     /// The manifest a caller parses on its own is the manifest the constructors
     /// validated, and it is already judged on everything a manifest can be
     /// judged on without its files — which is what lets the package assembly
@@ -1558,37 +1499,42 @@ value = "workspace/active"
     }
 
     #[test]
-    fn test_from_directory_reads_the_same_package_as_the_compile_time_route() {
-        let embedded = package();
-        let read = ProfilePackage::from_directory(&fixture_tree()).expect("valid package tree");
+    fn test_from_directory_reads_one_package_from_every_copy_of_one_authored_tree() {
+        // A copy of the authored tree elsewhere on disk is the same package:
+        // the manifest, both hashes, the inventory, and every declared source's
+        // bytes agree with the package read from the checked-in tree.
+        let authored = package();
+        let temp = TempDir::new().unwrap();
+        let copy = ProfilePackage::from_directory(&writable_package_tree(&temp))
+            .expect("valid package tree");
 
-        assert_eq!(read.manifest(), embedded.manifest());
-        assert_eq!(read.hashes().package, embedded.hashes().package);
-        assert_eq!(read.hashes().targets, embedded.hashes().targets);
-        assert_eq!(read.file_count(), embedded.file_count());
-        assert_eq!(read.byte_size(), embedded.byte_size());
-        assert!(read
+        assert_eq!(copy.manifest(), authored.manifest());
+        assert_eq!(copy.hashes().package, authored.hashes().package);
+        assert_eq!(copy.hashes().targets, authored.hashes().targets);
+        assert_eq!(copy.file_count(), authored.file_count());
+        assert_eq!(copy.byte_size(), authored.byte_size());
+        assert!(copy
             .manifest()
             .assets
             .iter()
-            .all(|asset| read.source_bytes(&asset.source) == embedded.source_bytes(&asset.source)));
+            .all(|asset| copy.source_bytes(&asset.source) == authored.source_bytes(&asset.source)));
 
         // The package outlives the tree it was read from, which is what owning
         // the validated bytes buys: this temporary directory is deleted before
-        // anything below reads the package back.
+        // the package is read back.
         let owned = {
             let temp = TempDir::new().unwrap();
             let root = writable_package_tree(&temp);
             ProfilePackage::from_directory(&root).expect("valid package tree")
         };
-        assert_eq!(owned.hashes(), embedded.hashes());
+        assert_eq!(owned.hashes(), authored.hashes());
         assert!(
             owned
                 .manifest()
                 .assets
                 .iter()
                 .all(|asset| owned.source_bytes(&asset.source)
-                    == embedded.source_bytes(&asset.source))
+                    == authored.source_bytes(&asset.source))
         );
     }
 
@@ -1632,11 +1578,6 @@ value = "workspace/active"
                 .source(),
             &ProfilePackageSource::Directory(resolved)
         );
-    }
-
-    #[test]
-    fn test_from_embedded_dir_records_a_compiled_in_source() {
-        assert_eq!(package().source(), &ProfilePackageSource::Embedded);
     }
 
     #[test]

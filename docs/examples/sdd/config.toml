@@ -41,8 +41,9 @@ story = "story"
 # coverage-preview's checker runs
 # `jit validate --scope <C>` (resolving C from B's `brackets:<C-short-id>` label, so the
 # preview coverage rule fires and blocks when a [hard] criterion is uncovered);
-# plan-review and breakdown-review ship as warning-only review placeholders;
-# replace their checkers before treating either pass as review evidence.
+# plan-review and breakdown-review are declared as warning-only review
+# placeholders; replace their checkers before treating either pass as review
+# evidence.
 
 [validation]
 default_type = "task"

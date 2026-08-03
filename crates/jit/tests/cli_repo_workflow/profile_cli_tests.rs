@@ -119,18 +119,34 @@ fn test_profile_list_and_show_work_without_repository() {
     let repo = TempDir::new().unwrap();
 
     // A directory that is not a repository has recorded no profile, so it names
-    // none; inspection still resolves the package this binary carries.
+    // none.
     let list = jit(repo.path(), &["profile", "list", "--json"]);
     assert!(list.status.success(), "{list:?}");
     let list = json(&list);
     assert_eq!(list["count"], 0);
     assert_eq!(list["profiles"].as_array().unwrap(), &Vec::<Value>::new());
 
-    let show = jit(repo.path(), &["profile", "show", "jit-dogfood", "--json"]);
+    // Inspection still resolves a package a location names, which is the only
+    // route left when nothing has been recorded.
+    let location = crate::repository_package_at(repo.path(), "jit-dogfood");
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            "jit-dogfood",
+            "--from",
+            &location,
+            "--json",
+        ],
+    );
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
     assert_eq!(show["manifest"]["profile"]["id"], "jit-dogfood");
-    assert_eq!(show["origin"], serde_json::json!({ "source": "embedded" }));
+    assert_eq!(
+        show["origin"],
+        serde_json::json!({ "source": "directory", "location": location })
+    );
     assert!(show["package_hash"].as_str().unwrap().len() >= 64);
     assert!(!repo.path().join(".jit").exists());
 }
@@ -155,8 +171,8 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
-    // Nothing compiled into the binary declares this profile, so reporting it
-    // at all is the location having been read.
+    // Nothing but the supplied location holds a package declaring this
+    // profile, so reporting it at all is that location having been read.
     assert_eq!(show["manifest"]["profile"]["id"], FIXTURE_PROFILE);
     assert_eq!(
         show["origin"],
@@ -425,14 +441,17 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
 }
 
 #[test]
-fn test_init_profile_resolves_a_declared_dependency_from_the_binary() {
+fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package() {
     let repo = TempDir::new().unwrap();
     let location = package_at(repo.path(), "vendor/planner");
     declare_dependency(repo.path(), location, "jit-default");
+    // The dependency is named and no location is supplied for it, so it is
+    // resolved from the directory named after it beside the package declaring
+    // it — the shape an obtained set of packages arrives in.
+    let dependency = "vendor/jit-default";
+    jit::test_utils::assemble_repository_package("jit-default", &repo.path().join(dependency))
+        .expect("this repository's jit-default package assembles");
 
-    // The dependency is named and nothing says where it is: no location is
-    // supplied for it, and a repository being created has recorded nothing, so
-    // the package this binary carries is the only route left to it.
     let init = jit(
         repo.path(),
         &[
@@ -456,14 +475,14 @@ fn test_init_profile_resolves_a_declared_dependency_from_the_binary() {
     assert_eq!(requested_profile(applied)["status"], "applied");
 
     // Both packages reached the created repository: each has its provenance
-    // record, the dependency's names the binary it came from, and the named
-    // package published its asset.
+    // record naming the directory it was read from, and the named package
+    // published its asset.
     assert_eq!(
         serde_json::from_slice::<Value>(
             &fs::read(repo.path().join(".jit/profiles/jit-default.json")).unwrap()
         )
         .unwrap()["origin"],
-        serde_json::json!({ "source": "embedded" })
+        serde_json::json!({ "source": "directory", "location": dependency })
     );
     assert_eq!(
         stored_record(repo.path())["origin"],
@@ -517,7 +536,17 @@ fn test_init_from_without_a_profile_is_a_usage_error() {
 fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
     let repo = TempDir::new().unwrap();
 
-    let show = jit(repo.path(), &["profile", "show", "jit-dogfood", "--json"]);
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
 
@@ -597,7 +626,17 @@ fn test_profile_unknown_id_has_typed_json_error_without_mutation() {
 #[test]
 fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
     let repo = TempDir::new().unwrap();
-    let init = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+    let init = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(
         init.status.success(),
         "stdout={}\nstderr={}",
@@ -649,11 +688,19 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
 #[test]
 fn test_validate_plain_and_json_report_installed_profile_drift() {
     let repo = TempDir::new().unwrap();
-    assert!(
-        jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"])
-            .status
-            .success()
-    );
+    assert!(jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    )
+    .status
+    .success());
     fs::write(
         repo.path().join(".agents/skills/jit-manage/SKILL.md"),
         "STALE\n",
@@ -684,14 +731,31 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
     // A preview is derived over one package against the repository in front of
     // it, so a delta package is previewed with its declared dependency already
     // applied — the order the composed application uses.
-    assert!(jit(repo.path(), &["init", "--profile", "jit-default"])
-        .status
-        .success());
+    assert!(jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-default",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-default"),
+        ]
+    )
+    .status
+    .success());
     let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
     let preview = jit(
         repo.path(),
-        &["profile", "apply", "jit-dogfood", "--dry-run", "--json"],
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--dry-run",
+            "--json",
+        ],
     );
     assert!(preview.status.success(), "{preview:?}");
     assert_eq!(json(&preview)["status"], "would_apply");
@@ -701,12 +765,32 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
     );
     assert!(!repo.path().join(".jit/profiles/jit-dogfood.json").exists());
 
-    let applied = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    let applied = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(applied.status.success(), "{applied:?}");
     assert_eq!(requested_profile(&json(&applied))["status"], "applied");
     let events_after = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
-    let unchanged = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    let unchanged = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(unchanged.status.success(), "{unchanged:?}");
     assert_eq!(requested_profile(&json(&unchanged))["status"], "unchanged");
     assert_eq!(
@@ -718,7 +802,17 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
 #[test]
 fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op() {
     let repo = TempDir::new().unwrap();
-    let initialized = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+    let initialized = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(initialized.status.success(), "{initialized:?}");
 
     let namespace_schema = repo
@@ -735,19 +829,47 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
     fs::remove_file(&namespace_schema).unwrap();
     let preview = jit(
         repo.path(),
-        &["profile", "apply", "jit-dogfood", "--dry-run", "--json"],
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--dry-run",
+            "--json",
+        ],
     );
     assert!(preview.status.success(), "{preview:?}");
     assert_eq!(json(&preview)["status"], "would_apply");
     assert!(!namespace_schema.exists(), "dry-run must remain read-only");
 
-    let repaired_missing = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    let repaired_missing = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(repaired_missing.status.success(), "{repaired_missing:?}");
     assert!(published_anything(&json(&repaired_missing)));
     assert_eq!(fs::read(&namespace_schema).unwrap(), expected_namespace);
 
     fs::write(&type_schema, b"stale\n").unwrap();
-    let repaired_stale = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    let repaired_stale = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(repaired_stale.status.success(), "{repaired_stale:?}");
     assert!(published_anything(&json(&repaired_stale)));
     assert_eq!(fs::read(&type_schema).unwrap(), expected_types);
@@ -760,7 +882,17 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
             .count(),
         event_count_before + 2
     );
-    let unchanged = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
+    let unchanged = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert!(unchanged.status.success(), "{unchanged:?}");
     assert!(!published_anything(&json(&unchanged)));
     assert_eq!(fs::read(events_path).unwrap(), events_after_repairs);
@@ -773,7 +905,17 @@ fn test_profiled_init_conflict_preserves_the_occupant_and_publishes_no_conflicti
     let occupant = repo.path().join("contrib/gates/ai-review.sh");
     fs::write(&occupant, b"local script\n").unwrap();
 
-    let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+    let output = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
 
     assert_eq!(output.status.code(), Some(4));
     assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
@@ -797,7 +939,17 @@ fn test_existing_partial_profiled_init_conflict_preserves_authored_bytes_and_the
     let occupant = repo.path().join("contrib/gates/ai-review.sh");
     fs::write(&occupant, b"local script\n").unwrap();
 
-    let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+    let output = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
 
     assert_eq!(output.status.code(), Some(4));
     assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
@@ -817,7 +969,17 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
     let index = b"{\n  \"schema_version\": 2,\n  \"all_ids\": [],\n  \"deleted_ids\": []\n}";
     fs::write(repo.path().join(".jit/index.json"), index).unwrap();
 
-    let output = jit(repo.path(), &["init", "--profile", "jit-dogfood", "--json"]);
+    let output = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(repo.path(), "jit-dogfood"),
+            "--json",
+        ],
+    );
 
     assert!(
         output.status.success(),

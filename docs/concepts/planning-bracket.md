@@ -154,11 +154,11 @@ bracket:
 | `coverage-preview` | `B` | deterministic, in-process | Does the *decomposition* cover every `[hard]` criterion? Runs scoped repository validation for `C`. |
 | `breakdown-review` | `B` | review placeholder | Reserves the decomposition-quality checkpoint. Replace the checker with a real reviewer before relying on it. |
 
-**`plan-review`** ships with the in-process `review_placeholder` checker. It passes
-with the structured warning `WARNING: EXTERNAL REVIEW PLACEHOLDER`, so the bracket
-can be installed without a shell, source checkout, or selected agent. It does not
-judge plan quality. Replace it with a repository-owned reviewer before treating a
-pass as approval.
+**`plan-review`** is declared with the in-process `review_placeholder` checker. It
+passes with the structured warning `WARNING: EXTERNAL REVIEW PLACEHOLDER`, so the
+bracket can be installed without a shell, source checkout, or selected agent. It
+does not judge plan quality. Replace it with a repository-owned reviewer before
+treating a pass as approval.
 
 **`coverage-preview`** is deterministic. Its checker resolves the container `C`
 from `B`'s `brackets:<C-short-id>` label and runs `jit validate --scope <C>`. That
@@ -167,18 +167,18 @@ scoped validation evaluates the **preview coverage rule** (below), which exits 4
 uncovered. No human judgment, no agent: pure structural coverage over the drafted
 decomposition.
 
-**`breakdown-review`** ships with the same warning-only placeholder on `B`. Its
-intended role is the *quality* half of `B`'s split: a repository-supplied reviewer
-can audit child content, dependency-DAG coherence, decomposition depth, and
-blank-workspace reachability without duplicating `coverage-preview`. The built-in
-checker performs none of those judgments.
+**`breakdown-review`** is declared with the same warning-only placeholder on `B`.
+Its intended role is the *quality* half of `B`'s split: a repository-supplied
+reviewer can audit child content, dependency-DAG coherence, decomposition depth,
+and blank-workspace reachability without duplicating `coverage-preview`. The
+placeholder checker performs none of those judgments.
 
 The three checkpoints are designed to answer different questions once real
 review integrations replace the placeholders. `plan-review` asks *"is this plan
 any good?"*; `coverage-preview` asks *"does this breakdown actually cover what the
 container promised?"*; `breakdown-review` asks *"is the decomposition itself sound
-— right pieces, right wiring?"* Only `coverage-preview` answers its question in
-the built-in configuration.
+— right pieces, right wiring?"* Only `coverage-preview` answers its question with
+a placeholder checker in place.
 
 ## Coverage at both ends: preview vs closure
 

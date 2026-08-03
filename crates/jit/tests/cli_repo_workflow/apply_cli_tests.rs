@@ -3,9 +3,8 @@
 //!
 //! These exercise the real subprocess path end-to-end: the built `jit` binary
 //! against an isolated `TempDir`-backed `.jit/` repo whose `config.toml` declares
-//! the planning hierarchy and whose `templates.toml` declares the `plan`
-//! template. The referenced gate presets (`plan-review`, `coverage-preview`,
-//! `breakdown-review`) are builtins, so no preset registration is needed.
+//! the planning hierarchy, whose `templates.toml` declares the `plan` template,
+//! and whose gate registry declares the keys that template names.
 //!
 //! Every fixture lives in its own `TempDir` — the production `.jit/` is NEVER
 //! touched. The tests assert that `jit apply plan` creates the `C → B → P`
@@ -24,9 +23,9 @@ types = { epic = 1, planning = 2, breakdown = 2, task = 3 }
 "#;
 
 /// The repo's `plan`-shaped graph template: a planning node `P` and a breakdown
-/// node `B` (with `brackets:<short-id>`), each with builtin gate presets, plus
-/// the `B → P` edge, the `C → B` anchor edge, and the `move-upstream-to-role`
-/// transform onto `planning`.
+/// node `B` (with `brackets:<short-id>`), each with the gate keys the fixture
+/// declares, plus the `B → P` edge, the `C → B` anchor edge, and the
+/// `move-upstream-to-role` transform onto `planning`.
 const PLAN_TEMPLATE_TOML: &str = r#"
 [[template]]
 name        = "plan"
@@ -88,11 +87,59 @@ fn jit_json(temp: &TempDir, args: &[&str]) -> serde_json::Value {
 /// graph template on disk.
 fn setup_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
-    jit(&temp).arg("init").assert().success();
     let jit_dir = temp.path().join(".jit");
+    // The configuration is written before initialization, which preserves it
+    // and derives the coupled rules and schemas from the registry it declares.
+    std::fs::create_dir_all(&jit_dir).unwrap();
     std::fs::write(jit_dir.join("config.toml"), CONFIG_TOML).unwrap();
+    jit(&temp).arg("init").assert().success();
     std::fs::write(jit_dir.join("templates.toml"), PLAN_TEMPLATE_TOML).unwrap();
+    // A template's gate entries resolve against the repository's own presets
+    // and its own gate registry, so the repository declares every key the
+    // template names before it is applied.
+    for key in template_gate_keys(PLAN_TEMPLATE_TOML) {
+        jit(&temp)
+            .args([
+                "gate",
+                "define",
+                &key,
+                "--title",
+                &format!("{key} gate"),
+                "--description",
+                &format!("Repository-declared {key} gate"),
+            ])
+            .assert()
+            .success();
+    }
     temp
+}
+
+/// Every gate key the templates in `registry_toml` name, on a node or an
+/// anchor, read from that registry so a changed declaration needs no edit here.
+pub(crate) fn template_gate_keys(registry_toml: &str) -> Vec<String> {
+    let unchecked_hierarchy: [&str; 0] = [];
+    let mut keys: Vec<String> =
+        jit::templates::TemplateRegistry::from_toml_str(registry_toml, &unchecked_hierarchy)
+            .expect("the fixture template registry parses")
+            .templates
+            .iter()
+            .flat_map(|template| {
+                template
+                    .nodes
+                    .iter()
+                    .flat_map(|node| node.gates.iter())
+                    .chain(
+                        template
+                            .anchors
+                            .iter()
+                            .flat_map(|anchor| anchor.gates.iter()),
+                    )
+            })
+            .cloned()
+            .collect();
+    keys.sort();
+    keys.dedup();
+    keys
 }
 
 /// Create an `epic` container, returning its full id.

@@ -1,28 +1,26 @@
 <!-- Generated from `crate::gate_presets::reference` — do not edit by hand. -->
 
-# Built-in Gate Presets
+# Gate Presets
 
 > **Diátaxis Type:** Reference
 
-The gate presets the `jit` binary ships. A preset is a named bundle of gate
-definitions; `jit gate preset apply <preset> <id>...` inserts each bundled gate
-into the project's gate registry (`.jit/gates.toml`) under its key — for keys the
-registry does not already carry, and, with `--timeout <seconds>`, overwriting the
-key with the overridden checker timeout — and then adds those keys to each issue's
-required gates. `--no-precheck`, `--no-postcheck`, and `--except <key>` narrow which
-of the preset's gates are applied. Each gate materializes into the registry with
+A gate preset is a named bundle of gate definitions a project declares for
+itself. `jit gate preset create <issue> <name>` captures an issue's gates into
+`.jit/config/gate-presets/<name>.json`, and every JSON file in that directory
+loads as a preset whose name must equal its filename stem. `jit gate preset list`
+reports them, `jit gate preset show <preset>` prints one, and
+`jit gate preset apply <preset> <id>...` inserts each bundled gate into the
+project's gate registry (`.jit/gates.toml`) under its key — for keys the registry
+does not already carry, and, with `--timeout <seconds>`, overwriting the key with
+the overridden checker timeout — and then adds those keys to each issue's required
+gates. `--no-precheck`, `--no-postcheck`, and `--except <key>` narrow which of the
+preset's gates are applied. Each gate materializes into the registry with
 `version = 1`, `priority = 100`, and `auto` set from its mode.
 
-This page is generated from the binary's package-derived preset projection. The
-embedded `jit-dogfood` profile's plan template selects the built-in names, and its
-matching gate contributions provide their definitions. The page lists what the
-binary carries — not what any repository has configured. Plain `jit init` writes an
-empty gate registry; `jit init --profile jit-dogfood` installs the package's matching
-definitions directly, while manual adopters can use `jit gate preset apply`. See
-[Repository Profiles](profiles.md) for the profile contract. The gates a project
-actually enforces live in its own `.jit/gates.toml`, its settings in
+The gates a project enforces live in its own `.jit/gates.toml`, its settings in
 `.jit/config.toml`; render those with `jit project render` (see
-[Rules and Gates](rules-and-gates.md)).
+[Rules and Gates](rules-and-gates.md)). A profile package can contribute gate
+definitions when it is applied; see [Repository Profiles](profiles.md).
 
 ## Portable checker types
 
@@ -102,40 +100,3 @@ auto = true
 [gates.checker]
 type = "review_placeholder"
 ```
-
-A project can also define its own presets: `jit gate preset create <issue> <name>`
-captures an issue's gates into `.jit/config/gate-presets/<name>.json`, and every
-JSON file in that directory loads alongside the built-ins. `jit gate preset create`
-rejects a built-in name; a hand-authored file that reuses one shadows the built-in
-for `jit gate preset show` and `apply`, and `jit gate preset list` then reports that
-name as project-local instead of `[builtin]`.
-
-| Preset | Description | Gates |
-| --- | --- | --- |
-| [`breakdown-review`](#breakdown-review) | External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. | 1 |
-| [`coverage-preview`](#coverage-preview) | Validate the container named by the breakdown issue's brackets label. | 1 |
-| [`plan-review`](#plan-review) | External-review placeholder for the linked plan before implementation work fans out. | 1 |
-
-## `breakdown-review`
-
-External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation.
-
-| Gate key | Title | Stage | Mode | Description | Checker |
-| --- | --- | --- | --- | --- | --- |
-| `breakdown-review` | Breakdown Review | postcheck | auto | External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |
-
-## `coverage-preview`
-
-Validate the container named by the breakdown issue's brackets label.
-
-| Gate key | Title | Stage | Mode | Description | Checker |
-| --- | --- | --- | --- | --- | --- |
-| `coverage-preview` | Coverage Preview | postcheck | auto | Validate the container named by the breakdown issue's brackets label. | `label_target_validation` — built-in scoped validation; target label namespace: `brackets` |
-
-## `plan-review`
-
-External-review placeholder for the linked plan before implementation work fans out.
-
-| Gate key | Title | Stage | Mode | Description | Checker |
-| --- | --- | --- | --- | --- | --- |
-| `plan-review` | Plan Review | postcheck | auto | External-review placeholder for the linked plan before implementation work fans out. | `review_placeholder` — WARNING: EXTERNAL REVIEW PLACEHOLDER PASSED WITHOUT RUNNING A REVIEWER. Replace this checker with a real external review integration before relying on this gate. |

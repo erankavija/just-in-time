@@ -50,7 +50,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Release Policy](reference/release-policy.md) - How the product version is
   declared and verified, what a release publishes, and the supported Rust
   version with its recency window
-- [Repository Profiles](reference/profiles.md) - Preferred embedded workflow setup, package contract, and recovery boundary
+- [Repository Profiles](reference/profiles.md) - Preferred repository workflow setup, package contract, and recovery boundary
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
 - [Machine-readable Error Codes](reference/error-codes.md) - Generated vocabulary of error-envelope codes, meanings, and exit statuses
 - [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
@@ -65,15 +65,15 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
 - [Rules and Gates](reference/rules-and-gates.md) - Projected reference for a project's validation rules and gate registry
-- [Built-in Gate Presets](reference/gate-presets.md) - The gate bundles the binary ships, with each preset's gates and checkers
+- [Gate Presets](reference/gate-presets.md) - Declaring, listing, and applying a project's own gate bundles, with the portable checker syntax
 - [Worktree and Validate Commands](reference/worktree-validate.md) - `jit worktree` and `jit validate` command reference
 
 ### 🧪 [Examples](examples/) - Sample Configurations and Rulesets
 *Ready-to-copy configuration and ruleset examples for common domains, referenced throughout [Validation Rules](how-to/validation-rules.md)*
 
 These are advanced customization examples. For the portable recommended
-workflow, start with the
-[embedded `jit-dogfood` profile](reference/profiles.md).
+workflow, start with the `jit-dogfood` repository profile described in
+[Repository Profiles](reference/profiles.md).
 
 - [sdd](examples/sdd/) - Spec-Driven Development
 - [bug-repro](examples/bug-repro/) - bug triage

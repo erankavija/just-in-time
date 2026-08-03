@@ -19,7 +19,7 @@ const PROFILE_RECORD: &str = ".jit/profiles/jit-dogfood.json";
 ///
 /// What these fixtures need from it is what the checkout declares — the targets
 /// an application owns and the executable bits it publishes — so the package is
-/// drawn from there rather than from a copy compiled into the test binary.
+/// assembled from the checkout rather than read from a copy of it.
 fn shipped_workflow_package() -> (tempfile::TempDir, jit::profile::ProfilePackage) {
     jit::test_utils::temporary_repository_package("jit-dogfood")
 }
@@ -36,23 +36,30 @@ fn write(harness: &TestHarness, path: &str, content: &str) {
     }
 }
 
-fn profiled_harness(omit_profile_record: bool) -> TestHarness {
+/// A harness carrying the derived state of a profiled repository, with the
+/// source checkout that repository was initialized in.
+///
+/// The harness is rooted at that checkout and the caller keeps it alive: the
+/// applied-profile record names the worktree-relative directory its package was
+/// read from, and repair reads the package back from there.
+fn profiled_harness(omit_profile_record: bool) -> (tempfile::TempDir, TestHarness) {
     let source = tempfile::tempdir().unwrap();
     let source_storage = jit::storage::JsonFileStorage::new(source.path().join(".jit"));
     let source_layout =
         jit::storage::discover_repository_layout(source.path(), source_storage.root()).unwrap();
+    let location = jit::test_utils::stage_repository_packages(source.path(), "jit-dogfood");
     jit::commands::CommandExecutor::new(source_storage)
         .with_layout(source_layout)
         .initialize_fresh_repository(
             source.path(),
             Some(jit::commands::ProfileSelection {
                 id: "jit-dogfood",
-                location: None,
+                location: Some(&location),
             }),
         )
         .unwrap();
 
-    let harness = TestHarness::new();
+    let harness = TestHarness::rooted_at(source.path());
     for path in repair_paths()
         .into_iter()
         .filter(|path| !omit_profile_record || path != PROFILE_RECORD)
@@ -63,7 +70,7 @@ fn profiled_harness(omit_profile_record: bool) -> TestHarness {
             &std::fs::read_to_string(source.path().join(&path)).unwrap(),
         );
     }
-    harness
+    (source, harness)
 }
 
 fn capture(
@@ -198,13 +205,14 @@ fn repair_target_path_strings() -> Vec<String> {
             let storage = jit::storage::JsonFileStorage::new(source.path().join(".jit"));
             let layout =
                 jit::storage::discover_repository_layout(source.path(), storage.root()).unwrap();
+            let location = jit::test_utils::stage_repository_packages(source.path(), "jit-dogfood");
             jit::commands::CommandExecutor::new(storage.clone())
                 .with_layout(layout.clone())
                 .initialize_fresh_repository(
                     source.path(),
                     Some(jit::commands::ProfileSelection {
                         id: "jit-dogfood",
-                        location: None,
+                        location: Some(&location),
                     }),
                 )
                 .unwrap();
@@ -265,12 +273,12 @@ fn repair_paths() -> Vec<String> {
     paths
 }
 
-/// The fixture package every directory-recorded case below applies. No package
-/// this binary carries declares its id, so a fact validation states about it can
-/// only have been read from the location the repository's record names.
-static DIRECTORY_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
-    "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
-);
+/// The checked-in fixture tree every directory-recorded case below stages a
+/// copy of inside the repository under test, which is the only place a fact
+/// validation states about that package can have been read from.
+fn directory_package() -> std::path::PathBuf {
+    jit::test_utils::profile_package_fixture("planner-asset-only")
+}
 
 /// Worktree-relative directory the fixture package is written to and recorded
 /// from.
@@ -309,8 +317,8 @@ impl DirectoryPackageRepo {
     fn unapplied() -> Self {
         let root = tempfile::tempdir().expect("create repository root");
         let package =
-            jit::profile::ProfilePackage::from_directory(&jit::test_utils::write_package_tree(
-                &DIRECTORY_PACKAGE,
+            jit::profile::ProfilePackage::from_directory(&jit::test_utils::copy_package_tree(
+                &directory_package(),
                 &root.path().join(PACKAGE_DIRECTORY),
             ))
             .expect("a valid package tree");
@@ -487,9 +495,7 @@ fn test_validate_fix_restores_a_deleted_or_edited_target_from_the_recorded_locat
 /// so the stored digests describe the rewritten package exactly as well as they
 /// described the applied one. Only the location holds the bytes that tell them
 /// apart, and repair restoring those bytes is a live read of it — a repair that
-/// derived its expectations from the record could not produce them, and one
-/// that read this binary's compiled-in packages could not produce this profile
-/// at all.
+/// derived its expectations from the record could not produce them.
 #[test]
 fn test_validate_fix_restores_the_bytes_the_recorded_location_holds_now() {
     let mut repo = DirectoryPackageRepo::applied();
@@ -654,7 +660,7 @@ fn test_validate_fix_without_an_applied_record_reads_no_package() {
 
 #[test]
 fn test_harness_validate_fix_repairs_each_owned_class_and_preserves_authored_bytes() {
-    let mut harness = profiled_harness(false);
+    let (_source, mut harness) = profiled_harness(false);
     let baseline = [
         ".jit/rules.toml",
         ".jit/schemas/default-type-hierarchy-known.json",
@@ -749,7 +755,7 @@ fn test_harness_validate_fix_repairs_each_owned_class_and_preserves_authored_byt
 
 #[test]
 fn test_harness_validate_fix_repairs_mode_only_profile_drift() {
-    let mut harness = profiled_harness(false);
+    let (_source, mut harness) = profiled_harness(false);
     let (_workspace, package) = shipped_workflow_package();
     let executable = package
         .manifest()
@@ -808,7 +814,7 @@ fn test_harness_validate_fix_repairs_mode_only_profile_drift() {
 
 #[test]
 fn test_harness_validate_fix_rejects_ambiguous_ownership_transactionally() {
-    let mut harness = profiled_harness(false);
+    let (_source, mut harness) = profiled_harness(false);
     write(
         &harness,
         ".jit/rules.toml",
@@ -833,7 +839,7 @@ fn test_harness_validate_fix_rejects_ambiguous_ownership_transactionally() {
 #[test]
 fn test_harness_validate_fix_profile_provenance_failures_are_zero_write() {
     for mismatch in [true, false] {
-        let mut harness = if mismatch {
+        let (_source, mut harness) = if mismatch {
             profiled_harness(false)
         } else {
             profiled_harness(true)

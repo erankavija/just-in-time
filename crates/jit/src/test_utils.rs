@@ -167,6 +167,43 @@ pub fn assemble_repository_package(
     )
 }
 
+/// Assemble every profile package this repository authors into
+/// `worktree`/[`PROFILE_PACKAGE_SOURCES`], and answer with the location of `id`.
+///
+/// A package is applied from inside the worktree it is applied to, and a
+/// package's declared dependency is looked for in a directory named after it
+/// beside the package declaring it. Staging the whole authored set therefore
+/// makes any one of them applicable, whatever it depends on, without a caller
+/// restating the dependency graph (`@/invariant/shared-test-contracts`).
+///
+/// Panics when the checkout's package sources cannot be listed or a package
+/// does not assemble, which is a defect in the checkout rather than a condition
+/// a test distinguishes.
+pub fn stage_repository_packages(worktree: &Path, id: &str) -> PathBuf {
+    let sources = repository_checkout().join(PROFILE_PACKAGE_SOURCES);
+    let staged = worktree.join(PROFILE_PACKAGE_SOURCES);
+    fs::read_dir(&sources)
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to list the checkout's package sources at {}: {error}",
+                sources.display()
+            )
+        })
+        .for_each(|entry| {
+            let name = entry.expect("read a package source entry").file_name();
+            let package = name.to_string_lossy();
+            assemble_repository_package(&package, &staged.join(name.as_os_str())).unwrap_or_else(
+                |error| panic!("this repository's {package} package assembles: {error}"),
+            );
+        });
+    let location = staged.join(id);
+    assert!(
+        location.is_dir(),
+        "this repository authors no profile package '{id}'"
+    );
+    location
+}
+
 /// This repository's profile package `id` assembled into a temporary
 /// destination, answered with the directory that owns it.
 ///
@@ -186,43 +223,34 @@ pub fn temporary_repository_package(id: &str) -> (TempDir, ProfilePackage) {
     (workspace, package)
 }
 
-/// Write a compile-time-embedded profile package tree to `root`, creating it
-/// and every declared parent, and return `root`.
+/// The checked-in source tree of the profile-package fixture named `name`.
 ///
-/// One writer serves every test that needs a profile package on disk, so the
-/// directory route reads back exactly the authored fixture the compile-time
-/// route embeds instead of a per-module copy of it.
-pub fn write_package_tree(package: &include_dir::Dir<'_>, root: &Path) -> PathBuf {
-    fn write(directory: &include_dir::Dir<'_>, root: &Path) {
-        directory.files().for_each(|file| {
-            let path = root.join(file.path());
-            fs::create_dir_all(path.parent().expect("package file has a parent"))
-                .expect("create package parent directory");
-            fs::write(path, file.contents()).expect("write package file");
-        });
-        directory.dirs().for_each(|child| write(child, root));
-    }
-
-    fs::create_dir_all(root).expect("create package root");
-    write(package, root);
-    root.to_path_buf()
+/// Fixture packages are ordinary directories under the crate's own
+/// `tests/fixtures/profile-packages/`, resolved from the crate root so the
+/// answer is independent of the process working directory. One resolver serves
+/// every test that stages a fixture package, so no caller spells the fixture
+/// prefix for itself (`@/invariant/shared-test-contracts`).
+pub fn profile_package_fixture(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/profile-packages")
+        .join(name)
 }
 
-/// Write a compile-time-embedded profile package tree to `root` under a
-/// manifest rewritten to declare `id`, a dependency on each of `dependencies`,
-/// and asset targets named for `id`, and read the package back from there.
+/// Copy the profile-package fixture tree at `source` to `root` under a manifest
+/// rewritten to declare `id`, a dependency on each of `dependencies`, and asset
+/// targets named for `id`, and read the package back from there.
 ///
 /// No package this repository ships declares a dependency, so every test of
 /// composition authors one. One rewrite serves them all
 /// (`@/invariant/shared-test-contracts`), and renaming the asset targets after
 /// the id is what keeps two authored packages from publishing the same file.
 pub fn write_package_declaring(
-    package: &include_dir::Dir<'_>,
+    source: &Path,
     root: &Path,
     id: &str,
     dependencies: &[&str],
 ) -> crate::profile::ProfilePackage {
-    let tree = write_package_tree(package, root);
+    let tree = copy_package_tree(source, root);
     let manifest_path = tree.join(crate::profile::MANIFEST_FILE_NAME);
     let authored = fs::read_to_string(&manifest_path).expect("read the package manifest");
     let source = crate::profile::ProfilePackage::parse_manifest(authored.as_bytes())

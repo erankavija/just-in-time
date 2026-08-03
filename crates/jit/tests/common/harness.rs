@@ -7,7 +7,7 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::{Issue, Priority, State};
-use jit::repository_state::{RepositoryLayout, RepositoryRootEvidence};
+
 use jit::storage::{InMemoryStorage, IssueStore};
 
 /// Test harness that provides isolated environment for each test
@@ -19,24 +19,34 @@ pub struct TestHarness {
 impl TestHarness {
     /// Create a new test harness with isolated in-memory storage
     pub fn new() -> Self {
+        Self::from_storage(InMemoryStorage::new())
+    }
+
+    /// A harness whose in-memory store carries the synthetic layout rooted at
+    /// `root`.
+    ///
+    /// The aggregate is still in memory. A repository whose applied-profile
+    /// record names a worktree-relative package location needs that name to
+    /// reach a real directory, because resolving such a record reads the
+    /// package from the location it names.
+    pub fn rooted_at(root: impl Into<std::path::PathBuf>) -> Self {
+        Self::from_storage(InMemoryStorage::rooted_at(root))
+    }
+
+    fn from_storage(storage: InMemoryStorage) -> Self {
         // Disable worktree divergence checks in tests
         std::env::set_var("JIT_TEST_MODE", "1");
 
-        let storage = InMemoryStorage::new();
         // Session-backed declaration mutations capture config from the same
         // aggregate image as gates/events; an empty file is the minimal valid
         // repository declaration set for generic harness tests.
         storage.add_data_file("config.toml", "");
-        // A synthetic canonical layout so session-backed mutations (e.g. the
-        // validate-fix path) can open the in-memory mutation session. The in-memory
-        // backend models its state in one aggregate map keyed by virtual path and
-        // never touches these paths on the real filesystem, so any valid nested
-        // worktree/data layout serves.
-        let layout = RepositoryLayout::new(
-            RepositoryRootEvidence::new("/jit-test-harness", "harness-worktree", true),
-            RepositoryRootEvidence::new("/jit-test-harness/.jit", "harness-data", true),
-        )
-        .expect("synthetic harness layout is valid");
+        // The store's own canonical layout, so session-backed mutations (e.g.
+        // the validate-fix path) can open the in-memory mutation session. The
+        // in-memory backend models its state in one aggregate map keyed by
+        // virtual path and never touches these paths on the real filesystem
+        // unless a case roots the store somewhere it wants read.
+        let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
         Self { executor, storage }
     }
@@ -251,6 +261,73 @@ pub(crate) fn seed_memory_gate_registry(
 ) {
     let bytes = jit::declarations::serialize_gate_registry(registry).unwrap();
     storage.add_data_file("gates.toml", std::str::from_utf8(&bytes).unwrap());
+}
+
+/// Every gate key `template` names, on a node or an anchor.
+///
+/// A template's gate entries resolve against the repository's own presets and
+/// its own gate registry, so a case that applies a template declares these in
+/// the repository first. Reading them from the template is what keeps a changed
+/// declaration from needing an edit beside it.
+pub(crate) fn template_gate_keys(template: &jit::templates::GraphTemplate) -> Vec<String> {
+    let mut keys: Vec<String> = template
+        .nodes
+        .iter()
+        .flat_map(|node| node.gates.iter())
+        .chain(
+            template
+                .anchors
+                .iter()
+                .flat_map(|anchor| anchor.gates.iter()),
+        )
+        .cloned()
+        .collect();
+    keys.sort();
+    keys.dedup();
+    keys
+}
+
+/// Declare every gate key `template` names in the in-memory gate registry.
+pub(crate) fn seed_memory_template_gates(
+    storage: &InMemoryStorage,
+    template: &jit::templates::GraphTemplate,
+) {
+    let keys = template_gate_keys(template);
+    seed_memory_gate_keys(
+        storage,
+        &keys.iter().map(String::as_str).collect::<Vec<_>>(),
+    );
+}
+
+/// Declare `keys` as manual postcheck gates in the in-memory gate registry.
+///
+/// A template node's `gates` entry resolves against the repository's own gate
+/// presets and its own gate registry, so a suite whose template names gate keys
+/// declares them through this one seeder rather than authoring a registry per
+/// case (`@/invariant/shared-test-contracts`). The whole registry is replaced,
+/// so a case that needs a specific definition seeds one itself.
+pub(crate) fn seed_memory_gate_keys(storage: &InMemoryStorage, keys: &[&str]) {
+    let mut registry = jit::declarations::GateRegistry::default();
+    registry.gates.extend(keys.iter().map(|key| {
+        (
+            (*key).to_string(),
+            jit::declarations::GateDefinition {
+                version: 1,
+                key: (*key).to_string(),
+                title: format!("{key} gate"),
+                description: format!("Repository-declared {key} gate"),
+                stage: jit::declarations::GateStage::Postcheck,
+                mode: jit::declarations::GateMode::Manual,
+                checker: None,
+                inputs: None,
+                priority: 100,
+                reserved: std::collections::HashMap::new(),
+                auto: false,
+                example_integration: None,
+            },
+        )
+    }));
+    seed_memory_gate_registry(storage, &registry);
 }
 
 impl Default for TestHarness {

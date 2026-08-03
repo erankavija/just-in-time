@@ -236,7 +236,22 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     assert!(!fresh.path.join(".git").exists());
     assert!(!existing.path.join(".git").exists());
 
-    let fresh_init = success_json(&fresh.path, &["init", "--profile", "jit-dogfood", "--json"]);
+    // Both worktrees carry the same staged packages, so the trees compared at
+    // the end differ only in how the profile got there.
+    let fresh_location = crate::repository_package_at(&fresh.path, "jit-dogfood");
+    let existing_location = crate::repository_package_at(&existing.path, "jit-dogfood");
+    assert_eq!(fresh_location, existing_location);
+    let fresh_init = success_json(
+        &fresh.path,
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &fresh_location,
+            "--json",
+        ],
+    );
     assert_eq!(
         requested_profile(&fresh_init["profile"])["status"],
         "applied"
@@ -247,14 +262,29 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     // a repository declaring nothing can be shown. It writes nothing.
     let preview = success_json(
         &existing.path,
-        &["profile", "apply", "jit-default", "--dry-run", "--json"],
+        &[
+            "profile",
+            "apply",
+            "jit-default",
+            "--from",
+            &crate::repository_package_at(&existing.path, "jit-default"),
+            "--dry-run",
+            "--json",
+        ],
     );
     assert_eq!(preview["status"], "would_apply");
     assert!(!existing.path.join(".jit/profiles").exists());
 
     let applied = success_json(
         &existing.path,
-        &["profile", "apply", "jit-dogfood", "--json"],
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &existing_location,
+            "--json",
+        ],
     );
     assert_eq!(requested_profile(&applied)["status"], "applied");
     let no_op = success_json(
@@ -306,9 +336,11 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     }
 }
 
-static COMPOSITION_PACKAGE: include_dir::Dir<'_> = include_dir::include_dir!(
-    "$CARGO_MANIFEST_DIR/tests/fixtures/profile-packages/planner-asset-only"
-);
+/// The checked-in fixture tree every composition case below stages copies of,
+/// each under a rewritten manifest declaring its own id.
+fn composition_package() -> std::path::PathBuf {
+    jit::test_utils::profile_package_fixture("planner-asset-only")
+}
 
 #[test]
 fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
@@ -316,13 +348,13 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
     success_json(&repo.path, &["init", "--json"]);
     // An obtained set of packages, side by side inside the worktree.
     jit::test_utils::write_package_declaring(
-        &COMPOSITION_PACKAGE,
+        &composition_package(),
         &repo.path.join("packages/base"),
         "base",
         &[],
     );
     jit::test_utils::write_package_declaring(
-        &COMPOSITION_PACKAGE,
+        &composition_package(),
         &repo.path.join("packages/workflow"),
         "workflow",
         &["base"],
@@ -379,17 +411,17 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
 /// A repository that applied a directory package validates, and repairs the
 /// targets that package owns from the location its record names.
 ///
-/// The package is a fixture this binary does not carry, so every fact
-/// validation states about it — that the repository is coherent, and the bytes
-/// it restores to a deleted target — can only have come from reading the
-/// recorded location again.
+/// The recorded location is the only place the package's bytes exist, so every
+/// fact validation states about it — that the repository is coherent, and the
+/// bytes it restores to a deleted target — can only have come from reading that
+/// location again.
 #[test]
 fn test_validate_repairs_a_profile_applied_from_a_directory() {
     const LOCATION: &str = "packages/planner";
 
     let repo = TestRepo::new();
     let directory =
-        jit::test_utils::write_package_tree(&COMPOSITION_PACKAGE, &repo.path.join(LOCATION));
+        jit::test_utils::copy_package_tree(&composition_package(), &repo.path.join(LOCATION));
     let package = jit::profile::ProfilePackage::from_directory(&directory)
         .expect("a valid package tree")
         .manifest()
@@ -441,7 +473,7 @@ fn test_validate_repairs_a_profile_applied_from_a_directory() {
 fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
     let repo = TestRepo::new();
     jit::test_utils::write_package_declaring(
-        &COMPOSITION_PACKAGE,
+        &composition_package(),
         &repo.path.join("packages/workflow"),
         "workflow",
         &["absent-base"],
@@ -478,7 +510,7 @@ fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
     let repo = TestRepo::new();
     success_json(&repo.path, &["init", "--json"]);
     jit::test_utils::write_package_declaring(
-        &COMPOSITION_PACKAGE,
+        &composition_package(),
         &repo.path.join("packages/workflow"),
         "workflow",
         &["absent-base"],
@@ -514,7 +546,17 @@ fn test_profile_application_contributes_workflow_invariants_to_scaffolded_regist
     let repo = TestRepo::new();
 
     success_json(&repo.path, &["init", "--json"]);
-    let applied = success_json(&repo.path, &["profile", "apply", "jit-dogfood", "--json"]);
+    let applied = success_json(
+        &repo.path,
+        &[
+            "profile",
+            "apply",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(&repo.path, "jit-dogfood"),
+            "--json",
+        ],
+    );
     assert_eq!(requested_profile(&applied)["status"], "applied");
     assert_eq!(
         success_json(&repo.path, &["validate", "--json"])["valid"],
@@ -545,7 +587,14 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let path = Some(checker_path.value.as_path());
     success_json_with_path(
         &repo.path,
-        &["init", "--profile", "jit-dogfood", "--json"],
+        &[
+            "init",
+            "--profile",
+            "jit-dogfood",
+            "--from",
+            &crate::repository_package_at(&repo.path, "jit-dogfood"),
+            "--json",
+        ],
         path,
     );
     assert!(!repo.path.join(".git").exists());

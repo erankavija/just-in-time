@@ -733,36 +733,30 @@ jit issue update $ISSUE --state done
 
 Gate presets are pre-configured bundles of quality gates that dramatically reduce setup time. Instead of defining and adding gates individually, apply entire workflows in seconds.
 
-### What the Binary Ships
+### Where Presets Come From
 
-The `jit` binary ships exactly the three
-[planning-bracket](../concepts/planning-bracket.md) presets — `plan-review`,
-`coverage-preview`, and `breakdown-review`. They are listed in
-[Built-in Gate Presets](../reference/gate-presets.md), a reference generated from
-the preset definitions themselves.
+Every preset is declared by the project that uses it, under
+`.jit/config/gate-presets/`. Gate keys, titles, and checkers (a test runner, a
+linter, a formatter, a security audit) are domain vocabulary, so the bundles that
+carry them belong to the repository rather than to the binary.
+[Gate Presets](../reference/gate-presets.md) states the preset contract and the
+portable checker syntax a bundled gate can use.
 
-A `plan`-style graph template resolves these presets by name to gate its planning
-and breakdown nodes, but the template itself is optional, project-declared
-configuration: `jit init` does not scaffold `templates.toml`. A project that wants
-the plan bracket declares its own `plan` template in `.jit/templates.toml` (this
-repository does so).
-
-Gate keys, titles, and checkers (a test runner, a linter, a formatter, a security
-audit) are domain vocabulary, so language- and stack-specific bundles are
-declared per project rather than built in. The one built-in bundle is the
-planning-bracket trio (`plan-review`, `coverage-preview`, `breakdown-review`),
-retained because it encodes jit's own plan-before-fan-out workflow, not adopter
-domain vocabulary. Declare project bundles once as project presets and they
-load alongside it.
+A `plan`-style graph template gates its planning and breakdown nodes by name,
+resolving each name against the project's presets and then its gate registry.
+The template itself is optional, project-declared configuration: `jit init` does
+not scaffold `templates.toml`. A project that wants the
+[planning bracket](../concepts/planning-bracket.md) declares its own `plan`
+template in `.jit/templates.toml`, along with the gate keys that template names
+(this repository does so).
 
 **List available presets:**
 ```bash
 jit gate preset list
 ```
 
-Each line names one preset with its description and gate count, prefixed
-`[builtin]` for a preset the binary ships and `[custom]` for a project-defined
-one. To inspect the gates a preset carries, run `jit gate preset show <name>`.
+Each line names one preset with its description and gate count. To inspect the
+gates a preset carries, run `jit gate preset show <name>`.
 
 ### Declaring a Project Preset
 
@@ -802,8 +796,7 @@ jit gate preset create abc123 rust-ci
 
 This writes the bundle to `.jit/config/gate-presets/<name>.json` (here
 `rust-ci.json`) with those four gates.
-`jit gate preset create` rejects a built-in name; commit the JSON file to share
-the preset with your team.
+Commit the JSON file to share the preset with your team.
 
 **View preset details:**
 ```bash
@@ -911,9 +904,9 @@ Created preset 'team-standard' at .jit/config/gate-presets/team-standard.json
 
 **Step 3: Use everywhere**
 ```bash
-# List shows custom preset
+# List shows the captured preset
 jit gate preset list
-# [custom] team-standard - Custom preset created from issue abc123 (5 gates)
+# team-standard - Custom preset created from issue abc123 (5 gates)
 
 # Apply to any issue
 jit gate preset apply team-standard def456
@@ -956,7 +949,6 @@ cat .jit/config/gate-presets/team-standard.json
 - Edit JSON files directly for fine-tuning
 - Delete files to remove presets
 - Share files with team via git
-- Custom presets override builtin with same name
 
 ### Practical Workflows
 

@@ -111,16 +111,18 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
     // The area a document declaration names is one the repository declares, so
     // the fixture declares it before a template that names it is applied.
     declare_document_area(h);
-    // `repo-validate` is a CONFIG-DECLARED gate (it lives in `.jit/gates.toml`,
-    // not the built-in preset set), so the in-memory registry must declare it for
-    // the `plan` template's `container` anchor to resolve it as a registry gate
-    // key. Mirrors the shipped whole-repo `jit validate` gate.
-    h.add_gate(
-        "repo-validate",
-        "Repo Validate",
-        "Whole-repository validation must pass (jit validate with no issue id)",
-        true,
-    );
+    // A template's gate entries resolve against the repository's own presets
+    // and its own gate registry, so the fixture declares every key the `plan`
+    // template names — the `container` anchor's `repo-validate` and the bracket
+    // node gates — before a template that names them is applied.
+    for key in crate::harness::template_gate_keys(&plan_template()) {
+        h.add_gate(
+            &key,
+            &format!("{key} gate"),
+            &format!("Repository-declared {key} gate"),
+            true,
+        );
+    }
     let (id, _) = h
         .executor
         .create_issue(
@@ -669,10 +671,10 @@ applies_to  = ["epic"]
 #[test]
 fn test_apply_plan_template_attaches_repo_validate_to_container() {
     // REQ-13 (issue 552ff75c): applying the `plan` template attaches the
-    // whole-repo integrity gate `repo-validate` to the bound container anchor —
-    // now via the registry-gate-key path (`repo-validate` is config-declared in
-    // `.jit/gates.toml`, registered here by `create_epic`, NOT a built-in preset)
-    // — so the container cannot reach Done until whole-repo validation passes.
+    // whole-repo integrity gate `repo-validate` to the bound container anchor,
+    // via the registry-gate-key path (`repo-validate` is config-declared in
+    // `.jit/gates.toml` and registered here by `create_epic`), so the container
+    // cannot reach Done until whole-repo validation passes.
     let h = TestHarness::new();
     let template = plan_template();
     let epic = create_epic(&h, "Repo-validate epic");
@@ -694,14 +696,15 @@ fn test_apply_plan_template_attaches_repo_validate_to_container() {
 #[test]
 fn test_apply_attaches_registry_gate_key_not_preset() {
     // REQ-13 (issue 552ff75c): a template gate that names a REGISTRY GATE KEY
-    // (declared in `.jit/gates.toml`, NOT a built-in preset) is attached to the
-    // bound issue at apply time — the same effect as `jit gate add <issue> <key>`.
+    // (declared in `.jit/gates.toml`, with no preset of that name) is attached
+    // to the bound issue at apply time — the same effect as
+    // `jit gate add <issue> <key>`.
     // Here the anchor and a node each name `deploy-check`, a registry-only gate.
     let h = TestHarness::new();
     h.add_gate(
         "deploy-check",
         "Deploy Check",
-        "A config-declared gate, not a preset",
+        "A config-declared gate with no preset of that name",
         true,
     );
     // Guard: the name must NOT also be a preset, so the test exercises the
@@ -842,6 +845,86 @@ applies_to  = ["epic"]
     assert_eq!(h.all_issues().len(), before);
 }
 
+/// REQ-02 (jit:ff1bbada): a template gate that no preset and no registry entry
+/// supplies is reported by name, whatever that name is.
+///
+/// The names checked are the planning bracket's own: they are the ones an
+/// adopter is most likely to expect the engine to answer for, and the engine
+/// answers for none of them until the repository declares them itself.
+#[test]
+fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_supplies() {
+    for key in ["plan-review", "coverage-preview", "breakdown-review"] {
+        // A repository declaring no preset and no gate registry at all, so the
+        // name under test is supplied by neither.
+        let h = TestHarness::new();
+        assert!(
+            h.storage.get_gate_preset(key).is_err(),
+            "{key} must not resolve as a preset this repository never declared"
+        );
+        assert!(
+            !h.storage
+                .load_gate_registry()
+                .expect("an empty registry loads")
+                .gates
+                .contains_key(key),
+            "{key} must not be a registry gate this repository never declared"
+        );
+
+        let toml = format!(
+            r#"
+[[template]]
+name        = "unsupplied"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  gates       = ["{key}"]
+  description = "Planning node for {{container.title}}."
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "planning"
+"#
+        );
+        let template = TemplateRegistry::from_toml_str(&toml, &HIERARCHY)
+            .unwrap()
+            .get("unsupplied")
+            .unwrap()
+            .clone();
+        let epic = h
+            .executor
+            .create_issue(
+                format!("Container gated by {key}"),
+                "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
+                jit::domain::Priority::Normal,
+                vec![],
+                vec!["type:epic".to_string()],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .0;
+
+        let before = h.all_issues().len();
+        let error = h
+            .executor
+            .apply_template_with(&template, &epic, &container_binding(&epic), false)
+            .unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains(key),
+            "the failure must name the gate it could not resolve: {error:#}"
+        );
+        assert_eq!(
+            h.all_issues().len(),
+            before,
+            "the unresolved gate is reported before the first node is created"
+        );
+    }
+}
+
 // === REQ-13 regression: a malformed custom preset must propagate, NOT silently
 // fall back to a same-named registry gate key (issue 552ff75c) ===
 
@@ -866,8 +949,8 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
             .unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);
 
-    // `repo-validate` is a config-declared REGISTRY gate, NOT a built-in preset, so
-    // the registry-key fallback WOULD match it.
+    // `repo-validate` is a config-declared REGISTRY gate with no preset of that
+    // name, so the registry-key fallback WOULD match it.
     executor
         .add_gate_definition(
             "repo-validate".to_string(),
@@ -975,7 +1058,7 @@ applies_to  = ["epic"]
 #[test]
 fn test_repo_gates_toml_declares_repo_validate_whole_repo_checker() {
     // REQ-13 (issue 552ff75c): `repo-validate` is CONFIG-DECLARED in the repo's
-    // own `.jit/gates.toml` (not a built-in preset), with a whole-repo checker —
+    // own `.jit/gates.toml`, with a whole-repo checker —
     // `jit validate` with NO issue id — distinct from the per-issue `jit-validate`
     // gate (`jit validate "$JIT_ISSUE_ID"`). Gates persist as a `[[gates]]`
     // array-of-tables (jit:f5d35048), so each entry is found by scanning for its
