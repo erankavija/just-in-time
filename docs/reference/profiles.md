@@ -36,13 +36,10 @@ jit profile apply jit-dogfood --dry-run
 jit profile apply jit-dogfood
 ```
 
-`show` and `apply` read their package through one resolution order: the
-directory `--from` names, else the location this repository's applied-profile
-record names, else the package this binary carries. A package obtained as a
-directory is therefore named once —
-`jit profile apply <id> --from vendor/<id>` — and every later run reads it back
-from the record. `jit init --profile <id> --from <path>` takes the same
-location, because a repository being created has no record to read.
+The command syntax, supplied-location form, and package-resolution contract are
+defined in [Profile Commands](cli-commands.md#profile-commands). This page
+describes the package and its lifecycle; the command reference covers how a
+package obtained from a directory is selected and found again on later runs.
 
 A package a resolved one declares a dependency on is looked for beside it,
 under the dependency's own id, before the record and the binary answer. A
@@ -58,9 +55,8 @@ package that declared it beside the one that could not be found — so an adopte
 is never left diagnosing a package they did not name. Both refusals are raised
 over the whole set before any of it is applied.
 
-Enumeration follows the records alone: a repository that has applied nothing
-names no profile, and a recorded location that no longer holds a readable
-package fails the command by naming the record and the location.
+Profile enumeration and its handling of applied-profile records are defined in
+[Profile Commands](cli-commands.md#profile-commands).
 
 All profile commands support `--json`. `profile list` and `profile apply` use
 the standard count-wrapped list shape; an application reports one result per
@@ -132,9 +128,10 @@ bytes; it never treats a conventional filename as proof of ownership.
 
 What a recorded profile owns is recomputed from the package its own record
 resolves to, read again from the location that record names. A stored record
-that disagrees with the package read there, and a recorded location that no
-longer resolves, both fail validation naming the record, so repair restores
-every profile-owned target or none.
+that disagrees with the package read there fails validation naming the record,
+so repair restores every profile-owned target or none. The command-level
+package lookup and its failure behavior are defined in
+[Profile Commands](cli-commands.md#profile-commands).
 
 Managed regions replace only the package- or projection-owned marked region.
 Distinct regions may nest, but delimiters must form one unambiguous containment
@@ -185,21 +182,20 @@ application.
 Successful application writes a minimal provenance record at
 `.jit/profiles/<profile-id>.json` (therefore the `jit-dogfood` ID selects the
 matching filename) and appends the repository-scoped `profile_applied` audit
-event. Every applied package writes its own record and appends its own event, so
-applying a package that declares a dependency leaves one record and one event
-per package of the set. The record stores the profile ID, version, origin,
-package hash, and per-target hashes used to recognize an exact reapplication. It
-does not state why a package was applied, so a record reads the same whether the
-adopter named that package or received it as another's dependency.
+event. Every applied package writes its own record and appends its own event,
+so applying a package that declares a dependency leaves one record and one
+event per package of the set. The record stores the profile ID, version, origin,
+package hash, and per-target hashes used to recognize an exact reapplication.
+It does not state why a package was applied, so a record reads the same whether
+the adopter named that package or received it as another's dependency.
 
 The origin says where the applied bytes came from: either compiled into the
 binary, or read from a repository directory, in which case it carries that
-directory as a worktree-relative location. The record is the one place a
-repository states where its package is, so a later run reads the same package
-from the same location. That location is confined to the worktree — a package
-read from outside it, including from under `.jit/`, is refused by name rather
-than recorded — so re-reading a repository's package never depends on machine
-state.
+directory as a worktree-relative location. The command reference defines how
+later commands use that recorded location. The location is confined to the
+worktree — a package read from outside it, including from under `.jit/`, is
+refused by name rather than recorded — so re-reading a repository's package
+never depends on machine state.
 
 These repository-state guarantees do not change Git requirements. Core commands,
 including init, profile application, project rendering, and validation, work
@@ -222,11 +218,10 @@ deferred to the post-1.0 profile epic and do not exist in this release:
 - safe removal.
 
 There is no composition flag, variable input, profile-upgrade command, or
-profile-removal command hidden behind the v1.0 interface. A package's location
-is named explicitly, read from this repository's own record, or taken from
-beside the package that declares it as a dependency; no configured search path
-discovers one. Edit repository configuration directly for advanced
-customization, or start from the manual guides below.
+profile-removal command hidden behind the v1.0 interface. Package lookup follows
+the command contract in [Profile Commands](cli-commands.md#profile-commands);
+no configured search path discovers a package. Edit repository configuration
+directly for advanced customization, or start from the manual guides below.
 
 ## Advanced customization
 
