@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bc48ffbe51eaa1e8729fedd6ad370430884865b8",
+  "completed_at": "2026-08-03T20:38:41.123571393Z",
+  "duration_ms": 169175,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria and the prior blocking findings are verified in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7af6eb3d-3f1d-434b-9db7-d66c706a4b1c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e16e23c0-1207-4c40-b5e7-a994ec82862d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T20:35:51.948103295Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cc59ae07, cb46b238, bc48ffbe (`jit:7af6eb3d`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13, D-21, D-22, D-23 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/invariant/domain-agnostic, canonical-cutover, single-source-prose (.jit/invariants.toml); @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); mcp-ci passed (no exit code); npm-ci passed (no exit code); jit-validate passed (0); docs-mechanical passed (0); doc-review passed (0)\nTruncation recovery: narrowed parent patches, remediation patches, current init/profile/MCP/web/path-boundary sources, and focused conformance tests\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria and the prior blocking findings are verified in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

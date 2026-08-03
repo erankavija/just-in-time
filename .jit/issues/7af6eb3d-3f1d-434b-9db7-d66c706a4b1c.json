@@ -15,6 +15,7 @@
   ],
   "description": "The configuration a new repository receives, the named content bundles, the vocabulary literals in every shipped artefact, and this checkout's own paths have all left the binary, and the invariant states the rule that keeps them out.\n\n## Background\n\nBeyond one project's workflow, the binary carries a whole configuration it renders for every new repository, four named icon bundles selectable by name, a label namespace built from a literal in two commands, this repository's own gate keys and item ids in the agent-facing bridge's shipped text, a type hierarchy and a namespace colour table in the web bundle, and the documentation and script paths of this checkout. Each produces content an adopter never declared, so each is an instance rather than a mechanism.\n\nWhat stays is named as carefully as what goes: the defaults that name a mechanism's own parameter, and the rules that derive both their assertion and their membership from whatever registry the adopter declared. The amended invariant carries both classes explicitly, because a narrower wording would delete the first by implication and be silent where the boundary reaches furthest.\n\n## Success Criteria\n\n- [hard] REQ-01: A bare initialization writes the structural minimum, and no compiled configuration template, named hierarchy bundle, or named icon bundle remains.\n- [hard] REQ-02: No type name or label namespace literal remains in the engine's own label construction, in the agent-facing bridge's shipped text, or in the web bundle's rendering paths.\n- [hard] REQ-03: No path inside this checkout is reachable from an adopter build.\n- [hard] REQ-04: The project invariant carries no sanctioned exception and states which names belong to a mechanism, reaching every class the boundary names.\n- [hard] REQ-05: The adopter-facing documentation describes obtaining and applying the published packages, the affordance that goes with the removal, and the two workflow warnings a repository stops receiving unless it applies the workflow package.\n\n## Notes\n\nThe generated policy regions are repaired inside the change that breaks them, because their generator reads the very table the removal stops writing.\n",
   "documents": [],
+  "done_at": "2026-08-03T20:38:58.660404765Z",
   "first_ready_at": "2026-08-03T18:48:55.842771790Z",
   "gates_required": [
     "cargo-ci",
@@ -28,37 +29,37 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-03T19:34:25.823890681Z",
+      "updated_at": "2026-08-03T20:33:56.001301699Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T19:39:26.825413480Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T20:38:41.495541922Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T19:36:10.998724781Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T20:35:50.294257523Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-03T19:28:06.320849878Z",
+      "updated_at": "2026-08-03T20:24:44.598068273Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_at": "2026-08-03T19:27:55.336879012Z",
+      "updated_at": "2026-08-03T20:05:31.606747818Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-08-03T19:28:22.477050859Z",
+      "updated_at": "2026-08-03T20:05:45.463892579Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
       "status": "passed",
-      "updated_at": "2026-08-03T19:28:22.178773789Z",
+      "updated_at": "2026-08-03T20:05:44.973700870Z",
       "updated_by": "auto:executor"
     }
   },
@@ -76,7 +77,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "The binary carries no configuration it writes for a repository",
-  "updated_at": "2026-08-03T20:04:28.806825523Z"
+  "updated_at": "2026-08-03T20:38:58.660404765Z"
 }

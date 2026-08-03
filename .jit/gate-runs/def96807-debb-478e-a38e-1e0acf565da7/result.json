@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb46b2380dc6967c00d9fbacfa73db7d8a5fcdcb",
+  "completed_at": "2026-08-03T20:20:46.604894785Z",
+  "duration_ms": 250024,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria and both prior blocking findings are verified in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7af6eb3d-3f1d-434b-9db7-d66c706a4b1c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "def96807-debb-478e-a38e-1e0acf565da7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T20:16:36.580198275Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cc59ae07, cb46b238 (`jit:7af6eb3d`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/e204e63d/decision/D-13,D-21,D-22,D-23 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/canonical-cutover, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); mcp-ci passed; npm-ci passed; jit-validate passed (0); docs-mechanical passed (0); doc-review failed (1); prior code-review failed (1, F1/F2 resolved)\nTruncation recovery: narrowed tagged-commit reads, remediation patches, affected source/tests/docs, and the application bundle after broad-search truncation\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria and both prior blocking findings are verified in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

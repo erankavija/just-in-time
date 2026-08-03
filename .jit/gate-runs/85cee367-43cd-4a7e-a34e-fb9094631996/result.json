@@ -1,0 +1,25 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "cd web && npm test -- --run && npm run lint && npm run build",
+  "commit": null,
+  "completed_at": "2026-08-03T20:05:44.962947283Z",
+  "duration_ms": 0,
+  "exit_code": null,
+  "gate_key": "npm-ci",
+  "inputs_digest": "0c48c72336c57f6c289972ddcd7da3b1182e8d385c5e50530d042c01c56ea3b7",
+  "issue_id": "7af6eb3d-3f1d-434b-9db7-d66c706a4b1c",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_run": "a2a4e85f-409a-4d94-83db-60e76e84ed3e"
+  },
+  "run_id": "85cee367-43cd-4a7e-a34e-fb9094631996",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T20:05:44.962947283Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "",
+  "tree_dirty": null
+}

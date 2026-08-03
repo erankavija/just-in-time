@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bc48ffbe51eaa1e8729fedd6ad370430884865b8",
+  "completed_at": "2026-08-03T20:35:49.881711929Z",
+  "duration_ms": 112638,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-attributable documentation accurately describes the package-based profile workflow; the prior first-use command defect is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "7af6eb3d-3f1d-434b-9db7-d66c706a4b1c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fb1d528f-64ed-4a30-9490-4db9bc3f831f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T20:33:57.243477888Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: container `7af6eb3d` plus all 11 resolved, delivered children; every included issue had reachable `jit:<short-id>` commits, inspected individually with rename detection. The prior blocking finding is fixed: first-use profile inspection now supplies `--from`, matching current command help.\n\nDocumentation accurately covers package acquisition, application, workflow warnings, and manual gate alternatives. No issue-impact defects remain.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-attributable documentation accurately describes the package-based profile workflow; the prior first-use command defect is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
