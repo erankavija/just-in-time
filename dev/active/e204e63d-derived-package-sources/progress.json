@@ -547,7 +547,8 @@
     {
       "at": "2026-08-02",
       "session": 6,
-      "text": "jit-dogfood's packaged [namespaces.satisfies] contribution still carries the pre-amendment one-line description, while .jit/config.toml carries the sharpened one the owner ruled in session 5. A package re-apply would overwrite the ruling. [namespaces.per] is in neither package and is repository-local only. Whoever reduces the packages (e4ba28c5) or applies one to this repository must reconcile both."
+      "text": "jit-dogfood's packaged [namespaces.satisfies] contribution still carries the pre-amendment one-line description, while .jit/config.toml carries the sharpened one the owner ruled in session 5. A package re-apply would overwrite the ruling. [namespaces.per] is in neither package and is repository-local only. Whoever reduces the packages (e4ba28c5) or applies one to this repository must reconcile both.",
+      "disposition": "CLOSED session 8 at commit a1fb4e4f. Reconciled while gating 93fef456: its REQ-03 names the vocabulary the workflow package adds, and a packaged namespace declaration that would overwrite the owner's ruling on re-apply is inside that subject, so it was closed before the container gate rather than carried as a follow-up. [namespaces.per] stays repository-local by the session-5 ruling and is correctly in neither package."
     },
     {
       "at": "2026-08-02",
