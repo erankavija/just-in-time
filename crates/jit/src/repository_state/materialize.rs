@@ -571,7 +571,7 @@ mod tests {
         CaptureSpec, Contribution, EntryIdentity, InitializationScaffold, MapEntryTarget,
         MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
         MaterializationRequest, MutationContext, ProfileApplicationInput, ProfileAssetClaim,
-        ProfileClaims, ProfileRegionClaim, RepositoryImage, RepositoryLayout,
+        ProfileClaims, ProfilePackageId, ProfileRegionClaim, RepositoryImage, RepositoryLayout,
         RepositoryRootEvidence, RepositorySeed, RepositorySeedKind, TargetClaim,
     };
     use std::collections::BTreeMap;
@@ -955,6 +955,7 @@ kind = "advisory"
             target_hashes: BTreeMap::new(),
             origin: ProfileOrigin::Embedded,
             claims: ProfileClaims {
+                package_id: ProfilePackageId::new("identity-test"),
                 contributions: Vec::new(),
                 assets: Vec::new(),
                 regions: Vec::new(),
@@ -1700,6 +1701,7 @@ kind = "advisory"
 
         let test_layout = layout();
         let profile_claims = ProfileClaims {
+            package_id: ProfilePackageId::new("profile-test"),
             contributions: vec![Contribution::MapEntry {
                 target: MapEntryTarget::Namespaces,
                 identity: "profile-owned".to_string(),

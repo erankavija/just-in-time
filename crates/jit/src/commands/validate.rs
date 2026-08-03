@@ -327,11 +327,26 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         for listing in &closure.listings {
             spec.discover_listing(listing.clone())?;
         }
+        // Profile composition needs the per-package target provenance to tell a
+        // package occupant from repository-authored content. The profile directory
+        // is listed for every captured image, and its records are added to the
+        // exact phase-three read set from that one listing.
+        let profiles_dir = VirtualPath::PROFILES;
+        spec.discover_listing(profiles_dir)?;
         let mut phase_three = spec.clone();
         let image_two = match capture_or_retry(session.capture(spec))? {
             Some(image) if image.has_stable_overlap(&image_one) => image,
             Some(_) | None => return Ok(None),
         };
+        if let Some(listing) = image_two.listing_fingerprints().get(&VirtualPath::PROFILES) {
+            phase_three.discover_paths(
+                listing
+                    .children()
+                    .keys()
+                    .map(|name| VirtualPath::data(format!("profiles/{name}")))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?;
+        }
 
         let issues = effective_issues(&image_two, &all_ids, &effective)?;
         let mut full_config = config.clone();

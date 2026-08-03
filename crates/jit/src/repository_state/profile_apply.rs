@@ -155,12 +155,65 @@ pub struct ProfileRegionClaim {
     pub content: Vec<u8>,
 }
 
+/// The source that already owns a conflicting repository declaration or target.
+///
+/// Repository-authored content is deliberately distinct from a package occupant:
+/// an adopter needs to know whether it must change its own file or resolve a
+/// package composition conflict.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProfileConflictOccupant {
+    /// The repository authored the existing declaration or target.
+    Repository,
+    /// An already-applied package authored the existing declaration or target.
+    Package(ProfilePackageId),
+}
+
+impl std::fmt::Display for ProfileConflictOccupant {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Repository => formatter.write_str("the repository"),
+            Self::Package(id) => write!(formatter, "package {id}"),
+        }
+    }
+}
+
+/// Stable semantic identity of a profile package.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
+#[serde(transparent)]
+#[schemars(with = "String")]
+pub struct ProfilePackageId(String);
+
+impl ProfilePackageId {
+    /// Construct an identity from a validated package manifest identifier.
+    pub fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    /// Borrow the package identifier.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ProfilePackageId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
 /// A package asset cannot replace an authored occupant it does not own.
 #[derive(Debug, thiserror::Error)]
-#[error("profile asset target {path:?} contains differing bytes")]
+#[error(
+    "profile package {candidate} asset target {path:?} conflicts with {occupant} and contains differing bytes"
+)]
 pub struct ProfileTargetConflictError {
     /// Conflicting canonical repository path.
     pub path: VirtualPath,
+    /// Package whose asset is being applied.
+    pub candidate: ProfilePackageId,
+    /// Existing owner of the target.
+    pub occupant: ProfileConflictOccupant,
 }
 
 /// A profile package's contribution to a repository, in canonical repository-state
@@ -168,6 +221,8 @@ pub struct ProfileTargetConflictError {
 /// consumed only by [`compose_profile_targets`].
 #[derive(Clone)]
 pub struct ProfileClaims {
+    /// Package that authored these claims.
+    pub package_id: ProfilePackageId,
     pub contributions: Vec<Contribution>,
     pub assets: Vec<ProfileAssetClaim>,
     pub regions: Vec<ProfileRegionClaim>,
@@ -290,7 +345,7 @@ pub(crate) fn profile_capture_closure(
     base: &RepositoryImage,
     claims: &ProfileClaims,
 ) -> Result<Vec<VirtualPath>, RepositoryStateError> {
-    let registries = merge_semantic_contributions(base, &claims.contributions)?;
+    let registries = merge_semantic_contributions(base, &claims.package_id, &claims.contributions)?;
     let proposed = apply_overlay(
         base,
         registries
@@ -332,7 +387,9 @@ pub(super) fn compose_profile_targets(
     base: &RepositoryImage,
     claims: ProfileClaims,
 ) -> Result<BTreeMap<VirtualPath, (Vec<u8>, FileMode)>, RepositoryStateError> {
-    let mut targets = merge_semantic_contributions(base, &claims.contributions)?;
+    let mut targets =
+        merge_semantic_contributions(base, &claims.package_id, &claims.contributions)?;
+    let package_id = claims.package_id.clone();
     let projection_targets = configured_projection_targets(base, &targets)?;
     for asset in claims.assets {
         let path = asset.claim.target().clone();
@@ -342,7 +399,11 @@ pub(super) fn compose_profile_targets(
             {
                 if bytes != &asset.bytes {
                     return Err(RepositoryStateError::ProfileTargetConflict(
-                        ProfileTargetConflictError { path },
+                        ProfileTargetConflictError {
+                            occupant: profile_conflict_occupant(base, &path)?,
+                            candidate: package_id.clone(),
+                            path,
+                        },
                     ));
                 }
             }
@@ -413,6 +474,7 @@ pub(super) fn compose_profile_targets(
 
 fn merge_semantic_contributions(
     base: &RepositoryImage,
+    package_id: &ProfilePackageId,
     contributions: &[Contribution],
 ) -> Result<BTreeMap<VirtualPath, (Vec<u8>, FileMode)>, RepositoryStateError> {
     let mut documents = BTreeMap::<String, MergeDocument>::new();
@@ -430,7 +492,13 @@ fn merge_semantic_contributions(
         let document = documents
             .get_mut(&target)
             .expect("profile registry document was inserted");
-        merge_contribution(&target, &mut document.document, contribution)?;
+        merge_contribution_with_base(
+            Some(base),
+            package_id,
+            &target,
+            &mut document.document,
+            contribution,
+        )?;
     }
     documents
         .into_iter()
@@ -497,21 +565,43 @@ fn profile_registry_error(target: &str, source: ProfileRegistryParseError) -> Re
     .into()
 }
 
+#[cfg(test)]
 fn merge_contribution(
     registry: &str,
     document: &mut DocumentMut,
     contribution: &Contribution,
 ) -> Result<(), RepositoryStateError> {
+    merge_contribution_with_base(
+        None,
+        &ProfilePackageId::new("test-package"),
+        registry,
+        document,
+        contribution,
+    )
+}
+
+fn merge_contribution_with_base(
+    base: Option<&RepositoryImage>,
+    package_id: &ProfilePackageId,
+    registry: &str,
+    document: &mut DocumentMut,
+    contribution: &Contribution,
+) -> Result<(), RepositoryStateError> {
     let semantic = semantic_document(registry, document)?;
+    let context = ContributionMergeContext {
+        base,
+        package_id,
+        registry,
+    };
     match contribution {
         Contribution::Scalar { target, value } => {
-            merge_scalar(registry, document, &semantic, *target, value)
+            merge_scalar(&context, document, &semantic, *target, value)
         }
         Contribution::MapEntry {
             target,
             identity,
             value,
-        } => merge_map_entry(registry, document, &semantic, *target, identity, value),
+        } => merge_map_entry(&context, document, &semantic, *target, identity, value),
         Contribution::SetString { target, value } => {
             merge_set_string(registry, document, &semantic, *target, value)
         }
@@ -519,15 +609,21 @@ fn merge_contribution(
             target,
             identity,
             value,
-        } => merge_keyed_array(registry, document, *target, identity, value),
+        } => merge_keyed_array(&context, document, *target, identity, value),
         Contribution::Projection { name, value } => {
-            merge_projection(registry, document, &semantic, name, value)
+            merge_projection(&context, document, &semantic, name, value)
         }
     }
 }
 
+struct ContributionMergeContext<'a> {
+    base: Option<&'a RepositoryImage>,
+    package_id: &'a ProfilePackageId,
+    registry: &'a str,
+}
+
 fn merge_scalar(
-    registry: &str,
+    context: &ContributionMergeContext<'_>,
     document: &mut DocumentMut,
     semantic: &JsonValue,
     target: ScalarTarget,
@@ -535,14 +631,14 @@ fn merge_scalar(
 ) -> Result<(), RepositoryStateError> {
     let (table, key) = scalar_target_path(target);
     if let Some(existing) = semantic.get(table).and_then(|table| table.get(key)) {
-        return equal_or_conflict(
-            registry,
+        return equal_or_conflict_with_base(
+            context,
             &format!("{table}.{key}"),
             existing,
             &JsonValue::String(candidate.to_string()),
         );
     }
-    ensure_table(document.as_table_mut(), table, registry)?.insert(key, candidate.into());
+    ensure_table(document.as_table_mut(), table, context.registry)?.insert(key, candidate.into());
     Ok(())
 }
 
@@ -556,7 +652,7 @@ fn scalar_target_path(target: ScalarTarget) -> (&'static str, &'static str) {
 }
 
 fn merge_map_entry(
-    registry: &str,
+    context: &ContributionMergeContext<'_>,
     document: &mut DocumentMut,
     semantic: &JsonValue,
     target: MapEntryTarget,
@@ -576,26 +672,26 @@ fn merge_map_entry(
         MapEntryTarget::ItemKinds => semantic_map_entry(semantic, &["item_kinds"], identity),
     };
     if let Some(existing) = existing {
-        return equal_or_conflict(registry, identity, existing, candidate);
+        return equal_or_conflict_with_base(context, identity, existing, candidate);
     }
     match target {
         MapEntryTarget::TypeHierarchyTypes => {
             ensure_inline_table(
-                ensure_table(document.as_table_mut(), "type_hierarchy", registry)?,
+                ensure_table(document.as_table_mut(), "type_hierarchy", context.registry)?,
                 "types",
-                registry,
+                context.registry,
             )?
-            .insert(identity, json_to_edit_value(candidate, registry)?);
+            .insert(identity, json_to_edit_value(candidate, context.registry)?);
         }
         MapEntryTarget::LabelAssociations => {
             ensure_table(
-                ensure_table(document.as_table_mut(), "type_hierarchy", registry)?,
+                ensure_table(document.as_table_mut(), "type_hierarchy", context.registry)?,
                 "label_associations",
-                registry,
+                context.registry,
             )?
             .insert(
                 identity,
-                Item::Value(json_to_edit_value(candidate, registry)?),
+                Item::Value(json_to_edit_value(candidate, context.registry)?),
             );
         }
         MapEntryTarget::Namespaces | MapEntryTarget::ItemKinds => {
@@ -604,9 +700,9 @@ fn merge_map_entry(
             } else {
                 "item_kinds"
             };
-            ensure_table(document.as_table_mut(), root, registry)?.insert(
+            ensure_table(document.as_table_mut(), root, context.registry)?.insert(
                 identity,
-                Item::Table(json_object_to_table(candidate, registry)?),
+                Item::Table(json_object_to_table(candidate, context.registry)?),
             );
         }
     }
@@ -666,21 +762,24 @@ fn set_string_target_path(target: SetStringTarget) -> (&'static str, &'static st
 }
 
 fn merge_keyed_array(
-    registry: &str,
+    context: &ContributionMergeContext<'_>,
     document: &mut DocumentMut,
     target: KeyedArrayTarget,
     identity: &str,
     candidate: &JsonValue,
 ) -> Result<(), RepositoryStateError> {
     let field = target.identity_field();
-    let (array, preserved_comment) =
-        ensure_array_of_tables(document.as_table_mut(), target.array_name(), registry)?;
+    let (array, preserved_comment) = ensure_array_of_tables(
+        document.as_table_mut(),
+        target.array_name(),
+        context.registry,
+    )?;
     let mut identities = BTreeSet::new();
     let mut existing = None;
     for table in array.iter() {
         let Some(actual) = table.get(field).and_then(Item::as_str) else {
             return Err(profile_registry_error(
-                registry,
+                context.registry,
                 ProfileRegistryParseError::MissingIdentity {
                     field: field.to_string(),
                 },
@@ -688,20 +787,20 @@ fn merge_keyed_array(
         };
         if !identities.insert(actual.to_string()) {
             return Err(profile_registry_error(
-                registry,
+                context.registry,
                 ProfileRegistryParseError::DuplicateIdentity {
                     field: field.to_string(),
                 },
             ));
         }
         if actual == identity {
-            existing = Some(table_to_json(table, registry)?);
+            existing = Some(table_to_json(table, context.registry)?);
         }
     }
     if let Some(existing) = existing {
-        return equal_or_conflict(registry, identity, &existing, candidate);
+        return equal_or_conflict_with_base(context, identity, &existing, candidate);
     }
-    let mut table = json_object_to_table(candidate, registry)?;
+    let mut table = json_object_to_table(candidate, context.registry)?;
     if let Some(comment) = preserved_comment {
         table.decor_mut().set_prefix(comment);
     }
@@ -710,7 +809,7 @@ fn merge_keyed_array(
 }
 
 fn merge_projection(
-    registry: &str,
+    context: &ContributionMergeContext<'_>,
     document: &mut DocumentMut,
     semantic: &JsonValue,
     name: &str,
@@ -721,11 +820,11 @@ fn merge_projection(
         .get("projection")
         .and_then(|projections| projections.get(name))
     {
-        return equal_or_conflict(registry, name, existing, &candidate);
+        return equal_or_conflict_with_base(context, name, existing, &candidate);
     }
-    ensure_table(document.as_table_mut(), "projection", registry)?.insert(
+    ensure_table(document.as_table_mut(), "projection", context.registry)?.insert(
         name,
-        Item::Table(json_object_to_table(&candidate, registry)?),
+        Item::Table(json_object_to_table(&candidate, context.registry)?),
     );
     Ok(())
 }
@@ -738,8 +837,8 @@ fn semantic_document(
         .map_err(|error| profile_registry_error(registry, error.into()))
 }
 
-fn equal_or_conflict(
-    registry: &str,
+fn equal_or_conflict_with_base(
+    context: &ContributionMergeContext<'_>,
     identity: &str,
     existing: &JsonValue,
     candidate: &JsonValue,
@@ -749,9 +848,62 @@ fn equal_or_conflict(
     } else {
         Err(ProducerError::ProfileContributionConflict {
             identity: identity.to_string(),
-            registry: registry.to_string(),
+            registry: context.registry.to_string(),
+            occupant: context
+                .base
+                .map(|base| {
+                    profile_conflict_occupant(
+                        base,
+                        &VirtualPath::data(
+                            context
+                                .registry
+                                .strip_prefix(".jit/")
+                                .unwrap_or(context.registry),
+                        )?,
+                    )
+                })
+                .transpose()?
+                .unwrap_or(ProfileConflictOccupant::Repository),
+            candidate: context.package_id.clone(),
         }
         .into())
+    }
+}
+
+fn profile_conflict_occupant(
+    base: &RepositoryImage,
+    target: &VirtualPath,
+) -> Result<ProfileConflictOccupant, RepositoryStateError> {
+    let target = repository_target_string(target);
+    let Some(listing) = base.listing_fingerprints().get(&VirtualPath::PROFILES) else {
+        return Ok(ProfileConflictOccupant::Repository);
+    };
+    for name in listing.children().keys() {
+        let record_path = VirtualPath::data(format!("profiles/{name}"))?;
+        let RepositoryEntry::File { bytes, .. } =
+            base.entry(&record_path).map_err(ProducerError::from)?
+        else {
+            continue;
+        };
+        let record: AppliedProfileRecord =
+            serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
+                path: repository_target_string(&record_path),
+                source,
+            })?;
+        if record.target_hashes.contains_key(&target) {
+            return Ok(ProfileConflictOccupant::Package(ProfilePackageId::new(
+                record.id,
+            )));
+        }
+    }
+    Ok(ProfileConflictOccupant::Repository)
+}
+
+fn repository_target_string(path: &VirtualPath) -> String {
+    let relative = path.relative().as_str();
+    match path.root_class() {
+        super::RepositoryRootClass::Data => format!(".jit/{relative}"),
+        super::RepositoryRootClass::Worktree => relative.to_string(),
     }
 }
 
@@ -951,12 +1103,113 @@ fn existing_file_mode(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::{CaptureBudget, CaptureSpec, EntryIdentity};
+    use crate::repository_state::{
+        CaptureBudget, CaptureSpec, EntryIdentity, ListingFingerprint, RepositoryLayout,
+    };
+    use std::collections::BTreeMap;
+
+    fn image_with_profile_owner(
+        target: &VirtualPath,
+        target_bytes: &[u8],
+        package_owns_target: bool,
+    ) -> (RepositoryImage, RepositoryLayout) {
+        let layout = super::super::RepositoryLayout::new(
+            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
+            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .unwrap();
+        let target_name = repository_target_string(target);
+        let target_hashes = package_owns_target
+            .then(|| (target_name, "target-hash".to_string()))
+            .into_iter()
+            .collect();
+        let record = AppliedProfileRecord::new(
+            "base-package",
+            "1.0.0",
+            ProfileOrigin::Embedded,
+            "package-hash",
+            target_hashes,
+        );
+        let record_bytes = record.to_bytes().unwrap();
+        let record_path = VirtualPath::data("profiles/base-package.json").unwrap();
+        let profiles = VirtualPath::PROFILES;
+        let mut spec = CaptureSpec::phase_one(
+            [
+                VirtualPath::CONFIG,
+                profiles.clone(),
+                record_path.clone(),
+                target.clone(),
+            ],
+            CaptureBudget {
+                max_paths: 8,
+                max_listings: 1,
+                max_bytes: 4096,
+                max_depth: 8,
+            },
+        )
+        .unwrap();
+        spec.discover_listing(profiles.clone()).unwrap();
+        let record_identity = EntryIdentity::for_bytes("record", &record_bytes).unwrap();
+        let entries = BTreeMap::from([
+            (VirtualPath::CONFIG, RepositoryEntry::Absent),
+            (
+                profiles.clone(),
+                RepositoryEntry::Directory {
+                    identity: EntryIdentity::for_bytes("profiles", b"directory").unwrap(),
+                    mode: FileMode::Regular,
+                },
+            ),
+            (
+                record_path,
+                RepositoryEntry::File {
+                    identity: record_identity.clone(),
+                    bytes: record_bytes,
+                    mode: FileMode::Regular,
+                },
+            ),
+            (
+                target.clone(),
+                RepositoryEntry::File {
+                    identity: EntryIdentity::for_bytes("target", target_bytes).unwrap(),
+                    bytes: target_bytes.to_vec(),
+                    mode: FileMode::Regular,
+                },
+            ),
+        ]);
+        let listings = BTreeMap::from([(
+            profiles,
+            ListingFingerprint::new(BTreeMap::from([(
+                "base-package.json".to_string(),
+                record_identity,
+            )]))
+            .unwrap(),
+        )]);
+        (
+            RepositoryImage::close(
+                layout.clone(),
+                spec,
+                entries,
+                listings,
+                BTreeMap::new(),
+                BTreeMap::new(),
+            )
+            .unwrap(),
+            layout,
+        )
+    }
 
     #[test]
     fn test_equal_or_conflict_preserves_raw_profile_identifiers() {
-        let error = equal_or_conflict(
-            ".jit/config.toml",
+        let target = VirtualPath::data("config.toml").unwrap();
+        let (image, _) = image_with_profile_owner(&target, b"[validation]\n", false);
+        let package_id = ProfilePackageId::new("candidate");
+        let context = ContributionMergeContext {
+            base: Some(&image),
+            package_id: &package_id,
+            registry: ".jit/config.toml",
+        };
+        let error = equal_or_conflict_with_base(
+            &context,
             "task",
             &serde_json::json!({"level": 3}),
             &serde_json::json!({"level": 4}),
@@ -966,8 +1219,106 @@ mod tests {
         assert!(matches!(
             error,
             RepositoryStateError::Producer(
-                ProducerError::ProfileContributionConflict { identity, registry }
+                ProducerError::ProfileContributionConflict {
+                    identity,
+                    registry,
+                    candidate,
+                    occupant: ProfileConflictOccupant::Repository,
+                }
             ) if identity == "task" && registry == ".jit/config.toml"
+                && candidate.as_str() == "candidate"
+        ));
+    }
+
+    #[test]
+    fn test_equal_or_conflict_reports_package_occupant_and_candidate() {
+        let target = VirtualPath::data("config.toml").unwrap();
+        let (image, _) = image_with_profile_owner(&target, b"[validation]\n", true);
+        let package_id = ProfilePackageId::new("workflow-package");
+        let context = ContributionMergeContext {
+            base: Some(&image),
+            package_id: &package_id,
+            registry: ".jit/config.toml",
+        };
+        let error = equal_or_conflict_with_base(
+            &context,
+            "validation.default_type",
+            &serde_json::json!("task"),
+            &serde_json::json!("story"),
+        )
+        .expect_err("different contribution values must conflict");
+
+        assert!(matches!(
+            error,
+            RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
+                identity,
+                registry,
+                candidate,
+                occupant: ProfileConflictOccupant::Package(occupant),
+            }) if identity == "validation.default_type"
+                && registry == ".jit/config.toml"
+                && candidate.as_str() == "workflow-package"
+                && occupant.as_str() == "base-package"
+        ));
+    }
+
+    #[test]
+    fn test_profile_target_conflict_reports_package_occupant_and_candidate() {
+        let target = VirtualPath::data("custom.txt").unwrap();
+        let (image, layout) = image_with_profile_owner(&target, b"authored by package", true);
+        let claims = ProfileClaims {
+            package_id: ProfilePackageId::new("workflow-package"),
+            contributions: Vec::new(),
+            assets: vec![ProfileAssetClaim {
+                claim: TargetClaim::new(&layout, target.clone(), "profile-asset:custom.txt")
+                    .unwrap(),
+                bytes: b"different package bytes".to_vec(),
+                mode: FileMode::Regular,
+                replace_owned: false,
+            }],
+            regions: Vec::new(),
+        };
+
+        let error = compose_profile_targets(&image, claims)
+            .expect_err("different package target bytes must conflict");
+        assert!(matches!(
+            error,
+            RepositoryStateError::ProfileTargetConflict(ProfileTargetConflictError {
+                path,
+                candidate,
+                occupant: ProfileConflictOccupant::Package(occupant),
+            }) if path == target
+                && candidate.as_str() == "workflow-package"
+                && occupant.as_str() == "base-package"
+        ));
+    }
+
+    #[test]
+    fn test_profile_target_conflict_reports_repository_occupant() {
+        let target = VirtualPath::data("custom.txt").unwrap();
+        let (image, layout) = image_with_profile_owner(&target, b"repository bytes", false);
+        let claims = ProfileClaims {
+            package_id: ProfilePackageId::new("workflow-package"),
+            contributions: Vec::new(),
+            assets: vec![ProfileAssetClaim {
+                claim: TargetClaim::new(&layout, target.clone(), "profile-asset:custom.txt")
+                    .unwrap(),
+                bytes: b"different package bytes".to_vec(),
+                mode: FileMode::Regular,
+                replace_owned: false,
+            }],
+            regions: Vec::new(),
+        };
+
+        let error = compose_profile_targets(&image, claims)
+            .expect_err("a package must not replace repository-authored bytes");
+        assert!(matches!(
+            error,
+            RepositoryStateError::ProfileTargetConflict(ProfileTargetConflictError {
+                occupant: ProfileConflictOccupant::Repository,
+                candidate,
+                path,
+            }) if candidate.as_str() == "workflow-package" && path == target
         ));
     }
 
@@ -1092,7 +1443,8 @@ mod tests {
             error,
             RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
                 identity,
-                registry
+                registry,
+                ..
             }) if identity == "validation.default_type" && registry == ".jit/config.toml"
         ));
     }
@@ -1134,8 +1486,10 @@ mod tests {
         )
         .unwrap();
 
-        assert!(merge_semantic_contributions(&image, &[])
-            .unwrap()
-            .is_empty());
+        assert!(
+            merge_semantic_contributions(&image, &ProfilePackageId::new("test"), &[])
+                .unwrap()
+                .is_empty()
+        );
     }
 }

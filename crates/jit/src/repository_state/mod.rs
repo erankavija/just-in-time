@@ -190,8 +190,9 @@ pub use path::{
 pub(crate) use profile_apply::profile_capture_closure;
 pub use profile_apply::{
     AppliedProfileRecord, CompleteProjectionConfig, Contribution, KeyedArrayTarget, MapEntryTarget,
-    ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileRegionClaim,
-    ProfileTargetConflictError, ScalarTarget, SetStringTarget,
+    ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileConflictOccupant,
+    ProfilePackageId, ProfileRegionClaim, ProfileTargetConflictError, ScalarTarget,
+    SetStringTarget,
 };
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
@@ -291,8 +292,28 @@ pub enum ProducerError {
         source: Box<ProfileRegistryParseError>,
     },
     /// A profile contribution conflicts with an existing registry identity.
-    #[error("profile contribution '{identity}' conflicts in '{registry}'")]
-    ProfileContributionConflict { identity: String, registry: String },
+    #[error(
+        "profile package {candidate} contribution '{identity}' in '{registry}' conflicts with {occupant}"
+    )]
+    ProfileContributionConflict {
+        /// Conflicting declaration identity.
+        identity: String,
+        /// Registry containing the declaration.
+        registry: String,
+        /// Package whose declaration is being applied.
+        candidate: profile_apply::ProfilePackageId,
+        /// Existing owner of the declaration.
+        occupant: profile_apply::ProfileConflictOccupant,
+    },
+    /// An applied-profile provenance record could not be decoded while resolving
+    /// the owner of a conflicting target.
+    #[error("invalid applied profile record '{path}': {source}")]
+    ProfileRecordParse {
+        /// Repository-relative record path.
+        path: String,
+        /// JSON decoding failure.
+        source: serde_json::Error,
+    },
     /// A supported archive edge target is absent from the proposed plan.
     #[error("supported archive edge target is absent from plan: {target}")]
     ProposedLayoutTargetAbsent { target: String },
