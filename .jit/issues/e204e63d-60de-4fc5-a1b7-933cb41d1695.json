@@ -45,8 +45,16 @@
       "format": "markdown",
       "label": "Session 9 handoff",
       "path": "dev/active/e204e63d-derived-package-sources/handoff-8.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/e204e63d-derived-package-sources/e204e63d-completion-report.md"
     }
   ],
+  "done_at": "2026-08-03T21:18:47.192586095Z",
   "first_ready_at": "2026-07-26T19:29:45.471191451Z",
   "gates_required": [
     "repo-validate",
@@ -72,7 +80,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Derived profile assets and projected policy documentation",
-  "updated_at": "2026-08-03T21:17:01.354433367Z"
+  "updated_at": "2026-08-03T21:18:49.238934418Z"
 }
