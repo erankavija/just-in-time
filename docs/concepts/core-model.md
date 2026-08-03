@@ -882,9 +882,10 @@ Labels provide organizational membership using `namespace:value` format for filt
 
 A configured `type` namespace can enforce **at most one** `type:*` label. The
 type vocabulary is project configuration, not fixed by the engine
-(`@/inv/domain-agnostic`): `jit init` ships the `milestone → epic → story → task`
-hierarchy, and a project declares its own type names and levels under
-`[type_hierarchy]`. A project may use `[validation].default_type` to add a type
+(`@/inv/domain-agnostic`): a project declares its own type names and levels
+under `[type_hierarchy]`, and the `jit-default` package declares the
+`milestone → epic → story → task` hierarchy for a project that wants a generic
+one. A project may use `[validation].default_type` to add a type
 when one is absent; without that default or a project rule, a type label is not
 universally required.
 

@@ -18,7 +18,12 @@ jit init --profile jit-dogfood
 ```
 
 Plain `jit init` remains the methodology-neutral alternative. It creates the
-base repository without installing the dogfood workflow.
+structural minimum — the schema version and the project name, beside the empty
+registries, the event log and the index — and declares no vocabulary at all.
+`jit-default` carries the generic vocabulary a repository needs to be usable
+(the type hierarchy, the namespace registry, the item kinds, the validation
+defaults, and the development-area classification), and `jit-dogfood` declares
+this project's workflow on top of it.
 
 ## Commands
 

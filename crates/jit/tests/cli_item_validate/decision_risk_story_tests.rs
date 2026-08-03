@@ -148,7 +148,7 @@ fn default_executor_with(
     let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(repo, &taxonomy.hierarchy_template(), None)
+        .initialize_fresh_repository(repo, None)
         .unwrap();
     let layout = jit::storage::discover_repository_layout(repo, storage.root()).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);

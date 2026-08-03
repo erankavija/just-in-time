@@ -38,7 +38,6 @@ fn write(harness: &TestHarness, path: &str, content: &str) {
 
 fn profiled_harness(omit_profile_record: bool) -> TestHarness {
     let source = tempfile::tempdir().unwrap();
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let source_storage = jit::storage::JsonFileStorage::new(source.path().join(".jit"));
     let source_layout =
         jit::storage::discover_repository_layout(source.path(), source_storage.root()).unwrap();
@@ -46,7 +45,6 @@ fn profiled_harness(omit_profile_record: bool) -> TestHarness {
         .with_layout(source_layout)
         .initialize_fresh_repository(
             source.path(),
-            &taxonomy.hierarchy_template(),
             Some(jit::commands::ProfileSelection {
                 id: "jit-dogfood",
                 location: None,
@@ -197,7 +195,6 @@ fn repair_target_path_strings() -> Vec<String> {
     PATHS
         .get_or_init(|| {
             let source = tempfile::tempdir().unwrap();
-            let taxonomy = jit::test_taxonomy::test_taxonomy();
             let storage = jit::storage::JsonFileStorage::new(source.path().join(".jit"));
             let layout =
                 jit::storage::discover_repository_layout(source.path(), storage.root()).unwrap();
@@ -205,7 +202,6 @@ fn repair_target_path_strings() -> Vec<String> {
                 .with_layout(layout.clone())
                 .initialize_fresh_repository(
                     source.path(),
-                    &taxonomy.hierarchy_template(),
                     Some(jit::commands::ProfileSelection {
                         id: "jit-dogfood",
                         location: None,
@@ -300,7 +296,6 @@ impl DirectoryPackageRepo {
         repo.executor
             .initialize_profiled_repository(
                 repo.root.path(),
-                &jit::hierarchy_templates::HierarchyTemplate::default(),
                 jit::commands::ProfileSelection {
                     id: repo.id(),
                     location: Some(&repo.root.path().join(PACKAGE_DIRECTORY)),
@@ -634,11 +629,7 @@ fn test_validate_fails_when_a_record_declares_a_profile_its_name_does_not() {
 fn test_validate_fix_without_an_applied_record_reads_no_package() {
     let mut repo = DirectoryPackageRepo::unapplied();
     repo.executor
-        .initialize_fresh_repository(
-            repo.root.path(),
-            &jit::hierarchy_templates::HierarchyTemplate::default(),
-            None,
-        )
+        .initialize_fresh_repository(repo.root.path(), None)
         .unwrap();
     assert!(!repo.root.path().join(".jit/profiles").exists());
     let target = repo.target();

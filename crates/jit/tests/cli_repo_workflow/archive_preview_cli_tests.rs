@@ -90,10 +90,34 @@ fn assert_success(output: &std::process::Output) {
     );
 }
 
-/// Replace the scaffolded documentation policy with a test-specific one.
+/// The type vocabulary these cases name: a container type carrying a
+/// membership namespace, and the leaf beneath it.
 ///
-/// `jit init` authors a complete `[documentation]` policy, so a test that needs
-/// its own classification overrides that table instead of adding a second one.
+/// A repository declares its own vocabulary, and these cases address containers
+/// by their membership label, so the fixture declares the types and the
+/// association that label rides on.
+const TAXONOMY: &str = r#"
+[type_hierarchy]
+types = { epic = 1, task = 2 }
+strategic_types = ["epic"]
+
+[type_hierarchy.label_associations]
+epic = "epic"
+
+[namespaces.type]
+description = "Issue type"
+unique = true
+
+[namespaces.epic]
+description = "Epic membership"
+unique = false
+"#;
+
+/// Replace an initialized repository's `[documentation]` table.
+///
+/// Only the classification changes, and no rule or schema is derived from it,
+/// so a case whose subject is reclassifying an existing repository rewrites the
+/// table in place.
 fn set_documentation_policy(repo: &TempDir, policy: &str) {
     let path = repo.path().join(".jit/config.toml");
     let mut config = fs::read_to_string(&path)
@@ -104,6 +128,17 @@ fn set_documentation_policy(repo: &TempDir, policy: &str) {
     fs::write(&path, config.to_string()).unwrap();
 }
 
+/// Initialize `repo` declaring the shared taxonomy and `policy`.
+///
+/// The configuration is written before initialization, which preserves it and
+/// derives the coupled rules and schemas from the registry it declares.
+fn initialize_with_policy(repo: &TempDir, policy: &str) {
+    let jit_dir = repo.path().join(".jit");
+    fs::create_dir_all(&jit_dir).unwrap();
+    fs::write(jit_dir.join("config.toml"), format!("{TAXONOMY}\n{policy}")).unwrap();
+    assert_success(&jit(repo, &["init", "--json"]));
+}
+
 /// A bundle repository that declares no development-root boundary, so its
 /// `fixtures` area classifies by the managed/permanent split alone.
 ///
@@ -112,8 +147,7 @@ fn set_documentation_policy(repo: &TempDir, policy: &str) {
 /// boundary and retain every artifact, leaving nothing to archive. The tests
 /// whose subject is that boundary configure a real root of their own.
 fn configured_bundle(repo: &TempDir) {
-    assert_success(&jit(repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         repo,
         r#"
 [documentation]
@@ -482,8 +516,7 @@ fn test_archive_execute_is_explicit_and_available_for_document_and_container_tar
         .exists());
 
     let container_repo = TempDir::new().unwrap();
-    assert_success(&jit(&container_repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         &container_repo,
         "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
     );
@@ -557,8 +590,7 @@ fn test_archive_execute_leaves_an_out_of_root_source_where_it_is_without_schedul
     // together so the retention cannot be satisfied by silently dropping the
     // artifact from the plan.
     let repo = TempDir::new().unwrap();
-    assert_success(&jit(&repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         &repo,
         concat!(
             "[documentation]\n",
@@ -843,8 +875,7 @@ fn test_archive_candidates_cli_returns_complete_deterministic_plans_with_human_p
 #[test]
 fn test_archive_candidates_cli_reports_directory_root_but_skips_directory_link_targets() {
     let repo = TempDir::new().unwrap();
-    assert_success(&jit(&repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         &repo,
         "[documentation]\nmanaged_paths = [\"dev/active\"]\npermanent_paths = []\narchive_root = \"dev/archive\"\n",
     );
@@ -1027,8 +1058,7 @@ fn test_archive_candidates_cli_preserves_all_three_policy_states_without_mutatio
 #[test]
 fn test_container_archive_slug_is_consistent_and_frozen_by_marker() {
     let repo = TempDir::new().unwrap();
-    assert_success(&jit(&repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         &repo,
         "[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\n",
     );
@@ -1151,8 +1181,7 @@ fn citation_scan_repo(vcs: bool, citing_text: &str) -> TempDir {
                 .success());
         }
     }
-    assert_success(&jit(&repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         &repo,
         concat!(
             "[documentation]\n",
@@ -1339,8 +1368,7 @@ fn test_archive_document_preview_actions_blockers_and_eligibility_match_regardle
 /// ownership edge, not an absent one.
 fn presentation_deck_repo(managed: bool, terminal: bool) -> (TempDir, String, String) {
     let repo = TempDir::new().unwrap();
-    assert_success(&jit(&repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         &repo,
         concat!(
             "[documentation]\n",
@@ -1820,8 +1848,7 @@ fn test_archive_container_preview_and_execution_preserve_citations_beside_unread
     use std::os::unix::fs::PermissionsExt as _;
 
     let repo = TempDir::new().unwrap();
-    assert_success(&jit(&repo, &["init", "--json"]));
-    set_documentation_policy(
+    initialize_with_policy(
         &repo,
         concat!(
             "[documentation]\n",

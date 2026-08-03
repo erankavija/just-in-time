@@ -53,9 +53,8 @@ const STOPPED_OBSERVATION_WINDOW: Duration = Duration::from_secs(1);
 
 /// Builds the valid repository the server requires at startup.
 fn initialize_repository(worktree_root: &Path) {
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
     executor_for(worktree_root)
-        .initialize_fresh_repository(worktree_root, &taxonomy.hierarchy_template(), None)
+        .initialize_fresh_repository(worktree_root, None)
         .expect("initialize the fixture repository");
 }
 

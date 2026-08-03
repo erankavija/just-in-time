@@ -2069,7 +2069,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
         executor
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         executor
             .define_gate(
@@ -2143,7 +2143,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
                 .expect("a repository layout");
             let executor = CommandExecutor::new(storage).with_layout(layout);
             executor
-                .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+                .initialize_fresh_repository(repo.path(), None)
                 .expect("a fresh repository");
 
             std::fs::create_dir_all(repo.path().join("workspace/src")).expect("create workspace");
@@ -4809,7 +4809,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let layout = crate::storage::discover_repository_layout(repo_root, &jit_root).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
         executor
-            .initialize_fresh_repository(repo_root, &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo_root, None)
             .unwrap();
         executor
             .define_gate(

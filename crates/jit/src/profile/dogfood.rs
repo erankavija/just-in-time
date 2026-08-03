@@ -147,7 +147,6 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
-    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::profile::{ExclusionPattern, LiveSourceDeclaration};
     use crate::repository_state::{
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
@@ -1298,7 +1297,7 @@ mod tests {
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
         let initializer = CommandExecutor::new(storage.clone()).with_layout(layout);
         initializer
-            .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(temp.path(), None)
             .unwrap();
         fs::write(temp.path().join("AGENTS.md"), b"# Existing guidance\n").unwrap();
         let invariants_path = temp.path().join(".jit/invariants.toml");

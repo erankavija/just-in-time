@@ -20,7 +20,6 @@ pub mod gate_presets;
 #[cfg(any(test, feature = "test-support"))]
 pub mod generated_artifacts;
 pub mod graph;
-pub mod hierarchy_templates;
 pub mod labels;
 pub mod output;
 pub mod profile;

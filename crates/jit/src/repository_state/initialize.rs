@@ -46,12 +46,28 @@ const PROFILE_OWNER: &str = "profile-application";
 /// Stable ownership identity for the worktree `.gitattributes` line-set claim.
 const GITATTRIBUTES_OWNER: &str = "gitattributes-merge-driver";
 
-/// Render the canonical fresh `config.toml` from a template body plus identity.
+/// The configuration schema version a fresh repository declares.
+pub const FRESH_CONFIG_SCHEMA_VERSION: u32 = 2;
+
+/// The configuration body a bare initialization writes.
 ///
-/// The exact scaffold format: template body, then the project-identity table with
-/// its guiding comment. Kept byte-for-byte to preserve the generated file a user
+/// Only what the engine derives from the repository rather than from a
+/// declaration: the schema version here, and the project name
+/// [`render_repo_config`] appends beneath it. A vocabulary — types, namespaces,
+/// item kinds, validation defaults, a documentation-area classification —
+/// reaches a repository by applying a profile package that declares it, so a
+/// repository that applies none declares none.
+pub fn structural_minimum_config() -> String {
+    format!("[version]\nschema = {FRESH_CONFIG_SCHEMA_VERSION}\n")
+}
+
+/// Render the canonical fresh `config.toml` from a configuration body plus
+/// identity.
+///
+/// The exact scaffold format: the body, then the project-identity table with its
+/// guiding comment. Kept byte-for-byte to preserve the generated file a user
 /// first sees after `jit init`. `repository_state` owns this rendering so init
-/// submits the template choice and identity, never final bytes.
+/// submits the identity, never final bytes.
 pub fn render_repo_config(base_config_toml: &str, project_name: &ProjectName) -> String {
     format!(
         "{}\n# =============================================================================\n# PROJECT IDENTITY\n# =============================================================================\n# Canonical, human-editable project name: the `@<project>` scope token in the\n# multi-jit addressing scheme. Must match ^[a-z][a-z0-9-]*$. Defaults to a\n# slug of this repository's directory name; edit freely.\n[project]\nname = \"{}\"\n",

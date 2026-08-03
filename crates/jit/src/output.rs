@@ -1292,8 +1292,6 @@ pub struct InitResponse {
     pub data_dir: String,
     /// Machine-local worktree identity, when inside a Git worktree.
     pub repository_id: Option<String>,
-    /// Applied hierarchy template name.
-    pub hierarchy_template: String,
     /// Exact disposition of the worktree Git-attributes claim.
     pub gitattributes_status: crate::repository_state::GitattributesStatus,
     /// Files absent before this run and created by it.

@@ -533,13 +533,17 @@ canonicalize unusual-but-valid TOML syntax spellings elsewhere in the file —
 semantically lossless, with every rule, comment, and unrelated table preserved.
 
 ```bash
-jit init [--hierarchy-template <name>] [--profile <profile-id>] [--from <PATH>]
-         [--json]
+jit init [--profile <profile-id>] [--from <PATH>] [--json]
 ```
 
-`--hierarchy-template` selects the type hierarchy seeded into `config.toml`
-(`default`, `extended`, `agile`, `minimal`); an unknown name is a usage error
-(exit `2`).
+A plain `jit init` writes the structural minimum: `config.toml` carries the
+schema version and the project name slugged from the directory, beside the
+empty gate and invariant registries, the event log, and the index. A type
+hierarchy, a label-namespace registry, item kinds, validation defaults and a
+development-area classification are declarations, and a repository obtains them
+by applying a profile package that carries them — `jit-default` for the generic
+vocabulary. Read a package directory's `manifest.toml` to see which taxonomy it
+declares before choosing one.
 
 `--profile <profile-id>` applies a repository profile as part of
 initialization. `jit init --profile jit-dogfood` is the preferred setup for
@@ -576,7 +580,6 @@ and projection republishing, are not path-listed):
   "repository_root": "/path/to/repo",
   "data_dir": "/path/to/repo/.jit",
   "repository_id": "wt:d5f301ab",
-  "hierarchy_template": "default",
   "gitattributes_status": "created",
   "created_paths": [
     ".jit/index.json",
@@ -3664,8 +3667,9 @@ these sections — `config get` does not invent a third:
 
 `templates` and `invariants` are NOT part of the dotted-path surface: both
 are loaded from sibling files (`.jit/templates.toml`, `.jit/invariants.toml`)
-rather than `config.toml` itself. Introspect them via `jit config
-list-templates` / `jit item list --kind invariant`.
+rather than `config.toml` itself. Read the graph templates in
+`.jit/templates.toml`, and introspect the invariants via `jit item list --kind
+invariant`.
 
 **Exit codes** (per the [exit-code reference](exit-codes.md#command-specific-mappings)):
 `0` when the key resolves, `2` (`INVALID_ARGUMENT`) for an unknown key. An unknown
@@ -3720,15 +3724,13 @@ jit config validate [--json]
 See the [command-specific `config validate` mapping in the generated exit-code
 reference](exit-codes.md#command-specific-mappings) for its outcomes.
 
-### `jit config show-hierarchy` / `jit config list-templates`
+### `jit config show-hierarchy`
 
-`show-hierarchy` prints the effective type→level map (built from the
-namespace registry, with built-in defaults applied); `list-templates` lists
-the built-in hierarchy templates `jit init --hierarchy-template` accepts.
+Prints the effective type→level map the repository's `[type_hierarchy]`
+declaration resolves to. A repository that declares none has an empty map.
 
 ```bash
 jit config show-hierarchy [--json]
-jit config list-templates [--json]
 ```
 
 ## Scripting and Automation
@@ -3804,7 +3806,6 @@ The collection key is command-specific:
 | `claim list`, `claim status` | `leases` |
 | `label namespaces` | `namespaces` |
 | `label values` | `values` |
-| `config list-templates` | `templates` |
 | `item list`, `item search` | `items` |
 | `worktree list` | `worktrees` |
 | `graph roots` | `roots` |

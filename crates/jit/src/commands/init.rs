@@ -1,6 +1,5 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
-use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::{
     build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
     ProfilePackage,
@@ -52,10 +51,9 @@ impl CommandExecutor<JsonFileStorage> {
     pub fn initialize_profiled_repository(
         &self,
         repo_dir: &Path,
-        template: &HierarchyTemplate,
         profile: ProfileSelection<'_>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, template, Some(profile))
+        self.run_initialization(repo_dir, Some(profile))
     }
 
     /// Publish a fresh neutral or profiled repository through the recovered
@@ -68,10 +66,9 @@ impl CommandExecutor<JsonFileStorage> {
     pub fn initialize_fresh_repository(
         &self,
         repo_dir: &Path,
-        template: &HierarchyTemplate,
         profile: Option<ProfileSelection<'_>>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, template, profile)
+        self.run_initialization(repo_dir, profile)
     }
 
     /// Capture the base under one recovered session, validate the proposed
@@ -87,7 +84,6 @@ impl CommandExecutor<JsonFileStorage> {
     fn run_initialization(
         &self,
         repo_dir: &Path,
-        template: &HierarchyTemplate,
         profile: Option<ProfileSelection<'_>>,
     ) -> Result<FreshInitResult> {
         let closure = profile
@@ -111,8 +107,7 @@ impl CommandExecutor<JsonFileStorage> {
             &layout,
             "repository initialization",
             |session| {
-                let (config, project_name) =
-                    self.resolve_init_config(&mut *session, repo_dir, template)?;
+                let (config, project_name) = self.resolve_init_config(&mut *session, repo_dir)?;
                 let profile = match package.as_ref() {
                     Some(package) => Some(self.profile_input(package)?),
                     None => None,
@@ -271,12 +266,12 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Resolve the effective configuration bytes and project identity: an existing
     /// `config.toml` is preserved (its authored project name kept), otherwise the
-    /// template body is rendered under a slug of the repository directory name.
+    /// structural minimum is rendered under a slug of the repository directory
+    /// name.
     fn resolve_init_config(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         repo_dir: &Path,
-        template: &HierarchyTemplate,
     ) -> Result<(String, ProjectName)> {
         use crate::repository_state::{CaptureBudget, CaptureSpec};
         let budget = CaptureBudget {
@@ -305,7 +300,7 @@ impl CommandExecutor<JsonFileStorage> {
             }
             None => Ok((
                 crate::repository_state::render_repo_config(
-                    &template.generate_config_toml(),
+                    &crate::repository_state::structural_minimum_config(),
                     &generated_name,
                 ),
                 generated_name,
@@ -587,7 +582,7 @@ mod tests {
         let executor = executor_with_layout(&storage, repo.path());
 
         let result = executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         assert!(result.profile.is_none());
@@ -608,14 +603,55 @@ mod tests {
         assert_repo_valid(repo.path());
     }
 
+    /// The `invariant` item kind, declared by the repository itself.
+    ///
+    /// A kind is a declaration like any other, so a repository that applies no
+    /// package obtains one by writing it. This is the smallest declaration that
+    /// makes `@/invariant/<id>` resolve against `.jit/invariants.toml`.
+    const INVARIANT_KIND: &str = "\n[item_kinds.invariant]\n\
+section = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\n\
+markers = []\n\
+link-namespaces = []\n\
+scope = \"project\"\n\
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
+source-of-truth = \"registry-first\"\n";
+
+    /// The `rule` and `gate` item kinds, declared by the repository itself, for
+    /// a case whose package contributes projections naming them.
+    const RULE_AND_GATE_KINDS: &str = "\n[item_kinds.rule]\n\
+section = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\n\
+markers = []\n\
+link-namespaces = []\n\
+scope = \"project\"\n\
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"description\" }\n\
+source-of-truth = \"registry-first\"\n\
+\n[item_kinds.gate]\n\
+section = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\n\
+markers = []\n\
+link-namespaces = []\n\
+scope = \"project\"\n\
+source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }\n\
+source-of-truth = \"registry-first\"\n";
+
+    /// Write `config_toml` as the repository's configuration before it is
+    /// initialized, which initialization preserves.
+    fn declare_before_init(repo: &Path, config_toml: &str) {
+        fs::create_dir_all(repo.join(".jit")).unwrap();
+        fs::write(repo.join(".jit/config.toml"), config_toml).unwrap();
+    }
+
     #[test]
     fn test_fresh_init_creates_the_invariant_registry_present_and_empty() {
         let repo = TempDir::new().unwrap();
+        declare_before_init(repo.path(), INVARIANT_KIND);
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
 
         let result = executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         // Present and empty, like the gate registry beside it: the file exists,
@@ -644,10 +680,11 @@ mod tests {
     #[test]
     fn test_fresh_init_registry_resolves_an_authored_invariant_without_a_package() {
         let repo = TempDir::new().unwrap();
+        declare_before_init(repo.path(), INVARIANT_KIND);
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
         executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         // The adopter authors into the registry initialization gave them; nothing
@@ -700,7 +737,6 @@ mod tests {
         let result = executor_with_layout(&storage, repo.path())
             .initialize_profiled_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 ProfileSelection {
                     id: "workflow",
                     location: Some(&repo.path().join("packages/workflow")),
@@ -745,7 +781,6 @@ mod tests {
         let result = executor
             .initialize_fresh_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
                     location: None,
@@ -809,7 +844,6 @@ mod tests {
             .with_layout(layout)
             .initialize_profiled_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
                 ProfileSelection {
                     id: "workflow",
                     location: Some(&repo.path().join("packages/workflow")),
@@ -884,7 +918,6 @@ mod tests {
         let error = executor_with_layout(&storage, repo.path())
             .initialize_profiled_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 ProfileSelection {
                     id: "workflow",
                     location: Some(&repo.path().join("packages/workflow")),
@@ -910,7 +943,6 @@ mod tests {
         let result = executor
             .initialize_fresh_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
                     location: None,
@@ -960,7 +992,6 @@ mod tests {
         executor
             .initialize_fresh_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
                 Some(ProfileSelection {
                     id: "jit-dogfood",
                     location: None,
@@ -988,7 +1019,6 @@ mod tests {
         let again = reinit
             .initialize_profiled_repository(
                 repo.path(),
-                &HierarchyTemplate::default(),
                 ProfileSelection {
                     id: "jit-dogfood",
                     location: None,
@@ -1016,7 +1046,7 @@ mod tests {
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
         executor
-            .initialize_fresh_repository(repo.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         let config_path = repo.path().join(".jit/config.toml");
@@ -1033,6 +1063,11 @@ mod tests {
              [projection.race]\nkind = \"race\"\nmode = \"separate-file\"\n\
              target = \"RACE.generated.md\"\nstyle = \"id-anchor\"\n",
         );
+        // The package's own projections name the kinds its dependency declares,
+        // and this case composes the package alone, so the repository declares
+        // those kinds itself.
+        config.push_str(INVARIANT_KIND);
+        config.push_str(RULE_AND_GATE_KINDS);
         fs::write(
             repo.path().join("RACE.md"),
             "## Race\n\n- **R-1** — recaptured\n",
@@ -1086,10 +1121,13 @@ description = \"Owning squad\"\n\
 unique = true\n";
 
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = crate::test_taxonomy::test_taxonomy();
+        // Re-initialization refreshes what the repository's own registry
+        // generates, so the repository declares that registry first.
+        declare_before_init(repo.path(), &taxonomy.config_fragment());
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         let config_path = repo.path().join(".jit/config.toml");
@@ -1115,7 +1153,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         fs::write(&rules_path, authored_rules).unwrap();
 
         executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         let refreshed = fs::read_to_string(&rules_path).unwrap();
@@ -1131,7 +1169,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
 
         fs::write(&config_path, config.replace(SQUAD_NAMESPACE, "")).unwrap();
         executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         let refreshed = fs::read_to_string(&rules_path).unwrap();
         assert!(!refreshed.contains("name = \"namespace-unique-squad\""));
@@ -1152,7 +1190,6 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                     barrier.wait();
                     executor.initialize_fresh_repository(
                         repo.path(),
-                        &HierarchyTemplate::default(),
                         Some(ProfileSelection {
                             id: "jit-dogfood",
                             location: None,

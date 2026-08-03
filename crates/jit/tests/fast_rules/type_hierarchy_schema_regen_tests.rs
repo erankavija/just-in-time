@@ -3,7 +3,6 @@
 
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
-use jit::hierarchy_templates::HierarchyTemplate;
 use jit::storage::JsonFileStorage;
 use std::fs;
 use tempfile::TempDir;
@@ -31,7 +30,7 @@ unique = true
     let layout = jit::storage::discover_repository_layout(temp.path(), &jit_dir).unwrap();
     CommandExecutor::new(JsonFileStorage::new(&jit_dir))
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     (temp, jit_dir)
 }

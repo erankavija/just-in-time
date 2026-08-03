@@ -252,7 +252,6 @@ fn test_add_document_reference_new_path_appends() {
 #[test]
 fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     use jit::commands::CommandExecutor;
-    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{discover_repository_layout, JsonFileStorage};
     use sha2::{Digest, Sha256};
 
@@ -287,7 +286,7 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
@@ -345,7 +344,6 @@ fn test_add_document_rejects_asset_closure_over_fixed_budget_without_writes() {
 #[test]
 fn test_add_document_rejects_malformed_utf8_without_writes() {
     use jit::commands::CommandExecutor;
-    use jit::hierarchy_templates::HierarchyTemplate;
     use jit::storage::{discover_repository_layout, JsonFileStorage};
 
     let temp = tempfile::tempdir().unwrap();
@@ -353,7 +351,7 @@ fn test_add_document_rejects_malformed_utf8_without_writes() {
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+        .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     let layout = discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage.clone()).with_layout(layout);

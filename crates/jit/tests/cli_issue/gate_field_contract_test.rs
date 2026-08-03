@@ -22,12 +22,12 @@
 //! matching `jit --schema` declaration, so a rename on either side fails the
 //! build (REQ-04).
 
+use crate::TaxonomyRepo;
 use assert_cmd::prelude::*;
 use serde_json::Value;
 use std::process::Command;
-use tempfile::TempDir;
 
-fn jit(temp: &TempDir, args: &[&str]) -> Vec<u8> {
+fn jit(temp: &TaxonomyRepo, args: &[&str]) -> Vec<u8> {
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .args(args)
@@ -40,9 +40,10 @@ fn jit(temp: &TempDir, args: &[&str]) -> Vec<u8> {
 
 /// Create an issue carrying one required (manual) gate so every surface has a
 /// non-empty gate list to project.
-fn setup_repo_with_gated_issue() -> (TempDir, String) {
-    let temp = TempDir::new().unwrap();
-    jit(&temp, &["init"]);
+fn setup_repo_with_gated_issue() -> (TaxonomyRepo, String) {
+    // `query strategic` resolves the tiers the repository's own
+    // `[type_hierarchy]` declares, so the fixture repository declares one.
+    let temp = crate::setup_test_repo_with_taxonomy();
 
     let stdout = jit(
         &temp,
@@ -86,7 +87,7 @@ fn setup_repo_with_gated_issue() -> (TempDir, String) {
     (temp, id)
 }
 
-fn json(temp: &TempDir, args: &[&str]) -> Value {
+fn json(temp: &TaxonomyRepo, args: &[&str]) -> Value {
     serde_json::from_slice(&jit(temp, args)).unwrap()
 }
 
@@ -244,6 +245,12 @@ fn test_query_variant_full_dumps_keep_storage_gate_fields() {
         "query available",
     );
 
+    let strategic_type = temp
+        .taxonomy
+        .strategic_types
+        .first()
+        .expect("the declared vocabulary names a strategic type")
+        .clone();
     let strategic_out = jit(
         &temp,
         &[
@@ -252,7 +259,7 @@ fn test_query_variant_full_dumps_keep_storage_gate_fields() {
             "--title",
             "Strategic gated",
             "--type",
-            "epic",
+            &strategic_type,
             "--description",
             "Body",
         ],
@@ -336,8 +343,7 @@ fn test_issue_search_full_keeps_storage_gate_fields_and_summary_omits_them() {
 
 #[test]
 fn test_issue_create_exposes_gates_array() {
-    let temp = TempDir::new().unwrap();
-    jit(&temp, &["init"]);
+    let temp = crate::setup_test_repo_with_taxonomy();
     jit(
         &temp,
         &[
@@ -423,7 +429,7 @@ fn test_issue_release_keeps_storage_gate_fields() {
 
 #[test]
 fn test_issue_show_summary_help_names_gates_not_storage_fields() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::setup_test_repo_with_taxonomy();
     // `--help` exits 0 and prints the generated command help, including the
     // `--summary` description that must promise `gates`, not the storage split.
     let out = jit(&temp, &["issue", "show", "--help"]);

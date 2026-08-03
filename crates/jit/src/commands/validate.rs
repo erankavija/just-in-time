@@ -2879,7 +2879,6 @@ mod tests {
             .with_layout(source_layout)
             .initialize_fresh_repository(
                 source.path(),
-                &taxonomy.hierarchy_template(),
                 profile.map(|id| crate::commands::ProfileSelection { id, location: None }),
             )
             .unwrap();
@@ -3023,7 +3022,6 @@ depends_on = ["planning"]
             .with_layout(layout)
             .initialize_fresh_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some(crate::commands::ProfileSelection {
                     id: "jit-dogfood",
                     location: None,
@@ -3115,7 +3113,6 @@ depends_on = ["planning"]
             .with_layout(layout)
             .initialize_fresh_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some(crate::commands::ProfileSelection {
                     id: "jit-dogfood",
                     location: None,
@@ -3364,7 +3361,6 @@ depends_on = ["planning"]
         executor
             .initialize_fresh_repository(
                 repo.path(),
-                &crate::test_taxonomy::test_taxonomy().hierarchy_template(),
                 Some(crate::commands::ProfileSelection {
                     id: "jit-dogfood",
                     location: None,

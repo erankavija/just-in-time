@@ -1,7 +1,9 @@
 # JIT Configuration File (Schema v2)
 #
 # Place this file at `.jit/config.toml` to customize JIT behavior.
-# All settings are optional - JIT uses sensible defaults if this file doesn't exist.
+# Every table is optional, and each one declares a vocabulary the engine reads
+# back: what a table omits, the repository does not have. Applying a profile
+# package writes the tables it carries into this file.
 
 [version]
 # Schema version - required for new features
@@ -11,39 +13,19 @@ schema = 2
 # DOCUMENTATION LIFECYCLE
 # =============================================================================
 # Configure how JIT manages development documentation (design docs, session notes).
-# `jit init` writes this whole table from the shipped development-area
-# classification, so author it only to reclassify. The classification, what each
-# key means, how its entries are matched, and what an absent key resolves to:
-# docs/reference/configuration.md, section `[documentation]`.
+# Applying the `jit-default` profile package writes this whole table from that
+# package's development-area classification, so author it only to reclassify.
+# The classification, what each key means, how its entries are matched, and what
+# an absent key resolves to: docs/reference/configuration.md, section
+# `[documentation]`.
 
 # jit:shipped-documentation-policy:begin
 [documentation]
 development_root = "dev"
 archive_root = "dev/archive"
-managed_paths = [
-  "dev/active",
-  "dev/studies",
-  "dev/sessions",
-  "dev/plans",
-  "dev/presentations",
-  "dev/design",
-  "dev/benchmarks",
-  "dev/experiments",
-]
-permanent_paths = [
-  "dev/architecture",
-  "dev/eval",
-  "dev/vision",
-  "dev/index.md",
-  "dev/TESTING.md",
-  "dev/authoring-conventions.md",
-]
-issue_scoped_areas = [
-  "dev/active",
-  "dev/studies",
-  "dev/plans",
-  "dev/presentations",
-]
+managed_paths = ["dev/active", "dev/studies", "dev/sessions", "dev/plans", "dev/presentations", "dev/design", "dev/benchmarks", "dev/experiments"]
+permanent_paths = ["dev/architecture", "dev/eval", "dev/vision", "dev/index.md", "dev/TESTING.md", "dev/authoring-conventions.md"]
+issue_scoped_areas = ["dev/active", "dev/studies", "dev/plans", "dev/presentations"]
 # jit:shipped-documentation-policy:end
 
 # =============================================================================
@@ -52,8 +34,9 @@ issue_scoped_areas = [
 # Define issue types and their strategic importance
 
 [type_hierarchy]
-# Type name to hierarchy level mapping (lower numbers = more strategic)
-# Default: { milestone = 1, epic = 2, story = 3, task = 4 }
+# Type name to hierarchy level mapping (lower numbers = more strategic).
+# The four levels below are the ones the `jit-default` package declares; a
+# repository with no `[type_hierarchy]` table has no types at all.
 types = { milestone = 1, epic = 2, story = 3, task = 4 }
 
 # Types shown in 'jit query strategic' (high-level planning view)

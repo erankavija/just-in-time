@@ -91,7 +91,6 @@
     "jit_config_set": "Mutates repository configuration; a maintainer decision.",
     "jit_config_show": "Configuration inspection is a repository-setup concern.",
     "jit_config_show-hierarchy": "Type-hierarchy inspection is a repository-setup concern.",
-    "jit_config_list-templates": "Hierarchy templates are chosen at jit init time.",
     "jit_config_validate": "Configuration linting is a maintainer chore.",
     "jit_archive_document": "Artifact lifecycle administration; operators explicitly choose when a document plan may publish or delete files.",
     "jit_archive_container": "Container-wide artifact lifecycle administration; operators review the complete plan before mutation.",

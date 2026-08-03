@@ -2134,35 +2134,12 @@ fn run() -> Result<()> {
 
     match &command {
         Commands::Init {
-            hierarchy_template,
             profile,
             from,
             json,
         } => {
             let output_ctx = OutputContext::new(quiet, *json);
 
-            // Resolve the template before init so we can error early on bad names.
-            // Routed through the json-aware `invalid_argument` helper (rather than
-            // a bare `anyhow!`) so `--json` callers get a machine-readable envelope
-            // instead of a silently-empty stdout.
-            let template = if let Some(template_name) = hierarchy_template {
-                match jit::hierarchy_templates::HierarchyTemplate::get(template_name) {
-                    Some(t) => Some(t),
-                    None => {
-                        return Err(invalid_argument(
-                            format!("Unknown hierarchy template: {}", template_name),
-                            *json,
-                        ));
-                    }
-                }
-            } else {
-                None
-            };
-
-            let chosen = template
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(jit::hierarchy_templates::HierarchyTemplate::default);
             let profile_location = from.as_deref();
             if let Some(id) = profile.as_deref() {
                 profile_result(
@@ -2183,14 +2160,13 @@ fn run() -> Result<()> {
                 if let Some(id) = profile.as_deref() {
                     executor.initialize_profiled_repository(
                         &current_dir,
-                        &chosen,
                         ProfileSelection {
                             id,
                             location: profile_location,
                         },
                     )
                 } else {
-                    executor.initialize_fresh_repository(&current_dir, &chosen, None)
+                    executor.initialize_fresh_repository(&current_dir, None)
                 },
                 *json,
             )?;
@@ -2219,9 +2195,7 @@ fn run() -> Result<()> {
             }
             let profile_result = init_result.profile;
 
-            let message = if let Some(ref t) = template {
-                format!("Initialized with '{}' hierarchy template", t.name)
-            } else if let Some(ref identity) = worktree_identity {
+            let message = if let Some(ref identity) = worktree_identity {
                 format!(
                     "Initialized jit repository (worktree: {})",
                     identity.worktree_id
@@ -2236,7 +2210,6 @@ fn run() -> Result<()> {
                     repository_root: current_dir.display().to_string(),
                     data_dir: jit_dir.display().to_string(),
                     repository_id: worktree_identity.map(|identity| identity.worktree_id),
-                    hierarchy_template: chosen.name.clone(),
                     gitattributes_status: gitattributes_outcome,
                     created_paths: init_result.created_paths,
                     modified_paths: init_result.modified_paths,
@@ -6399,41 +6372,6 @@ fn run() -> Result<()> {
                     sorted.sort_by_key(|(_, level)| *level);
                     for (type_name, level) in sorted {
                         println!("  {} → Level {}", type_name, level);
-                    }
-                }
-            }
-            jit::cli::ConfigCommands::ListTemplates { json } => {
-                let output_ctx = OutputContext::new(quiet, json);
-                let templates = jit::hierarchy_templates::HierarchyTemplate::all();
-
-                if json {
-                    use jit::output::JsonOutput;
-                    use serde_json::json;
-                    let template_data: Vec<_> = templates
-                        .iter()
-                        .map(|t| {
-                            json!({
-                                "name": t.name,
-                                "description": t.description,
-                                "hierarchy": t.hierarchy
-                            })
-                        })
-                        .collect();
-                    let count = template_data.len();
-                    println!(
-                        "{}",
-                        JsonOutput::success(
-                            serde_json::json!({"templates": template_data, "count": count})
-                        )
-                        .with_message(format!("{} template(s)", count))
-                        .to_json_string()?
-                    );
-                } else {
-                    let _ = output_ctx.print_info("Available Hierarchy Templates:\n");
-                    for template in templates {
-                        println!("  {}", template.name);
-                        println!("    {}", template.description);
-                        println!();
                     }
                 }
             }

@@ -50,38 +50,19 @@ Schema version. Required for newer features like namespace registry and document
 [documentation]
 development_root = "dev"
 archive_root = "dev/archive"
-managed_paths = [
-  "dev/active",
-  "dev/studies",
-  "dev/sessions",
-  "dev/plans",
-  "dev/presentations",
-  "dev/design",
-  "dev/benchmarks",
-  "dev/experiments",
-]
-permanent_paths = [
-  "dev/architecture",
-  "dev/eval",
-  "dev/vision",
-  "dev/index.md",
-  "dev/TESTING.md",
-  "dev/authoring-conventions.md",
-]
-issue_scoped_areas = [
-  "dev/active",
-  "dev/studies",
-  "dev/plans",
-  "dev/presentations",
-]
+managed_paths = ["dev/active", "dev/studies", "dev/sessions", "dev/plans", "dev/presentations", "dev/design", "dev/benchmarks", "dev/experiments"]
+permanent_paths = ["dev/architecture", "dev/eval", "dev/vision", "dev/index.md", "dev/TESTING.md", "dev/authoring-conventions.md"]
+issue_scoped_areas = ["dev/active", "dev/studies", "dev/plans", "dev/presentations"]
 ```
 <!-- jit:shipped-documentation-policy:end -->
 
-Controls document lifecycle management. The table above is the one `jit init`
-scaffolds into a new repository, rendered from the `SHIPPED_DOCUMENTATION_POLICY`
-declaration in `crates/jit/src/config.rs`, the single source of that
+Controls document lifecycle management. The table above is the one a repository
+receives by applying the `jit-default` profile package, rendered from that
+package's `[documentation]` contributions, the single source of the
 classification; `jit config get documentation` reports the table a repository is
-running under.
+running under. A repository that declares no `[documentation]` table and applies
+no package carrying one classifies no area, so archival has nothing to move or
+copy until the table names something.
 
 Path vocabulary is repository policy: an adopter reclassifies any area, adds
 areas of their own, or drops a convention entirely, and every command reads the
@@ -231,9 +212,9 @@ story = "story"
 | `label_associations` | Type → membership label namespace mapping |
 
 The hierarchy is repository configuration: its type names are not a fixed JIT
-vocabulary. The `jit init` template uses the four types shown above. This
+vocabulary. The `jit-default` package declares the four types shown above. This
 repository's dogfood configuration additionally declares `bug` and
-`enhancement`; those are local choices, not shipped defaults.
+`enhancement`; those are local choices, not package declarations.
 
 Omit the table and the repository has no hierarchy: no type name is known, the
 queries that resolve tiers resolve none, and neither the `type-hierarchy-known`
@@ -616,8 +597,8 @@ section reads the repository's `config.toml` only, with no system/user merge or
 built-in defaults; an absent section resolves to `{}`. This visibility does
 not make the parsed compatibility fields above active runtime controls.
 `templates` and `invariants` are not part of this surface (they load from
-sibling files, not `config.toml`); see `jit config list-templates` / `jit item
-list --kind invariant`.
+sibling files, not `config.toml`); read the graph templates in
+`.jit/templates.toml`, and see `jit item list --kind invariant`.
 
 An unknown key exits `2` (`INVALID_ARGUMENT`): an unknown top-level key
 names the valid sections, an unknown nested key names the missing segment

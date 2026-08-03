@@ -1,8 +1,10 @@
 //! Integration tests for `jit init`
 
-use jit::config::{DocumentationConfig, SHIPPED_DOCUMENTATION_POLICY};
+use jit::config::DocumentationConfig;
 use jit::declarations::parse_configuration;
 use jit::domain::artifact_classifier::contains_path;
+use jit::profile::ProfileManifest;
+use jit::repository_state::{Contribution, ScalarTarget, SetStringTarget};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -22,12 +24,32 @@ fn jit_init(dir: &std::path::Path, extra_args: &[&str]) -> std::process::Output 
         .expect("failed to run jit init")
 }
 
+/// The package carrying the generic domain vocabulary a repository needs to be
+/// usable, including the development-area classification.
+const DEFAULT_PACKAGE: &str = "jit-default";
+
+/// Worktree-relative directory the fixture publishes an obtained package into.
+///
+/// Application records the package's worktree-relative location and refuses a
+/// package read from outside the worktree, so a repository that applies one
+/// holds it inside itself — which is where an adopter puts an obtained set.
+const PACKAGE_LOCATION: &str = "packages";
+
+/// Initialize `dir` with this repository's default vocabulary package applied,
+/// assembled from the checkout into `dir`'s own worktree first.
+fn jit_init_with_default_package(dir: &Path) -> std::process::Output {
+    let location = format!("{PACKAGE_LOCATION}/{DEFAULT_PACKAGE}");
+    jit::test_utils::assemble_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
+        .expect("this repository's default package assembles");
+    jit_init(dir, &["--profile", DEFAULT_PACKAGE, "--from", &location])
+}
+
 // ---------------------------------------------------------------------------
 // Basic init
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_init_creates_config_toml() {
+fn test_init_creates_config_toml_carrying_only_repository_derived_declarations() {
     let temp = TempDir::new().unwrap();
     let out = jit_init(temp.path(), &[]);
     assert!(out.status.success(), "jit init failed: {:?}", out);
@@ -39,21 +61,89 @@ fn test_init_creates_config_toml() {
     );
 
     let content = fs::read_to_string(&config).unwrap();
-    // Should contain the default hierarchy types
-    assert!(
-        content.contains("milestone"),
-        "config should mention milestone"
+    let parsed: jit::config::JitConfig =
+        toml::from_str(&content).expect("the scaffolded config.toml should parse");
+    // What the engine derives from the repository: the schema version, and the
+    // project name slugged from the directory it was created in.
+    assert!(parsed.version.is_some(), "the schema version is declared");
+    assert_eq!(
+        parse_configuration(content.as_bytes())
+            .unwrap()
+            .project_name()
+            .map(|name| name.as_str().to_string()),
+        temp.path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(jit::config::slugify_project_name),
+        "the project name is the slugged directory name"
     );
-    assert!(content.contains("epic"), "config should mention epic");
-    assert!(content.contains("story"), "config should mention story");
-    assert!(content.contains("task"), "config should mention task");
-    // Should contain strategic_types
-    assert!(
-        content.contains("strategic_types"),
-        "config should have strategic_types"
+
+    // A vocabulary is a declaration, and this repository made none: no types,
+    // no namespaces, no item kinds, no validation defaults, no area
+    // classification reaches it until it applies a package that declares them.
+    assert!(parsed.type_hierarchy.is_none(), "no type hierarchy");
+    assert!(parsed.namespaces.is_none(), "no namespace registry");
+    assert!(parsed.item_kinds.is_none(), "no item kinds");
+    assert!(parsed.validation.is_none(), "no validation defaults");
+    assert!(parsed.documentation.is_none(), "no area classification");
+}
+
+#[test]
+fn test_init_writes_the_rule_set_the_declared_registry_supports() {
+    // REQ-01: the rule set is derived from the repository's own registry, so a
+    // repository declaring none receives the label grammar alone — the one rule
+    // whose assertion names no namespace and no type — and exactly the
+    // projection that rule references.
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let rules: toml::Value =
+        toml::from_str(&fs::read_to_string(temp.path().join(".jit/rules.toml")).unwrap()).unwrap();
+    let rules = rules["rules"].as_array().unwrap();
+    let references = rules
+        .iter()
+        .filter_map(|rule| {
+            let reference = rule["assert"].get("json-schema")?.as_str()?;
+            Some(reference.rsplit('/').next().unwrap().to_string())
+        })
+        .collect::<BTreeSet<_>>();
+    let published = fs::read_dir(temp.path().join(".jit/schemas"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect::<BTreeSet<_>>();
+
+    assert_eq!(
+        rules
+            .iter()
+            .map(|rule| rule["name"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["label-format"],
     );
-    // Should be commented
-    assert!(content.contains('#'), "config should have comments");
+    assert_eq!(
+        published, references,
+        "every published projection is one an emitted rule references"
+    );
+
+    // The scaffold is a usable repository even so: it validates, and an issue
+    // can be created in it.
+    let validate = Command::new(jit_binary())
+        .args(["validate", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        validate.status.success(),
+        "a repository declaring no vocabulary validates: {validate:?}"
+    );
+    let created = Command::new(jit_binary())
+        .args(["issue", "create", "--title", "First", "--json"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        created.status.success(),
+        "a repository declaring no vocabulary accepts an issue: {created:?}"
+    );
 }
 
 #[test]
@@ -154,131 +244,6 @@ fn test_init_idempotent_does_not_overwrite_index() {
 }
 
 // ---------------------------------------------------------------------------
-// --hierarchy-template
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_init_template_default() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &["--hierarchy-template", "default"]);
-    assert!(
-        out.status.success(),
-        "init with default template failed: {:?}",
-        out
-    );
-
-    let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-    assert!(
-        content.contains("milestone"),
-        "default template should include milestone"
-    );
-    assert!(
-        content.contains("epic"),
-        "default template should include epic"
-    );
-    assert!(
-        content.contains("story"),
-        "default template should include story"
-    );
-    assert!(
-        content.contains("task"),
-        "default template should include task"
-    );
-}
-
-#[test]
-fn test_init_template_agile() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &["--hierarchy-template", "agile"]);
-    assert!(
-        out.status.success(),
-        "init with agile template failed: {:?}",
-        out
-    );
-
-    let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-    // The types line should contain "release" and not "milestone"
-    let types_line = content
-        .lines()
-        .find(|l| l.trim_start().starts_with("types ="))
-        .expect("config should have a types = line");
-    assert!(
-        types_line.contains("release"),
-        "agile types should include release"
-    );
-    assert!(
-        !types_line.contains("milestone"),
-        "agile types should not include milestone"
-    );
-}
-
-#[test]
-fn test_init_template_minimal() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &["--hierarchy-template", "minimal"]);
-    assert!(
-        out.status.success(),
-        "init with minimal template failed: {:?}",
-        out
-    );
-
-    let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-    let types_line = content
-        .lines()
-        .find(|l| l.trim_start().starts_with("types ="))
-        .expect("config should have a types = line");
-    assert!(
-        types_line.contains("milestone"),
-        "minimal types should include milestone"
-    );
-    assert!(
-        types_line.contains("task"),
-        "minimal types should include task"
-    );
-    assert!(
-        !types_line.contains("story"),
-        "minimal types should not include story"
-    );
-    assert!(
-        !types_line.contains("epic"),
-        "minimal types should not include epic"
-    );
-}
-
-#[test]
-fn test_init_template_extended() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &["--hierarchy-template", "extended"]);
-    assert!(
-        out.status.success(),
-        "init with extended template failed: {:?}",
-        out
-    );
-
-    let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-    assert!(
-        content.contains("program"),
-        "extended template should include program"
-    );
-}
-
-#[test]
-fn test_init_template_unknown_errors() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(temp.path(), &["--hierarchy-template", "nonexistent"]);
-    assert!(
-        !out.status.success(),
-        "unknown template should fail, but it succeeded"
-    );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("Unknown hierarchy template"),
-        "error message missing, got: {}",
-        stderr
-    );
-}
-
-// ---------------------------------------------------------------------------
 // REQ-03 (jit:1a63ef75): `--json` machine output
 // ---------------------------------------------------------------------------
 
@@ -295,7 +260,6 @@ fn test_init_json_reports_repository_id_and_created_paths_outside_git() {
             "repository_root": temp.path().to_string_lossy(),
             "data_dir": temp.path().join(".jit").to_string_lossy(),
             "repository_id": null,
-            "hierarchy_template": "default",
             "gitattributes_status": "not_applicable",
             "created_paths": [
                 ".jit/index.json",
@@ -691,49 +655,6 @@ fn test_init_json_reinit_reports_only_file_restored_by_plan() {
     assert_eq!(json["modified_paths"], serde_json::json!([]));
 }
 
-#[test]
-fn test_init_json_unknown_template_emits_json_error() {
-    let temp = TempDir::new().unwrap();
-    let out = jit_init(
-        temp.path(),
-        &["--hierarchy-template", "nonexistent", "--json"],
-    );
-    assert!(!out.status.success());
-    assert_eq!(out.status.code(), Some(2));
-
-    let json: serde_json::Value = serde_json::from_slice(&out.stdout)
-        .expect("--json should emit a structured error object on stdout");
-    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
-    assert!(json["error"]["message"]
-        .as_str()
-        .unwrap()
-        .contains("Unknown hierarchy template"));
-}
-
-#[test]
-fn test_init_template_idempotent_does_not_overwrite() {
-    let temp = TempDir::new().unwrap();
-
-    // First init with template
-    let out = jit_init(temp.path(), &["--hierarchy-template", "agile"]);
-    assert!(out.status.success());
-
-    // Mark the scaffolded config, keeping the declarations the first template wrote.
-    let config = temp.path().join(".jit/config.toml");
-    let authored = format!("# AGILE CUSTOM\n{}", fs::read_to_string(&config).unwrap());
-    fs::write(&config, &authored).unwrap();
-
-    // Second init with a different template — config must not be overwritten
-    let out = jit_init(temp.path(), &["--hierarchy-template", "minimal"]);
-    assert!(out.status.success());
-
-    let content = fs::read_to_string(&config).unwrap();
-    assert!(
-        content.contains("AGILE CUSTOM"),
-        "second init should not overwrite existing config.toml"
-    );
-}
-
 // ---------------------------------------------------------------------------
 // Generated config is valid TOML
 // ---------------------------------------------------------------------------
@@ -753,40 +674,24 @@ fn test_init_config_is_valid_toml() {
     );
 }
 
-#[test]
-fn test_init_template_config_is_valid_toml() {
-    for template in &["default", "agile", "minimal", "extended"] {
-        let temp = TempDir::new().unwrap();
-        jit_init(temp.path(), &["--hierarchy-template", template]);
-
-        let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
-        let parsed: Result<toml::Value, _> = toml::from_str(&content);
-        assert!(
-            parsed.is_ok(),
-            "config.toml for template '{}' is not valid TOML: {:?}",
-            template,
-            parsed.err()
-        );
-    }
-}
-
 // ---------------------------------------------------------------------------
-// Scaffolded documentation policy: the shipped development-area classification
+// The development-area classification the default package declares
 // ---------------------------------------------------------------------------
 
-/// The `[documentation]` policy a freshly initialized repository carries.
+/// The `[documentation]` policy a repository carries after applying the default
+/// package.
 ///
 /// Read through the configuration parser, so a commented-out block resolves to
 /// no policy at all rather than to a table this helper could inspect.
-fn scaffolded_documentation_policy(dir: &Path) -> DocumentationConfig {
+fn packaged_documentation_policy(dir: &Path) -> DocumentationConfig {
     let bytes = fs::read(dir.join(".jit/config.toml")).expect("init should write config.toml");
     parse_configuration(&bytes)
-        .expect("scaffolded config.toml should parse")
+        .expect("the written config.toml should parse")
         .documentation
-        .expect("init should scaffold an authored [documentation] policy")
+        .expect("applying the default package should author a [documentation] policy")
 }
 
-/// Every area the scaffolded policy classifies, managed and permanent alike.
+/// Every area the applied policy classifies, managed and permanent alike.
 fn classified_areas(policy: &DocumentationConfig) -> Vec<String> {
     policy
         .managed_paths
@@ -798,23 +703,24 @@ fn classified_areas(policy: &DocumentationConfig) -> Vec<String> {
 }
 
 #[test]
-fn test_init_scaffolds_a_documentation_policy_classifying_every_development_area() {
+fn test_init_with_the_default_package_classifies_every_development_area() {
     let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path(), &[]).status.success());
+    let out = jit_init_with_default_package(temp.path());
+    assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = scaffolded_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(temp.path());
     let development_root = policy.development_root();
     let managed = policy
         .managed_paths
         .clone()
-        .expect("the scaffolded policy should author its managed areas");
+        .expect("the applied policy should author its managed areas");
     let permanent = policy
         .permanent_paths
         .clone()
-        .expect("the scaffolded policy should author its permanent areas");
+        .expect("the applied policy should author its permanent areas");
     assert!(
         policy.archive_root.is_some(),
-        "the scaffolded policy should author its archive root"
+        "the applied policy should author its archive root"
     );
 
     // Each classified entry is a distinct area beneath the development root. A
@@ -844,7 +750,8 @@ fn test_init_scaffolds_a_documentation_policy_classifying_every_development_area
 #[test]
 fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys() {
     let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path(), &[]).status.success());
+    let out = jit_init_with_default_package(temp.path());
+    assert!(out.status.success(), "profiled init failed: {out:?}");
 
     let content = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
     let scaffolded: toml::Table = content.parse().expect("config.toml should be valid TOML");
@@ -878,11 +785,12 @@ fn test_init_documentation_block_is_active_configuration_naming_only_typed_keys(
 }
 
 #[test]
-fn test_init_classifies_development_root_files_as_exact_path_entries() {
+fn test_init_with_the_default_package_classifies_root_files_as_exact_path_entries() {
     let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path(), &[]).status.success());
+    let out = jit_init_with_default_package(temp.path());
+    assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = scaffolded_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(temp.path());
     let development_root = policy.development_root();
     let areas = classified_areas(&policy);
     let root_files = areas
@@ -919,49 +827,90 @@ fn test_init_classifies_development_root_files_as_exact_path_entries() {
 }
 
 #[test]
-fn test_init_documentation_policy_is_the_shipped_area_declaration() {
+fn test_init_documentation_policy_is_the_default_package_declaration() {
+    // REQ-06: the classification a repository receives is the one the default
+    // package declares, compared against that manifest rather than against a
+    // second copy of the lists.
     let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path(), &[]).status.success());
+    let out = jit_init_with_default_package(temp.path());
+    assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = scaffolded_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(temp.path());
+    let (_workspace, package) = jit::test_utils::temporary_repository_package(DEFAULT_PACKAGE);
+    let manifest = package.manifest();
+
     assert_eq!(
         policy.development_root(),
-        SHIPPED_DOCUMENTATION_POLICY.development_root
+        declared_scalar(manifest, ScalarTarget::DocumentationDevelopmentRoot),
     );
     assert_eq!(
         policy.archive_root(),
-        SHIPPED_DOCUMENTATION_POLICY.archive_root
+        declared_scalar(manifest, ScalarTarget::DocumentationArchiveRoot),
     );
     assert_eq!(
         policy.managed_paths(),
-        SHIPPED_DOCUMENTATION_POLICY.managed_paths
+        declared_set(manifest, SetStringTarget::DocumentationManagedPaths),
     );
     assert_eq!(
         policy.permanent_paths(),
-        SHIPPED_DOCUMENTATION_POLICY.permanent_paths
+        declared_set(manifest, SetStringTarget::DocumentationPermanentPaths),
     );
     assert_eq!(
         policy.issue_scoped_areas(),
-        SHIPPED_DOCUMENTATION_POLICY.issue_scoped_areas
+        declared_set(manifest, SetStringTarget::DocumentationIssueScopedAreas),
     );
 }
 
-#[test]
-fn test_init_scaffolds_an_authored_issue_scoped_area_registry_the_membership_query_accepts() {
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path(), &[]).status.success());
+/// The one scalar value a manifest contributes to `target`.
+fn declared_scalar(manifest: &ProfileManifest, target: ScalarTarget) -> String {
+    manifest
+        .contributions
+        .iter()
+        .find_map(|contribution| match contribution {
+            Contribution::Scalar {
+                target: declared,
+                value,
+            } if *declared == target => Some(value.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("the package declares {target:?}"))
+}
 
-    let policy = scaffolded_documentation_policy(temp.path());
-    // Active configuration, not commented-out guidance: the registry is authored
-    // in the scaffolded file, so the accessor reads it rather than falling back.
+/// Every value a manifest contributes to `target`, in declaration order.
+fn declared_set(manifest: &ProfileManifest, target: SetStringTarget) -> Vec<String> {
+    let declared = manifest
+        .contributions
+        .iter()
+        .filter_map(|contribution| match contribution {
+            Contribution::SetString {
+                target: declared,
+                value,
+            } if *declared == target => Some(value.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(!declared.is_empty(), "the package declares {target:?}");
+    declared
+}
+
+#[test]
+fn test_init_with_the_default_package_authors_an_issue_scoped_registry_the_query_accepts() {
+    let temp = TempDir::new().unwrap();
+    let out = jit_init_with_default_package(temp.path());
+    assert!(out.status.success(), "profiled init failed: {out:?}");
+
+    let policy = packaged_documentation_policy(temp.path());
+    // Active configuration, not commented-out guidance: the application writes
+    // the registry into the file, so the accessor reads it rather than answering
+    // from an absent key.
     let registry = policy
         .issue_scoped_areas
         .clone()
-        .expect("the scaffolded policy should author its issue-scoped area registry");
+        .expect("the applied policy should author its issue-scoped area registry");
     assert!(!registry.is_empty());
 
     // Every declared entry is a distinct area beneath the development root, and
-    // the membership query accepts exactly what the scaffold declared.
+    // the membership query accepts exactly what the package declared.
     let development_root = policy.development_root();
     for area in &registry {
         assert!(
@@ -980,16 +929,17 @@ fn test_init_scaffolds_an_authored_issue_scoped_area_registry_the_membership_que
 }
 
 #[test]
-fn test_init_repository_plans_archival_under_a_configured_policy() {
+fn test_init_with_the_default_package_plans_archival_under_a_configured_policy() {
     let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path(), &[]).status.success());
+    let out = jit_init_with_default_package(temp.path());
+    assert!(out.status.success(), "profiled init failed: {out:?}");
 
-    let policy = scaffolded_documentation_policy(temp.path());
+    let policy = packaged_documentation_policy(temp.path());
     let area = policy
         .managed_paths()
         .into_iter()
         .next()
-        .expect("the scaffolded policy should classify at least one managed area");
+        .expect("the applied policy should classify at least one managed area");
     fs::create_dir_all(temp.path().join(&area)).unwrap();
     let document = format!("{area}/note.md");
     fs::write(temp.path().join(&document), "note").unwrap();

@@ -170,27 +170,28 @@ pub(crate) fn jit(repo: &Path, args: &[&str]) -> Output {
         .unwrap()
 }
 
-/// A repository initialized from the shared taxonomy fixture and the shipped
-/// documentation registry, with no Git history. The tests exercise both
-/// vocabularies, so the repository declares them rather than relying on
-/// compiled-in defaults.
+/// A repository initialized from the shared taxonomy fixture and this suite's
+/// own documentation registry, with no Git history. The tests exercise both
+/// vocabularies, so the repository declares them rather than inheriting any.
 pub(crate) fn initialized_repo() -> TempDir {
-    let issue_scoped_areas = jit::config::SHIPPED_DOCUMENTATION_POLICY
-        .issue_scoped_areas
-        .iter()
-        .map(|area| format!("\"{area}\""))
-        .collect::<Vec<_>>()
-        .join(", ");
     let (temp, _storage, _taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
     let config_path = temp.path().join(".jit/config.toml");
     let mut config = fs::read_to_string(&config_path).unwrap();
     config.push_str(&format!(
-        "\n[documentation]\nissue_scoped_areas = [{issue_scoped_areas}]\n"
+        "\n[documentation]\ndevelopment_root = \"{DEVELOPMENT_ROOT}\"\n\
+         managed_paths = [\"{}\", \"{}\"]\n\
+         issue_scoped_areas = [\"{}\"]\n",
+        declared_area(),
+        undeclared_area(),
+        declared_area(),
     ));
     fs::write(config_path, config).unwrap();
 
     temp
 }
+
+/// The development root this suite's repository declares.
+const DEVELOPMENT_ROOT: &str = "workspace";
 
 /// The identifiers a created issue answers to.
 pub(crate) struct CreatedIssue {
@@ -214,31 +215,16 @@ pub(crate) fn create_issue(repo: &Path, title: &str, labels: &[String]) -> Creat
     }
 }
 
-/// An issue-scoped area from the shipped documentation policy. Reading the
-/// policy states which area the repository declares without restating the
-/// registry here.
+/// The issue-scoped area this suite's repository declares.
 pub(crate) fn declared_area() -> &'static str {
-    jit::config::SHIPPED_DOCUMENTATION_POLICY
-        .issue_scoped_areas
-        .first()
-        .copied()
-        .expect("the shipped policy declares at least one issue-scoped area")
+    "workspace/drafts"
 }
 
-/// A development area the shipped policy manages but leaves outside the
-/// convention. A real area rather than an invented path, so rejecting it can
-/// only come from the registry.
+/// A development area this suite's repository manages while leaving it outside
+/// the issue-scoped convention, so rejecting it can only come from the
+/// registry rather than from the path being unknown.
 pub(crate) fn undeclared_area() -> &'static str {
-    jit::config::SHIPPED_DOCUMENTATION_POLICY
-        .managed_paths
-        .iter()
-        .copied()
-        .find(|path| {
-            !jit::config::SHIPPED_DOCUMENTATION_POLICY
-                .issue_scoped_areas
-                .contains(path)
-        })
-        .expect("the shipped policy manages an area outside the convention")
+    "workspace/notes"
 }
 
 /// A type the shared taxonomy maps to a membership namespace, with that

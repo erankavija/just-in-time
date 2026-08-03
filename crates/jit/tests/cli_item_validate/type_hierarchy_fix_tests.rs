@@ -8,14 +8,7 @@ fn jit_binary() -> &'static str {
 }
 
 fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let jit = jit_binary();
-    Command::new(jit)
-        .args(["init"])
-        .current_dir(temp.path())
-        .status()
-        .unwrap();
-    temp
+    crate::setup_repo_with_default_vocabulary()
 }
 
 fn run_jit(temp: &TempDir, args: &[&str]) -> std::process::Output {

@@ -25,12 +25,7 @@ fn jit_path() -> String {
 /// Initialize a repo and write a `.jit/rules.toml`. Also declares a `req`
 /// label namespace so `req:*` labels pass the namespace registry check.
 fn setup_repo_with_rules(rules_toml: &str) -> TempDir {
-    let temp = TempDir::new().unwrap();
-    bin()
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
+    let temp = crate::setup_repo_with_default_vocabulary();
     // Register the `req` namespace used by the test rules.
     let config_path = temp.path().join(".jit").join("config.toml");
     let mut config = fs::read_to_string(&config_path).unwrap();

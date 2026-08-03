@@ -114,10 +114,13 @@ mod tests {
     use proptest::prelude::*;
     use std::collections::HashMap;
 
-    /// A registry vocabulary unrelated to the shipped areas, so any `dev/`-shaped
-    /// assumption in the resolver fails these tests rather than passing by
-    /// coincidence.
+    /// A registry vocabulary unrelated to any area this project itself uses, so
+    /// any `dev/`-shaped assumption in the resolver fails these tests rather
+    /// than passing by coincidence.
     const AREA: &str = "workspace/notes";
+    /// A second registry vocabulary, disjoint from [`AREA`], so a case can show
+    /// that each registry accepts its own areas and rejects the other's.
+    const OTHER_AREA: &str = "records/logbook";
     const TYPE: &str = "workstream";
     const NAMESPACE: &str = "workstream-group";
     const MEMBERSHIP: &str = "platform-archive";
@@ -286,12 +289,8 @@ mod tests {
                 declared_directory.clone(),
             ),
             (
-                "an area of the shipped vocabulary this registry replaced",
-                documentation(None)
-                    .issue_scoped_areas()
-                    .first()
-                    .cloned()
-                    .expect("the shipped registry declares at least one area"),
+                "an area a different registry declares",
+                OTHER_AREA.to_string(),
             ),
         ];
 
@@ -351,20 +350,15 @@ mod tests {
     ) {
         let issue = fixture("Canonical Directory Resolver", &single_membership());
         let authored = documentation(Some(&[AREA]));
-        let shipped = documentation(None);
-        let shipped_area = shipped
-            .issue_scoped_areas()
-            .first()
-            .cloned()
-            .expect("the shipped registry declares at least one area");
+        let other = documentation(Some(&[OTHER_AREA]));
 
         // Each registry accepts its own areas and rejects the other's, so the
         // accepted set is whatever configuration declares.
         [
             (&authored, AREA, true),
-            (&authored, shipped_area.as_str(), false),
-            (&shipped, shipped_area.as_str(), true),
-            (&shipped, AREA, false),
+            (&authored, OTHER_AREA, false),
+            (&other, OTHER_AREA, true),
+            (&other, AREA, false),
         ]
         .iter()
         .for_each(|(documentation, area, accepted)| {

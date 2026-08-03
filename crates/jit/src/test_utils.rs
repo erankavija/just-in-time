@@ -5,7 +5,6 @@
 #![cfg(any(test, feature = "test-support"))]
 
 use crate::commands::CommandExecutor;
-use crate::hierarchy_templates::HierarchyTemplate;
 use crate::profile::package_assembly::{assemble_package_tree, PackageAssemblyError};
 use crate::profile::ProfilePackage;
 use crate::storage::worktree_paths::WorktreePaths;
@@ -82,7 +81,7 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     let layout = discover_repository_layout(temp.path(), &jit_root)?;
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)?;
+        .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
 
@@ -107,7 +106,7 @@ pub fn setup_test_repo_with_taxonomy() -> Result<(TempDir, JsonFileStorage, Test
     let layout = discover_repository_layout(temp.path(), &jit_root)?;
     CommandExecutor::new(storage.clone())
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)?;
+        .initialize_fresh_repository(temp.path(), None)?;
     // Claim coordination tests use this as a synthetic Git control directory.
     fs::create_dir(temp.path().join(".git"))?;
 

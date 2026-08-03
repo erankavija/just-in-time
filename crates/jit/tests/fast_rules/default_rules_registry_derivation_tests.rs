@@ -37,12 +37,11 @@ unique = true
 "#;
     fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let initial_layout =
         jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
     CommandExecutor::new(storage.clone())
         .with_layout(initial_layout)
-        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
+        .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     (temp, jit_dir)
 }
