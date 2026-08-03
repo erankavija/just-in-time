@@ -52,7 +52,18 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T21:17:01.354433367Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-08-03T21:10:28.463664459Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
   "labels": [
     "epic:derived-package-sources",
@@ -63,5 +74,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Derived profile assets and projected policy documentation",
-  "updated_at": "2026-08-03T21:09:57.580990259Z"
+  "updated_at": "2026-08-03T21:17:01.354433367Z"
 }

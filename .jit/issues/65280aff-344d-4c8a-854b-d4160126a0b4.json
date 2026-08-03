@@ -16,7 +16,7 @@
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-08-03T21:09:36.046347232Z",
+      "updated_at": "2026-08-03T21:12:31.144770122Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Reconcile the unreleased changelog against the release it describes",
-  "updated_at": "2026-08-03T21:09:52.158225222Z"
+  "updated_at": "2026-08-03T21:12:31.144770122Z"
 }
