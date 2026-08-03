@@ -545,8 +545,9 @@ jit init [--hierarchy-template <name>] [--profile <profile-id>] [--from <PATH>]
 initialization. `jit init --profile jit-dogfood` is the preferred setup for
 JIT's portable workflow; plain init remains methodology-neutral. `--from <PATH>`
 names the repository directory holding that profile's package and requires
-`--profile`; [Repository Profiles](profiles.md#commands) states when it is
-needed. For a
+`--profile`. On a first application from a repository package, supply this
+location because a fresh repository has no applied-profile record to read. The
+resolution order and recorded-location failure behavior are defined below. For a
 fresh repository, the neutral scaffold and profile projection are planned,
 validated, and published together. If the data root is absent, JIT stages the complete root
 beside its destination and publishes it with an atomic no-replace rename; an
@@ -619,8 +620,16 @@ planning or writing.
 
 `show` and `apply` take `--from <PATH>`: a repository directory holding the
 package to read, which must hold a package declaring the requested profile ID.
-Which package a command reads when `--from` is absent is stated in
-[Repository Profiles](profiles.md#commands).
+Profiled `jit init` accepts the same form. For each of these commands, a
+supplied location wins. If `--from` is absent, JIT reads the location named by
+the repository's applied-profile record; when no record exists, it uses the
+matching package compiled into the binary. The applied-profile record is
+defined in [Repository Profiles](profiles.md#publication-rollback-and-recovery),
+including where it lives and what it stores, so a package obtained from a
+repository directory can be found again on later runs. A recorded location is
+confined to the worktree. If it no longer holds a readable package, the command
+fails naming the record and path; it does not replay stored digests or treat the
+profile as absent.
 
 A package the resolved one declares a dependency on is looked for beside it,
 in a directory named by that dependency's own ID, before the record and the
@@ -641,7 +650,9 @@ whether the stored record still matches the package at its location. That check
 compares records, not installed target bytes. JSON uses the standard list
 envelope `{"count": N, "profiles": [...]}`. Each profile entry carries `id`,
 `version`, `origin`, `jit`, and `applied`. What the command reports, and when it
-fails, is stated in [Repository Profiles](profiles.md#commands).
+fails, follows the applied-profile records alone: a repository that has applied
+nothing reports no profile, and a recorded location that no longer holds a
+readable package fails the command by naming the record and the location.
 
 The resolved package is authoritative for the live values; scripts should inspect
 the returned fields rather than copy package identity or compatibility values
