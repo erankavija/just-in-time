@@ -23,6 +23,9 @@
 
 use crate::profile::template_region;
 
+/// The package whose template declarations the generated registry region holds.
+const TEMPLATE_REGION_PACKAGE_ID: &str = "jit-dogfood";
+
 /// A render of one committed artifact's current bytes, given the bytes the
 /// checkout holds. A whole-file render ignores them; a region render splices
 /// into them, preserving every authored byte outside its delimiters.
@@ -192,14 +195,23 @@ fn render_storage_records_reference(_committed: &[u8]) -> Result<Vec<u8>, String
 /// The registry's bytes with the packaged declarations spliced into its
 /// generated region.
 ///
+/// The declarations come from this repository's workflow package assembled from
+/// the checkout, so a run renders what the checkout currently declares.
+///
 /// A render that moved a byte outside the delimiters is a defect in the splice
 /// rather than an edit to publish, so it is reported instead of returned.
 fn render_template_region(committed: &[u8]) -> Result<Vec<u8>, String> {
     let outside = |registry: &[u8]| {
         template_region::outside_template_region(registry).map_err(|error| error.to_string())
     };
-    let rendered =
-        template_region::render_template_registry(committed).map_err(|error| error.to_string())?;
+    let destination = tempfile::TempDir::new().map_err(|error| error.to_string())?;
+    let package = crate::test_utils::assemble_repository_package(
+        TEMPLATE_REGION_PACKAGE_ID,
+        &destination.path().join(TEMPLATE_REGION_PACKAGE_ID),
+    )
+    .map_err(|error| error.to_string())?;
+    let rendered = template_region::render_template_registry(committed, &package)
+        .map_err(|error| error.to_string())?;
     (outside(&rendered)? == outside(committed)?)
         .then_some(rendered)
         .ok_or_else(|| {

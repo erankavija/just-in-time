@@ -126,6 +126,25 @@ pub fn assemble_repository_package(
     )
 }
 
+/// This repository's profile package `id` assembled into a temporary
+/// destination, answered with the directory that owns it.
+///
+/// The fixture over [`assemble_repository_package`] for a caller that reads a
+/// package's declarations and has no repository to publish it into. The
+/// returned directory holds the published tree, so the package's recorded
+/// source stays readable for as long as the caller keeps it; a caller that
+/// applies the package names its own destination and calls the entry point
+/// directly.
+///
+/// Panics when the package does not assemble, which is a defect in the checkout
+/// rather than a condition a test distinguishes.
+pub fn temporary_repository_package(id: &str) -> (TempDir, ProfilePackage) {
+    let workspace = TempDir::new().expect("create a package destination");
+    let package = assemble_repository_package(id, &workspace.path().join(id))
+        .unwrap_or_else(|error| panic!("this repository's {id} package assembles: {error}"));
+    (workspace, package)
+}
+
 /// Write a compile-time-embedded profile package tree to `root`, creating it
 /// and every declared parent, and return `root`.
 ///

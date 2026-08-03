@@ -1,21 +1,22 @@
 //! Render of this repository's generated graph-template region.
 //!
 //! This repository declares the plan-before-fan-out bracket twice: once as a
-//! template contribution of the embedded `jit-dogfood` package, and once in its
-//! own `.jit/templates.toml`. The package is the authority, so the registry
-//! file's declaration is a generated region bounded by
-//! [`TEMPLATE_REGION_BEGIN`] / [`TEMPLATE_REGION_END`] and everything outside
-//! those delimiters is authored (`@/issue/e204e63d/decision/D-1`).
+//! template contribution of the `jit-dogfood` package, and once in its own
+//! `.jit/templates.toml`. The package is the authority, so the registry file's
+//! declaration is a generated region bounded by [`TEMPLATE_REGION_BEGIN`] /
+//! [`TEMPLATE_REGION_END`] and everything outside those delimiters is authored
+//! (`@/issue/e204e63d/decision/D-1`).
 //!
 //! Everything here is pure: the functions render bytes, compare parsed
-//! declarations, and read nothing from the filesystem. The two callers supply
-//! the I/O — [`crate::generated_artifacts`] declares the render the `regenerate`
-//! example publishes the registry file through, and the dogfood module's drift
-//! assertions read it — and the module compiles only for the crate's own tests
-//! and for the dev-dependency-active builds those two need, so an adopter build
+//! declarations, and read nothing from the filesystem. The package arrives as
+//! an argument, and the two callers supply the I/O around it —
+//! [`crate::generated_artifacts`] declares the render the `regenerate` example
+//! publishes the registry file through, and the dogfood module's drift
+//! assertions read it. The module compiles only for the crate's own tests and
+//! for the dev-dependency-active builds those two need, so an adopter build
 //! carries none of it.
 
-use crate::profile::{jit_dogfood_package, EmbeddedProfileError};
+use crate::profile::ProfilePackage;
 use crate::repository_state::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
@@ -44,9 +45,6 @@ pub const TEMPLATE_REGION_GENERATOR: &str = "./scripts/generate-template-region.
 /// A render of the generated template region that could not be produced.
 #[derive(Debug, thiserror::Error)]
 pub enum TemplateRegionError {
-    /// The embedded package failed to load.
-    #[error(transparent)]
-    Package(#[from] EmbeddedProfileError),
     /// A packaged template contribution does not parse as a graph template.
     #[error("a packaged template contribution is not a graph template: {0}")]
     Contribution(#[from] serde_json::Error),
@@ -68,11 +66,12 @@ pub enum TemplateRegionError {
     MissingDelimiter(&'static str),
 }
 
-/// The packaged template contributions, typed as the model the repository's
-/// template registry parses its declarations into.
-pub fn packaged_templates() -> Result<Vec<GraphTemplate>, TemplateRegionError> {
+/// The template contributions `package` declares, typed as the model the
+/// repository's template registry parses its declarations into.
+pub fn packaged_templates(
+    package: &ProfilePackage,
+) -> Result<Vec<GraphTemplate>, TemplateRegionError> {
     use crate::repository_state::{Contribution, KeyedArrayTarget};
-    let package = jit_dogfood_package()?;
     package
         .manifest()
         .contributions
@@ -154,11 +153,17 @@ pub fn inside_template_region(registry: &[u8]) -> Result<String, TemplateRegionE
     Ok(text[begin..end].to_string())
 }
 
-/// The registry bytes the packaged declarations render to, given the registry's
+/// The registry bytes `package`'s declarations render to, given the registry's
 /// current bytes: the authored text outside the delimiters, with the packaged
 /// block between them.
-pub fn render_template_registry(existing: &[u8]) -> Result<Vec<u8>, TemplateRegionError> {
-    splice_template_region(existing, &render_template_block(&packaged_templates()?)?)
+pub fn render_template_registry(
+    existing: &[u8],
+    package: &ProfilePackage,
+) -> Result<Vec<u8>, TemplateRegionError> {
+    splice_template_region(
+        existing,
+        &render_template_block(&packaged_templates(package)?)?,
+    )
 }
 
 /// How the declarations of the repository's generated region disagree with the
@@ -262,7 +267,8 @@ mod tests {
     /// reported at its own position, naming the side that lacks it.
     #[test]
     fn test_template_drift_report_names_a_template_only_the_repository_declares() {
-        let packaged = packaged_templates().unwrap();
+        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
+        let packaged = packaged_templates(&package).unwrap();
         let repository = [packaged.clone(), packaged.clone()].concat();
         let report = template_drift_report(&repository, &packaged)
             .unwrap()
