@@ -5,7 +5,7 @@ use std::fmt;
 use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 use crate::repository_state::Contribution;
 
-/// The only manifest filename recognized at the root of an embedded package.
+/// The only manifest filename recognized at the root of a profile package.
 pub const MANIFEST_FILE_NAME: &str = "manifest.toml";
 
 /// Version of the immutable v1 profile-manifest wire contract.

@@ -330,7 +330,7 @@ pub trait IssueStore: Clone {
     /// - [`PathReadError::Other`] for any other read failure.
     fn read_repo_file(&self, rel_path: &str) -> Result<Option<String>, PathReadError>;
 
-    /// List all available gate presets (builtin and custom).
+    /// List the gate presets this repository declares.
     ///
     /// # Errors
     ///

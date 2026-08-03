@@ -65,7 +65,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Example Config](reference/example-config.toml) - Sample configuration
 - [Labels](reference/labels.md) - Label system reference
 - [Rules and Gates](reference/rules-and-gates.md) - Projected reference for a project's validation rules and gate registry
-- [Built-in Gate Presets](reference/gate-presets.md) - The gate bundles the binary ships, with each preset's gates and checkers
+- [Gate Presets](reference/gate-presets.md) - Declaring, listing, and applying a project's own gate bundles, with the portable checker syntax
 - [Worktree and Validate Commands](reference/worktree-validate.md) - `jit worktree` and `jit validate` command reference
 
 ### 🧪 [Examples](examples/) - Sample Configurations and Rulesets

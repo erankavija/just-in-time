@@ -343,8 +343,8 @@ pub enum MutationIntent {
         registry: Box<GateRegistry>,
     },
     /// Create one project-defined gate preset at its canonical path. The target
-    /// must be absent in the captured image; custom presets never overwrite one
-    /// another or shadow a builtin preset.
+    /// must be absent in the captured image, so a preset never overwrites
+    /// another.
     CreateGatePreset {
         /// Validated semantic preset whose name determines the filename stem.
         preset: Box<crate::gate_presets::GatePresetDefinition>,

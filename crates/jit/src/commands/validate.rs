@@ -688,11 +688,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
 /// Resolve one package, and its record's canonical path, per recorded profile.
 ///
-/// Each package is read through the route its own record names
-/// ([`recorded_package`](super::profile::recorded_package)) — a worktree
-/// location, or this binary's compiled-in bytes — so validation reads the
-/// package the repository applied rather than the one this binary happens to
-/// carry. `records` is the capture holding those records.
+/// Each package is read through the worktree location its own record names
+/// ([`recorded_package`](super::profile::recorded_package)), so validation
+/// reads the package the repository applied rather than whatever sits at
+/// another location. `records` is the capture holding those records.
 ///
 /// The first record whose package cannot be obtained is the whole answer:
 /// repairing the profiles that did resolve would narrow what repair restores

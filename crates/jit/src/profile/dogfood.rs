@@ -29,9 +29,9 @@ mod tests {
     /// This repository's workflow package, assembled from its checkout, with
     /// the directory holding the assembled tree.
     ///
-    /// Every assertion here is about the package this repository ships, so it
-    /// is read from the checkout it is drawn from rather than from a copy
-    /// compiled into the test binary.
+    /// Every assertion here is about the package this repository authors, so
+    /// it is assembled from the checkout it is drawn from rather than read from
+    /// a copy of it.
     fn assembled_package() -> (TempDir, ProfilePackage) {
         crate::test_utils::temporary_repository_package(PACKAGE_ID)
     }

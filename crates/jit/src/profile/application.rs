@@ -258,8 +258,8 @@ mod tests {
             serde_json::json!({ "source": "directory", "location": "/absolute" }),
             serde_json::json!({ "source": "directory", "location": "a/./b" }),
             serde_json::json!({ "source": "directory", "location": 7 }),
-            // A location attached to bytes that were compiled in names a
-            // package nothing read, so it is refused rather than ignored.
+            // A source the origin vocabulary does not carry is refused
+            // outright rather than read past to its location.
             serde_json::json!({ "source": "embedded", "location": "profiles/example" }),
             serde_json::json!({ "source": "unknown", "location": "profiles/example" }),
         ] {

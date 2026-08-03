@@ -1079,9 +1079,9 @@ mod tests {
     /// `id`, to publish `content` at asset target `target`, and to carry
     /// `contributions` verbatim, and read back from there.
     ///
-    /// Every package this repository ships or embeds publishes targets of its
-    /// own, so two packages claiming one target — which is what a conflict
-    /// between packages is — are authored from the same fixture tree the other
+    /// Every package this repository authors publishes targets of its own, so
+    /// two packages claiming one target — which is what a conflict between
+    /// packages is — are authored from the same fixture tree the other
     /// scenarios read (`@/invariant/shared-test-contracts`).
     fn authored_package(
         temp: &TempDir,
@@ -1253,13 +1253,13 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_profile_package_prefers_the_record_over_the_compiled_in_package() {
+    fn test_resolve_profile_package_reads_the_recorded_package_not_another_declaring_that_id() {
         let (temp, _storage, executor, _package) = fixture();
-        let (_workspace, shipped) = crate::test_utils::temporary_repository_package("jit-dogfood");
-        let id = shipped.manifest().profile.id.to_string();
+        let (_workspace, authored) = crate::test_utils::temporary_repository_package("jit-dogfood");
+        let id = authored.manifest().profile.id.to_string();
 
-        // A directory package declaring the id this binary also carries, so
-        // nothing but the route taken decides which of the two answers.
+        // A directory package declaring the id this repository also authors, so
+        // nothing but the record decides which of the two answers.
         package_read_from(&temp, "vendor/dogfood");
         let manifest = fs::read_to_string(temp.path().join("vendor/dogfood/manifest.toml"))
             .unwrap()
@@ -1269,7 +1269,7 @@ mod tests {
             );
         let recorded = repackage(&temp, "vendor/dogfood", "manifest.toml", &manifest);
         assert_eq!(recorded.manifest().profile.id.as_str(), id);
-        assert_ne!(recorded.hashes(), shipped.hashes());
+        assert_ne!(recorded.hashes(), authored.hashes());
         store_record(
             &temp,
             &AppliedProfileRecord::new(

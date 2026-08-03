@@ -9,7 +9,7 @@
  */
 
 import { spawn } from 'child_process';
-import { mkdirSync, readFileSync, rmSync } from 'fs';
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { strict as assert } from 'node:assert';
@@ -50,6 +50,38 @@ function presentsConfiguredKindVocabulary(text) {
     [...text.matchAll(itemKindTerm)].map(([term]) => itemKindForms.get(term.toLowerCase()))
   );
   return mentionedKinds.size >= 2 && itemKindEnumeration.test(text);
+}
+
+// The checked-in profile-package fixture the profile tools are exercised over.
+// A package is applied from inside the worktree it is applied to, so each case
+// stages a copy of this tree in its own test repository.
+const PROFILE_PACKAGE_FIXTURE = new URL(
+  '../crates/jit/tests/fixtures/profile-packages/planner-asset-only',
+  import.meta.url
+);
+
+/**
+ * Stage a copy of the fixture package under `repo` at the repository-relative
+ * `location`, rewritten to declare `id`, a dependency on each of
+ * `dependencies`, and an asset target named for `id`.
+ *
+ * No package this repository authors declares a dependency, so a composition
+ * scenario is authored here; renaming the asset target after the id is what
+ * keeps two staged packages from publishing the same file.
+ *
+ * @returns {string} the repository-relative location, as `--from` names it
+ */
+function stagePackage(repo, location, id, dependencies = []) {
+  const root = join(repo, location);
+  cpSync(PROFILE_PACKAGE_FIXTURE, root, { recursive: true });
+  const manifestPath = join(root, 'manifest.toml');
+  const declared = dependencies.map(dependency => `"${dependency}"`).join(', ');
+  const manifest = readFileSync(manifestPath, 'utf8')
+    .replace(/^id = ".*"$/m, `id = "${id}"`)
+    .replace('[profile]', `dependencies = [${declared}]\n\n[profile]`)
+    .replace(/^target = "docs\/.*"$/m, `target = "docs/${id}.txt"`);
+  writeFileSync(manifestPath, manifest);
+  return location;
 }
 
 // ---------------------------------------------------------------------------
@@ -448,45 +480,44 @@ async function main() {
       try {
         await profileTester.callToolRaw('jit_init', {});
 
+        // An obtained set of packages, side by side inside the worktree: the
+        // named one and the one it declares a dependency on.
+        const baseLocation = stagePackage(profileTester.testDir, 'packages/base', 'base');
+        const workflowLocation = stagePackage(
+          profileTester.testDir, 'packages/workflow', 'workflow', ['base']);
+
         // Enumeration follows the repository's own applied-profile records, so
         // a repository that has applied nothing names no profile.
         const listed = await profileCall('jit_profile_list');
         assert.strictEqual(listed.count, 0);
         assert.deepStrictEqual(listed.profiles, []);
 
-        const shown = await profileCall('jit_profile_show', { id: 'jit-dogfood' });
-        assert.strictEqual(shown.manifest.profile.id, 'jit-dogfood');
-        const liveSources = shown.manifest['live-source'];
-        assert.ok(Array.isArray(liveSources) && liveSources.length > 0,
-          'the reported manifest declares live-source roots');
-        const roots = liveSources.map(source => source && source.root);
-        assert.ok(roots.every(root => typeof root === 'string' && root.length > 0),
-          'every reported live-source declaration names a root');
-        const liveAssets = shown.manifest.asset.filter(asset =>
-          asset.source.startsWith('assets/live/'));
-        assert.ok(liveAssets.length > 0, 'the reported manifest declares live assets');
-        const targetUnderRoot = (target, root) =>
-          target === root || target.startsWith(`${root}/`);
-        assert.ok(liveAssets.every(asset => roots.some(root =>
-          targetUnderRoot(asset.target, root))),
-        'every reported live asset target is accounted for by a reported root');
-        assert.ok(roots.every(root => liveAssets.some(asset =>
-          targetUnderRoot(asset.target, root))),
-        'every reported root accounts for a reported live asset target');
-        assert.deepStrictEqual(shown.origin, { source: 'embedded' });
+        const shown = await profileCall('jit_profile_show', {
+          id: 'workflow',
+          from: workflowLocation,
+        });
+        assert.strictEqual(shown.manifest.profile.id, 'workflow');
+        assert.deepStrictEqual(shown.origin, {
+          source: 'directory',
+          location: workflowLocation,
+        });
 
         // A preview is derived over one package against the repository in
         // front of it, so the package a repository declaring nothing can be
         // shown is the self-contained one.
-        const defaultPreview = await profileCall('jit_profile_apply', {
-          id: 'jit-default',
+        const basePreview = await profileCall('jit_profile_apply', {
+          id: 'base',
+          from: baseLocation,
           'dry-run': true,
         });
-        assert.strictEqual(defaultPreview.status, 'would_apply');
+        assert.strictEqual(basePreview.status, 'would_apply');
 
         // An application reports one result per applied package: the packages
         // the named one depends on, then the named one.
-        const applied = await profileCall('jit_profile_apply', { id: 'jit-dogfood' });
+        const applied = await profileCall('jit_profile_apply', {
+          id: 'workflow',
+          from: workflowLocation,
+        });
         assert.strictEqual(applied.count, applied.profiles.length);
         const appliedProfileIds = applied.profiles.map(profile => profile.id);
         const expectedProfileIds = [
@@ -502,16 +533,15 @@ async function main() {
         assert.strictEqual(appliedProfileIds.at(-1), shown.manifest.profile.id);
         assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
-        // The applied package's own preview names its executable asset.
+        // The applied package's own preview names the target it published.
         const preview = await profileCall('jit_profile_apply', {
-          id: 'jit-dogfood',
+          id: 'workflow',
           'dry-run': true,
         });
-        assert.ok(preview.targets.some(target =>
-          target.path === 'contrib/gates/ai-review.sh' && target.executable === true));
+        assert.ok(preview.targets.some(target => target.path === 'docs/workflow.txt'));
 
         const unchanged = await profileCall('jit_profile_apply', {
-          id: 'jit-dogfood',
+          id: 'workflow',
           'dry-run': true,
         });
         assert.strictEqual(unchanged.status, 'unchanged');
