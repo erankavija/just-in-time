@@ -695,7 +695,8 @@
   "590ff4db": 1,
   "959274b6": 1,
   "93fef456": 0,
-  "daddfc0b": 1
+  "daddfc0b": 1,
+  "ff1bbada": 1
  },
  "started_at": "2026-07-31",
  "owner_rulings": [
@@ -994,6 +995,30 @@
      "status": "resequenced",
      "text": "The root test checks declared assets only and never walks declared roots to reject files absent from the asset inventory and exclusions (crates/jit/src/profile/dogfood.rs:426), citing D-2 and D-6.",
      "resolution": "Not a defect in 39c34568, whose REQ-01 states the exclusion lists may be empty because what belongs in them is measured elsewhere. Sharpening [namespaces.per] did not bind the reviewer across two rounds. 0cf1f351 — which owns the walk and depends only on 39c34568, whose code is on main — was dispatched ahead of 39c34568's close so the claim the reviewer tests becomes true in the tree. Re-run 39c34568's code-review after 0cf1f351 lands."
+    }
+   ]
+  },
+  {
+   "at": "2026-08-03",
+   "session": 9,
+   "gate": "lead-review",
+   "issue": "ff1bbada",
+   "verdict": "fail",
+   "round": 1,
+   "findings": [
+    {
+     "id": "F1",
+     "severity": "high",
+     "status": "resolved",
+     "text": "Sixteen sites still asserted the binary carries a package or preset, or that resolution falls back to one. Worst: docs/reference/cli-commands.md:628 documented the removed compiled-in route as live behaviour.",
+     "resolution": "Fixed in de87d9ff. Ten sites named by the lead, six found by the workers themselves (planning_preset_tests.rs, template_apply_tests.rs x2, docs/concepts/guarantees.md, docs/index.md, docs/reference/jit-content-standards.md, scripts/generate-template-region.sh)."
+    },
+    {
+     "id": "F2",
+     "severity": "medium",
+     "status": "resolved",
+     "text": "The lead's brief scoped the markdown obligation to sentences false about PRESETS specifically, which is why the profile-resolution sentence and the 'embedded profile package' wording in release-policy.md and scripts/release-version-contract.py survived round 1.",
+     "resolution": "Boundary restated: fix every false statement the change creates EXCEPT inside the six surfaces 8d534ee7 rewrites wholesale (docs/reference/profiles.md, README.md, INSTALL.md, docs/tutorials/**, docs/examples/**, docs/how-to/adopt-planning-bracket.md). docs/index.md is NOT among them."
     }
    ]
   }
