@@ -639,6 +639,18 @@
       "subject": "6013cd81 must land before ff1bbada, and the graph does not force it",
       "detail": "9de22aa7 publishes only packages/jit-dogfood in the release archive. Its smoke path applies jit-dogfood from the extracted prefix; the declared dependency jit-default is looked for at packages/jit-default, is absent from the archive, and resolves through the copy dogfood.rs embeds (d35cc3f2 added the jit-default embed). ff1bbada removes both embeds. The graph orders 6013cd81 only before daddfc0b, so ff1bbada and 6013cd81 are siblings and nothing prevents the embed going first, which would leave the release smoke unable to resolve jit-default.",
       "resolution": "Wave sequencing by the lead: 6013cd81 is dispatched and landed before ff1bbada is dispatched. No graph edge added; recorded here so a later session does not lose it."
+    },
+    {
+      "at": "2026-08-03",
+      "session": 8,
+      "finding": "test_live_assets_match_every_declared_source_tree_consumer (crates/jit/src/profile/dogfood.rs:955) has a tautological half after 959274b6. Against an assembled package, package.source_bytes(&asset.source) resolves to the same fs::read(root.join(&asset.target)) the comparison's other side performs, so the asset-bytes assertion can no longer fail. Surfaced by the 959274b6 worker, which correctly declined to delete it.",
+      "disposition": "Not a 959274b6 criterion violation: its criteria say every existing assertion holds afterwards, and it does — it just stops discriminating. Do NOT delete it now: d94f6849 REQ-02 is exactly 'The assertion comparing a packaged copy against its repository counterpart is gone, along with the copies it compared', so deleting it here would pre-empt that criterion's subject. The property meanwhile lives in test_assemble_package_tree_produces_the_checked_in_tree_file_for_file (package_assembly.rs:546); the executable-mode half and the region half of the flagged test both stay real. Verify at d94f6849 that its removal is the one that lands."
+    },
+    {
+      "at": "2026-08-03",
+      "session": 8,
+      "finding": "test_compatibility_names_equal_package_template_node_gates (crates/jit/src/gate_presets/builtin.rs) was tautological BEFORE 959274b6: BuiltinPresets::names() is jit_dogfood_planning_gate_keys(), so both sides of the assert_eq! called the same function. 959274b6 made it a real cross-route comparison of the binary's preset names against the checked-out package.",
+      "disposition": "Resolved by 959274b6. Recorded because it is the second vacuous assertion found in this container by reading a diff rather than by a gate, after 0439da41 REQ-05."
     }
   ],
   "rework_counts": {

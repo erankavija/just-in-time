@@ -119,6 +119,25 @@ All prior traps remain in force; read every earlier trap section. New this sessi
   `959274b6` was prodded twice via `SendMessage` and answered neither time, though its work
   was complete and correct. Read the branch; treat the report as a bonus. This confirms the
   session-6 trap rather than superseding it.
+- **An assertion can become tautological without any gate noticing, and the tell is that both
+  sides now perform the same read.** After `959274b6`,
+  `test_live_assets_match_every_declared_source_tree_consumer` (`dogfood.rs:955`) compares
+  `package.source_bytes(&asset.source)` against `fs::read(root.join(&asset.target))` — which,
+  for an assembled package, *is* that same read. `cargo-ci` and `code-review` both passed
+  over it; the worker found it by reading its own diff and correctly declined to delete it.
+  **Do not delete it now:** `d94f6849` REQ-02 is precisely "The assertion comparing a packaged
+  copy against its repository counterpart is gone, along with the copies it compared", so
+  removing it early would pre-empt that criterion's subject. Recorded in `surfaced_pitfalls`.
+  A second instance of the same shape was found in the opposite direction: the compatibility
+  test at `gate_presets/builtin.rs` was tautological *before* `959274b6` (both sides of the
+  `assert_eq!` called `jit_dogfood_planning_gate_keys`) and is now a real cross-route
+  comparison. **When an issue changes where a value is read from, re-ask what each side of
+  every assertion over it now reads.**
+- **A grep-derived call-site inventory in a lead brief is a starting point, not a contract.**
+  The `959274b6` brief's pattern covered `jit_dogfood_gate` but not
+  `jit_dogfood_planning_gate_keys`, so `gate_presets/builtin.rs` was missing from it; the
+  worker re-derived the set and found it. Tell workers to re-derive rather than trust the
+  list — that instruction is what caught this.
 - **`codex exec` rejects an absolute path outside its `-C` directory even when that path is
   inside the worktree it was given.** The `9de22aa7` worker hit
   `patch rejected: writing outside of the project` and recovered by using the repository's own
