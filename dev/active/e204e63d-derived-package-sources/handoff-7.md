@@ -8,31 +8,36 @@ remains in force unless a trap here records its resolution.
 
 ## Current state
 
-- Epic `e204e63d` — state: backlog. **78 issues** carry the epic label. **57 done** (51 at
-  session start), 15 backlog, 5 in_progress, 1 ready. `jit validate` clean.
-- **Wave 3 closed, plus two issues pulled forward.** Closed this session: `ebbb254f`,
-  `590ff4db`, `2ce8ce1b`, `9de22aa7`, `6013cd81`, `d54f8f83`.
-- **`959274b6` is merged on `main` with `cargo-ci` green and one blocking `code-review`
-  finding open.** A fix is dispatched into a *separate* worktree,
-  `.agents/worktrees/agent-959274b6-fix` on branch `worktree-agent-959274b6-fix`. Its
-  `code-review` must be re-run after that lands.
-- **Wave 4 is dispatched and in flight:** `59f12ba7` and `25a33a83` (codex `gpt-5.6-luna`),
-  `daddfc0b` (Opus). `1c0eb82e`'s story-checkpoint gates are running.
+- Epic `e204e63d` — state: backlog. **78 issues** carry the epic label. **61 done** (51 at
+  session start), 13 backlog, 2 in_progress, 2 ready. `jit validate` clean.
+- **Wave 3 closed and wave 4 is most of the way.** Closed this session: `ebbb254f`,
+  `590ff4db`, `2ce8ce1b`, `9de22aa7`, `6013cd81`, `d54f8f83`, `959274b6`, `25a33a83`,
+  `59f12ba7`, and the `1c0eb82e` story checkpoint.
+- **`daddfc0b` is the only worker still running** (Opus, on
+  `.agents/worktrees/agent-daddfc0b`, three commits in, running its full suite).
+- **`93fef456` is `in_progress` with three failed gate records** — a lead error, not a defect
+  in its delivered work. See the trap on gating a container whose criterion depends on a
+  non-predecessor.
+- **`ff1bbada` is `ready`** and is the next dispatch, after `daddfc0b` merges.
 - Progress file: `progress.json`, same directory.
 
 ## What this session did
 
 - **Reclaimed 11 merged worktrees, freeing ~38 GB** (/ went 88% → 84%). Do this at every
   session start.
-- **Landed six issues and pulled two more forward**, all reviewed, gated and closed.
+- **Closed ten issues**, every one reviewed against its criteria and gated.
 - **Delivered the release-archive distribution end to end.** The native archive now carries
   both package directories under `packages/`, the archive verification asserts both, and the
   release smoke applies `jit-dogfood` from the extracted prefix and asserts each applied
   package's origin names its own extracted directory — so a dependency resolved from the
   compiled-in copy fails the assertion.
-- **Caught two ordering defects in the reviewed graph before they cost a wave** (below).
+- **Caught three ordering problems in the reviewed graph**, two before they cost a wave and
+  one at a gate (below).
 - **Converged three duplicate `.jit/`-prefix helpers** into `VirtualPath::repository_relative()`
-  as a side effect of `d54f8f83`'s rework.
+  and four unsynchronized `set_current_dir` test sites onto one RAII guard.
+- **Closed the packaged-`satisfies` drift** (`surfaced_pitfalls`): the workflow package
+  carried a pre-amendment description that a re-apply would have written over the owner's
+  session-5 ruling.
 
 ## Owner rulings and lead decisions this session
 
