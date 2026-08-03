@@ -3,18 +3,48 @@
 > **Diátaxis Type:** Reference
 
 Repository profiles install a coherent JIT workflow as one explicit operation.
-JIT v1.0 embeds two immutable packages in the binary: `jit-dogfood`, the
-workflow package an adopter names, and `jit-default`, the generic vocabulary it
-declares a dependency on. Applying `jit-dogfood` applies both, so the
-dependency is never named. Either needs no Git repository, network access,
-`jq`, or JIT source checkout.
+A profile is a package: a directory holding a manifest, the assets that
+manifest declares, and the managed-region sources it owns. JIT v1.0 publishes
+two, `jit-dogfood`, the workflow package an adopter names, and `jit-default`,
+the generic vocabulary it declares a dependency on. Applying `jit-dogfood`
+applies both, so the dependency is never named.
+
+## Obtaining a package
+
+A release carries the package directories. The [asset
+table](release-policy.md#what-a-release-publishes) is the complete list of what
+a release publishes, and the [Installation
+Guide](../../INSTALL.md#pre-built-binaries) covers downloading an archive,
+verifying it, and where its contents land.
+
+A package is applied from a location inside the repository worktree, so an
+obtained directory is placed in the repository before it is applied. A package
+read from outside the worktree — including from under `.jit/` — is refused by
+name. Leave the directory where it was applied from: the applied-profile record
+names that location, and `jit profile list`, `jit validate`, and
+`jit validate --fix` read the package there again.
+
+Place a package and the packages it depends on as siblings under one parent,
+each directory named by its own profile ID — that is where [Profile
+Commands](cli-commands.md#profile-commands) looks for a declared dependency:
+
+```text
+packages/
+  jit-default/
+  jit-dogfood/
+```
+
+Applying a package needs no network access, no Git repository, and no JIT
+source checkout: the application reads the placed directory and writes the
+repository. What it does need is bytes that were obtained beforehand.
 
 For a new repository, this is the preferred setup:
 
 ```bash
 mkdir my-project
 cd my-project
-jit init --profile jit-dogfood
+cp -R <extracted-archive>/packages .
+jit init --profile jit-dogfood --from packages/jit-dogfood
 ```
 
 Plain `jit init` remains the methodology-neutral alternative. It creates the
@@ -27,29 +57,33 @@ this project's workflow on top of it.
 
 ## Commands
 
-List the profiles this repository's own records name, and inspect one:
+List the profiles this repository's own records name, and inspect one — either
+one those records name, or a package at a location:
 
 ```bash
 jit profile list
 jit profile show jit-dogfood
+jit profile show jit-dogfood --from packages/jit-dogfood
 ```
 
 Preview and apply a profile to an existing JIT repository:
 
 ```bash
+# A first application names where the package was placed
+jit profile apply jit-dogfood --from packages/jit-dogfood --dry-run
+jit profile apply jit-dogfood --from packages/jit-dogfood
+
+# Later runs need no location: the applied-profile record names it
 jit profile apply jit-dogfood --dry-run
-jit profile apply jit-dogfood
 ```
 
 The command syntax, supplied-location form, and package-resolution contract are
 defined in [Profile Commands](cli-commands.md#profile-commands). This page
 describes the package and its lifecycle; the command reference covers how a
-package obtained from a directory is selected and found again on later runs.
-
-A package a resolved one declares a dependency on is looked for beside it,
-under the dependency's own id, before the record and the binary answer. A
-directory of obtained packages therefore applies as a set: naming one of them
-reaches its siblings without naming them.
+package obtained from a directory is selected and found again on later runs,
+including where a declared dependency is looked for. A directory of obtained
+packages applies as a set: naming one of them reaches its siblings without
+naming them.
 
 Applying a package applies the packages it declares a dependency on first,
 transitively, so a package carrying a delta over another produces the same
@@ -82,11 +116,11 @@ of the named package: it returns the deterministic plan hash and every target's
 reapplication of an exact installation returns `unchanged` for every package of
 the set.
 
-`jit init --profile jit-dogfood` combines the neutral init scaffold and profile
-projection into one validated publication; where the profile declares
-dependencies, the first package of the resolved set is published with the
-scaffold and the rest follow it in order. For an existing repository,
-`jit profile apply jit-dogfood` uses the same profile planner and publisher.
+Profiled `jit init` combines the neutral init scaffold and profile projection
+into one validated publication; where the profile declares dependencies, the
+first package of the resolved set is published with the scaffold and the rest
+follow it in order. For an existing repository, `jit profile apply` uses the
+same profile planner and publisher.
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
 tools.
@@ -96,8 +130,8 @@ tools.
 The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
 run `jit profile show jit-dogfood --json` for the exact version, dependencies,
-contributions, assets, managed regions, hashes, and executable declarations
-carried by the running binary. It also declares the repository roots from which
+contributions, assets, managed regions, hashes, and executable declarations the
+resolved package carries. It also declares the repository roots from which
 packaged live assets are drawn, so any repository file under a declared root
 that is neither claimed by a packaged asset nor matched by a declared exclusion
 is caught rather than silently left out of the package.
@@ -200,13 +234,10 @@ package hash, and per-target hashes used to recognize an exact reapplication.
 It does not state why a package was applied, so a record reads the same whether
 the adopter named that package or received it as another's dependency.
 
-The origin says where the applied bytes came from: either compiled into the
-binary, or read from a repository directory, in which case it carries that
-directory as a worktree-relative location. The command reference defines how
-later commands use that recorded location. The location is confined to the
-worktree — a package read from outside it, including from under `.jit/`, is
-refused by name rather than recorded — so re-reading a repository's package
-never depends on machine state.
+The origin says where the applied bytes were read from: the repository
+directory holding the package, carried as a worktree-relative location, so
+re-reading a repository's package never depends on machine state. The command
+reference defines how later commands use that recorded location.
 
 These repository-state guarantees do not change Git requirements. Core commands,
 including init, profile application, project rendering, and validation, work
