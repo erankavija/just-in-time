@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "857a640daa1a6d196841e6a9a74dfd5b30cdfa22",
+  "completed_at": "2026-08-03T20:59:22.095693978Z",
+  "duration_ms": 203090,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "profiles/jit-dogfood/manifest.toml",
+        "id": "F1",
+        "line": 245,
+        "origin": "pre-existing",
+        "references": [
+          "@/invariant/canonical-cutover",
+          "@/invariant/domain-agnostic"
+        ],
+        "severity": "low",
+        "summary": "The shipped package manifest retains an obsolete claim that built-in compatibility presets exist."
+      }
+    ],
+    "summary": "The attributable documentation correction is correct; one pre-existing advisory manifest comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6df7e456-d845-4a0e-b1f4-38a727285bba",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6f931610-714a-4896-9754-f60273fb560a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T20:55:59.005615300Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a91c29e7ae59d062281a28a80e1a5645ce76a4ad (`jit:6df7e456`); current `docs/reference/profiles.md` matches it\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-10 and @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/canonical-cutover, and @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/issue/e204e63d/decision/D-10, @/issue/e204e63d/decision/D-13, and @/issue/e204e63d/requirement/REQ-07 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-08-03T20:47:11Z); mcp-ci passed (exit code unavailable, 2026-08-03T20:47:11Z); docs-mechanical passed (exit 0, 2026-08-03T20:53:54Z); doc-review passed (exit 0, 2026-08-03T20:54:07Z)\nTruncation recovery: recovered bounded reads of the attributable patch/current reference, build-input and provenance ranges, preset manager/reference, package assembly/test helpers, and MCP bridge tests; the oversized historical patch was outside attribution and needed only its exact blame origin\n\n1. [advisory][pre-existing] `profiles/jit-dogfood/manifest.toml:245` still claims that “Built-in compatibility presets” derive gate definitions, although presets are repository-declared and the built-in compatibility presets have been removed. `git blame` attributes this comment to pre-existing commit `45fe0a99`, not the context issue. References: @/invariant/canonical-cutover, @/invariant/domain-agnostic.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable documentation correction is correct; one pre-existing advisory manifest comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The shipped package manifest retains an obsolete claim that built-in compatibility presets exist.\",\"file\":\"profiles/jit-dogfood/manifest.toml\",\"line\":245,\"references\":[\"@/invariant/canonical-cutover\",\"@/invariant/domain-agnostic\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

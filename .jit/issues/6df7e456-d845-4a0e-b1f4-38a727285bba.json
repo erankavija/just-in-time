@@ -9,6 +9,7 @@
   ],
   "description": "jit's own workflow profile and the presets derived from it are gone from the binary, riding in the release archive instead.\n\n## Background\n\nTwo things carry this project's workflow inside the binary: the whole package directory, and three gate presets whose names and shapes are read out of it. Both are applications of the mechanisms around them rather than mechanisms, so both leave under one rule.\n\nRemoving them is bounded by two facts and one ordering. Nothing an adopter can do today stops working: a gate key resolves through the repository's own registry when no preset supplies it. Nothing this repository does stops working: its own bracket gates are hand-authored and it has never applied its own profile. And the package must ride in the release archive and be provably applicable from it before the compiled-in copy stops existing.\n\n## Success Criteria\n\n- [hard] REQ-01: The binary compiles in no profile package and no workflow preset, and the generated preset reference matches what remains.\n- [hard] REQ-02: This repository's own tests read the package from its checkout rather than from a compiled-in copy.\n- [hard] REQ-03: Editing a packaged source no longer reports an installed binary as stale.\n- [hard] REQ-04: No superseded embedded-package name survives, in the crate, the command help, or the agent-facing bridge.\n\n## Notes\n\nThe rest of the boundary — the configuration the binary writes, the named bundles, the vocabulary literals, and this checkout's own paths — is delivered beside this rather than inside it.\n",
   "documents": [],
+  "done_at": "2026-08-03T20:59:41.544722407Z",
   "first_ready_at": "2026-08-03T19:26:44.977697311Z",
   "gates_required": [
     "cargo-ci",
@@ -25,12 +26,12 @@
     },
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-08-03T20:53:25.826396975Z",
+      "updated_at": "2026-08-03T20:59:22.451199700Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T20:49:38.058530043Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T20:55:57.781272330Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -56,7 +57,7 @@
     "type:story"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "The binary carries no workflow instance",
-  "updated_at": "2026-08-03T20:54:06.956892358Z"
+  "updated_at": "2026-08-03T20:59:41.544722407Z"
 }
