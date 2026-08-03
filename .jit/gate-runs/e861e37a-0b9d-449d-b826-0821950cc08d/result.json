@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5acde0a10f5a17e87a91586a71f6693e48a0e974",
+  "completed_at": "2026-08-03T07:34:20.414440650Z",
+  "duration_ms": 195146,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "mcp-server/test-integration.js",
+        "id": "F1",
+        "line": 501,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/mcp-ci"
+        ],
+        "severity": "high",
+        "summary": "The MCP integration test expects one applied profile record after composed application, but the current behavior correctly creates two."
+      }
+    ],
+    "summary": "The profile-composition change leaves the required MCP integration suite failing on its obsolete one-record expectation.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1c0eb82e-b42b-4cfe-9351-78880b415f79",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e861e37a-0b9d-449d-b826-0821950cc08d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T07:31:05.268164166Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18258 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc688-8c9b-72b1-add2-a2639a5a4137\n--------\nuser\n--- 18245 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fallback — no reachable commit contains `jit:1c0eb82e`; uncommitted JIT lifecycle metadata excluded\nPolicy sources: AGENTS.md (repository root; no lower applicable AGENTS.md)\nResolved items: @/issue/e204e63d/decision/D-14 and D-19 (.jit issue source); @/invariant/domain-agnostic and derived-state-coherence (.jit/invariants.toml); @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate and mcp-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed/0; docs-mechanical passed/0; doc-review passed/0; mcp-ci failed/1; code-review pending\nTruncation recovery: narrowed profile, repair, MCP-gate, and MCP-test reads to affected files and line ranges\n\n1. **F1 — blocking, issue-impact, high:** `mcp-server/test-integration.js:501` still asserts that applying `jit-dogfood` leaves one recorded profile. Composition correctly applies its `jit-default` dependency too, producing two records; the latest `mcp-ci` run fails with `2 !== 1`. Update the MCP integration expectation to verify both dependency-ordered records. References: `@/gate/mcp-ci`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The profile-composition change leaves the required MCP integration suite failing on its obsolete one-record expectation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The MCP integration test expects one applied profile record after composed application, but the current behavior correctly creates two.\",\"file\":\"mcp-server/test-integration.js\",\"line\":501,\"references\":[\"@/gate/mcp-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

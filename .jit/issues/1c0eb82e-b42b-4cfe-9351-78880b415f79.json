@@ -18,10 +18,30 @@
     "mcp-ci"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T07:28:35.230020487Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T07:34:20.723525847Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T07:31:00.692447663Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-03T07:28:46.396469167Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
-      "status": "pending",
-      "updated_at": "2026-07-31T17:34:21.747376812Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-03T07:31:04.237739888Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "1c0eb82e-b42b-4cfe-9351-78880b415f79",
@@ -39,5 +59,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "A profile package is read from disk, and packages compose",
-  "updated_at": "2026-08-03T07:19:59.264622862Z"
+  "updated_at": "2026-08-03T07:34:20.723525847Z"
 }
