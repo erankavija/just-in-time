@@ -1,7 +1,7 @@
 {
  "epic_id": "e204e63d-60de-4fc5-a1b7-933cb41d1695",
  "epic_short_id": "e204e63d",
- "current_wave": 5,
+ "current_wave": 7,
  "waves": [
   {
    "wave_number": 0,
@@ -410,12 +410,69 @@
   },
   {
    "wave": 5,
-   "status": "in progress",
+   "status": "closed",
    "issues": [
     {
      "short_id": "ff1bbada",
-     "status": "dispatched (Opus, worktree agent-ff1bbada, base e6aabd51)",
+     "status": "done (1 rework round; code-review re-run after its corrections landed)",
      "title": "Take the workflow profile and its presets out of the binary"
+    }
+   ]
+  },
+  {
+   "wave": 6,
+   "status": "closed",
+   "issues": [
+    {
+     "short_id": "aa258222",
+     "status": "done — resequenced as a PREDECESSOR of ff1bbada",
+     "title": "State the engine-vocabulary boundary in the invariant"
+    },
+    {
+     "short_id": "6fef2d7c",
+     "status": "done (0 rounds)",
+     "title": "Stop naming the package a build input"
+    },
+    {
+     "short_id": "5de2c401",
+     "status": "done (0 rounds)",
+     "title": "Stop naming this checkout's paths in the defaults and gate modules"
+    },
+    {
+     "short_id": "d94f6849",
+     "status": "done (0 rounds)",
+     "title": "Retire the checked-in copies of the packaged live assets"
+    },
+    {
+     "short_id": "d913a510",
+     "status": "done (0 rounds)",
+     "title": "Retire the embedded-package vocabulary"
+    },
+    {
+     "short_id": "8d534ee7",
+     "status": "done (0 rounds)",
+     "title": "Describe obtaining and applying a profile package"
+    }
+   ]
+  },
+  {
+   "wave": 7,
+   "status": "not started",
+   "issues": [
+    {
+     "short_id": "26f503cc",
+     "status": "ready",
+     "title": "Adjust the citation checker's package exclusions"
+    },
+    {
+     "short_id": "62ef09b6",
+     "status": "ready",
+     "title": "Follow the renamed profile surface in the command reference"
+    },
+    {
+     "short_id": "d198030e",
+     "status": "ready",
+     "title": "Follow the renamed profile surface on the agent-facing bridge"
     }
    ]
   }
@@ -669,6 +726,12 @@
    "session": 8,
    "finding": "93fef456's REQ-01 ('A repository declaring no namespaces and no type hierarchy receives neither, and still validates') is not satisfiable until daddfc0b lands, and daddfc0b is NOT one of its 13 declared predecessors. The lead gated the story on that graph readiness and it failed three gates. code-review finding 1 is correct and decisive: plain `jit init` still selects HierarchyTemplate::default() (crates/jit/src/main.rs:2165), whose template hardcodes the four-type hierarchy and namespace registry (crates/jit/src/hierarchy_templates.rs:351). Verified independently by running `jit init` in a temp directory on main: it writes [type_hierarchy] with milestone/epic/story/task and seven namespaces.",
    "disposition": "Lead error, not a worker defect and not a reviewer false positive. 93fef456 stays in_progress with its failed gate records intact; re-gate it after daddfc0b merges. doc-review's five findings are the same dependency seen from the documentation side — they describe pages that are accurate TODAY and become false when daddfc0b lands, which is why daddfc0b's own brief carries the documentation sweep. cargo-ci failed only on incremental-state (4360 tests, fmt, clippy and budget all passed) because a concurrent worker build wrote target/debug/incremental during the run; re-run it when no worker is building."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 9,
+   "finding": "profiles/jit-dogfood/manifest.toml carries a [[contribution]] whose value duplicates the .jit/invariants.toml domain-agnostic statement verbatim, and nothing binds the two. aa258222 changed all three carriers by hand.",
+   "disposition": "Closed for this statement, but the SHAPE is unguarded and general: any packaged contribution duplicating a repository registry entry can go stale and be written over on re-apply. Second instance in this container after the session-8 [namespaces.satisfies] drift. Worth a standalone issue at epic close."
   }
  ],
  "rework_counts": {
@@ -891,6 +954,20 @@
    "subject": "6013cd81 pulled forward beside 9de22aa7 (lead decision, no criteria change)",
    "ruling": "9de22aa7's code-review failed with one blocking finding: the archive carries only packages/jit-dogfood while that package declares jit-default as a dependency, so the release smoke resolves the dependency from the compiled-in copy rather than from published bytes. The reviewer cited @/charter/D-8 and @/issue/e204e63d/decision/D-16. Satisfying it literally is 6013cd81's entire content, so the edge 9de22aa7 -> 6013cd81 was dropped and 6013cd81 dispatched immediately; 9de22aa7's code-review re-runs once it lands.",
    "rejected": "Absorbing 6013cd81's criteria into 9de22aa7, which empties a reviewed issue; arguing the finding, which the No-argue discipline forbids."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 9,
+   "ruling": "The graph is there for a reason and shall not be worked around. When a gate blocks on graph shape, the correct measures are correcting a wrong dependency or sharpening the plan.",
+   "context": "The lead dispatched six successors of ff1bbada while ff1bbada was still in_progress, on the grounds that its code was already on main. The owner ruled that out.",
+   "applied": "aa258222 -> ff1bbada inverted to ff1bbada -> aa258222 with --reduce; ff1bbada re-gated and closed first; the five remaining successors then became ready through the graph and were closed in order."
+  },
+  {
+   "at": "2026-08-03",
+   "session": 9,
+   "ruling": "A code-review caveat is not the sharpening. If the ordering is correct, compliance never starts before the ruling and the finding cannot occur.",
+   "context": "The lead proposed recording 'ff1bbada's code-review is expected to fail until its successors land'. The owner rejected the framing.",
+   "applied": "Replaced with a scoping rule: an issue removes the falsehoods its own change creates; a successor may add new content but must never be the first place a predecessor falsehood is corrected."
   }
  ],
  "halted": {
@@ -1158,7 +1235,7 @@
    "text": "Reclaimed 12 merged worktrees (27 GB, / 87%->84%). Remaining graph: ff1bbada alone in wave 5; every other open leaf depends on it. Waves 6 (d94f6849, 5de2c401, 6fef2d7c, 8d534ee7, aa258222, d913a510) and 7 (26f503cc, 62ef09b6, d198030e) follow, then the three story checkpoints and the epic."
   }
  ],
- "handoff": "handoff-7.md",
+ "handoff": "handoff-8.md",
  "owner_preferences": [
   {
    "at": "2026-08-02",

@@ -37,6 +37,13 @@
       "format": "markdown",
       "label": "Session 8 handoff",
       "path": "dev/active/e204e63d-derived-package-sources/handoff-7.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "handoff",
+      "format": "markdown",
+      "label": "Session 9 handoff",
+      "path": "dev/active/e204e63d-derived-package-sources/handoff-8.md"
     }
   ],
   "first_ready_at": "2026-07-26T19:29:45.471191451Z",
@@ -55,5 +62,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Derived profile assets and projected policy documentation",
-  "updated_at": "2026-08-03T15:52:29.437008086Z"
+  "updated_at": "2026-08-03T18:50:47.604058390Z"
 }
