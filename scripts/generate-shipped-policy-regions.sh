@@ -32,10 +32,11 @@ set -euo pipefail
 # refuses a package read from outside the worktree it is applied to.
 #
 # WHY THIS SCRIPT STILL CHECKS THE BINARY ITSELF. The values it splices come
-# from a package directory in this checkout, so the binary's currency is not
-# what makes the read correct — the guard below is belt-and-braces over a
-# route that no longer depends on it. It stays because it costs nothing and
-# because the rest of what initialization writes still comes from the binary.
+# from a package directory in this checkout, so the package's contents do not
+# establish the binary's currency — the guard below is belt-and-braces over a
+# route that does not depend on the binary's embedded classification. It stays
+# because it costs nothing and because the rest of what initialization writes
+# still comes from the binary.
 # The repository's own stale-binary guard could not stand in for it: that guard
 # identifies a repository by resolving a revision in it, and the throwaway
 # directory is not a repository, so it reports nothing there whatever the
