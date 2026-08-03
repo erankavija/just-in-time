@@ -1,0 +1,43 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T21:53:54.583075006Z",
+  "dependencies": [],
+  "description": "A packaged contribution and the repository registry entry it restates are held equal by a check rather than by hand, so a package re-apply cannot overwrite a deliberate repository edit.\n\n## Background\n\n`profiles/jit-dogfood/manifest.toml` carries a `[[contribution]]` whose value restates the `domain-agnostic` statement in `.jit/invariants.toml` verbatim. Nothing binds the two: when that statement was amended, all three carriers were edited by hand because no check would have reported the drift.\n\nThe failure this admits is not cosmetic. The repository's copy is what its own validation reads, and the packaged copy is what an adopter receives. If they diverge, a re-apply writes the packaged text over the repository's, so a ruling recorded in the registry is silently replaced by the text the package happened to ship.\n\nThis is the second instance of the shape inside one container; a `[namespaces.satisfies]` contribution drifted from its registry entry earlier in the same work.\n\n## Success Criteria\n\n- [hard] REQ-01: A packaged contribution whose value restates a repository registry entry fails a check when the two texts disagree.\n- [hard] REQ-02: The check names both carriers and the differing text, so a reader repairs it without searching for the second copy.\n- [hard] REQ-03: The check derives which pairs it compares from what the package and the registry declare, rather than from a hand-listed set of pairs.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T21:53:54.583075006Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:10.650972334Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:10.825631045Z",
+      "updated_by": null
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:14.496768153Z",
+      "updated_by": null
+    }
+  },
+  "id": "a2d7d212-33d7-4c56-9a17-126d9c8e2af1",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:core",
+    "enforces:@/invariant/single-source-prose",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Bind a packaged contribution to the registry entry it restates",
+  "updated_at": "2026-08-03T21:55:14.496768153Z"
+}

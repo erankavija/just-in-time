@@ -1,0 +1,46 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T21:52:05.934637746Z",
+  "dependencies": [
+    "06f1fa95-2aa4-4493-a31e-1f149f3deee9",
+    "176d14d3-e63b-4e99-af07-547be55e7072",
+    "3019eacd-863a-428e-b25e-aede2cf37da7",
+    "5367fcba-09d5-4307-95d0-232a885533f6",
+    "6d496b8c-587f-4246-a7e7-4c7e1d6792cb",
+    "896b5b5d-f11f-48de-88b6-88cc1ba47588",
+    "89a7e34e-11a1-4acf-810b-43d2a056005f",
+    "a2d7d212-33d7-4c56-9a17-126d9c8e2af1",
+    "e516b4f8-506d-4b43-89a9-e72603aecaa6"
+  ],
+  "description": "Several facts in this repository exist as two carriers with nothing binding them, and several of the checks the development workflow trusts cannot fail, fail for reasons unrelated to the change under review, or report a cause that is not the one they detected. This epic binds the duplicated facts, makes the unreliable checks answer for themselves, and closes the tracker gaps that made the surrounding work harder than it needed to be.\n\n## Background\n\nEvery item here was surfaced while executing `e204e63d` and falls outside every criterion of that container, so each was recorded rather than fixed. They divide into three groups.\n\n**Facts with two carriers.** A packaged contribution can restate a repository registry entry verbatim, and a packaged managed-region source can restate what is rendered into a repository file. In both cases the two copies are kept equal by hand, and a package re-apply can overwrite an edit the repository made deliberately. Two instances occurred during one container, which is what distinguishes this from a one-off.\n\n**Checks that do not answer for themselves.** A merge-integrity guard reports a cold workspace build as passing implausibly fast, so a merge that breaks only test targets may pass it — and the merge protocol relies on that guard. The authoritative quality gate carries a timing-sensitive assertion that fails under concurrent host load, which makes a verdict depend on what else the machine was doing. A staleness guard reports the same commit on both sides of its message when the working tree is merely dirty in a build-input path, so its message reads as a contradiction rather than naming the dirty file.\n\n**Tracker and tooling gaps.** Creating an issue has no file or stdin form for its description, so a long description passes through shell quoting. A gate cannot be evaluated across several issues in one invocation. A packaging script takes a bare positional destination with no option parsing, so a mistyped flag is treated as a directory to write into. One test file carries a requirement tag naming an identifier that belongs to a different container.\n\n## Success Criteria\n\n- [hard] REQ-01: No fact this repository publishes through a package and also keeps in its own registry or rendered files is held equal by hand alone; each such pair fails a check when the two disagree.\n- [hard] REQ-02: The merge-integrity guard fails a merge whose result does not build and test, or it is removed in favour of the check that does.\n- [hard] REQ-03: A quality-gate verdict does not depend on unrelated load on the host running it.\n- [hard] REQ-04: Every guard that refuses to run states the condition it actually detected, naming the evidence a reader can act on.\n- [hard] REQ-05: An issue description and a multi-issue gate evaluation are both expressible without shell quoting workarounds or one invocation per issue.\n- [hard] REQ-06: A script that takes a destination rejects an unrecognised option rather than treating it as the destination.\n- [hard] REQ-07: No test or source file carries a requirement identifier belonging to a container other than its own.\n\n## Notes\n\nThe two carrier-pair instances have different fix sites — one is a package contribution against a registry, the other a region source against a rendered region — but they share one shape. Whether one mechanism covers both is a design question for breakdown, not a decision this description makes.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T21:52:05.934637746Z",
+  "gates_required": [
+    "repo-validate",
+    "holistic-review"
+  ],
+  "gates_status": {
+    "holistic-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:52:15.010197451Z",
+      "updated_by": null
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-08-03T21:55:35.134900707Z",
+      "updated_by": "auto:executor"
+    }
+  },
+  "id": "f3f7de97-7315-4780-8389-9c857da29239",
+  "labels": [
+    "milestone:v1.0",
+    "epic:guards-and-ergonomics",
+    "component:core",
+    "type:epic"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Unguarded duplicate facts, unreliable verification, and tracker ergonomics",
+  "updated_at": "2026-08-03T21:55:35.134900707Z"
+}

@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T21:54:17.260616032Z",
+  "dependencies": [],
+  "description": "A guard that refuses to run names the condition it detected, so a reader repairs the right thing.\n\n## Background\n\nThe stale-binary guard refuses to run a gate when the installed binary's provenance does not match the tree under review. When the working tree is merely dirty in a build-input path, its message reports the same commit on both sides — \"built from commit X, but the repository's current HEAD is X\" — and names no dirty file.\n\nThe guard's decision is correct: a dirty build input invalidates the provenance. Only the explanation is wrong, and it reads as a contradiction, which sends a reader looking for a commit mismatch that does not exist.\n\n## Success Criteria\n\n- [hard] REQ-01: A refusal caused by uncommitted build inputs names that cause and the paths responsible, and does not present two equal commits as a mismatch.\n- [hard] REQ-02: A refusal caused by a genuine commit mismatch still reports both commits.\n- [hard] REQ-03: A test covers both refusal causes and asserts that each message names its own cause.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T21:54:17.260616032Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:12.051815869Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:12.226715910Z",
+      "updated_by": null
+    }
+  },
+  "id": "89a7e34e-11a1-4acf-810b-43d2a056005f",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:gates",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Make the staleness refusal name the condition it detected",
+  "updated_at": "2026-08-03T21:55:12.226715910Z"
+}

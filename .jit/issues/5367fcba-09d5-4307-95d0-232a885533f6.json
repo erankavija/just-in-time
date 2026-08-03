@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T21:54:49.936640548Z",
+  "dependencies": [],
+  "description": "A script taking a destination rejects an unrecognised option instead of treating it as the destination.\n\n## Background\n\n`scripts/assemble-package.sh` takes one positional argument, the destination, and parses no options. Invoking it as `./scripts/assemble-package.sh --help` therefore assembles the full package tree into a directory literally named `--help` in the current working directory, and reports success.\n\nA run replaces its destination whole, so the same shape applied to a mistyped path is a directory-replacing write chosen by a typo.\n\n## Success Criteria\n\n- [hard] REQ-01: An argument beginning with `-` that the script does not recognise is a usage error, and nothing is written.\n- [hard] REQ-02: `--help` prints usage and exits successfully without writing.\n- [hard] REQ-03: Invoking the script with no destination, or with more than one, is a usage error naming what was expected.\n- [hard] REQ-04: The existing single-destination invocation continues to work unchanged.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T21:54:49.936640548Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:13.099334724Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:13.271045321Z",
+      "updated_by": null
+    }
+  },
+  "id": "5367fcba-09d5-4307-95d0-232a885533f6",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:core",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Reject an unrecognised option instead of writing to it",
+  "updated_at": "2026-08-03T21:55:13.271045321Z"
+}

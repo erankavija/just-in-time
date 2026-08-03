@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T21:54:55.622617639Z",
+  "dependencies": [],
+  "description": "No source or test file carries a requirement identifier belonging to a container other than its own.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/ai_review_verdict_tests.rs` opens with a `(REQ-11)` tag. Requirement identifiers are issue-local: `REQ-11` names a requirement of a different epic, so the tag points at a contract this file does not implement.\n\nA stale identifier of this kind survives because nothing reads it — which is also why it misleads: a reader tracing coverage follows it to the wrong container.\n\n## Success Criteria\n\n- [hard] REQ-01: The tag names the requirement this file actually covers, or is removed.\n- [hard] REQ-02: A sweep of the crate's sources and tests reports no other requirement identifier attributed to a container that does not own the file, and the sweep's result is stated.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T21:54:55.622617639Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:13.442711237Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:13.614582094Z",
+      "updated_by": null
+    }
+  },
+  "id": "e516b4f8-506d-4b43-89a9-e72603aecaa6",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:core",
+    "enforces:@/invariant/canonical-cutover",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Remove the requirement tag naming another container",
+  "updated_at": "2026-08-03T21:55:13.614582094Z"
+}

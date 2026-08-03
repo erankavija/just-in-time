@@ -1,0 +1,48 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-03T21:54:44.263265718Z",
+  "dependencies": [],
+  "description": "One gate is evaluated across several issues in one invocation, so gating a wave does not require one command per issue.\n\n## Background\n\n`jit gate evaluate` takes one issue and one gate. Gating a set of issues that share a gate therefore means one invocation per issue, each paying whatever the checker costs even when the declared inputs have not changed between them.\n\nVerdict reuse already exists: a gate whose declared inputs digest to a value a prior run recorded carries that run's verdict instead of executing the checker. The gap is at the command surface, not in the evaluation model.\n\n## Success Criteria\n\n- [hard] REQ-01: One invocation evaluates a named gate for several named issues.\n- [hard] REQ-02: Each issue receives its own recorded run and its own verdict; a failure for one issue does not suppress evaluation for the rest.\n- [hard] REQ-03: The invocation reports per-issue results, and its exit status reflects whether any issue failed.\n- [hard] REQ-04: Evaluation remains serialised per issue, so concurrent evaluation cannot lose a result to a per-issue lock.",
+  "documents": [],
+  "first_ready_at": "2026-08-03T21:54:44.263265718Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical",
+    "mcp-ci"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:12.753648348Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:12.927210217Z",
+      "updated_by": null
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:14.145551618Z",
+      "updated_by": null
+    },
+    "mcp-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-03T21:55:14.322304402Z",
+      "updated_by": null
+    }
+  },
+  "id": "6d496b8c-587f-4246-a7e7-4c7e1d6792cb",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Evaluate one gate across several issues in one invocation",
+  "updated_at": "2026-08-03T21:55:14.322304402Z"
+}
