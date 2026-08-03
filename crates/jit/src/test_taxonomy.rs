@@ -9,8 +9,7 @@
 //!   and appends its own `[item_kinds.*]`, `[gates]` or `[rules]` tables to it
 //!   ([`TestTaxonomy::config_fragment`]);
 //! - a whole repository, built by [`crate::test_utils::setup_test_repo_with_taxonomy`]
-//!   from that fragment plus the initialization preset
-//!   ([`TestTaxonomy::hierarchy_template`]) the initializer derives the
+//!   from that fragment, which initialization preserves and derives the
 //!   repository's coupled rules and schemas from.
 //!
 //! This module reaches for nothing but the pure hierarchy types it renders into,
@@ -26,7 +25,6 @@
 #![cfg(any(test, feature = "test-support"))]
 
 use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::hierarchy_templates::HierarchyTemplate;
 use std::collections::HashMap;
 
 /// One namespace declaration in the shared test vocabulary.
@@ -85,17 +83,6 @@ impl TestTaxonomy {
             "the declared test vocabulary has one type at level {level}"
         );
         name
-    }
-
-    /// The initialization preset carrying this vocabulary, for the fixture that
-    /// derives a repository's coupled rules and schemas from it.
-    pub fn hierarchy_template(&self) -> HierarchyTemplate {
-        HierarchyTemplate {
-            name: "test-taxonomy".to_string(),
-            description: "Shared test vocabulary".to_string(),
-            hierarchy: self.hierarchy.clone(),
-            label_associations: self.label_associations.clone(),
-        }
     }
 
     /// This vocabulary as `.jit/config.toml` text: a complete configuration on
@@ -293,16 +280,17 @@ mod tests {
     }
 
     #[test]
-    fn test_hierarchy_template_carries_the_declared_vocabulary() {
+    fn test_config_fragment_declares_the_strategic_types_the_vocabulary_names() {
         let taxonomy = test_taxonomy();
-        let template = taxonomy.hierarchy_template();
+        let configured = toml::from_str::<JitConfig>(&taxonomy.config_fragment())
+            .expect("the fragment is a parseable configuration")
+            .type_hierarchy
+            .expect("the fragment declares the vocabulary");
 
-        assert_eq!(template.hierarchy, taxonomy.hierarchy);
-        assert_eq!(template.label_associations, taxonomy.label_associations);
         assert_eq!(
-            template.get_strategic_types(),
+            configured.strategic_types.unwrap_or_default(),
             taxonomy.strategic_types,
-            "the preset's strategic types are the declared ones"
+            "a repository built from the fragment resolves the declared strategic types"
         );
     }
 }

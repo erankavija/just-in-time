@@ -598,11 +598,7 @@ schema = 1
                 .unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
         executor
-            .initialize_fresh_repository(
-                dir.path().parent().unwrap(),
-                &taxonomy.hierarchy_template(),
-                None,
-            )
+            .initialize_fresh_repository(dir.path().parent().unwrap(), None)
             .unwrap();
 
         // A recognized level is accepted and persisted.

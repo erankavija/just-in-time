@@ -232,7 +232,6 @@ impl CommandSchema {
             "claim_list",
             "claim_status",
             "config_get",
-            "config_list-templates",
             "config_set",
             "config_show",
             "config_show-hierarchy",

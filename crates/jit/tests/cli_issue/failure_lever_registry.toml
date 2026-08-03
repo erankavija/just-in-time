@@ -146,11 +146,6 @@ expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
-path = "config list-templates"
-exemption_reason = "The arm only enumerates the built-in HierarchyTemplate::all() collection and serializes it; source inspection finds no repository input or fallible command-body operation that can produce a post-dispatch failure."
-confirmation = "source-only"
-
-[[arms]]
 path = "dep add"
 argv = ["dep", "add", "missing-from", "missing-to", "--json"]
 setup = ["init", "no-issue:missing-from"]

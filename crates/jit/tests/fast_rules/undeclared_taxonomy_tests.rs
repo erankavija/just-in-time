@@ -24,11 +24,10 @@ fn scaffold_declaring(config_toml: &str) -> (TempDir, std::path::PathBuf) {
     fs::create_dir(&jit_dir).unwrap();
     fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
-    let taxonomy = jit::test_taxonomy::test_taxonomy();
     let layout = jit::storage::discover_repository_layout(temp.path(), &jit_dir).unwrap();
     CommandExecutor::new(storage)
         .with_layout(layout)
-        .initialize_fresh_repository(temp.path(), &taxonomy.hierarchy_template(), None)
+        .initialize_fresh_repository(temp.path(), None)
         .unwrap();
     (temp, jit_dir)
 }

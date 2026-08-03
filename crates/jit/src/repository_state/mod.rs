@@ -63,8 +63,8 @@ pub use image::{
 pub use index::RepositoryIndexError;
 pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
 pub use initialize::{
-    render_repo_config, GitattributesClaim, GitattributesStatus, InitializationError,
-    InitializationScaffold,
+    render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
+    InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
 };
 pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{

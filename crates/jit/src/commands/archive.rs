@@ -1128,7 +1128,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();
@@ -1446,7 +1446,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::create_dir(repo.path().join("shared")).unwrap();
@@ -1525,7 +1525,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
         fs::write(repo.path().join("dev/guides/permanent.md"), b"permanent").unwrap();
@@ -1568,7 +1568,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("archive/guides")).unwrap();
         fs::create_dir_all(repo.path().join("dev/guides")).unwrap();
@@ -1663,7 +1663,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         let mut container =
@@ -1763,7 +1763,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), b"shared").unwrap();
@@ -1824,7 +1824,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
 
         fs::create_dir_all(repo.path().join("fixtures/bundle/theme")).unwrap();
@@ -2058,7 +2058,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("scripts")).unwrap();
         fs::create_dir_all(repo.path().join("workspace/active")).unwrap();
@@ -2116,7 +2116,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         for (path, content) in [
             ("workspace/active/target.md", "# Target\n"),
@@ -2330,7 +2330,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("real.md"), "[referent](secret.html)").unwrap();
@@ -2373,11 +2373,7 @@ mod tests {
         )
         .unwrap();
         executor(&regular_repo, regular_storage.clone())
-            .initialize_fresh_repository(
-                regular_repo.path(),
-                &regular_taxonomy.hierarchy_template(),
-                None,
-            )
+            .initialize_fresh_repository(regular_repo.path(), None)
             .unwrap();
         fs::create_dir(regular_repo.path().join("fixtures")).unwrap();
         fs::create_dir(regular_repo.path().join("real-archive")).unwrap();
@@ -2408,11 +2404,7 @@ mod tests {
         )
         .unwrap();
         executor(&owner_repo, owner_storage.clone())
-            .initialize_fresh_repository(
-                owner_repo.path(),
-                &owner_taxonomy.hierarchy_template(),
-                None,
-            )
+            .initialize_fresh_repository(owner_repo.path(), None)
             .unwrap();
         fs::create_dir_all(owner_repo.path().join("docs")).unwrap();
         fs::create_dir_all(owner_repo.path().join("fixtures")).unwrap();
@@ -2466,7 +2458,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir_all(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/index.md"), "[section](section/)").unwrap();
@@ -2564,7 +2556,7 @@ mod tests {
         )
         .unwrap();
         executor(&repo, storage.clone())
-            .initialize_fresh_repository(repo.path(), &taxonomy.hierarchy_template(), None)
+            .initialize_fresh_repository(repo.path(), None)
             .unwrap();
         fs::create_dir(repo.path().join("fixtures")).unwrap();
         fs::write(repo.path().join("fixtures/root.md"), content).unwrap();

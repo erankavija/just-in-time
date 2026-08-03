@@ -900,7 +900,6 @@ pub(super) fn reject_reserved_application_targets<'a>(
 mod tests {
     use super::*;
     use crate::domain::Event;
-    use crate::hierarchy_templates::HierarchyTemplate;
     use crate::repository_state::{
         Contribution, InitializationError, MapEntryTarget, ProducerError, ProfileConflictOccupant,
         ProfilePackageId, ProfileTargetConflictError, RepositoryStateError, RootRelativePath,
@@ -1010,7 +1009,7 @@ mod tests {
         let initializer = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
         initializer
-            .initialize_fresh_repository(temp.path(), &HierarchyTemplate::default(), None)
+            .initialize_fresh_repository(temp.path(), None)
             .unwrap();
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());

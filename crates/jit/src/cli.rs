@@ -41,10 +41,6 @@ pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
     /// staged complete and published without replacing an occupied destination
     Init {
-        /// Hierarchy template to use (default, extended, agile, minimal)
-        #[arg(long)]
-        hierarchy_template: Option<String>,
-
         /// Apply a profile during initialization
         #[arg(long)]
         profile: Option<String>,
@@ -2585,14 +2581,6 @@ pub enum ConfigCommands {
         #[arg(long)]
         json: bool,
     },
-
-    /// List available hierarchy templates
-    ///
-    /// JSON output uses the list envelope `{"count": N, "templates": [...]}`.
-    ListTemplates {
-        #[arg(long)]
-        json: bool,
-    },
 }
 
 #[derive(Subcommand)]
@@ -3129,8 +3117,7 @@ impl ConfigCommands {
             Self::Show { .. }
             | Self::Get { .. }
             | Self::Validate { .. }
-            | Self::ShowHierarchy { .. }
-            | Self::ListTemplates { .. } => false,
+            | Self::ShowHierarchy { .. } => false,
         }
     }
 }
@@ -3345,8 +3332,7 @@ impl ConfigCommands {
             | Self::Get { .. }
             | Self::Set { .. }
             | Self::Validate { .. }
-            | Self::ShowHierarchy { .. }
-            | Self::ListTemplates { .. } => false,
+            | Self::ShowHierarchy { .. } => false,
         }
     }
 }
@@ -3441,7 +3427,6 @@ mod recovery_dispatch_tests {
         "claim renew",
         "claim status",
         "config get",
-        "config list-templates",
         "config set",
         "config show",
         "config show-hierarchy",
@@ -3603,7 +3588,6 @@ mod recovery_dispatch_tests {
     #[test]
     fn test_representative_writer_and_reader_classification() {
         assert!(Commands::Init {
-            hierarchy_template: None,
             profile: None,
             from: None,
             json: false,

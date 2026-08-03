@@ -152,14 +152,14 @@ fn human_verdict(repo: &Path, path: &str) -> String {
 
 /// Replace the `issue_scoped_areas` registry in the repository's configuration.
 ///
-/// `jit init` scaffolds the shipped declaration as an explicit list, so this
-/// rewrites that list in place and leaves the rest of the table alone.
+/// The fixture repository authors that registry as an explicit list, so this
+/// rewrites the list in place and leaves the rest of the table alone.
 fn declare_issue_scoped_areas(repo: &Path, areas: &[&str]) {
     let config_path = repo.join(".jit/config.toml");
     let config = fs::read_to_string(&config_path).unwrap();
     let start = config
         .find("issue_scoped_areas = [")
-        .expect("the scaffolded configuration declares issue_scoped_areas");
+        .expect("the fixture configuration declares issue_scoped_areas");
     let end = config[start..]
         .find(']')
         .map(|offset| start + offset + 1)
@@ -180,15 +180,10 @@ fn declare_issue_scoped_areas(repo: &Path, areas: &[&str]) {
     .unwrap();
 }
 
-/// The areas a freshly initialized repository declares issue-scoped. `jit init`
-/// scaffolds the shipped policy, so this is that repository's configured
-/// registry rather than a second copy of the list.
+/// The areas the fixture repository declares issue-scoped, named through the
+/// same helper that authored them rather than as a second copy of the list.
 fn scaffolded_areas() -> Vec<String> {
-    jit::config::SHIPPED_DOCUMENTATION_POLICY
-        .issue_scoped_areas
-        .iter()
-        .map(|area| (*area).to_string())
-        .collect()
+    vec![declared_area().to_string()]
 }
 
 /// Every file under `root` with its bytes, so a run can be shown to have

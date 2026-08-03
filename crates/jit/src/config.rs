@@ -306,13 +306,16 @@ impl ValidationConfig {
 
 /// Documentation lifecycle management configuration.
 ///
-/// Every field is optional and falls back to [`SHIPPED_DOCUMENTATION_POLICY`],
-/// so the default value is the wholly unauthored table: what a repository
-/// whose configuration omits `[documentation]` declares.
+/// Every field is optional, and an absent one declares nothing rather than
+/// resolving to a classification the engine supplies, so the default value is
+/// the wholly unauthored table: what a repository whose configuration omits
+/// `[documentation]` declares. A repository obtains a development-area
+/// classification by declaring one, directly or by applying a profile package
+/// that contributes it.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DocumentationConfig {
-    /// Root directory for development documentation. Absent falls back to
-    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s development root.
+    /// Root directory for development documentation. Absent declares no root,
+    /// so no boundary excludes an area from classification.
     ///
     /// Archival planning classifies by this root as well: a linked artifact it
     /// does not contain is retained where it is, so the plan schedules no
@@ -320,19 +323,15 @@ pub struct DocumentationConfig {
     /// (`@/issue/8e071e18/decision/D-14`).
     pub development_root: Option<String>,
     /// Paths inside the development root whose artifacts are subject to
-    /// archival. Absent falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
-    /// managed paths.
+    /// archival. Absent declares no managed area.
     pub managed_paths: Option<Vec<String>>,
-    /// Where archived docs are stored. Absent falls back to
-    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s archive root.
+    /// Where archived docs are stored. Absent declares no archive root.
     pub archive_root: Option<String>,
     /// Paths inside the development root whose artifacts archive by copy while
-    /// the source is retained. Absent falls back to
-    /// [`SHIPPED_DOCUMENTATION_POLICY`]'s permanent paths.
+    /// the source is retained. Absent declares no permanent area.
     pub permanent_paths: Option<Vec<String>>,
     /// Areas that organize their artifacts one directory per issue. Absent
-    /// falls back to [`SHIPPED_DOCUMENTATION_POLICY`]'s issue-scoped areas; an
-    /// authored empty list declares that no area adopts the convention.
+    /// declares no such area, exactly as an authored empty list does.
     pub issue_scoped_areas: Option<Vec<String>>,
     /// Roots an in-content citation scan reads. Absent falls back to the
     /// development root together with the configured permanent paths.
@@ -340,61 +339,33 @@ pub struct DocumentationConfig {
 }
 
 impl DocumentationConfig {
-    /// Development root, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
-    /// declared root when unauthored.
+    /// The declared development root, empty when unauthored.
     pub fn development_root(&self) -> String {
-        self.development_root
-            .clone()
-            .unwrap_or_else(|| SHIPPED_DOCUMENTATION_POLICY.development_root.to_string())
+        self.development_root.clone().unwrap_or_default()
     }
 
-    /// Managed paths, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
-    /// declared managed paths when unauthored.
+    /// The declared managed paths, empty when unauthored.
     pub fn managed_paths(&self) -> Vec<String> {
-        self.managed_paths.clone().unwrap_or_else(|| {
-            SHIPPED_DOCUMENTATION_POLICY
-                .managed_paths
-                .iter()
-                .map(|path| path.to_string())
-                .collect()
-        })
+        self.managed_paths.clone().unwrap_or_default()
     }
 
-    /// Archive root, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
-    /// declared archive root when unauthored.
+    /// The declared archive root, empty when unauthored.
     pub fn archive_root(&self) -> String {
-        self.archive_root
-            .clone()
-            .unwrap_or_else(|| SHIPPED_DOCUMENTATION_POLICY.archive_root.to_string())
+        self.archive_root.clone().unwrap_or_default()
     }
 
-    /// Permanent paths, falling back to [`SHIPPED_DOCUMENTATION_POLICY`]'s
-    /// declared permanent paths when unauthored.
+    /// The declared permanent paths, empty when unauthored.
     pub fn permanent_paths(&self) -> Vec<String> {
-        self.permanent_paths.clone().unwrap_or_else(|| {
-            SHIPPED_DOCUMENTATION_POLICY
-                .permanent_paths
-                .iter()
-                .map(|path| path.to_string())
-                .collect()
-        })
+        self.permanent_paths.clone().unwrap_or_default()
     }
 
-    /// The areas that organize their artifacts one directory per issue, falling
-    /// back to [`SHIPPED_DOCUMENTATION_POLICY`]'s declared areas when
-    /// unauthored.
+    /// The areas that organize their artifacts one directory per issue, empty
+    /// when unauthored.
     ///
-    /// An authored list is the whole registry: it replaces the shipped
-    /// declaration rather than extending it, so an empty list opts every area
-    /// out of the convention.
+    /// An authored list is the whole registry, so an empty list and an absent
+    /// key alike opt every area out of the convention.
     pub fn issue_scoped_areas(&self) -> Vec<String> {
-        self.issue_scoped_areas.clone().unwrap_or_else(|| {
-            SHIPPED_DOCUMENTATION_POLICY
-                .issue_scoped_areas
-                .iter()
-                .map(|area| area.to_string())
-                .collect()
-        })
+        self.issue_scoped_areas.clone().unwrap_or_default()
     }
 
     /// The repository-relative roots an in-content citation scan reads, falling
@@ -437,90 +408,6 @@ impl DocumentationConfig {
             })
     }
 }
-
-/// The development-area classification an initialized repository is shipped with.
-///
-/// Configuration the tool writes for an adopter, not classifier logic
-/// (`@/invariant/domain-agnostic`): the `jit init` scaffold renders this
-/// declaration as the `[documentation]` table of a fresh `.jit/config.toml`
-/// (`HierarchyTemplate::generate_config_toml`), so the repository reports a
-/// configured archival policy without hand-editing. An adopter is free to
-/// reclassify any area afterwards.
-///
-/// A managed area's artifacts move under the archive root when their owning
-/// issue is archived; a permanent area's artifacts are copied there and the
-/// source is retained. Entries are matched with
-/// [`contains_path`](crate::domain::artifact_classifier::contains_path), which
-/// covers everything beneath a directory entry and exactly one file for a file
-/// entry, so development-root files belonging to no area are named individually
-/// rather than reached through an entry for the root itself
-/// (`@/issue/8e071e18/decision/D-13`).
-#[derive(Debug, Clone, Copy)]
-pub struct ShippedDocumentationPolicy {
-    /// Root directory holding development documentation.
-    pub development_root: &'static str,
-    /// Root the archived artifacts are published under.
-    pub archive_root: &'static str,
-    /// Areas whose artifacts move on archival. Declared inside the development
-    /// root, because a source that root does not contain is retained whichever
-    /// areas claim it (`@/issue/8e071e18/decision/D-14`).
-    pub managed_paths: &'static [&'static str],
-    /// Areas whose artifacts archive by copy, retaining their source. Declared
-    /// inside the development root, for the same reason as `managed_paths`.
-    pub permanent_paths: &'static [&'static str],
-    /// Areas that organize their artifacts one directory per issue.
-    ///
-    /// Matched as whole areas rather than by prefix (see
-    /// [`DocumentationConfig::is_issue_scoped_area`]). Adoption is independent
-    /// of the managed/permanent split: an area may appear here, there, both, or
-    /// neither, and a flat managed area still archives its artifacts normally
-    /// (`@/issue/8e071e18/decision/D-3`).
-    pub issue_scoped_areas: &'static [&'static str],
-}
-
-/// The shipped documentation policy: the one declaration of which development
-/// areas are managed, which are permanent, and which organize their artifacts
-/// by issue.
-///
-/// See [`ShippedDocumentationPolicy`] for the matching semantics and for why the
-/// classification is scaffolded configuration.
-pub const SHIPPED_DOCUMENTATION_POLICY: ShippedDocumentationPolicy = ShippedDocumentationPolicy {
-    development_root: "dev",
-    archive_root: "dev/archive",
-    // Revision-specific work products of terminal issues: archiving the owning
-    // issue takes them with it.
-    managed_paths: &[
-        "dev/active",
-        "dev/studies",
-        "dev/sessions",
-        "dev/plans",
-        "dev/presentations",
-        "dev/design",
-        "dev/benchmarks",
-        "dev/experiments",
-    ],
-    // Living documentation, a configured item-kind source, or documented
-    // invocation paths: each keeps its source where readers and configuration
-    // already point. The trailing entries are the development-root files that
-    // belong to no area, classified one path at a time.
-    permanent_paths: &[
-        "dev/architecture",
-        "dev/eval",
-        "dev/vision",
-        "dev/index.md",
-        "dev/TESTING.md",
-        "dev/authoring-conventions.md",
-    ],
-    // Areas whose contents are per-issue work products, so one issue owns a
-    // whole directory. The remaining areas hold living documentation, dated
-    // records, or generated output that no single issue owns, and stay flat.
-    issue_scoped_areas: &[
-        "dev/active",
-        "dev/studies",
-        "dev/plans",
-        "dev/presentations",
-    ],
-};
 
 /// Label namespace configuration from TOML.
 /// Replaces the namespace definitions in labels.json.
@@ -2387,49 +2274,44 @@ enforced-by = "dag-no-cycles"
     }
 
     #[test]
-    fn test_documentation_config_fallbacks_derive_from_shipped_policy() {
-        // No table authored at all: every accessor must fall back to the SAME
-        // shipped declaration `jit init` scaffolds, rather than a literal of
-        // its own (REQ-01).
-        let unauthored = DocumentationConfig {
-            development_root: None,
-            managed_paths: None,
-            archive_root: None,
-            permanent_paths: None,
-            issue_scoped_areas: None,
+    fn test_documentation_config_unauthored_table_classifies_no_area() {
+        // A table whose keys are all absent declares no classification, so no
+        // area name reaches a repository that never named one (REQ-01).
+        let unauthored = DocumentationConfig::default();
+
+        assert!(unauthored.development_root().is_empty());
+        assert!(unauthored.archive_root().is_empty());
+        assert!(unauthored.managed_paths().is_empty());
+        assert!(unauthored.permanent_paths().is_empty());
+        assert!(unauthored.issue_scoped_areas().is_empty());
+        // The membership query answers from the same empty registry, so an area
+        // an adopter might plausibly name is rejected rather than accepted by a
+        // declaration they never wrote.
+        assert!(!unauthored.is_issue_scoped_area("dev/active"));
+    }
+
+    #[test]
+    fn test_documentation_config_accessors_answer_from_the_authored_declaration() {
+        // Each accessor reports what the table declares, so a repository's
+        // classification is its own declaration and nothing else.
+        let authored = DocumentationConfig {
+            development_root: Some("workspace".to_string()),
+            managed_paths: Some(vec!["workspace/drafts".to_string()]),
+            archive_root: Some("workspace/attic".to_string()),
+            permanent_paths: Some(vec!["workspace/handbook".to_string()]),
+            issue_scoped_areas: Some(vec!["workspace/drafts".to_string()]),
             citation_scan_roots: None,
         };
+
+        assert_eq!(authored.development_root(), "workspace");
+        assert_eq!(authored.archive_root(), "workspace/attic");
+        assert_eq!(authored.managed_paths(), vec!["workspace/drafts"]);
+        assert_eq!(authored.permanent_paths(), vec!["workspace/handbook"]);
+        assert!(authored.is_issue_scoped_area("workspace/drafts"));
+        // The unauthored scan universe derives from this table's own values.
         assert_eq!(
-            unauthored.development_root(),
-            SHIPPED_DOCUMENTATION_POLICY.development_root
-        );
-        assert_eq!(
-            unauthored.managed_paths(),
-            SHIPPED_DOCUMENTATION_POLICY
-                .managed_paths
-                .iter()
-                .map(|path| path.to_string())
-                .collect::<Vec<_>>()
-        );
-        assert_eq!(
-            unauthored.archive_root(),
-            SHIPPED_DOCUMENTATION_POLICY.archive_root
-        );
-        assert_eq!(
-            unauthored.permanent_paths(),
-            SHIPPED_DOCUMENTATION_POLICY
-                .permanent_paths
-                .iter()
-                .map(|path| path.to_string())
-                .collect::<Vec<_>>()
-        );
-        assert_eq!(
-            unauthored.issue_scoped_areas(),
-            SHIPPED_DOCUMENTATION_POLICY
-                .issue_scoped_areas
-                .iter()
-                .map(|area| area.to_string())
-                .collect::<Vec<_>>()
+            authored.citation_scan_roots(),
+            vec!["workspace", "workspace/handbook"]
         );
     }
 
