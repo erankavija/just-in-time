@@ -652,6 +652,12 @@
       "session": 8,
       "finding": "test_compatibility_names_equal_package_template_node_gates (crates/jit/src/gate_presets/builtin.rs) was tautological BEFORE 959274b6: BuiltinPresets::names() is jit_dogfood_planning_gate_keys(), so both sides of the assert_eq! called the same function. 959274b6 made it a real cross-route comparison of the binary's preset names against the checked-out package.",
       "disposition": "Resolved by 959274b6. Recorded because it is the second vacuous assertion found in this container by reading a diff rather than by a gate, after 0439da41 REQ-05."
+    },
+    {
+      "at": "2026-08-03",
+      "session": 8,
+      "finding": "93fef456's REQ-01 ('A repository declaring no namespaces and no type hierarchy receives neither, and still validates') is not satisfiable until daddfc0b lands, and daddfc0b is NOT one of its 13 declared predecessors. The lead gated the story on that graph readiness and it failed three gates. code-review finding 1 is correct and decisive: plain `jit init` still selects HierarchyTemplate::default() (crates/jit/src/main.rs:2165), whose template hardcodes the four-type hierarchy and namespace registry (crates/jit/src/hierarchy_templates.rs:351). Verified independently by running `jit init` in a temp directory on main: it writes [type_hierarchy] with milestone/epic/story/task and seven namespaces.",
+      "disposition": "Lead error, not a worker defect and not a reviewer false positive. 93fef456 stays in_progress with its failed gate records intact; re-gate it after daddfc0b merges. doc-review's five findings are the same dependency seen from the documentation side — they describe pages that are accurate TODAY and become false when daddfc0b lands, which is why daddfc0b's own brief carries the documentation sweep. cargo-ci failed only on incremental-state (4360 tests, fmt, clippy and budget all passed) because a concurrent worker build wrote target/debug/incremental during the run; re-run it when no worker is building."
     }
   ],
   "rework_counts": {
@@ -676,7 +682,8 @@
     "d54f8f83": 1,
     "2ce8ce1b": 1,
     "590ff4db": 1,
-    "959274b6": 1
+    "959274b6": 1,
+    "93fef456": 0
   },
   "started_at": "2026-07-31",
   "owner_rulings": [

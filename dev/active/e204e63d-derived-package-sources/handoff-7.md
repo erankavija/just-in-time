@@ -57,8 +57,16 @@ Full text in `progress.json` under `owner_rulings`. In brief:
       Keep `agent-a122b9b3` and `steward-v1-readiness` (unmerged).
 - [ ] **Close out `959274b6`.** Review the fix on `worktree-agent-959274b6-fix`, merge it, and
       re-run `jit gate evaluate 959274b6 code-review`. `cargo-ci` already passed.
-- [ ] **Land wave 4:** `59f12ba7`, `25a33a83`, `daddfc0b`. Then `ff1bbada` unblocks once
-      `959274b6` closes.
+- [ ] **Land `daddfc0b`**, the last of wave 4 still running. `59f12ba7`, `25a33a83` and
+      `6013cd81` are closed.
+- [ ] **Re-gate `93fef456` only after `daddfc0b` merges.** It is `in_progress` with three
+      failed gate records; see the trap below. Nothing is wrong with the story's delivered
+      work — its REQ-01 simply is not true until `daddfc0b` lands.
+- [ ] **Dispatch `ff1bbada` after `daddfc0b` merges, not beside it.** Both rewrite
+      `crates/jit/src/commands/init.rs`, `crates/jit/src/gate_presets/` and
+      `crates/jit/src/profile/dogfood.rs`; the plan calls the embed-and-preset removal
+      indivisible across ten files. `6013cd81` already landed, so the archive constraint that
+      `ff1bbada` had to follow is satisfied.
 - [ ] **Order `6013cd81` before `ff1bbada`** — already satisfied, `6013cd81` is done. Nothing
       to do; recorded so the constraint is not re-derived.
 - [ ] **`d94f6849` now runs after `ff1bbada`**, and `26f503cc` after it. Do not re-order.
@@ -119,6 +127,28 @@ All prior traps remain in force; read every earlier trap section. New this sessi
   `959274b6` was prodded twice via `SendMessage` and answered neither time, though its work
   was complete and correct. Read the branch; treat the report as a bonus. This confirms the
   session-6 trap rather than superseding it.
+- **A container's criterion can depend on an issue that is not one of its predecessors, and
+  graph readiness is then not gate readiness.** `93fef456`'s 13 declared predecessors were all
+  done, so it looked gateable; its REQ-01 ("a repository declaring no namespaces and no type
+  hierarchy receives neither") is not satisfiable until `daddfc0b` lands, because plain
+  `jit init` still selects `HierarchyTemplate::default()` (`crates/jit/src/main.rs:2165`) over
+  a template hardcoding the four types and seven namespaces
+  (`crates/jit/src/hierarchy_templates.rs:351`). `code-review` said exactly that and was
+  right; `doc-review`'s five findings are the same dependency seen from the documentation
+  side. **Before gating a container, read its criteria against the tree, not its predecessor
+  list against the graph** — one `jit init` in a temp directory would have shown it in
+  seconds. Re-gate `93fef456` after `daddfc0b` merges.
+- **A new gate line in the pipeline log means the previous gate finished, not that it
+  passed.** The lead read `=== gate 93fef456 jit-validate` as evidence `cargo-ci` had passed
+  and said so; three of that issue's five gates had in fact failed. Read `jit gate status-all`,
+  never the progress log, for a verdict.
+- **`cargo-ci`'s incremental-state check fails when a concurrent worker builds during the
+  gate run.** `merge-and-gate.sh` clears `target/*/incremental` immediately before every
+  evaluation, which defeats a writer that ran *before* the gate but not one that runs *during*
+  it. `93fef456`'s run passed fmt, clippy, 4360 tests, provenance and the budget, and failed
+  only on a `target/debug/incremental` directory that appeared mid-run while the `daddfc0b`
+  worker was executing its full suite. Do not gate on main while a worker is running a full
+  Rust suite.
 - **An assertion can become tautological without any gate noticing, and the tell is that both
   sides now perform the same read.** After `959274b6`,
   `test_live_assets_match_every_declared_source_tree_consumer` (`dogfood.rs:955`) compares

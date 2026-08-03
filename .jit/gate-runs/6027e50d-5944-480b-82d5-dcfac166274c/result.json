@@ -1,0 +1,74 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "daddf47baab4b4f6f1e6549f2320e3b6227b9e0e",
+  "completed_at": "2026-08-03T08:28:21.768180504Z",
+  "duration_ms": 220319,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F1",
+        "line": 234,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The configuration reference incorrectly says jit init supplies the four-type hierarchy."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/core-model.md",
+        "id": "F2",
+        "line": 885,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Core Model incorrectly presents the package-provided hierarchy and strategic types as jit init shipped defaults."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/labels.md",
+        "id": "F3",
+        "line": 238,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The Labels reference incorrectly says the jit init scaffold declares the four-level hierarchy."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/software-development.md",
+        "id": "F4",
+        "line": 378,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The software-development recipe incorrectly describes taxonomy and namespaces as plain jit init scaffolding."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/example-config.toml",
+        "id": "F5",
+        "line": 56,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The example configuration labels the package-provided hierarchy as an engine default."
+      }
+    ],
+    "summary": "Five issue-impact documentation defects still describe the removed plain-init vocabulary defaults.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "93fef456-ac33-4525-bbe4-3a170de0b253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6027e50d-5944-480b-82d5-dcfac166274c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T08:24:41.448668099Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 20815 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc6b9-a249-7c33-a876-a9f39053c79d\n--------\nuser\n--- 20802 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: story `93fef456` is a container; its 15 resolved leaf children are all done. I inspected the container and every descendant’s individually tagged commits with rename detection, then verified the resulting package behavior in the current tree. Uncommitted gate records were excluded.\n\nThe package and release-archive documentation is accurate, but several directly affected pages still describe the removed plain-`jit init` taxonomy defaults.\n\n1. **Blocking, issue-impact** — [Configuration reference](docs/reference/configuration.md:234) says the `jit init` template supplies the four-type hierarchy. Plain initialization now declares no hierarchy; identify this as the `jit-default` package’s vocabulary and direct users to profile application.\n\n2. **Blocking, issue-impact** — [Core Model](docs/concepts/core-model.md:885) says `jit init` ships the hierarchy and calls `milestone`/`epic` the shipped strategic default ([line 927](docs/concepts/core-model.md:927)). Replace these claims with the package/profile distinction and remove “alongside these” wording for plain repositories.\n\n3. **Blocking, issue-impact** — [Labels reference](docs/reference/labels.md:238) says the `jit init` scaffold declares the four-level hierarchy. Plain initialization no longer does; state that the example vocabulary comes from the applied package or must be declared manually.\n\n4. **Blocking, issue-impact** — [Software development how-to](docs/how-to/software-development.md:378) describes the hierarchy and base namespaces as `jit init` scaffolding. The recipe must either require `jit init --profile jit-dogfood` or instruct manual declaration of every required type and namespace.\n\n5. **Blocking, issue-impact** — [Example configuration](docs/reference/example-config.toml:56) labels the four-type hierarchy an engine “Default.” Mark it as an example or as `jit-default` package content, not a plain-initialization default.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Five issue-impact documentation defects still describe the removed plain-init vocabulary defaults.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference incorrectly says jit init supplies the four-type hierarchy.\",\"file\":\"docs/reference/configuration.md\",\"line\":234},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Core Model incorrectly presents the package-provided hierarchy and strategic types as jit init shipped defaults.\",\"file\":\"docs/concepts/core-model.md\",\"line\":885},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The Labels reference incorrectly says the jit init scaffold declares the four-level hierarchy.\",\"file\":\"docs/reference/labels.md\",\"line\":238},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The software-development recipe incorrectly describes taxonomy and namespaces as plain jit init scaffolding.\",\"file\":\"docs/how-to/software-development.md\",\"line\":378},{\"id\":\"F5\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The example configuration labels the package-provided hierarchy as an engine default.\",\"file\":\"docs/reference/example-config.toml\",\"line\":56}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

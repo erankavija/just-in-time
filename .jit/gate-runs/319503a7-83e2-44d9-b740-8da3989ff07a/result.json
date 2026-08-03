@@ -1,0 +1,107 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "daddf47baab4b4f6f1e6549f2320e3b6227b9e0e",
+  "completed_at": "2026-08-03T08:31:56.666383115Z",
+  "duration_ms": 213263,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 2165,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13",
+          "@/invariant/domain-agnostic"
+        ],
+        "severity": "high",
+        "summary": "Plain jit init still selects a compiled four-type hierarchy and namespace registry, failing REQ-01."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F2",
+        "line": 234,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "Configuration reference says plain jit init supplies the four-type hierarchy."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/core-model.md",
+        "id": "F3",
+        "line": 885,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "Core Model presents the package vocabulary as jit init shipped defaults."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/labels.md",
+        "id": "F4",
+        "line": 238,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "Labels reference says the plain-init scaffold declares the four-level hierarchy."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/software-development.md",
+        "id": "F5",
+        "line": 378,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "Software-development recipe describes taxonomy and namespaces as plain-init scaffolding."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/example-config.toml",
+        "id": "F6",
+        "line": 56,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Example configuration labels the package vocabulary an engine default."
+      }
+    ],
+    "summary": "Plain initialization still installs the removed vocabulary defaults, and five affected documentation surfaces retain that obsolete contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "93fef456-ac33-4525-bbe4-3a170de0b253",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "319503a7-83e2-44d9-b740-8da3989ff07a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T08:28:23.402796215Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.aGuavyAr4s: binary file matches\n--- agent stderr (first 12 of 8853 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc6bd-02d4-7720-bb6a-d74e3b2a296d\n--------\n--- 8841 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a1fb4e4f `fix(jit:93fef456)` (profiles/jit-dogfood/manifest.toml)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (.jit issue description); @/issue/e204e63d/decision/D-14 (.jit issue description); @/invariant/domain-agnostic (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1; incremental-state only); jit-validate passed (exit 0); docs-mechanical passed (exit 0); doc-review failed (exit 1; five structured findings)\nTruncation recovery: re-read individual manifests, release-smoke range, gate results, implementation, and cited documentation ranges after combined output truncation\n\n1. **Blocking, issue-impact** — Plain `jit init` still selects `HierarchyTemplate::default()` at `crates/jit/src/main.rs:2165`; that template hardcodes the four-type hierarchy and namespace registry at `crates/jit/src/hierarchy_templates.rs:351`. This fails REQ-01 and the decision that declarative vocabulary reaches repositories only from a package or repository configuration. References: `@/issue/e204e63d/decision/D-13`, `@/invariant/domain-agnostic`.\n\n2. **Blocking, issue-impact** — `docs/reference/configuration.md:234` says plain `jit init` supplies the four-type hierarchy, leaving the intended package-based contract undocumented. References: `@/invariant/domain-agnostic`, `@/invariant/single-source-prose`.\n\n3. **Blocking, issue-impact** — `docs/concepts/core-model.md:885` presents the hierarchy as shipped by `jit init`, and the same section calls `milestone` and `epic` shipped strategic defaults. References: `@/invariant/domain-agnostic`, `@/invariant/single-source-prose`.\n\n4. **Blocking, issue-impact** — `docs/reference/labels.md:238` states that the plain-init scaffold declares the four-level hierarchy instead of identifying it as package-provided or adopter-authored. References: `@/invariant/domain-agnostic`, `@/invariant/single-source-prose`.\n\n5. **Blocking, issue-impact** — `docs/how-to/software-development.md:378` describes the default taxonomy and namespaces as plain-init scaffolding, so its recipe cannot be followed by a repository that applies no package. References: `@/invariant/domain-agnostic`, `@/invariant/single-source-prose`.\n\n6. **Blocking, issue-impact** — `docs/reference/example-config.toml:56` labels the four-type hierarchy an engine “Default,” contradicting the required package-based source of vocabulary. References: `@/invariant/domain-agnostic`, `@/invariant/single-source-prose`.\n\nTotal findings: 6\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Plain initialization still installs the removed vocabulary defaults, and five affected documentation surfaces retain that obsolete contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Plain jit init still selects a compiled four-type hierarchy and namespace registry, failing REQ-01.\",\"file\":\"crates/jit/src/main.rs\",\"line\":2165,\"references\":[\"@/issue/e204e63d/decision/D-13\",\"@/invariant/domain-agnostic\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Configuration reference says plain jit init supplies the four-type hierarchy.\",\"file\":\"docs/reference/configuration.md\",\"line\":234,\"references\":[\"@/invariant/domain-agnostic\",\"@/invariant/single-source-prose\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Core Model presents the package vocabulary as jit init shipped defaults.\",\"file\":\"docs/concepts/core-model.md\",\"line\":885,\"references\":[\"@/invariant/domain-agnostic\",\"@/invariant/single-source-prose\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Labels reference says the plain-init scaffold declares the four-level hierarchy.\",\"file\":\"docs/reference/labels.md\",\"line\":238,\"references\":[\"@/invariant/domain-agnostic\",\"@/invariant/single-source-prose\"]},{\"id\":\"F5\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Software-development recipe describes taxonomy and namespaces as plain-init scaffolding.\",\"file\":\"docs/how-to/software-development.md\",\"line\":378,\"references\":[\"@/invariant/domain-agnostic\",\"@/invariant/single-source-prose\"]},{\"id\":\"F6\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Example configuration labels the package vocabulary an engine default.\",\"file\":\"docs/reference/example-config.toml\",\"line\":56,\"references\":[\"@/invariant/domain-agnostic\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

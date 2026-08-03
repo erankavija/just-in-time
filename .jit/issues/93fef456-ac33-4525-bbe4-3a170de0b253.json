@@ -28,7 +28,33 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-03T08:24:25.542990822Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T08:31:56.983387305Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T08:28:22.084024523Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-03T08:24:40.460273349Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "status": "passed",
+      "updated_at": "2026-08-03T08:24:28.829593371Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "93fef456-ac33-4525-bbe4-3a170de0b253",
   "labels": [
     "type:story",
@@ -44,5 +70,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The generic domain vocabulary reaches a repository as a package",
-  "updated_at": "2026-08-03T08:13:34.872782123Z"
+  "updated_at": "2026-08-03T08:31:56.983387305Z"
 }
