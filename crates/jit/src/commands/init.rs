@@ -504,7 +504,7 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::{jit_default_package, jit_dogfood_package, ProfileOrigin};
+    use crate::profile::ProfileOrigin;
     use crate::repository_state::{AppliedProfileRecord, Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
     use std::fs;
@@ -736,10 +736,11 @@ mod tests {
         let executor = executor_with_layout(&storage, repo.path());
         // What the binary answers with before a repository exists: nothing is
         // supplied and there is no record to read, so the compiled-in packages
-        // are the whole set initialization has to apply.
-        let closure = executor
-            .resolve_profile_closure(&jit_dogfood_package().unwrap())
-            .unwrap();
+        // are the whole set initialization has to apply. The set is named from
+        // this repository's own package, so the two sides reach it by
+        // different routes.
+        let (_workspace, workflow) = crate::test_utils::temporary_repository_package("jit-dogfood");
+        let closure = executor.resolve_profile_closure(&workflow).unwrap();
 
         let result = executor
             .initialize_fresh_repository(
@@ -844,7 +845,8 @@ mod tests {
             .hierarchy
             .expect("the published configuration declares a type hierarchy")
             .types;
-        let dependency = jit_default_package().unwrap();
+        let (_workspace, dependency) =
+            crate::test_utils::temporary_repository_package("jit-default");
         let missing = dependency
             .manifest()
             .contributions
@@ -1037,7 +1039,13 @@ mod tests {
         )
         .unwrap();
 
-        let package = jit_dogfood_package().unwrap();
+        // Read from inside the worktree it is prepared against, because the
+        // preparation records the package's worktree-relative location.
+        let package = crate::test_utils::assemble_repository_package(
+            "jit-dogfood",
+            &repo.path().join("profiles/jit-dogfood"),
+        )
+        .unwrap();
         let profile = executor.profile_input(&package).unwrap();
         let proposed_config = config.as_bytes().to_vec();
         let scaffold =

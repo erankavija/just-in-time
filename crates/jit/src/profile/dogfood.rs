@@ -20,13 +20,13 @@ pub enum EmbeddedProfileError {
     #[error("invalid embedded profile package: {0}")]
     Package(#[from] ProfilePackageError),
     /// A requested gate is absent from the package.
-    #[error("jit-dogfood package does not declare gate '{0}'")]
+    #[error("the profile package does not declare gate '{0}'")]
     MissingGate(String),
     /// The planning template is absent or structurally invalid.
-    #[error("jit-dogfood planning template is invalid: {0}")]
+    #[error("the profile package's planning template is invalid: {0}")]
     InvalidPlanningTemplate(String),
     /// A package gate does not match the runtime gate wire type.
-    #[error("jit-dogfood gate '{key}' is invalid: {source}")]
+    #[error("profile package gate '{key}' is invalid: {source}")]
     InvalidGate {
         /// Requested package gate key.
         key: String,
@@ -45,9 +45,17 @@ pub fn jit_dogfood_package() -> Result<ProfilePackage, EmbeddedProfileError> {
     ProfilePackage::from_embedded_dir(&JIT_DOGFOOD_DIRECTORY).map_err(Into::into)
 }
 
-/// Deserialize one gate definition from the package's authored gate inventory.
+/// Deserialize one gate definition from the compiled-in package's authored gate
+/// inventory.
 pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, EmbeddedProfileError> {
-    let package = jit_dogfood_package()?;
+    packaged_gate(&jit_dogfood_package()?, key)
+}
+
+/// Deserialize one gate definition from `package`'s authored gate inventory.
+pub(super) fn packaged_gate(
+    package: &ProfilePackage,
+    key: &str,
+) -> Result<GateDefinition, EmbeddedProfileError> {
     let value = package
         .manifest()
         .contributions
@@ -70,12 +78,21 @@ pub fn jit_dogfood_gate(key: &str) -> Result<GateDefinition, EmbeddedProfileErro
     })
 }
 
-/// Gate keys attached to nodes of the package-authored `plan` template.
+/// Gate keys attached to nodes of the compiled-in package's authored `plan`
+/// template.
 ///
 /// Anchor-only gates are excluded, so this is also the compatibility preset
 /// inventory used by [`crate::gate_presets::BuiltinPresets`].
 pub fn jit_dogfood_planning_gate_keys() -> Result<Vec<String>, EmbeddedProfileError> {
-    let package = jit_dogfood_package()?;
+    packaged_planning_gate_keys(&jit_dogfood_package()?)
+}
+
+/// Gate keys attached to nodes of `package`'s authored `plan` template.
+///
+/// Anchor-only gates are excluded; see [`jit_dogfood_planning_gate_keys`].
+pub(crate) fn packaged_planning_gate_keys(
+    package: &ProfilePackage,
+) -> Result<Vec<String>, EmbeddedProfileError> {
     let template = package
         .manifest()
         .contributions
@@ -143,9 +160,23 @@ mod tests {
     use std::process::Command;
     use tempfile::TempDir;
 
+    /// The id of the workflow package this repository declares its own workflow
+    /// in, which is the package every assertion below is about.
+    const PACKAGE_ID: &str = "jit-dogfood";
+
+    /// This repository's workflow package, assembled from its checkout, with
+    /// the directory holding the assembled tree.
+    ///
+    /// Every assertion here is about the package this repository ships, so it
+    /// is read from the checkout it is drawn from rather than from a copy
+    /// compiled into the test binary.
+    fn assembled_package() -> (TempDir, ProfilePackage) {
+        crate::test_utils::temporary_repository_package(PACKAGE_ID)
+    }
+
     #[test]
     fn test_jit_dogfood_package_validates_and_has_expected_workflow_inventory() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         assert_eq!(package.manifest().profile.id.as_str(), "jit-dogfood");
         assert!(package.file_count() <= super::super::MAX_PROFILE_PACKAGE_FILES);
         assert!(package.byte_size() <= super::super::MAX_PROFILE_PACKAGE_BYTES);
@@ -219,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_jit_dogfood_package_contains_no_deferred_or_checkout_local_content() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         for declaration in package
             .manifest()
             .assets
@@ -268,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_packaged_skills_only_require_declared_project_item_kinds() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let declares_charter = package.manifest().contributions.iter().any(|contribution| {
             matches!(
                 contribution,
@@ -300,7 +331,7 @@ mod tests {
 
     #[test]
     fn test_packaged_content_standard_paths_are_repository_root_relative() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let prompt = package
             .source_bytes("assets/live/.agents/skills/jit-breakdown/references/analysis-prompt.md")
             .unwrap();
@@ -311,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_installed_paths_do_not_require_jq() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         for asset in &package.manifest().assets {
             let text = std::str::from_utf8(package.source_bytes(&asset.source).unwrap())
                 .unwrap_or_default();
@@ -328,7 +359,7 @@ mod tests {
 
     #[test]
     fn test_packaged_qualified_item_citations_resolve_from_installed_registries() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let mut known = BTreeMap::<String, BTreeSet<String>>::new();
         for contribution in &package.manifest().contributions {
             if let Contribution::KeyedArray {
@@ -388,7 +419,7 @@ mod tests {
     /// adopter state the package installs is never drawn from this repository.
     #[test]
     fn test_live_assets_exclude_install_only_adopter_state() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let live: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
         assert!(!live.is_empty(), "the package declares live assets");
         let regions: BTreeSet<&str> = package
@@ -440,7 +471,7 @@ mod tests {
     /// two, and no root is declared that nothing is drawn from.
     #[test]
     fn test_declared_live_source_roots_claim_every_live_asset_target_exactly_once() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let roots = &package.manifest().live_sources;
         assert!(
             !roots.is_empty(),
@@ -492,7 +523,7 @@ mod tests {
     /// asset or admit a package-authored source as a live consumer.
     #[test]
     fn test_declared_live_source_roots_claim_no_package_authored_source() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let roots = &package.manifest().live_sources;
         let authored = package_authored_sources(&package);
         assert!(
@@ -629,7 +660,7 @@ mod tests {
     #[test]
     fn test_unpackaged_files_under_declared_roots_is_empty_across_the_tracked_repository_tree() {
         let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let roots = &package.manifest().live_sources;
         let tracked = tracked_repository_paths(&worktree);
         let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
@@ -670,7 +701,7 @@ mod tests {
     /// what fails the walk above, whose assertion is that nothing is reported.
     #[test]
     fn test_unpackaged_files_under_declared_roots_names_a_tracked_file_no_declaration_covers() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let roots = &package.manifest().live_sources;
         assert!(!roots.is_empty(), "the package declares live-source roots");
         let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
@@ -710,7 +741,7 @@ mod tests {
     /// second declaration whose patterns could also claim the path.
     #[test]
     fn test_unpackaged_files_under_declared_roots_consults_only_the_declaration_owning_the_path() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let declared = &package.manifest().live_sources;
         assert!(
             declared.len() >= 2,
@@ -782,7 +813,7 @@ mod tests {
     #[test]
     fn test_excluded_files_under_declared_roots_covers_more_files_than_there_are_patterns() {
         let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let roots = &package.manifest().live_sources;
         let tracked = tracked_repository_paths(&worktree);
         let covered = excluded_files_under_declared_roots(roots, &tracked);
@@ -826,7 +857,7 @@ mod tests {
     #[test]
     fn test_excluded_files_under_declared_roots_matches_only_patterns_authored_beneath_their_root()
     {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let roots = &package.manifest().live_sources;
 
         let stray: Vec<(&str, &str)> = roots
@@ -884,7 +915,7 @@ mod tests {
 
     #[test]
     fn test_managed_region_sources_stay_outside_live_asset_prefix() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         assert!(!package.manifest().regions.is_empty());
         assert!(package
             .manifest()
@@ -895,6 +926,7 @@ mod tests {
 
     #[test]
     fn test_all_package_gate_values_deserialize_as_runtime_gates() {
+        let (_workspace, package) = assembled_package();
         for key in [
             "plan-review",
             "breakdown-review",
@@ -903,7 +935,7 @@ mod tests {
             "jit-validate",
             "repo-validate",
         ] {
-            let gate = jit_dogfood_gate(key).unwrap();
+            let gate = packaged_gate(&package, key).unwrap();
             assert_eq!(gate.key, key);
             assert!(
                 matches!(
@@ -926,7 +958,7 @@ mod tests {
             render_managed_document, ManagedDocumentClaim, RegionPlacement,
         };
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
 
         // Every live asset is an exact copy of the repo file it consumes, mode included.
         for asset in package
@@ -1026,10 +1058,11 @@ mod tests {
         };
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let existing = fs::read(root.join(TEMPLATE_REGISTRY_PATH)).unwrap();
-        let block = render_template_block(&packaged_templates().unwrap()).unwrap();
+        let (_workspace, package) = assembled_package();
+        let block = render_template_block(&packaged_templates(&package).unwrap()).unwrap();
         // The render the generator publishes, so the two cannot disagree about
         // what the registry should hold.
-        let rendered = render_template_registry(&existing).unwrap();
+        let rendered = render_template_registry(&existing, &package).unwrap();
 
         // The committed registry IS the render. On drift the generator, not
         // this assertion, is what brings the two back into agreement.
@@ -1139,8 +1172,9 @@ mod tests {
     #[test]
     fn test_committed_template_declarations_agree_with_the_packaged_declarations() {
         use crate::profile::template_region::{packaged_templates, template_drift_report};
+        let (_workspace, package) = assembled_package();
         let repository = region_declarations_of(&committed_template_registry());
-        let packaged = packaged_templates().unwrap();
+        let packaged = packaged_templates(&package).unwrap();
 
         if let Some(report) = template_drift_report(&repository, &packaged).unwrap() {
             panic!("{report}");
@@ -1159,6 +1193,7 @@ mod tests {
             packaged_templates, render_template_block, splice_template_region,
             template_drift_report, TEMPLATE_REGION_GENERATOR,
         };
+        let (_workspace, package) = assembled_package();
         let committed = committed_template_registry();
         let mut edited = region_declarations_of(&committed);
         let node = edited
@@ -1174,7 +1209,7 @@ mod tests {
 
         let report = template_drift_report(
             &region_declarations_of(&hand_edited),
-            &packaged_templates().unwrap(),
+            &packaged_templates(&package).unwrap(),
         )
         .unwrap()
         .expect("an edited repository declaration is drift");
@@ -1197,8 +1232,9 @@ mod tests {
         use crate::profile::template_region::{
             packaged_templates, template_drift_report, TEMPLATE_REGION_GENERATOR,
         };
+        let (_workspace, package) = assembled_package();
         let repository = region_declarations_of(&committed_template_registry());
-        let mut packaged = packaged_templates().unwrap();
+        let mut packaged = packaged_templates(&package).unwrap();
         let anchor = packaged
             .first_mut()
             .and_then(|template| template.anchors.first_mut())
@@ -1229,7 +1265,8 @@ mod tests {
         use crate::profile::template_region::{
             packaged_templates, render_template_block, template_drift_report,
         };
-        let packaged = packaged_templates().unwrap();
+        let (_workspace, package) = assembled_package();
+        let packaged = packaged_templates(&package).unwrap();
         let mut authored = packaged.clone();
         authored
             .first_mut()
@@ -1274,7 +1311,13 @@ mod tests {
         let layout =
             crate::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
-        let package = jit_dogfood_package().unwrap();
+        // Applied from inside the worktree it is applied to, because an
+        // application records the package's worktree-relative location.
+        let package = crate::test_utils::assemble_repository_package(
+            PACKAGE_ID,
+            &temp.path().join("profiles").join(PACKAGE_ID),
+        )
+        .unwrap();
         let applied = executor.apply_profile_package(&package).unwrap();
         assert_eq!(
             applied.requested().unwrap().status,
@@ -1344,7 +1387,7 @@ mod tests {
 
     #[test]
     fn test_installed_rules_gates_reference_is_derived_from_manifest_registries() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let rule_values = package
             .manifest()
             .contributions
@@ -1385,7 +1428,7 @@ mod tests {
         ] {
             gates
                 .gates
-                .insert(key.to_string(), jit_dogfood_gate(key).unwrap());
+                .insert(key.to_string(), packaged_gate(&package, key).unwrap());
         }
         let expected = render_rules_and_gates_markdown(&rules, &gates, ProjectionStyle::Full);
         assert_eq!(
@@ -1501,7 +1544,7 @@ mod tests {
     #[test]
     fn test_executable_mode_mismatches_is_empty_across_every_declared_live_asset() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let declarations = live_asset_executable_declarations(&package);
         assert!(
             !declarations.is_empty(),
@@ -1518,7 +1561,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "failed to stat")]
     fn test_executable_mode_mismatches_panics_when_a_declared_target_is_absent() {
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let declarations = live_asset_executable_declarations(&package);
         let empty = TempDir::new().unwrap();
         // No declared target exists under an empty root, so a declaration that
@@ -1531,7 +1574,7 @@ mod tests {
     fn test_executable_mode_mismatches_reports_a_permission_change_on_a_live_source() {
         use std::os::unix::fs::PermissionsExt;
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let declarations = live_asset_executable_declarations(&package);
 
         // A faithful copy of the live sources, mode included, so a permission
@@ -1582,7 +1625,7 @@ mod tests {
     fn test_executable_mode_mismatches_reports_a_declaration_inverted_against_its_repository_file()
     {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let package = jit_dogfood_package().unwrap();
+        let (_workspace, package) = assembled_package();
         let declarations = live_asset_executable_declarations(&package);
 
         for executable in [true, false] {

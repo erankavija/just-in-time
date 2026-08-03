@@ -38,6 +38,10 @@ pub use dogfood::{
     jit_default_package, jit_dogfood_gate, jit_dogfood_package, jit_dogfood_planning_gate_keys,
     EmbeddedProfileError, JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
 };
+// Reached only by the preset module's own assertion that the binary's preset
+// names are the checked-out package's plan-template gate keys.
+#[cfg(test)]
+pub(crate) use dogfood::packaged_planning_gate_keys;
 pub use manifest::{
     profile_manifest_schema, AssetDeclaration, LiveSourceDeclaration, ProfileId, ProfileManifest,
     ProfileMetadata, RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME,

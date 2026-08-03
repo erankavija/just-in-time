@@ -1273,8 +1273,8 @@ mod tests {
     #[test]
     fn test_resolve_profile_package_prefers_the_record_over_the_compiled_in_package() {
         let (temp, _storage, executor, _embedded) = fixture();
-        let compiled = jit_dogfood_package().unwrap();
-        let id = compiled.manifest().profile.id.to_string();
+        let (_workspace, shipped) = crate::test_utils::temporary_repository_package("jit-dogfood");
+        let id = shipped.manifest().profile.id.to_string();
 
         // A directory package declaring the id this binary also carries, so
         // nothing but the route taken decides which of the two answers.
@@ -1287,7 +1287,7 @@ mod tests {
             );
         let recorded = repackage(&temp, "vendor/dogfood", "manifest.toml", &manifest);
         assert_eq!(recorded.manifest().profile.id.as_str(), id);
-        assert_ne!(recorded.hashes(), compiled.hashes());
+        assert_ne!(recorded.hashes(), shipped.hashes());
         store_record(
             &temp,
             &AppliedProfileRecord::new(
@@ -1308,15 +1308,16 @@ mod tests {
     fn test_resolve_profile_package_falls_back_to_each_compiled_in_package_without_a_record() {
         let (temp, _storage, executor, _embedded) = fixture();
         assert!(!temp.path().join(".jit/profiles").exists());
-        for compiled in [
-            crate::profile::jit_default_package().unwrap(),
-            jit_dogfood_package().unwrap(),
-        ] {
+        let (_default_workspace, default) =
+            crate::test_utils::temporary_repository_package("jit-default");
+        let (_workflow_workspace, workflow) =
+            crate::test_utils::temporary_repository_package("jit-dogfood");
+        for shipped in [&default, &workflow] {
             let resolved = executor
-                .resolve_profile_package(compiled.manifest().profile.id.as_str(), None)
+                .resolve_profile_package(shipped.manifest().profile.id.as_str(), None)
                 .unwrap();
 
-            assert_eq!(resolved.hashes(), compiled.hashes());
+            assert_eq!(resolved.hashes(), shipped.hashes());
             assert_eq!(
                 package_origin(&resolved, &executor.require_layout().unwrap()).unwrap(),
                 ProfileOrigin::Embedded
@@ -1676,20 +1677,18 @@ mod tests {
         assert!(storage.read_events().unwrap().is_empty());
     }
 
-    /// The directory holding this repository's checked-in generic vocabulary
-    /// package, used by tests that exercise the directory route.
-    fn jit_default_directory() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-default")
+    /// This repository's generic vocabulary package, assembled from its
+    /// checkout, with the directory holding the assembled tree.
+    fn assembled_default_package() -> (TempDir, ProfilePackage) {
+        crate::test_utils::temporary_repository_package("jit-default")
     }
 
-    fn jit_default_package() -> ProfilePackage {
-        ProfilePackage::from_directory(&jit_default_directory())
-            .expect("the checked-in jit-default package validates")
-    }
-
-    /// The directory holding this repository's checked-in workflow package.
-    fn jit_dogfood_directory() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../profiles/jit-dogfood")
+    /// This repository's `id` package, assembled from its checkout into
+    /// `worktree`, which is where a package has to sit to be applied to the
+    /// repository rooted there.
+    fn shipped_package_in(worktree: &Path, id: &str) -> ProfilePackage {
+        crate::test_utils::assemble_repository_package(id, &worktree.join("profiles").join(id))
+            .expect("this repository's package assembles")
     }
 
     /// The project name every repository built by
@@ -1726,18 +1725,8 @@ mod tests {
         bare["project"]["name"] = toml_edit::value(COMPOSITION_PROJECT_NAME);
         fs::write(&config_path, bare.to_string()).unwrap();
 
-        let default_root = crate::test_utils::copy_package_tree(
-            &jit_default_directory(),
-            &temp.path().join("profiles/jit-default"),
-        );
-        let dogfood_root = crate::test_utils::copy_package_tree(
-            &jit_dogfood_directory(),
-            &temp.path().join("profiles/jit-dogfood"),
-        );
-        let default = ProfilePackage::from_directory(&default_root)
-            .expect("the checked-in jit-default package validates");
-        let dogfood = ProfilePackage::from_directory(&dogfood_root)
-            .expect("the checked-in jit-dogfood package validates");
+        let default = shipped_package_in(temp.path(), "jit-default");
+        let dogfood = shipped_package_in(temp.path(), "jit-dogfood");
         // Re-discovered over the reduced configuration, as a fresh process
         // would read it.
         let executor = CommandExecutor::new(storage.clone())
@@ -1793,15 +1782,15 @@ mod tests {
 
     #[test]
     fn test_from_directory_reads_jit_default_with_a_stable_content_address() {
-        let package = jit_default_package();
+        let (_workspace, package) = assembled_default_package();
+        let (_repeated_workspace, repeated) = assembled_default_package();
+        let (_workflow_workspace, workflow) =
+            crate::test_utils::temporary_repository_package("jit-dogfood");
 
-        // The address is over content: re-reading the same directory reproduces
-        // it, and the workflow package next to it does not share it.
-        assert_eq!(package.hashes(), jit_default_package().hashes());
-        assert_ne!(
-            package.hashes().package,
-            jit_dogfood_package().unwrap().hashes().package
-        );
+        // The address is over content: re-reading the same declarations
+        // reproduces it, and the workflow package next to it does not share it.
+        assert_eq!(package.hashes(), repeated.hashes());
+        assert_ne!(package.hashes().package, workflow.hashes().package);
         assert!(!package.hashes().package.is_empty());
         // One repository target, because every declaration writes the
         // configuration registry and the package publishes no file.
@@ -1813,7 +1802,7 @@ mod tests {
 
     #[test]
     fn test_jit_default_carries_no_asset_and_no_workflow_registry_content() {
-        let package = jit_default_package();
+        let (_workspace, package) = assembled_default_package();
         let manifest = package.manifest();
 
         // The manifest is the whole package: no file is published with it, so
@@ -1833,7 +1822,7 @@ mod tests {
     #[test]
     fn test_jit_default_declares_every_kind_an_initialized_repository_can_carry() {
         let (temp, _storage, _executor, _fixture_package) = fixture();
-        let package = jit_default_package();
+        let (_workspace, package) = assembled_default_package();
         let kinds = declared_item_kinds(&package);
 
         assert!(
@@ -1881,11 +1870,7 @@ mod tests {
     #[test]
     fn test_apply_profile_package_repairs_a_generated_schema_outside_the_package_targets() {
         let (temp, _storage, executor, _fixture_package) = fixture();
-        let package_root = crate::test_utils::copy_package_tree(
-            &jit_default_directory(),
-            &temp.path().join("profiles/jit-default"),
-        );
-        let package = ProfilePackage::from_directory(&package_root).unwrap();
+        let package = shipped_package_in(temp.path(), "jit-default");
         // The package writes the configuration, so applying it re-derives the
         // default rules and the schemas they reference — targets it names none
         // of, and whose drift it therefore has to reach without being told.
@@ -1926,11 +1911,7 @@ mod tests {
 
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        let package_root = crate::test_utils::copy_package_tree(
-            &jit_default_directory(),
-            &temp.path().join("profiles/jit-default"),
-        );
-        let package = ProfilePackage::from_directory(&package_root).unwrap();
+        let package = shipped_package_in(temp.path(), "jit-default");
         let applied = executor.apply_profile_package(&package).unwrap();
         assert_eq!(
             applied.requested().unwrap().status,
@@ -1958,8 +1939,9 @@ mod tests {
 
     #[test]
     fn test_jit_dogfood_declares_default_dependency_and_only_additive_contributions() {
-        let default = jit_default_package();
-        let dogfood = jit_dogfood_package().unwrap();
+        let (_default_workspace, default) = assembled_default_package();
+        let (_workflow_workspace, dogfood) =
+            crate::test_utils::temporary_repository_package("jit-dogfood");
 
         assert_eq!(
             dogfood
@@ -2112,7 +2094,13 @@ mod tests {
 
     #[test]
     fn test_jit_default_states_the_coordination_guidance_without_its_engine_defaults() {
-        let manifest = fs::read_to_string(jit_default_directory().join("manifest.toml")).unwrap();
+        let (_workspace, package) = assembled_default_package();
+        let manifest = std::str::from_utf8(
+            package
+                .source_bytes(crate::profile::MANIFEST_FILE_NAME)
+                .expect("the package carries its manifest"),
+        )
+        .expect("the packaged manifest is UTF-8");
 
         // The scaffold renders two engine constants into its coordination
         // guidance. A package is bytes and projects nothing, so the packaged
@@ -2257,7 +2245,7 @@ mod tests {
     #[test]
     fn test_profile_preparation_retries_when_final_proposed_closure_expands() {
         let (temp, _storage, executor, _package) = fixture();
-        let package = jit_dogfood_package().unwrap();
+        let package = shipped_package_in(temp.path(), "jit-dogfood");
         let layout = executor.require_layout().unwrap();
         let inner = executor.storage().open_mutation_session(layout).unwrap();
         let mut session = FinalClosureRaceSession {

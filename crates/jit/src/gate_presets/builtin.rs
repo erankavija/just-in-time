@@ -116,9 +116,17 @@ mod tests {
         assert!(names.contains(&"breakdown-review".to_string()));
     }
 
+    /// The names the binary answers with are the gate keys this repository's
+    /// checked-out workflow package attaches to its plan template's nodes.
+    ///
+    /// The package is assembled from the checkout, so the two sides of the
+    /// comparison reach the declaration by different routes: a change to the
+    /// packaged template that the binary was not rebuilt against is reported
+    /// here.
     #[test]
     fn test_compatibility_names_equal_package_template_node_gates() {
-        let derived = jit_dogfood_planning_gate_keys().unwrap();
+        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
+        let derived = crate::profile::packaged_planning_gate_keys(&package).unwrap();
         assert_eq!(BuiltinPresets::names().unwrap(), derived);
     }
 
