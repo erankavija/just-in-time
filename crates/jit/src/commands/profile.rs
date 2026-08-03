@@ -1291,8 +1291,8 @@ mod tests {
         let (temp, _storage, executor, _package) = fixture();
         assert!(!temp.path().join(".jit/profiles").exists());
         // The ids this repository authors are named beside an id it does not,
-        // because a resolution that answered from the binary would answer for
-        // exactly those.
+        // because a resolution with no supplied or recorded package must
+        // report profile-not-found for each of them.
         for id in ["jit-default", "jit-dogfood", "no-such-profile"] {
             let error = executor.resolve_profile_package(id, None).unwrap_err();
 

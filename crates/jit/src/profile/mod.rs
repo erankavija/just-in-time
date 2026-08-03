@@ -6,9 +6,9 @@
 
 mod application;
 mod apply_claims;
-mod dogfood;
 mod manifest;
 mod package;
+mod repository_package;
 // Repository-local generator seam: the package tree this repository assembles
 // is produced by one entry point and read back by nothing, so the render has no
 // production caller. It builds with dev-dependencies active, which turns on
@@ -18,8 +18,8 @@ mod package;
 pub mod package_assembly;
 // Repository-local generator seam: the render of this repository's generated
 // template region has two consumers, the artifact registry the `regenerate`
-// example publishes through and the dogfood module's drift assertion, and no
-// production caller. Both build
+// example publishes through and the repository package module's drift
+// assertion, and no production caller. Both build
 // with dev-dependencies active, which turns on `test-support` through the
 // crate's own self-edge, so gating the module on that pair keeps it out of an
 // adopter build entirely rather than shipping it as unreachable surface.
@@ -34,7 +34,6 @@ pub use application::{
     ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
-pub use dogfood::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;
 pub use manifest::{
     profile_manifest_schema, AssetDeclaration, LiveSourceDeclaration, ProfileId, ProfileManifest,
     ProfileMetadata, RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME,
@@ -44,3 +43,4 @@ pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
+pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;

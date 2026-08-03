@@ -1,4 +1,5 @@
-//! Package-source conventions this repository's own workflow package follows.
+//! Repository-local checks and package-source conventions for this checkout's
+//! workflow package.
 
 /// Package-source prefix identifying assets that also project into this source tree.
 pub const JIT_DOGFOOD_LIVE_SOURCE_PREFIX: &str = "assets/live/";

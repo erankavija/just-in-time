@@ -108,7 +108,7 @@ pub struct ProfileMetadata {
     pub jit: String,
 }
 
-/// A one-to-one embedded file asset.
+/// A one-to-one file asset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AssetDeclaration {
@@ -121,7 +121,7 @@ pub struct AssetDeclaration {
     pub executable: bool,
 }
 
-/// A managed region sourced from one embedded file.
+/// A managed region sourced from one file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct RegionDeclaration {
