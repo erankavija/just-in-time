@@ -487,7 +487,18 @@ async function main() {
         // the named one depends on, then the named one.
         const applied = await profileCall('jit_profile_apply', { id: 'jit-dogfood' });
         assert.strictEqual(applied.count, applied.profiles.length);
-        assert.strictEqual(applied.profiles.at(-1).id, 'jit-dogfood');
+        const appliedProfileIds = applied.profiles.map(profile => profile.id);
+        const expectedProfileIds = [
+          ...shown.manifest.dependencies,
+          shown.manifest.profile.id,
+        ];
+        assert.ok(shown.manifest.dependencies.length > 0,
+          'the named package declares a dependency');
+        for (const id of expectedProfileIds) {
+          assert.ok(appliedProfileIds.includes(id),
+            `application should include declared package ${id}`);
+        }
+        assert.strictEqual(appliedProfileIds.at(-1), shown.manifest.profile.id);
         assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
         const unchanged = await profileCall('jit_profile_apply', {
@@ -498,10 +509,22 @@ async function main() {
 
         // The record the application wrote is what the repository now names.
         const recorded = await profileCall('jit_profile_list');
-        assert.strictEqual(recorded.count, 1);
-        assert.strictEqual(recorded.profiles[0].id, 'jit-dogfood');
-        assert.strictEqual(recorded.profiles[0].applied, true);
-        assert.deepStrictEqual(recorded.profiles[0].origin, { source: 'embedded' });
+        assert.strictEqual(recorded.count, recorded.profiles.length);
+        assert.deepStrictEqual(
+          recorded.profiles.map(profile => profile.id),
+          appliedProfileIds,
+          'recorded profiles should match the dependency-first application order'
+        );
+        const appliedOrigins = new Map(await Promise.all(
+          appliedProfileIds.map(async id => {
+            const resolved = await profileCall('jit_profile_show', { id });
+            return [id, resolved.origin];
+          })
+        ));
+        for (const profile of recorded.profiles) {
+          assert.strictEqual(profile.applied, true);
+          assert.deepStrictEqual(profile.origin, appliedOrigins.get(profile.id));
+        }
       } finally {
         await profileTester.stop();
       }
