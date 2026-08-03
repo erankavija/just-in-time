@@ -2,7 +2,7 @@
 
 use super::ProfilePackage;
 use crate::repository_state::{
-    FileMode, ProfileAssetClaim, ProfileClaims, ProfileRegionClaim, TargetClaim,
+    FileMode, ProfileAssetClaim, ProfileClaims, ProfilePackageId, ProfileRegionClaim, TargetClaim,
 };
 use serde_json::Value as JsonValue;
 use std::collections::BTreeSet;
@@ -89,6 +89,7 @@ fn build_claims(
         })
         .collect::<Result<Vec<_>, ProfileClaimError>>()?;
     Ok(ProfileClaims {
+        package_id: ProfilePackageId::new(package.manifest().profile.id.to_string()),
         contributions: if replace_owned {
             Vec::new()
         } else {

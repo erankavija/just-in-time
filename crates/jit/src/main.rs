@@ -8388,8 +8388,9 @@ mod repository_state_classifier_tests {
     use super::{error_to_exit_code, profile_json_error};
     use jit::repository_state::{
         AmbiguousOwnershipError, ArchiveExecutionError, GateRegistryEditError, InitializationError,
-        ManagedDocumentError, ProducerError, ProfileTargetConflictError, ProjectionError,
-        RepositoryLayoutError, RepositoryStateError, VirtualPath,
+        ManagedDocumentError, ProducerError, ProfileConflictOccupant, ProfilePackageId,
+        ProfileTargetConflictError, ProjectionError, RepositoryLayoutError, RepositoryStateError,
+        VirtualPath,
     };
 
     fn path() -> VirtualPath {
@@ -8407,10 +8408,22 @@ mod repository_state_classifier_tests {
                 ManagedDocumentError::DuplicateRegionIdentity("r".into()).into(),
                 4,
             ),
-            (ProfileTargetConflictError { path: path() }.into(), 4),
+            (
+                ProfileTargetConflictError {
+                    path: path(),
+                    candidate: ProfilePackageId::new("candidate"),
+                    occupant: ProfileConflictOccupant::Repository,
+                }
+                .into(),
+                4,
+            ),
             (
                 RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
-                    ProfileTargetConflictError { path: path() },
+                    ProfileTargetConflictError {
+                        path: path(),
+                        candidate: ProfilePackageId::new("candidate"),
+                        occupant: ProfileConflictOccupant::Repository,
+                    },
                 )),
                 4,
             ),
@@ -8452,13 +8465,24 @@ mod repository_state_classifier_tests {
         // profile conflicts (validation exit 4); an unreadable registry and an
         // unrelated variant keep the generic profile-error code (exit 1).
         let conflict_cases: Vec<RepositoryStateError> = vec![
-            ProfileTargetConflictError { path: path() }.into(),
+            ProfileTargetConflictError {
+                path: path(),
+                candidate: ProfilePackageId::new("candidate"),
+                occupant: ProfileConflictOccupant::Repository,
+            }
+            .into(),
             RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
-                ProfileTargetConflictError { path: path() },
+                ProfileTargetConflictError {
+                    path: path(),
+                    candidate: ProfilePackageId::new("candidate"),
+                    occupant: ProfileConflictOccupant::Repository,
+                },
             )),
             ProducerError::ProfileContributionConflict {
                 identity: "i".into(),
                 registry: "r".into(),
+                candidate: ProfilePackageId::new("candidate"),
+                occupant: ProfileConflictOccupant::Repository,
             }
             .into(),
         ];

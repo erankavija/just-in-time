@@ -55,6 +55,13 @@ package that declared it beside the one that could not be found — so an adopte
 is never left diagnosing a package they did not name. Both refusals are raised
 over the whole set before any of it is applied.
 
+A registry declaration or asset target that two packages state differently is
+refused for the same reason: neither package holds authority over the other's
+declarations. The failure names the package being applied, the declaration or
+target it carries, and who already holds it — the repository, or the package
+whose applied-profile record claims that target. Identical restatements merge,
+so a package and its dependency may declare the same thing.
+
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).
 
@@ -112,8 +119,7 @@ semantics and [Custom Gates](../how-to/custom-gates.md) for replacement.
 The profile changes configuration and installs files, but it never creates Git
 commits, rewrites existing issues, or treats the dogfood vocabulary as engine
 behavior. A semantic registry entry or one-to-one asset that collides with
-differing repository-owned content is a conflict; that content is not silently
-overwritten.
+differing content is a conflict; that content is not silently overwritten.
 
 ## Derived state and managed regions
 
