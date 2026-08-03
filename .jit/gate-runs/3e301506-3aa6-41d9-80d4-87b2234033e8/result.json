@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "50fed1be547a9550553b0f128034c6ab99c330a9",
+  "completed_at": "2026-08-03T20:43:10.640904973Z",
+  "duration_ms": 165565,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The delivered container’s documentation impact is accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "cc75b4e6-dca6-4b12-be45-ee25ca6560bd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3e301506-3aa6-41d9-80d4-87b2234033e8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T20:40:25.075076694Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: configured hierarchy makes this story a container; all 12 resolved children are done. I reviewed each child’s individually tagged reachable commit patches with rename detection. No parent-tagged commit exists, so its supplied intent was used as fallback. The combined documentation contract accurately covers live-source declarations, relocated gate assets, and gate input verdict reuse.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The delivered container’s documentation impact is accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

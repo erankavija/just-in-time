@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "50fed1be547a9550553b0f128034c6ab99c330a9",
+  "completed_at": "2026-08-03T20:46:38.491666712Z",
+  "duration_ms": 205898,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met in the current tree; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cc75b4e6-dca6-4b12-be45-ee25ca6560bd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b4f40073-359e-44af-920d-bda87387b18d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T20:43:12.593401556Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fallback — no reachable commit contains `jit:cc75b4e6`; current tree and completed dependency integration inspected\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover, @/invariant/bounded-rust-build-footprint, @/invariant/single-source-prose (.jit/invariants.toml); @/issue/e204e63d/decision/D-5, D-6, D-7 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit unavailable); mcp-ci passed (0); docs-mechanical passed (exit unavailable); doc-review passed (0); code-review pending\nTruncation recovery: recovered broad-search and combined-read truncation with per-file/range reads of assembly, manifest, repository-package checks, MCP test, docs, and individual dependency patches\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met in the current tree; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

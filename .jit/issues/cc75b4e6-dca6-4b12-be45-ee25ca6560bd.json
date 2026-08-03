@@ -11,6 +11,7 @@
   ],
   "description": "The packaged live-asset tree is produced from the repository files it mirrors rather than carried as a second checked-in copy, and a live consumer that no packaged asset claims fails the suite.\n\n## Background\n\nSixty of the package's files are byte copies of files this repository also carries at their working paths. A test holds each pair equal, so drift fails rather than ships, but both copies are hand-maintained and the test walks one direction only: it never asks whether a live file that belongs in the package was declared, so a newly added consumer is absent from every adopter install with nothing reporting it.\n\nBoth halves close here. One entry point assembles the package from the working files the manifest declares, the duplicated copies retire once the produced tree has been compared against them, and the manifest declares the repository roots its live assets are drawn from so a walk can report a file under any of them that no packaged asset claims and no declared exclusion covers.\n\n## Success Criteria\n\n- [hard] REQ-01: The packaged live-asset tree is produced from the repository files it mirrors, and no copy of any of them is checked in.\n- [hard] REQ-02: Two assemblies from the same repository state produce identical package content and report identical digests.\n- [hard] REQ-03: Every root the packaged live assets are drawn from is declared with the exclusion patterns that bound it.\n- [hard] REQ-04: A tracked repository file under a declared root that no packaged asset claims and no declared exclusion covers fails the suite.\n- [hard] REQ-05: The adopter-facing description of what the manifest carries accounts for the declaration, and the agent-facing bridge observes it.\n\n## Notes\n\nThe produced tree is the artefact the profile's distribution publishes, so this work is the input to taking the profile out of the binary rather than a change beside it.\n",
   "documents": [],
+  "done_at": "2026-08-03T20:46:53.562351306Z",
   "first_ready_at": "2026-08-03T19:23:55.489781370Z",
   "gates_required": [
     "cargo-ci",
@@ -19,7 +20,33 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:40:23.974956454Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:46:38.853222014Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:43:11.046121975Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:40:19.850748447Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T20:40:23.417808717Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cc75b4e6-dca6-4b12-be45-ee25ca6560bd",
   "labels": [
     "epic:derived-package-sources",
@@ -31,7 +58,7 @@
     "type:story"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "The packaged asset tree is derived from the repository files it mirrors",
-  "updated_at": "2026-08-03T19:23:55.489781370Z"
+  "updated_at": "2026-08-03T20:46:53.562351306Z"
 }
