@@ -781,7 +781,7 @@ jit issue create --title <TITLE> [OPTIONS]
 | `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable and comma-separated. |
 | `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to Markdown. `html`/`xml` require the matching cargo feature. |
 | `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
-| `--orphan` | Suppress the `orphan-leaf` hint for an issue deliberately created without a container. |
+| `--orphan` | Suppress the workflow profile's `orphan-leaf` hint for an issue deliberately created without a container. |
 | `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
 
 ```bash

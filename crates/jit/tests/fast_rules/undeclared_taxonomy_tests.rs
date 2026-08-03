@@ -252,16 +252,14 @@ unique = true
 
     assert_eq!(projected_namespaces(&jit_dir), names(&["squad"]));
     assert!(rule_names.contains(&"namespace-unique-squad".to_string()));
-    for hierarchy_rule in [
-        "type-hierarchy-known",
-        "orphan-leaf",
-        "strategic-consistency",
-    ] {
-        assert!(
-            !rule_names.contains(&hierarchy_rule.to_string()),
-            "a repository declaring no type hierarchy received `{hierarchy_rule}`",
-        );
-    }
+    assert!(
+        rule_names.iter().all(|name| {
+            name != "type-hierarchy-known"
+                && name != "orphan-leaf"
+                && name != "strategic-consistency"
+        }),
+        "a repository declaring no type hierarchy received the rule: {rule_names:?}",
+    );
 }
 
 /// REQ-02 + REQ-03: declaring a type hierarchy alone yields the type rules and
@@ -280,13 +278,13 @@ types = { objective = 1, action = 2 }
     let rule_names = scaffolded_rule_names(&jit_dir);
 
     assert_eq!(projected_types(&jit_dir), names(&["objective", "action"]));
-    for hierarchy_rule in [
-        "type-hierarchy-known",
-        "orphan-leaf",
-        "strategic-consistency",
-    ] {
-        assert!(rule_names.contains(&hierarchy_rule.to_string()));
-    }
+    assert!(rule_names.contains(&"type-hierarchy-known".to_string()));
+    assert!(
+        rule_names
+            .iter()
+            .all(|name| { name != "orphan-leaf" && name != "strategic-consistency" }),
+        "a repository that applied no package received a workflow rule: {rule_names:?}",
+    );
     assert!(
         !rule_names
             .iter()

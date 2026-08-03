@@ -203,9 +203,10 @@ stable id rather than by copied text. The namespace is non-unique: one issue may
 enforce several items.
 
 > **Enforcement lives in `.jit/rules.toml`.** The canonical label format, the
-> namespace registry, per-namespace uniqueness, and the orphan-leaf /
-> strategic-consistency warnings are declarative rules there (scaffolded by `jit
-> init`). Those built-in rules are `origin = "default"`: they derive their
+> namespace registry, and per-namespace uniqueness are declarative rules there
+> (scaffolded by `jit init`). The workflow profile contributes the orphan-leaf /
+> strategic-consistency warnings. The scaffolded rules are `origin = "default"`:
+> they derive their
 > assertion — and the family's membership — from the
 > `[namespaces]` / `[type_hierarchy]` registry in `config.toml` at load, so a
 > `[namespaces.<name>]` table's `unique` flag and its membership drive them

@@ -237,8 +237,9 @@ repository's dogfood configuration additionally declares `bug` and
 
 Omit the table and the repository has no hierarchy: no type name is known, the
 queries that resolve tiers resolve none, and neither the `type-hierarchy-known`
-rule nor the `orphan-leaf` / `strategic-consistency` warnings are written, so no
-rule or schema enumerates a type name the repository never declared.
+rule nor any workflow profile's type-hierarchy warnings have a subject. The
+workflow profile contributes `orphan-leaf` / `strategic-consistency` when
+installed; a plain repository receives neither rule.
 
 ### `[validation]`
 
@@ -271,8 +272,9 @@ proceeds and the bypass is logged, at every level.
 
 > **Validation enforcement lives in `.jit/rules.toml`.** The ruleset `jit
 > validate` and write-validation enforce is declared there, scaffolded by `jit
-> init`: label/type format, the namespace registry, per-namespace uniqueness, the
-> orphan-leaf / strategic-consistency warnings, and any custom rules you author.
+> init`: label/type format, the namespace registry, per-namespace uniqueness, and
+> any custom rules you author. The workflow profile contributes the
+> orphan-leaf / strategic-consistency warnings when installed.
 > The built-in rules marked `origin = "default"` derive their assertion — and
 > the family's membership — from the `[namespaces]` /
 > `[type_hierarchy]` registry in `config.toml`, in memory at load; the

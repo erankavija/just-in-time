@@ -79,11 +79,7 @@ feature = "epic"
 }
 
 #[test]
-fn test_orphan_warning_is_unconditional_in_default_ruleset() {
-    // The orphan-leaf / strategic-consistency graph warnings are now UNCONDITIONAL
-    // built-in default rules (the former `warn_*` toggles were removed; MF1). With
-    // no rules.toml, the in-memory defaults always emit them, so an orphaned task
-    // warns. A repo that wants them silenced edits rules.toml.
+fn test_default_ruleset_does_not_emit_workflow_graph_warnings() {
     let (temp_dir, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
 
     // Remove only rules.toml so the command derives the in-memory defaults from
@@ -115,8 +111,8 @@ fn test_orphan_warning_is_unconditional_in_default_ruleset() {
         .filter(|gf| gf.issue_id.as_deref() == Some(issue_id.as_str()))
         .collect();
     assert!(
-        !warnings.is_empty(),
-        "Expected an orphan warning from the unconditional default graph rules"
+        warnings.is_empty(),
+        "workflow graph warnings must come from an applied profile, not default rules: {warnings:?}"
     );
 }
 

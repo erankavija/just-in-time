@@ -102,10 +102,11 @@ default_type = "task"
 # Markdown fallback.
 content_format = "markdown"
 
-# NOTE: individual label/type rules (format, namespace registry, per-namespace
-# uniqueness, and the orphan-leaf / strategic-consistency warnings) are defined
-# declaratively in `.jit/rules.toml`, scaffolded by `jit init`. Those built-in
-# `origin = "default"` rules derive their assertion — and their membership — from
+# NOTE: individual label/type rules (format, namespace registry, and
+# per-namespace uniqueness) are defined declaratively in `.jit/rules.toml`,
+# scaffolded by `jit init`. The workflow profile contributes the orphan-leaf /
+# strategic-consistency warnings. The scaffolded `origin = "default"` rules
+# derive their assertion — and their membership — from
 # the `[namespaces]` / `[type_hierarchy]` registry above, in
 # memory at load; the `schemas/default-*.json` files are regenerated projections,
 # not the authority. jit-driven writes to this file (config set, re-init) also
