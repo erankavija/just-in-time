@@ -35,9 +35,11 @@ where each comes up.
 
 `templates.toml` is authored per project; `jit init` does not scaffold it.
 `config.toml`, the empty `gates.toml`, the empty `invariants.toml`, and
-`rules.toml` (with a default ruleset and its `schemas/` files) are scaffolded
-by `jit init`, so the `gate`, `invariant`, and `rule` item kinds each resolve
-against a registry that exists before anything is authored into it.
+`rules.toml` (with the rules the declared registry generates, and their
+`schemas/` files) are scaffolded by `jit init`, so the `gate`, `invariant`, and
+`rule` item kinds each resolve against a registry that exists before anything is
+authored into it — the `rule` kind itself only once a `[item_kinds]` declaration
+reaches the repository.
 
 A live repository also carries gitignored, machine-local files directly under
 `.jit/`: `worktree.json`, `server.log`, `server.pid.json`, a fixed set of lock

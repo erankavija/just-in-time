@@ -265,16 +265,6 @@ fn test_label_envelopes() {
 }
 
 #[test]
-fn test_config_list_templates_envelope() {
-    let (temp, _) = setup_repo();
-    assert_envelope(
-        &run_json(&temp, &["config", "list-templates", "--json"]),
-        "templates",
-        &["config", "list-templates"],
-    );
-}
-
-#[test]
 fn test_item_envelopes() {
     let (temp, _) = setup_repo();
     assert_envelope(

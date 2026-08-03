@@ -1891,8 +1891,9 @@ impl EffectiveConfig {
     /// `templates` and `invariants` are deliberately excluded: both are
     /// `#[serde(skip)]` on [`JitConfig`], populated from the SIBLING
     /// `templates.toml` / `invariants.toml` files rather than `config.toml`
-    /// itself, so neither has a dotted path here. Introspect them via `jit
-    /// config list-templates` / `jit invariant list`.
+    /// itself, so neither has a dotted path here. Read the graph templates in
+    /// `.jit/templates.toml`, and introspect the invariants via `jit item list
+    /// --kind invariant`.
     pub fn full_snapshot(&self) -> Result<serde_json::Value> {
         fn section<T: Serialize>(value: Option<&T>) -> Result<serde_json::Value> {
             match value {

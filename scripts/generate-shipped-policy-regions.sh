@@ -17,24 +17,29 @@ set -euo pipefail
 # example — so the prose and comments that explain the table stay hand-written
 # around it.
 #
-# WHERE THE VALUES COME FROM. The classification is declared once, as the
-# constant `jit init` renders into the configuration table a new repository
-# receives. The route to it that respects the dogfooding boundary is to
-# initialize a throwaway repository in a temporary directory and read the table
-# written there. This repository's own `.jit/config.toml` and the
-# effective-configuration report are not sources: both describe the policy this
-# repository runs under, which agrees with the shipped classification by a
-# hand-maintained claim rather than by binding
+# WHERE THE VALUES COME FROM. The classification is declared once, in the
+# `jit-default` package's `[documentation]` contributions under `profiles/` in
+# this checkout. The route to it that respects the dogfooding boundary is to
+# initialize a throwaway repository in a temporary directory with that package
+# applied, and read the table written there. This repository's own
+# `.jit/config.toml` and the effective-configuration report are not sources:
+# both describe the policy this repository runs under, which agrees with the
+# shipped classification by a hand-maintained claim rather than by binding
 # (`@/issue/e204e63d/decision/D-4`).
 #
-# WHY THIS SCRIPT CHECKS THE BINARY ITSELF. Initialization runs from the
-# installed binary, so the values obtained here are the classification compiled
-# into the binary in use, not the declaration at the current revision. An
-# unreinstalled binary therefore writes regions that are stale and internally
-# consistent: a second run changes nothing, so nothing downstream notices. The
-# repository's own stale-binary guard cannot cover this — it identifies a
-# repository by resolving a revision in it, and the throwaway directory is not
-# a repository, so it reports nothing there whatever the binary's age.
+# The package is copied into the throwaway repository before it is applied,
+# because an application records the package's worktree-relative location and
+# refuses a package read from outside the worktree it is applied to.
+#
+# WHY THIS SCRIPT STILL CHECKS THE BINARY ITSELF. The values it splices come
+# from a package directory in this checkout, so the binary's currency is not
+# what makes the read correct — the guard below is belt-and-braces over a
+# route that no longer depends on it. It stays because it costs nothing and
+# because the rest of what initialization writes still comes from the binary.
+# The repository's own stale-binary guard could not stand in for it: that guard
+# identifies a repository by resolving a revision in it, and the throwaway
+# directory is not a repository, so it reports nothing there whatever the
+# binary's age.
 #
 # Nor is that guard's silence, taken in this repository, evidence on its own: a
 # binary with no injected provenance, an unresolvable head, and a build commit
@@ -86,6 +91,11 @@ root=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null) ||
 reference="docs/reference/configuration.md"
 example="docs/reference/example-config.toml"
 region="shipped-documentation-policy"
+package="jit-default"
+package_source="profiles/$package"
+# Where the package is placed inside the throwaway repository, worktree-relative
+# because that is the form `--from` records.
+package_location="packages/$package"
 
 # --- provenance: establish currency, or refuse -------------------------------
 
@@ -117,13 +127,19 @@ fi
 
 tmp=$(mktemp -d) || die "could not create a temporary directory"
 trap 'rm -rf "$tmp" "$root/$reference.jit-region" "$root/$example.jit-region"' EXIT
-mkdir -p "$tmp/scaffold"
+mkdir -p "$tmp/scaffold/$package_location"
+
+[ -f "$root/$package_source/manifest.toml" ] ||
+  die "$package_source carries no manifest.toml in $root — the classification's declaration is not where this script looks for it"
+cp -R "$root/$package_source/." "$tmp/scaffold/$package_location/" ||
+  die "could not place the $package package inside the throwaway repository"
 
 # `JIT_DATA_DIR` is cleared so discovery cannot reach out of the temporary
 # directory, and `JIT_GATE_RUN` so the throwaway directory — which is no
 # repository — never becomes the subject of a currency verdict.
-(cd "$tmp/scaffold" && env -u JIT_DATA_DIR -u JIT_GATE_RUN jit init --quiet) >/dev/null 2>&1 ||
-  die "'jit init' failed in the throwaway repository"
+(cd "$tmp/scaffold" &&
+  env -u JIT_DATA_DIR -u JIT_GATE_RUN jit init --profile "$package" --from "$package_location" --quiet) >/dev/null 2>&1 ||
+  die "'jit init --profile $package' failed in the throwaway repository"
 
 scaffold_config="$tmp/scaffold/.jit/config.toml"
 [ -f "$scaffold_config" ] || die "'jit init' wrote no $scaffold_config"
@@ -138,7 +154,7 @@ table=$(awk '
 
 for key in development_root archive_root managed_paths permanent_paths issue_scoped_areas; do
   printf '%s\n' "$table" | grep -q "^$key = " ||
-    die "the scaffolded [documentation] table carries no '$key' — the extraction no longer matches what 'jit init' writes"
+    die "the written [documentation] table carries no '$key' — the extraction no longer matches what applying $package writes"
 done
 
 # shellcheck disable=SC2016  # The backticks are a literal markdown code fence.

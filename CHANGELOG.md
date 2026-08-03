@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- **The configuration the binary wrote for a new repository.** `jit init`
+  rendered a whole `config.toml` into every repository it created: a four-level
+  type hierarchy, seven label namespaces, six item kinds, validation defaults,
+  a development-area classification, and the commented guidance around them.
+  None of it was asked for, and all of it is now declared by the `jit-default`
+  profile package instead, so a bare initialization writes only what the engine
+  derives from the repository — the schema version and the project name slugged
+  from the directory — beside the empty gate and invariant registries, the event
+  log, and the index. The rule set it derives shrinks with the registry it
+  derives from: a repository declaring no namespaces and no type hierarchy
+  receives the label grammar alone and the one schema projection that rule
+  references. Such a repository is usable — it validates and accepts issues —
+  and obtains a vocabulary by applying a package that declares one:
+  `jit init --profile jit-default --from <path>` produces the configuration a
+  plain `jit init` used to write.
+
+- **The four named hierarchy presets, the `--hierarchy-template` flag, and
+  `jit config list-templates`.** The presets (`default`, `extended`, `agile`,
+  `minimal`) were a bundle of type names selected by name; the flag and the
+  listing command existed only to select and enumerate them. All three are gone
+  rather than left answering with an empty set, and `jit init --json` no longer
+  reports a `hierarchy_template` field. An adopter who chose a taxonomy by
+  asking the binary which ones existed now reads a package directory's
+  `manifest.toml` and applies the one they want.
+
+- **The compiled documentation-area classification.** `SHIPPED_DOCUMENTATION_POLICY`
+  named this project's own development areas and supplied them to any repository
+  whose `[documentation]` table omitted a key. An absent key now declares
+  nothing, so no area name reaches a repository that never named one, and the
+  generated `[documentation]` regions in `docs/reference/configuration.md` and
+  `docs/reference/example-config.toml` are rendered from the `jit-default`
+  package's own contributions.
+
 ### Fixed
 
 - **Installing marks a binary stale only when a path it is built from is
