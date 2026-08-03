@@ -52,10 +52,15 @@ function presentsConfiguredKindVocabulary(text) {
   return mentionedKinds.size >= 2 && itemKindEnumeration.test(text);
 }
 
-function describesRepositoryPackageLocation(text) {
-  return /\bpackages?\b/i.test(text) &&
-    /\brepositor(?:y|ies)\b/i.test(text) &&
-    /\b(?:locations?|directories|paths?)\b/i.test(text);
+// A profile package reaches jit as files in a repository; nothing about one
+// lives inside the connected binary. These are the framings that claim otherwise.
+const claimsBinaryEmbedding = /\b(?:embedded|embeds|compiled[- ]in|built[- ]in)\b|\bbinary\b/i;
+
+// A description sources the package when it names the package and attributes it
+// to the repository. Which words place it inside the repository are the text's
+// own choice, so only the two concepts are required.
+function sourcesPackageFromRepository(text) {
+  return /\bpackages?\b/i.test(text) && /\brepositor(?:y|ies)\b/i.test(text);
 }
 
 // The checked-in profile-package fixture the profile tools are exercised over.
@@ -372,20 +377,32 @@ async function main() {
       );
     });
 
-    await runTest('profile descriptions describe repository package locations without embedded binary claims', async () => {
-      const resp = await tester.request('tools/list');
-      const profileTools = resp.result.tools.filter(tool => tool.name.startsWith('jit_profile_'));
-      assert.ok(profileTools.length > 0, 'profile tools should be curated');
-      for (const tool of profileTools) {
-        assert.doesNotMatch(
-          tool.description,
-          /\b(?:embedded|compiled[- ]in|built[- ]in)\b|\bbinary\b/i,
-          `${tool.name} must not present a package as embedded in the binary`
-        );
-        assert.ok(
-          describesRepositoryPackageLocation(tool.description),
-          `${tool.name} should describe repository package locations`
-        );
+    await runTest('profile descriptions source the package from the repository, never from the connected binary', async () => {
+      const isProfileTool = name => name.startsWith('jit_profile_');
+      const curated = Object.entries(CURATION.include)
+        .filter(([name]) => isProfileTool(name))
+        .map(([name, description]) => [`CURATION.include.${name}`, description]);
+      const listed = (await tester.request('tools/list')).result.tools
+        .filter(tool => isProfileTool(tool.name))
+        .map(({ name, description }) => [`tools/list.${name}`, description]);
+
+      assert.ok(curated.length > 0, 'profile tools should be curated in');
+      assert.strictEqual(listed.length, curated.length,
+        'every curated profile tool should be advertised');
+
+      // No profile description, curated or advertised, may place a package
+      // inside the binary an agent is connected to.
+      for (const [source, description] of [...curated, ...listed]) {
+        assert.doesNotMatch(description, claimsBinaryEmbedding,
+          `${source} must not present a profile package as embedded in the binary`);
+      }
+
+      // Where the package is read from is stated by the curated descriptions,
+      // which this manifest authors. An advertised description is the command's
+      // own text from the CLI schema, so it is held only to the claim above.
+      for (const [source, description] of curated) {
+        assert.ok(sourcesPackageFromRepository(description),
+          `${source} should state that the package is read from the repository`);
       }
     });
 
