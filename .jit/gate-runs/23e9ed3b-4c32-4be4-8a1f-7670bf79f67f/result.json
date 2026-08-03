@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e555a39afb140f5faec5e270eeb99d1fdb2dc0a7",
+  "completed_at": "2026-08-03T06:27:48.730983813Z",
+  "duration_ms": 280884,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".github/workflows/release-artifacts.yml",
+        "id": "F1",
+        "line": 132,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-16",
+          "@/charter/D-8"
+        ],
+        "severity": "high",
+        "summary": "Archive omits jit-default, so the smoke test can use the embedded dependency instead of proving an extracted offline package set."
+      }
+    ],
+    "summary": "The release archive omits the declared jit-default dependency, allowing the smoke test to fall back to embedded bytes.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9de22aa7-9ba3-4567-84b0-8e7dc66c7684",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "23e9ed3b-4c32-4be4-8a1f-7670bf79f67f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T06:23:07.846011658Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2692 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc64a-5537-76e0-b47d-c044a9db3fa7\n--------\nuser\n--- 2679 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a588083a, e555a39a (jit:9de22aa7)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-11 and D-16 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/charter/D-8 and D-16 (dev/vision/9db27a3a-charter.md)\nGate evidence: none\nTruncation recovery: parent issue source re-read via jq/sed after a truncated search result\n\n1. [blocking][issue-impact] The archive contains only `packages/jit-dogfood` ([release-artifacts.yml](/home/vkaskivuo/Projects/just-in-time/.github/workflows/release-artifacts.yml:132)), although that package declares `jit-default` as a dependency ([manifest.toml](/home/vkaskivuo/Projects/just-in-time/profiles/jit-dogfood/manifest.toml:1)). The resolver looks for dependencies beside the supplied directory and otherwise falls back to the embedded package ([profile.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/profile.rs:319)); therefore the smoke test can pass using the binary’s embedded `jit-default`, while its assertions check only the dogfood origin ([release-artifacts.yml](/home/vkaskivuo/Projects/just-in-time/.github/workflows/release-artifacts.yml:269)). This fails the declared two-package offline distribution policy and will break the extracted-package path once the embeds are removed. References: @/issue/e204e63d/decision/D-16, @/charter/D-8.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The release archive omits the declared jit-default dependency, allowing the smoke test to fall back to embedded bytes.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Archive omits jit-default, so the smoke test can use the embedded dependency instead of proving an extracted offline package set.\",\"file\":\".github/workflows/release-artifacts.yml\",\"line\":132,\"references\":[\"@/issue/e204e63d/decision/D-16\",\"@/charter/D-8\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

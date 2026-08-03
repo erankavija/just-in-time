@@ -12,7 +12,13 @@
   "gates_required": [
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T06:27:49.048210743Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9de22aa7-9ba3-4567-84b0-8e7dc66c7684",
   "labels": [
     "epic:derived-package-sources",
@@ -28,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Carry the assembled package in the release archive",
-  "updated_at": "2026-08-03T05:38:00.756683487Z"
+  "updated_at": "2026-08-03T06:27:49.048210743Z"
 }

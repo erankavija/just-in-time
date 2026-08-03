@@ -1,14 +1,15 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T06:29:56.232808414Z",
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
   "dependencies": [
     "7835fdc0-bd54-473c-a6fc-bd8c55dc390b",
-    "9de22aa7-9ba3-4567-84b0-8e7dc66c7684",
     "e4ba28c5-c95b-4e28-add0-b7853826c9f6"
   ],
   "description": "The release archive carries the default vocabulary package as well, so a repository can obtain everything it needs from one download once the binary writes no configuration of its own.\n\n## Background\n\nThe workflow package already rides in the archive. Two things then make a second directory necessary rather than tidy. The workflow package declares a dependency on the default package and no longer restates its vocabulary, so applying it from the archive resolves nothing unless the dependency is there beside it. And a bare initialization is about to stop writing any vocabulary at all, so a repository that applies no package has none — which is the intent, but only if a package is obtainable.\n\nThe mechanism exists: the staging step and the member list the workflow package's directory established take a second directory unchanged. What is new is the dependency the smoke path can now observe. Asserting that the default package was applied as a resolved dependency is the release's best end-to-end evidence that composition works from published bytes, so the step is strengthened rather than merely extended.\n\n## Success Criteria\n\n- [hard] REQ-01: The archive carries the default package directory beside the workflow package, under the same directory the workflow package uses.\n- [hard] REQ-02: The published asset set is still unchanged, and the existing checksum file still covers both.\n- [hard] REQ-03: The archive-verification step asserts both package directories are present.\n- [hard] REQ-04: The smoke path applies the workflow package from the extracted archive and asserts that the default package was applied as its resolved dependency.\n\n## Notes\n\nThis is a hard predecessor of removing the configuration the binary writes: without it, that removal leaves a release in which a fresh repository can obtain no vocabulary at all.\n",
   "documents": [],
+  "first_ready_at": "2026-08-03T06:29:08.862011429Z",
   "gates_required": [
     "code-review"
   ],
@@ -25,7 +26,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Carry the default package in the release archive too",
-  "updated_at": "2026-07-31T17:59:00.346182875Z"
+  "updated_at": "2026-08-03T06:29:56.232808414Z"
 }
