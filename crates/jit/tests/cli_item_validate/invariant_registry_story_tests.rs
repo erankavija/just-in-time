@@ -66,17 +66,7 @@ kind = "advisory"
 /// Initialize a full `jit` repo (via the real binary) and write an
 /// `invariants.toml` into it.  Used by CLI-path tests (REQ-03, REQ-05).
 fn setup_cli_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("jit init failed to spawn");
-    assert!(
-        output.status.success(),
-        "jit init exited non-zero: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    let temp = crate::setup_repo_with_default_vocabulary();
 
     std::fs::write(
         temp.path().join(".jit").join("invariants.toml"),

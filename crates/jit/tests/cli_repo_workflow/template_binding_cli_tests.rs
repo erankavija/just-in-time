@@ -134,11 +134,15 @@ fn jit_json(temp: &TempDir, args: &[&str]) -> Value {
 }
 
 /// Initialize an isolated temp repo carrying `templates_toml`.
+///
+/// The configuration is written before initialization, which preserves it and
+/// derives the coupled rules and schemas from the registry it declares.
 fn setup_repo(templates_toml: &str) -> TempDir {
     let temp = TempDir::new().unwrap();
-    jit(&temp).arg("init").assert().success();
     let jit_dir = temp.path().join(".jit");
+    std::fs::create_dir_all(&jit_dir).unwrap();
     std::fs::write(jit_dir.join("config.toml"), CONFIG_TOML).unwrap();
+    jit(&temp).arg("init").assert().success();
     std::fs::write(jit_dir.join("templates.toml"), templates_toml).unwrap();
     temp
 }

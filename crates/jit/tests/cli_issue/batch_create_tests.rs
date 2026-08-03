@@ -5,32 +5,38 @@
 //! unknown dependency, cycle, invalid label/gate/type) exits 2 and creates ZERO
 //! issues; created edges are asserted via `jit issue show --json`.
 
+use crate::TaxonomyRepo;
 use std::process::Command;
-use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-    assert!(output.status.success(), "jit init failed");
-    temp
+/// A repository whose configuration declares the type vocabulary these
+/// manifests name, so a rejected type is one this repository never declared.
+fn setup_test_repo() -> TaxonomyRepo {
+    crate::setup_test_repo_with_taxonomy()
+}
+
+/// The declared leaf type, the one a manifest entry names when it wants the
+/// most granular kind of work.
+fn leaf_type(repo: &TaxonomyRepo) -> &str {
+    repo.taxonomy.type_at_level(4)
+}
+
+/// A declared container type, distinct from the leaf.
+fn container_type(repo: &TaxonomyRepo) -> &str {
+    repo.taxonomy.type_at_level(3)
 }
 
 /// Write a batch JSON file into the repo and return its path.
-fn write_batch(temp: &TempDir, json: &str) -> std::path::PathBuf {
+fn write_batch(temp: &TaxonomyRepo, json: &str) -> std::path::PathBuf {
     let path = temp.path().join("batch.json");
     std::fs::write(&path, json).unwrap();
     path
 }
 
-fn run_batch(temp: &TempDir, file: &std::path::Path, json: bool) -> std::process::Output {
+fn run_batch(temp: &TaxonomyRepo, file: &std::path::Path, json: bool) -> std::process::Output {
     let mut args = vec![
         "issue".to_string(),
         "batch-create".to_string(),
@@ -47,7 +53,7 @@ fn run_batch(temp: &TempDir, file: &std::path::Path, json: bool) -> std::process
         .unwrap()
 }
 
-fn run_dry_batch(temp: &TempDir, file: &std::path::Path, json: bool) -> std::process::Output {
+fn run_dry_batch(temp: &TaxonomyRepo, file: &std::path::Path, json: bool) -> std::process::Output {
     let mut args = vec![
         "issue",
         "batch-create",
@@ -65,7 +71,7 @@ fn run_dry_batch(temp: &TempDir, file: &std::path::Path, json: bool) -> std::pro
         .unwrap()
 }
 
-fn count_issues(temp: &TempDir) -> usize {
+fn count_issues(temp: &TaxonomyRepo) -> usize {
     let output = Command::new(jit_binary())
         .args(["query", "all", "--json"])
         .current_dir(temp.path())
@@ -82,13 +88,16 @@ fn count_issues(temp: &TempDir) -> usize {
 #[test]
 fn test_batch_create_valid_creates_issues_and_edges() {
     let temp = setup_test_repo();
+    let (container, leaf) = (container_type(&temp), leaf_type(&temp));
     let file = write_batch(
         &temp,
-        r#"[
-          { "key": "spec", "title": "Write the spec", "type": "story" },
-          { "key": "impl", "title": "Implement it", "type": "task", "depends_on": ["spec"] },
-          { "key": "test", "title": "Test it", "type": "task", "depends_on": ["impl"] }
-        ]"#,
+        &format!(
+            r#"[
+          {{ "key": "spec", "title": "Write the spec", "type": "{container}" }},
+          {{ "key": "impl", "title": "Implement it", "type": "{leaf}", "depends_on": ["spec"] }},
+          {{ "key": "test", "title": "Test it", "type": "{leaf}", "depends_on": ["impl"] }}
+        ]"#
+        ),
     );
 
     let output = run_batch(&temp, &file, true);
@@ -246,8 +255,8 @@ fn test_batch_create_unknown_gate_exits_2() {
 #[test]
 fn test_batch_create_unknown_type_exits_2() {
     let temp = setup_test_repo();
-    // The default `jit init` config configures a type hierarchy
-    // (milestone/epic/story/task), so an unknown type is rejected.
+    // The repository's own `[type_hierarchy]` declaration is what a type is
+    // judged against, so a name it does not carry is rejected.
     let file = write_batch(
         &temp,
         r#"[
@@ -291,12 +300,15 @@ fn test_batch_create_write_time_violation_in_later_entry_zero_created() {
     // which namespace-uniqueness validation rejects only at write time. Without
     // full pre-validation this would save the first issue then fail on the
     // second, leaving a partial write. It must now be caught BEFORE any write.
+    let (container, leaf) = (container_type(&temp), leaf_type(&temp));
     let file = write_batch(
         &temp,
-        r#"[
-          { "key": "ok", "title": "Fine", "type": "task" },
-          { "key": "bad", "title": "Bad", "type": "task", "labels": ["type:story"] }
-        ]"#,
+        &format!(
+            r#"[
+          {{ "key": "ok", "title": "Fine", "type": "{leaf}" }},
+          {{ "key": "bad", "title": "Bad", "type": "{leaf}", "labels": ["type:{container}"] }}
+        ]"#
+        ),
     );
 
     let output = run_batch(&temp, &file, false);
@@ -313,11 +325,14 @@ fn test_batch_create_write_time_violation_in_later_entry_zero_created() {
 #[test]
 fn test_batch_create_human_output_lists_key_to_id() {
     let temp = setup_test_repo();
+    let leaf = leaf_type(&temp);
     let file = write_batch(
         &temp,
-        r#"[
-          { "key": "only", "title": "Only one", "type": "task" }
-        ]"#,
+        &format!(
+            r#"[
+          {{ "key": "only", "title": "Only one", "type": "{leaf}" }}
+        ]"#
+        ),
     );
 
     let output = run_batch(&temp, &file, false);

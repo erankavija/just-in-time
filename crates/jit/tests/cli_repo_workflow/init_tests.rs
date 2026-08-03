@@ -74,7 +74,7 @@ fn test_init_creates_config_toml_carrying_only_repository_derived_declarations()
         temp.path()
             .file_name()
             .and_then(|name| name.to_str())
-            .map(str::to_string),
+            .map(jit::config::slugify_project_name),
         "the project name is the slugged directory name"
     );
 

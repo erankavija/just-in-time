@@ -40,17 +40,24 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-/// Bootstrap a default-initialized repo (whose `jit init`-emitted `[item_kinds]`
-/// table declares this fixture's four kinds, among six total) and return the
-/// temp dir so the caller owns the lifetime.
+/// Bootstrap a repository carrying the `jit-default` package's `[item_kinds]`
+/// table, which declares this fixture's four kinds among the six it carries,
+/// and return the temp dir so the caller owns the lifetime.
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
+    let location = "packages/jit-default";
+    jit::test_utils::assemble_repository_package("jit-default", &temp.path().join(location))
+        .expect("this repository's default package assembles");
     let output = Command::new(jit_binary())
-        .arg("init")
+        .args(["init", "--profile", "jit-default", "--from", location])
         .current_dir(temp.path())
         .output()
         .expect("failed to run jit init");
-    assert!(output.status.success(), "jit init failed");
+    assert!(
+        output.status.success(),
+        "jit init --profile jit-default failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     temp
 }
 

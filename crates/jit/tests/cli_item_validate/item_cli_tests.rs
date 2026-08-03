@@ -14,14 +14,7 @@ fn jit_binary() -> &'static str {
 }
 
 fn setup_test_repo() -> TempDir {
-    let temp = TempDir::new().unwrap();
-    let output = Command::new(jit_binary())
-        .arg("init")
-        .current_dir(temp.path())
-        .output()
-        .expect("Failed to run jit init");
-    assert!(output.status.success(), "jit init failed");
-    temp
+    crate::setup_repo_with_default_vocabulary()
 }
 
 /// Create an issue with the given body and return its short id.

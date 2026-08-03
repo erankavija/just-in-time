@@ -903,6 +903,7 @@ mod tests {
     use crate::repository_state::{
         Contribution, InitializationError, MapEntryTarget, ProducerError, ProfileConflictOccupant,
         ProfilePackageId, ProfileTargetConflictError, RepositoryStateError, RootRelativePath,
+        ScalarTarget, SetStringTarget,
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
@@ -1878,11 +1879,10 @@ mod tests {
             .targets
             .keys()
             .all(|target| !target.starts_with(".jit/schemas/")));
-        let schema = temp
-            .path()
-            .join(".jit/schemas/default-namespace-registry.json");
-        let generated = fs::read(&schema).unwrap();
-        fs::remove_file(&schema).unwrap();
+        let schemas = temp.path().join(".jit/schemas");
+        let grammar = schemas.join("default-label-format.json");
+        let generated = fs::read(&grammar).unwrap();
+        fs::remove_file(&grammar).unwrap();
 
         let applied = executor.apply_profile_package(&package).unwrap();
 
@@ -1890,23 +1890,39 @@ mod tests {
             applied.requested().unwrap().status,
             ProfileApplicationStatus::Applied
         );
-        assert_eq!(fs::read(&schema).unwrap(), generated);
+        // The projection the repository already had is restored, and the
+        // registry the package declared brings its own along, though the
+        // package names neither as a target.
+        assert_eq!(fs::read(&grammar).unwrap(), generated);
+        assert!(schemas.join("default-namespace-registry.json").is_file());
     }
 
     #[test]
-    fn test_apply_profile_package_jit_default_reproduces_the_scaffolded_configuration() {
+    fn test_apply_profile_package_jit_default_writes_every_declaration_it_contributes() {
+        // An initialization writes the structural minimum, so what the applied
+        // package declares is the whole of the repository's vocabulary. Each
+        // assertion below reads the manifest rather than a copy of its values,
+        // so the repository is compared against the package's own declaration.
         let (temp, storage, _executor, _fixture_package) = fixture();
         let config_path = temp.path().join(".jit/config.toml");
-        let scaffolded = fs::read_to_string(&config_path).unwrap();
-
-        // Reduce the repository to the configuration an initialization derives
-        // from the repository itself — the schema version and the project name.
-        // What comes back afterwards is what the package declares, and nothing
-        // that survived the reduction.
-        let mut bare = scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
-        bare.as_table_mut()
-            .retain(|key, _| matches!(key, "version" | "project"));
-        fs::write(&config_path, bare.to_string()).unwrap();
+        let initialized: serde_json::Value =
+            toml_edit::de::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
+        let table_names = |config: &serde_json::Value| {
+            config
+                .as_object()
+                .expect("configuration is a table")
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<String>>()
+        };
+        assert_eq!(
+            table_names(&initialized),
+            ["project", "version"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<BTreeSet<_>>(),
+            "an initialization derives only these from the repository"
+        );
 
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
@@ -1919,21 +1935,94 @@ mod tests {
 
         let produced: serde_json::Value =
             toml_edit::de::from_str(&fs::read_to_string(&config_path).unwrap()).unwrap();
-        let scaffold: serde_json::Value = toml_edit::de::from_str(&scaffolded).unwrap();
-        let table_names = |config: &serde_json::Value| {
-            config
-                .as_object()
-                .expect("configuration is a table")
-                .keys()
-                .cloned()
-                .collect::<BTreeSet<String>>()
-        };
+        assert_eq!(
+            table_names(&produced),
+            [
+                "documentation",
+                "item_kinds",
+                "namespaces",
+                "project",
+                "type_hierarchy",
+                "validation",
+                "version",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<BTreeSet<_>>(),
+            "the tables the package's contributions target, and nothing else"
+        );
 
-        // Neither less nor more than the scaffold declares, table for table.
-        assert_eq!(table_names(&produced), table_names(&scaffold));
-        for table in table_names(&scaffold).iter() {
-            assert_eq!(produced[table], scaffold[table], "table [{table}]");
-        }
+        // Every declaration the manifest carries reaches the table it targets,
+        // under the identity and value the manifest gave it.
+        package
+            .manifest()
+            .contributions
+            .iter()
+            .for_each(|contribution| match contribution {
+                Contribution::MapEntry {
+                    target,
+                    identity,
+                    value,
+                } => {
+                    let (table, key) = match target {
+                        MapEntryTarget::TypeHierarchyTypes => ("type_hierarchy", "types"),
+                        MapEntryTarget::LabelAssociations => {
+                            ("type_hierarchy", "label_associations")
+                        }
+                        MapEntryTarget::Namespaces => ("namespaces", ""),
+                        MapEntryTarget::ItemKinds => ("item_kinds", ""),
+                    };
+                    let entries = if key.is_empty() {
+                        &produced[table]
+                    } else {
+                        &produced[table][key]
+                    };
+                    assert_eq!(
+                        &entries[identity], value,
+                        "[{table}] carries the declared {identity}"
+                    );
+                }
+                Contribution::Scalar { target, value } => {
+                    let (table, key) = match target {
+                        ScalarTarget::DocumentationDevelopmentRoot => {
+                            ("documentation", "development_root")
+                        }
+                        ScalarTarget::DocumentationArchiveRoot => ("documentation", "archive_root"),
+                        ScalarTarget::ValidationStrictness => ("validation", "strictness"),
+                        ScalarTarget::ValidationDefaultType => ("validation", "default_type"),
+                    };
+                    assert_eq!(
+                        produced[table][key].as_str(),
+                        Some(value.as_str()),
+                        "[{table}].{key} carries the declared value"
+                    );
+                }
+                Contribution::SetString { target, value } => {
+                    let (table, key) = match target {
+                        SetStringTarget::StrategicTypes => ("type_hierarchy", "strategic_types"),
+                        SetStringTarget::DocumentationManagedPaths => {
+                            ("documentation", "managed_paths")
+                        }
+                        SetStringTarget::DocumentationPermanentPaths => {
+                            ("documentation", "permanent_paths")
+                        }
+                        SetStringTarget::DocumentationIssueScopedAreas => {
+                            ("documentation", "issue_scoped_areas")
+                        }
+                    };
+                    assert!(
+                        produced[table][key]
+                            .as_array()
+                            .is_some_and(|declared| declared
+                                .iter()
+                                .any(|entry| entry.as_str() == Some(value.as_str()))),
+                        "[{table}].{key} carries the declared {value}"
+                    );
+                }
+                Contribution::KeyedArray { .. } | Contribution::Projection { .. } => {
+                    panic!("the default package contributes no registry entry or projection")
+                }
+            });
     }
 
     #[test]
@@ -2244,6 +2333,12 @@ mod tests {
     #[test]
     fn test_profile_preparation_retries_when_final_proposed_closure_expands() {
         let (temp, _storage, executor, _package) = fixture();
+        // The workflow package's projections name kinds its declared dependency
+        // carries, so the dependency is applied first — the order the resolved
+        // closure would apply them in.
+        executor
+            .apply_profile_package(&shipped_package_in(temp.path(), "jit-default"))
+            .unwrap();
         let package = shipped_package_in(temp.path(), "jit-dogfood");
         let layout = executor.require_layout().unwrap();
         let inner = executor.storage().open_mutation_session(layout).unwrap();

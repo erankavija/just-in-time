@@ -2320,74 +2320,61 @@ enforced-by = "dag-no-cycles"
     fn test_is_issue_scoped_area_matches_a_declared_area_exactly_rather_than_by_prefix() {
         use crate::domain::artifact_classifier::contains_path;
 
-        let unauthored = DocumentationConfig {
-            development_root: None,
-            managed_paths: None,
-            archive_root: None,
-            permanent_paths: None,
-            issue_scoped_areas: None,
-            citation_scan_roots: None,
+        let declared = "workspace/drafts".to_string();
+        let authored = DocumentationConfig {
+            issue_scoped_areas: Some(vec![declared.clone()]),
+            ..DocumentationConfig::default()
         };
-        let declared = unauthored
-            .issue_scoped_areas()
-            .into_iter()
-            .next()
-            .expect("the shipped registry should declare at least one area");
-        assert!(unauthored.is_issue_scoped_area(&declared));
+        assert!(authored.is_issue_scoped_area(&declared));
 
         // The same area written with redundant path syntax names the same area.
-        assert!(unauthored.is_issue_scoped_area(&format!("./{declared}/")));
+        assert!(authored.is_issue_scoped_area(&format!("./{declared}/")));
 
         // Exact-area matching: a path *inside* a declared area is not itself a
         // declared area, so a caller cannot pass an issue's own directory where
         // an area is expected. Not vacuous — prefix containment, which the
         // archival classifier applies to its own path lists, does accept it.
         let inside = format!("{declared}/abcd1234-example");
-        assert!(!unauthored.is_issue_scoped_area(&inside));
+        assert!(!authored.is_issue_scoped_area(&inside));
         assert!(contains_path(&declared, &inside));
 
         // A sibling whose name merely starts with a declared area's name is not
         // that area either.
-        assert!(!unauthored.is_issue_scoped_area(&format!("{declared}-other")));
+        assert!(!authored.is_issue_scoped_area(&format!("{declared}-other")));
     }
 
     #[test]
-    fn test_is_issue_scoped_area_follows_an_authored_registry_instead_of_the_shipped_one() {
-        let shipped = DocumentationConfig {
-            development_root: None,
-            managed_paths: None,
-            archive_root: None,
-            permanent_paths: None,
-            issue_scoped_areas: None,
-            citation_scan_roots: None,
-        };
-        let shipped_area = shipped
-            .issue_scoped_areas()
-            .into_iter()
-            .next()
-            .expect("the shipped registry should declare at least one area");
-
-        // An authored registry is the whole registry: it replaces the shipped
-        // declaration rather than extending it, and its entries need no
-        // relationship to the shipped area names (`@/invariant/domain-agnostic`).
-        let authored_area = "workspace/notes".to_string();
+    fn test_is_issue_scoped_area_follows_the_registry_the_repository_authored() {
+        // A registry is exactly what a repository wrote: the engine supplies no
+        // area of its own to extend or be replaced
+        // (`@/invariant/domain-agnostic`).
+        let first_area = "workspace/notes".to_string();
         let authored = DocumentationConfig {
-            issue_scoped_areas: Some(vec![authored_area.clone()]),
-            ..shipped.clone()
+            issue_scoped_areas: Some(vec![first_area.clone()]),
+            ..DocumentationConfig::default()
         };
-        assert_eq!(authored.issue_scoped_areas(), vec![authored_area.clone()]);
-        assert!(authored.is_issue_scoped_area(&authored_area));
-        assert!(!authored.is_issue_scoped_area(&shipped_area));
+        assert_eq!(authored.issue_scoped_areas(), vec![first_area.clone()]);
+        assert!(authored.is_issue_scoped_area(&first_area));
 
-        // An authored empty registry declares that no area adopts the
-        // convention, which is distinct from leaving the list unauthored.
+        // Reauthoring the registry replaces it rather than extending it, so an
+        // area the new declaration omits stops being one.
+        let second_area = "workspace/drafts".to_string();
+        let reauthored = DocumentationConfig {
+            issue_scoped_areas: Some(vec![second_area.clone()]),
+            ..DocumentationConfig::default()
+        };
+        assert!(reauthored.is_issue_scoped_area(&second_area));
+        assert!(!reauthored.is_issue_scoped_area(&first_area));
+
+        // An authored empty registry and an absent key both declare that no
+        // area adopts the convention.
         let opted_out = DocumentationConfig {
             issue_scoped_areas: Some(Vec::new()),
-            ..shipped.clone()
+            ..DocumentationConfig::default()
         };
         assert!(opted_out.issue_scoped_areas().is_empty());
-        assert!(!opted_out.is_issue_scoped_area(&shipped_area));
-        assert!(shipped.is_issue_scoped_area(&shipped_area));
+        assert!(!opted_out.is_issue_scoped_area(&first_area));
+        assert!(!DocumentationConfig::default().is_issue_scoped_area(&first_area));
     }
 
     #[test]
@@ -2407,35 +2394,33 @@ enforced-by = "dag-no-cycles"
                 .collect::<std::collections::BTreeSet<_>>()
         };
 
-        let unauthored = DocumentationConfig {
-            development_root: None,
-            managed_paths: None,
-            archive_root: None,
-            permanent_paths: None,
-            issue_scoped_areas: None,
-            citation_scan_roots: None,
+        let classified = DocumentationConfig {
+            development_root: Some("dev".to_string()),
+            permanent_paths: Some(vec!["dev/architecture".to_string()]),
+            ..DocumentationConfig::default()
         };
         assert_eq!(
-            resolved_universe(&unauthored),
-            derived_universe(&unauthored)
+            resolved_universe(&classified),
+            derived_universe(&classified)
         );
+        assert!(!resolved_universe(&classified).is_empty());
 
         // Reclassifying the table moves the default with it: a repository that
         // renames its development root and declares its own permanent areas
-        // scans those, not the shipped ones.
+        // scans those, not the ones it replaced.
         let reclassified = DocumentationConfig {
             development_root: Some("workspace".to_string()),
             permanent_paths: Some(vec![
                 "workspace/guides".to_string(),
                 "README.md".to_string(),
             ]),
-            ..unauthored.clone()
+            ..DocumentationConfig::default()
         };
         assert_eq!(
             resolved_universe(&reclassified),
             derived_universe(&reclassified)
         );
-        assert!(resolved_universe(&reclassified).is_disjoint(&resolved_universe(&unauthored)));
+        assert!(resolved_universe(&reclassified).is_disjoint(&resolved_universe(&classified)));
     }
 
     #[test]
@@ -2443,15 +2428,14 @@ enforced-by = "dag-no-cycles"
     ) {
         use crate::domain::artifact_classifier::contains_path;
 
-        let unauthored = DocumentationConfig {
-            development_root: None,
-            managed_paths: None,
-            archive_root: None,
-            permanent_paths: None,
-            issue_scoped_areas: None,
-            citation_scan_roots: None,
+        // A classified table, so the derived default universe this one replaces
+        // reaches something and the replacement is not vacuous.
+        let classified = DocumentationConfig {
+            development_root: Some("dev".to_string()),
+            permanent_paths: Some(vec!["dev/architecture".to_string()]),
+            ..DocumentationConfig::default()
         };
-        let development_root = unauthored.development_root();
+        let development_root = classified.development_root();
 
         // A directory entry and a file entry, both outside the development
         // root: the universe is not bounded by it.
@@ -2467,14 +2451,14 @@ enforced-by = "dag-no-cycles"
         ];
         let authored = DocumentationConfig {
             citation_scan_roots: Some(authored_entries.clone()),
-            ..unauthored.clone()
+            ..classified.clone()
         };
         let resolved = authored.citation_scan_roots();
         assert!(resolved.contains(&outside_directory) && resolved.contains(&outside_file));
 
         // The authored list is the whole universe: it replaces the default
         // instead of extending it, so a default root it omits is gone.
-        let omitted = unauthored
+        let omitted = classified
             .citation_scan_roots()
             .into_iter()
             .find(|root| !authored_entries.contains(root))
@@ -2507,23 +2491,25 @@ enforced-by = "dag-no-cycles"
             PolicyStatus::Unconfigured
         );
 
-        let unauthored = DocumentationConfig {
-            development_root: None,
-            managed_paths: None,
-            archive_root: None,
-            permanent_paths: None,
-            issue_scoped_areas: None,
-            citation_scan_roots: None,
-        };
         assert_eq!(
-            PolicyStatus::from_documentation(Some(&unauthored)),
+            PolicyStatus::from_documentation(Some(&DocumentationConfig::default())),
             PolicyStatus::Incomplete
         );
 
-        // Not vacuous: the fallbacks themselves are non-empty (derived from
-        // the real shipped declaration), yet still don't count as authored.
-        assert!(!unauthored.managed_paths().is_empty());
-        assert!(!unauthored.permanent_paths().is_empty());
+        // Not vacuous: a table authoring the keys outside the required three is
+        // still Incomplete, so the status follows which fields were authored
+        // rather than how much the table says.
+        let partly_authored = DocumentationConfig {
+            development_root: Some("dev".to_string()),
+            issue_scoped_areas: Some(vec!["dev/active".to_string()]),
+            citation_scan_roots: Some(vec!["dev".to_string()]),
+            ..DocumentationConfig::default()
+        };
+        assert_eq!(
+            PolicyStatus::from_documentation(Some(&partly_authored)),
+            PolicyStatus::Incomplete
+        );
+        assert!(!partly_authored.development_root().is_empty());
     }
 
     #[test]

@@ -31,7 +31,7 @@ const HIERARCHY: [&str; 3] = ["epic", "planning", "breakdown"];
 /// `container` anchor (REQ-13). A fresh apply wires the `depends_on` edge (B→P),
 /// the `anchor_edge` (C→B), and runs the `move-upstream-to-role` transform onto P.
 fn plan_template() -> GraphTemplate {
-    plan_template_document("{container.dir}/plan.md", Some("dev/active"))
+    plan_template_document("{container.dir}/plan.md", Some(DOCUMENT_AREA))
 }
 
 /// The same `plan`-shaped template with its planning node's document
@@ -108,6 +108,9 @@ fn type_of(issue: &jit::domain::Issue) -> Option<String> {
 }
 
 fn create_epic(h: &TestHarness, title: &str) -> String {
+    // The area a document declaration names is one the repository declares, so
+    // the fixture declares it before a template that names it is applied.
+    declare_document_area(h);
     // `repo-validate` is a CONFIG-DECLARED gate (it lives in `.jit/gates.toml`,
     // not the built-in preset set), so the in-memory registry must declare it for
     // the `plan` template's `container` anchor to resolve it as a registry gate
@@ -237,7 +240,7 @@ fn test_apply_resolves_node_doc_location() {
     // hand-composed `area/id` path.
     let directory = h
         .executor
-        .resolve_issue_artifact_directory(&epic, "dev/active")
+        .resolve_issue_artifact_directory(&epic, DOCUMENT_AREA)
         .unwrap()
         .directory;
     assert!(
@@ -385,6 +388,9 @@ fn test_apply_snapshots_container_dependencies_before_mutation() {
 #[test]
 fn test_apply_rejects_wrong_container_type_and_creates_nothing() {
     let h = TestHarness::new();
+    // The template's document area is declared, so the refusal under test is
+    // the container's type rather than an undeclared area reached first.
+    declare_document_area(&h);
     let template = plan_template();
     let (task, _) = h
         .executor

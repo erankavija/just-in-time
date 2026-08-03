@@ -681,7 +681,12 @@ fn test_validate_plain_and_json_report_installed_profile_drift() {
 #[test]
 fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
     let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
+    // A preview is derived over one package against the repository in front of
+    // it, so a delta package is previewed with its declared dependency already
+    // applied — the order the composed application uses.
+    assert!(jit(repo.path(), &["init", "--profile", "jit-default"])
+        .status
+        .success());
     let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
 
     let preview = jit(
@@ -694,7 +699,7 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
         events_before
     );
-    assert!(!repo.path().join(".jit/profiles").exists());
+    assert!(!repo.path().join(".jit/profiles/jit-dogfood.json").exists());
 
     let applied = jit(repo.path(), &["profile", "apply", "jit-dogfood", "--json"]);
     assert!(applied.status.success(), "{applied:?}");

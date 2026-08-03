@@ -603,9 +603,50 @@ mod tests {
         assert_repo_valid(repo.path());
     }
 
+    /// The `invariant` item kind, declared by the repository itself.
+    ///
+    /// A kind is a declaration like any other, so a repository that applies no
+    /// package obtains one by writing it. This is the smallest declaration that
+    /// makes `@/invariant/<id>` resolve against `.jit/invariants.toml`.
+    const INVARIANT_KIND: &str = "\n[item_kinds.invariant]\n\
+section = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\n\
+markers = []\n\
+link-namespaces = []\n\
+scope = \"project\"\n\
+source = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
+source-of-truth = \"registry-first\"\n";
+
+    /// The `rule` and `gate` item kinds, declared by the repository itself, for
+    /// a case whose package contributes projections naming them.
+    const RULE_AND_GATE_KINDS: &str = "\n[item_kinds.rule]\n\
+section = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\n\
+markers = []\n\
+link-namespaces = []\n\
+scope = \"project\"\n\
+source = { toml = \".jit/rules.toml\", table = \"rules\", id-field = \"name\", text-field = \"description\" }\n\
+source-of-truth = \"registry-first\"\n\
+\n[item_kinds.gate]\n\
+section = \"success_criteria\"\n\
+id-pattern = \"[a-z][a-z0-9-]*\"\n\
+markers = []\n\
+link-namespaces = []\n\
+scope = \"project\"\n\
+source = { toml = \".jit/gates.toml\", table = \"gates\", id-field = \"key\", text-field = \"description\" }\n\
+source-of-truth = \"registry-first\"\n";
+
+    /// Write `config_toml` as the repository's configuration before it is
+    /// initialized, which initialization preserves.
+    fn declare_before_init(repo: &Path, config_toml: &str) {
+        fs::create_dir_all(repo.join(".jit")).unwrap();
+        fs::write(repo.join(".jit/config.toml"), config_toml).unwrap();
+    }
+
     #[test]
     fn test_fresh_init_creates_the_invariant_registry_present_and_empty() {
         let repo = TempDir::new().unwrap();
+        declare_before_init(repo.path(), INVARIANT_KIND);
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
 
@@ -639,6 +680,7 @@ mod tests {
     #[test]
     fn test_fresh_init_registry_resolves_an_authored_invariant_without_a_package() {
         let repo = TempDir::new().unwrap();
+        declare_before_init(repo.path(), INVARIANT_KIND);
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let executor = executor_with_layout(&storage, repo.path());
         executor
@@ -1021,6 +1063,11 @@ mod tests {
              [projection.race]\nkind = \"race\"\nmode = \"separate-file\"\n\
              target = \"RACE.generated.md\"\nstyle = \"id-anchor\"\n",
         );
+        // The package's own projections name the kinds its dependency declares,
+        // and this case composes the package alone, so the repository declares
+        // those kinds itself.
+        config.push_str(INVARIANT_KIND);
+        config.push_str(RULE_AND_GATE_KINDS);
         fs::write(
             repo.path().join("RACE.md"),
             "## Race\n\n- **R-1** — recaptured\n",
@@ -1074,8 +1121,11 @@ description = \"Owning squad\"\n\
 unique = true\n";
 
         let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let taxonomy = crate::test_taxonomy::test_taxonomy();
+        // Re-initialization refreshes what the repository's own registry
+        // generates, so the repository declares that registry first.
+        declare_before_init(repo.path(), &taxonomy.config_fragment());
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         executor_with_layout(&storage, repo.path())
             .initialize_fresh_repository(repo.path(), None)
             .unwrap();

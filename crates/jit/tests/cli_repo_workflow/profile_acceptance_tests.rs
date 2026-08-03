@@ -243,16 +243,14 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     );
 
     success_json(&existing.path, &["init", "--json"]);
+    // A preview is derived over one package, so the self-contained one is what
+    // a repository declaring nothing can be shown. It writes nothing.
     let preview = success_json(
         &existing.path,
-        &["profile", "apply", "jit-dogfood", "--dry-run", "--json"],
+        &["profile", "apply", "jit-default", "--dry-run", "--json"],
     );
     assert_eq!(preview["status"], "would_apply");
     assert!(!existing.path.join(".jit/profiles").exists());
-    assert_eq!(
-        target(&preview, "contrib/gates/ai-review.sh")["executable"],
-        true
-    );
 
     let applied = success_json(
         &existing.path,
