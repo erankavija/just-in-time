@@ -9,7 +9,7 @@ use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
     MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
     ProfileTargetDisposition, RepositoryEntry, RepositoryImage, RepositoryLayout,
-    RepositoryRootClass, RootRelativePath, VirtualPath,
+    RepositoryRootClass, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -572,7 +572,7 @@ impl CommandExecutor<JsonFileStorage> {
                     ProfileTargetDisposition::Create => ProfileTargetAction::Create,
                     ProfileTargetDisposition::Update => ProfileTargetAction::Update,
                 };
-                ProfileTargetChange::new(repo_string(&target.path), action, target.mode)
+                ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
             })
             .collect();
         Ok(Some((plan, changes)))
@@ -733,7 +733,7 @@ pub(super) fn recorded_package(
             ProfilePackage::from_directory(&layout.worktree_root().join(location.as_path()))
                 .map_err(|source| {
                     ProfileResolutionError::UnresolvableRecordedLocation {
-                        record: repo_string(record_path),
+                        record: record_path.repository_relative(),
                         location: location.as_path().display().to_string(),
                         source,
                     }
@@ -742,7 +742,7 @@ pub(super) fn recorded_package(
         }
         ProfileOrigin::Embedded => embedded_profile(&record.id).map_err(|_| {
             ProfileResolutionError::UnresolvableRecordedEmbedding {
-                record: repo_string(record_path),
+                record: record_path.repository_relative(),
                 id: record.id.clone(),
             }
             .into()
@@ -850,18 +850,6 @@ fn embedded_profile(id: &str) -> Result<ProfilePackage> {
         .ok_or_else(|| crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into())
 }
 
-/// Repo-relative spelling of a canonical virtual path (`.jit/...` for Data).
-pub(super) fn repo_string(path: &VirtualPath) -> String {
-    let rel = match path.relative() {
-        RootRelativePath::Root => String::new(),
-        RootRelativePath::Descendant(text) => text.to_string(),
-    };
-    match path.root_class() {
-        RepositoryRootClass::Data => format!(".jit/{rel}"),
-        RepositoryRootClass::Worktree => rel,
-    }
-}
-
 /// Read the captured installed record, or `None` when absent.
 fn read_applied_record(
     base: &RepositoryImage,
@@ -875,14 +863,14 @@ fn read_applied_record(
                 .map(Some)
                 .map_err(|_| {
                     ProfileApplyError::InstalledRecordConflict {
-                        path: repo_string(record_path),
+                        path: record_path.repository_relative(),
                         id: id.to_string(),
                     }
                     .into()
                 })
         }
         _ => Err(ProfileApplyError::UnsupportedMetadataPath {
-            path: repo_string(record_path),
+            path: record_path.repository_relative(),
         }
         .into()),
     }
@@ -913,7 +901,10 @@ mod tests {
     use super::*;
     use crate::domain::Event;
     use crate::hierarchy_templates::HierarchyTemplate;
-    use crate::repository_state::{Contribution, MapEntryTarget, RootRelativePath};
+    use crate::repository_state::{
+        Contribution, InitializationError, MapEntryTarget, ProducerError, ProfileConflictOccupant,
+        ProfilePackageId, ProfileTargetConflictError, RepositoryStateError, RootRelativePath,
+    };
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
@@ -1103,6 +1094,105 @@ mod tests {
             &fs::read(temp.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
         )
         .unwrap()
+    }
+
+    /// The fixture package tree written at `relative`, rewritten to declare
+    /// `id`, to publish `content` at asset target `target`, and to carry
+    /// `contributions` verbatim, and read back from there.
+    ///
+    /// Every package this repository ships or embeds publishes targets of its
+    /// own, so two packages claiming one target — which is what a conflict
+    /// between packages is — are authored from the same fixture tree the other
+    /// scenarios read (`@/invariant/shared-test-contracts`).
+    fn authored_package(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        target: &str,
+        content: &str,
+        contributions: &str,
+    ) -> ProfilePackage {
+        let tree = crate::test_utils::write_package_tree(&PACKAGE, &temp.path().join(relative));
+        let manifest_path = tree.join(crate::profile::MANIFEST_FILE_NAME);
+        let authored = fs::read_to_string(&manifest_path).expect("read the package manifest");
+        let source = ProfilePackage::parse_manifest(authored.as_bytes())
+            .expect("the source package manifest parses");
+        let asset = source
+            .assets
+            .first()
+            .expect("the fixture package declares an asset");
+        fs::write(tree.join(&asset.source), content).expect("write the package asset content");
+        let rewritten = authored
+            .replace(
+                &format!("id = \"{}\"", source.profile.id),
+                &format!("id = \"{id}\""),
+            )
+            .replace(
+                &format!("target = \"{}\"", asset.target),
+                &format!("target = \"{target}\""),
+            );
+        fs::write(&manifest_path, format!("{rewritten}{contributions}"))
+            .expect("write the rewritten package manifest");
+        ProfilePackage::from_directory(&tree).expect("a valid package tree")
+    }
+
+    /// A package declaring `id` and publishing `content` at asset target
+    /// `target`.
+    fn package_publishing(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        target: &str,
+        content: &str,
+    ) -> ProfilePackage {
+        authored_package(temp, relative, id, target, content, "")
+    }
+
+    /// A package declaring `id`, publishing an asset target of its own, and
+    /// contributing the label namespace `namespace` described as `description`.
+    fn package_contributing(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        namespace: &str,
+        description: &str,
+    ) -> ProfilePackage {
+        authored_package(
+            temp,
+            relative,
+            id,
+            &format!("docs/{id}.txt"),
+            id,
+            &namespace_contribution(namespace, description),
+        )
+    }
+
+    /// A manifest fragment declaring the label namespace `namespace` as
+    /// `description`.
+    fn namespace_contribution(namespace: &str, description: &str) -> String {
+        format!(
+            "\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\n\
+             identity = \"{namespace}\"\n\
+             value = {{ description = \"{description}\", unique = false }}\n"
+        )
+    }
+
+    /// The asset-target conflict `error` reports, whichever variant carries it.
+    ///
+    /// Composition raises one conflict value; the profile-application producer
+    /// re-wraps it under initialization on its way out. A test asserting what a
+    /// conflict reports reads that value rather than the variant that carried
+    /// it (`@/invariant/semantic-test-assertions`).
+    fn target_conflict(error: &anyhow::Error) -> &ProfileTargetConflictError {
+        match error.downcast_ref::<RepositoryStateError>() {
+            Some(
+                RepositoryStateError::ProfileTargetConflict(conflict)
+                | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
+                    conflict,
+                )),
+            ) => conflict,
+            _ => panic!("a colliding asset target fails as a target conflict: {error:#}"),
+        }
     }
 
     /// Store `record` as this repository's applied-profile record for its id.
@@ -2059,7 +2149,7 @@ mod tests {
             .delta()
             .actions()
             .iter()
-            .map(|action| repo_string(action.path()))
+            .map(|action| action.path().repository_relative())
             .collect::<Vec<_>>();
 
         assert!(paths.iter().any(|path| path == "docs/profile.txt"));
@@ -2271,6 +2361,153 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn test_apply_profile_package_names_both_packages_of_a_conflicting_asset_target() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let target = "docs/shared.txt";
+        let occupant = package_publishing(&temp, "vendor/base", "base", target, "first\n");
+        let candidate =
+            package_publishing(&temp, "vendor/workflow", "workflow", target, "second\n");
+        executor.apply_profile_package(&occupant).unwrap();
+
+        let error = executor.apply_profile_package(&candidate).unwrap_err();
+
+        let conflict = target_conflict(&error);
+        assert_eq!(
+            conflict.occupant,
+            ProfileConflictOccupant::Package(ProfilePackageId::new(
+                occupant.manifest().profile.id.to_string()
+            ))
+        );
+        assert_eq!(
+            conflict.candidate,
+            ProfilePackageId::new(candidate.manifest().profile.id.to_string())
+        );
+        assert_eq!(conflict.path.repository_relative(), target);
+        // The occupant's bytes stand: a conflict applies nothing.
+        assert_eq!(
+            fs::read_to_string(temp.path().join(target)).unwrap(),
+            "first\n"
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_names_both_packages_of_a_conflicting_contribution() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let namespace = "shared-namespace";
+        let occupant = package_contributing(
+            &temp,
+            "vendor/base",
+            "base",
+            namespace,
+            "What the occupant means by it.",
+        );
+        let candidate = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            namespace,
+            "Another meaning entirely.",
+        );
+        executor.apply_profile_package(&occupant).unwrap();
+
+        let error = executor.apply_profile_package(&candidate).unwrap_err();
+
+        let Some(RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
+            identity,
+            candidate: conflicting,
+            occupant: held_by,
+            ..
+        })) = error.downcast_ref::<RepositoryStateError>()
+        else {
+            panic!("a colliding contribution fails as a contribution conflict: {error:#}");
+        };
+        assert_eq!(identity, namespace);
+        assert_eq!(
+            *held_by,
+            ProfileConflictOccupant::Package(ProfilePackageId::new(
+                occupant.manifest().profile.id.to_string()
+            ))
+        );
+        assert_eq!(
+            *conflicting,
+            ProfilePackageId::new(candidate.manifest().profile.id.to_string())
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_reports_the_repository_as_the_occupant_it_authored() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let target = "docs/shared.txt";
+        // A package is applied first, so what distinguishes the answer is which
+        // targets a record claims rather than whether any record exists.
+        let applied = package_publishing(
+            &temp,
+            "vendor/applied",
+            "applied",
+            "docs/applied.txt",
+            "applied\n",
+        );
+        executor.apply_profile_package(&applied).unwrap();
+        let authored = temp.path().join(target);
+        fs::create_dir_all(authored.parent().unwrap()).unwrap();
+        fs::write(&authored, "authored here\n").unwrap();
+        let candidate = package_publishing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            target,
+            "package bytes\n",
+        );
+
+        let error = executor.apply_profile_package(&candidate).unwrap_err();
+
+        let conflict = target_conflict(&error);
+        assert_eq!(conflict.occupant, ProfileConflictOccupant::Repository);
+        assert_eq!(conflict.path.repository_relative(), target);
+        assert_eq!(fs::read_to_string(&authored).unwrap(), "authored here\n");
+    }
+
+    #[test]
+    fn test_apply_profile_package_merges_an_identical_restatement_of_an_applied_target() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let target = "docs/shared.txt";
+        let namespace = "shared-namespace";
+        let contribution = namespace_contribution(namespace, "One meaning.");
+        let stated = authored_package(
+            &temp,
+            "vendor/stated",
+            "stated",
+            target,
+            "identical\n",
+            &contribution,
+        );
+        let restated = authored_package(
+            &temp,
+            "vendor/restated",
+            "restated",
+            target,
+            "identical\n",
+            &contribution,
+        );
+        executor.apply_profile_package(&stated).unwrap();
+
+        let applied = executor.apply_profile_package(&restated).unwrap();
+
+        // A restatement of what is already there is not a conflict: neither
+        // package overrides the other, and both records stand.
+        assert_eq!(
+            applied.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
+        assert_eq!(
+            fs::read_to_string(temp.path().join(target)).unwrap(),
+            "identical\n"
+        );
+        assert_eq!(record_for(&temp, "stated").id, "stated");
+        assert_eq!(record_for(&temp, "restated").id, "restated");
     }
 
     #[test]
