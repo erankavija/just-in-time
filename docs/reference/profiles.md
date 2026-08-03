@@ -129,9 +129,10 @@ tools.
 
 The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
-run `jit profile show jit-dogfood --json` for the exact version, dependencies,
-contributions, assets, managed regions, hashes, and executable declarations the
-resolved package carries. It also declares the repository roots from which
+run `jit profile show jit-dogfood --from packages/jit-dogfood --json` for the
+exact version, dependencies, contributions, assets, managed regions, hashes, and
+executable declarations the resolved package carries. Once the repository has
+applied it, its own record names the location and `--from` can be dropped. It also declares the repository roots from which
 packaged live assets are drawn, so any repository file under a declared root
 that is neither claimed by a packaged asset nor matched by a declared exclusion
 is caught rather than silently left out of the package.
