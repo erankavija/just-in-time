@@ -546,11 +546,12 @@ vocabulary. Read a package directory's `manifest.toml` to see which taxonomy it
 declares before choosing one.
 
 `--profile <profile-id>` applies a profile package as part of
-initialization. `jit init --profile jit-dogfood` is the preferred setup for
-JIT's portable workflow; plain init remains methodology-neutral. `--from <PATH>`
-names the repository directory holding that profile package and requires
-`--profile`. On a first application from a repository package, supply this
-location because a fresh repository has no applied-profile record to read. The
+initialization. `jit init --profile jit-dogfood --from packages/jit-dogfood` is
+the preferred setup for JIT's portable workflow; plain init remains
+methodology-neutral. `--from <PATH>` names the repository directory holding that
+profile package and requires `--profile`. On a first application from a
+repository package, supply this location because a fresh repository has no
+applied-profile record to read. The
 resolution order and recorded-location failure behavior are defined below. For a
 fresh repository, the neutral scaffold and profile projection are planned,
 validated, and published together. If the data root is absent, JIT stages the complete root
