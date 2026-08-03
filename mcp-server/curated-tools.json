@@ -52,9 +52,9 @@
     "jit_item_search": "Finds an addressable item by text when the self-id is unknown.",
     "jit_label_namespaces": "Lists declared label namespaces, which an agent needs to write a label accepted by the repository's configuration.",
     "jit_label_values": "Lists values in use in a namespace, so an agent reuses the project vocabulary.",
-    "jit_profile_list": "Lists the offline workflow packages the connected repository's own records name.",
-    "jit_profile_show": "Inspects a profile manifest and package identity before an agent applies it.",
-    "jit_profile_apply": "Dry-runs or recoverably applies a workflow package to the current repository.",
+    "jit_profile_list": "Lists the offline workflow packages and repository locations named by the connected repository's own records.",
+    "jit_profile_show": "Inspects a profile manifest and package identity read from a repository package location before an agent applies it.",
+    "jit_profile_apply": "Dry-runs or recoverably applies a workflow package read from a repository location to the current repository.",
     "jit_search": "Text search across issues and documents in one call.",
     "jit_apply": "Instantiates a graph template into a container, the plan-before-fan-out scaffold.",
     "jit_validate": "Repository integrity check; an agent runs it before handing work back."

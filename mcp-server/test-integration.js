@@ -52,6 +52,12 @@ function presentsConfiguredKindVocabulary(text) {
   return mentionedKinds.size >= 2 && itemKindEnumeration.test(text);
 }
 
+function describesRepositoryPackageLocation(text) {
+  return /\bpackages?\b/i.test(text) &&
+    /\brepositor(?:y|ies)\b/i.test(text) &&
+    /\b(?:locations?|directories|paths?)\b/i.test(text);
+}
+
 // The checked-in profile-package fixture the profile tools are exercised over.
 // A package is applied from inside the worktree it is applied to, so each case
 // stages a copy of this tree in its own test repository.
@@ -364,6 +370,23 @@ async function main() {
         tools.find(tool => tool.name === 'jit_profile_list').inputSchema.required,
         []
       );
+    });
+
+    await runTest('profile descriptions describe repository package locations without embedded binary claims', async () => {
+      const resp = await tester.request('tools/list');
+      const profileTools = resp.result.tools.filter(tool => tool.name.startsWith('jit_profile_'));
+      assert.ok(profileTools.length > 0, 'profile tools should be curated');
+      for (const tool of profileTools) {
+        assert.doesNotMatch(
+          tool.description,
+          /\b(?:embedded|compiled[- ]in|built[- ]in)\b|\bbinary\b/i,
+          `${tool.name} must not present a package as embedded in the binary`
+        );
+        assert.ok(
+          describesRepositoryPackageLocation(tool.description),
+          `${tool.name} should describe repository package locations`
+        );
+      }
     });
 
     // -- Error handling ------------------------------------------------------
