@@ -4,7 +4,8 @@
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
     "7d038e97-87e8-4d02-9101-6ffef1e8bdc0",
-    "9943c488-9689-4b58-a1a3-e0571db52cf3"
+    "9943c488-9689-4b58-a1a3-e0571db52cf3",
+    "ff1bbada-b22a-432a-a75a-8506743e90f9"
   ],
   "description": "The sixty packaged files that duplicate repository files exist once, at their working paths, and the assembly is their only producer.\n\n## Background\n\nEach of those files is carried twice: once where this repository consumes it, and once inside the package directory. A test holds the two equal, so drift fails rather than ships, but both copies are hand-maintained and keeping them equal is a step every contributor has to remember. The assembly that precedes this work produces the packaged side from the working side, and its output has already been compared against the checked-in copies file for file, so the second copy has no remaining reason to exist.\n\nRetiring it retires the equality assertion with it, because there is no longer a second copy to compare. Two things must not be lost with it. The executable-mode contract was asserted inside that same comparison loop; it now has a guard of its own, which stays and keeps holding each declared asset's mode against its repository file. And the correspondence between the manifest and the tree stays with the package model, which rejects a declared source that is absent and a package file no declaration claims — so an assembled package still proves it carries exactly what it declares.\n\nWhat remains checked in is the package's own material: the manifest, the install-only assets, and the managed-region source. Nothing beneath the live-source prefix remains, so that prefix becomes a package-internal namespace the assembly fills rather than a directory anyone edits.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository carries no file beneath the package's live-source prefix; every such package-relative path exists only inside an assembled package.\n- [hard] REQ-02: The assertion comparing a packaged copy against its repository counterpart is gone, along with the copies it compared.\n- [hard] REQ-03: The executable-mode guard still holds each declared live asset's mode against its repository file.\n- [hard] REQ-04: An assembled package validates as a package: every declared source resolves and no produced file is undeclared.\n- [hard] REQ-05: The checked-in package directory holds the manifest, the install-only assets, and the managed-region source, and nothing drawn from a repository counterpart.\n\n## Notes\n\nApplying the profile from this repository's checkout now means assembling it first. Nothing in this repository applies its own profile, so that costs nothing here; what an adopter receives is the assembled tree, not this directory.\n",
   "documents": [],
@@ -25,7 +26,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Retire the checked-in copies of the packaged live assets",
-  "updated_at": "2026-08-02T20:35:12.662408130Z"
+  "updated_at": "2026-08-03T05:36:56.852899886Z"
 }
