@@ -601,10 +601,9 @@ pub enum Assertion {
         /// `gates_required`".
         gates: Vec<String>,
     },
-    /// A built-in type-hierarchy warning (orphan-leaf or strategic-consistency).
+    /// A type-hierarchy warning (orphan-leaf or strategic-consistency).
     /// Graph scope. Authorable in `rules.toml` via the `type-hierarchy` assert
-    /// kind, and also constructed programmatically as a built-in default rule
-    /// (see [`default_ruleset`](crate::repository_state::default_ruleset)).
+    /// kind; the workflow profile contributes the standard instances.
     /// Evaluation reuses the existing [`crate::domain::type_taxonomy`] domain functions
     /// rather than reimplementing the hierarchy logic; the repo's
     /// [`HierarchyConfig`] is NOT stored in the parsed rule — it is injected by

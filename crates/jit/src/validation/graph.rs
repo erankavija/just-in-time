@@ -1552,15 +1552,15 @@ fn describe_missing(id: &str, gate_prefix: Option<&str>, check_namespace: Option
 // type-hierarchy (orphan-leaf / strategic-consistency)
 // ---------------------------------------------------------------------------
 
-/// Evaluate a built-in `type-hierarchy` rule (orphan-leaf or
+/// Evaluate a declarative `type-hierarchy` rule (orphan-leaf or
 /// strategic-consistency) by REUSING the existing
 /// [`crate::domain::type_taxonomy`] domain functions over each issue, converting their
 /// [`ValidationWarning`]s into [`GraphFinding`]s attributed to the issue.
 ///
 /// This carries no hierarchy logic of its own: `OrphanLeaf` delegates to
 /// [`validate_orphans`] and `StrategicConsistency` to [`validate_strategic_labels`],
-/// preserving the exact legacy warnings (which were warn-only). Each warning maps
-/// to one finding with the rule's severity (Warn for the built-in defaults).
+/// preserving the exact warnings (which are warn-only in the workflow profile).
+/// Each warning maps to one finding with the rule's severity.
 fn evaluate_type_hierarchy(
     rule: &Rule,
     kind: TypeHierarchyKind,

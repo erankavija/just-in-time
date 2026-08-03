@@ -1,25 +1,43 @@
 //! Integration tests for CLI warning display.
 //!
-//! The orphan-leaf / strategic-consistency warnings are now produced by the
-//! built-in GRAPH rules (`orphan-leaf` / `strategic-consistency`, origin =
-//! "default") rather than the former hard-coded `check_warnings` path. These
-//! tests exercise that the same create-time warnings still surface, now through
-//! the rule engine.
+//! The orphan-leaf / strategic-consistency warnings are produced by the
+//! workflow profile's GRAPH rules rather than a hard-coded `check_warnings`
+//! path. These tests apply that profile and exercise the create-time warnings
+//! through the rule engine.
 
 use jit::commands::CommandExecutor;
 use jit::storage::{IssueStore, JsonFileStorage};
-use jit::test_taxonomy::TestTaxonomy;
+use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use jit::validation::graph::GraphFinding;
 use tempfile::TempDir;
 
 fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, TestTaxonomy) {
-    let (temp_dir, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy().unwrap();
+    let (temp_dir, storage) = jit::test_utils::setup_test_repo().unwrap();
+    let mut taxonomy = test_taxonomy();
+    taxonomy.hierarchy = [
+        ("milestone".to_string(), 1),
+        ("epic".to_string(), 2),
+        ("story".to_string(), 3),
+        ("task".to_string(), 4),
+    ]
+    .into_iter()
+    .collect();
+    taxonomy.strategic_types = ["milestone", "epic"]
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    taxonomy.label_associations = [
+        ("milestone".to_string(), "milestone".to_string()),
+        ("epic".to_string(), "epic".to_string()),
+        ("story".to_string(), "story".to_string()),
+    ]
+    .into_iter()
+    .collect();
+    taxonomy.default_type = "task".to_string();
     let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
-    (
-        temp_dir,
-        CommandExecutor::new(storage).with_layout(layout),
-        taxonomy,
-    )
+    let executor = CommandExecutor::new(storage).with_layout(layout);
+    executor.apply_profile("jit-dogfood", None).unwrap();
+    (temp_dir, executor, taxonomy)
 }
 
 fn type_label(taxonomy: &TestTaxonomy, level: u8) -> String {

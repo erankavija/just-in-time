@@ -555,8 +555,8 @@ mod tests {
 
     #[test]
     fn test_round_trip_full_default_ruleset() {
-        // A registry exercising every default rule kind (json-schema, shorthand,
-        // graph) the fixed default emits.
+        // A registry exercising every remaining default rule kind (json-schema
+        // and shorthand) the fixed default emits.
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
@@ -567,7 +567,7 @@ mod tests {
         ])
         .declaring_test_hierarchy();
         let set = default_ruleset(&reg);
-        // Sanity: the set covers json-schema, shorthand, and graph kinds.
+        // Sanity: the set covers json-schema and shorthand kinds.
         assert!(set
             .rules
             .iter()
@@ -576,10 +576,6 @@ mod tests {
             .rules
             .iter()
             .any(|r| matches!(r.assert, Assertion::RequireLabel { .. })));
-        assert!(set
-            .rules
-            .iter()
-            .any(|r| matches!(r.assert, Assertion::TypeHierarchy { .. })));
         assert_round_trips(&set);
     }
 

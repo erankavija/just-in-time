@@ -2488,13 +2488,12 @@ fn run() -> Result<()> {
                             println!("Created issue: {}", id);
                         }
 
-                        // Surface the built-in type-hierarchy warnings
+                        // Surface workflow type-hierarchy warnings
                         // (orphan-leaf / strategic-consistency) for the new issue
-                        // unless --force or --quiet. These are now GRAPH rule
-                        // findings (`orphan-leaf` / `strategic-consistency`,
-                        // origin = "default") produced by the rule engine, not a
-                        // hard-coded check. `--orphan` suppresses the orphan-leaf
-                        // hint (acknowledged intentional orphan).
+                        // unless --force or --quiet. These are GRAPH rule
+                        // findings produced by the rule engine, not a hard-coded
+                        // check. `--orphan` suppresses the orphan-leaf hint
+                        // (acknowledged intentional orphan).
                         if !force && !quiet {
                             let issues = storage.list_issues()?;
                             let graph_findings = executor.evaluate_graph_rules(&issues)?;

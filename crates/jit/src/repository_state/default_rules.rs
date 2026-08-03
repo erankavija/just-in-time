@@ -34,12 +34,6 @@
 //! 4. `namespace-unique-<ns>` — `severity = error`, `enforce = true`, per
 //!    UNIQUE namespace (sorted). At most one label per unique namespace; blocks
 //!    the write and fails `jit validate`.
-//! 5. `orphan-leaf` + `strategic-consistency` — `severity = warn`,
-//!    `enforce = false`, when the declared type hierarchy is NON-EMPTY. Built-in
-//!    [`RuleScope::Graph`] rules whose evaluation REUSES the existing
-//!    [`type_taxonomy::validate_orphans`](crate::domain::type_taxonomy::validate_orphans)
-//!    / [`validate_strategic_labels`](crate::domain::type_taxonomy::validate_strategic_labels)
-//!    domain functions.
 //!
 //! Every member is therefore derived from a declaration: a repository whose
 //! `config.toml` declares neither `[namespaces]` nor `[type_hierarchy]` receives
@@ -50,8 +44,7 @@
 //! rules. A repo wanting those authors them directly in `rules.toml`.
 
 use crate::declarations::rules::{
-    Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, TypeHierarchyKind,
-    DEFAULT_ORIGIN,
+    Assertion, Rule, RuleScope, RuleSet, SchemaSource, Selector, Severity, DEFAULT_ORIGIN,
 };
 use crate::domain::type_taxonomy::HierarchyConfig;
 use crate::domain::LabelNamespaces;
@@ -194,40 +187,6 @@ pub fn default_ruleset(namespaces: &LabelNamespaces) -> RuleSet {
                 },
             ));
         }
-    }
-
-    // (5) Type-hierarchy GRAPH warnings: orphan-leaf + strategic-consistency.
-    // Built-in GRAPH rules whose evaluation REUSES the existing
-    // `type_taxonomy::validate_orphans` / `validate_strategic_labels` domain
-    // functions (see `validation::graph`). Each is `severity = warn` /
-    // `enforce = false`, and both are emitted for a NON-EMPTY declared hierarchy:
-    // each reads the levels and membership associations `[type_hierarchy]`
-    // declares, so a repository declaring none has nothing for them to evaluate.
-    // The repo `HierarchyConfig` is injected by the graph evaluator at evaluation
-    // time.
-    if declares_hierarchy {
-        rules.push(graph_rule(
-            "orphan-leaf",
-            "Warn when a leaf-level-typed issue (a type at the deepest hierarchy \
-             level, e.g. task) carries no parent-membership label (e.g. `epic:*`), \
-             leaving it unattached to any strategic container. Advisory: never \
-             blocks a write.",
-            Severity::Warn,
-            Assertion::TypeHierarchy {
-                kind: TypeHierarchyKind::OrphanLeaf,
-            },
-        ));
-        rules.push(graph_rule(
-            "strategic-consistency",
-            "Warn when a strategic-typed issue (a type with a membership namespace, \
-             e.g. epic/milestone) lacks its own identifying membership label, such \
-             as a `type:epic` issue that has no `epic:*` label. Advisory: never \
-             blocks a write.",
-            Severity::Warn,
-            Assertion::TypeHierarchy {
-                kind: TypeHierarchyKind::StrategicConsistency,
-            },
-        ));
     }
 
     RuleSet { rules }
@@ -593,27 +552,6 @@ fn local_rule(
     }
 }
 
-/// Construct a built-in graph-scope rule (warn-only, never blocking). Used for
-/// the type-hierarchy defaults, whose assertions are [`RuleScope::Graph`].
-fn graph_rule(name: &str, description: &str, severity: Severity, assert: Assertion) -> Rule {
-    let scope = assert.scope();
-    debug_assert_eq!(
-        scope,
-        RuleScope::Graph,
-        "graph default rules are graph-scope"
-    );
-    Rule {
-        name: name.to_string(),
-        origin: Some(DEFAULT_ORIGIN.to_string()),
-        description: Some(description.to_string()),
-        when: Selector::default(),
-        severity,
-        enforce: false,
-        assert,
-        scope,
-    }
-}
-
 /// Construct a local-scope rule carrying a raw JSON Schema (inline, no file).
 fn json_schema_rule(
     name: &str,
@@ -806,8 +744,6 @@ mod tests {
                 // namespace-unique only for the UNIQUE namespaces, sorted.
                 ("namespace-unique-team", Severity::Error, true),
                 ("namespace-unique-type", Severity::Error, true),
-                ("orphan-leaf", Severity::Warn, false),
-                ("strategic-consistency", Severity::Warn, false),
             ]
         );
         // Every emitted rule carries the FIXED default's origin marker.
@@ -1204,18 +1140,18 @@ mod tests {
     }
 
     #[test]
-    fn test_all_rules_carry_default_origin_and_are_unique() {
+    fn test_default_ruleset_excludes_workflow_graph_rules() {
         let reg = registry(vec![
             ("type", LabelNamespace::new("Type", true)),
             ("team", LabelNamespace::new("Team", true)),
-        ]);
+        ])
+        .declaring_test_hierarchy();
         let rules = default_ruleset(&reg);
-        // The only graph rules are the two type-hierarchy warnings.
         assert!(rules
             .rules
             .iter()
-            .filter(|r| r.scope == RuleScope::Graph)
-            .all(|r| r.name == "orphan-leaf" || r.name == "strategic-consistency"));
+            .all(|r| { r.name != "orphan-leaf" && r.name != "strategic-consistency" }));
+        assert!(rules.rules.iter().all(|r| r.scope != RuleScope::Graph));
         assert!(rules
             .rules
             .iter()

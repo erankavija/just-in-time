@@ -1278,6 +1278,50 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_workflow_profile_to_bare_repository_contributes_hierarchy_rules() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let config_path = temp.path().join(".jit/config.toml");
+        let scaffolded = fs::read_to_string(&config_path).unwrap();
+        let mut bare = scaffolded.parse::<toml_edit::DocumentMut>().unwrap();
+        bare.as_table_mut()
+            .retain(|key, _| matches!(key, "version" | "project"));
+        fs::write(&config_path, bare.to_string()).unwrap();
+        let rules_path = temp.path().join(".jit/rules.toml");
+        let mut rules = fs::read_to_string(&rules_path)
+            .unwrap()
+            .parse::<toml_edit::DocumentMut>()
+            .unwrap();
+        rules["rules"]
+            .as_array_of_tables_mut()
+            .unwrap()
+            .retain(|rule| {
+                !matches!(
+                    rule["name"].as_str(),
+                    Some("orphan-leaf" | "strategic-consistency")
+                )
+            });
+        fs::write(&rules_path, rules.to_string()).unwrap();
+
+        executor
+            .apply_profile("jit-dogfood", None)
+            .unwrap_or_else(|error| panic!("{error:#}"));
+
+        let rules: toml::Value =
+            toml::from_str(&fs::read_to_string(temp.path().join(".jit/rules.toml")).unwrap())
+                .unwrap();
+        let rules = rules["rules"].as_array().unwrap();
+        for expected in ["orphan-leaf", "strategic-consistency"] {
+            assert!(
+                rules.iter().any(|rule| {
+                    rule["name"].as_str() == Some(expected)
+                        && rule["origin"].as_str() == Some("jit-dogfood")
+                }),
+                "workflow profile did not contribute {expected}: {rules:?}"
+            );
+        }
+    }
+
+    #[test]
     fn test_resolve_profile_package_reports_a_recorded_location_that_no_longer_resolves() {
         let (temp, _storage, executor, _embedded) = fixture();
         let applied = package_read_from(&temp, "vendor/recorded");
