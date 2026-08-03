@@ -397,7 +397,7 @@
         {
           "short_id": "daddfc0b",
           "worker": "Opus",
-          "status": "merged at 30b7d75e; cargo-ci and docs-mechanical passed; code-review and doc-review failed on one class (prose and generated help still describing the old bare-init behaviour). Rework dispatched with the full swept site list.",
+          "status": "done — merged at 30b7d75e, documentation sweep at 2789d281, one lead fix at d310175f; all four gates passed",
           "title": "Remove the configuration template the binary writes"
         },
         {
