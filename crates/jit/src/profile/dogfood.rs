@@ -541,8 +541,8 @@ mod tests {
     /// Every tracked repository file beneath a declared live-source root is
     /// either packaged as a live asset or covered by a declared exclusion.
     ///
-    /// This is the direction the drift assertion does not walk: that one reads
-    /// each declared asset's repository file, so a live consumer added under a
+    /// This is the direction the asset declarations do not walk: each declared
+    /// asset names its repository file, so a live consumer added under a
     /// packaged root and declared nowhere is absent from every adopter install
     /// with nothing reporting it.
     #[test]
@@ -813,6 +813,29 @@ mod tests {
     }
 
     #[test]
+    fn test_checked_in_package_has_no_live_source_files() {
+        let package_sources = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../profiles/jit-dogfood")
+            .join(JIT_DOGFOOD_LIVE_SOURCE_PREFIX);
+        fn contains_file(path: &Path) -> bool {
+            let entries = match fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return false,
+                Err(error) => panic!("failed to inspect package sources beneath {path:?}: {error}"),
+            };
+            entries.flatten().any(|entry| {
+                let path = entry.path();
+                path.is_file() || (path.is_dir() && contains_file(&path))
+            })
+        }
+        assert!(
+            !contains_file(&package_sources),
+            "checked-in package sources must not contain live asset files: {}",
+            package_sources.display()
+        );
+    }
+
+    #[test]
     fn test_all_package_gate_values_deserialize_as_runtime_gates() {
         let (_workspace, package) = assembled_package();
         for key in [
@@ -841,44 +864,12 @@ mod tests {
     }
 
     #[test]
-    fn test_live_assets_match_every_declared_source_tree_consumer() {
+    fn test_managed_regions_match_every_declared_source_tree_consumer() {
         use crate::repository_state::{
             render_managed_document, ManagedDocumentClaim, RegionPlacement,
         };
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let (_workspace, package) = assembled_package();
-
-        // Every live asset is an exact copy of the repo file it consumes, mode included.
-        for asset in package
-            .manifest()
-            .assets
-            .iter()
-            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
-        {
-            let live = fs::read(root.join(&asset.target))
-                .unwrap_or_else(|error| panic!("failed to read {}: {error}", asset.target));
-            assert_eq!(
-                live,
-                package.source_bytes(&asset.source).unwrap(),
-                "{} drifted from the package",
-                asset.target
-            );
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let executable = fs::metadata(root.join(&asset.target))
-                    .unwrap()
-                    .permissions()
-                    .mode()
-                    & 0o111
-                    != 0;
-                assert_eq!(
-                    executable, asset.executable,
-                    "{} has the wrong executable mode",
-                    asset.target
-                );
-            }
-        }
 
         // Each managed region's packaged source matches the live region body, modulo
         // any nested managed sub-region the repo fills (the invariants projection)

@@ -133,8 +133,7 @@ fn repository_checkout() -> PathBuf {
 /// manifest and the sources the package authors itself come from the checked-in
 /// package directory named after `id` under [`PROFILE_PACKAGE_SOURCES`]; every
 /// live asset's bytes come from the repository file its declaration targets. A
-/// caller therefore reads what the checkout holds, rather than a second copy of
-/// it.
+/// caller therefore reads the checkout's current repository files.
 ///
 /// `destination` belongs to the caller. That is what lets a test which applies
 /// the package name a directory inside the repository it applies it to: an
@@ -145,9 +144,9 @@ fn repository_checkout() -> PathBuf {
 /// Each call assembles afresh and takes `destination` over whole, so calling
 /// twice at one destination answers with the checkout's state at each call.
 /// Nothing is cached between calls: a cached tree would answer from the state
-/// at the first call, and this repository's drift and executable-mode contracts
-/// assert about the checkout at the moment they read it, so a stale answer
-/// would report an agreement that no longer holds.
+/// at the first call, and this repository's managed-region and executable-mode
+/// contracts assert about the checkout at the moment they read it, so a stale
+/// answer would report an agreement that no longer holds.
 ///
 /// # Errors
 ///
