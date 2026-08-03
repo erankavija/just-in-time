@@ -11,7 +11,7 @@ Tutorials are designed to help you learn JIT through hands-on practice. Each tut
 **Time:** 10 minutes  
 **Prerequisites:** JIT installed  
 **What you'll learn:**
-- Initialize a JIT tracker with the embedded workflow profile
+- Initialize a JIT tracker with the workflow profile package
 - Create and manage issues
 - Build dependency graphs
 - Add quality gates

@@ -9,7 +9,9 @@ canonical, profile-managed content standard lives at
 The `jit-dogfood` workflow package carries that asset for its workflow skills
 and review prompts. Ordinary `jit init` does not install it;
 `jit init --profile jit-dogfood` and
-`jit profile apply jit-dogfood` do. See
-[Repository Profiles](profiles.md) for the package and lifecycle contract.
+`jit profile apply jit-dogfood` do, each naming the package's location with
+`--from` on a first application. See
+[Repository Profiles](profiles.md) for how that package is obtained and
+applied, and for the lifecycle contract.
 The content standard is profile-installed workflow policy, not an engine
 default or a requirement for repositories that use plain initialization.

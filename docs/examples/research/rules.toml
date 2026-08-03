@@ -74,7 +74,7 @@
 #   — NOT a software container; the breakable type is research vocabulary, which is
 #   the whole point of this example (design D11: prove the bracket carries no
 #   software assumptions). It adds two function-typed bracket node types —
-#   `planning` (`P`) and `breakdown` (`B`) — each carrying its gate presets.
+#   `planning` (`P`) and `breakdown` (`B`) — each carrying its gates.
 #   (`planning`/`breakdown` are added to `config.toml`'s `[type_hierarchy]` so they
 #   are valid child types.) A breakable goal is bracketed by `jit apply plan <goal>`
 #   into a reduced spine: the container `C` (the goal) depends on the experiment

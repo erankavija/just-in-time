@@ -10,15 +10,15 @@ container and breaking it down. For the *why* — the spine, the three gates, an
 preview-vs-closure split — read
 [The Plan-Before-Fan-Out Bracket](../concepts/planning-bracket.md) first.
 
-For JIT's portable recommended workflow, use
-`jit init --profile jit-dogfood` instead. The
-[Repository Profiles reference](../reference/profiles.md) owns that package's
-commands, inventory, and guarantees. Continue with this guide when you need an
-alternative container type, taxonomy, coverage convention, template, or gate
-integration.
+For JIT's portable recommended workflow, apply the `jit-dogfood` package
+instead. The [Repository Profiles reference](../reference/profiles.md) owns how
+that package is obtained and applied, its inventory, and its guarantees.
+Continue with this guide when you need an alternative container type, taxonomy,
+coverage convention, template, or gate integration.
 
-The bracket is **configuration**, not engine behaviour. Two complete, copy-ready
-rulesets ship it; this guide points you at the exact blocks to lift:
+The bracket is **configuration**, not engine behaviour. Two copy-ready rulesets
+carry its taxonomy, template, and coverage rules; this guide points you at the
+exact blocks to lift:
 
 - [`docs/examples/sdd/`](../examples/sdd/config.toml) — software, `epic` breakable.
 - [`docs/examples/research/`](../examples/research/config.toml) — research, `goal`
@@ -28,14 +28,18 @@ rulesets ship it; this guide points you at the exact blocks to lift:
 > The files under `docs/examples/` are EXAMPLES, not active on this repository. To
 > use one, copy its `config.toml` to `.jit/config.toml`, its `rules.toml` to
 > `.jit/rules.toml`, its `templates.toml` to `.jit/templates.toml`, and its
-> `schemas/` directory to `.jit/schemas/`.
+> `schemas/` directory to `.jit/schemas/`. Neither example carries a
+> `gates.toml`; the three gate definitions the template names come from
+> [Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders).
 
 **Bracket configuration is optional and affects issues only when applied.** A
 project with no `planning`/`breakdown` types and no `plan` template needs nothing
-in this guide. The opt-in path is the three additions below: declare the `planning` and
+in this guide. The opt-in path is the four additions below: declare the `planning` and
 `breakdown` types ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
 add a `plan` template ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
-and add the preview + closure coverage rules ([Steps 2–3](#step-2--add-the-closure-coverage-rule)).
+add the preview + closure coverage rules ([Steps 2–3](#step-2--add-the-closure-coverage-rule)),
+and supply the three gate definitions
+([Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders)).
 Existing issues are untouched until you bracket one with `jit apply plan <C>`.
 
 ## Prerequisites
@@ -43,12 +47,13 @@ Existing issues are untouched until you bracket one with `jit apply plan <C>`.
 - A JIT repository (`jit init`).
 - A methodology already expressed (or about to be) as a ruleset — the bracket
   *adds to* a coverage ruleset; it does not replace one. If you are starting from
-  scratch, copy `docs/examples/sdd/` or `docs/examples/research/` wholesale and
-  skip to [Step 5](#step-5--scaffold-a-container).
+  scratch, copy `docs/examples/sdd/` or `docs/examples/research/` wholesale, then
+  take [Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders)
+  and skip to [Step 5](#step-5--scaffold-a-container).
 - A repository-owned review integration if `plan-review` and
-  `breakdown-review` must provide real approval rather than the built-in
-  warning-only placeholders (see
-  [Step 4](#step-4--understand-and-replace-the-review-placeholders)).
+  `breakdown-review` must provide real approval rather than warning-only
+  placeholders (see
+  [Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders)).
 
 ## Step 1 — Declare the breakable container and the two bracket types
 
@@ -103,7 +108,7 @@ The research example is identical in shape, with `goal` substituted for `epic`
 [`docs/examples/research/templates.toml`](../examples/research/templates.toml).
 
 The engine hardcodes **none** of these names — `epic`/`goal`, `planning`,
-`breakdown`, and the preset names are all read from the template.
+`breakdown`, and the gate names are all read from the template.
 
 `doc_area` and `doc` place `P`'s plan in the canonical artifact directory `C` owns
 in `dev/active` — the directory `jit doc dir <C> dev/active` prints — so the
@@ -201,13 +206,70 @@ Verify the ruleset loads:
 jit validate --explain
 ```
 
-## Step 4 — Understand and replace the review placeholders
+## Step 4 — Declare the three gates, then replace the review placeholders
 
-The three gate presets (`plan-review`, `coverage-preview`, `breakdown-review`) are
-**built in** to JIT, so you do not define them by hand and no checker scripts or
-JIT source checkout are required.
+The bracket needs three gate definitions — `plan-review`, `coverage-preview`,
+and `breakdown-review` — under the keys the template's `gates` fields name.
+There are two routes to them.
 
-What each does:
+**Route one: apply the `jit-dogfood` workflow package.** It contributes all
+three definitions to your gate registry when it is applied. [Repository
+Profiles](../reference/profiles.md) covers obtaining that package and applying
+it, and is the whole recommended workflow rather than the gates alone.
+
+**Route two: declare them in your own gate registry.** These are the three
+definitions the package would contribute, in `.jit/gates.toml`. Every checker
+here runs in process, so this route needs no checker script and no JIT source
+checkout:
+
+```toml
+[[gates]]
+version = 1
+key = "plan-review"
+title = "Plan Review"
+description = "External-review placeholder for the linked plan before implementation work fans out."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "review_placeholder"
+
+[[gates]]
+version = 1
+key = "breakdown-review"
+title = "Breakdown Review"
+description = "External-review placeholder for decomposition quality, issue content, and dependency ordering before implementation."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "review_placeholder"
+
+[[gates]]
+version = 1
+key = "coverage-preview"
+title = "Coverage Preview"
+description = "Validate the container named by the breakdown issue's brackets label."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "label_target_validation"
+label_namespace = "brackets"
+```
+
+The titles and descriptions are yours to reword; the keys, the checker types,
+and `coverage-preview`'s `label_namespace` are what the bracket depends on.
+[Gate Presets](../reference/gate-presets.md#portable-checker-types) specifies
+each checker type and the registry syntax above.
+
+What each gate does:
 
 - **`coverage-preview`** uses the in-process `label_target_validation` checker. It
   reads `B`'s `brackets:<C-short-id>` label and runs scoped validation for `C`.
@@ -233,12 +295,12 @@ agent, JSON processor, or source checkout. See
 [Custom Gates](custom-gates.md#context-aware-gates) for passing gate context to an
 external reviewer.
 
-You can inspect any preset before applying it:
+Whichever route supplied them, the three definitions are then in your gate
+registry and inspectable there:
 
 ```bash
-jit gate preset show plan-review
-jit gate preset show coverage-preview
-jit gate preset show breakdown-review
+jit gate list
+jit gate show plan-review
 ```
 
 ## Step 5 — Scaffold a container
@@ -250,13 +312,13 @@ label must be one of the template's `applies_to` types):
 jit apply plan epic-123
 ```
 
-This reads the `plan` template (the node types, gate presets, doc location, and
+This reads the `plan` template (the node types, gate names, doc location, and
 the `brackets:` label all come from `.jit/templates.toml`) and in one step:
 
-- creates the planning node `P` (`type:planning`), applies the `plan-review`
-  preset, and sets `P`'s plan-doc location from the template's `doc`;
+- creates the planning node `P` (`type:planning`), requires the `plan-review`
+  gate on it, and sets `P`'s plan-doc location from the template's `doc`;
 - creates the breakdown node `B` (`type:breakdown`, labelled `brackets:<C-short-id>`),
-  carrying the `coverage-preview` and `breakdown-review` presets, depending on `P`;
+  requiring the `coverage-preview` and `breakdown-review` gates, depending on `P`;
 - wires the anchor edge `C → B` and **moves `C`'s pre-existing upstream
   dependencies onto `P`** (so planning waits on that upstream work and `C` becomes
   the pure closure node).
@@ -299,7 +361,7 @@ leaves, and malformed/duplicate contract headings also fail. Per-code sizing
 overrides remain visible for reviewer judgment. Shared contracts are marked
 `plan-fixed` or `implementation-produced`; produced contracts require one
 dependency-reachable producer. Each terminal discloses created/touched paths or
-footprint uncertainty, including greenfield files. The built-in placeholder is
+footprint uncertainty, including greenfield files. The placeholder checker is
 not approval; replace it as described in Step 4. Correct the manifest first,
 regenerate the plan, and rerun validation.
 
@@ -352,7 +414,7 @@ breakdown gate (plan time), *mapping done* at the container's done transition
 
 ## See Also
 
-- [Repository Profiles](../reference/profiles.md) — preferred embedded workflow setup
+- [Repository Profiles](../reference/profiles.md) — preferred workflow setup: obtaining and applying the package
 - [The Plan-Before-Fan-Out Bracket](../concepts/planning-bracket.md) — the spine, the three gates, and the preview-vs-closure split
 - [How-To: Author Validation Rules](validation-rules.md) — the `label-coverage` rule kind and selectors
 - [How-To: Custom Gates](custom-gates.md) — the agent-gate mechanism and gate presets

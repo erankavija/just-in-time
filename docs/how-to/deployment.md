@@ -121,7 +121,7 @@ build context, so `docker compose up -d` builds it on first use.
 ### Initialize the Repository First
 
 The served repository is initialized on the host before the container starts —
-`jit init --profile jit-dogfood` for the preferred workflow setup, plain
+with the `jit-dogfood` package applied for the preferred workflow setup, plain
 `jit init` for a methodology-neutral one (see
 [Repository Profiles](../reference/profiles.md)). A container started against a
 directory without `.jit/` exits with status 78 and creates nothing.

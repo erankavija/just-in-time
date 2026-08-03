@@ -26,7 +26,11 @@ table](docs/reference/release-policy.md#what-a-release-publishes) describes the
 complete asset set and what the native archive carries.
 
 The `jit` and `jit-server` binaries are at the archive's extraction root, which
-is the location used by the install commands below.
+is the location used by the install commands below. Beside them the archive
+carries the repository profile packages, one directory per package under
+`packages/`. Those are not installed onto `PATH`: a package is applied from a
+location inside the repository it configures, which [Repository
+Profiles](docs/reference/profiles.md#obtaining-a-package) covers.
 
 ### Download and Verify
 
@@ -214,10 +218,11 @@ their own guides.
 
 ## Next Steps
 
-- Initialize with the preferred embedded workflow:
-  `jit init --profile jit-dogfood`
+- Initialize with the preferred workflow package the archive carries: [Repository
+  Profiles](docs/reference/profiles.md#obtaining-a-package) covers placing it in
+  the repository and initializing with it
 - Read the [Repository Profiles reference](docs/reference/profiles.md) for the
-  offline package contract, dry-run/apply commands, and recovery guarantees
+  package contract, dry-run/apply commands, and recovery guarantees
 - Read the [Quick Start](README.md#quick-start)
 - See [Quickstart Tutorial](docs/tutorials/quickstart.md) for complete workflows
 - Check the [Deployment Guide](docs/how-to/deployment.md) for serving the API

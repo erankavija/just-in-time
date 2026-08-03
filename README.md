@@ -51,8 +51,9 @@ stale-binary guard effective.
 ### Basic Usage
 
 ```bash
-# Preferred setup: initialize with the embedded, offline JIT workflow
-jit init --profile jit-dogfood
+# Preferred setup: initialize with JIT's portable workflow package
+# (Repository Profiles, linked below, covers obtaining it and placing it here)
+jit init --profile jit-dogfood --from packages/jit-dogfood
 
 # Create work; -q prints just the issue id for capture
 EPIC=$(jit issue create --title "User authentication" --label type:epic --priority high -q)
@@ -78,10 +79,11 @@ jit issue progress $EPIC             # counts by state, done/total
 
 Ordering between siblings is also a dependency edge: `jit dep add $TASK2 $TASK1 --reduce`. Edge operations are atomic and keep the graph transitively reduced. Here `--reduce` drops the epic's now-shortcut edge to `$TASK1` in the same step.
 
-The profile works without Git or network access. Plain `jit init` remains the
+Applying a profile reads its package from a directory inside the repository and
+needs no Git repository or network access. Plain `jit init` remains the
 methodology-neutral setup. See the
-[Repository Profiles reference](docs/reference/profiles.md) for the package,
-commands, safety guarantees, and v1.0 lifecycle boundary.
+[Repository Profiles reference](docs/reference/profiles.md) for obtaining a
+package, the commands, the safety guarantees, and the v1.0 lifecycle boundary.
 
 **See the [Quickstart Tutorial](docs/tutorials/quickstart.md) and [Complete Workflow Example](docs/tutorials/first-workflow.md) for full walkthroughs.**
 
@@ -215,10 +217,10 @@ Quick links:
 
 ## Configuration
 
-The embedded `jit-dogfood` profile is the preferred way to install JIT's
+The `jit-dogfood` profile package is the preferred way to install JIT's
 portable recommended workflow. The
-[Repository Profiles reference](docs/reference/profiles.md) owns its package
-inventory and guarantees.
+[Repository Profiles reference](docs/reference/profiles.md) owns how it is
+obtained and applied, its package inventory, and its guarantees.
 
 For advanced customization, JIT is configurable via `.jit/config.toml`:
 
