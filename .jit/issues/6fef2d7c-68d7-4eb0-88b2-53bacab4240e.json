@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T18:47:45.815943434Z",
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
@@ -7,6 +8,8 @@
   ],
   "description": "Editing a packaged live source no longer reports an installed binary as stale, because the package is no longer an input to the binary.\n\n## Background\n\nA path predicate decides whether a changed repository file can affect the production binary, and the stale-binary report refuses to trust a binary built before such a file changed. The package directory is one of its entries, and it was true: the whole directory was compiled in, so editing any of it changed the binary.\n\nIt stops being true the moment the package leaves the binary. Left in place, the entry reports every package edit as invalidating an installed binary that it cannot affect, and every gate run behind that report refuses until a rebuild that changes nothing has happened.\n\nThe predicate stays what it is: a pure path test in the layer that performs no input or output, evaluated against whatever repository the binary is validating. Only the set of paths it names changes.\n\n## Success Criteria\n\n- [hard] REQ-01: The build-input path predicate no longer matches the package directory.\n- [hard] REQ-02: A change to a file under the package directory does not report an installed binary as stale.\n- [hard] REQ-03: A change to a crate source still does.\n- [hard] REQ-04: The predicate remains a pure path test in a layer that performs no input or output.\n\n## Notes\n\nEvery other entry stays: the workspace manifests, the lock files, the build script, the crate sources, and the hook scripts all still affect the binary.\n",
   "documents": [],
+  "done_at": "2026-08-03T18:47:50.960779954Z",
+  "first_ready_at": "2026-08-03T18:46:20.141955487Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -34,7 +37,7 @@
     "enforces:@/invariant/architecture-dependency-direction"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Stop naming the package a build input",
-  "updated_at": "2026-08-03T18:17:10.733732515Z"
+  "updated_at": "2026-08-03T18:47:50.960779954Z"
 }

@@ -8,6 +8,7 @@
   ],
   "description": "The adopter-facing command reference describes the profile commands the way their help now describes them, so the reference and the binary agree.\n\n## Background\n\nThe profile commands' names for what they operate on changed: they read a package from a repository location rather than listing what is embedded in the binary. The help strings changed with them. The reference that documents those commands still describes the surface by its superseded vocabulary, so an adopter reading it meets one description in the page and another in `--help`.\n\nNothing about the commands' behaviour or arguments changes here; this is the page catching up with the surface.\n\n## Success Criteria\n\n- [hard] REQ-01: The command reference describes each profile command in the vocabulary its help now uses, naming no embedded package.\n- [hard] REQ-02: No adopter-facing page describes a profile as carried inside the binary.\n- [hard] REQ-03: The mechanical documentation checks pass over the changed pages.\n\n## Notes\n\nThe resolution order and the supplied-location form are documented by their own entry; this covers the vocabulary those descriptions are written in.\n",
   "documents": [],
+  "first_ready_at": "2026-08-03T18:48:35.409095616Z",
   "gates_required": [
     "code-review",
     "docs-mechanical",
@@ -25,7 +26,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Follow the renamed profile surface in the command reference",
-  "updated_at": "2026-07-31T17:55:41.256943076Z"
+  "updated_at": "2026-08-03T18:48:35.409095616Z"
 }

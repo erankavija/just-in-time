@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T18:48:45.687984828Z",
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
@@ -8,6 +9,8 @@
   ],
   "description": "The adopter-facing documentation describes a profile that arrives as a published package and is applied from a location inside the repository.\n\n## Background\n\nThe profile reference tells an adopter that this release exposes one immutable profile embedded in the binary, and that applying it needs no Git repository, network access, or jit source checkout. Half of that stays true and half stops: the application is still offline and still needs no checkout, but the bytes now have to have been obtained, and the release is where they come from.\n\nThe planning-bracket how-to has the same shape of change. Its instructions still work — a hand-authored template still applies — but the gate definitions its bracket needs are no longer supplied by the binary, so the page has to state the two routes an adopter has: apply the profile, or declare the three gates in the repository's own registry, which is what the profile would have contributed anyway.\n\nEach of these facts has one home. The release's asset list belongs with the release policy, the installation steps with the installation guide, and what a profile is and how it is applied with the profile reference; a page needing another's fact cites it rather than restating it.\n\n## Success Criteria\n\n- [hard] REQ-01: The profile reference describes a package obtained from a release and applied from a location inside the repository, and states exactly what the offline promise still covers.\n- [hard] REQ-02: The installation guide names the package asset among what a release carries.\n- [hard] REQ-03: The planning-bracket how-to states both routes to the bracket's gates.\n- [hard] REQ-04: No adopter-facing page describes a profile or a preset bundle carried inside the binary.\n- [hard] REQ-05: Each fact has one home, and a page needing another page's fact cites it.\n\n## Notes\n\nThe pages describe the surface as it is; a narrative of what it used to be belongs in the release notes.\n",
   "documents": [],
+  "done_at": "2026-08-03T18:48:50.795878248Z",
+  "first_ready_at": "2026-08-03T18:46:25.118430946Z",
   "gates_required": [
     "code-review",
     "docs-mechanical",
@@ -42,7 +45,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "Describe obtaining and applying a profile package",
-  "updated_at": "2026-08-03T18:38:19.768694362Z"
+  "updated_at": "2026-08-03T18:48:50.795878248Z"
 }

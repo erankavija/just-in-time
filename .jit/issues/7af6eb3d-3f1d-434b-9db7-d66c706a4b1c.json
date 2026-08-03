@@ -13,6 +13,7 @@
   ],
   "description": "The configuration a new repository receives, the named content bundles, the vocabulary literals in every shipped artefact, and this checkout's own paths have all left the binary, and the invariant states the rule that keeps them out.\n\n## Background\n\nBeyond one project's workflow, the binary carries a whole configuration it renders for every new repository, four named icon bundles selectable by name, a label namespace built from a literal in two commands, this repository's own gate keys and item ids in the agent-facing bridge's shipped text, a type hierarchy and a namespace colour table in the web bundle, and the documentation and script paths of this checkout. Each produces content an adopter never declared, so each is an instance rather than a mechanism.\n\nWhat stays is named as carefully as what goes: the defaults that name a mechanism's own parameter, and the rules that derive both their assertion and their membership from whatever registry the adopter declared. The amended invariant carries both classes explicitly, because a narrower wording would delete the first by implication and be silent where the boundary reaches furthest.\n\n## Success Criteria\n\n- [hard] REQ-01: A bare initialization writes the structural minimum, and no compiled configuration template, named hierarchy bundle, or named icon bundle remains.\n- [hard] REQ-02: No type name or label namespace literal remains in the engine's own label construction, in the agent-facing bridge's shipped text, or in the web bundle's rendering paths.\n- [hard] REQ-03: No path inside this checkout is reachable from an adopter build.\n- [hard] REQ-04: The project invariant carries no sanctioned exception and states which names belong to a mechanism, reaching every class the boundary names.\n- [hard] REQ-05: The adopter-facing documentation describes obtaining and applying the published packages, the affordance that goes with the removal, and the two workflow warnings a repository stops receiving unless it applies the workflow package.\n\n## Notes\n\nThe generated policy regions are repaired inside the change that breaks them, because their generator reads the very table the removal stops writing.\n",
   "documents": [],
+  "first_ready_at": "2026-08-03T18:48:55.842771790Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -37,7 +38,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "The binary carries no configuration it writes for a repository",
-  "updated_at": "2026-08-03T18:38:19.768694362Z"
+  "updated_at": "2026-08-03T18:48:55.842771790Z"
 }

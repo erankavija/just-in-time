@@ -25,7 +25,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Follow the renamed profile surface on the agent-facing bridge",
-  "updated_at": "2026-07-31T17:55:51.405300828Z"
+  "updated_at": "2026-08-03T18:48:40.526177211Z"
 }

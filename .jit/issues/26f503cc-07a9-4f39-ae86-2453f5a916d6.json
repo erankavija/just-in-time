@@ -23,7 +23,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Adjust the citation checker's package exclusions",
-  "updated_at": "2026-07-31T16:39:13.631314985Z"
+  "updated_at": "2026-08-03T18:48:18.297798288Z"
 }
