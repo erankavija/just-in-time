@@ -475,13 +475,14 @@ async function main() {
         'every reported root accounts for a reported live asset target');
         assert.deepStrictEqual(shown.origin, { source: 'embedded' });
 
-        const preview = await profileCall('jit_profile_apply', {
-          id: 'jit-dogfood',
+        // A preview is derived over one package against the repository in
+        // front of it, so the package a repository declaring nothing can be
+        // shown is the self-contained one.
+        const defaultPreview = await profileCall('jit_profile_apply', {
+          id: 'jit-default',
           'dry-run': true,
         });
-        assert.strictEqual(preview.status, 'would_apply');
-        assert.ok(preview.targets.some(target =>
-          target.path === 'contrib/gates/ai-review.sh' && target.executable === true));
+        assert.strictEqual(defaultPreview.status, 'would_apply');
 
         // An application reports one result per applied package: the packages
         // the named one depends on, then the named one.
@@ -490,18 +491,30 @@ async function main() {
         assert.strictEqual(applied.profiles.at(-1).id, 'jit-dogfood');
         assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
+        // The applied package's own preview names its executable asset.
+        const preview = await profileCall('jit_profile_apply', {
+          id: 'jit-dogfood',
+          'dry-run': true,
+        });
+        assert.ok(preview.targets.some(target =>
+          target.path === 'contrib/gates/ai-review.sh' && target.executable === true));
+
         const unchanged = await profileCall('jit_profile_apply', {
           id: 'jit-dogfood',
           'dry-run': true,
         });
         assert.strictEqual(unchanged.status, 'unchanged');
 
-        // The record the application wrote is what the repository now names.
+        // The records the application wrote are what the repository now names:
+        // one per applied package, and no other.
         const recorded = await profileCall('jit_profile_list');
-        assert.strictEqual(recorded.count, 1);
-        assert.strictEqual(recorded.profiles[0].id, 'jit-dogfood');
-        assert.strictEqual(recorded.profiles[0].applied, true);
-        assert.deepStrictEqual(recorded.profiles[0].origin, { source: 'embedded' });
+        assert.strictEqual(recorded.count, recorded.profiles.length);
+        assert.deepStrictEqual(
+          recorded.profiles.map(profile => profile.id).sort(),
+          applied.profiles.map(profile => profile.id).sort());
+        assert.ok(recorded.profiles.every(profile => profile.applied === true));
+        assert.ok(recorded.profiles.every(profile =>
+          profile.origin && profile.origin.source === 'embedded'));
       } finally {
         await profileTester.stop();
       }
