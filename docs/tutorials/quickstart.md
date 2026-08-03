@@ -79,19 +79,21 @@ This tutorial shows the basics. For the full power of label hierarchies, see [Fi
 # Create a new project
 mkdir my-project && cd my-project
 
-# Initialize JIT with the embedded, offline workflow profile
-jit init --profile jit-dogfood
+# Place the workflow package the release archive carries, then initialize with it
+cp -R <extracted-archive>/packages .
+jit init --profile jit-dogfood --from packages/jit-dogfood
 
 # Check initial status
 jit status
 ```
 
 This is the preferred setup for new repositories. It installs JIT's portable
-planning, validation, gate, projection, and agent workflow without Git, network
-access, `jq`, or a source checkout. Plain `jit init` remains the minimal,
-methodology-neutral alternative. The
+planning, validation, gate, projection, and agent workflow, reading the placed
+package and needing no Git repository, network access, or source checkout.
+Plain `jit init` remains the minimal, methodology-neutral alternative. The
 [Repository Profiles reference](../reference/profiles.md) is the canonical
-command, package, guarantee, and lifecycle reference.
+reference for obtaining a package, the commands, the guarantees, and the
+lifecycle.
 
 ## Create Your First Issues
 

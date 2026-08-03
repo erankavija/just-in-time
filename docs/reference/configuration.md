@@ -4,9 +4,9 @@
 
 Complete reference for JIT configuration options.
 
-For the portable recommended workflow, initialize with
-`jit init --profile jit-dogfood`; the
-[Repository Profiles reference](profiles.md) owns that package's exact contract.
+For the portable recommended workflow, initialize with the `jit-dogfood`
+package; the [Repository Profiles reference](profiles.md) owns how it is
+obtained and applied, and its exact contract.
 This page is the advanced manual surface for repositories that want to inspect
 or customize individual settings.
 

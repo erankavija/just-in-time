@@ -9,8 +9,8 @@ shape of that structure — the **bracket** — the three gates it carries, and 
 coverage split that lets the same rule kind check the decomposition twice: once
 at plan time, once at closure.
 
-The preferred way to install JIT's portable bracket workflow is
-`jit init --profile jit-dogfood`; see
+The preferred way to install JIT's portable bracket workflow is to apply the
+`jit-dogfood` package; see
 [Repository Profiles](../reference/profiles.md). The configuration and examples
 below explain the mechanism and remain the advanced path for repositories that
 want a different taxonomy, container type, rule names, or review integration.
@@ -259,7 +259,7 @@ traversals; the bracket relies on both.
   the work is supposedly finished.
 - **One engine, no baked-in vocabulary.** Nothing about `epic`, `planning`, or
   `breakdown` lives in the engine. The container type, the two node types, the
-  gate presets, and the coverage knobs are all read from a ruleset. Swap the names
+  gate names, and the coverage knobs are all read from a ruleset. Swap the names
   and the same machinery drives a research program instead of software — which is
   exactly what the SDD and research examples demonstrate.
 - **The same rule kind at both ends.** Because preview and closure are two
