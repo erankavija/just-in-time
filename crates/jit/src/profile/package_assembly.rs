@@ -3,10 +3,9 @@
 //! A package is a directory: a manifest, the assets it declares, and a
 //! managed-region source. Most of those assets name a repository file as their
 //! target and carry that file's bytes, so the repository file is their
-//! authority and the tree is produced from it rather than carrying a second
-//! copy of it. What the package authors itself — its manifest, its install-only
-//! assets, its region source — is checked in, and the assembly draws each
-//! declared source from whichever of the two owns it.
+//! authority and the tree is produced from it. What the package authors itself
+//! — its manifest, its install-only assets, its region source — is checked in,
+//! and the assembly draws each declared source from its owning source.
 //!
 //! The production is a repository entry point over the render here, not a build
 //! step. No build consumes the assembled tree, so a build step would make every
@@ -397,7 +396,7 @@ fn rename(action: &'static str, from: &Path, to: &Path) -> Result<(), PackageAss
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
     use std::process::Command;
     use tempfile::TempDir;
@@ -538,12 +537,10 @@ target = "docs/guide.md"
         (package_source, repository)
     }
 
-    /// The produced tree and the checked-in one it will replace, compared while
-    /// both exist: the same package-relative paths, the same bytes, and the
-    /// same executable declaration. This is the observation the later
-    /// retirement of the checked-in copies rests on.
+    /// The produced tree carries exactly the package-relative paths declared by
+    /// its manifest, with the executable declarations published as modes.
     #[test]
-    fn test_assemble_package_tree_produces_the_checked_in_tree_file_for_file() {
+    fn test_assemble_package_tree_produces_the_declared_package_tree() {
         let root = repository_root();
         let temp = TempDir::new().unwrap();
         let destination = temp.path().join("package/jit-dogfood");
@@ -552,36 +549,40 @@ target = "docs/guide.md"
             .expect("this repository's package assembles");
 
         let produced = tree_files(&destination);
-        let checked_in = tree_files(&root.join(PACKAGE_SOURCE_PATH));
         assert!(
             produced.len() > 1,
             "the produced tree carries more than a manifest"
         );
-        assert_eq!(
-            produced.keys().collect::<Vec<_>>(),
-            checked_in.keys().collect::<Vec<_>>(),
-            "the produced and checked-in trees carry different package-relative paths"
-        );
-        let differing: Vec<&String> = produced
-            .iter()
-            .filter(|(path, content)| checked_in.get(*path) != Some(content))
-            .map(|(path, _)| path)
+        let declared: BTreeSet<String> = std::iter::once(MANIFEST_FILE_NAME.to_string())
+            .chain(
+                assembled
+                    .manifest()
+                    .assets
+                    .iter()
+                    .map(|asset| asset.source.clone()),
+            )
+            .chain(
+                assembled
+                    .manifest()
+                    .regions
+                    .iter()
+                    .map(|region| region.source.clone()),
+            )
             .collect();
         assert_eq!(
-            differing,
-            Vec::<&String>::new(),
-            "each entry names a produced file whose bytes or executable mode \
-             differ from the checked-in copy it replaces"
+            produced.keys().cloned().collect::<BTreeSet<_>>(),
+            declared,
+            "the produced tree carries an undeclared path or omits a declared source"
         );
         assert!(
             produced.values().any(|(_, executable)| *executable),
-            "no produced file is executable, so the mode half of the comparison \
-             observes nothing"
+            "no produced file is executable, so the executable-mode declarations \
+             observe nothing"
         );
         assert_eq!(assembled.file_count(), produced.len());
 
-        // The live assets' bytes are the repository files', which is what makes
-        // the checked-in copies redundant rather than merely equal by habit.
+        // The live assets' bytes are drawn from the repository files named by
+        // their declarations.
         let live: Vec<&crate::profile::AssetDeclaration> = assembled
             .manifest()
             .assets

@@ -9,8 +9,8 @@ set -euo pipefail
 # target and carry that file's bytes, so the repository file is their authority
 # and the tree is produced from it. What the package authors itself — its
 # manifest, its install-only assets, its region source — is checked in under
-# profiles/jit-dogfood, and the assembly draws each declared source from
-# whichever of the two owns it.
+# profiles/jit-dogfood, and the assembly draws each declared source from its
+# owning source.
 #
 # WHY THIS IS NOT A BUILD STEP. No build consumes the tree it writes, so a build
 # step would make every build do work no build consumes, and the directory
