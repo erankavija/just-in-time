@@ -843,7 +843,7 @@ mod tests {
     use tempfile::TempDir;
 
     // Use shared test utilities
-    use crate::test_utils::{create_test_paths, setup_test_repo};
+    use crate::test_utils::{create_test_paths, setup_test_repo, CurrentDirGuard};
 
     /// Execute claim acquire with manually constructed paths (bypassing WorktreePaths::detect)
     fn execute_claim_acquire_test(
@@ -1665,16 +1665,14 @@ mod tests {
     fn test_get_current_branch_errors_when_git_fails() {
         // Create a temp directory that's NOT a git repo
         let temp = TempDir::new().unwrap();
-        let original_dir = std::env::current_dir().unwrap();
 
         // Change to non-git directory
-        std::env::set_current_dir(&temp).unwrap();
+        let result = {
+            let _cwd = CurrentDirGuard::new(&temp).unwrap();
 
-        // get_current_branch() should return an error, not "main"
-        let result = get_current_branch();
-
-        // Restore directory before assertions
-        std::env::set_current_dir(original_dir).unwrap();
+            // get_current_branch() should return an error, not "main"
+            get_current_branch()
+        };
 
         // Should fail, not return "main" as fallback
         assert!(

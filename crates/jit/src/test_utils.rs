@@ -14,7 +14,49 @@ use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 use tempfile::TempDir;
+
+/// Serializes tests that temporarily change the process-wide working directory.
+///
+/// The mutex is recovered after poisoning because a panic while a guard is
+/// alive runs its `Drop` implementation before the mutex guard is released,
+/// so the directory has already been restored when another test acquires it.
+static CURRENT_DIR_LOCK: Mutex<()> = Mutex::new(());
+
+/// Change the process working directory for a scope and restore it on drop.
+///
+/// This guard is intended for tests only. The process-wide lock prevents two
+/// tests from observing or changing the working directory at the same time,
+/// and restoration also occurs while unwinding after a panic.
+#[must_use = "dropping the guard restores the process working directory"]
+pub struct CurrentDirGuard {
+    original: PathBuf,
+    _lock: MutexGuard<'static, ()>,
+}
+
+impl CurrentDirGuard {
+    /// Change the process working directory, retaining the directory to which
+    /// it must be restored when this guard is dropped.
+    pub fn new(path: impl AsRef<Path>) -> std::io::Result<Self> {
+        let lock = CURRENT_DIR_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let original = std::env::current_dir()?;
+        std::env::set_current_dir(path)?;
+
+        Ok(Self {
+            original,
+            _lock: lock,
+        })
+    }
+}
+
+impl Drop for CurrentDirGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.original);
+    }
+}
 
 /// Repository-relative directory holding the checked-in sources of the profile
 /// packages this repository ships, one directory per package id.
@@ -305,6 +347,24 @@ mod tests {
             .expect("the package source path names a directory")
     }
 
+    #[test]
+    fn test_current_dir_guard_restores_after_panic() {
+        let elsewhere = TempDir::new().unwrap();
+        let mut original = None;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
+            original = Some(_cwd.original.clone());
+            assert_eq!(std::env::current_dir().unwrap(), elsewhere.path());
+            panic!("the guard must restore the directory during unwinding");
+        }));
+
+        assert!(result.is_err());
+        let _verification_lock = CURRENT_DIR_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert_eq!(std::env::current_dir().unwrap(), original.unwrap());
+    }
+
     /// Every package this repository ships assembles under the id its source
     /// directory is named after, which is what makes an id a sufficient way to
     /// name one.
@@ -364,10 +424,10 @@ mod tests {
         let elsewhere = TempDir::new().unwrap();
         let workspace = TempDir::new().unwrap();
         let destination = workspace.path().join("package");
-        let original = std::env::current_dir().unwrap();
-        std::env::set_current_dir(elsewhere.path()).unwrap();
-        let assembled = assemble_repository_package(assembled_package_id(), &destination);
-        let _ = std::env::set_current_dir(&original);
+        let assembled = {
+            let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
+            assemble_repository_package(assembled_package_id(), &destination)
+        };
 
         let package = assembled.expect("the package assembles from an unrelated working directory");
         assert_eq!(

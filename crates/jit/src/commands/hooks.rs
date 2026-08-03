@@ -156,6 +156,7 @@ fn set_executable(_path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::CurrentDirGuard;
     use std::fs;
     use tempfile::TempDir;
 
@@ -170,12 +171,10 @@ mod tests {
         fs::create_dir(&subdir).unwrap();
 
         // Change to subdirectory and find .git
-        let original_dir = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&subdir).unwrap();
-
-        let found = find_git_dir().unwrap();
-
-        std::env::set_current_dir(&original_dir).unwrap();
+        let found = {
+            let _cwd = CurrentDirGuard::new(&subdir).unwrap();
+            find_git_dir().unwrap()
+        };
 
         assert_eq!(found, git_dir);
     }
