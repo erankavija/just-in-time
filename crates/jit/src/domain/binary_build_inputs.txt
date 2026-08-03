@@ -16,10 +16,10 @@
 # them against each other over this repository's own file set.
 #
 # It is a positive inventory, not a denylist of paths presumed safe. The source
-# and manifest roots cover Cargo's compilation inputs; the profile and hook
-# paths cover the files embedded by `include_dir!`/`include_str!` in production
-# code. A newly added path elsewhere in the repository is therefore irrelevant
-# to the binary by construction.
+# and manifest roots cover Cargo's compilation inputs; the hook paths cover the
+# files embedded by `include_str!` in production code. A newly added path
+# elsewhere in the repository is therefore irrelevant to the binary by
+# construction.
 #
 # One repository-relative path per line. A line naming a directory covers
 # everything beneath it. Blank lines and `#` comments are ignored.
@@ -30,6 +30,5 @@ crates/jit/Cargo.toml
 crates/jit/Cargo.lock
 crates/jit/build.rs
 crates/jit/src
-profiles/jit-dogfood
 scripts/hooks/pre-commit
 scripts/hooks/pre-push

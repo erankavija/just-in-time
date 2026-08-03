@@ -329,7 +329,7 @@ mod tests {
         );
         assert!(is_binary_build_input("Cargo.toml"));
         assert!(is_binary_build_input("crates/jit/src/main.rs"));
-        assert!(is_binary_build_input("profiles/jit-dogfood/manifest.toml"));
+        assert!(!is_binary_build_input("profiles/jit-dogfood/manifest.toml"));
         assert!(is_binary_build_input("scripts/hooks/pre-commit"));
         assert!(!is_binary_build_input("docs/new-reference.md"));
         assert!(!is_binary_build_input("scripts/new-tool.sh"));
@@ -337,6 +337,48 @@ mod tests {
             "docs/new-reference.md",
             "scripts/new-tool.sh",
         ]));
+    }
+
+    /// REQ-02: changing a packaged live source leaves an installed clean
+    /// binary fresh when the path is evaluated through the production
+    /// build-input predicate.
+    #[test]
+    fn test_assess_binary_provenance_fresh_for_profile_package_change() {
+        let real = build_info::version_info();
+        let build_inputs_changed =
+            binary_build_inputs_changed(["profiles/jit-dogfood/manifest.toml"]);
+        assert_eq!(
+            assess_binary_provenance(
+                Some(real.git_commit),
+                Some(false),
+                Some(real.git_commit),
+                true,
+                build_inputs_changed,
+            ),
+            BinaryProvenance::Fresh
+        );
+    }
+
+    /// REQ-03: changing a crate source still makes an installed clean binary
+    /// stale when the path is evaluated through the production build-input
+    /// predicate.
+    #[test]
+    fn test_assess_binary_provenance_stale_for_crate_source_change() {
+        let real = build_info::version_info();
+        let build_inputs_changed = binary_build_inputs_changed(["crates/jit/src/main.rs"]);
+        assert_eq!(
+            assess_binary_provenance(
+                Some(real.git_commit),
+                Some(false),
+                Some(real.git_commit),
+                true,
+                build_inputs_changed,
+            ),
+            BinaryProvenance::Stale(StaleBinaryReason::CommitMismatch {
+                built_from: real.git_commit.to_string(),
+                head: real.git_commit.to_string(),
+            })
+        );
     }
 
     /// REQ-12: the covering rule and git's pathspec matching read one
