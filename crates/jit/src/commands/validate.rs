@@ -775,9 +775,9 @@ fn record_filed_under_its_own_id(
     } else {
         Err(anyhow!(
             "applied profile provenance stored at '{}' declares profile '{}', whose record is '{}'",
-            super::profile::repo_string(record_path),
+            record_path.repository_relative(),
             record.id,
-            super::profile::repo_string(&declared)
+            declared.repository_relative()
         ))
     }
 }
@@ -841,7 +841,7 @@ fn compose_recorded_resolution(
                 crate::validation::repository::RepositoryValidationFailure::materialization(
                     error.context(format!(
                         "applied profile record '{}' names profile '{id}', whose package cannot be obtained{relationship}",
-                        super::profile::repo_string(&record_path)
+                        record_path.repository_relative()
                     )),
                 )
             })
@@ -4159,7 +4159,7 @@ description = \"Full Rust CI pipeline must pass.\"
             resolved
                 .iter()
                 .map(|(path, package)| (
-                    super::profile::repo_string(path),
+                    path.repository_relative(),
                     package.hashes().package.clone()
                 ))
                 .collect::<Vec<_>>(),

@@ -205,7 +205,8 @@ impl std::fmt::Display for ProfilePackageId {
 /// A package asset cannot replace an authored occupant it does not own.
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "profile package {candidate} asset target {path:?} conflicts with {occupant} and contains differing bytes"
+    "profile package {candidate} asset target '{}' conflicts with {occupant} and contains differing bytes",
+    .path.repository_relative()
 )]
 pub struct ProfileTargetConflictError {
     /// Conflicting canonical repository path.
@@ -492,8 +493,8 @@ fn merge_semantic_contributions(
         let document = documents
             .get_mut(&target)
             .expect("profile registry document was inserted");
-        merge_contribution_with_base(
-            Some(base),
+        merge_contribution(
+            base,
             package_id,
             &target,
             &mut document.document,
@@ -565,23 +566,8 @@ fn profile_registry_error(target: &str, source: ProfileRegistryParseError) -> Re
     .into()
 }
 
-#[cfg(test)]
 fn merge_contribution(
-    registry: &str,
-    document: &mut DocumentMut,
-    contribution: &Contribution,
-) -> Result<(), RepositoryStateError> {
-    merge_contribution_with_base(
-        None,
-        &ProfilePackageId::new("test-package"),
-        registry,
-        document,
-        contribution,
-    )
-}
-
-fn merge_contribution_with_base(
-    base: Option<&RepositoryImage>,
+    base: &RepositoryImage,
     package_id: &ProfilePackageId,
     registry: &str,
     document: &mut DocumentMut,
@@ -616,8 +602,10 @@ fn merge_contribution_with_base(
     }
 }
 
+/// What one contribution is merged against: the captured repository, the
+/// package declaring the contribution, and the registry receiving it.
 struct ContributionMergeContext<'a> {
-    base: Option<&'a RepositoryImage>,
+    base: &'a RepositoryImage,
     package_id: &'a ProfilePackageId,
     registry: &'a str,
 }
@@ -631,7 +619,7 @@ fn merge_scalar(
 ) -> Result<(), RepositoryStateError> {
     let (table, key) = scalar_target_path(target);
     if let Some(existing) = semantic.get(table).and_then(|table| table.get(key)) {
-        return equal_or_conflict_with_base(
+        return equal_or_conflict(
             context,
             &format!("{table}.{key}"),
             existing,
@@ -672,7 +660,7 @@ fn merge_map_entry(
         MapEntryTarget::ItemKinds => semantic_map_entry(semantic, &["item_kinds"], identity),
     };
     if let Some(existing) = existing {
-        return equal_or_conflict_with_base(context, identity, existing, candidate);
+        return equal_or_conflict(context, identity, existing, candidate);
     }
     match target {
         MapEntryTarget::TypeHierarchyTypes => {
@@ -798,7 +786,7 @@ fn merge_keyed_array(
         }
     }
     if let Some(existing) = existing {
-        return equal_or_conflict_with_base(context, identity, &existing, candidate);
+        return equal_or_conflict(context, identity, &existing, candidate);
     }
     let mut table = json_object_to_table(candidate, context.registry)?;
     if let Some(comment) = preserved_comment {
@@ -820,7 +808,7 @@ fn merge_projection(
         .get("projection")
         .and_then(|projections| projections.get(name))
     {
-        return equal_or_conflict_with_base(context, name, existing, &candidate);
+        return equal_or_conflict(context, name, existing, &candidate);
     }
     ensure_table(document.as_table_mut(), "projection", context.registry)?.insert(
         name,
@@ -837,44 +825,41 @@ fn semantic_document(
         .map_err(|error| profile_registry_error(registry, error.into()))
 }
 
-fn equal_or_conflict_with_base(
+fn equal_or_conflict(
     context: &ContributionMergeContext<'_>,
     identity: &str,
     existing: &JsonValue,
     candidate: &JsonValue,
 ) -> Result<(), RepositoryStateError> {
     if existing == candidate {
-        Ok(())
-    } else {
-        Err(ProducerError::ProfileContributionConflict {
-            identity: identity.to_string(),
-            registry: context.registry.to_string(),
-            occupant: context
-                .base
-                .map(|base| {
-                    profile_conflict_occupant(
-                        base,
-                        &VirtualPath::data(
-                            context
-                                .registry
-                                .strip_prefix(".jit/")
-                                .unwrap_or(context.registry),
-                        )?,
-                    )
-                })
-                .transpose()?
-                .unwrap_or(ProfileConflictOccupant::Repository),
-            candidate: context.package_id.clone(),
-        }
-        .into())
+        return Ok(());
     }
+    let registry = context
+        .base
+        .layout()
+        .classify_repository_relative(context.registry)?;
+    Err(ProducerError::ProfileContributionConflict {
+        identity: identity.to_string(),
+        registry: context.registry.to_string(),
+        occupant: profile_conflict_occupant(context.base, &registry)?,
+        candidate: context.package_id.clone(),
+    }
+    .into())
 }
 
+/// Who already holds `target`: an applied package, or the repository itself.
+///
+/// An applied-profile record states the targets its package published, keyed by
+/// the same repository-relative spelling
+/// ([`VirtualPath::repository_relative`]) the package's manifest addresses them
+/// with, so a target no record claims is the repository's own content. The
+/// records are read from the `.jit/profiles/` listing, which every capture that
+/// reaches composition discovers together with the record files beneath it.
 fn profile_conflict_occupant(
     base: &RepositoryImage,
     target: &VirtualPath,
 ) -> Result<ProfileConflictOccupant, RepositoryStateError> {
-    let target = repository_target_string(target);
+    let target = target.repository_relative();
     let Some(listing) = base.listing_fingerprints().get(&VirtualPath::PROFILES) else {
         return Ok(ProfileConflictOccupant::Repository);
     };
@@ -887,7 +872,7 @@ fn profile_conflict_occupant(
         };
         let record: AppliedProfileRecord =
             serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
-                path: repository_target_string(&record_path),
+                path: record_path.repository_relative(),
                 source,
             })?;
         if record.target_hashes.contains_key(&target) {
@@ -897,14 +882,6 @@ fn profile_conflict_occupant(
         }
     }
     Ok(ProfileConflictOccupant::Repository)
-}
-
-fn repository_target_string(path: &VirtualPath) -> String {
-    let relative = path.relative().as_str();
-    match path.root_class() {
-        super::RepositoryRootClass::Data => format!(".jit/{relative}"),
-        super::RepositoryRootClass::Worktree => relative.to_string(),
-    }
 }
 
 fn ensure_table<'a>(
@@ -1118,7 +1095,7 @@ mod tests {
             super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap();
-        let target_name = repository_target_string(target);
+        let target_name = target.repository_relative();
         let target_hashes = package_owns_target
             .then(|| (target_name, "target-hash".to_string()))
             .into_iter()
@@ -1198,17 +1175,34 @@ mod tests {
         )
     }
 
+    /// Merge one contribution into `document` over a repository whose applied
+    /// package claims no target, which is the occupant a declaration-shape test
+    /// composes against.
+    fn merge_authored_contribution(
+        document: &mut DocumentMut,
+        contribution: &Contribution,
+    ) -> Result<(), RepositoryStateError> {
+        let (image, _) = image_with_profile_owner(&VirtualPath::CONFIG, b"", false);
+        merge_contribution(
+            &image,
+            &ProfilePackageId::new("test-package"),
+            ".jit/config.toml",
+            document,
+            contribution,
+        )
+    }
+
     #[test]
     fn test_equal_or_conflict_preserves_raw_profile_identifiers() {
         let target = VirtualPath::data("config.toml").unwrap();
         let (image, _) = image_with_profile_owner(&target, b"[validation]\n", false);
         let package_id = ProfilePackageId::new("candidate");
         let context = ContributionMergeContext {
-            base: Some(&image),
+            base: &image,
             package_id: &package_id,
             registry: ".jit/config.toml",
         };
-        let error = equal_or_conflict_with_base(
+        let error = equal_or_conflict(
             &context,
             "task",
             &serde_json::json!({"level": 3}),
@@ -1236,11 +1230,11 @@ mod tests {
         let (image, _) = image_with_profile_owner(&target, b"[validation]\n", true);
         let package_id = ProfilePackageId::new("workflow-package");
         let context = ContributionMergeContext {
-            base: Some(&image),
+            base: &image,
             package_id: &package_id,
             registry: ".jit/config.toml",
         };
-        let error = equal_or_conflict_with_base(
+        let error = equal_or_conflict(
             &context,
             "validation.default_type",
             &serde_json::json!("task"),
@@ -1359,12 +1353,8 @@ mod tests {
             (ScalarTarget::ValidationStrictness, "strict".to_string()),
             (ScalarTarget::ValidationDefaultType, "work-item".to_string()),
         ] {
-            merge_contribution(
-                ".jit/config.toml",
-                &mut document,
-                &Contribution::Scalar { target, value },
-            )
-            .unwrap();
+            merge_authored_contribution(&mut document, &Contribution::Scalar { target, value })
+                .unwrap();
         }
 
         let json: JsonValue = toml_edit::de::from_str(&document.to_string()).unwrap();
@@ -1392,8 +1382,7 @@ mod tests {
                 "workspace/active",
             ),
         ] {
-            merge_contribution(
-                ".jit/config.toml",
+            merge_authored_contribution(
                 &mut document,
                 &Contribution::SetString {
                     target,
@@ -1427,7 +1416,7 @@ mod tests {
             target: ScalarTarget::ValidationDefaultType,
             value: "task".to_string(),
         };
-        merge_contribution(".jit/config.toml", &mut document, &contribution).unwrap();
+        merge_authored_contribution(&mut document, &contribution).unwrap();
         assert_eq!(
             document["validation"]["default_type"].as_str(),
             Some("task")
@@ -1437,7 +1426,7 @@ mod tests {
             target: ScalarTarget::ValidationDefaultType,
             value: "story".to_string(),
         };
-        let error = merge_contribution(".jit/config.toml", &mut document, &conflicting)
+        let error = merge_authored_contribution(&mut document, &conflicting)
             .expect_err("different scalar declarations must conflict");
         assert!(matches!(
             error,

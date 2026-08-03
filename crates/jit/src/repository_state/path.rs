@@ -320,6 +320,22 @@ impl VirtualPath {
     pub(crate) fn ensure_semantic(&self) -> Result<(), RepositoryLayoutError> {
         Self::from_parts(self.root_class(), self.relative().clone()).map(drop)
     }
+
+    /// The adopter-facing repository-relative spelling of this identity.
+    ///
+    /// The inverse of [`RepositoryLayout::classify_repository_relative`]:
+    /// a data-root identity renders under the logical `.jit/` prefix and every
+    /// other identity renders worktree-relative. Both directions live beside the
+    /// identity they convert so no consumer maintains its own `.jit` prefix
+    /// adapter — profile packages address targets, applied-profile records key
+    /// their target hashes, and messages name paths in exactly this spelling.
+    pub fn repository_relative(&self) -> String {
+        let relative = self.relative().as_str();
+        match self.root_class() {
+            RepositoryRootClass::Data => format!(".jit/{relative}"),
+            RepositoryRootClass::Worktree => relative.to_string(),
+        }
+    }
 }
 
 /// Boundary-acquired, no-follow evidence for one root.
