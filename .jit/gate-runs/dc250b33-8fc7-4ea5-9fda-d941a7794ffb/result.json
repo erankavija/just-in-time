@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fd6ed253d1d5544f58f59ba09ea550076c83ba42",
+  "completed_at": "2026-08-03T19:14:27.678837189Z",
+  "duration_ms": 239626,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/cli.rs",
+        "id": "F1",
+        "line": 2882,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/mcp-ci"
+        ],
+        "severity": "high",
+        "summary": "The bridge emits the CLI schema description for jit_profile_show, which omits a repository location, so the new required MCP coverage fails."
+      }
+    ],
+    "summary": "The live jit_profile_show description omits the repository location and fails mcp-ci.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d198030e-e637-444e-b444-e4e82a3d1ccf",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dc250b33-8fc7-4ea5-9fda-d941a7794ffb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T19:10:28.052395003Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4293 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc908-d990-7aa1-abb9-5d67af0d0fe2\n--------\nuser\n--- 4280 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `9f0c7172` and `e9b14468` (tag `jit:d198030e`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/e204e63d/decision/D-13` (`.jit/issues/e204e63d-e637-444e-b444-e4e82a3d1ccf.json`, markdown-first); `@/invariant/canonical-cutover` (`.jit/invariants.toml`, registry-first); `@/gate/mcp-ci` (`.jit/gates.toml`, registry-first)\nGate evidence: `mcp-ci` failed (exit 1, 2026-08-03T19:10:25Z); `code-review` pending\nTruncation recovery: Re-read the D-13 source and bounded generator, test, curation, CLI, and schema-loader ranges.\n\n1. **[blocking, issue-impact]** `jit_profile_show` still fails the new required surface assertion: its schema description says only “from a repository package” at `crates/jit/src/cli.rs:2882`, omitting a repository location. The bridge emits `cmd.description` (`mcp-server/lib/tool-generator.js:81`) and only uses curation to filter tools, so the corrected curation rationale at `mcp-server/curated-tools.json:56` never reaches `tools/list`. The recorded `mcp-ci` run fails exactly on `jit_profile_show should describe repository package locations`, leaving REQ-02 and REQ-03 unmet. References: `@/gate/mcp-ci`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The live jit_profile_show description omits the repository location and fails mcp-ci.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The bridge emits the CLI schema description for jit_profile_show, which omits a repository location, so the new required MCP coverage fails.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":2882,\"references\":[\"@/gate/mcp-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

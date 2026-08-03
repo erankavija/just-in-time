@@ -14,7 +14,18 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T19:14:28.005100924Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-03T19:10:27.343428102Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d198030e-e637-444e-b444-e4e82a3d1ccf",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Follow the renamed profile surface on the agent-facing bridge",
-  "updated_at": "2026-08-03T18:59:13.978713111Z"
+  "updated_at": "2026-08-03T19:14:28.005100924Z"
 }
