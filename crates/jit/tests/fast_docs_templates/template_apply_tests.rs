@@ -845,6 +845,87 @@ applies_to  = ["epic"]
     assert_eq!(h.all_issues().len(), before);
 }
 
+/// REQ-02 (jit:ff1bbada): a template gate that no preset and no registry entry
+/// supplies is reported by name, whatever that name is.
+///
+/// The names checked are the planning bracket's own, because a resolution that
+/// answered from the binary would answer for exactly those and for nothing else
+/// — which is what makes them the case that distinguishes a repository-supplied
+/// gate registry from a compiled-in one.
+#[test]
+fn test_apply_reports_a_planning_bracket_gate_no_preset_and_no_registry_entry_supplies() {
+    for key in ["plan-review", "coverage-preview", "breakdown-review"] {
+        // A repository declaring no preset and no gate registry at all, so the
+        // name under test is supplied by neither.
+        let h = TestHarness::new();
+        assert!(
+            h.storage.get_gate_preset(key).is_err(),
+            "{key} must not resolve as a preset this repository never declared"
+        );
+        assert!(
+            !h.storage
+                .load_gate_registry()
+                .expect("an empty registry loads")
+                .gates
+                .contains_key(key),
+            "{key} must not be a registry gate this repository never declared"
+        );
+
+        let toml = format!(
+            r#"
+[[template]]
+name        = "unsupplied"
+applies_to  = ["epic"]
+  [[template.anchors]]
+  name = "container"
+  [[template.nodes]]
+  role        = "planning"
+  type        = "planning"
+  gates       = ["{key}"]
+  description = "Planning node for {{container.title}}."
+  [[template.anchor_edges]]
+  from = "container"
+  to   = "planning"
+"#
+        );
+        let template = TemplateRegistry::from_toml_str(&toml, &HIERARCHY)
+            .unwrap()
+            .get("unsupplied")
+            .unwrap()
+            .clone();
+        let epic = h
+            .executor
+            .create_issue(
+                format!("Container gated by {key}"),
+                "## Success Criteria\n\n- [hard] REQ-01: it works\n".to_string(),
+                jit::domain::Priority::Normal,
+                vec![],
+                vec!["type:epic".to_string()],
+                None,
+                None,
+                false,
+            )
+            .unwrap()
+            .0;
+
+        let before = h.all_issues().len();
+        let error = h
+            .executor
+            .apply_template_with(&template, &epic, &container_binding(&epic), false)
+            .unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains(key),
+            "the failure must name the gate it could not resolve: {error:#}"
+        );
+        assert_eq!(
+            h.all_issues().len(),
+            before,
+            "the unresolved gate is reported before the first node is created"
+        );
+    }
+}
+
 // === REQ-13 regression: a malformed custom preset must propagate, NOT silently
 // fall back to a same-named registry gate key (issue 552ff75c) ===
 
