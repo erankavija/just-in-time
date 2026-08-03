@@ -154,6 +154,13 @@ All prior traps remain in force; read every earlier trap section. New this sessi
   only on a `target/debug/incremental` directory that appeared mid-run while the `daddfc0b`
   worker was executing its full suite. Do not gate on main while a worker is running a full
   Rust suite.
+- **A stale-narrative sweep is only as wide as its grep, and the reviewer's pattern differs
+  from yours.** The lead's sweep for `daddfc0b` keyed on `jit init (scaffolds|seeds|writes)`
+  and caught 25 sites across docs, Rust literals and test comments — but missed
+  `docs/reference/cli-commands.md:608`, which said "The unknown-template failure …" and named
+  neither `jit init` nor a scaffolding verb. `code-review` found it after `doc-review` had
+  gone green. **When an issue removes a named thing, also grep for the thing's own noun**
+  (`template`, `preset`, the flag spelling), not only for the verb phrases that introduce it.
 - **An assertion can become tautological without any gate noticing, and the tell is that both
   sides now perform the same read.** After `959274b6`,
   `test_live_assets_match_every_declared_source_tree_consumer` (`dogfood.rs:955`) compares
