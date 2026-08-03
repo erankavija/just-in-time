@@ -134,6 +134,31 @@ assert_rc 1 $? "citations: dangling repo-rooted path is MISSING"
 printf 'Config `crates/jit/Cargo.toml` and template `.jit/issues/{id}.json`.\n' >"$scratch/cite_clean.md"
 "$citations" "$scratch/cite_clean.md" >/dev/null 2>&1
 assert_rc 0 $? "citations: real path resolves, placeholder suppressed"
+
+# Package content: the exclusion splits a package directory by what each file
+# is for. The fixture reproduces that layout — a manifest beside the three
+# asset source prefixes a manifest declares — and seeds ONE unresolvable item
+# id into every one of them, so the two runs below differ only in which class
+# of package file they scan. The id is assembled from a variable so this
+# self-test source is not itself reported when the scripts tree is scanned.
+missing_id='does-not-exist-zzz'
+pkg="$scratch/pkgfixture/profiles/jit-fixture"
+mkdir -p "$pkg/assets/install/.jit/reference" "$pkg/assets/regions" "$pkg/assets/live/docs"
+printf 'enforced-by = "@/rule/%s"\n' "$missing_id" >"$pkg/manifest.toml"
+printf -- '- **@/rule/%s** — projected into the destination registry.\n' "$missing_id" \
+  >"$pkg/assets/install/.jit/reference/rules-and-gates.md"
+printf -- '- The @/rule/%s rule applies once the package is applied.\n' "$missing_id" \
+  >"$pkg/assets/regions/guidance.md"
+printf -- 'Guide text citing @/rule/%s.\n' "$missing_id" \
+  >"$pkg/assets/live/docs/guide.md"
+"$citations" "$pkg/assets" >/dev/null 2>&1
+assert_rc 0 $? "citations: destination-scoped ids in package assets are excluded"
+"$citations" "$pkg/manifest.toml" >/dev/null 2>&1
+assert_rc 1 $? "citations: the same id in a package manifest is reported"
+# The consequence on live content: what the exclusion leaves scanned in this
+# repository's own packages resolves.
+"$citations" profiles >/dev/null 2>&1
+assert_rc 0 $? "citations: this repository's scanned package content resolves"
 echo
 
 echo "== footprint error handling (env errors, never a false-green pass) =="
