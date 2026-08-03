@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T05:20:45.671531311Z",
   "context": {},
   "created_at": "2026-07-31T17:55:01.855466366Z",
   "dependencies": [
@@ -25,7 +26,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Describe the supplied-location form in the command reference",
-  "updated_at": "2026-08-02T20:26:35.788517563Z"
+  "updated_at": "2026-08-03T05:20:45.671531311Z"
 }

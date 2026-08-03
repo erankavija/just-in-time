@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-03T05:20:50.694768895Z",
   "context": {},
   "created_at": "2026-07-31T17:55:01.855466366Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "enforces:@/invariant/domain-agnostic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Move the two workflow rules into the workflow package",
-  "updated_at": "2026-08-02T23:03:31.089615512Z"
+  "updated_at": "2026-08-03T05:20:50.694768895Z"
 }
