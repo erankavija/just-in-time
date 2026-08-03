@@ -12708,3 +12708,7 @@
 {"from":"ready","id":"3531ca0f-ce12-4e6b-94e7-a1d5c751c136","issue_id":"ff1bbada-b22a-432a-a75a-8506743e90f9","timestamp":"2026-08-03T15:54:22.112666027Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"51216842-c093-4948-95ec-1f82bbb5195d","issue_id":"ff1bbada-b22a-432a-a75a-8506743e90f9","timestamp":"2026-08-03T15:54:22.112666027Z","type":"issue_claimed"}
 {"gate_key":"mcp-ci","id":"9f2af71d-c05b-4a40-895e-abadfb5a6162","issue_id":"ff1bbada-b22a-432a-a75a-8506743e90f9","timestamp":"2026-08-03T17:04:35.993818082Z","type":"gate_added"}
+{"gate_key":"cargo-ci","id":"cfee7010-c9ba-432a-b075-bed03c688aad","issue_id":"ff1bbada-b22a-432a-a75a-8506743e90f9","timestamp":"2026-08-03T17:35:44.540214227Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"4a02b957-4260-4851-89ea-6a467f4eb121","issue_id":"ff1bbada-b22a-432a-a75a-8506743e90f9","timestamp":"2026-08-03T17:35:55.607480308Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"781bfab8-7839-4f5d-8dfd-93aee487e2a5","issue_id":"ff1bbada-b22a-432a-a75a-8506743e90f9","timestamp":"2026-08-03T17:35:58.507764475Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"84794a21-d1ca-46af-8766-3739610cb9d7","issue_id":"ff1bbada-b22a-432a-a75a-8506743e90f9","timestamp":"2026-08-03T17:41:27.252864762Z","type":"gate_failed","updated_by":"auto:executor"}

@@ -18,10 +18,25 @@
     "mcp-ci"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T17:35:44.540214227Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T17:41:27.252864762Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-03T17:35:55.607480308Z",
+      "updated_by": "auto:executor"
+    },
     "mcp-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T17:04:35.993818082Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-03T17:35:58.507764475Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "ff1bbada-b22a-432a-a75a-8506743e90f9",
@@ -39,5 +54,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Take the workflow profile and its presets out of the binary",
-  "updated_at": "2026-08-03T17:04:35.993818082Z"
+  "updated_at": "2026-08-03T17:41:27.252864762Z"
 }

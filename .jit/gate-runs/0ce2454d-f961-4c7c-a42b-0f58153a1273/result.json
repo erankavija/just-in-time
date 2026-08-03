@@ -1,0 +1,68 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "262eeff56ba6f137df22aaa808620af821180d2f",
+  "completed_at": "2026-08-03T17:41:26.937332274Z",
+  "duration_ms": 327452,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/invariants.toml",
+        "id": "F1",
+        "line": 63,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "The registry-first domain-agnostic invariant still requires the removed planning-bracket presets to be retained as binary-shipped presets."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/binary_build_inputs.txt",
+        "id": "F2",
+        "line": 33,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/domain-agnostic",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "The production binary build-input declaration still embeds the project-specific profiles/jit-dogfood path and treats profile edits as binary inputs."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/profiles.md",
+        "id": "F3",
+        "line": 98,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "Directly affected adopter documentation and its related test still describe compiled-in packages and built-in planning presets."
+      }
+    ],
+    "summary": "The core removal works, but canonical policy, compiled build-input metadata, and directly affected documentation still retain the removed binary workflow model.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ff1bbada-b22a-432a-a75a-8506743e90f9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0ce2454d-f961-4c7c-a42b-0f58153a1273",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T17:35:59.485139288Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 31198 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc8b2-5afb-7f30-a255-fbd185067576\n--------\nuser\n--- 31185 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e868463e, 5324ae4a, 8b8cde0c, f5016c3d, 849d98d2, 2d234077, de87d9ff, f5a64947\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-10 (issue Markdown); @/charter/D-2, @/charter/D-3 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic, @/invariant/canonical-cutover, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0, 2026-08-03T17:28:09Z); docs-mechanical passed (0, 2026-08-03T17:35:45Z); mcp-ci passed (0, 2026-08-03T17:35:56Z); code-review pending\nTruncation recovery: narrowed reads by commit, core path, policy source, build-provenance declaration, and directly affected documentation\n\n1. **F1 — blocking, issue-impact, high:** The registry-first `domain-agnostic` policy still says the removed planning-bracket trio “is retained as the single binary-shipped preset bundle.” This directly contradicts REQ-02 and makes the issue’s `enforces:@/invariant/domain-agnostic` claim unsupported. Update the invariant source and its AGENTS projection as part of the cutover. [`.jit/invariants.toml:63`](/home/vkaskivuo/Projects/just-in-time/.jit/invariants.toml:63) References: @/invariant/domain-agnostic, @/invariant/canonical-cutover.\n\n2. **F2 — blocking, issue-impact, high:** The production `include_str!` build-input declaration still embeds the project-specific `profiles/jit-dogfood` path, and its conformance test explicitly treats changes there as binary build inputs. This leaves the binary naming the removed workflow package and can falsely mark it stale after profile-only changes. [`.binary_build_inputs.txt:33`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/binary_build_inputs.txt:33) References: @/invariant/domain-agnostic, @/invariant/canonical-cutover.\n\n3. **F3 — blocking, issue-impact, high:** Directly affected adopter documentation still describes compiled-in packages and built-in presets: the profile reference says `jit-dogfood` is carried by the running binary and records an embedded origin; the planning-bracket concept and adoption guide say the review presets are built in. These statements are false after this change, and the related test still names “built-in review placeholders.” [docs/reference/profiles.md:98](/home/vkaskivuo/Projects/just-in-time/docs/reference/profiles.md:98) References: @/invariant/single-source-prose, @/invariant/canonical-cutover.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The core removal works, but canonical policy, compiled build-input metadata, and directly affected documentation still retain the removed binary workflow model.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The registry-first domain-agnostic invariant still requires the removed planning-bracket presets to be retained as binary-shipped presets.\",\"file\":\".jit/invariants.toml\",\"line\":63,\"references\":[\"@/invariant/domain-agnostic\",\"@/invariant/canonical-cutover\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The production binary build-input declaration still embeds the project-specific profiles/jit-dogfood path and treats profile edits as binary inputs.\",\"file\":\"crates/jit/src/domain/binary_build_inputs.txt\",\"line\":33,\"references\":[\"@/invariant/domain-agnostic\",\"@/invariant/canonical-cutover\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Directly affected adopter documentation and its related test still describe compiled-in packages and built-in planning presets.\",\"file\":\"docs/reference/profiles.md\",\"line\":98,\"references\":[\"@/invariant/single-source-prose\",\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
