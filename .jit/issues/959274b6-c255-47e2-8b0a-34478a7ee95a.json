@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-03T07:13:38.545898262Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-03T07:16:12.324262771Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "959274b6-c255-47e2-8b0a-34478a7ee95a",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Resolve this repository's own package from its checkout",
-  "updated_at": "2026-08-03T05:37:55.679008806Z"
+  "updated_at": "2026-08-03T07:16:12.324262771Z"
 }

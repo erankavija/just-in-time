@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "96696b01cc82501dd47257a1b2b3a6acdf46dc94",
+  "completed_at": "2026-08-03T07:16:12.012681050Z",
+  "duration_ms": 152406,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 368,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The new test races on the process-wide working directory and lacks panic-safe restoration."
+      }
+    ],
+    "summary": "One issue-impact test-concurrency defect remains.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "959274b6-c255-47e2-8b0a-34478a7ee95a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "750c2937-7dbf-4a09-9961-0d9e9de7b067",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T07:13:39.606646680Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15878 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc678-98be-7ed3-b606-545c9b4e50b1\n--------\nuser\n--- 15865 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 8d318252, 1df47ef4, 079819e2, 74972b65, a4318a78, 96696b01 (merge; no combined patch)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-03T07:05:14Z)\nTruncation recovery: re-read bounded current-file ranges, package assembly, caller searches, and merge patch\n1. F1 — [blocking, issue-impact] The new CWD-independence test mutates the process-wide working directory without synchronization or panic-safe restoration. It runs alongside existing unit tests that also use `set_current_dir`, so parallel execution can make either test observe the wrong directory or leave the test process in the temporary directory after a panic. Use a synchronized/panic-safe guard or a subprocess. [crates/jit/src/test_utils.rs:368]\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact test-concurrency defect remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new test races on the process-wide working directory and lacks panic-safe restoration.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":368,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
