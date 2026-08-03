@@ -8,7 +8,7 @@
 # The plan-before-fan-out bracket vocabulary is DECLARED by the `plan` template in
 # the sibling `templates.toml`, which the engine stays agnostic to. The engine
 # hardcodes NONE of these names: the container type (`goal`), the two bracket node
-# types (`planning` / `breakdown`), and the gate presets are read from the template.
+# types (`planning` / `breakdown`), and the gate names are read from the template.
 #
 # The whole point of this example is domain-agnosticism: the breakable container
 # is a research `goal`, NOT a software container. There is no software-development
@@ -50,7 +50,8 @@ experiment = "experiment"
 # preview coverage rule fires and blocks when a [hard] criterion is uncovered);
 # plan-review and breakdown-review are declared as warning-only review
 # placeholders; replace their checkers before treating either pass as review
-# evidence.
+# evidence. The three gate definitions themselves are not in this directory —
+# see `docs/how-to/adopt-planning-bracket.md` Step 4 for the two routes to them.
 
 [validation]
 default_type = "experiment"

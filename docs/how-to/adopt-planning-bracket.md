@@ -16,8 +16,9 @@ that package is obtained and applied, its inventory, and its guarantees.
 Continue with this guide when you need an alternative container type, taxonomy,
 coverage convention, template, or gate integration.
 
-The bracket is **configuration**, not engine behaviour. Two complete, copy-ready
-rulesets ship it; this guide points you at the exact blocks to lift:
+The bracket is **configuration**, not engine behaviour. Two copy-ready rulesets
+carry its taxonomy, template, and coverage rules; this guide points you at the
+exact blocks to lift:
 
 - [`docs/examples/sdd/`](../examples/sdd/config.toml) — software, `epic` breakable.
 - [`docs/examples/research/`](../examples/research/config.toml) — research, `goal`
@@ -27,14 +28,18 @@ rulesets ship it; this guide points you at the exact blocks to lift:
 > The files under `docs/examples/` are EXAMPLES, not active on this repository. To
 > use one, copy its `config.toml` to `.jit/config.toml`, its `rules.toml` to
 > `.jit/rules.toml`, its `templates.toml` to `.jit/templates.toml`, and its
-> `schemas/` directory to `.jit/schemas/`.
+> `schemas/` directory to `.jit/schemas/`. Neither example carries a
+> `gates.toml`; the three gate definitions the template names come from
+> [Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders).
 
 **Bracket configuration is optional and affects issues only when applied.** A
 project with no `planning`/`breakdown` types and no `plan` template needs nothing
-in this guide. The opt-in path is the three additions below: declare the `planning` and
+in this guide. The opt-in path is the four additions below: declare the `planning` and
 `breakdown` types ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
 add a `plan` template ([Step 1](#step-1--declare-the-breakable-container-and-the-two-bracket-types)),
-and add the preview + closure coverage rules ([Steps 2–3](#step-2--add-the-closure-coverage-rule)).
+add the preview + closure coverage rules ([Steps 2–3](#step-2--add-the-closure-coverage-rule)),
+and supply the three gate definitions
+([Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders)).
 Existing issues are untouched until you bracket one with `jit apply plan <C>`.
 
 ## Prerequisites
@@ -42,8 +47,9 @@ Existing issues are untouched until you bracket one with `jit apply plan <C>`.
 - A JIT repository (`jit init`).
 - A methodology already expressed (or about to be) as a ruleset — the bracket
   *adds to* a coverage ruleset; it does not replace one. If you are starting from
-  scratch, copy `docs/examples/sdd/` or `docs/examples/research/` wholesale and
-  skip to [Step 5](#step-5--scaffold-a-container).
+  scratch, copy `docs/examples/sdd/` or `docs/examples/research/` wholesale, then
+  take [Step 4](#step-4--declare-the-three-gates-then-replace-the-review-placeholders)
+  and skip to [Step 5](#step-5--scaffold-a-container).
 - A repository-owned review integration if `plan-review` and
   `breakdown-review` must provide real approval rather than warning-only
   placeholders (see
