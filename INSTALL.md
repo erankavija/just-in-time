@@ -21,15 +21,12 @@ MCP server for an agent client.
 
 **Recommended for most users.** Statically linked binaries with no runtime
 dependencies, published as a GitHub release asset. No package manager and no
-container registry carries them; [what a release
-publishes](docs/reference/release-policy.md#what-a-release-publishes) lists the
-complete asset set.
+container registry carries them; the release policy's [asset
+table](docs/reference/release-policy.md#what-a-release-publishes) describes the
+complete asset set and what the native archive carries.
 
-The archive keeps the `jit` CLI, the `jit-server` binary, and both license texts
-at its extraction root. It also carries the `jit-default` vocabulary package and
-the assembled `jit-dogfood` workflow package under `packages/jit-default/` and
-`packages/jit-dogfood/`, so the profile and its dependency can be applied
-offline from the same download.
+The `jit` and `jit-server` binaries are at the archive's extraction root, which
+is the location used by the install commands below.
 
 ### Download and Verify
 
