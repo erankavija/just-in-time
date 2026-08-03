@@ -2695,8 +2695,6 @@ mod tests {
 
     #[test]
     fn test_read_path_bytes_working_tree_resolves_against_repo_root() {
-        use std::env;
-
         // Create a temp dir that acts as the repo root, with a .jit subdir.
         let repo_root = TempDir::new().unwrap();
         let jit_dir = repo_root.path().join(".jit");
@@ -2713,13 +2711,10 @@ mod tests {
 
         // Change CWD to a completely unrelated directory so that a naive
         // fs::read(path) using process CWD would fail to find the file.
-        let original_cwd = env::current_dir().unwrap();
-        env::set_current_dir(env::temp_dir()).unwrap();
-
-        let result = storage.read_path_bytes(file_name, None);
-
-        // Restore CWD regardless of outcome.
-        let _ = env::set_current_dir(&original_cwd);
+        let result = {
+            let _cwd = crate::test_utils::CurrentDirGuard::new(std::env::temp_dir()).unwrap();
+            storage.read_path_bytes(file_name, None)
+        };
 
         let (bytes, label) =
             result.expect("read_path_bytes should succeed even when CWD != repo root");
