@@ -153,7 +153,7 @@ The deterministic validation checkers run in process. The packaged plan,
 breakdown, and code-review checkers are deliberately warning-only placeholders:
 they pass with a visible structured warning until the repository replaces them
 with real review integrations. A placeholder pass is sequencing evidence, not
-review approval. See [Built-in Gate Presets](gate-presets.md) for checker
+review approval. See [Gate Presets](gate-presets.md) for checker
 semantics and [Custom Gates](../how-to/custom-gates.md) for replacement.
 
 The profile changes configuration and installs files, but it never creates Git
