@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "00b219cb75399b95a272ba249969f74211739d5c",
+  "completed_at": "2026-08-03T09:24:25.721358371Z",
+  "duration_ms": 271888,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 608,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e204e63d/decision/D-13",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "medium",
+        "summary": "The init reference still claims an unknown-template failure exists after hierarchy templates and their CLI option were removed."
+      }
+    ],
+    "summary": "One stale initialization reference still describes the removed hierarchy-template interface.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5cbb3bb6-1cf6-4e44-a70f-568f8944bd05",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T09:19:53.833105945Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18241 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fc6ec-2abd-7670-b2c7-07d4ecc98803\n--------\nuser\n--- 18228 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 2641eab7, 9a905caf, 3787f714, fd2338df, b8530b98, 692e4ceb, 30b7d75e, 2789d281, 00b219cb\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-13 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json); @/issue/e204e63d/decision/D-15 (same); @/invariant/domain-agnostic and @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-03T09:10:46Z); docs-mechanical passed (exit 0, 2026-08-03T09:18:20Z); doc-review passed (exit 0, 2026-08-03T09:18:32Z)\nTruncation recovery: narrowed initial aggregate patch reads into per-commit source, documentation, test, merge, and line-level reads\n\n1. **[blocking, issue-impact, medium]** [docs/reference/cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:608) still refers to an “unknown-template failure” for `jit init`. This issue removed `--hierarchy-template` and `config list-templates`, so the statement documents a removed interface and contradicts the new initialization contract. Remove it or replace it with the actual applicable failure. References: `@/issue/e204e63d/decision/D-13`, `@/invariant/canonical-cutover`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One stale initialization reference still describes the removed hierarchy-template interface.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The init reference still claims an unknown-template failure exists after hierarchy templates and their CLI option were removed.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":608,\"references\":[\"@/issue/e204e63d/decision/D-13\",\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

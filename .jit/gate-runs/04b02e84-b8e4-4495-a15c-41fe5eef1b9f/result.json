@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d310175fddf894471b7d5cca419ac12e7f2cc237",
+  "completed_at": "2026-08-03T09:29:46.904008978Z",
+  "duration_ms": 259616,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed removal, profile-backed initialization, generated documentation regions, and prior documentation correction satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "04b02e84-b8e4-4495-a15c-41fe5eef1b9f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T09:25:27.287698741Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2641eab7, 9a905caf, 3787f714, b8530b98, fd2338df, 692e4ceb, 30b7d75e, 00b219cb, 2789d281, d310175f (`jit:daddfc0b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-4, D-13, D-15 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, markdown-first); @/invariant/domain-agnostic, @/invariant/canonical-cutover (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0); docs-mechanical passed (exit 0); doc-review passed (exit 0)\nTruncation recovery: re-read individual commit stats, name-status, patches, policy sources, generator, current implementation, tests, and documentation in narrower calls\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed removal, profile-backed initialization, generated documentation regions, and prior documentation correction satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

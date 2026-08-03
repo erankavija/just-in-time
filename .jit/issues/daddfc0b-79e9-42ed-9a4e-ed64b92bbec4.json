@@ -10,6 +10,7 @@
   ],
   "description": "A bare initialization writes the structural minimum, because the binary no longer carries a configuration to write, and the generated policy documentation reads its values from the default package instead.\n\n## Background\n\nThe binary renders a whole configuration file for a new repository: a type hierarchy, seven namespaces, six item kinds, validation defaults, a documentation-area classification, and commented guidance. It also carries four named hierarchy presets selectable by name, and a documentation-policy constant the classification is drawn from. All of it is declarative configuration an adopter never asked for, and all of it is now declared by the default package instead.\n\nThe pieces come out together because they are one type and one surface. The template body and the presets are members of the same type; every fixture constructs one; the flag that selects a preset and the command that lists them lose their subject. Removing the presets without the body leaves a type whose only remaining member renders a configuration the boundary forbids.\n\nOne delivered artifact breaks in the same instant and is repaired in the same change. The generated policy regions are rendered by a script that initializes a throwaway repository and reads the documentation table the shipped path wrote there; once no table is written, it refuses on every run and both regions freeze. Its retarget is one line plus the path it must be given: initialize by applying the default package from this checkout, and read the same table from the same file. Every other property it establishes is unchanged, including its build-provenance refusal — which afterwards guards a value the binary no longer supplies, so it is belt-and-braces rather than the thing that makes the read correct.\n\n## Success Criteria\n\n- [hard] REQ-01: A bare initialization writes only what the engine derives from the repository rather than from a declaration, plus the empty registries and the derived index.\n- [hard] REQ-02: The compiled configuration template, the four named hierarchy presets, the type that carried them, and the documentation-policy constant are gone.\n- [hard] REQ-03: The flag that selected a hierarchy preset and the command that listed them are removed rather than left answering with an empty set.\n- [hard] REQ-04: The generated policy regions render from the default package's `[documentation]` declaration, through an initialization that applies it, and the freshness check passes on the same regions; neither adopter document retains a hand-maintained second copy of any list.\n- [hard] REQ-05: The scaffold's remaining machinery still derives rules and schemas from whatever registry the configuration declares, and still composes a profile application in one publication.\n- [hard] REQ-06: A repository initialized with the default package applied receives the configuration it received before this change.\n\n## Notes\n\nThe affordance an adopter loses is asking the binary which taxonomies exist and picking one by name; afterwards they read a package directory. That is stated where adopters read about initialization rather than left to be discovered.\n",
   "documents": [],
+  "done_at": "2026-08-03T09:30:26.758277846Z",
   "first_ready_at": "2026-08-03T06:46:31.327342313Z",
   "gates_required": [
     "cargo-ci",
@@ -20,22 +21,22 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-03T08:49:58.342329241Z",
+      "updated_at": "2026-08-03T09:18:19.761228143Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T08:56:18.909697506Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T09:29:47.220087296Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-08-03T08:52:14.973535684Z",
+      "status": "passed",
+      "updated_at": "2026-08-03T09:19:52.786079080Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-03T08:50:09.500038157Z",
+      "updated_at": "2026-08-03T09:18:31.261976921Z",
       "updated_by": "auto:executor"
     }
   },
@@ -53,7 +54,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove the configuration template the binary writes",
-  "updated_at": "2026-08-03T08:56:18.909697506Z"
+  "updated_at": "2026-08-03T09:30:26.758277846Z"
 }

@@ -12685,3 +12685,10 @@
 {"gate_key":"docs-mechanical","id":"2fef58d0-3509-48f9-b7d5-a1e33f15d630","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T08:50:09.500038157Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"doc-review","id":"a72f6fc7-214c-4d2a-861c-28a1f2d1e616","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T08:52:14.973535684Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"df5bca00-6506-46ea-ae31-fce2e94fb164","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T08:56:18.909697506Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"1acfa0d4-d13f-4d7c-b7a4-2cf7bea3f12e","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T09:18:19.761228143Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"8160baba-e507-400a-9580-f13d716af32b","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T09:18:31.261976921Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"201272be-d3e4-4eef-b155-5cf7ecab4453","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T09:19:52.786079080Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"50ebfd8c-63b9-4ad0-8d9e-a3e44468f6eb","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T09:24:26.029313577Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"99d83e02-b27d-429a-935b-c65cacb6dcd5","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T09:29:47.220087296Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"2baf14a5-f29f-4c1b-ab1b-719db876951c","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T09:30:26.758277846Z","to":"done","type":"issue_state_changed"}
+{"id":"fa40a115-5e76-447f-aad7-024ab4715363","issue_id":"daddfc0b-79e9-42ed-9a4e-ed64b92bbec4","timestamp":"2026-08-03T09:30:26.758277846Z","type":"issue_completed"}

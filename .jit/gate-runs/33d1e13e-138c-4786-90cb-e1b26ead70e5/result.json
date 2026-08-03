@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "00b219cb75399b95a272ba249969f74211739d5c",
+  "completed_at": "2026-08-03T09:19:52.469288Z",
+  "duration_ms": 80239,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s documented bare-init and package-based vocabulary behavior matches the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "daddfc0b-79e9-42ed-9a4e-ed64b92bbec4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "33d1e13e-138c-4786-90cb-e1b26ead70e5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T09:18:32.229624319Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue; reviewed the nine individually inspected reachable `jit:daddfc0b` commits with rename detection. Uncommitted JIT gate metadata was excluded. The current docs accurately describe neutral bare initialization and package-provided vocabulary; both prior blocking findings are resolved.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s documented bare-init and package-based vocabulary behavior matches the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
