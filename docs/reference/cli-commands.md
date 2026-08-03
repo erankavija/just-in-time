@@ -545,10 +545,10 @@ by applying a profile package that carries them — `jit-default` for the generi
 vocabulary. Read a package directory's `manifest.toml` to see which taxonomy it
 declares before choosing one.
 
-`--profile <profile-id>` applies a repository profile as part of
+`--profile <profile-id>` applies a profile package as part of
 initialization. `jit init --profile jit-dogfood` is the preferred setup for
 JIT's portable workflow; plain init remains methodology-neutral. `--from <PATH>`
-names the repository directory holding that profile's package and requires
+names the repository directory holding that profile package and requires
 `--profile`. On a first application from a repository package, supply this
 location because a fresh repository has no applied-profile record to read. The
 resolution order and recorded-location failure behavior are defined below. For a
@@ -641,7 +641,7 @@ One obtained directory of packages therefore applies as a set:
 
 ### `jit profile list`
 
-List the profiles this repository records:
+List the profiles this repository records from repository package locations:
 
 ```bash
 jit profile list [--json]
@@ -662,7 +662,7 @@ from prose.
 
 ### `jit profile show`
 
-Inspect one package:
+Show one profile manifest and package identity from a repository package:
 
 ```bash
 jit profile show <PROFILE_ID> [--from <PATH>] [--json]
@@ -678,7 +678,8 @@ verification.
 
 ### `jit profile apply`
 
-Preview or apply a profile to the current repository:
+Apply a profile package read from a repository location through one
+recoverable multi-target transaction:
 
 ```bash
 jit profile apply <PROFILE_ID> [--from <PATH>] [--dry-run] [--json]
