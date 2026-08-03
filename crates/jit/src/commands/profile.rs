@@ -1545,7 +1545,7 @@ mod tests {
 
     /// This repository's generic vocabulary package, assembled from its
     /// checkout, with the directory holding the assembled tree.
-    fn jit_default_package() -> (TempDir, ProfilePackage) {
+    fn assembled_default_package() -> (TempDir, ProfilePackage) {
         crate::test_utils::temporary_repository_package("jit-default")
     }
 
@@ -1648,8 +1648,8 @@ mod tests {
 
     #[test]
     fn test_from_directory_reads_jit_default_with_a_stable_content_address() {
-        let (_workspace, package) = jit_default_package();
-        let (_repeated_workspace, repeated) = jit_default_package();
+        let (_workspace, package) = assembled_default_package();
+        let (_repeated_workspace, repeated) = assembled_default_package();
         let (_workflow_workspace, workflow) =
             crate::test_utils::temporary_repository_package("jit-dogfood");
 
@@ -1668,7 +1668,7 @@ mod tests {
 
     #[test]
     fn test_jit_default_carries_no_asset_and_no_workflow_registry_content() {
-        let (_workspace, package) = jit_default_package();
+        let (_workspace, package) = assembled_default_package();
         let manifest = package.manifest();
 
         // The manifest is the whole package: no file is published with it, so
@@ -1688,7 +1688,7 @@ mod tests {
     #[test]
     fn test_jit_default_declares_every_kind_an_initialized_repository_can_carry() {
         let (temp, _storage, _executor, _fixture_package) = fixture();
-        let (_workspace, package) = jit_default_package();
+        let (_workspace, package) = assembled_default_package();
         let kinds = declared_item_kinds(&package);
 
         assert!(
@@ -1805,7 +1805,7 @@ mod tests {
 
     #[test]
     fn test_jit_dogfood_declares_default_dependency_and_only_additive_contributions() {
-        let (_default_workspace, default) = jit_default_package();
+        let (_default_workspace, default) = assembled_default_package();
         let (_workflow_workspace, dogfood) =
             crate::test_utils::temporary_repository_package("jit-dogfood");
 
@@ -1960,7 +1960,7 @@ mod tests {
 
     #[test]
     fn test_jit_default_states_the_coordination_guidance_without_its_engine_defaults() {
-        let (_workspace, package) = jit_default_package();
+        let (_workspace, package) = assembled_default_package();
         let manifest = std::str::from_utf8(
             package
                 .source_bytes(crate::profile::MANIFEST_FILE_NAME)
