@@ -120,8 +120,9 @@ jobs:
             --bin jit --bin jit-server
 
       # The binaries and license texts land at the extraction root. The
-      # assembled workflow package travels under one package directory so the
-      # extracted archive is sufficient for offline profile application.
+      # assembled workflow package and the checked-in default package travel
+      # under the same package directory so the extracted archive is sufficient
+      # for offline profile application.
       - name: Assemble the archive
         run: |
           mkdir -p stage dist
@@ -130,11 +131,15 @@ jobs:
           strip stage/jit stage/jit-server
           cp LICENSE-MIT LICENSE-APACHE stage/
           scripts/assemble-package.sh stage/packages/jit-dogfood
+          # The default package has no live assets; its checked-in directory is
+          # already complete and is copied unchanged into the staging tree.
+          cp -R profiles/jit-default stage/packages/jit-default
           archive_members=(
             jit
             jit-server
             LICENSE-MIT
             LICENSE-APACHE
+            packages/jit-default
             packages/jit-dogfood
           )
           tar -czf dist/jit-linux-x64.tar.gz -C stage \
@@ -216,11 +221,13 @@ jobs:
               exit 1
             fi
           done
-          if [ ! -d "$prefix/packages/jit-dogfood" ] || \
-             [ ! -s "$prefix/packages/jit-dogfood/manifest.toml" ]; then
-            echo "the archive carries no assembled jit-dogfood package"
-            exit 1
-          fi
+          for package in jit-default jit-dogfood; do
+            if [ ! -d "$prefix/packages/$package" ] || \
+               [ ! -s "$prefix/packages/$package/manifest.toml" ]; then
+              echo "the archive carries no $package package"
+              exit 1
+            fi
+          done
 
       - name: Verify the version, target, and profile the binaries report
         env:
@@ -262,17 +269,23 @@ jobs:
           applied = initialization["profile"]["profiles"]
           ids = {profile["id"] for profile in applied}
           assert "jit-dogfood" in ids, applied
+          assert "jit-default" in ids, applied
 
           listing = json.load(open("profiles.json"))
           assert listing["count"] == len(listing["profiles"]), listing
           assert ids == {profile["id"] for profile in listing["profiles"]}, listing
-          dogfood = next(
-              profile for profile in listing["profiles"] if profile["id"] == "jit-dogfood"
-          )
-          assert dogfood["origin"] == {
-              "source": "directory",
-              "location": "packages/jit-dogfood",
-          }, dogfood
+          expected_locations = {
+              "jit-default": "packages/jit-default",
+              "jit-dogfood": "packages/jit-dogfood",
+          }
+          for profile_id, location in expected_locations.items():
+              profile = next(
+                  profile for profile in listing["profiles"] if profile["id"] == profile_id
+              )
+              assert profile["origin"] == {
+                  "source": "directory",
+                  "location": location,
+              }, profile
 
           # Re-planning an exact installation reports no work, which is what
           # makes the quickstart's result observable rather than merely quiet.
