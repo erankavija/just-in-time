@@ -25,8 +25,10 @@ container registry carries them; [what a release
 publishes](docs/reference/release-policy.md#what-a-release-publishes) lists the
 complete asset set.
 
-The archive is flat and carries four files: the `jit` CLI, the `jit-server`
-binary, and both license texts.
+The archive keeps the `jit` CLI, the `jit-server` binary, and both license texts
+at its extraction root. It also carries the assembled `jit-dogfood` workflow
+package under `packages/jit-dogfood/`, so the profile can be applied offline
+from the same download.
 
 ### Download and Verify
 

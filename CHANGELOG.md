@@ -65,6 +65,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   through the storage layer's atomic no-replace rename, so an occupied
   destination is reported rather than overwritten.
 
+- **One native download now carries the assembled `jit-dogfood` workflow package
+  for offline profile application.** An adopter could previously download the
+  native archive but still needed a second source to apply the workflow package
+  offline; the archive now carries the assembled package under
+  `packages/jit-dogfood/`. The `jit` and `jit-server` binaries and both license
+  texts remain at the extraction root, so the documented install step is
+  unchanged. The published asset set and checksum file are unchanged because
+  the package rides inside the archive they already cover.
+
 - **A gate verdict is reused when its declared inputs are unchanged.** A quality
   gate runs once per issue, so several issues sitting on one repository state
   each paid for a whole-tree checker to re-derive an identical verdict; nothing
