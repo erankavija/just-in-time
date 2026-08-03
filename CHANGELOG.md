@@ -74,6 +74,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unchanged. The published asset set and checksum file are unchanged because
   the package rides inside the archive they already cover.
 
+- **The native archive now carries the default vocabulary beside the workflow
+  package.** The extracted `jit-dogfood` package can therefore resolve and apply
+  its `jit-default` dependency from `packages/jit-default/` without consulting
+  the binary's compiled-in copy. Both package directories remain inside the
+  existing native archive, so the published asset set and checksum coverage are
+  unchanged.
+
 - **A gate verdict is reused when its declared inputs are unchanged.** A quality
   gate runs once per issue, so several issues sitting on one repository state
   each paid for a whole-tree checker to re-derive an identical verdict; nothing

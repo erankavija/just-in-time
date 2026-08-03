@@ -26,9 +26,10 @@ publishes](docs/reference/release-policy.md#what-a-release-publishes) lists the
 complete asset set.
 
 The archive keeps the `jit` CLI, the `jit-server` binary, and both license texts
-at its extraction root. It also carries the assembled `jit-dogfood` workflow
-package under `packages/jit-dogfood/`, so the profile can be applied offline
-from the same download.
+at its extraction root. It also carries the `jit-default` vocabulary package and
+the assembled `jit-dogfood` workflow package under `packages/jit-default/` and
+`packages/jit-dogfood/`, so the profile and its dependency can be applied
+offline from the same download.
 
 ### Download and Verify
 
