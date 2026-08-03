@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4eef6d282ea2522cda56aa4e52894c376bb2923b",
+  "completed_at": "2026-08-03T21:09:35.687246105Z",
+  "duration_ms": 140054,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped changelog reconciliation satisfies all hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "65280aff-344d-4c8a-854b-d4160126a0b4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "53b577d2-0698-4c39-a56f-e105417cb4a8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T21:07:15.632786842Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 72c222bb, 4eef6d28 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e204e63d/decision/D-10 (.jit/issues/e204e63d-60de-4fc5-a1b7-933cb41d1695.json, markdown-first); @/invariant/single-source-prose (.jit/invariants.toml, registry-first)\nGate evidence: docs-mechanical passed (exit 0, 2026-08-03T21:04:09Z); doc-review passed (exit 0, 2026-08-03T21:06:20Z)\nTruncation recovery: reread the merge patch with -m; partitioned the changelog patch and resolver/release-workflow reads\n\n1. No findings. `CHANGELOG.md:44-54` records the removal, while the surviving entries match directory-only resolution (`crates/jit/src/commands/profile.rs:151-165`, `325-344`, `713-729`) and archive packaging (`.github/workflows/release-artifacts.yml:133-146`).\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped changelog reconciliation satisfies all hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

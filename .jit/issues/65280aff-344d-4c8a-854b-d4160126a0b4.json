@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The unreleased changelog describes the release it will ship, so no entry names a route this release does not have.\n\n## Background\n\nThe unreleased section accumulated entries across a container that changed the same subject twice. Several were written while the binary still carried a compiled-in package and describe it as a live resolution route: one names it as an answering step in dependency resolution, one says a package directory lets an adopter avoid consulting it, and three describe an origin, a stored-record failure case, and a compile-time read route that distinguish compiled-in bytes from directory bytes. That distinction no longer exists.\n\nThe change that removed it has no entry at all, so the section simultaneously describes a route the release does not have and omits the removal that took it away. Both halves are one defect: an unreleased entry is not history, it is a draft of what the release will say, and an adopter reading it would be told about something no release ever carried.\n\n## Success Criteria\n\n- [hard] REQ-01: No unreleased entry describes the binary as carrying, resolving from, or falling back to a compiled-in profile package or workflow preset.\n- [hard] REQ-02: The removal of the compiled-in package and the workflow presets is recorded as an unreleased entry, in the register the surrounding entries use.\n- [hard] REQ-03: Every unreleased entry that survives is true of the tree at this revision, and each still reads as one coherent statement rather than a patched one.",
   "documents": [],
+  "done_at": "2026-08-03T21:09:52.158225222Z",
   "first_ready_at": "2026-08-03T20:54:12.605315228Z",
   "gates_required": [
     "docs-mechanical",
@@ -14,19 +15,19 @@
   ],
   "gates_status": {
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T20:54:22.320016322Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-03T21:09:36.046347232Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T20:54:22.151118640Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-03T21:07:01.598030315Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-03T20:54:21.975866358Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-03T21:04:23.674722006Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "65280aff-344d-4c8a-854b-d4160126a0b4",
@@ -39,7 +40,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Reconcile the unreleased changelog against the release it describes",
-  "updated_at": "2026-08-03T20:55:36.509038686Z"
+  "updated_at": "2026-08-03T21:09:52.158225222Z"
 }

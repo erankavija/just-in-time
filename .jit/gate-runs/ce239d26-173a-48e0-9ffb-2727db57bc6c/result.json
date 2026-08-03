@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4eef6d282ea2522cda56aa4e52894c376bb2923b",
+  "completed_at": "2026-08-03T21:07:01.202443839Z",
+  "duration_ms": 40289,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue correctly reconciles only the excluded changelog surface and creates no unmet adopter-documentation impact.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "65280aff-344d-4c8a-854b-d4160126a0b4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ce239d26-173a-48e0-9ffb-2727db57bc6c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-03T21:06:20.913295220Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue (`task`, max hierarchy level) with no resolved children. I inspected both reachable `jit:65280aff` commits individually; the substantive patch changes only `CHANGELOG.md`, while the merge contributes no separate patch. Current profile resolution is directory- and applied-record-based.\n\nThe issue removes obsolete compiled-in-package claims and records the removal coherently. Its only changed surface is `CHANGELOG.md`, which is outside this gate’s adopter-facing documentation scope; no directly caused update to an adopter document is required.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue correctly reconciles only the excluded changelog surface and creates no unmet adopter-documentation impact.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
