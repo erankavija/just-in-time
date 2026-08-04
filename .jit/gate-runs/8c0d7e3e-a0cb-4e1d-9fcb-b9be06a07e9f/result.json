@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "13d307894d2c452ff205d6756f2819fcc15350ea",
+  "completed_at": "2026-08-04T17:46:39.742161850Z",
+  "duration_ms": 207017,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; the prior path-limit finding is resolved and the satisfies label correctly targets the parent epic's REQ-04.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "89a7e34e-11a1-4acf-810b-43d2a056005f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8c0d7e3e-a0cb-4e1d-9fcb-b9be06a07e9f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T17:43:12.724267621Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:89a7e34e` commits 630575b0, 1b13cb6f, 21730831, 8ed6a856, c9b5f2ff, 535531dd, 7bceffef\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/89a7e34e/requirement/REQ-01, REQ-02, REQ-03 (issue description); @/issue/f3f7de97/requirement/REQ-04 (parent issue description); @/gate/cargo-ci (.jit/gates.toml); @/invariant/architecture-dependency-direction, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T17:16:54Z); prior code-review failed (exit 1, 2026-08-04T17:30:04Z), with its path-limit finding verified resolved\nTruncation recovery: re-read truncated evidence as individual commit/file patches, current implementation/test ranges, merge-resolution diffs, and resolved parent requirement\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; the prior path-limit finding is resolved and the satisfies label correctly targets the parent epic's REQ-04.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
