@@ -45,7 +45,20 @@ grep -rn "prop_concurrent_different_issues_succeed\|prop_concurrent_claims_exclu
 ```
 
 Search 1 returned 23 files; search 2 returned 158 construct sites. Each site was
-read in its enclosing test and classified below. Production-code constructs
+read in its enclosing test and classified below.
+
+A fourth search covers concurrency that carries no clock, which the first three
+would miss: `grep -rln "thread::spawn" crates/ --include="*.rs"` returns 16
+files, 12 of them already in search 1. Of the four that are not,
+`claim_coordinator_proptests.rs` is the subject of this issue and is recorded
+below; the other three —
+`crates/jit/src/storage/json.rs:1584` (a spawned caller is refused while a
+session is retained), `crates/jit/tests/cli_query_graph/check_links_tests.rs:19`
+and `crates/jit/tests/cli_query_graph/remote_document_tls_tests.rs:78` (loopback
+servers in background threads) — assert outcomes the code enforces, with no
+test-side deadline and no bound a slow host can exhaust.
+
+Production-code constructs
 (`storage/lock.rs` poll loops, `storage/repo_lock.rs` owner waits,
 `gate_execution.rs` child-process waits, `server/src/shutdown.rs`,
 `server/src/watcher.rs`, `server/src/routes.rs`, `profile/package.rs`,
