@@ -12,9 +12,13 @@ mod tests {
     use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
     use crate::profile::contribution_drift::{DeclaredOverride, OverrideScope};
-    use crate::profile::{ExclusionPattern, LiveSourceDeclaration, ProfilePackage};
+    use crate::profile::drift_report::{DriftCarrier, DriftReport, DriftSubject};
+    use crate::profile::{
+        ExclusionPattern, LiveSourceDeclaration, ProfilePackage, RegionDeclaration, RegionPlacement,
+    };
     use crate::repository_state::{
-        render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
+        render_managed_document, render_rules_and_gates_markdown, Contribution, KeyedArrayTarget,
+        ManagedDocumentClaim, MapEntryTarget,
     };
     use crate::storage::{IssueStore, JsonFileStorage};
     use crate::templates::{GraphTemplate, TemplateRegistry};
@@ -865,11 +869,168 @@ mod tests {
         }
     }
 
+    /// Compare a rendered managed region with its packaged source through the
+    /// shared drift report, normalizing the nested invariants projection when
+    /// the package source carries it.
+    fn managed_region_drift_report(
+        region: &RegionDeclaration,
+        rendered: &str,
+        packaged: &str,
+    ) -> Option<DriftReport> {
+        let subject = DriftSubject {
+            repository: DriftCarrier::new(
+                region.target.clone(),
+                format!("region '{}'", region.region_id),
+            ),
+            packaged: DriftCarrier::new(
+                region.source.clone(),
+                format!("region '{}'", region.region_id),
+            ),
+            field_root: format!("region '{}'", region.region_id),
+            remedy: format!(
+                "edit the rendered region in '{}' and the packaged source in '{}' together so both carriers state the same region body",
+                region.target, region.source
+            ),
+        };
+        let rendered = normalized_managed_region_body(rendered, packaged);
+        let packaged = normalized_managed_region_body(packaged, packaged);
+        let differences = (rendered != packaged)
+            .then(|| {
+                vec![format!(
+                    "{}: the repository declares {rendered:?}, the package declares {packaged:?}",
+                    subject.field_root
+                )]
+            })
+            .unwrap_or_default();
+
+        subject.reporting(differences)
+    }
+
+    /// Apply the invariants placeholder splice used by the live repository
+    /// check to a region body when its packaged source declares that child.
+    fn normalized_managed_region_body(body: &str, packaged: &str) -> String {
+        let inv_begin = "<!-- jit:invariants:begin -->";
+        let inv_end = "<!-- jit:invariants:end -->";
+        if !packaged.contains(inv_begin) {
+            return body.to_string();
+        }
+
+        let claims = [ManagedDocumentClaim::Region {
+            owner: "test".into(),
+            region_id: "invariants".into(),
+            begin: inv_begin.as_bytes().to_vec(),
+            end: inv_end.as_bytes().to_vec(),
+            content: b"_No invariants declared._".to_vec(),
+            placement: crate::repository_state::RegionPlacement::RequireExisting,
+        }];
+        String::from_utf8(render_managed_document(body.as_bytes(), &claims).unwrap()).unwrap()
+    }
+
+    fn region_declaration(source: &str, target: &str, region_id: &str) -> RegionDeclaration {
+        RegionDeclaration {
+            source: source.to_string(),
+            target: target.to_string(),
+            region_id: region_id.to_string(),
+            placement: RegionPlacement::Append,
+        }
+    }
+
+    #[test]
+    fn test_managed_region_drift_report_is_silent_when_bodies_agree() {
+        let region = region_declaration(
+            "profiles/example/assets/region.md",
+            "docs/example.md",
+            "example",
+        );
+
+        assert!(managed_region_drift_report(&region, "the same body", "the same body").is_none());
+    }
+
+    #[test]
+    fn test_managed_region_drift_report_names_rendered_and_packaged_carriers() {
+        let region = region_declaration(
+            "profiles/example/assets/region.md",
+            "docs/example.md",
+            "example",
+        );
+        let report = managed_region_drift_report(&region, "the rendered body", "the packaged body")
+            .expect("different bodies are drift");
+
+        assert_eq!(report.repository().path, region.target);
+        assert_eq!(report.packaged().path, region.source);
+        assert!(report.repository().entry.contains("example"));
+        assert!(report.packaged().entry.contains("example"));
+        let rendered = report.to_string();
+        assert!(rendered.contains("repository: docs/example.md"));
+        assert!(rendered.contains("packaged:   profiles/example/assets/region.md"));
+        assert!(rendered.contains("edit the rendered region"));
+    }
+
+    #[test]
+    fn test_managed_region_drift_report_attributes_differing_text_to_each_carrier() {
+        let region = region_declaration(
+            "profiles/example/assets/region.md",
+            "docs/example.md",
+            "example",
+        );
+        let report = managed_region_drift_report(&region, "the rendered body", "the packaged body")
+            .expect("different bodies are drift");
+        let difference = report.differences().join("\n");
+
+        assert!(difference.contains("the repository declares \"the rendered body\""));
+        assert!(
+            difference.contains("the package declares \"the packaged body\""),
+            "{difference}"
+        );
+    }
+
+    #[test]
+    fn test_managed_region_drift_report_normalizes_a_nested_managed_subregion_on_both_sides() {
+        let region = region_declaration(
+            "profiles/example/assets/region.md",
+            "docs/example.md",
+            "example",
+        );
+        let rendered = "before\n<!-- jit:invariants:begin -->\n- repository projection\n<!-- jit:invariants:end -->\nafter\n";
+        let packaged = "before\n<!-- jit:invariants:begin -->\n_No invariants declared._\n<!-- jit:invariants:end -->\nafter\n";
+
+        assert!(managed_region_drift_report(&region, rendered, packaged).is_none());
+    }
+
+    #[test]
+    fn test_managed_region_drift_report_compares_every_manifest_region_declaration() {
+        let (_workspace, package) = assembled_package();
+        let expected = package
+            .manifest()
+            .regions
+            .iter()
+            .map(|region| (region.target.clone(), region.source.clone()))
+            .collect::<BTreeSet<_>>();
+        let compared = package
+            .manifest()
+            .regions
+            .iter()
+            .map(|region| {
+                let source =
+                    std::str::from_utf8(package.source_bytes(&region.source).unwrap()).unwrap();
+                let report = managed_region_drift_report(
+                    region,
+                    &format!("{source}\nrepository-only text"),
+                    source,
+                )
+                .expect("the synthetic repository-only text is drift");
+                (
+                    report.repository().path.clone(),
+                    report.packaged().path.clone(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(compared, expected);
+    }
+
     #[test]
     fn test_managed_regions_match_every_declared_source_tree_consumer() {
-        use crate::repository_state::{
-            render_managed_document, ManagedDocumentClaim, RegionPlacement,
-        };
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let (_workspace, package) = assembled_package();
 
@@ -878,8 +1039,6 @@ mod tests {
         // that the package leaves as a placeholder. Normalizing both sides' invariants
         // sub-region through the same splice makes prose drift the only difference the
         // comparison can surface.
-        let inv_begin = "<!-- jit:invariants:begin -->";
-        let inv_end = "<!-- jit:invariants:end -->";
         for region in &package.manifest().regions {
             let live = fs::read_to_string(root.join(&region.target)).unwrap();
             let begin = format!("<!-- jit:{}:begin -->", region.region_id);
@@ -889,35 +1048,8 @@ mod tests {
             let body = &live[body_start..body_end];
             let source =
                 std::str::from_utf8(package.source_bytes(&region.source).unwrap()).unwrap();
-            if source.contains(inv_begin) {
-                let claim = ManagedDocumentClaim::Region {
-                    owner: "test".into(),
-                    region_id: "invariants".into(),
-                    begin: inv_begin.as_bytes().to_vec(),
-                    end: inv_end.as_bytes().to_vec(),
-                    content: b"_No invariants declared._".to_vec(),
-                    placement: RegionPlacement::RequireExisting,
-                };
-                let normalized_live = String::from_utf8(
-                    render_managed_document(body.as_bytes(), std::slice::from_ref(&claim)).unwrap(),
-                )
-                .unwrap();
-                let normalized_source = String::from_utf8(
-                    render_managed_document(source.as_bytes(), &[claim]).unwrap(),
-                )
-                .unwrap();
-                assert_eq!(
-                    normalized_live, normalized_source,
-                    "{} region prose drifted from the package",
-                    region.target
-                );
-            } else {
-                assert_eq!(
-                    body.as_bytes(),
-                    source.as_bytes(),
-                    "{} region drifted from the package",
-                    region.target
-                );
+            if let Some(report) = managed_region_drift_report(region, body, source) {
+                panic!("{report}");
             }
         }
     }
