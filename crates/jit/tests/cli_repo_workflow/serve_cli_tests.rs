@@ -98,9 +98,20 @@ fn read_capture_segment(path: &Path, offset: u64, limit: u64) -> String {
         .unwrap_or_default()
 }
 
-/// Reads the head of a capture file, where a process announces itself.
+/// Reads the complete lines at the head of a capture file, where a process
+/// announces itself.
+///
+/// The trailing partial line is dropped, so a caller parsing a value out of a
+/// line never reads a prefix of that value as the value. A read can stop
+/// mid-line two ways: at the [`CAPTURE_SEGMENT`] cap, or on a writer that has
+/// put down half a line and not yet the rest. Either way half of
+/// `http://localhost:41407` parses as a plausible wrong port rather than as
+/// nothing, which would send the probe below to an address the process never
+/// announced.
 fn read_capture_head(path: &Path) -> String {
-    read_capture_segment(path, 0, CAPTURE_SEGMENT)
+    let head = read_capture_segment(path, 0, CAPTURE_SEGMENT);
+    head.rfind('\n')
+        .map_or_else(String::new, |last| head[..=last].to_owned())
 }
 
 /// Reads a capture file for a failure message, keeping both ends of one too
@@ -188,6 +199,35 @@ fn test_read_capture_answers_a_capture_within_the_cap_entire() {
 
     // What a failure message quotes for an ordinary capture is the capture.
     assert_eq!(read_capture(&path), written);
+}
+
+#[test]
+#[cfg(unix)]
+fn test_read_capture_head_omits_a_line_the_writer_has_not_finished() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("out");
+    // What a capture looks like mid-write: a complete line, then half of one.
+    fs::write(
+        &path,
+        "Starting server on http://localhost:41407\n  API: http://localhost:414",
+    )
+    .unwrap();
+
+    let head = read_capture_head(&path);
+
+    // The finished line is readable; the unfinished one is not offered to a
+    // parser that would read `414` as the port the process announced.
+    assert_eq!(
+        head.lines().find_map(parse_localhost_port),
+        Some(41407),
+        "the complete announcement must parse"
+    );
+    assert!(
+        head.lines()
+            .filter_map(parse_localhost_port)
+            .all(|port| port == 41407),
+        "no partial line may reach the parser: {head:?}"
+    );
 }
 
 #[test]
