@@ -117,6 +117,7 @@ value = { description = "Issue type (hierarchical). At most one per issue.", uni
   "type:task",
   "type:story",
   "type:epic",
+  "type:milestone",
 ] }
 
 [[contribution]]
@@ -164,6 +165,7 @@ identity = "resolution"
 value = { description = "Reason for issue closure (used with rejected state).", unique = true, examples = [
   "resolution:wont-fix",
   "resolution:duplicate",
+  "resolution:obsolete",
 ] }
 
 [[contribution]]

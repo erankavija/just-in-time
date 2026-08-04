@@ -147,13 +147,26 @@ pub enum OverrideScope {
 /// One declaration this repository deliberately holds differently from the
 /// packaged contribution that names it.
 ///
-/// An override is narrow by construction: it names the contributions it covers
-/// and, unless it covers the whole entry, the single top-level field the two
+/// An override is narrow by construction: it names the package whose
+/// contribution it covers, which contributions of that package it covers and,
+/// unless it covers the whole entry, the single top-level field the two
 /// carriers state differently. Every other field of the same entry stays bound,
 /// so an override suppresses the difference it was declared for and nothing
 /// else.
+///
+/// The package is named rather than defaulted because a reason is a reason
+/// about one package. This repository publishes several, they contribute to the
+/// same registries, and a reason that holds for one — a placeholder its adopter
+/// is meant to replace, an example naming this repository's own issues — need
+/// not hold for the next. An override that widened across packages by omission
+/// would be suppressing a comparison on the strength of a reason that was never
+/// asserted about it (`@/invariant/convention-convergence`). Two packages
+/// needing the same field suppressed are therefore two entries, each carrying
+/// the reason that holds for its own package.
 #[derive(Debug, Clone, Copy)]
 pub struct DeclaredOverride {
+    /// The package whose contribution this override covers, by manifest id.
+    pub package: &'static str,
     /// Which contributions the override covers.
     pub scope: OverrideScope,
     /// The entry it covers, or every entry of the scope when absent.
@@ -165,19 +178,20 @@ pub struct DeclaredOverride {
 }
 
 impl DeclaredOverride {
-    /// Whether this override covers `contribution`.
-    fn covers(&self, contribution: &Contribution) -> bool {
-        self.scope == scope_of(contribution)
+    /// Whether this override covers `contribution` as declared by `package`.
+    fn covers(&self, package: &str, contribution: &Contribution) -> bool {
+        self.package == package
+            && self.scope == scope_of(contribution)
             && self
                 .identity
                 .is_none_or(|identity| identity == entry_identity(contribution))
     }
 
-    /// Whether this override still has something to excuse in `contribution`:
-    /// it covers it, and the field it names — if it names one — is a field that
-    /// contribution declares.
-    pub fn applies_to(&self, contribution: &Contribution) -> bool {
-        self.covers(contribution)
+    /// Whether this override still has something to excuse in `contribution`
+    /// as declared by `package`: it covers it, and the field it names — if it
+    /// names one — is a field that contribution declares.
+    pub fn applies_to(&self, package: &str, contribution: &Contribution) -> bool {
+        self.covers(package, contribution)
             && self.field.is_none_or(|field| {
                 contributed_value(contribution)
                     .get(field)
@@ -231,14 +245,28 @@ pub fn contributed_registry_paths(contributions: &[Contribution]) -> BTreeSet<&'
         .collect()
 }
 
-/// Every packaged contribution whose repository counterpart states something
-/// else, one report per contribution.
+/// Repository-relative path of the manifest that declares package `id`.
 ///
-/// `manifest` is the repository-relative path of the manifest declaring
-/// `contributions`, and `registries` maps each repository-relative registry
-/// path to its authored text — [`contributed_registry_paths`] names the set
-/// that must be present. `overrides` declares which pairs this repository
-/// deliberately holds apart.
+/// Derived from the location this repository publishes its packages at, so a
+/// carrier names the file a reader opens without any caller spelling the path
+/// for a particular package.
+pub fn packaged_manifest_path(id: &str) -> String {
+    format!(
+        "{}/{id}/{}",
+        crate::test_utils::PROFILE_PACKAGE_SOURCES,
+        crate::profile::MANIFEST_FILE_NAME
+    )
+}
+
+/// Every contribution of `package` whose repository counterpart states
+/// something else, one report per contribution.
+///
+/// `package` is the manifest id of the package declaring `contributions`; it
+/// names the packaged carrier and selects which overrides apply. `registries`
+/// maps each repository-relative registry path to its authored text —
+/// [`contributed_registry_paths`] names the set that must be present.
+/// `overrides` declares which pairs this repository deliberately holds apart,
+/// and an entry naming a different package is not consulted.
 ///
 /// # Errors
 ///
@@ -246,21 +274,22 @@ pub fn contributed_registry_paths(contributions: &[Contribution]) -> BTreeSet<&'
 /// `registries`, when a registry does not parse, or when either side's value is
 /// not the declaration its target's comparison type describes.
 pub fn contribution_drift_reports(
-    manifest: &str,
+    package: &str,
     contributions: &[Contribution],
     registries: &BTreeMap<String, String>,
     overrides: &[DeclaredOverride],
 ) -> Result<Vec<DriftReport>, ContributionDriftError> {
     let documents = parsed_registries(contributions, registries)?;
+    let manifest = packaged_manifest_path(package);
     contributions
         .iter()
         .filter(|contribution| {
             !overrides
                 .iter()
-                .any(|declared| declared.field.is_none() && declared.covers(contribution))
+                .any(|declared| declared.field.is_none() && declared.covers(package, contribution))
         })
         .filter_map(|contribution| {
-            contribution_report(manifest, contribution, &documents, overrides).transpose()
+            contribution_report(package, &manifest, contribution, &documents, overrides).transpose()
         })
         .collect()
 }
@@ -301,6 +330,7 @@ fn parsed_registries(
 /// The report one contribution produces, or `None` when it agrees with its
 /// repository counterpart or the repository declares no counterpart.
 fn contribution_report(
+    package: &str,
     manifest: &str,
     contribution: &Contribution,
     documents: &BTreeMap<&'static str, Value>,
@@ -351,7 +381,7 @@ fn contribution_report(
     let packaged = contributed_value(contribution);
     let suppressed: BTreeSet<&str> = overrides
         .iter()
-        .filter(|declared| declared.covers(contribution))
+        .filter(|declared| declared.covers(package, contribution))
         .filter_map(|declared| declared.field)
         .collect();
 
@@ -581,18 +611,16 @@ statement = \"the ruling this repository recorded\"
 kind = \"advisory\"
 ";
 
+    /// The package id every case below declares its contributions under.
+    const PACKAGE: &str = "a-package";
+
     fn reports(
         contributions: &[Contribution],
         registries: &BTreeMap<String, String>,
         overrides: &[DeclaredOverride],
     ) -> Vec<DriftReport> {
-        contribution_drift_reports(
-            "profiles/p/manifest.toml",
-            contributions,
-            registries,
-            overrides,
-        )
-        .expect("the comparison runs")
+        contribution_drift_reports(PACKAGE, contributions, registries, overrides)
+            .expect("the comparison runs")
     }
 
     /// A contribution restating the repository's entry verbatim is not drift.
@@ -624,7 +652,7 @@ kind = \"advisory\"
         assert_eq!(reported.len(), 1);
         let rendered = reported[0].to_string();
         assert_eq!(reported[0].repository().path, ".jit/invariants.toml");
-        assert_eq!(reported[0].packaged().path, "profiles/p/manifest.toml");
+        assert_eq!(reported[0].packaged().path, packaged_manifest_path(PACKAGE));
         for named in [
             "a-property",
             "the ruling this repository recorded",
@@ -829,6 +857,7 @@ kind = \"advisory\"
 enforced-by = \"@/gate/checkout-only\"
 ";
         let binding = DeclaredOverride {
+            package: PACKAGE,
             scope: OverrideScope::KeyedArray(KeyedArrayTarget::Invariants),
             identity: None,
             field: Some("enforced-by"),
@@ -891,6 +920,7 @@ kind = \"advisory\"
             &contributions,
             &registries(&[(".jit/invariants.toml", repository)]),
             &[DeclaredOverride {
+                package: PACKAGE,
                 scope: OverrideScope::KeyedArray(KeyedArrayTarget::Invariants),
                 identity: Some("a-property"),
                 field: None,
@@ -907,7 +937,7 @@ kind = \"advisory\"
     #[test]
     fn test_contribution_drift_reports_errors_when_a_targeted_registry_is_unavailable() {
         let error = contribution_drift_reports(
-            "profiles/p/manifest.toml",
+            PACKAGE,
             &[invariant_contribution("s")],
             &BTreeMap::new(),
             &[],
@@ -926,7 +956,7 @@ kind = \"advisory\"
     #[test]
     fn test_contribution_drift_reports_errors_when_a_carrier_value_is_not_comparable() {
         let error = contribution_drift_reports(
-            "profiles/p/manifest.toml",
+            PACKAGE,
             &[Contribution::KeyedArray {
                 target: KeyedArrayTarget::Invariants,
                 identity: "a-property".to_string(),

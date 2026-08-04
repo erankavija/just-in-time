@@ -23,8 +23,7 @@
 
 use crate::profile::template_region;
 
-/// The package whose template declarations the generated registry region holds.
-const TEMPLATE_REGION_PACKAGE_ID: &str = "jit-dogfood";
+use crate::profile::template_region::TEMPLATE_REGION_PACKAGE_ID;
 
 /// A render of one committed artifact's current bytes, given the bytes the
 /// checkout holds. A whole-file render ignores them; a region render splices

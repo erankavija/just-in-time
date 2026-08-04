@@ -16,8 +16,9 @@
 //! and dev-dependency-active builds those two need, so an adopter build carries
 //! none of it.
 
+use crate::profile::contribution_drift::packaged_manifest_path;
 use crate::profile::drift_report::{DriftCarrier, DriftSubject};
-use crate::profile::{ProfilePackage, JIT_DOGFOOD_MANIFEST_PATH};
+use crate::profile::ProfilePackage;
 use crate::repository_state::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
@@ -31,6 +32,12 @@ pub const TEMPLATE_REGION_END: &str = "# jit:plan-template:end";
 
 /// Identity of the region claim, shared by every caller of the splice.
 const TEMPLATE_REGION_ID: &str = "plan-template";
+
+/// The package whose template contributions the generated region holds, and
+/// which owns the region claim. Every caller that names the package names this,
+/// so the region's owner, its packaged carrier, and the render's package cannot
+/// drift apart.
+pub const TEMPLATE_REGION_PACKAGE_ID: &str = "jit-dogfood";
 
 /// Root of the field paths the comparison reports, naming the declarations the
 /// way the registry file spells them (`[[template]]`).
@@ -113,7 +120,7 @@ pub fn splice_template_region(
     render_managed_document(
         existing,
         &[ManagedDocumentClaim::Region {
-            owner: "jit-dogfood".into(),
+            owner: TEMPLATE_REGION_PACKAGE_ID.into(),
             region_id: TEMPLATE_REGION_ID.into(),
             begin: TEMPLATE_REGION_BEGIN.as_bytes().to_vec(),
             end: TEMPLATE_REGION_END.as_bytes().to_vec(),
@@ -192,7 +199,10 @@ pub fn template_drift_report(
     };
     let subject = DriftSubject {
         repository: DriftCarrier::new(TEMPLATE_REGISTRY_PATH, "the generated template region"),
-        packaged: DriftCarrier::new(JIT_DOGFOOD_MANIFEST_PATH, "the template contributions"),
+        packaged: DriftCarrier::new(
+            packaged_manifest_path(TEMPLATE_REGION_PACKAGE_ID),
+            "the template contributions",
+        ),
         field_root: TEMPLATE_ARRAY_PATH.to_string(),
         remedy: format!(
             "the generated region of {TEMPLATE_REGISTRY_PATH} holds the packaged \
@@ -212,7 +222,8 @@ mod tests {
     /// reported at its own position, naming the side that lacks it.
     #[test]
     fn test_template_drift_report_names_a_template_only_the_repository_declares() {
-        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
+        let (_workspace, package) =
+            crate::test_utils::temporary_repository_package(TEMPLATE_REGION_PACKAGE_ID);
         let packaged = packaged_templates(&package).unwrap();
         let repository = [packaged.clone(), packaged.clone()].concat();
         let report = template_drift_report(&repository, &packaged)

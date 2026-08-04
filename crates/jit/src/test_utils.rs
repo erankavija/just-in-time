@@ -166,6 +166,42 @@ pub fn assemble_repository_package(
     )
 }
 
+/// The manifest id of every profile package this repository publishes, sorted.
+///
+/// Read from the checkout's [`PROFILE_PACKAGE_SOURCES`] listing, which is where
+/// this repository publishes its packages: a package added there joins every
+/// caller's set without an edit, and a caller that named its packages would go
+/// on ignoring it. One directory is one package id.
+///
+/// Panics when the listing cannot be read, and when it comes back empty: a walk
+/// over nothing reports nothing, so either would let a caller pass by vacuity
+/// rather than by the property holding.
+pub fn published_package_ids() -> Vec<String> {
+    let sources = repository_checkout().join(PROFILE_PACKAGE_SOURCES);
+    let mut ids: Vec<String> = fs::read_dir(&sources)
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to list the checkout's package sources at {}: {error}",
+                sources.display()
+            )
+        })
+        .map(|entry| {
+            entry
+                .expect("read a package source entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    assert!(
+        !ids.is_empty(),
+        "{} publishes no profile package",
+        sources.display()
+    );
+    ids.sort();
+    ids
+}
+
 /// Assemble every profile package this repository authors into
 /// `worktree`/[`PROFILE_PACKAGE_SOURCES`], and answer with the location of `id`.
 ///
@@ -179,22 +215,12 @@ pub fn assemble_repository_package(
 /// does not assemble, which is a defect in the checkout rather than a condition
 /// a test distinguishes.
 pub fn stage_repository_packages(worktree: &Path, id: &str) -> PathBuf {
-    let sources = repository_checkout().join(PROFILE_PACKAGE_SOURCES);
     let staged = worktree.join(PROFILE_PACKAGE_SOURCES);
-    fs::read_dir(&sources)
-        .unwrap_or_else(|error| {
-            panic!(
-                "failed to list the checkout's package sources at {}: {error}",
-                sources.display()
-            )
-        })
-        .for_each(|entry| {
-            let name = entry.expect("read a package source entry").file_name();
-            let package = name.to_string_lossy();
-            assemble_repository_package(&package, &staged.join(name.as_os_str())).unwrap_or_else(
-                |error| panic!("this repository's {package} package assembles: {error}"),
-            );
+    published_package_ids().into_iter().for_each(|package| {
+        assemble_repository_package(&package, &staged.join(&package)).unwrap_or_else(|error| {
+            panic!("this repository's {package} package assembles: {error}")
         });
+    });
     let location = staged.join(id);
     assert!(
         location.is_dir(),
