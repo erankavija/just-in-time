@@ -43,7 +43,7 @@
     {"topic": "epic criteria for CI", "resolution": "REQ-08 added"},
     {"topic": "Windows leg of the workflow", "resolution": "dropped from the matrix; the two Windows defects rejected"}
   ],
-  "rework_counts": {},
+  "rework_counts": {"6d496b8c": 1},
   "surfaced_pitfalls": [
     {
       "issue": "5367fcba",
@@ -56,6 +56,30 @@
       "finding": "The worker corrected a now-false CI statement in dev/active/c639cfb5-jit-profiles-complete/c639cfb5-investigation.md, an investigation document owned by a different container, and dropped its line-number citation into the workflow file while doing so.",
       "disposition": "Accepted. The brief's REQ-03 sweep reaches that surface and the statement was false after the change; the lost citation pointed at line numbers the edit moved anyway.",
       "criterion_subject": "ee02e514 REQ-03"
+    },
+    {
+      "issue": "6d496b8c",
+      "finding": "The merged change failed cargo-ci on main: adding a command surface requires registering it in every conformance suite that enumerates command surfaces, and four were missed — the classifier table in crates/jit/src/main.rs (repaired lead-direct), the row-set equality guard and both end-to-end subprocess bindings in command_exit_code_projection_tests, and the clap-arm probe in failure_probe_coverage_tests.",
+      "disposition": "Rework dispatched with all four findings named and a constraint forbidding any weakening of the assertions. Rework count 1 of 2.",
+      "criterion_subject": "6d496b8c REQ-01..REQ-03 via the cargo-ci gate"
+    },
+    {
+      "issue": "76a4bd21",
+      "finding": "The teardown's drained assertion reads an unreaped zombie as a surviving process, so on a host whose PID 1 never reaps orphans the case could fail spuriously after its 15-second teardown budget. The worker judged the risk low on a virtual-machine runner and kept the strict check because it is the direct evidence for REQ-02.",
+      "disposition": "Accepted. The failure mode is a bounded failure rather than the unbounded hang the issue exists to remove, and the message distinguishes a live survivor from a zombie by reporting whether the announced port still answers.",
+      "criterion_subject": "76a4bd21 REQ-02"
+    },
+    {
+      "issue": "76a4bd21",
+      "finding": "The test's kill_process_group calls the same nix primitive under the same pid-safety guard as the private helper at crates/jit/src/gate_execution.rs:345, rather than sharing it. The worker named this against @/inv/convention-convergence rather than leaving it silent.",
+      "disposition": "Accepted. The product helper is private to its module and takes a Child, so an integration test cannot reach it; exporting production API for a test's use is the worse trade. The shared mechanism actually at stake — the guarded conversion that keeps a negation from becoming kill(-1) — is followed and cited.",
+      "criterion_subject": "76a4bd21 REQ-02"
+    },
+    {
+      "issue": "76a4bd21",
+      "finding": "setup_repo now bounds and captures its jit init, which widens the change to all ten tests in the module rather than the foreground case alone.",
+      "disposition": "Accepted. REQ-03 says every wait the test performs is bounded, and the foreground case's own setup is one of those waits; a second parallel setup helper would have violated @/inv/convention-convergence. All ten tests pass.",
+      "criterion_subject": "76a4bd21 REQ-03"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z"
