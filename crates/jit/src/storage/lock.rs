@@ -534,11 +534,6 @@ mod tests {
     #[test]
     fn test_lock_exclusive_grants_the_lock_to_one_contender_at_a_time() {
         const CONTENDER_COUNT: usize = 8;
-        /// Each contender keeps the lock this long. Overlap detection widens
-        /// with it, and the verdict does not move with it: a lock that excludes
-        /// holds the peak at one for any hold length.
-        const OVERLAP_OBSERVATION_HOLD: Duration = Duration::from_millis(10);
-
         let temp_dir = TempDir::new().unwrap();
         let file_path = Arc::new(temp_dir.path().join("test.lock"));
         let contenders = Contenders::new();
@@ -574,7 +569,20 @@ mod tests {
                     .expect("an expired wait is asked again, so the lock answers every contender");
                     let now_holding = holding.fetch_add(1, Ordering::SeqCst) + 1;
                     peak_holding.fetch_max(now_holding, Ordering::SeqCst);
-                    thread::sleep(OVERLAP_OBSERVATION_HOLD);
+                    // The exclusion itself, asked of the lock while this
+                    // contender holds it. A peak of one cannot establish it —
+                    // a host free to run admitted contenders one after another
+                    // observes a peak of one whether the lock excludes or not —
+                    // so the holder asks directly instead, and gets an answer
+                    // that does not depend on anyone else being scheduled.
+                    let while_held = FileLocker::new(EXPIRING_LOCK_WAIT)
+                        .try_lock_exclusive(&file_path)
+                        .expect("asking whether the lock is free is not an error");
+                    assert!(
+                        while_held.is_none(),
+                        "the lock this contender holds is granted to a second \
+                         caller, so it excludes nobody"
+                    );
                     holding.fetch_sub(1, Ordering::SeqCst);
                     drop(guard);
                 })

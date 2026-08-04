@@ -26,8 +26,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T22:20:14.191675288Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T22:23:39.574692366Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
-  "updated_at": "2026-08-04T22:20:40.416592792Z"
+  "updated_at": "2026-08-04T22:23:39.574692366Z"
 }

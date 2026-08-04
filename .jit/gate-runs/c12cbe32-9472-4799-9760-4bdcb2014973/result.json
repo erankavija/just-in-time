@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0a68fb52dc5b3be46db404e2be1e256671c02a15",
+  "completed_at": "2026-08-04T22:27:09.279777149Z",
+  "duration_ms": 203114,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/lock.rs",
+        "id": "F1",
+        "line": 575,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e3c6c767/requirement/REQ-01",
+          "@/issue/e3c6c767/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The exclusivity test can still pass a broken lock when admitted threads are scheduled serially."
+      }
+    ],
+    "summary": "The exclusivity test can still pass a broken lock when admitted threads are scheduled serially.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c12cbe32-9472-4799-9760-4bdcb2014973",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T22:23:46.165320572Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4036 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcee0-2edf-7110-bf15-7d1d73febc84\n--------\nuser\n--- 4023 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b90ad3eb, b1c5ddd4, 436e697b, f53f9414 (`jit:e3c6c767`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e3c6c767/requirement/REQ-01–REQ-04 (issue description, markdown-first); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/gate-semantics (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T22:07:13Z)\nTruncation recovery: narrowed per-commit and merge-parent diffs, current line-ranged source reads, and seeded-regression/dependency evidence\n\n1. **F1 — Exclusivity can still pass a broken lock under serial scheduling** (blocking; issue-impact; high). [`crates/jit/src/storage/lock.rs:575`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/lock.rs:575) only establishes that every thread was refused before releasing `held`. Afterwards, there is no admission barrier: a broken `lock_exclusive` can admit one thread, let it complete its 10 ms sleep and decrement `holding`, then run the next. The observed peak remains one although exclusion is broken. The seeded record explicitly says its run fails in `await_refusals` before evaluating the peak assertion, so it does not demonstrate this assertion is schedule-independent. This leaves REQ-01 and REQ-04 unmet. References: `@/issue/e3c6c767/requirement/REQ-01`, `@/issue/e3c6c767/requirement/REQ-04`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The exclusivity test can still pass a broken lock when admitted threads are scheduled serially.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The exclusivity test can still pass a broken lock when admitted threads are scheduled serially.\",\"file\":\"crates/jit/src/storage/lock.rs\",\"line\":575,\"references\":[\"@/issue/e3c6c767/requirement/REQ-01\",\"@/issue/e3c6c767/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0a68fb52dc5b3be46db404e2be1e256671c02a15",
+  "completed_at": "2026-08-04T22:23:39.221485677Z",
+  "duration_ms": 151866,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; the linked seeded-regression record resolves the prior blocking finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "15afa1f8-5b3a-4c18-bc63-b7e237b837ee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "638fc010-1fb9-430e-bcba-25028d13d794",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T22:21:07.354641414Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fd1dd006, 974b3b27, cd720a43, 0a68fb52 (`jit:15afa1f8`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/15afa1f8/requirement/REQ-01, @/issue/15afa1f8/requirement/REQ-02, @/issue/15afa1f8/requirement/REQ-03, @/issue/15afa1f8/requirement/REQ-04 (issue description, markdown-first); @/invariant/semantic-test-assertions (.jit/invariants.toml, registry-first); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (2026-08-04T22:17:15Z; exit code unavailable); code-review failed (2026-08-04T22:17:27Z; exit 1, prior F1 addressed by the linked seeded-regression record)\nTruncation recovery: per-commit stats, changed-file lists, and patches; merge-parent patch; bounded shutdown.rs, policy, issue-record, and seeded-regression reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; the linked seeded-regression record resolves the prior blocking finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
