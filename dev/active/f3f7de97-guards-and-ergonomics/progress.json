@@ -8,7 +8,8 @@
     "Session 2 resumed after session 1 ended mid-run. Session 1 left four issues merged on main with a failing code-review gate (06f1fa95, 3923fd06, 89a7e34e, 57675b68), one issue fully gated but not transitioned (76a4bd21), and one worker's uncommitted design in its worktree (57675b68, preserved as 0f0fb836 on worktree-agent-57675b68).",
     "The lead pushed main to origin at b4859c87 to start a hosted CI run. REQ-08 can only be evidenced by a completed hosted run, and a run costs wall-clock the container does not control, so it starts as early as the tree allows rather than at completion.",
     "TRAP: a seeded regression reached main, through two faults that combined. The worker's REQ-04 re-verification ran in the parent checkout rather than its worktree \u2014 a `run_in_background` Bash call resets the session cwd, and every following command inherited the parent silently without a `cd` to reveal it. Its `sed -i` seed therefore landed on main. The lead then ran `git add -A` on main without reading `git status`, which committed the seed; the worker's `git checkout -- <path>` a moment later restored the file to that just-committed seeded state, and its `git diff --quiet` read clean because HEAD had moved under it. Neither fault alone would have shipped it: the revert would have worked, or there would have been nothing to sweep. Three habits follow \u2014 prefix every worker command with its worktree path rather than relying on session cwd; never `git add -A` on main unread while a worker is alive; and verify a revert against a known-good expected line rather than against `git diff --quiet`, which only says the tree matches HEAD and not that HEAD is right.",
-    "Workers run plain `cargo` commands, which do not take the host build lock that `scripts/cargo-ci.sh` re-execs under \u2014 only concurrent cargo-ci runs queue. Two live workers therefore starved a lead gate run to its 900-second runner timeout. Gate on main only when no worker is building."
+    "Workers run plain `cargo` commands, which do not take the host build lock that `scripts/cargo-ci.sh` re-execs under \u2014 only concurrent cargo-ci runs queue. Two live workers therefore starved a lead gate run to its 900-second runner timeout. Gate on main only when no worker is building.",
+    "BLOCKER at the end of wave 4: 63 orphaned busy-wait processes from 15afa1f8's load experiment saturate the host, and the lead's shell cannot signal them \u2014 the kill reports success while the processes survive, and the harness refuses the pattern-matching form as a self-match hazard. They are spin loops the worker spawned to saturate the host for a 20-repetition experiment; their parent shell died before its cleanup ran, so init adopted them. They are niced, and scripts/cargo-ci.sh also runs niced, so the gate competed with them on equal footing and overran its 900-second runner budget. The operator clears them by selecting processes whose parent is init, whose command line names the agent-15afa1f8 worktree and contains the spin loop, and killing that pid list."
   ],
   "waves": [
     {
@@ -117,25 +118,25 @@
           "short_id": "4c700c80",
           "title": "Decide the gate suite's remaining timed tests on behaviour, not on scheduling",
           "worker": "opus",
-          "status": "merged; four sites restated, lease module deleted per owner ruling; blocked on 15afa1f8 for REQ-05"
+          "status": "merged; blocked from done until 15afa1f8 closes, for REQ-05"
         },
         {
           "short_id": "e3c6c767",
           "title": "Decide the lock tests on lock behaviour, not on scheduling",
           "worker": "opus",
-          "status": "complete on branch, sent back to rebase onto contention_probe after a lead-caused mechanism collision"
+          "status": "merged; rebased onto contention_probe and strengthened it with an admitted counter; awaiting cargo-ci and code-review"
         },
         {
           "short_id": "e516b4f8",
           "title": "Remove the requirement tag naming another container",
           "worker": "codex/gpt-5.6-luna",
-          "status": "complete on branch, sweep result verified independently by the lead, awaiting merge"
+          "status": "merged; awaiting cargo-ci and code-review"
         },
         {
           "short_id": "15afa1f8",
           "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
           "worker": "opus",
-          "status": "dispatched, worktree agent-15afa1f8"
+          "status": "merged; the drain takes its boundary and sampling schedule from the caller; awaiting cargo-ci and code-review"
         }
       ]
     }
@@ -317,6 +318,12 @@
       "finding": "A cargo-ci evaluation hit the gate's own 900-second runner timeout and recorded status `error` rather than a verdict. The same gate over the same tree took 421 s idle and 537 s under a deliberate load test earlier in this session; this run coincided with two workers each running `cargo clippy --workspace --all-targets` and `cargo test`, carrying the host to a load average of 116 on 24 cores.",
       "disposition": "Not a REQ-03 violation, and not fixed by widening the timeout. The gate refused to answer rather than answering differently: `error` is distinguishable from `pass` and `fail`, and no verdict was produced from a starved run. Raising the 900-second budget would be a margin chosen to be long enough, which is the defect class this container exists to remove. The operational remedy is scheduling: the lead does not evaluate cargo-ci while a worker is building. Recorded because the observation is real and a reader comparing run durations will otherwise wonder.",
       "criterion_subject": "container REQ-03"
+    },
+    {
+      "issue": "15afa1f8",
+      "finding": "The worker's load experiment spawned 64 busy-wait spinners to saturate the host, ran the test 20 times against them, and was to kill them afterwards. Its parent shell died before the cleanup ran, orphaning all 64 to init, where they kept burning CPU for over half an hour and starved the lead's gate run to its runner timeout.",
+      "disposition": "Open at session end; the operator reaps them. The generalisable fix is a dispatch rule: a worker that spawns load traps its cleanup so an interrupted run still reaps, and the lead checks for orphaned load before attributing a slow gate to anything else. The lead first misattributed this load to an unrelated foreground application on the same host.",
+      "criterion_subject": "container REQ-08 in shape \u2014 an unbounded thing outliving the work that needed it"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z"
