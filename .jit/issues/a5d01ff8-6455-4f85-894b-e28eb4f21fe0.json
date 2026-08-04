@@ -1,0 +1,26 @@
+{
+  "assignee": "agent:claude",
+  "claimed_at": "2026-08-04T06:25:55.158697330Z",
+  "context": {},
+  "created_at": "2026-08-04T06:22:41.865401518Z",
+  "dependencies": [
+    "bb302dbd-bd03-42ed-ae71-b0f035453f56"
+  ],
+  "description": "GitHub Actions Security Audit workflow started failing on 2026-08-03 (run 30857369746): npm audit reports fast-uri 3.0.0-3.1.4 (high, GHSA-7p8r-x3mc-p8w7, host confusion via backslash authority introducer) and hono <4.12.34 (moderate, GHSA-8j4g-w8fx-2239, ReDoS in CORS middleware). Both are transitive dependencies (fast-uri via ajv, hono via @modelcontextprotocol/sdk) with fixes available inside the existing semver ranges.\n\n## Success Criteria\n\n- [hard] REQ-01: `npm audit --omit=dev --audit-level=info` in mcp-server/ exits 0 with 0 vulnerabilities reported.\n- [hard] REQ-02: Only mcp-server/package-lock.json changes; no direct dependency version pins in package.json are altered.",
+  "documents": [],
+  "done_at": "2026-08-04T06:26:33.835081542Z",
+  "first_ready_at": "2026-08-04T06:22:41.865401518Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "a5d01ff8-6455-4f85-894b-e28eb4f21fe0",
+  "labels": [
+    "epic:core-maintenance",
+    "component:mcp-server",
+    "type:bug",
+    "milestone:v1.0"
+  ],
+  "priority": "high",
+  "state": "done",
+  "title": "Remediate fast-uri and hono production dependency advisories in mcp-server",
+  "updated_at": "2026-08-04T06:26:33.835081542Z"
+}
