@@ -16,7 +16,8 @@
 //! and dev-dependency-active builds those two need, so an adopter build carries
 //! none of it.
 
-use crate::profile::ProfilePackage;
+use crate::profile::drift_report::{DriftCarrier, DriftSubject};
+use crate::profile::{ProfilePackage, JIT_DOGFOOD_MANIFEST_PATH};
 use crate::repository_state::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
@@ -171,10 +172,12 @@ pub fn render_template_registry(
 ///
 /// The comparison walks the two sides as the values they parse into, so it
 /// holds no expectation of its own about what either declares and covers every
-/// field the model carries, description strings included. Each reported line
-/// names a field by its path through the declaration and shows both values, and
-/// the report closes with [`TEMPLATE_REGION_GENERATOR`], which renders the
-/// repository's region from the packaged declarations.
+/// field the model carries, description strings included. The report is the
+/// shared [`DriftReport`](crate::profile::drift_report::DriftReport) shape:
+/// it names both carriers, then each differing field by its path through the
+/// declaration with the value both sides declare, and closes with
+/// [`TEMPLATE_REGION_GENERATOR`], which renders the repository's region from
+/// the packaged declarations.
 ///
 /// # Errors
 ///
@@ -187,76 +190,18 @@ pub fn template_drift_report(
     let compared = |declarations: &[GraphTemplate]| {
         serde_json::to_value(declarations).map_err(TemplateRegionError::Compare)
     };
-    let differences = value_differences(
-        TEMPLATE_ARRAY_PATH,
-        &compared(repository)?,
-        &compared(packaged)?,
-    );
-    Ok((!differences.is_empty()).then(|| {
-        format!(
-            "the repository's template declarations disagree with the packaged ones:\n  {}\n\
-             the generated region of .jit/templates.toml holds the packaged declarations: \
-             regenerate it with {TEMPLATE_REGION_GENERATOR}",
-            differences.join("\n  ")
-        )
-    }))
-}
-
-/// Every field at which two compared values differ, each named by its path
-/// through the declaration and shown from both sides.
-///
-/// Objects are compared over the union of their keys and arrays position by
-/// position, so a field one side omits and a position one side does not reach
-/// are both reported where they belong rather than collapsing the whole
-/// declaration into one difference.
-fn value_differences(
-    path: &str,
-    repository: &serde_json::Value,
-    packaged: &serde_json::Value,
-) -> Vec<String> {
-    use serde_json::Value;
-    match (repository, packaged) {
-        (left, right) if left == right => Vec::new(),
-        (Value::Object(left), Value::Object(right)) => left
-            .keys()
-            .chain(right.keys())
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .flat_map(|key| {
-                member_differences(&format!("{path}.{key}"), left.get(key), right.get(key))
-            })
-            .collect(),
-        (Value::Array(left), Value::Array(right)) => (0..left.len().max(right.len()))
-            .flat_map(|index| {
-                member_differences(
-                    &format!("{path}[{index}]"),
-                    left.get(index),
-                    right.get(index),
-                )
-            })
-            .collect(),
-        (left, right) => vec![format!(
-            "{path}: the repository declares {left}, the package declares {right}"
-        )],
-    }
-}
-
-/// The differences at one field path, where either side may be absent.
-fn member_differences(
-    path: &str,
-    repository: Option<&serde_json::Value>,
-    packaged: Option<&serde_json::Value>,
-) -> Vec<String> {
-    match (repository, packaged) {
-        (Some(left), Some(right)) => value_differences(path, left, right),
-        (Some(left), None) => vec![format!(
-            "{path}: the repository declares {left}, the package declares nothing"
-        )],
-        (None, Some(right)) => vec![format!(
-            "{path}: the repository declares nothing, the package declares {right}"
-        )],
-        (None, None) => Vec::new(),
-    }
+    let subject = DriftSubject {
+        repository: DriftCarrier::new(TEMPLATE_REGISTRY_PATH, "the generated template region"),
+        packaged: DriftCarrier::new(JIT_DOGFOOD_MANIFEST_PATH, "the template contributions"),
+        field_root: TEMPLATE_ARRAY_PATH.to_string(),
+        remedy: format!(
+            "the generated region of {TEMPLATE_REGISTRY_PATH} holds the packaged \
+             declarations: regenerate it with {TEMPLATE_REGION_GENERATOR}"
+        ),
+    };
+    Ok(subject
+        .compare(&compared(repository)?, &compared(packaged)?)
+        .map(|report| report.to_string()))
 }
 
 #[cfg(test)]

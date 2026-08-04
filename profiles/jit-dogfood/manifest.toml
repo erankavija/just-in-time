@@ -37,19 +37,19 @@ value = 4
 kind = "map-entry"
 target = "namespaces"
 identity = "epic"
-value = { description = "Feature or initiative membership.", unique = false, examples = ["epic:user-auth", "epic:release-readiness"] }
+value = { description = "Feature or initiative membership", unique = false, examples = ["epic:user-auth", "epic:release-readiness"] }
 
 [[contribution]]
 kind = "map-entry"
 target = "namespaces"
 identity = "story"
-value = { description = "Story membership.", unique = false, examples = ["story:login-flow", "story:release-validation"] }
+value = { description = "Story membership (optional)", unique = false, examples = ["story:login-flow", "story:release-validation"] }
 
 [[contribution]]
 kind = "map-entry"
 target = "namespaces"
 identity = "brackets"
-value = { description = "Planning-bracket container pointer.", unique = true, examples = ["brackets:0123abcd"] }
+value = { description = "Planning-bracket container pointer: on a breakdown node, names the container it brackets", unique = true, examples = ["brackets:0123abcd"] }
 
 [[contribution]]
 kind = "map-entry"
@@ -97,7 +97,7 @@ description = "While breakdown is reviewed, every hard requirement is credited t
 when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
 severity = "error"
 enforce = true
-assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"] } }
+assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] } }
 
 [[contribution]]
 kind = "keyed-array"

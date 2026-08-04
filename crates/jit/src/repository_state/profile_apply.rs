@@ -76,6 +76,19 @@ pub enum MapEntryTarget {
     ItemKinds,
 }
 
+impl MapEntryTarget {
+    /// The `.jit/config.toml` table path whose keys are this target's entry
+    /// identities.
+    pub(crate) fn table_path(self) -> &'static [&'static str] {
+        match self {
+            Self::TypeHierarchyTypes => &["type_hierarchy", "types"],
+            Self::LabelAssociations => &["type_hierarchy", "label_associations"],
+            Self::Namespaces => &["namespaces"],
+            Self::ItemKinds => &["item_kinds"],
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ScalarTarget {
@@ -85,6 +98,18 @@ pub enum ScalarTarget {
     ValidationDefaultType,
 }
 
+impl ScalarTarget {
+    /// The `.jit/config.toml` table and key this target's value is written at.
+    pub(crate) fn config_path(self) -> (&'static str, &'static str) {
+        match self {
+            Self::DocumentationDevelopmentRoot => ("documentation", "development_root"),
+            Self::DocumentationArchiveRoot => ("documentation", "archive_root"),
+            Self::ValidationStrictness => ("validation", "strictness"),
+            Self::ValidationDefaultType => ("validation", "default_type"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum SetStringTarget {
@@ -92,6 +117,18 @@ pub enum SetStringTarget {
     DocumentationManagedPaths,
     DocumentationPermanentPaths,
     DocumentationIssueScopedAreas,
+}
+
+impl SetStringTarget {
+    /// The `.jit/config.toml` table and key holding this target's array.
+    pub(crate) fn config_path(self) -> (&'static str, &'static str) {
+        match self {
+            Self::StrategicTypes => ("type_hierarchy", "strategic_types"),
+            Self::DocumentationManagedPaths => ("documentation", "managed_paths"),
+            Self::DocumentationPermanentPaths => ("documentation", "permanent_paths"),
+            Self::DocumentationIssueScopedAreas => ("documentation", "issue_scoped_areas"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -617,7 +654,7 @@ fn merge_scalar(
     target: ScalarTarget,
     candidate: &str,
 ) -> Result<(), RepositoryStateError> {
-    let (table, key) = scalar_target_path(target);
+    let (table, key) = target.config_path();
     if let Some(existing) = semantic.get(table).and_then(|table| table.get(key)) {
         return equal_or_conflict(
             context,
@@ -630,15 +667,6 @@ fn merge_scalar(
     Ok(())
 }
 
-fn scalar_target_path(target: ScalarTarget) -> (&'static str, &'static str) {
-    match target {
-        ScalarTarget::DocumentationDevelopmentRoot => ("documentation", "development_root"),
-        ScalarTarget::DocumentationArchiveRoot => ("documentation", "archive_root"),
-        ScalarTarget::ValidationStrictness => ("validation", "strictness"),
-        ScalarTarget::ValidationDefaultType => ("validation", "default_type"),
-    }
-}
-
 fn merge_map_entry(
     context: &ContributionMergeContext<'_>,
     document: &mut DocumentMut,
@@ -647,19 +675,7 @@ fn merge_map_entry(
     identity: &str,
     candidate: &JsonValue,
 ) -> Result<(), RepositoryStateError> {
-    let existing = match target {
-        MapEntryTarget::TypeHierarchyTypes => {
-            semantic_map_entry(semantic, &["type_hierarchy", "types"], identity)
-        }
-        MapEntryTarget::LabelAssociations => semantic_map_entry(
-            semantic,
-            &["type_hierarchy", "label_associations"],
-            identity,
-        ),
-        MapEntryTarget::Namespaces => semantic_map_entry(semantic, &["namespaces"], identity),
-        MapEntryTarget::ItemKinds => semantic_map_entry(semantic, &["item_kinds"], identity),
-    };
-    if let Some(existing) = existing {
+    if let Some(existing) = semantic_map_entry(semantic, target.table_path(), identity) {
         return equal_or_conflict(context, identity, existing, candidate);
     }
     match target {
@@ -715,7 +731,7 @@ fn merge_set_string(
     target: SetStringTarget,
     candidate: &str,
 ) -> Result<(), RepositoryStateError> {
-    let (table, key) = set_string_target_path(target);
+    let (table, key) = target.config_path();
     let values = semantic.get(table).and_then(|table| table.get(key));
     if let Some(values) = values {
         let values = values.as_array().ok_or_else(|| {
@@ -738,15 +754,6 @@ fn merge_set_string(
     )?
     .push(candidate);
     Ok(())
-}
-
-fn set_string_target_path(target: SetStringTarget) -> (&'static str, &'static str) {
-    match target {
-        SetStringTarget::StrategicTypes => ("type_hierarchy", "strategic_types"),
-        SetStringTarget::DocumentationManagedPaths => ("documentation", "managed_paths"),
-        SetStringTarget::DocumentationPermanentPaths => ("documentation", "permanent_paths"),
-        SetStringTarget::DocumentationIssueScopedAreas => ("documentation", "issue_scoped_areas"),
-    }
 }
 
 fn merge_keyed_array(
