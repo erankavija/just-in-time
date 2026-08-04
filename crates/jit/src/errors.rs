@@ -560,24 +560,17 @@ impl StaleBinaryError {
     }
 }
 
-/// Maximum number of working-tree build-input paths included in a refusal.
-const MAX_REPORTED_BUILD_INPUT_PATHS: usize = 5;
-
-/// Render the responsible paths without allowing a large working-tree change
-/// set to make a stale-binary refusal unreadable.
+/// Render every responsible path, one per line.
+///
+/// The refusal exists so a reader can commit or revert what made the binary
+/// stale, so every path is named: a set large enough to be unwieldy is still
+/// the set that has to be dealt with, and one path per line keeps it readable
+/// at any size.
 fn format_build_input_paths(paths: &[String]) -> String {
-    let shown = paths
+    paths
         .iter()
-        .take(MAX_REPORTED_BUILD_INPUT_PATHS)
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        .join(", ");
-    let remaining = paths.len().saturating_sub(MAX_REPORTED_BUILD_INPUT_PATHS);
-    if remaining == 0 {
-        shown
-    } else {
-        format!("{shown}, and {remaining} more path(s)")
-    }
+        .map(|path| format!("\n  {path}"))
+        .collect::<String>()
 }
 
 /// A `jit dep add` rejected because the edge would break transitive reduction.
@@ -1290,7 +1283,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stale_binary_error_bounds_uncommitted_input_paths() {
+    fn test_stale_binary_error_names_every_uncommitted_input_path() {
         let paths = (0..7)
             .map(|index| format!("crates/jit/src/file-{index}.rs"))
             .collect::<Vec<_>>();
@@ -1299,15 +1292,16 @@ mod tests {
             "tests",
             &crate::domain::build_provenance::StaleBinaryReason::UncommittedBuildInputs {
                 built_from: "a".repeat(40),
-                paths,
+                paths: paths.clone(),
             },
         );
         let message = err.to_string();
 
-        assert!(message.contains("file-0.rs"));
-        assert!(message.contains("file-4.rs"));
-        assert!(!message.contains("file-5.rs"));
-        assert!(message.contains("2 more path(s)"));
+        assert!(
+            paths.iter().all(|path| message.contains(path)),
+            "the reader commits or reverts these paths, so the refusal names \
+             each one: {message}"
+        );
     }
 
     #[test]

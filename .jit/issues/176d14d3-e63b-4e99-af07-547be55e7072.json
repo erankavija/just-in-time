@@ -26,9 +26,9 @@
       "updated_by": null
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:14.704105277Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T17:25:53.053241455Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "176d14d3-e63b-4e99-af07-547be55e7072",
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bind the packaged region source to the region rendered from it",
-  "updated_at": "2026-08-04T17:25:26.336968110Z"
+  "updated_at": "2026-08-04T17:25:53.053241455Z"
 }
