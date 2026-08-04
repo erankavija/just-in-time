@@ -10,11 +10,12 @@
 //! This module supplies the two pieces those tests need instead.
 //!
 //! [`Contenders`] is what the threads of one test record against: each writes
-//! down that its wait for the lock expired, so a test can establish that
-//! contention happened. [`Contenders::await_refusals`] then waits for the
-//! contenders' own recorded progress rather than for a clock, and
-//! [`admitted_when_reached`] puts a refused contender's question back to the
-//! lock, so the answer the test reads is the lock's rather than the scheduler's.
+//! down that its wait for the lock expired and that it got through, so a test
+//! can establish that contention happened and every waiter can see the set
+//! moving. [`Contenders::await_refusals`] then waits for the contenders' own
+//! recorded progress rather than for a clock, and [`admitted_when_reached`]
+//! puts a refused contender's question back to the lock, so the answer the test
+//! reads is the lock's rather than the scheduler's.
 //!
 //! [`ProgressWatch`] carries the bound every one of those waits needs. It is
 //! spent only while its subject is entirely still: any observed progress resets
@@ -23,6 +24,7 @@
 //! hanging.
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
 use std::time::{Duration, Instant};
@@ -96,9 +98,12 @@ impl ProgressWatch {
 /// progress. A contender records a refusal when its wait for the lock expires,
 /// which is the observable proof that it met the lock held — a test that needs
 /// contention establishes it here rather than assuming a schedule produced it.
+/// A contender records an admission when it gets through, so the set's progress
+/// is legible to the contenders still queued behind it.
 #[derive(Debug, Default)]
 pub(crate) struct Contenders {
     refused: Mutex<HashSet<ThreadId>>,
+    admitted: AtomicUsize,
 }
 
 impl Contenders {
@@ -109,8 +114,7 @@ impl Contenders {
 
     /// Record that the calling thread's wait for the lock expired.
     ///
-    /// Returns whether this is the first refusal this contender has recorded,
-    /// which is the progress a waiter watching the contenders is looking for.
+    /// Returns whether this is the first refusal this contender has recorded.
     pub(crate) fn record_refusal(&self) -> bool {
         self.locked_refusals().insert(std::thread::current().id())
     }
@@ -118,6 +122,26 @@ impl Contenders {
     /// How many distinct contenders have had a wait for the lock expire.
     pub(crate) fn refused_count(&self) -> usize {
         self.locked_refusals().len()
+    }
+
+    /// Record that the calling thread got through the lock, whatever the
+    /// operation behind it then decided: the critical section was entered and
+    /// left, so the lock is changing hands.
+    pub(crate) fn record_admission(&self) {
+        self.admitted.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// How many contenders the lock has let through.
+    pub(crate) fn admitted_count(&self) -> usize {
+        self.admitted.load(Ordering::SeqCst)
+    }
+
+    /// What the set has achieved so far, as one comparable observation.
+    ///
+    /// A change in either term is progress by the set, whichever contender made
+    /// it, which is what a waiter's [`ProgressWatch`] is looking for.
+    fn achieved(&self) -> (usize, usize) {
+        (self.refused_count(), self.admitted_count())
     }
 
     /// Wait until `contender_count` distinct contenders have each been refused
@@ -167,11 +191,17 @@ impl Contenders {
 /// answer it reads. `is_refusal` is what tells an expired wait apart from an
 /// outcome the locked operation decided.
 ///
+/// The bound is spent on the whole set going still rather than on this
+/// contender's own patience: any contender newly refused, and any contender the
+/// lock lets through, is progress that restarts it. However many contenders
+/// share `contenders`, a lock still changing hands is one none of them reports
+/// stuck.
+///
 /// # Panics
 ///
-/// Panics when this contender is refused for [`CONTENTION_STALL_LIMIT`] with no
-/// other contender refused in the meantime: nothing is releasing the lock, and
-/// the last refusal is reported rather than retried forever.
+/// Panics when no contender is admitted or newly refused for
+/// [`CONTENTION_STALL_LIMIT`]: nothing is releasing the lock, and the last
+/// refusal is reported rather than retried forever.
 pub(crate) fn admitted_when_reached<T, E: std::fmt::Display>(
     contenders: &Contenders,
     subject: &str,
@@ -179,10 +209,14 @@ pub(crate) fn admitted_when_reached<T, E: std::fmt::Display>(
     is_refusal: impl Fn(&E) -> bool,
 ) -> Result<T, E> {
     let mut watch = ProgressWatch::new();
+    let mut achieved = contenders.achieved();
     loop {
         match attempt() {
             Err(error) if is_refusal(&error) => {
-                let progressed = contenders.record_refusal();
+                contenders.record_refusal();
+                let now_achieved = contenders.achieved();
+                let progressed = now_achieved != achieved;
+                achieved = now_achieved;
                 watch.observe(progressed, |stalled_for| {
                     format!(
                         "no contender for {subject} was admitted or newly refused \
@@ -191,7 +225,10 @@ pub(crate) fn admitted_when_reached<T, E: std::fmt::Display>(
                     )
                 });
             }
-            decided => return decided,
+            decided => {
+                contenders.record_admission();
+                return decided;
+            }
         }
     }
 }
@@ -266,6 +303,40 @@ mod tests {
             refusals_before_admission + 1,
             "every refusal is retried and the first decision is returned"
         );
+        assert_eq!(
+            contenders.admitted_count(),
+            1,
+            "the contender the lock let through is recorded as progress for the set"
+        );
+    }
+
+    #[test]
+    fn test_admitted_when_reached_records_an_admission_for_every_contender_let_through() {
+        let contenders = Contenders::new();
+        let contender_count = 4;
+
+        let threads: Vec<_> = (0..contender_count)
+            .map(|_| {
+                let contenders = Arc::clone(&contenders);
+                std::thread::spawn(move || {
+                    admitted_when_reached(
+                        &contenders,
+                        "a lock that admits at once",
+                        || Ok::<_, &str>(()),
+                        |error| *error == "refused",
+                    )
+                })
+            })
+            .collect();
+        threads
+            .into_iter()
+            .for_each(|thread| thread.join().unwrap().unwrap());
+
+        assert_eq!(
+            contenders.admitted_count(),
+            contender_count,
+            "each contender's own passage through the lock is progress the rest can see"
+        );
     }
 
     #[test]
@@ -284,6 +355,11 @@ mod tests {
             contenders.refused_count(),
             0,
             "a rejection is the lock's answer, not a wait that expired"
+        );
+        assert_eq!(
+            contenders.admitted_count(),
+            1,
+            "a caller the operation rejected still entered and left the critical section"
         );
     }
 }
