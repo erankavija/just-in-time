@@ -7,9 +7,11 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::net::TcpListener;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::process::Child;
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 
@@ -291,6 +293,165 @@ pub fn find_server_binary() -> Result<PathBuf> {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Startup observation
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Ceiling on each of connecting, sending, and reading within one liveness
+/// probe, so a probe against a socket nobody is serving answers rather than
+/// blocking on a read.
+pub const PROBE_TIMEOUT: Duration = Duration::from_millis(500);
+
+/// Wait between two observations of a server that is still starting.
+pub const STARTUP_POLL_INTERVAL: Duration = Duration::from_millis(20);
+
+/// Time a starting server is given to answer beyond the longest wait its own
+/// bootstrap recovery can spend on the repository lock.
+///
+/// Generous against the work it covers, which is a process that already holds
+/// the lock reading a repository and binding nothing (the socket it serves on
+/// is bound before it is spawned).
+pub const STARTUP_SERVE_ALLOWANCE: Duration = Duration::from_secs(30);
+
+/// Longest [`start_server`] follows a spawned server that has neither answered
+/// on its port nor exited.
+///
+/// Derived from the repository's own configuration rather than fixed: the
+/// slowest step a starting server takes is its bootstrap recovery, which gives
+/// up on the repository lock at the configured storage-lock timeout
+/// (`JIT_LOCK_TIMEOUT`, or
+/// [`LOCK_TIMEOUT_SECS`](crate::runtime_defaults::LOCK_TIMEOUT_SECS)) and then
+/// either serves or exits. The bound is that timeout plus
+/// [`STARTUP_SERVE_ALLOWANCE`], so a repository that raises the timeout raises
+/// what a start will follow, and a server waiting out a lock its repository
+/// entitles it to wait for is never terminated mid-recovery.
+///
+/// Reaching the bound means the child is running and unreachable, which
+/// [`start_server`] reports as a startup failure after terminating the child.
+/// The alternative to a bound is an unbounded wait, the failure mode
+/// `@/issue/f3f7de97/requirement/REQ-08` closed after one held four
+/// continuous-integration jobs to their execution ceiling.
+#[must_use]
+pub fn startup_bound() -> Duration {
+    crate::storage::json::configured_lock_timeout() + STARTUP_SERVE_ALLOWANCE
+}
+
+/// The request one liveness probe sends.
+const HEALTH_REQUEST: &[u8] = b"GET /api/health HTTP/1.0\r\nHost: localhost\r\n\r\n";
+
+/// The prefix of the status line a serving process answers it with.
+const HTTP_STATUS_PREFIX: [u8; 5] = *b"HTTP/";
+
+/// Answers whether a `jit-server` is serving on `port` of the loopback
+/// interface.
+///
+/// A completed HTTP exchange is what decides it. The parent binds the listening
+/// socket and hands it to the child ([`spawn_with_listener`]), so the kernel
+/// accepts a connection into the listen backlog throughout the child's startup:
+/// a successful connect reports that the socket exists, which was already true
+/// before the child was spawned. A status line comes back from the serving
+/// process alone.
+///
+/// Every step is bounded by [`PROBE_TIMEOUT`], so one observation of a server
+/// that is still starting costs at most that and then answers.
+#[must_use]
+pub fn is_serving_on_port(port: u16) -> bool {
+    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, PROBE_TIMEOUT) else {
+        return false;
+    };
+    let mut status_prefix = [0u8; HTTP_STATUS_PREFIX.len()];
+    stream.set_write_timeout(Some(PROBE_TIMEOUT)).is_ok()
+        && stream.set_read_timeout(Some(PROBE_TIMEOUT)).is_ok()
+        && stream.write_all(HEALTH_REQUEST).is_ok()
+        && stream.read_exact(&mut status_prefix).is_ok()
+        && status_prefix == HTTP_STATUS_PREFIX
+}
+
+/// How [`start_server`] observes a server it has spawned.
+///
+/// The whole schedule arrives from the caller — what serving means, how often
+/// that is observed, and how long the observation runs — so a test supplies the
+/// observation that decides its case and orders its events by what it saw.
+/// [`StartupWatch::for_live_server`] is the schedule a live `jit serve` runs.
+pub struct StartupWatch<'a> {
+    /// Answers whether the server is serving on the port it was handed.
+    pub is_serving: &'a dyn Fn(u16) -> bool,
+    /// Wait between two observations.
+    pub interval: Duration,
+    /// Longest the watch runs while the child neither serves nor exits.
+    pub bound: Duration,
+}
+
+impl StartupWatch<'static> {
+    /// The schedule a live `jit serve` runs: [`is_serving_on_port`] every
+    /// [`STARTUP_POLL_INTERVAL`], bounded at [`startup_bound`].
+    #[must_use]
+    pub fn for_live_server() -> Self {
+        // A value with a stable address, so the watch borrows the production
+        // observation for the whole program.
+        static IS_SERVING: fn(u16) -> bool = is_serving_on_port;
+        Self {
+            is_serving: &IS_SERVING,
+            interval: STARTUP_POLL_INTERVAL,
+            bound: startup_bound(),
+        }
+    }
+}
+
+/// What a [`StartupWatch`] saw.
+#[derive(Debug)]
+enum StartupOutcome {
+    /// The server answered on its port.
+    Serving,
+    /// The child exited before it answered.
+    Exited(std::process::ExitStatus),
+    /// The bound expired with the child running and its port unanswered.
+    Unreached,
+}
+
+/// Reads whether `child` has exited, naming the startup check in any error.
+fn exit_status(child: &mut Child) -> Result<Option<std::process::ExitStatus>> {
+    child.try_wait().context("Failed to check server startup")
+}
+
+/// Follows `child` until it serves on `port`, exits, or `watch` runs out, and
+/// returns on the first of the three.
+///
+/// Each round asks the two questions whose answers end the startup, so a caller
+/// reports what the child did rather than what it had yet to do at a fixed
+/// moment. Exit is read first on every round and once more at the bound, so a
+/// child that dies is reported as a child that died whenever it dies, including
+/// during the observation that reached the bound.
+///
+/// # Errors
+/// Returns an error when the child's exit state cannot be read.
+fn watch_startup(child: &mut Child, port: u16, watch: &StartupWatch<'_>) -> Result<StartupOutcome> {
+    let deadline = Instant::now() + watch.bound;
+    loop {
+        if let Some(status) = exit_status(child)? {
+            return Ok(StartupOutcome::Exited(status));
+        }
+        if (watch.is_serving)(port) {
+            return Ok(StartupOutcome::Serving);
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Ok(
+                exit_status(child)?.map_or(StartupOutcome::Unreached, StartupOutcome::Exited)
+            );
+        }
+        std::thread::sleep(watch.interval.min(remaining));
+    }
+}
+
+/// Terminates `child` and reaps it, so a server this process gave up on leaves
+/// no survivor nothing is tracking.
+fn terminate_child(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Start / stop logic
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -343,13 +504,28 @@ pub fn find_web_dir() -> Option<PathBuf> {
 }
 
 /// Checks for a running server; if alive returns `AlreadyRunning`, otherwise
-/// starts a new daemonized `jit-server` process and returns `Started`.
+/// starts a new daemonized `jit-server` process, follows it until it serves,
+/// and returns `Started`.
+///
+/// `watch` supplies what serving means and how long the start is followed;
+/// [`StartupWatch::for_live_server`] is what the CLI passes. The start ends on
+/// the first thing the child does — answering on its port, or exiting — so the
+/// outcome reports the child's own state rather than its state at one chosen
+/// moment.
 ///
 /// Foreground mode is handled by the caller, not this function. Use
 /// [`find_available_port`] to bind the socket and [`spawn_with_listener`] to
 /// hand it to the child — the same inheritance path this function uses — so
 /// the port is never re-bound across the process boundary.
-pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
+///
+/// # Errors
+/// Returns an error when the port cannot be bound, the server binary cannot be
+/// found or spawned, the child exits during startup, `watch`'s bound expires
+/// with the child running and its port unanswered, or the PID file cannot be
+/// written. The child is terminated on the last two, and the PID file is
+/// written only once the server has answered, so no record names a process that
+/// is not serving.
+pub fn start_server(opts: ServeOptions, watch: StartupWatch<'_>) -> Result<ServeOutcome> {
     let data_dir = &opts.data_dir;
 
     // Check existing PID file
@@ -424,19 +600,27 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
 
     let pid = child.id();
 
-    // Brief pause to let the server bind its port before checking liveness.
-    std::thread::sleep(Duration::from_millis(300));
-
-    // Verify the child is still alive. A rapid exit indicates a startup
-    // failure (e.g. it could not adopt the inherited socket, or a data-dir
-    // error). In that case we must not write a PID file — doing so would
-    // leave a stale record that falsely reports a running server.
-    if let Some(exit_status) = child.try_wait().context("Failed to check server startup")? {
-        bail!(
+    // Nothing below this point runs until the server has answered on its port,
+    // so a startup failure — a child that could not adopt the inherited socket,
+    // or hit a data-dir error, however long it took to get there — writes no
+    // PID file and leaves no record falsely reporting a running server.
+    match watch_startup(&mut child, port, &watch)? {
+        StartupOutcome::Serving => {}
+        StartupOutcome::Exited(exit_status) => bail!(
             "jit-server exited during startup with {exit_status}. \
              Check the log file for details: {}",
             log_file.display()
-        );
+        ),
+        StartupOutcome::Unreached => {
+            terminate_child(&mut child);
+            bail!(
+                "jit-server was still starting {:?} after launch, with port {port} \
+                 unanswered; terminated it (PID {pid}). \
+                 Check the log file for details: {}",
+                watch.bound,
+                log_file.display()
+            )
+        }
     }
 
     let pf = ServerPidFile {
@@ -449,8 +633,7 @@ pub fn start_server(opts: ServeOptions) -> Result<ServeOutcome> {
     if let Err(e) = write_pid_file(data_dir, &pf) {
         // PID file write failed but the child is already detached and running.
         // Kill it now so we do not leave an orphaned, untrackable process.
-        let _ = child.kill();
-        let _ = child.wait(); // reap to avoid zombie
+        terminate_child(&mut child);
         return Err(e.context(format!(
             "Failed to persist PID file; terminated spawned jit-server (PID {pid})"
         )));
@@ -878,7 +1061,115 @@ mod tests {
         assert!(!pid_file_path(data_dir).exists());
     }
 
-    // ── startup failure: child exits immediately ──────────────────────────────
+    // ── liveness probe ───────────────────────────────────────────────────────
+
+    /// Serves one HTTP status line on an OS-assigned loopback port and returns
+    /// that port. The thread accepts exactly one connection and ends.
+    fn serve_one_status_line() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+            }
+        });
+        port
+    }
+
+    #[test]
+    fn test_is_serving_on_port_reports_a_port_that_answers_as_serving() {
+        assert!(
+            is_serving_on_port(serve_one_status_line()),
+            "a process that answers the health request is serving"
+        );
+    }
+
+    #[test]
+    fn test_is_serving_on_port_reports_a_bound_socket_nobody_serves_as_not_serving() {
+        // The shape `start_server` faces while its child is starting: the socket
+        // is bound, so the kernel completes the connect into the listen backlog,
+        // and nothing has accepted it. A connect is therefore not evidence, and
+        // the probe must decide on the answer that never comes.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        assert!(
+            !is_serving_on_port(port),
+            "a connection the backlog accepted is not a server answering"
+        );
+    }
+
+    #[test]
+    fn test_is_serving_on_port_reports_an_unbound_port_as_not_serving() {
+        // Bind and release, so the port is one nothing is listening on.
+        let port = {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            listener.local_addr().unwrap().port()
+        };
+
+        assert!(!is_serving_on_port(port));
+    }
+
+    // ── startup observation ──────────────────────────────────────────────────
+
+    /// A readiness observation that never reports the server serving, so the
+    /// only outcomes left to a case using it are the child's exit and the bound.
+    fn never_serving(_port: u16) -> bool {
+        false
+    }
+
+    /// Writes an executable shell script and returns its path.
+    #[cfg(unix)]
+    fn executable_script(path: PathBuf, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(&path, body).unwrap();
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&path, perms).unwrap();
+        path
+    }
+
+    /// Options that start `server_binary` in `data_dir` on an OS-assigned port.
+    ///
+    /// Port 0 leaves the choice to the kernel: no case here cares which port is
+    /// chosen, and it means no case shares a fixed range with a sibling running
+    /// in parallel.
+    fn opts_for(data_dir: &Path, server_binary: PathBuf) -> ServeOptions {
+        ServeOptions {
+            data_dir: data_dir.to_path_buf(),
+            preferred_port: 0,
+            log_file: None,
+            web_dir: None,
+            server_binary: Some(server_binary),
+        }
+    }
+
+    /// A watch that observes `is_serving` as often as the loop allows.
+    ///
+    /// The bound belongs to the case: one that ends on the child's exit or on a
+    /// readiness answer never reaches it, and one about the bound itself states
+    /// its own.
+    fn watch_with(is_serving: &dyn Fn(u16) -> bool, bound: Duration) -> StartupWatch<'_> {
+        StartupWatch {
+            is_serving,
+            interval: Duration::from_millis(1),
+            bound,
+        }
+    }
+
+    /// Opens the write end of `fifo` without blocking, answering `None` while no
+    /// reader holds it open.
+    #[cfg(unix)]
+    fn open_fifo_writer(fifo: &Path) -> Option<std::fs::File> {
+        use std::os::unix::fs::OpenOptionsExt;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .custom_flags(nix::libc::O_NONBLOCK)
+            .open(fifo)
+            .ok()
+    }
+
+    // ── startup failure: the child exits ──────────────────────────────────────
 
     #[test]
     #[cfg(unix)]
@@ -886,33 +1177,184 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let data_dir = tmp.path();
 
-        // `/bin/false` exits immediately with exit code 1 — simulates a
-        // jit-server that fails to bind its port.
-        let opts = ServeOptions {
-            data_dir: data_dir.to_path_buf(),
-            // 0 = any OS-assigned free port; this test doesn't care which
-            // port is chosen, and using 0 avoids sharing a fixed range with
-            // any sibling test running in parallel.
-            preferred_port: 0,
-            log_file: None,
-            web_dir: None,
-            server_binary: Some(PathBuf::from("/bin/false")),
-        };
-
-        let result = start_server(opts);
-        assert!(
-            result.is_err(),
-            "must return Err when server exits immediately"
+        // `/bin/false` exits with code 1 as soon as it is scheduled — a
+        // jit-server that fails at the first thing it tries. Readiness never
+        // answers, so the exit is the only outcome available and the case
+        // decides on it whenever the host gets round to running the child.
+        let result = start_server(
+            opts_for(data_dir, PathBuf::from("/bin/false")),
+            watch_with(&never_serving, startup_bound()),
         );
+
         let msg = result.unwrap_err().to_string();
         assert!(
             msg.contains("exited during startup"),
             "error message should mention startup exit, got: {msg}"
         );
-        // No stale PID file should be written.
         assert!(
             !pid_file_path(data_dir).exists(),
-            "PID file must not be written when server exits immediately"
+            "PID file must not be written when the server exits during startup"
+        );
+    }
+
+    /// A child that exits after the watch has already observed it running is
+    /// reported as a startup failure too.
+    ///
+    /// The ordering is established rather than timed. The fake server blocks
+    /// reading a FIFO, and the readiness observation the watch makes on every
+    /// round is what opens the write end and releases that read, so the child's
+    /// exit strictly follows at least one observation of it running — later than
+    /// a pause of any fixed length would have concluded the server was up. A
+    /// slow host adds observations before the release and changes nothing about
+    /// the outcome.
+    #[test]
+    #[cfg(unix)]
+    fn test_start_server_errors_when_child_exits_after_being_observed_running() {
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path();
+        let fifo = data_dir.join("release-the-child");
+        nix::unistd::mkfifo(&fifo, nix::sys::stat::Mode::S_IRWXU).unwrap();
+
+        // `cat` returns once the write end below closes; the script then exits
+        // non-zero, the way a server failing after its first moments does.
+        let fake_server = executable_script(
+            data_dir.join("late-failure.sh"),
+            &format!("#!/bin/sh\ncat '{}' > /dev/null\nexit 3\n", fifo.display()),
+        );
+        // An open before the child reaches its read finds no reader and answers
+        // `None`, so the next observation asks again.
+        let release_and_answer_not_serving = |_port: u16| {
+            drop(open_fifo_writer(&fifo));
+            false
+        };
+
+        let result = start_server(
+            opts_for(data_dir, fake_server),
+            watch_with(&release_and_answer_not_serving, startup_bound()),
+        );
+
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("exited during startup"),
+            "a child that exits after being observed running is still a startup \
+             failure, got: {msg}"
+        );
+        assert!(
+            msg.contains('3'),
+            "the failure should carry the status the child exited with, got: {msg}"
+        );
+        assert!(
+            !pid_file_path(data_dir).exists(),
+            "PID file must not be written for a child that exited"
+        );
+    }
+
+    // ── startup failure: the child is unreachable ─────────────────────────────
+
+    /// A child that neither serves nor exits ends the start at the watch's
+    /// bound, terminated rather than left running untracked.
+    ///
+    /// Nothing here can be flipped by load: the child sleeps well past the
+    /// bound, so it never serves and never exits, and a slower host delays the
+    /// bounded failure instead of changing it. The one interval the case relies
+    /// on is the child announcing its own PID — one `echo` — inside the bound
+    /// below, which a host would have to stall for two seconds to prevent.
+    #[test]
+    #[cfg(unix)]
+    fn test_start_server_bounds_a_child_that_neither_serves_nor_exits() {
+        let bound = Duration::from_secs(2);
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path();
+        let announced_pid = data_dir.join("child.pid");
+
+        // `exec` keeps the announced PID: the shell is replaced by the sleep, so
+        // the process the start must terminate is the one named in the file.
+        let fake_server = executable_script(
+            data_dir.join("silent-server.sh"),
+            &format!(
+                "#!/bin/sh\necho $$ > '{}'\nexec sleep 10\n",
+                announced_pid.display()
+            ),
+        );
+
+        let result = start_server(
+            opts_for(data_dir, fake_server),
+            watch_with(&never_serving, bound),
+        );
+
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("unanswered") && msg.contains(&format!("{bound:?}")),
+            "the failure should report the bound it spent and the port it \
+             watched, got: {msg}"
+        );
+        assert!(
+            !pid_file_path(data_dir).exists(),
+            "PID file must not be written for a server that never answered"
+        );
+        let child_pid: u32 = std::fs::read_to_string(&announced_pid)
+            .expect("the fake server announces its PID before sleeping")
+            .trim()
+            .parse()
+            .expect("the announced PID is a process id");
+        assert!(
+            !is_process_alive(child_pid),
+            "a server the start gave up on must not outlive it"
+        );
+    }
+
+    // ── startup success: the server answers ──────────────────────────────────
+
+    /// A start that observes the server serving records that server's PID, and
+    /// the record is what stops it again.
+    #[test]
+    #[cfg(unix)]
+    fn test_start_server_records_the_pid_of_a_server_that_answers() {
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path();
+        let fake_server = executable_script(
+            data_dir.join("live-server.sh"),
+            "#!/bin/sh\nexec sleep 30\n",
+        );
+
+        // A readiness answer of "serving" is what ends this start. A bound the
+        // start never reaches is the point: were readiness ignored, the outcome
+        // would be the bounded failure the sibling case asserts rather than a
+        // slower success.
+        let outcome = start_server(
+            opts_for(data_dir, fake_server),
+            watch_with(&|_port| true, Duration::from_secs(2)),
+        );
+
+        // Read the record and stop the server before asserting, so a failing
+        // assertion leaves nothing running.
+        let recorded = read_pid_file(data_dir).unwrap();
+        let recorded_is_alive = recorded
+            .as_ref()
+            .is_some_and(|record| is_process_alive(record.pid));
+        let stopped = stop_server(data_dir).unwrap();
+
+        let record = recorded.expect("a started server leaves a record");
+        assert_eq!(
+            outcome.unwrap(),
+            ServeOutcome::Started {
+                pid: record.pid,
+                port: record.port,
+                log_file: record.log_file.clone(),
+            },
+            "the record and the reported outcome must name one server"
+        );
+        assert!(
+            recorded_is_alive,
+            "the recorded process must be running at the moment it is recorded"
+        );
+        assert_eq!(
+            stopped,
+            StopOutcome::Stopped {
+                pid: record.pid,
+                port: record.port
+            },
+            "the record must be enough to stop the server it names"
         );
     }
 
@@ -921,50 +1363,63 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_start_server_kills_orphan_when_pid_write_fails() {
-        use std::os::unix::fs::PermissionsExt;
-
         let tmp = TempDir::new().unwrap();
         let data_dir = tmp.path();
+        let announced_pid = data_dir.join("child.pid");
 
-        // Write a shell script that ignores all arguments and sleeps, so it
-        // stays alive long enough to pass the try_wait liveness check.
-        let fake_server = tmp.path().join("fake-jit-server.sh");
-        std::fs::write(&fake_server, "#!/bin/sh\nexec sleep 60\n").unwrap();
-        let mut perms = std::fs::metadata(&fake_server).unwrap().permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&fake_server, perms).unwrap();
-
-        // Block write_pid_file by placing a directory at the PID file path.
-        // The atomic write goes tmp→final via rename; renaming a regular file
-        // over a directory fails, triggering our orphan-cleanup path.
+        // `exec` keeps the announced PID, so the file names the process the
+        // failed start has to clean up.
+        let fake_server = executable_script(
+            data_dir.join("fake-jit-server.sh"),
+            &format!(
+                "#!/bin/sh\necho $$ > '{}'\nexec sleep 30\n",
+                announced_pid.display()
+            ),
+        );
+        // Block write_pid_file by placing a directory where its atomic write
+        // stages the record. Writing a regular file over a directory fails, so
+        // the start reaches its orphan-cleanup path with the child already
+        // spawned. The blocker sits on the staging path rather than on the
+        // final one, which `start_server` reads before it spawns anything: a
+        // directory there is a PID file it cannot parse, and the start fails at
+        // that first read having spawned nothing at all.
         let pid_path = pid_file_path(data_dir);
-        std::fs::create_dir_all(&pid_path).unwrap();
+        let staging_blocker = pid_path.with_extension("pid.tmp");
+        std::fs::create_dir_all(&staging_blocker).unwrap();
 
-        let opts = ServeOptions {
-            data_dir: data_dir.to_path_buf(),
-            // See the sibling startup-failure test above for why 0.
-            preferred_port: 0,
-            log_file: None,
-            web_dir: None,
-            server_binary: Some(fake_server),
+        // Readiness answers "serving" once the child has announced its PID, so
+        // the start reaches the PID write with the child established and the
+        // announcement already readable — no interval separates the two.
+        let child_pid = || {
+            std::fs::read_to_string(&announced_pid)
+                .ok()
+                .and_then(|announced| announced.trim().parse::<u32>().ok())
         };
+        let serving_once_announced = |_port: u16| child_pid().is_some();
 
-        let result = start_server(opts);
-        assert!(result.is_err(), "must fail when PID file cannot be written");
+        let result = start_server(
+            opts_for(data_dir, fake_server),
+            watch_with(&serving_once_announced, startup_bound()),
+        );
+
         let msg = result.unwrap_err().to_string();
         assert!(
             msg.contains("PID") || msg.contains("pid") || msg.contains("persist"),
             "error should relate to PID persistence, got: {msg}"
         );
-
-        // Give the kill a moment to propagate, then confirm the process is gone.
-        std::thread::sleep(Duration::from_millis(200));
-        // We do not have the child PID here, but the key invariant is that the
-        // PID file was NOT successfully written as a JSON record (the directory
-        // blocker is still in place, proving no rename succeeded).
         assert!(
-            pid_path.is_dir(),
-            "directory blocker should still be there — no JSON PID was persisted"
+            !pid_path.exists(),
+            "no record may be published when the start could not persist one"
+        );
+        assert!(
+            staging_blocker.is_dir(),
+            "the blocker should still be there — no record was staged past it"
+        );
+        // The kill is followed by a reap inside `start_server`, so the process
+        // is already gone by the time it returns.
+        assert!(
+            !is_process_alive(child_pid().expect("the fake server announced its PID")),
+            "a spawned server must not outlive the start that failed to record it"
         );
     }
 }

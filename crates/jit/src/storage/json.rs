@@ -269,7 +269,12 @@ pub struct JsonFileStorage {
 
 /// The configured storage-lock acquisition timeout (`JIT_LOCK_TIMEOUT` seconds,
 /// or the runtime default), shared by every file-backed lock this backend opens.
-fn configured_lock_timeout() -> Duration {
+///
+/// Visible to the crate because a caller that waits on a process performing its
+/// own recovery has to allow for this wait: `commands::serve`'s startup bound
+/// reads it here rather than resolving the same setting a second way
+/// (`@/invariant/convention-convergence`).
+pub(crate) fn configured_lock_timeout() -> Duration {
     std::env::var("JIT_LOCK_TIMEOUT")
         .ok()
         .and_then(|value| value.parse().ok())
