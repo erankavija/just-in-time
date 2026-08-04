@@ -144,17 +144,17 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
 }
 
 // Gate verbs that run an external checker process and need the long timeout.
-// `evaluate`/`evaluate-all` execute a gate's checker command (or record a
+// `evaluate`/`evaluate-all`/`evaluate-many` execute a gate's checker command (or record a
 // manual attestation); `fail` only writes gate state with no subprocess, and
 // `status`/`status-all` only read recorded results — both stay on the
 // default timeout. Visible aliases (e.g. `eval` for `evaluate`) never reach
 // this function: the MCP server builds cmdPath from the CLI's `--schema`
 // output, which lists canonical verbs only.
-const LONG_TIMEOUT_GATE_VERBS = new Set(['evaluate', 'evaluate-all']);
+const LONG_TIMEOUT_GATE_VERBS = new Set(['evaluate', 'evaluate-all', 'evaluate-many']);
 
 /**
  * Get appropriate timeout for a command based on its path.
- * Gate evaluate/evaluate-all commands may run external processes and need longer timeouts.
+ * Gate evaluate/evaluate-all/evaluate-many commands may run external processes and need longer timeouts.
  * @param {string[]} cmdPath - Command path (e.g., ['gate', 'evaluate'])
  * @returns {number} Timeout in milliseconds
  */

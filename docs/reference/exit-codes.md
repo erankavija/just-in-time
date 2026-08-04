@@ -39,8 +39,8 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `issue batch-create` | `2` | The batch file failed pre-validation; no issues were created. |  |
 | `snapshot export` | `6` | The snapshot output path already exists. |  |
 | `claim` | `10` | A lease subcommand was run outside a git repository (leases require git for worktree identity). |  |
-| `gate evaluate, gate evaluate-all` | `4` | A checker ran and its verdict was fail. | yes |
-| `gate evaluate, gate evaluate-all` | `10` | A checker could not run to a verdict (timeout, crash, or command not found). | yes |
+| `gate evaluate, gate evaluate-all, gate evaluate-many` | `4` | A checker ran and its verdict was fail. | yes |
+| `gate evaluate, gate evaluate-all, gate evaluate-many` | `10` | A checker could not run to a verdict (timeout, crash, or command not found). | yes |
 | `validate` | `4` | Repository-integrity, scope, or drift validation found error-severity findings. | yes |
 | `validate` | `1` | Rule evaluation reported error-severity findings. | yes |
 | `validate --branch-drift` | `1` | Branch-drift validation failed: the check reported drift from the upstream branch or could not run. | yes |

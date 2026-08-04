@@ -107,6 +107,20 @@ pub struct PassAllOutcome {
     pub results: Vec<GatePassAllEntry>,
 }
 
+/// The outcome of evaluating one gate across several issues.
+pub struct GateEvaluateManyEntry {
+    /// Issue identifier as supplied to the command.
+    pub issue_id: String,
+    /// The per-issue gate result, or the error that prevented a verdict.
+    pub result: Result<GatePassOutcome>,
+}
+
+/// Per-issue results from [`CommandExecutor::pass_gate_many`].
+pub struct GateEvaluateManyOutcome {
+    /// Results in the same order as the requested issue identifiers.
+    pub results: Vec<GateEvaluateManyEntry>,
+}
+
 /// Result of adding multiple gates
 #[derive(Debug, Serialize)]
 pub struct GateAddResult {
@@ -959,6 +973,33 @@ impl<S: IssueStore> CommandExecutor<S> {
         )?;
 
         Ok(PassAllOutcome { results })
+    }
+
+    /// Evaluate one gate for several issues in sequence.
+    ///
+    /// Each issue is passed through [`pass_gate`](Self::pass_gate), preserving
+    /// its per-issue locking, verdict reuse, and run recording semantics. An
+    /// error for one issue is retained in that issue's result and does not
+    /// prevent later issue identifiers from being evaluated.
+    pub fn pass_gate_many(
+        &self,
+        issue_ids: &[String],
+        gate_key: &str,
+        by: Option<String>,
+        force: bool,
+    ) -> GateEvaluateManyOutcome
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let results = issue_ids
+            .iter()
+            .map(|issue_id| GateEvaluateManyEntry {
+                issue_id: issue_id.clone(),
+                result: self.pass_gate(issue_id, gate_key.to_string(), by.clone(), force),
+            })
+            .collect();
+
+        GateEvaluateManyOutcome { results }
     }
 
     /// Whether the gate's latest run passed at the current `HEAD` commit.

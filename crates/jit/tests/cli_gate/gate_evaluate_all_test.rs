@@ -407,3 +407,67 @@ fn test_evaluate_all_mixed_gates_with_by_all_pass() {
     assert_eq!(gates[1]["key"], "manual-gate");
     assert_eq!(run_count(&root, "auto-gate"), 1);
 }
+
+#[test]
+fn test_evaluate_many_reports_each_issue_and_continues_after_failure() {
+    let (_temp, root) = setup_git_jit_repo();
+    // The first invocation fails and the second passes. The shared log also
+    // proves the checker calls were serialized in the supplied issue order.
+    define_gate(
+        &root,
+        "wave-gate",
+        "count=$(wc -l < wave-gate-sequence.log 2>/dev/null || echo 0); echo run-$count >> wave-gate-sequence.log; test \"$count\" -gt 0",
+    );
+    let first = create_issue_with_gates(&root, &["wave-gate"]);
+    let second = create_issue_with_gates(&root, &["wave-gate"]);
+
+    let out = jit()
+        .current_dir(&root)
+        .args([
+            "gate",
+            "evaluate-many",
+            "wave-gate",
+            &first,
+            &second,
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert_eq!(
+        out.status.code(),
+        Some(4),
+        "stdout: {} stderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["count"], 2);
+    let results = json["results"].as_array().unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0]["issue_id"], first);
+    assert_eq!(results[0]["status"], "failed");
+    assert_eq!(results[0]["verdict"], "fail");
+    assert_eq!(results[1]["issue_id"], second);
+    assert_eq!(results[1]["status"], "passed");
+    assert_eq!(results[1]["verdict"], "pass");
+    assert_eq!(run_count(&root, "wave-gate"), 2);
+    assert_eq!(
+        fs::read_to_string(root.join("wave-gate-sequence.log")).unwrap(),
+        "run-0\nrun-1\n"
+    );
+
+    for issue_id in [&first, &second] {
+        let status = jit()
+            .current_dir(&root)
+            .args(["gate", "status", issue_id, "wave-gate", "--json"])
+            .output()
+            .unwrap();
+        assert!(status.status.success());
+        let status_json: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+        assert!(
+            status_json["run_id"].is_string(),
+            "each issue must have its own recorded run: {status_json}"
+        );
+    }
+}

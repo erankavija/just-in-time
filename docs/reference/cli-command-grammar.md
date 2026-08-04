@@ -191,7 +191,8 @@ Mutating the registry, attaching gates to issues, and managing presets.
 **2. Execution** *produces a verdict and may advance issue state*. These are the
 only gate verbs that mutate gate-run state.
 
-- `gate evaluate` (alias `eval`), `gate evaluate-all`, `gate fail`.
+- `gate evaluate` (alias `eval`), `gate evaluate-all`, `gate evaluate-many`,
+  `gate fail`.
 
 **3. Inspection** *reports definitions or run results with no side effects*.
 Strictly read-only.
@@ -206,7 +207,7 @@ Strictly read-only.
 **Inspection never mutates; execution never merely reports.** `gate status` and
 `gate status-all` show recorded state and must stay non-mutating (their help
 already says "inspection only, non-mutating"). `gate evaluate` / `gate fail` /
-`gate evaluate-all` run checkers, record verdicts, and can transition the issue. The
+`gate evaluate-all` and `gate evaluate-many` run checkers, record verdicts, and can transition issues. The
 two must never be conflated: an inspection verb that quietly re-runs a checker, or
 an execution verb dressed as a "check", is nonconforming. This configuration ÷
 execution ÷ inspection partition is the contract the gate surface holds to.

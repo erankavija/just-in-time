@@ -1975,6 +1975,34 @@ jit gate evaluate-all abc123
 #          stale (no gate ran at all for that entry)
 ```
 
+### `jit gate evaluate-many`
+
+Evaluate one named gate for several issues in sequence. Every issue receives
+its own gate evaluation and result; a failure does not stop later issues from
+being evaluated.
+
+**Usage:**
+```bash
+jit gate evaluate-many <GATE_KEY> <ISSUE_ID>... [--by <WHO>] [--force]
+```
+
+The gate key comes first, followed by one or more issue IDs. This common-
+argument-first shape matches the multi-issue `gate preset apply` command. Use
+`--by <WHO>` for a manual gate; it is ignored for an automated gate. Use
+`--force` to execute an automated checker even when its current pass or a
+declared-input verdict is reusable.
+
+Issues are evaluated in argument order. Evaluation is serialised per issue,
+and the command continues after a checker failure, runner error, lookup error,
+or manual-gate attestation error. Exit `0` means every issue passed; otherwise
+the command returns the first failing issue's code from the [`jit gate
+evaluate`](#jit-gate-evaluate) taxonomy.
+
+With `--json`, the response uses the list envelope `{"count": N,
+"results": [...]}`. Each result contains `issue_id`, `key`, `status`,
+`verdict` when a verdict was produced, `already_passed` for automated checker
+reuse, `warnings`, and `error` when that issue did not pass.
+
 ### `jit gate fail`
 
 Record a failed verdict for a **manual** gate. An automated gate is rejected
