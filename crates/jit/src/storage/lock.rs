@@ -397,6 +397,8 @@ pub(crate) fn remove_orphaned_issue_read_sidecars(issues_dir: &Path) -> Result<u
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::contention_probe::{admitted_when_reached, Contenders};
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier, Mutex};
     use std::thread;
     use tempfile::TempDir;
@@ -453,50 +455,140 @@ mod tests {
         let _guard2 = locker.lock_exclusive(&file_path).unwrap();
     }
 
+    /// While one caller holds the exclusive lock, every other caller that asks
+    /// for it is refused.
+    ///
+    /// The test thread takes the lock itself, so the hold is read off the
+    /// lock's own answer rather than assumed of a thread the host may not have
+    /// scheduled. It releases only once every contender has recorded its
+    /// refusal, so the refusals cannot invert into grants by the hold ending
+    /// before a contender asked.
+    /// Shorter than any hold these tests take, so a contender that meets the
+    /// lock held is refused it and says so.
+    const EXPIRING_LOCK_WAIT: Duration = Duration::from_millis(1);
+
     #[test]
-    fn test_exclusive_lock_prevents_concurrent_writes() {
+    fn test_lock_exclusive_refuses_every_contender_that_asks_while_the_lock_is_held() {
+        const CONTENDER_COUNT: usize = 4;
+
         let temp_dir = TempDir::new().unwrap();
-        let file_path = temp_dir.path().join("test.lock");
+        let file_path = Arc::new(temp_dir.path().join("test.lock"));
+        let contenders = Contenders::new();
 
-        // Thread 1: Acquire lock and hold it
-        let path1 = Arc::new(file_path.clone());
-        let acquired = Arc::new(Mutex::new(false));
-        let acquired1 = Arc::clone(&acquired);
+        let held = FileLocker::new(EXPIRING_LOCK_WAIT)
+            .try_lock_exclusive(&file_path)
+            .unwrap()
+            .expect("no contender has started yet, so the lock is free");
 
-        let handle1 = thread::spawn(move || {
-            let locker = FileLocker::new(Duration::from_millis(500));
-            let _guard = locker.lock_exclusive(&path1).unwrap();
-            *acquired1.lock().unwrap() = true;
-            thread::sleep(Duration::from_millis(200));
-            // Lock held until guard drops
-        });
+        let asking = (0..CONTENDER_COUNT)
+            .map(|_| {
+                let file_path = Arc::clone(&file_path);
+                let contenders = Arc::clone(&contenders);
+                thread::spawn(move || {
+                    // The hold outlives this wait by construction, so the
+                    // wait's length decides how soon this contender reports,
+                    // not what it reports.
+                    let outcome = FileLocker::new(EXPIRING_LOCK_WAIT).lock_exclusive(&file_path);
+                    if outcome.as_ref().err().is_some_and(is_lock_timeout) {
+                        contenders.record_refusal();
+                    }
+                    outcome.map(drop)
+                })
+            })
+            .collect::<Vec<_>>();
 
-        // Wait for first thread to acquire lock
-        thread::sleep(Duration::from_millis(50));
+        contenders.await_refusals(CONTENDER_COUNT);
+        drop(held);
+
+        let outcomes = asking
+            .into_iter()
+            .map(|contender| contender.join().unwrap())
+            .collect::<Vec<_>>();
+
         assert!(
-            *acquired.lock().unwrap(),
-            "First thread should have acquired lock"
+            outcomes
+                .iter()
+                .all(|outcome| outcome.as_ref().err().is_some_and(is_lock_timeout)),
+            "every contender that asked while the lock was held was refused it, \
+             and reports an expired wait rather than an outcome of its own: \
+             {outcomes:?}"
         );
-
-        // Thread 2: Try to acquire same lock with short timeout (should fail)
-        let path2 = file_path.clone();
-        let handle2 = thread::spawn(move || {
-            let locker = FileLocker::new(Duration::from_millis(50));
-            // Should timeout since lock is held
-            locker.lock_exclusive(&path2)
-        });
-
-        handle1.join().unwrap();
-        let result2 = handle2.join().unwrap();
-
-        // Second thread should have timed out
         assert!(
-            result2.is_err(),
-            "Second thread should timeout waiting for lock"
+            FileLocker::new(EXPIRING_LOCK_WAIT)
+                .try_lock_exclusive(&file_path)
+                .unwrap()
+                .is_some(),
+            "the same lock is granted once the hold is released, so the hold is \
+             what refused the contenders"
         );
-        assert!(
-            result2.unwrap_err().to_string().contains("Lock timeout"),
-            "Error should mention lock timeout"
+    }
+
+    /// Contenders that keep asking until the lock lets them through never hold
+    /// it together: the number inside the critical section at once peaks at
+    /// one.
+    ///
+    /// Every fact the verdict rests on is one the callers observed of
+    /// themselves. An expired wait is put back to the lock rather than read as
+    /// its answer, so a contender the host was slow to schedule changes how
+    /// many times it asks and nothing about the outcome.
+    #[test]
+    fn test_lock_exclusive_grants_the_lock_to_one_contender_at_a_time() {
+        const CONTENDER_COUNT: usize = 8;
+        /// Each contender keeps the lock this long. Overlap detection widens
+        /// with it, and the verdict does not move with it: a lock that excludes
+        /// holds the peak at one for any hold length.
+        const OVERLAP_OBSERVATION_HOLD: Duration = Duration::from_millis(10);
+
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = Arc::new(temp_dir.path().join("test.lock"));
+        let contenders = Contenders::new();
+        // Contenders inside the critical section, and the most ever seen there
+        // together. A peak above one is two callers writing at once.
+        let holding = Arc::new(AtomicUsize::new(0));
+        let peak_holding = Arc::new(AtomicUsize::new(0));
+
+        let asking = (0..CONTENDER_COUNT)
+            .map(|_| {
+                let file_path = Arc::clone(&file_path);
+                let contenders = Arc::clone(&contenders);
+                let holding = Arc::clone(&holding);
+                let peak_holding = Arc::clone(&peak_holding);
+                thread::spawn(move || {
+                    let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
+                    let guard = admitted_when_reached(
+                        &contenders,
+                        "the exclusive file lock",
+                        || locker.lock_exclusive(&file_path),
+                        is_lock_timeout,
+                    )
+                    .expect("an expired wait is asked again, so the lock answers every contender");
+                    let now_holding = holding.fetch_add(1, Ordering::SeqCst) + 1;
+                    peak_holding.fetch_max(now_holding, Ordering::SeqCst);
+                    thread::sleep(OVERLAP_OBSERVATION_HOLD);
+                    holding.fetch_sub(1, Ordering::SeqCst);
+                    drop(guard);
+                })
+            })
+            .collect::<Vec<_>>();
+
+        asking
+            .into_iter()
+            .for_each(|contender| contender.join().unwrap());
+
+        assert_eq!(
+            peak_holding.load(Ordering::SeqCst),
+            1,
+            "the exclusive lock is held by one contender at a time"
+        );
+        assert_eq!(
+            holding.load(Ordering::SeqCst),
+            0,
+            "every contender left the critical section it entered"
+        );
+        assert_eq!(
+            contenders.admitted_count(),
+            CONTENDER_COUNT,
+            "the lock admitted every contender"
         );
     }
 
