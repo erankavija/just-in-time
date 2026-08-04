@@ -13115,3 +13115,7 @@
 {"gate_key":"code-review","id":"7db6d77f-2b10-4953-a5ad-09f3b451c8b0","issue_id":"06f1fa95-2aa4-4493-a31e-1f149f3deee9","timestamp":"2026-08-04T19:25:42.604166673Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"gated","id":"66822cb8-748a-4925-a647-81c3f8753fa3","issue_id":"06f1fa95-2aa4-4493-a31e-1f149f3deee9","timestamp":"2026-08-04T19:25:54.711327068Z","to":"done","type":"issue_state_changed"}
 {"id":"dbfebd90-7fd1-456d-93e8-74a4146154cb","issue_id":"06f1fa95-2aa4-4493-a31e-1f149f3deee9","timestamp":"2026-08-04T19:25:54.711327068Z","type":"issue_completed"}
+{"id":"f6a1585c-a783-4bf4-a284-6e4962d96a34","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","priority":"normal","timestamp":"2026-08-04T19:26:47.813286226Z","title":"Decide the gate suite's remaining timed tests on behaviour, not on scheduling","type":"issue_created"}
+{"fields":["dependencies"],"id":"ab46f784-c247-4228-b65c-4ec8eb8076ef","issue_id":"f3f7de97-7315-4780-8389-9c857da29239","timestamp":"2026-08-04T19:27:00.504957681Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"51467798-a913-47b8-8bb8-c03e5eb27ae1","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T19:27:02.477724386Z","type":"gate_added"}
+{"gate_key":"code-review","id":"57bee58e-8b1e-44a8-b50e-845117c0f139","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T19:27:04.396594684Z","type":"gate_added"}
