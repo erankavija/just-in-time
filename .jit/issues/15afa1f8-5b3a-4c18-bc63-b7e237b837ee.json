@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-04T20:30:35.749850731Z",
   "context": {},
   "created_at": "2026-08-04T20:28:16.312816572Z",
   "dependencies": [],
@@ -31,7 +32,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
-  "updated_at": "2026-08-04T20:28:38.512857829Z"
+  "updated_at": "2026-08-04T20:30:35.749850731Z"
 }

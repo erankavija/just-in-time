@@ -13132,3 +13132,5 @@
 {"gate_key":"code-review","id":"dac59265-b46f-4056-972a-d40cf93673e2","issue_id":"15afa1f8-5b3a-4c18-bc63-b7e237b837ee","timestamp":"2026-08-04T20:28:38.512857829Z","type":"gate_added"}
 {"fields":["dependencies"],"id":"9daa0b35-a5db-45e3-b4bc-fc8fb08fa252","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T20:28:56.809410164Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"0f8c16a4-2cd6-459d-8fa7-5bee3efbe8e2","issue_id":"f3f7de97-7315-4780-8389-9c857da29239","new_count":15,"old_count":16,"removed_deps":["15afa1f8-5b3a-4c18-bc63-b7e237b837ee"],"timestamp":"2026-08-04T20:28:56.809410164Z","type":"dependency_reduced"}
+{"from":"ready","id":"95bf459a-fd3c-4478-8526-eda5544cedac","issue_id":"15afa1f8-5b3a-4c18-bc63-b7e237b837ee","timestamp":"2026-08-04T20:30:35.749850731Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"4a6b7b6f-cfb6-4922-9d13-02c06a5cc79c","issue_id":"15afa1f8-5b3a-4c18-bc63-b7e237b837ee","timestamp":"2026-08-04T20:30:35.749850731Z","type":"issue_claimed"}

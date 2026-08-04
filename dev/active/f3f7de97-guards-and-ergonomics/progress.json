@@ -6,7 +6,8 @@
     "Four wave-1 branches were merged before any of them was gated, and 6d496b8c's conformance failures then made cargo-ci red on main for every issue at once, blocking completion of five otherwise-finished issues. The protocol 3019eacd rewrote names exactly this: gate after each merge whenever per-merge attribution matters. Gate before merging the next branch from here on.",
     "A backgrounded `codex exec` blocks forever on 'Reading additional input from stdin...' unless stdin is redirected from /dev/null. The 6d496b8c rework sat 17 minutes with a live process, a clean worktree, no commits and 00:00:00 CPU before this was found. It is a harness defect, not a worker failure, and does not count against the rework budget.",
     "Session 2 resumed after session 1 ended mid-run. Session 1 left four issues merged on main with a failing code-review gate (06f1fa95, 3923fd06, 89a7e34e, 57675b68), one issue fully gated but not transitioned (76a4bd21), and one worker's uncommitted design in its worktree (57675b68, preserved as 0f0fb836 on worktree-agent-57675b68).",
-    "The lead pushed main to origin at b4859c87 to start a hosted CI run. REQ-08 can only be evidenced by a completed hosted run, and a run costs wall-clock the container does not control, so it starts as early as the tree allows rather than at completion."
+    "The lead pushed main to origin at b4859c87 to start a hosted CI run. REQ-08 can only be evidenced by a completed hosted run, and a run costs wall-clock the container does not control, so it starts as early as the tree allows rather than at completion.",
+    "TRAP: a worker's seeded regression reached main's checkout instead of its worktree. 4c700c80's REQ-04 evidence seeds a one-line defect, runs, and reverts; the archive.rs seed was written to the parent checkout, so the worker's 'reverted, tree clean' was true of its worktree and false of the repository. check-leak-into-main.sh ran clean immediately after the merge because the leak arrived later \u2014 the worker was still alive. The lead then swept it into a commit with `git add -A`. Two habits follow: run the leak check again immediately before every commit on main while any worker is alive, and never `git add -A` on main without reading `git status` first. Every dispatch that asks for a seeded regression now carries an explicit path-discipline warning."
   ],
   "waves": [
     {
@@ -115,19 +116,25 @@
           "short_id": "4c700c80",
           "title": "Decide the gate suite's remaining timed tests on behaviour, not on scheduling",
           "worker": "opus",
-          "status": "dispatched, worktree agent-4c700c80"
+          "status": "merged; four sites restated, lease module deleted per owner ruling; blocked on 15afa1f8 for REQ-05"
         },
         {
           "short_id": "e3c6c767",
           "title": "Decide the lock tests on lock behaviour, not on scheduling",
           "worker": "opus",
-          "status": "dispatched, worktree agent-e3c6c767"
+          "status": "complete on branch, sent back to rebase onto contention_probe after a lead-caused mechanism collision"
         },
         {
           "short_id": "e516b4f8",
           "title": "Remove the requirement tag naming another container",
           "worker": "codex/gpt-5.6-luna",
-          "status": "dispatched, worktree agent-e516b4f8"
+          "status": "complete on branch, sweep result verified independently by the lead, awaiting merge"
+        },
+        {
+          "short_id": "15afa1f8",
+          "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
+          "worker": "opus",
+          "status": "dispatched, worktree agent-15afa1f8"
         }
       ]
     }
@@ -168,6 +175,10 @@
     {
       "short_id": "4c700c80",
       "why": "57675b68's suite survey reported four load-sensitive sites it did not file; the container's REQ-03 names their subject, so the owner directed them into this container rather than into follow-up work"
+    },
+    {
+      "short_id": "15afa1f8",
+      "why": "4c700c80's re-run survey added a search for aliased timing calls and found a 50ms margin in crates/server/src/shutdown.rs that the thread::sleep search could not see; the container's REQ-03 names its subject and 4c700c80's REQ-05 cannot close until it does"
     }
   ],
   "escalations": [
@@ -202,6 +213,10 @@
     {
       "topic": "the four load-sensitive sites 57675b68's survey did not file",
       "resolution": "Owner directed one remediation task inside this container: 4c700c80 covers repo_lock.rs, repository_state_store_tests.rs, archive.rs and the lease.rs clock injection."
+    },
+    {
+      "topic": "the dead storage::lease module",
+      "resolution": "Owner ruled the module deleted rather than clock-injected, and 4c700c80's REQ-03 was amended to the end state. Injecting a clock would have produced clock-injected dead code and left a duplicate of a canonical type standing against @/invariant/canonical-cutover."
     }
   ],
   "rework_counts": {
@@ -283,6 +298,18 @@
       "finding": "The lead's first whole-gate load comparison ran one concurrent build that finished in 46 seconds against a seven-minute gate run, leaving most of the run unloaded.",
       "disposition": "Discarded and re-run with load sustained across the whole run \u2014 nine from-scratch workspace builds and a 12-way CPU load, host reaching load average 30.9. The discarded attempt is named in the record rather than omitted.",
       "criterion_subject": "06f1fa95 REQ-03"
+    },
+    {
+      "issue": "4c700c80 and e3c6c767",
+      "finding": "Both wave-4 workers independently extracted the same test mechanism out of claim_coordinator.rs into different modules: contention_probe.rs and lock_contention_testing.rs. Landing both would be the duplicate @/invariant/convention-convergence forbids.",
+      "disposition": "Lead's dispatch error: file ownership was assigned, ownership of the shared extraction was not. contention_probe.rs is canonical \u2014 the more general form, with ProgressWatch factored out, already serving three consumers. e3c6c767 was sent back to rebase onto it and delete its own module; this does not count against its rework budget.",
+      "criterion_subject": "@/invariant/convention-convergence"
+    },
+    {
+      "issue": "e516b4f8",
+      "finding": "The worker reported auditing all 1545 REQ occurrences and finding every one sound. The claim does not survive as stated: plain `git log` ownership makes the test-consolidation issue 8d4f7084 a phantom owner of every file it moved, which flags roughly 29 files spuriously, and the report drew no line between attribution comments and synthetic fixture data.",
+      "disposition": "Conclusion upheld, evidence rebuilt by the lead. With `git log --follow` ownership and fixtures separated from attributions, five bare occurrences remain and all five are synthetic. The commit body carries the method rather than the assertion.",
+      "criterion_subject": "e516b4f8 REQ-02"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z"
