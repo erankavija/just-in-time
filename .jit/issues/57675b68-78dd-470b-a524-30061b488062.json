@@ -13,14 +13,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-04T14:37:46.396859609Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:55:17.417854023Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-04T14:37:46.775910229Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T16:10:04.057368652Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "57675b68-78dd-470b-a524-30061b488062",
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Hold a concurrency property without racing a wall clock",
-  "updated_at": "2026-08-04T14:57:41.884324534Z"
+  "updated_at": "2026-08-04T16:10:04.057368652Z"
 }

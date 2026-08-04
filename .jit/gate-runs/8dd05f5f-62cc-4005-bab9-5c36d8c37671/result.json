@@ -1,0 +1,66 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07ec3cd64fd5a17f6a8c4baa278425682841bddd",
+  "completed_at": "2026-08-04T16:10:03.748705255Z",
+  "duration_ms": 171387,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/claim_coordinator_proptests.rs",
+        "id": "F1",
+        "line": 293,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/57675b68/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The target proptest still fails based on a five-second file-lock timeout under host load."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/claim_coordinator.rs",
+        "id": "F2",
+        "line": 1774,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/57675b68/requirement/REQ-02",
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "medium",
+        "summary": "The added tests do not deterministically force or observe lock timeout, so they do not demonstrate the seeded regression."
+      },
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci.sh",
+        "id": "F3",
+        "line": 30,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/57675b68/requirement/REQ-04"
+        ],
+        "severity": "medium",
+        "summary": "No report surveys remaining host-load-sensitive assertions; cargo-ci still identifies the original proptest as one."
+      }
+    ],
+    "summary": "The original timeout-sensitive proptest remains in the cargo-ci suite, and the required deterministic regression evidence and suite survey are absent.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "57675b68-78dd-470b-a524-30061b488062",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8dd05f5f-62cc-4005-bab9-5c36d8c37671",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T16:07:12.361675568Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6023 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcd87-6dcf-7a22-a0c0-f5b35df890ce\n--------\nuser\n--- 6010 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cb9cc86d, 6f4b96e8, 07ec3cd6 (merge’s first-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/57675b68/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (.jit issue Markdown); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed 2026-08-04T15:55:17Z (reused; exit code/stdout unavailable); code-review pending\nTruncation recovery: per-commit/path diffs; bounded current-file reads; scoped searches excluding .jit gate-run output\n\n1. **[blocking, issue-impact, high]** `prop_concurrent_different_issues_succeed` still invokes `acquire_claim` directly after configuring a five-second `FileLocker` timeout, then requires every thread to succeed. It was not changed by the attributed patch, and cargo-ci still explicitly says it serializes builds to keep this exact proptest from starving that timeout. The gate outcome therefore remains host-load dependent, failing REQ-01. [crates/jit/src/storage/claim_coordinator_proptests.rs:22](crates/jit/src/storage/claim_coordinator_proptests.rs:22), [crates/jit/src/storage/claim_coordinator_proptests.rs:293](crates/jit/src/storage/claim_coordinator_proptests.rs:293), [scripts/cargo-ci.sh:30](scripts/cargo-ci.sh:30). References: `@/issue/57675b68/requirement/REQ-01`.\n\n2. **[blocking, issue-impact, medium]** The added “every lock wait expires” tests do not deterministically seed an expired wait: the barrier releases threads but does not hold the critical section, and neither test observes a `LockTimeout`. A serial schedule can let every acquisition succeed before contention; restoring the original bounded acquisition path would then still pass. This does not demonstrate the required regression independent of host scheduling. [crates/jit/src/storage/claim_coordinator.rs:1774](crates/jit/src/storage/claim_coordinator.rs:1774), [crates/jit/src/storage/lock.rs:159](crates/jit/src/storage/lock.rs:159). References: `@/issue/57675b68/requirement/REQ-02`, `@/invariant/semantic-test-assertions`.\n\n3. **[blocking, issue-impact, medium]** No attributable survey reports every remaining host-load-sensitive assertion and its result. The changelog only describes the intended fix, while the current gate script itself records the original proptest as still load-sensitive. REQ-04 remains unmet. [CHANGELOG.md:73](CHANGELOG.md:73), [scripts/cargo-ci.sh:30](scripts/cargo-ci.sh:30). References: `@/issue/57675b68/requirement/REQ-04`.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The original timeout-sensitive proptest remains in the cargo-ci suite, and the required deterministic regression evidence and suite survey are absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The target proptest still fails based on a five-second file-lock timeout under host load.\",\"file\":\"crates/jit/src/storage/claim_coordinator_proptests.rs\",\"line\":293,\"references\":[\"@/issue/57675b68/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The added tests do not deterministically force or observe lock timeout, so they do not demonstrate the seeded regression.\",\"file\":\"crates/jit/src/storage/claim_coordinator.rs\",\"line\":1774,\"references\":[\"@/issue/57675b68/requirement/REQ-02\",\"@/invariant/semantic-test-assertions\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No report surveys remaining host-load-sensitive assertions; cargo-ci still identifies the original proptest as one.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":30,\"references\":[\"@/issue/57675b68/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07ec3cd64fd5a17f6a8c4baa278425682841bddd",
+  "completed_at": "2026-08-04T16:03:58.021787863Z",
+  "duration_ms": 134048,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/errors.rs",
+        "id": "F1",
+        "line": 435,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The documented refusal condition omits the newly implemented uncommitted-build-inputs cause."
+      },
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/89a7e34e-11a1-4acf-810b-43d2a056005f.json",
+        "id": "F2",
+        "line": 32,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "The pre-existing satisfies:REQ-04 label cannot resolve because this issue declares no REQ-04 requirement."
+      }
+    ],
+    "summary": "One issue-impact blocking finding remains: the public stale-binary refusal-condition documentation omits uncommitted build inputs.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "89a7e34e-11a1-4acf-810b-43d2a056005f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f87f3651-ddda-4391-950e-c22d5fb435d2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T16:01:43.973345905Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3036 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcd82-6b08-7f02-8cdf-923427e8faea\n--------\nuser\n--- 3023 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 630575b0, 1b13cb6f, 21730831, 8ed6a856 (all `jit:89a7e34e`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/convention-convergence (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-08-04T15:55:16Z); code-review previously failed (exit 1, superseded finding reviewed)\nTruncation recovery: recovered bounded reads of gate_check.rs, main.rs, git_revision.rs, build_provenance.rs, and errors.rs\n\n1. [blocking][issue-impact][medium] `crates/jit/src/errors.rs:435` still documents the refusal as firing only for a commit mismatch or dirty build. The attributable implementation adds a third condition—uncommitted build inputs—at `build_provenance.rs:236`; update this material behavioral contract to include it.\n\n2. [advisory][pre-existing][low] `.jit/issues/89a7e34e-11a1-4acf-810b-43d2a056005f.json:32` has `satisfies:REQ-04`, but this issue declares no addressable `REQ-04`; the label target remains unresolved. It predates the attributable commits.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact blocking finding remains: the public stale-binary refusal-condition documentation omits uncommitted build inputs.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The documented refusal condition omits the newly implemented uncommitted-build-inputs cause.\",\"file\":\"crates/jit/src/errors.rs\",\"line\":435,\"references\":[]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The pre-existing satisfies:REQ-04 label cannot resolve because this issue declares no REQ-04 requirement.\",\"file\":\".jit/issues/89a7e34e-11a1-4acf-810b-43d2a056005f.json\",\"line\":32,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

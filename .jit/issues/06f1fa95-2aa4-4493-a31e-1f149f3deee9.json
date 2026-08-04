@@ -13,14 +13,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:11.699319621Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:55:15.793640709Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:11.871961459Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T16:01:42.702643090Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "06f1fa95-2aa4-4493-a31e-1f149f3deee9",
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "gated",
   "title": "Make the cargo-ci verdict independent of unrelated host load",
-  "updated_at": "2026-08-04T15:36:33.268279883Z"
+  "updated_at": "2026-08-04T16:01:42.702643090Z"
 }

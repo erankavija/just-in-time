@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07ec3cd64fd5a17f6a8c4baa278425682841bddd",
+  "completed_at": "2026-08-04T15:58:44.104218868Z",
+  "duration_ms": 205687,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five issue criteria and the REQ-08 contribution claim are supported by the current attributable test changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "76a4bd21-4afc-40ab-a2c0-376c296dc9ab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1e44b787-3647-4660-b91c-e051b9e8f55d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T15:55:18.416271600Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 326686eb, c6939e93, 1a4826a1, a82c6c71, 15815f55, 505b2bc2 (`jit:76a4bd21`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/issues/f3f7de97-7315-4780-8389-9c857da29239.json\nResolved items: @/issue/f3f7de97/requirement/REQ-08 (.jit/issues/f3f7de97-7315-4780-8389-9c857da29239.json); @/invariant/pid-safety, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T15:45:20Z); prior code-review failed (exit 1, 2026-08-04T14:52:42Z), with its capture-read finding addressed\nTruncation recovery: narrowed reads of each attributable patch, merge-parent diffs, and current test ranges 1–180 and 430–720; unrelated repository-search output excluded from the issue footprint\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five issue criteria and the REQ-08 contribution claim are supported by the current attributable test changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

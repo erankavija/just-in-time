@@ -14,12 +14,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T14:34:36.307435683Z",
+      "updated_at": "2026-08-04T15:55:15.196964639Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T14:55:39.563764461Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T15:58:44.436014182Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling",
-  "updated_at": "2026-08-04T14:55:39.563764461Z"
+  "updated_at": "2026-08-04T15:58:44.436014182Z"
 }

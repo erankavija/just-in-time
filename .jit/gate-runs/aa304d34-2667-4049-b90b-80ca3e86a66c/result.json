@@ -1,0 +1,40 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07ec3cd64fd5a17f6a8c4baa278425682841bddd",
+  "completed_at": "2026-08-04T16:07:10.800310196Z",
+  "duration_ms": 191174,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3923fd06/requirement/REQ-04",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "No attributable record states every discovered difference, both carrier texts, and its disposition as REQ-04 requires."
+      }
+    ],
+    "summary": "The comparison implementation is sound, but the required carrier-by-carrier measured result is absent.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3923fd06-5bed-4ff9-934c-0e6ceb453c67",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aa304d34-2667-4049-b90b-80ca3e86a66c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T16:03:59.625530154Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9050 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcd84-7cf9-79b2-8393-eddcef65f365\n--------\nuser\n--- 9037 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b80fe588, 7c892dd3, 7b013c12, adf03a90 (uncommitted JIT metadata excluded)\nPolicy sources: AGENTS.md\nResolved items: @/issue/3923fd06/requirement/REQ-01 and REQ-04 (issue description); @/invariant/single-source-prose and @/invariant/convention-convergence (.jit/invariants.toml)\nGate evidence: cargo-ci — passed (latest recorded; exit code none)\nTruncation recovery: narrowed historical-artifact searches; re-read affected implementation and merge-relative patch by path\n\n1. **F1 — blocking, issue-impact, medium:** REQ-04 is not evidenced by an attributable measurement record. The implementation correctly compares the discovered package set, but the tagged commit only says six registry entries and two package lists were repaired, then claims the carrier-by-carrier dispositions are “in the report”; this issue has no linked documents or prior run history containing that report. The hard criterion requires every discovered difference, both carrier texts, and its disposition to be stated. References: @/issue/3923fd06/requirement/REQ-04, @/invariant/single-source-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The comparison implementation is sound, but the required carrier-by-carrier measured result is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No attributable record states every discovered difference, both carrier texts, and its disposition as REQ-04 requires.\",\"references\":[\"@/issue/3923fd06/requirement/REQ-04\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -14,14 +14,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-04T15:38:27.782298043Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T15:55:16.903221535Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-04T14:48:21.865732473Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T16:07:11.115544643Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "3923fd06-5bed-4ff9-934c-0e6ceb453c67",
@@ -36,5 +36,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Bind every published package to the registry it restates",
-  "updated_at": "2026-08-04T15:38:27.782298043Z"
+  "updated_at": "2026-08-04T16:07:11.115544643Z"
 }
