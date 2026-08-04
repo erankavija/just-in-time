@@ -86,9 +86,25 @@ test_acquire_claim_already_claimed ....................................... FAILE
 test result: FAILED. 48 passed; 4 failed
 ```
 
-The two properties this issue restated are among them, so the restatement reads
-coordination rather than the schedule: it still rejects a coordinator that lets
-two claimants hold one issue.
+The exclusion property this issue restated is among them, so the restatement
+reads coordination rather than the schedule: it still rejects a coordinator that
+lets two claimants hold one issue.
+
+**Distinct-issue acquisition breaks (REQ-02).** Duplicate-claim exclusion is not
+the behaviour `prop_concurrent_different_issues_succeed` is about, so it gets its
+own seed: the same availability check was made to consult the first lease in the
+index rather than the one for the issue asked about, so any held claim refuses
+every other issue. The target property failed, with the unit test that holds the
+same property under forced expiry:
+
+```
+prop_concurrent_different_issues_succeed ................................. FAILED
+test_acquire_claim_grants_every_distinct_issue_when_every_lock_wait_expires  FAILED
+test result: FAILED. 46 passed; 6 failed
+```
+
+The other four failures are the index and lease-limit tests that read the same
+check, and they place the seed rather than weaken the demonstration.
 
 **The bound goes back into the deciding path (REQ-01).** The retry's
 `is_lock_timeout` arm was disabled, making an expired wait a verdict again — the
@@ -116,12 +132,10 @@ deliberately, and restoring the clock-bounded path is enough to fail them.
 | `crates/jit/src/storage/claim_coordinator.rs:1973` `..._grants_exactly_one_claimant_when_every_lock_wait_expires` | as above | **Restated**, same mechanism. |
 | `scripts/cargo-ci.sh` | (not an assertion) the build lock's stated reason named this proptest as load-sensitive | **Removed.** CPU oversubscription and peak RAM remain; they survive the change. The `ionice` class choice is restated on the gate's own completion instead of on the proptests. |
 
-The retry that carries the restatement is bounded on the claimants' progress, not
-on a clock the caller races: it fails when no claimant at all has been answered
-for `CLAIMANT_STALL_LIMIT`
-(`crates/jit/src/storage/claim_coordinator.rs:1432,1472`). Load slows claimants
-without stopping them, so a stall of that length with claimants still queued is a
-stuck lock rather than a lost race.
+The retry that carries the restatement is bounded on the claimants' progress
+rather than on this caller's own wait, and that bound is itself an elapsed-time
+assertion — recorded below with the rest of the retained ones rather than
+counted as clock-free.
 
 ## Result — remaining sites, by disposition
 
@@ -168,6 +182,8 @@ detection, which is a missed defect rather than a false verdict.
 
 | Site | Assertion | Margin | Argument |
 | --- | --- | --- | --- |
+| `crates/jit/src/storage/claim_coordinator.rs:1451` `acquire_claim_when_reached` | no claimant has been answered for `CLAIMANT_STALL_LIMIT` | 30 s | An elapsed-time assertion, and this issue's own addition. It is not a window this caller has to be scheduled inside: any claimant being answered resets it, so a run in which the coordinator keeps deciding never spends it however slowly it decides. A host that starves all eight claimants for thirty consecutive seconds does flip it, and that is the exposure this retention carries. The alternative is an unbounded retry, which returns the failure mode `@/issue/f3f7de97/requirement/REQ-08` exists to close: a stuck lock would hold a continuous-integration job to its execution ceiling instead of failing. `@/issue/57675b68/requirement/REQ-01` was amended by the owner to permit a bound of this shape — one that fires only when nothing at all is progressing, and fails loudly when it does. |
+| `crates/jit/src/storage/claim_coordinator.rs:1626` `await_lock_refusals` | the same limit, waiting for every claimant to be refused the lock once | 30 s | The same assertion from the other side, and the same argument: it resets on every claimant refused, so it measures the set going quiet rather than this thread's patience. It reports a claimant that never asks for the lock, which would otherwise leave the test waiting on a condition that will not arrive. |
 | `crates/server/.../graceful_shutdown_tests.rs:497` | the server exits strictly inside ten seconds of the signal | product requirement | The bound is the shipped contract the test exists to hold, not a margin chosen to be long enough. Weakening it would weaken the requirement. |
 | `crates/server/.../graceful_shutdown_tests.rs:116,178,296,318` | startup, read and close waits give up at their budgets | 10–30 s | Stated at the call sites as hang bounds rather than properties; the properties themselves are asserted from the server's own record. Removing them restores an unbounded wait, which is the failure mode `76a4bd21` closed. |
 | `crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs:151,644,669,673` | seeding a repository, and the foreground-serve case, reach a verdict inside their budgets | 15–90 s | Bounded deliberately by `76a4bd21` after this test held four CI jobs to a six-hour execution ceiling. The trade — a budget that a saturated host can exceed, against a wait nothing bounds — is that issue's decision. |

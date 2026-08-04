@@ -1,0 +1,65 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "84ec4beb54f89664ab25f46c0ec725fa9ddbe41a",
+  "completed_at": "2026-08-04T18:50:53.509760166Z",
+  "duration_ms": 194682,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/claim_coordinator.rs",
+        "id": "F1",
+        "line": 1451,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/57675b68/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The retry and deterministic wait helper fail after a 30-second wall-clock lack of claimant progress, so host load can still flip the property."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/57675b68/57675b68-host-load-survey.md",
+        "id": "F2",
+        "line": 76,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/57675b68/requirement/REQ-02"
+        ],
+        "severity": "medium",
+        "summary": "The seeded regression demonstrates duplicate-claim exclusion failure, not failure of the target distinct-issue property."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/57675b68/57675b68-host-load-survey.md",
+        "id": "F3",
+        "line": 119,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/57675b68/requirement/REQ-04"
+        ],
+        "severity": "medium",
+        "summary": "The survey misclassifies the new elapsed-time progress assertions as load-independent and therefore omits a remaining host-load-sensitive assertion."
+      }
+    ],
+    "summary": "The restated concurrency tests retain a host-load-sensitive progress timeout, and the regression evidence and survey do not fully substantiate the hard criteria.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "57675b68-78dd-470b-a524-30061b488062",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "67707ea2-f75a-4d2e-9cbb-79938d30597a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T18:47:38.827755050Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9179 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fce1a-5159-7472-8869-af0710137d28\n--------\nuser\n--- 9166 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cb9cc86d, 6f4b96e8, 07ec3cd6, 0f0fb836, 47b7baa6, eca0a30f, 51c8e502, b60266f1, 05a36cd2, 51408435, 84ec4beb\nPolicy sources: AGENTS.md\nResolved items: @/issue/57675b68/requirement/REQ-01..REQ-04 (issue description, markdown-first); @/invariant/semantic-test-assertions (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T18:37:56Z); code-review failed (exit 1, prior structured run)\nTruncation recovery: re-read bounded current ranges for coordinator, proptests, and survey; split individual commit patches by path\n\n1. **F1 — high, blocking, issue-impact:** The retry still makes the property depend on wall time: `acquire_claim_when_reached` fails when no claimant is answered for 30 seconds. A heavily scheduled-out but otherwise correct set of claimants can hit this assertion; `await_lock_refusals` repeats the same timing assertion. This fails REQ-01. `crates/jit/src/storage/claim_coordinator.rs:1451` References: @/issue/57675b68/requirement/REQ-01\n\n2. **F2 — medium, blocking, issue-impact:** The documented seeded REQ-02 regression breaks duplicate-claim exclusion and records failure of `prop_concurrent_claims_exclusive`, but not the target `prop_concurrent_different_issues_succeed`. It therefore does not demonstrate that the restated distinct-issue property fails when its concurrent-acquisition behavior breaks. `dev/active/57675b68/57675b68-host-load-survey.md:76` References: @/issue/57675b68/requirement/REQ-02\n\n3. **F3 — medium, blocking, issue-impact:** The host-load survey categorizes the new progress timeout as clock-free, despite the two `Instant::elapsed()` assertions that can fail under host starvation. Thus it does not accurately report every remaining host-load-sensitive assertion in the gate suite. `dev/active/57675b68/57675b68-host-load-survey.md:119` References: @/issue/57675b68/requirement/REQ-04\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The restated concurrency tests retain a host-load-sensitive progress timeout, and the regression evidence and survey do not fully substantiate the hard criteria.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The retry and deterministic wait helper fail after a 30-second wall-clock lack of claimant progress, so host load can still flip the property.\",\"file\":\"crates/jit/src/storage/claim_coordinator.rs\",\"line\":1451,\"references\":[\"@/issue/57675b68/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The seeded regression demonstrates duplicate-claim exclusion failure, not failure of the target distinct-issue property.\",\"file\":\"dev/active/57675b68/57675b68-host-load-survey.md\",\"line\":76,\"references\":[\"@/issue/57675b68/requirement/REQ-02\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The survey misclassifies the new elapsed-time progress assertions as load-independent and therefore omits a remaining host-load-sensitive assertion.\",\"file\":\"dev/active/57675b68/57675b68-host-load-survey.md\",\"line\":119,\"references\":[\"@/issue/57675b68/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
