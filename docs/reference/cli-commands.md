@@ -3523,6 +3523,11 @@ server exposes the HTTP API under `/api` and the web UI at `/` — from built
 static files when a web directory is found, otherwise from assets embedded in the
 binary.
 
+A start reports a running server once that server answers on its port. A server
+that exits while starting, or that stays unreachable past the start's bound, is
+reported as a failed start, is terminated where it is still running, and leaves
+no PID file behind for the next command to read.
+
 ```bash
 jit serve [OPTIONS]
 ```

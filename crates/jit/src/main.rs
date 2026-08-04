@@ -7291,7 +7291,7 @@ fn run() -> Result<()> {
         } => {
             use jit::commands::serve::{
                 find_web_dir, server_status, start_server, stop_server, ServeOptions, ServeOutcome,
-                StopOutcome,
+                StartupWatch, StopOutcome,
             };
             use serde_json::json;
 
@@ -7381,6 +7381,18 @@ fn run() -> Result<()> {
                     }
                 }
             } else {
+                // Release this process's startup mutation session before
+                // spawning the server it then waits on. Pre-service recovery
+                // already ran on the parent; the server child runs its own
+                // recovery under the ordinary bootstrap → repository chain, so
+                // holding the guards across the wait deadlocks the child against
+                // the parent. Both starts wait: the foreground one on
+                // `child.wait()`, the daemonizing one until the server answers on
+                // its port.
+                if let Some(guard) = retained_mutation_session.take() {
+                    guard.release()?;
+                }
+
                 // Foreground mode: run inline so we can print the URL before blocking.
                 if fg {
                     use jit::commands::serve::{
@@ -7444,16 +7456,6 @@ fn run() -> Result<()> {
                             cmd.arg("--web-dir").arg(web);
                         }
                     }
-                    // Release this process's startup mutation session before
-                    // spawning the server we then block on. Pre-service recovery
-                    // already ran on the parent; the server child runs its own
-                    // recovery under the ordinary bootstrap → repository chain,
-                    // so holding the guards across `child.wait()` would deadlock
-                    // the child against the parent for the parent's lifetime.
-                    if let Some(guard) = retained_mutation_session.take() {
-                        guard.release()?;
-                    }
-
                     // Hand the bound socket to the child (inherited fd on
                     // Unix); it adopts this exact socket instead of re-binding.
                     let mut child = spawn_with_listener(&mut cmd, listener)
@@ -7490,7 +7492,7 @@ fn run() -> Result<()> {
                         web_dir: resolved_web_dir,
                         server_binary: None,
                     };
-                    match start_server(opts) {
+                    match start_server(opts, StartupWatch::for_live_server()) {
                         Ok(ServeOutcome::Started {
                             pid,
                             port: p,

@@ -1139,6 +1139,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   does the deadline expire — so a slow host delays each step instead of changing
   which branch the drain takes.
 
+### Fixed
+
+- **`jit serve` reports the start on what the server did.** The daemonizing
+  start spawned the server, slept 300 milliseconds, and asked once whether the
+  child had exited. A child that exited at 301 milliseconds was reported as a
+  started server and left a PID file naming a process that was not running —
+  the stale record that check exists to prevent — and the failure was likelier
+  the slower the host, which is when an adopter can least afford to be told the
+  wrong thing. The start now follows the child until it answers on its port or
+  exits, whichever comes first, and reports that. An exit is a startup failure
+  whenever it happens, a server that answers is reported at the moment it
+  answers rather than after a fixed pause, and a child that does neither ends
+  the start at a bound, is terminated, and is reported as unreachable, so no
+  start can wait unboundedly and none leaves a survivor nothing is tracking. The
+  bound tracks the repository's own configured storage-lock timeout plus room to
+  serve past it, so raising that timeout raises what a start will follow rather
+  than terminating a server still waiting for a lock it is entitled to wait for.
+  The PID file is written only after the server has answered. What answering means,
+  how often it is observed, and how long the start follows the child all arrive
+  from the caller, so the cases decide on the outcome the start produced: one
+  releases a blocked child through a FIFO on the very observation the start
+  makes, so the child's exit strictly follows an observation of it running and
+  no pause of any length could have concluded otherwise. Restoring the "it has
+  not died yet" conclusion fails them.
+
+- **The daemonizing `jit serve` releases the recovery lock its child needs.**
+  The parent takes the bootstrap recovery lock at startup, and the foreground
+  start already released it before waiting on its child. The daemonizing start
+  did not, and the omission was invisible only because that start returned
+  moments after spawning and the parent then exited; a start that follows its
+  child holds the lock while the child waits for it, so the child times out and
+  dies. Both starts now release the session at the same point, before either
+  begins waiting. Two cases cover the pair end to end: the foreground one that
+  already existed, and one asserting a reported start names a server answering
+  on the port it reported.
+
+- **The orphan-cleanup case reaches the orphan cleanup.** It blocked the PID
+  write by placing a directory at the PID file path, which `start_server` reads
+  before it spawns anything: the start failed at that first read, having spawned
+  no child, and the case's assertions — that the error mentions PID persistence
+  and that the blocker survives — both held without any of the cleanup running.
+  The blocker now sits on the path the atomic write stages through, so the start
+  spawns its child, succeeds at everything up to the write, and fails there; the
+  case asserts that the child it spawned is gone and that no record was
+  published.
+
 ## [1.0.0] - 2026-07-30
 
 The first stable release. [The v1.0.0 release

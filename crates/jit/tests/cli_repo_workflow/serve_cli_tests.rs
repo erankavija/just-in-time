@@ -1,9 +1,10 @@
 //! Integration tests for `jit serve` CLI command.
 //!
 //! Most cases cover output contracts for `--status`, `--stop`, `--json`, stale
-//! PID cleanup, and MCP schema exclusion without starting a server. The
-//! foreground case at the end does start a live `jit-server`, and runs only
-//! when one was built beside the `jit` binary under test.
+//! PID cleanup, and MCP schema exclusion without starting a server. The two
+//! end-to-end cases at the end — the daemonizing start and the foreground one —
+//! do start a live `jit-server`, and run only when one was built beside the
+//! `jit` binary under test.
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
@@ -424,7 +425,167 @@ fn test_serve_stop_rejects_pid_zero_gracefully() {
         .stdout(predicate::str::contains("not running"));
 }
 
-// ── foreground serve end-to-end: parent must release the recovery lock ────────
+// ── serve end-to-end: the parent must release the recovery lock ───────────────
+
+/// The `jit-server` built beside the `jit` binary under test, or `None` — with
+/// a skip reported — when no server was built for it to spawn.
+///
+/// `commands::serve::find_server_binary` resolves a sibling of the running
+/// `jit` first, and `cargo test --workspace` builds that sibling. A narrower
+/// invocation such as `cargo test -p jit --features html,xml` never builds it,
+/// and a case here must not build one for itself: the build it would spawn has
+/// to take the cargo lock the build running this very test already holds, and
+/// nothing bounds that wait (jit:76a4bd21).
+#[cfg(unix)]
+fn server_binary_beside_jit(case: &str) -> Option<std::path::PathBuf> {
+    let server_bin: std::path::PathBuf =
+        std::path::PathBuf::from(assert_cmd::cargo::cargo_bin!("jit")).with_file_name("jit-server");
+    if !server_bin.exists() {
+        eprintln!(
+            "SKIP: no jit-server at {}, so {case} has no server to spawn. \
+             `cargo test --workspace` builds it; a narrower invocation needs \
+             `cargo build -p jit-server` first.",
+            server_bin.display()
+        );
+        return None;
+    }
+    Some(server_bin)
+}
+
+/// Wall-clock ceiling for the whole daemonizing-start case below.
+#[cfg(unix)]
+const DAEMON_BUDGET: Duration = Duration::from_secs(80);
+
+/// The share of [`DAEMON_BUDGET`] spent waiting for `jit serve` to report.
+///
+/// Above the `commands::serve::startup_bound` the case's lowered
+/// `JIT_LOCK_TIMEOUT` produces, so a start that gives up on an unreachable
+/// server reports that itself rather than being cut off here.
+#[cfg(unix)]
+const DAEMON_START_BUDGET: Duration = Duration::from_secs(40);
+
+/// The share spent stopping the server the case started.
+#[cfg(unix)]
+const DAEMON_STOP_BUDGET: Duration = Duration::from_secs(10);
+
+#[cfg(unix)]
+const _: () = assert!(
+    SETUP_BUDGET.as_secs() + DAEMON_START_BUDGET.as_secs() + DAEMON_STOP_BUDGET.as_secs()
+        <= DAEMON_BUDGET.as_secs(),
+    "the daemonizing-start phase budgets must fit inside DAEMON_BUDGET"
+);
+
+/// Runs `jit` with `args` and `envs` in `dir`, capturing its output under
+/// `capture`, and answers with its exit status and captured output.
+///
+/// `envs` reaches the spawned process alone, so a case setting one does not
+/// steal it from a sibling running in parallel.
+///
+/// The process is killed and reaped if it has not finished by `deadline`, so no
+/// case here can hold a continuous-integration job open (jit:76a4bd21).
+#[cfg(unix)]
+fn run_jit_capturing(
+    dir: &TempDir,
+    args: &[&str],
+    envs: &[(&str, &str)],
+    capture: &Path,
+    deadline: Instant,
+) -> (Option<std::process::ExitStatus>, String) {
+    let (out, err) = (capture.join("out"), capture.join("err"));
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    command
+        .current_dir(dir.path())
+        .args(args)
+        .envs(envs.iter().copied());
+    let mut child = spawn_capturing(&mut command, &out, &err).expect("spawn jit");
+    if !exited_by(&mut child, deadline) {
+        let _ = child.kill();
+        let _ = exited_by(&mut child, Instant::now() + REAP_GRACE);
+        return (None, read_capture(&out));
+    }
+    (
+        child.try_wait().unwrap(),
+        format!("{}{}", read_capture(&out), read_capture(&err)),
+    )
+}
+
+/// A daemonizing `jit serve` reports a started server only once that server is
+/// answering, and the record it leaves names one that is.
+///
+/// The start follows its child until the child serves, and the child's own
+/// bootstrap recovery needs the cross-process lock the parent takes at startup,
+/// so the parent must release it before it begins following. A parent holding it
+/// gives the child a lock timeout instead of a server, and the start reports
+/// that exit — which is why `JIT_LOCK_TIMEOUT` is lowered here: it bounds how
+/// long that failure takes to arrive rather than deciding the case.
+#[test]
+#[cfg(unix)]
+fn test_serve_reports_a_started_server_only_once_it_answers() {
+    use jit::commands::serve::is_serving_on_port;
+
+    let Some(_server_bin) = server_binary_beside_jit("the daemonizing `jit serve`") else {
+        return;
+    };
+    let overall = Instant::now() + DAEMON_BUDGET;
+    let phase = |budget: Duration| (Instant::now() + budget).min(overall);
+
+    let temp = setup_repo();
+    let capture = TempDir::new().unwrap();
+    let started_capture = capture.path().join("started");
+    let stopped_capture = capture.path().join("stopped");
+    std::fs::create_dir_all(&started_capture).unwrap();
+    std::fs::create_dir_all(&stopped_capture).unwrap();
+
+    let (status, output) = run_jit_capturing(
+        &temp,
+        &["serve", "--port", "0", "--json"],
+        &[("JIT_LOCK_TIMEOUT", "3")],
+        &started_capture,
+        phase(DAEMON_START_BUDGET),
+    );
+
+    // Probe before stopping: the report is only worth what the server behind it
+    // is doing at the moment it is made.
+    let reported: Option<Value> = serde_json::from_str(&output).ok();
+    let reported_port = reported
+        .as_ref()
+        .and_then(|report| report["port"].as_u64())
+        .and_then(|port| u16::try_from(port).ok());
+    let answered = reported_port.is_some_and(is_serving_on_port);
+
+    // Stop before asserting, so a failing assertion leaves no server running.
+    let (stop_status, stop_output) = run_jit_capturing(
+        &temp,
+        &["serve", "--stop", "--json"],
+        &[],
+        &stopped_capture,
+        phase(DAEMON_STOP_BUDGET),
+    );
+
+    assert_eq!(
+        status.and_then(|status| status.code()),
+        Some(0),
+        "`jit serve` must report a start it can stand behind, got: {output}"
+    );
+    assert_eq!(
+        reported.as_ref().map(|report| &report["status"]),
+        Some(&Value::from("started")),
+        "the start must report a started server, got: {output}"
+    );
+    assert!(
+        answered,
+        "the server `jit serve` reported started must be answering on the port \
+         it reported: {output}"
+    );
+    assert_eq!(
+        stop_status.and_then(|status| status.code()),
+        Some(0),
+        "the reported server must be stoppable through its record, got: \
+         {stop_output}"
+    );
+}
+
+// ── foreground serve end-to-end ───────────────────────────────────────────────
 
 /// Extracts the port from a `Starting server on http://localhost:<port> …` line.
 #[cfg(unix)]
@@ -458,10 +619,6 @@ const FG_SERVING_BUDGET: Duration = Duration::from_secs(20);
 /// The share spent killing the spawned process group and confirming it drained.
 #[cfg(unix)]
 const FG_TEARDOWN_BUDGET: Duration = Duration::from_secs(15);
-
-/// Ceiling on one connect, write, or read of a single HTTP liveness probe.
-#[cfg(unix)]
-const FG_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// The phases have to fit inside the stated total, or the total is not the
 /// bound it claims to be.
@@ -532,8 +689,7 @@ fn process_group_survives(pgid: u32) -> bool {
 #[test]
 #[cfg(unix)]
 fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
-    use std::io::Write;
-    use std::net::{SocketAddr, TcpStream};
+    use jit::commands::serve::is_serving_on_port;
     use std::os::unix::process::CommandExt;
 
     let started = Instant::now();
@@ -542,47 +698,18 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     // the total this test states.
     let phase = |budget: Duration| (Instant::now() + budget).min(overall);
 
-    // `commands::serve::find_server_binary` resolves a sibling of the running
-    // `jit` first, and `cargo test --workspace` builds that sibling. A narrower
-    // invocation such as `cargo test -p jit --features html,xml` never builds
-    // it, and this test must not build one for itself: the build it would spawn
-    // has to take the cargo lock the build running this very test already
-    // holds, and nothing bounds that wait (jit:76a4bd21).
-    let server_bin: std::path::PathBuf =
-        std::path::PathBuf::from(assert_cmd::cargo::cargo_bin!("jit")).with_file_name("jit-server");
-    if !server_bin.exists() {
-        eprintln!(
-            "SKIP: no jit-server at {}, so `jit serve --fg` has no server to \
-             spawn. `cargo test --workspace` builds it; a narrower invocation \
-             needs `cargo build -p jit-server` first.",
-            server_bin.display()
-        );
+    let Some(_server_bin) = server_binary_beside_jit("`jit serve --fg`") else {
         return;
-    }
-
-    // A real HTTP round-trip, not a bare TCP connect: the parent binds the
-    // listening socket and hands its fd to the child, so the kernel accepts
-    // connections into the listen backlog even while the child is still
-    // blocked on the recovery lock and serving nothing. Only a completed
-    // HTTP response proves the child actually adopted the socket and is
-    // serving.
-    let server_responds = |port: u16| -> bool {
-        let addr = SocketAddr::from(([127, 0, 0, 1], port));
-        let Ok(mut stream) = TcpStream::connect_timeout(&addr, FG_PROBE_TIMEOUT) else {
-            return false;
-        };
-        let _ = stream.set_read_timeout(Some(FG_PROBE_TIMEOUT));
-        let _ = stream.set_write_timeout(Some(FG_PROBE_TIMEOUT));
-        if stream
-            .write_all(b"GET /api/health HTTP/1.0\r\nHost: localhost\r\n\r\n")
-            .is_err()
-        {
-            return false;
-        }
-        let mut buf = [0u8; 5];
-        stream.read_exact(&mut buf).is_ok() && &buf == b"HTTP/"
     };
 
+    // `is_serving_on_port` is the probe `jit serve` itself decides a startup on
+    // (`commands::serve`), so this case reads liveness exactly as the product
+    // does. It takes a real HTTP round-trip rather than a bare TCP connect: the
+    // parent binds the listening socket and hands its fd to the child, so the
+    // kernel accepts connections into the listen backlog even while the child
+    // is still blocked on the recovery lock and serving nothing. Only a
+    // completed HTTP response proves the child adopted the socket and is
+    // serving.
     let temp = setup_repo();
     let capture = TempDir::new().unwrap();
     let (out_path, err_path) = (capture.path().join("out"), capture.path().join("err"));
@@ -628,7 +755,7 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     let mut served = false;
     if let Some(port) = port {
         poll_until(serving_deadline, || {
-            served = server_responds(port);
+            served = is_serving_on_port(port);
             served || matches!(child.try_wait(), Ok(Some(_)))
         });
     }
@@ -649,7 +776,7 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     if !drained {
         // Whether the announced port still answers separates a live survivor
         // from a member the kernel has killed but nothing has reaped yet.
-        let still_serving = port.is_some_and(server_responds);
+        let still_serving = port.is_some_and(is_serving_on_port);
         panic!(
             "a process this test spawned outlived it: process group {pgid} still \
              has members after SIGKILL and a {FG_TEARDOWN_BUDGET:?} teardown \
