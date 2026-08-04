@@ -459,7 +459,15 @@ pub struct StaleBinaryError {
 
 impl StaleBinaryError {
     /// Build a [`StaleBinaryError`] for `issue_id`/`gate_key`, explaining
-    /// `reason` (a commit mismatch or a dirty build) and the fix.
+    /// `reason` and the fix.
+    ///
+    /// Each [`StaleBinaryReason`](crate::domain::build_provenance::StaleBinaryReason)
+    /// renders the cause it names and nothing else: a commit mismatch reports
+    /// both commits, uncommitted build inputs report the paths responsible
+    /// rather than two equal commits, and a dirty build reports the commit it
+    /// was built on top of. The remedies follow the cause — committing or
+    /// reverting the named paths closes the uncommitted case, where the others
+    /// need a reinstall.
     pub fn new(
         issue_id: &str,
         gate_key: &str,
