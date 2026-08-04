@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-04T12:03:58.811800615Z",
   "context": {},
   "created_at": "2026-08-04T11:59:16.905366417Z",
   "dependencies": [],
@@ -37,7 +38,7 @@
     "satisfies:REQ-08"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Run the workflow only on platforms whose failures are acted on",
-  "updated_at": "2026-08-04T12:02:23.176039427Z"
+  "updated_at": "2026-08-04T12:03:58.811800615Z"
 }
