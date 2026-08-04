@@ -14,6 +14,7 @@
       "path": "dev/active/15afa1f8/15afa1f8-seeded-regression.md"
     }
   ],
+  "done_at": "2026-08-04T23:13:52.040697476Z",
   "first_ready_at": "2026-08-04T20:28:16.312816572Z",
   "gates_required": [
     "cargo-ci",
@@ -40,7 +41,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
-  "updated_at": "2026-08-04T22:49:39.245578760Z"
+  "updated_at": "2026-08-04T23:13:52.040697476Z"
 }

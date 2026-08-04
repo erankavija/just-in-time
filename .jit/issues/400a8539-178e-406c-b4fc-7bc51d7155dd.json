@@ -14,6 +14,7 @@
       "path": "dev/active/400a8539/400a8539-seeded-regression.md"
     }
   ],
+  "done_at": "2026-08-04T23:13:44.947752031Z",
   "first_ready_at": "2026-08-04T21:22:07.452012368Z",
   "gates_required": [
     "cargo-ci",
@@ -26,8 +27,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T22:56:11.050818371Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T23:13:30.138618658Z",
       "updated_by": "auto:executor"
     }
   },
@@ -40,7 +41,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Report server startup on what the child did, not on a fixed pause",
-  "updated_at": "2026-08-04T23:10:26.859845464Z"
+  "updated_at": "2026-08-04T23:13:44.947752031Z"
 }

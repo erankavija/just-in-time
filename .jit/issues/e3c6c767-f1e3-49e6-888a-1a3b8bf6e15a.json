@@ -16,6 +16,7 @@
       "path": "dev/active/e3c6c767/e3c6c767-seeded-regressions.md"
     }
   ],
+  "done_at": "2026-08-04T23:13:59.107728329Z",
   "first_ready_at": "2026-08-04T15:41:51.548702439Z",
   "gates_required": [
     "cargo-ci",
@@ -42,7 +43,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Decide the lock tests on lock behaviour, not on scheduling",
-  "updated_at": "2026-08-04T22:52:21.400168169Z"
+  "updated_at": "2026-08-04T23:13:59.107728329Z"
 }

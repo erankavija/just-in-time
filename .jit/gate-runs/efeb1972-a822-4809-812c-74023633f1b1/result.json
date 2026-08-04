@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f2bb135c17491b56b6de3f998e17b3fcd8b6b8b1",
+  "completed_at": "2026-08-04T23:13:29.779661031Z",
+  "duration_ms": 170141,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met, including the prior post-readiness exit finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "400a8539-178e-406c-b4fc-7bc51d7155dd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "efeb1972-a822-4809-812c-74023633f1b1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T23:10:39.637855058Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: aa49a080, aa0ba830, 49c41e7b, beafbc24, f2bb135c (`jit:400a8539`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/400a8539/requirement/REQ-01–REQ-05 (issue Markdown, markdown-first); @/issue/f3f7de97/requirement/REQ-08 (issue Markdown); @/invariant/semantic-test-assertions, @/invariant/convention-convergence, @/invariant/architecture-dependency-direction (.jit/invariants.toml, registry-first); @/gate/cargo-ci (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (2026-08-04T23:03:47Z, exit 0); code-review failed (2026-08-04T22:52:30Z, exit 1; prior F1 verified addressed)\nTruncation recovery: aa49a080’s source patch reread in two bounded ranges; current startup tests, caller, docs, gate record, and post-probe fix reread narrowly; merge first-parent patch verified identical to aa49a080\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met, including the prior post-readiness exit finding.\" ,\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

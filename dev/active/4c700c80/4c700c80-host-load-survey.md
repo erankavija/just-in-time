@@ -68,9 +68,20 @@ test-side deadline and no bound a slow host can exhaust.
 regex could not see.** A test that imports `sleep` and calls it unqualified is
 invisible to search 1's `thread::sleep`. Two files do this:
 `crates/jit/src/storage/temp_cleanup.rs` (five sites, all classified below as
-unflippable) and `crates/server/src/shutdown.rs:515`, which is reported for
-separate work. Search 5 also surfaces every `Clock` implementation, which is the
-opposite shape — an injected clock is a supplied instant rather than a host read.
+unflippable) and `crates/server/src/shutdown.rs:515`, which was filed as
+`15afa1f8` and closed. Search 5 also surfaces every `Clock` implementation, which
+is the opposite shape — an injected clock is a supplied instant rather than a
+host read.
+
+The same sweep, run again over `crates/server` and `crates/jit` while `15afa1f8`
+was in flight, found one further site of the class: `start_server`'s
+300-millisecond startup pause. It hid from every search over test sources because
+the sleep deciding the verdict sits in production code, and only reading the test
+against what it calls reaches it. It was filed as `400a8539` and closed. That is
+the fourth distinct search shape this container has needed, and each has found
+fewer: four sites, then one, then one. A fifth shape may exist; this survey does
+not claim otherwise, and states its method so the next reader can extend it
+rather than repeat it.
 
 Production-code constructs
 (`storage/lock.rs` poll loops, `storage/repo_lock.rs` owner waits,
@@ -235,17 +246,21 @@ and reduces the second.
 
 ## Result — remaining sites, by disposition
 
-### Reported for separate work
+### Reported by this survey and closed since
 
-| Site | Assertion | Margin | Restatement available |
-| --- | --- | --- | --- |
-| `crates/server/src/shutdown.rs:515` `test_run_shutdown_sequence_reports_drained_when_final_interval_empties` | the drain reports `Drained` rather than force-closing, because the last live connection completed inside the final sampling interval | 50 ms against a 400 ms deadline | **Found by search 5 in this re-run; not filed.** The test sleeps 3.5 sampling intervals and then completes the connection, so the completion must land in the fourth 100-millisecond interval before the 400-millisecond deadline. A stall of 50 ms in that window expires the deadline first and the outcome becomes `ForcedClosed`. This is the tightest margin in the suite outside `lock.rs`. Restating it means the drain loop taking its sampling schedule from outside rather than from `tokio::time`, which is a change to `drain_connections` in `crates/server`, outside this issue's four sites and touching shutdown semantics `76a4bd21` owns. |
+Both sites this survey reported were filed into this container and closed. The
+rows stay so a reader can see what the survey found and where it went.
+
+| Site | Margin | Result |
+| --- | --- | --- |
+| `crates/server/src/shutdown.rs:515` `test_run_shutdown_sequence_reports_drained_when_final_interval_empties` | 50 ms against a 400 ms deadline | **Closed by `15afa1f8`.** The case slept 3.5 sampling intervals and then completed the connection, so the completion had to land in the fourth 100-millisecond interval before the deadline; a 50-millisecond stall expired the deadline first and turned a voluntary drain into a forced close. The drain now takes its boundary and its sampling schedule from its caller, and the case orders its three events by observation — the drain reports the sample that found the connection live, the handle reports the retirement, and only then does the deadline expire. A paused runtime was evaluated first and rejected: it tightens the dependence to zero rather than removing it, because virtual time cannot bring an OS readiness event forward. |
+| `crates/jit/src/commands/serve.rs:428` `start_server`'s startup pause | 300 ms | **Closed by `400a8539`.** Found by the alias sweep in `15afa1f8` rather than by this survey: the sleep deciding the verdict lived in production code, so a search over test sources could not see it. `start_server` slept 300 milliseconds and read the child's exit once, so a child that died at 301 milliseconds was reported as a started server and given a PID file. It now observes the child until it serves, exits, or a bound derived from the repository's configured lock timeout expires — and reads the exit once more after a positive readiness probe, because a child can answer and die before the read completes. |
 
 ### Filed as separate work
 
 | Site | Assertion | Margin | Result |
 | --- | --- | --- | --- |
-| `crates/jit/src/storage/lock.rs:470,475` `test_exclusive_lock_prevents_concurrent_writes` | the holder acquired within 50 ms; the contender was refused while the holder slept 200 ms | 50 ms / 200 ms | Filed as `e3c6c767`, "Decide the lock tests on lock behaviour, not on scheduling", and in flight in the same wave as this issue. The tightest margins in the suite. Present at this survey's revision because that work is on its own branch; out of this issue's scope, and this issue's worker was directed not to touch the file. |
+| `crates/jit/src/storage/lock.rs:470,475` `test_exclusive_lock_prevents_concurrent_writes` | the holder acquired within 50 ms; the contender was refused while the holder slept 200 ms | 50 ms / 200 ms | **Closed by `e3c6c767`**, in flight in the same wave as this issue and merged since. Both margins are gone: the refusal property holds the lock until every contender has recorded being refused it, and the exclusion property is asked of the lock by its own holder — while one contender holds it, an independent acquisition must fail — rather than sampled for overlap, which a serial schedule can hide. |
 
 ### Outside the schedule by construction
 
@@ -314,3 +329,22 @@ dead code" above.
   system implementation and a fixed test implementation. `@/invariant/convention-convergence`
   reads on one convention having one form; neither is load-sensitive, and
   converging them is outside this issue.
+
+## Result
+
+No assertion in the gate's suite has a verdict a busy host can flip.
+
+Every site this survey found is accounted for above: restated so its outcome is
+decided by what the code did, closed under a filed issue, argued as one load can
+only make more true, or retained with the reason it is a bound on a hang rather
+than a statement of a property. The four sites this issue was filed for are
+restated; the two this survey reported are closed under `15afa1f8` and
+`400a8539`; the pair `e3c6c767` owned are closed.
+
+What that claim rests on, stated so it can be checked rather than trusted: five
+search shapes over `crates/`, listed under Method, each result read in its
+enclosing test. The claim is bounded by those shapes. Each new shape this
+container has added found fewer sites than the last — four, then one, then one —
+and the last one needed reading production code that a test-source search cannot
+reach. A sixth shape is not ruled out, and the method is written down so the next
+reader extends it instead of starting over.

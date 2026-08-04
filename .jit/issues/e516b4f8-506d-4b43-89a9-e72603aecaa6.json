@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "No source or test file carries a requirement identifier belonging to a container other than its own.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/ai_review_verdict_tests.rs` opens with a `(REQ-11)` tag. Requirement identifiers are issue-local: `REQ-11` names a requirement of a different epic, so the tag points at a contract this file does not implement.\n\nA stale identifier of this kind survives because nothing reads it — which is also why it misleads: a reader tracing coverage follows it to the wrong container.\n\n## Success Criteria\n\n- [hard] REQ-01: The tag names the requirement this file actually covers, or is removed.\n- [hard] REQ-02: A sweep of the crate's sources and tests reports no other requirement identifier attributed to a container that does not own the file, and the sweep's result is stated.",
   "documents": [],
+  "done_at": "2026-08-04T23:14:06.186894222Z",
   "first_ready_at": "2026-08-03T21:54:55.622617639Z",
   "gates_required": [
     "cargo-ci",
@@ -33,7 +34,7 @@
     "satisfies:REQ-07"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove the requirement tag naming another container",
-  "updated_at": "2026-08-04T22:49:40.393513237Z"
+  "updated_at": "2026-08-04T23:14:06.186894222Z"
 }
