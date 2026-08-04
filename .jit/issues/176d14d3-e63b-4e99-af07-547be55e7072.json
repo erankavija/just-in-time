@@ -40,7 +40,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Bind the packaged region source to the region rendered from it",
-  "updated_at": "2026-08-04T12:01:35.585572698Z"
+  "updated_at": "2026-08-04T15:36:49.512229725Z"
 }

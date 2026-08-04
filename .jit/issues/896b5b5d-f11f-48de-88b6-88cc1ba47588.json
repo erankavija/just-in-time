@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "An issue description reaches `jit issue create` from a file or standard input, so its content is not shaped by shell quoting.\n\n## Background\n\n`jit issue update` accepts a description from a file, and `jit issue create` does not. A description authored as markdown — the shape the content standards require, with headings, backticks, and marked criteria — therefore reaches creation through `--description \"$(cat file)\"`, where the shell has already interpreted it.\n\nThe workaround is not merely awkward. Command substitution strips trailing newlines and the surrounding quoting has to survive backticks and dollar signs, so the stored description can differ from the file that was authored.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit issue create` accepts a description read from a named file.\n- [hard] REQ-02: `jit issue create` accepts a description read from standard input.\n- [hard] REQ-03: A description containing backticks, dollar signs and a trailing blank line is stored byte-identically to the file it was read from.\n- [hard] REQ-04: The file and inline forms are mutually exclusive, and supplying both is a usage error rather than a silent precedence.",
   "documents": [],
+  "done_at": "2026-08-04T15:37:01.629382325Z",
   "first_ready_at": "2026-08-03T21:54:38.615842229Z",
   "gates_required": [
     "cargo-ci",
@@ -44,7 +45,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Read an issue description from a file or standard input on create",
-  "updated_at": "2026-08-04T15:34:19.080359602Z"
+  "updated_at": "2026-08-04T15:37:01.629382325Z"
 }

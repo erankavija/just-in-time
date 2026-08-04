@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The merge-integrity guard fails a merge whose result does not build and pass its tests, so the protocol that relies on it is relying on something.\n\n## Background\n\n`scripts/verify-commit-builds.sh` reports a cold `cargo build --workspace` of a fresh git-archive extraction as passing in 24–30 seconds, with no `sccache`, no `RUSTC_WRAPPER`, no `VERIFY_COMMIT_TARGET_DIR`, and an empty cache directory. A genuine cold build of this workspace's dependency set cannot complete in that time, so the guard may be reporting a verdict it never established.\n\nSeparately and independently observed: a merge of three branches produced a tree that did not compile, because one branch changed a function signature while another added a caller of the old form. The edits did not overlap textually, so the merge was clean. The guard reported that merge commit as building.\n\nA build-only check would not close this even if it were sound, because a merge can compile and fail at run time — that also happened during the same container.\n\n## Success Criteria\n\n- [hard] REQ-01: A merge commit whose tree fails to compile is reported as failing by the guard.\n- [hard] REQ-02: A merge commit whose tree compiles but whose tests fail is reported as failing by the guard.\n- [hard] REQ-03: The guard's runtime is consistent with the work it claims to perform, or the guard is removed in favour of the check that already performs that work.\n- [hard] REQ-04: A self-test demonstrates REQ-01 and REQ-02 against seeded broken trees, so the guard cannot silently become vacuous again.",
   "documents": [],
+  "done_at": "2026-08-04T15:36:27.969786746Z",
   "first_ready_at": "2026-08-03T21:54:05.900915540Z",
   "gates_required": [
     "cargo-ci",
@@ -32,7 +33,7 @@
     "satisfies:REQ-02"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Make the merge-integrity guard fail a merge that does not build and test",
-  "updated_at": "2026-08-04T14:52:41.687044960Z"
+  "updated_at": "2026-08-04T15:36:27.969786746Z"
 }

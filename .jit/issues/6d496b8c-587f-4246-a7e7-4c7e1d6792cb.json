@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "One gate is evaluated across several issues in one invocation, so gating a wave does not require one command per issue.\n\n## Background\n\n`jit gate evaluate` takes one issue and one gate. Gating a set of issues that share a gate therefore means one invocation per issue, each paying whatever the checker costs even when the declared inputs have not changed between them.\n\nVerdict reuse already exists: a gate whose declared inputs digest to a value a prior run recorded carries that run's verdict instead of executing the checker. The gap is at the command surface, not in the evaluation model.\n\n## Success Criteria\n\n- [hard] REQ-01: One invocation evaluates a named gate for several named issues.\n- [hard] REQ-02: Each issue receives its own recorded run and its own verdict; a failure for one issue does not suppress evaluation for the rest.\n- [hard] REQ-03: The invocation reports per-issue results, and its exit status reflects whether any issue failed.\n- [hard] REQ-04: Evaluation remains serialised per issue, so concurrent evaluation cannot lose a result to a per-issue lock.",
   "documents": [],
+  "done_at": "2026-08-04T15:36:22.704331773Z",
   "first_ready_at": "2026-08-03T21:54:44.263265718Z",
   "gates_required": [
     "cargo-ci",
@@ -44,7 +45,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Evaluate one gate across several issues in one invocation",
-  "updated_at": "2026-08-04T15:23:00.999540081Z"
+  "updated_at": "2026-08-04T15:36:22.704331773Z"
 }
