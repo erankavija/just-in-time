@@ -90,14 +90,6 @@ mkdir -p "$TMPDIR"
 # fact rather than an assumption.
 export CARGO_INCREMENTAL=0
 
-# Parallel test harness across 20 threads. The suite is I/O-bound (the
-# storage::claim_coordinator proptests do real filesystem locking over hundreds
-# of cases each), so serial execution pushed the gate past two minutes. Capped
-# at 20 (not nproc) to leave headroom: a pre-existing load-sensitive concurrency
-# proptest (prop_concurrent_different_issues_succeed) can starve its file-lock
-# timeout when every core is saturated by parallel build+test load. Overridable.
-export RUST_TEST_THREADS="${RUST_TEST_THREADS:-20}"
-
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
