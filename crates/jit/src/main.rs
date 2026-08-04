@@ -2409,6 +2409,7 @@ fn run() -> Result<()> {
                     positional_title,
                     title,
                     description,
+                    description_file,
                     priority,
                     issue_type,
                     gate,
@@ -2427,6 +2428,15 @@ fn run() -> Result<()> {
                     let content_format = content_format
                         .map(|s| jit::domain::ContentFormat::from_str(&s))
                         .transpose()?;
+                    let description = match (description, description_file) {
+                        (Some(text), None) => text,
+                        (None, Some(path)) => read_description_source(&path)
+                            .map_err(|error| invalid_argument(format!("{error:#}"), json))?,
+                        (None, None) => String::new(),
+                        (Some(_), Some(_)) => {
+                            unreachable!("clap rejects --description with --description-file")
+                        }
+                    };
 
                     // The command layer owns `--type` validation and `type:<kind>`
                     // label derivation; the CLI just forwards the typed value.

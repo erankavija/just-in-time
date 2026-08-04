@@ -18,6 +18,7 @@ mod failure_probe_coverage_tests;
 mod failure_probe_fixture;
 mod gate_field_contract_test;
 mod invocation_exit_status_parity_tests;
+mod issue_create_description_file_tests;
 mod issue_create_json_contract_test;
 mod issue_create_positional_type_tests;
 mod issue_search_json_tests;

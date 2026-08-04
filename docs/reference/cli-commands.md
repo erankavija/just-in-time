@@ -790,6 +790,7 @@ jit issue create --title <TITLE> [OPTIONS]
 |------|-------------|
 | `-t`, `--title <TITLE>` | Title, as a flag instead of the positional argument. |
 | `-d`, `--description <DESCRIPTION>` | Issue body. Defaults to the empty string. |
+| `--description-file <PATH>` | Read the issue body from `PATH`, or from standard input when `PATH` is `-`; content is stored verbatim, including trailing newlines. Mutually exclusive with `--description`. |
 | `-p`, `--priority <PRIORITY>` | `low`, `normal` (default), `high`, or `critical`. |
 | `--type <KIND>` | Issue type, written as a `type:<kind>` label. Must be declared in `[type_hierarchy]` in `config.toml`. Long-only, because `-t` is `--title`. |
 | `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable and comma-separated. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
@@ -804,6 +805,8 @@ jit issue create "Fix login bug"
 jit issue create "Fix login bug" --type task --priority high
 jit issue create --title "Fix login bug" --gate tests --label epic:auth
 jit issue create "Wire up parser" --json
+jit issue create --title "Capture markdown" --description-file notes.md
+cat notes.md | jit issue create --title "Capture markdown" --description-file -
 ```
 
 **Initial state.** A new issue has no dependencies, so it is born `Ready` and its
