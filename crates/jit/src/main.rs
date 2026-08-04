@@ -8181,12 +8181,12 @@ mod exit_code_projection_tests {
             (
                 gate_pass_failed(GateRunStatus::Failed),
                 4,
-                "gate evaluate, gate evaluate-all",
+                "gate evaluate, gate evaluate-all, gate evaluate-many",
             ),
             (
                 gate_pass_failed(GateRunStatus::Error),
                 10,
-                "gate evaluate, gate evaluate-all",
+                "gate evaluate, gate evaluate-all, gate evaluate-many",
             ),
             // Universal rows: raised from shared paths, reachable from any command.
             (anyhow::anyhow!("untyped failure"), 1, "*"),
