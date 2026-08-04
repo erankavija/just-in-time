@@ -13111,3 +13111,4 @@
 {"id":"c390ac63-14f1-45c1-8c0e-0b89dd9b908a","issue_id":"57675b68-78dd-470b-a524-30061b488062","timestamp":"2026-08-04T19:11:29.262458881Z","type":"issue_completed"}
 {"from":"backlog","id":"a59aaa3d-e907-42a9-be0f-b42b8ced9357","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T19:11:34.561941170Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"code-review","id":"94f61a96-4a4a-42ec-95ad-f283a8ca2cd4","issue_id":"06f1fa95-2aa4-4493-a31e-1f149f3deee9","timestamp":"2026-08-04T19:14:23.777056301Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"4b7166ea-b306-4e55-b1cf-c0c16024fbca","issue_id":"06f1fa95-2aa4-4493-a31e-1f149f3deee9","timestamp":"2026-08-04T19:22:25.770898075Z","type":"gate_passed","updated_by":"auto:executor"}
