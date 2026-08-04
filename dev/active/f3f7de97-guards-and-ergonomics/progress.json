@@ -4,7 +4,9 @@
   "current_wave": 3,
   "lead_notes": [
     "Four wave-1 branches were merged before any of them was gated, and 6d496b8c's conformance failures then made cargo-ci red on main for every issue at once, blocking completion of five otherwise-finished issues. The protocol 3019eacd rewrote names exactly this: gate after each merge whenever per-merge attribution matters. Gate before merging the next branch from here on.",
-    "A backgrounded `codex exec` blocks forever on 'Reading additional input from stdin...' unless stdin is redirected from /dev/null. The 6d496b8c rework sat 17 minutes with a live process, a clean worktree, no commits and 00:00:00 CPU before this was found. It is a harness defect, not a worker failure, and does not count against the rework budget."
+    "A backgrounded `codex exec` blocks forever on 'Reading additional input from stdin...' unless stdin is redirected from /dev/null. The 6d496b8c rework sat 17 minutes with a live process, a clean worktree, no commits and 00:00:00 CPU before this was found. It is a harness defect, not a worker failure, and does not count against the rework budget.",
+    "Session 2 resumed after session 1 ended mid-run. Session 1 left four issues merged on main with a failing code-review gate (06f1fa95, 3923fd06, 89a7e34e, 57675b68), one issue fully gated but not transitioned (76a4bd21), and one worker's uncommitted design in its worktree (57675b68, preserved as 0f0fb836 on worktree-agent-57675b68).",
+    "The lead pushed main to origin at b4859c87 to start a hosted CI run. REQ-08 can only be evidenced by a completed hosted run, and a run costs wall-clock the container does not control, so it starts as early as the tree allows rather than at completion."
   ],
   "waves": [
     {
@@ -26,7 +28,7 @@
           "short_id": "89a7e34e",
           "title": "Make the staleness refusal name the condition it detected",
           "worker": "codex/gpt-5.6-luna",
-          "status": "merged, reworked lead-direct, code-review re-running"
+          "status": "merged, code-review failed on one doc-contract finding, rework dispatched (codex/gpt-5.6-luna)"
         },
         {
           "short_id": "6d496b8c",
@@ -44,7 +46,7 @@
           "short_id": "76a4bd21",
           "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling",
           "worker": "opus",
-          "status": "merged, reworked in worktree, awaiting merge of rework"
+          "status": "done; rework merged, both gates green"
         }
       ]
     },
@@ -55,31 +57,31 @@
           "short_id": "06f1fa95",
           "title": "Make the cargo-ci verdict independent of unrelated host load",
           "worker": "opus",
-          "status": "merged, gates green"
+          "status": "merged, code-review failed on REQ-02 and REQ-03 evidence, rework dispatched (opus)"
         },
         {
           "short_id": "a2d7d212",
           "title": "Bind a packaged contribution to the registry entry it restates",
           "worker": "opus",
-          "status": "merged, code-review re-running"
+          "status": "done, all three gates green"
         },
         {
           "short_id": "896b5b5d",
           "title": "Read an issue description from a file or standard input on create",
           "worker": "codex/gpt-5.6-luna",
-          "status": "merged, code-review re-running"
+          "status": "done, gates green"
         },
         {
           "short_id": "3923fd06",
           "title": "Bind every published package to the registry it restates",
           "worker": "opus",
-          "status": "complete, awaiting merge"
+          "status": "merged, code-review failed on the REQ-04 measured-result record, rework dispatched (codex/gpt-5.6-luna)"
         },
         {
           "short_id": "57675b68",
           "title": "Hold a concurrency property without racing a wall clock",
           "worker": "opus",
-          "status": "complete, open question on unbounded retry"
+          "status": "merged, code-review failed on three findings, rework dispatched (opus)"
         }
       ]
     },
@@ -89,14 +91,20 @@
         {
           "short_id": "176d14d3",
           "title": "Bind the packaged region source to the region rendered from it",
+          "worker": "codex/gpt-5.6-luna",
+          "status": "dispatched, worktree agent-176d14d3-w2"
+        },
+        {
+          "short_id": "e3c6c767",
+          "title": "Decide the lock tests on lock behaviour, not on scheduling",
           "worker": "unassigned",
-          "status": "blocked until a2d7d212 reaches done"
+          "status": "blocked until 57675b68 reaches done"
         },
         {
           "short_id": "e516b4f8",
           "title": "Remove the requirement tag naming another container",
           "worker": "unassigned",
-          "status": "held until the tree settles"
+          "status": "held to last so its sweep observes the finished tree"
         }
       ]
     }
@@ -129,6 +137,10 @@
     {
       "short_id": "3923fd06",
       "why": "Criterion violation surfaced by a2d7d212's report: a second published package unbound to the registry it restates, which the container's REQ-01 names"
+    },
+    {
+      "short_id": "e3c6c767",
+      "why": "REQ-04's suite survey in 57675b68 found the tightest remaining scheduling margins in test_exclusive_lock_prevents_concurrent_writes; filed as its own child rather than widened into 57675b68"
     }
   ],
   "escalations": [
@@ -154,11 +166,15 @@
     },
     {
       "topic": "unbounded retry in 57675b68",
-      "resolution": "open: asked whether it reintroduces the six-hour-hang failure mode 76a4bd21 removed from the same gate, or whether an attempt-based bound keeps load-independence while failing loudly"
+      "resolution": "Decided by the lead rather than re-escalated: an unbounded retry is not acceptable. REQ-08 exists because one unbounded wait in this suite held four CI jobs to a six-hour ceiling, so reintroducing one into the same gate is the failure mode the container closes. The bound must not be a wall clock the caller races; the preserved session-1 design bounds on claimant progress and fails loudly on a stuck lock, and the rework worker was told to adopt, improve or replace it against that decision."
     }
   ],
   "rework_counts": {
-    "6d496b8c": 1
+    "6d496b8c": 1,
+    "06f1fa95": 1,
+    "57675b68": 1,
+    "3923fd06": 1,
+    "89a7e34e": 1
   },
   "surfaced_pitfalls": [
     {
@@ -208,6 +224,12 @@
       "finding": "docs/reference/example-config.toml carried team:core, the value the registry moved off, as a third carrier bound by no check.",
       "disposition": "Fixed at 7b013c12, one line. Deliberately no check: that file illustrates the configuration format for adopters, so binding it would make every adopter example a carrier of this repository's live state. The worker declined two further edits I had asked for and was right both times \u2014 the description matched the file's own no-period convention rather than mirroring the registry, and milestone:2026-q1 illustrates the second half of its own sentence rather than mirroring superseded text.",
       "criterion_subject": "container REQ-01"
+    },
+    {
+      "issue": "89a7e34e",
+      "finding": "code-review reported the issue's `satisfies:REQ-04` label as a dangling item link because the issue declares no REQ-04 of its own.",
+      "disposition": "Dismissed as a reviewer misreading. The `satisfies` namespace is declared in .jit/config.toml as coverage credit naming a *container* requirement, so the label resolves against f3f7de97's REQ-04, which this issue does deliver. `jit validate` passes. No label change.",
+      "criterion_subject": "container REQ-04"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z"
