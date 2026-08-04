@@ -475,6 +475,14 @@ impl StaleBinaryError {
                 ),
                 built_from.clone(),
             ),
+            StaleBinaryReason::UncommittedBuildInputs { built_from, paths } => (
+                format!(
+                    "This jit binary was built from commit {built_from}, but the \
+                     repository has uncommitted changes to build inputs: {}",
+                    format_build_input_paths(paths),
+                ),
+                built_from.clone(),
+            ),
             StaleBinaryReason::DirtyBuild { built_from } => (
                 format!(
                     "This jit binary was built from commit {built_from} with a dirty \
@@ -493,14 +501,21 @@ impl StaleBinaryError {
         .with_cause(
             "A gate verdict produced by a stale binary is not evidence about the \
              change under review",
-        )
-        .with_remedy(
-            "Rebuild and reinstall with build provenance: scripts/install-jit.sh \
+        );
+        let actionable = match reason {
+            StaleBinaryReason::UncommittedBuildInputs { .. } => actionable.with_remedy(
+                "Commit or revert the named build-input paths before rerunning the gate",
+            ),
+            _ => actionable,
+        };
+        let actionable = actionable
+            .with_remedy(
+                "Rebuild and reinstall with build provenance: scripts/install-jit.sh \
              (wraps cargo install --path crates/jit)",
-        )
-        .with_remedy(format!(
-            "Verify with: jit --version (should show commit {built_from})"
-        ));
+            )
+            .with_remedy(format!(
+                "Verify with: jit --version (should show commit {built_from})"
+            ));
 
         Self {
             message: actionable.to_error_message(),
@@ -528,6 +543,26 @@ impl StaleBinaryError {
     /// Why the binary was judged stale (commit mismatch or dirty build).
     pub fn reason(&self) -> &crate::domain::build_provenance::StaleBinaryReason {
         &self.reason
+    }
+}
+
+/// Maximum number of working-tree build-input paths included in a refusal.
+const MAX_REPORTED_BUILD_INPUT_PATHS: usize = 5;
+
+/// Render the responsible paths without allowing a large working-tree change
+/// set to make a stale-binary refusal unreadable.
+fn format_build_input_paths(paths: &[String]) -> String {
+    let shown = paths
+        .iter()
+        .take(MAX_REPORTED_BUILD_INPUT_PATHS)
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let remaining = paths.len().saturating_sub(MAX_REPORTED_BUILD_INPUT_PATHS);
+    if remaining == 0 {
+        shown
+    } else {
+        format!("{shown}, and {remaining} more path(s)")
     }
 }
 
@@ -1198,6 +1233,67 @@ mod tests {
         assert!(msg.contains("Possible causes:"));
         assert!(msg.contains("• Something went wrong"));
         assert!(!msg.contains("To fix:"));
+    }
+
+    #[test]
+    fn test_stale_binary_error_names_uncommitted_input_cause_and_path() {
+        let err = StaleBinaryError::new(
+            "issue-123",
+            "tests",
+            &crate::domain::build_provenance::StaleBinaryReason::UncommittedBuildInputs {
+                built_from: "a".repeat(40),
+                paths: vec!["crates/jit/src/main.rs".to_string()],
+            },
+        );
+        let message = err.to_string();
+
+        assert!(message.contains("uncommitted"));
+        assert!(message.contains("crates/jit/src/main.rs"));
+        assert!(!message.contains("current HEAD is"));
+        assert!(message.to_ascii_lowercase().contains("commit or revert"));
+        assert!(message
+            .to_ascii_lowercase()
+            .contains("rebuild and reinstall"));
+    }
+
+    #[test]
+    fn test_stale_binary_error_names_both_commits_for_commit_mismatch() {
+        let built_from = "a".repeat(40);
+        let head = "b".repeat(40);
+        let err = StaleBinaryError::new(
+            "issue-123",
+            "tests",
+            &crate::domain::build_provenance::StaleBinaryReason::CommitMismatch {
+                built_from: built_from.clone(),
+                head: head.clone(),
+            },
+        );
+        let message = err.to_string();
+
+        assert!(message.contains(&built_from));
+        assert!(message.contains(&head));
+        assert!(message.contains("current HEAD"));
+    }
+
+    #[test]
+    fn test_stale_binary_error_bounds_uncommitted_input_paths() {
+        let paths = (0..7)
+            .map(|index| format!("crates/jit/src/file-{index}.rs"))
+            .collect::<Vec<_>>();
+        let err = StaleBinaryError::new(
+            "issue-123",
+            "tests",
+            &crate::domain::build_provenance::StaleBinaryReason::UncommittedBuildInputs {
+                built_from: "a".repeat(40),
+                paths,
+            },
+        );
+        let message = err.to_string();
+
+        assert!(message.contains("file-0.rs"));
+        assert!(message.contains("file-4.rs"));
+        assert!(!message.contains("file-5.rs"));
+        assert!(message.contains("2 more path(s)"));
     }
 
     #[test]
