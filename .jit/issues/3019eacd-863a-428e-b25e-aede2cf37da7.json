@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:11.351576182Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T13:34:43.235959711Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Make the merge-integrity guard fail a merge that does not build and test",
-  "updated_at": "2026-08-04T12:04:04.107931229Z"
+  "updated_at": "2026-08-04T13:34:43.235959711Z"
 }

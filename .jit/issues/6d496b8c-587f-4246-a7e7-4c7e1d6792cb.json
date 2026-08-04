@@ -15,8 +15,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-04T12:23:22.969196921Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T14:08:39.812193910Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -46,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Evaluate one gate across several issues in one invocation",
-  "updated_at": "2026-08-04T12:23:22.969196921Z"
+  "updated_at": "2026-08-04T14:08:39.812193910Z"
 }
