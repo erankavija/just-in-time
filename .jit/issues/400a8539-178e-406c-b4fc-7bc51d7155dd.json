@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-04T21:22:07.452012368Z",
+  "dependencies": [],
+  "description": "Server startup reports what the child process did rather than what it had not done yet after a fixed pause.\n\n## Background\n\n`start_server` in `crates/jit/src/commands/serve.rs` spawns the server binary, sleeps 300 milliseconds, and calls `child.try_wait()` exactly once. A child that has already exited is caught and reported as a startup failure; a child that exits at 301 milliseconds is not. In that case `start_server` returns success and writes a PID file for a process that is not running, which is the stale record the check exists to prevent.\n\nThe defect is a product defect before it is a test defect. An adopter on a loaded machine, or one whose server fails slowly rather than instantly, is told the server started.\n\n`test_start_server_errors_when_child_exits_immediately` spawns `/bin/false` and asserts the error. It passes because `/bin/false` normally exits well inside 300 milliseconds, and it fails on a host that does not schedule the fork, exec and exit in that window — so the test's verdict is decided by the host's scheduler rather than by what `start_server` does. The sleep that decides it lives in the production path, which is why a search over test sources does not find it.\n\nA test that waits is asserting on the scheduler. This one should observe the child's exit, and the production path should give it something to observe: a wait that returns as soon as the child's state is known, bounded so a child that neither exits nor binds cannot hang the caller.\n\n## Success Criteria\n\n- [hard] REQ-01: A child that exits during startup is reported as a startup failure whenever it exits, not only when it exits inside a fixed pause.\n- [hard] REQ-02: No PID file records a process that has already exited.\n- [hard] REQ-03: The startup path returns as soon as the child's outcome is known, and a child that neither exits nor becomes reachable is bounded rather than waited on forever.\n- [hard] REQ-04: The test decides on the outcome `start_server` produced, with no sleep of its own and no dependence on the host scheduling the child inside a fixed window.\n- [hard] REQ-05: The startup failure is still detected when the behaviour regresses, demonstrated against a seeded regression.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-04T21:22:07.452012368Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-04T21:22:23.830925637Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-04T21:22:24.441233299Z",
+      "updated_by": null
+    }
+  },
+  "id": "400a8539-178e-406c-b4fc-7bc51d7155dd",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task",
+    "satisfies:REQ-03"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Report server startup on what the child did, not on a fixed pause",
+  "updated_at": "2026-08-04T21:22:24.441233299Z"
+}

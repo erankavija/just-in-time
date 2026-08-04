@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:13.442711237Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T21:25:16.772941007Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -35,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the requirement tag naming another container",
-  "updated_at": "2026-08-04T19:28:02.172551394Z"
+  "updated_at": "2026-08-04T21:25:16.772941007Z"
 }

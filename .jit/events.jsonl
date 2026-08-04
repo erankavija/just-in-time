@@ -13135,3 +13135,11 @@
 {"from":"ready","id":"95bf459a-fd3c-4478-8526-eda5544cedac","issue_id":"15afa1f8-5b3a-4c18-bc63-b7e237b837ee","timestamp":"2026-08-04T20:30:35.749850731Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"4a6b7b6f-cfb6-4922-9d13-02c06a5cc79c","issue_id":"15afa1f8-5b3a-4c18-bc63-b7e237b837ee","timestamp":"2026-08-04T20:30:35.749850731Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"c6986ef7-571d-4750-8a8b-cadeef259b86","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T20:55:51.200599131Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"1efb6db3-d808-455a-b213-3bb3c8894b54","issue_id":"400a8539-178e-406c-b4fc-7bc51d7155dd","priority":"normal","timestamp":"2026-08-04T21:22:07.452012368Z","title":"Report server startup on what the child did, not on a fixed pause","type":"issue_created"}
+{"fields":["dependencies"],"id":"5add0317-d1ba-40ff-9869-17d31c75ba45","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T21:22:21.771798473Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"6d72567b-f299-4c65-809e-5fd1835e4fc8","issue_id":"400a8539-178e-406c-b4fc-7bc51d7155dd","timestamp":"2026-08-04T21:22:23.830925637Z","type":"gate_added"}
+{"gate_key":"code-review","id":"b623845c-4113-46d8-b818-bf1ac45db75b","issue_id":"400a8539-178e-406c-b4fc-7bc51d7155dd","timestamp":"2026-08-04T21:22:24.441233299Z","type":"gate_added"}
+{"gate_key":"cargo-ci","id":"641dedd9-5272-4ee3-9ecf-3e9424f7de7e","issue_id":"15afa1f8-5b3a-4c18-bc63-b7e237b837ee","timestamp":"2026-08-04T21:24:26.158874572Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"4def2d5a-e062-4de7-8d55-1284c7101085","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T21:25:16.193889985Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"f2cba2dd-72b3-43a9-903d-7e3c471d3340","issue_id":"e516b4f8-506d-4b43-89a9-e72603aecaa6","timestamp":"2026-08-04T21:25:16.772941007Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"0a15ea1e-4e8c-4f71-b390-d5f4e0846915","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T21:25:17.356770336Z","type":"gate_passed","updated_by":"auto:executor"}
