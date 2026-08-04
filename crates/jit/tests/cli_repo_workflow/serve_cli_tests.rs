@@ -1,25 +1,102 @@
 //! Integration tests for `jit serve` CLI command.
 //!
-//! These tests cover output contracts for `--status`, `--stop`, `--json`,
-//! stale PID cleanup, and MCP schema exclusion. They do NOT start a live
-//! jit-server process (which would require the binary to be on PATH).
+//! Most cases cover output contracts for `--status`, `--stop`, `--json`, stale
+//! PID cleanup, and MCP schema exclusion without starting a server. The
+//! foreground case at the end does start a live `jit-server`, and runs only
+//! when one was built beside the `jit` binary under test.
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
-use std::process::Command;
+use std::path::Path;
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
+
+// ── bounded waiting ──────────────────────────────────────────────────────────
+
+/// Interval between two evaluations of a polled condition.
+const POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+/// Wall-clock ceiling for the `jit init` that seeds one scratch repository.
+const SETUP_BUDGET: Duration = Duration::from_secs(30);
+
+/// Grace period for a process to die once it has been signalled.
+const REAP_GRACE: Duration = Duration::from_secs(5);
+
+/// Evaluates `condition` until it holds or `deadline` passes, answering whether
+/// it held.
+///
+/// The condition is evaluated at least once, and no sleep here runs past
+/// `deadline`, so the call returns within the caller's budget whatever the
+/// condition observes.
+fn poll_until(deadline: Instant, mut condition: impl FnMut() -> bool) -> bool {
+    loop {
+        if condition() {
+            return true;
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return false;
+        }
+        std::thread::sleep(POLL_INTERVAL.min(remaining));
+    }
+}
+
+/// Waits for `child` to exit, giving up at `deadline`; answers whether it
+/// exited. A child observed exited here has also been reaped.
+fn exited_by(child: &mut Child, deadline: Instant) -> bool {
+    poll_until(deadline, || matches!(child.try_wait(), Ok(Some(_))))
+}
+
+/// Spawns `command` with its stdout and stderr redirected to `out` and `err`.
+///
+/// Files rather than pipes, so that reading a spawned process's output cannot
+/// block: a pipe stays open for as long as *any* descendant holds its inherited
+/// write end, so one surviving grandchild keeps a reader from ever reaching end
+/// of file, while a regular file always reads to end of file (jit:76a4bd21).
+fn spawn_capturing(command: &mut Command, out: &Path, err: &Path) -> std::io::Result<Child> {
+    command
+        .stdin(Stdio::null())
+        .stdout(fs::File::create(out)?)
+        .stderr(fs::File::create(err)?)
+        .spawn()
+}
+
+/// Reads a capture file, answering with the empty string when it cannot be read.
+fn read_capture(path: &Path) -> String {
+    fs::read_to_string(path).unwrap_or_default()
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 fn setup_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(temp.path())
-        .arg("init")
-        .assert()
-        .success();
+    // The captures live outside the repository being seeded, so `jit init` sees
+    // the empty directory it expects.
+    let capture = TempDir::new().unwrap();
+    let (out, err) = (capture.path().join("out"), capture.path().join("err"));
+
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    command.current_dir(temp.path()).arg("init");
+    let mut child = spawn_capturing(&mut command, &out, &err).expect("spawn jit init");
+
+    if !exited_by(&mut child, Instant::now() + SETUP_BUDGET) {
+        let _ = child.kill();
+        let _ = exited_by(&mut child, Instant::now() + REAP_GRACE);
+        panic!(
+            "`jit init` did not finish within {SETUP_BUDGET:?} in {}",
+            temp.path().display()
+        );
+    }
+    let status = child.try_wait().unwrap().expect("exited above");
+    assert!(
+        status.success(),
+        "`jit init` failed with {status}\n--- stdout ---\n{}\n--- stderr ---\n{}",
+        read_capture(&out),
+        read_capture(&err)
+    );
     temp
 }
 
@@ -219,29 +296,80 @@ fn parse_localhost_port(line: &str) -> Option<u16> {
         .ok()
 }
 
-/// Resolves the `jit-server` binary the foreground path will spawn.
+/// Wall-clock ceiling for the whole foreground-serve case below.
 ///
-/// `find_server_binary` looks for a sibling of the `jit` executable first, and
-/// `cargo test --workspace` (the CI path) always builds that sibling. An
-/// isolated `cargo test -p jit --test cli_repo_workflow` may not have, so build
-/// it best-effort to keep this test runnable in isolation too.
+/// Every wait that case performs takes its deadline from this budget, so the
+/// case reaches a verdict inside it even on a host where the server never comes
+/// up at all — it cannot hold a continuous-integration job open until the job's
+/// own execution ceiling cancels it (jit:76a4bd21).
 #[cfg(unix)]
-fn ensure_jit_server_binary() {
-    use std::process::Command;
-    let jit_bin: std::path::PathBuf = assert_cmd::cargo::cargo_bin!("jit").into();
-    let server_bin = jit_bin.with_file_name("jit-server");
-    if server_bin.exists() {
-        return;
+const FG_BUDGET: Duration = Duration::from_secs(90);
+
+/// The share of [`FG_BUDGET`] spent waiting for the parent to announce its port.
+#[cfg(unix)]
+const FG_PORT_BUDGET: Duration = Duration::from_secs(20);
+
+/// The share spent polling for a first served HTTP response.
+#[cfg(unix)]
+const FG_SERVING_BUDGET: Duration = Duration::from_secs(20);
+
+/// The share spent killing the spawned process group and confirming it drained.
+#[cfg(unix)]
+const FG_TEARDOWN_BUDGET: Duration = Duration::from_secs(15);
+
+/// Ceiling on one connect, write, or read of a single HTTP liveness probe.
+#[cfg(unix)]
+const FG_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
+
+/// The phases have to fit inside the stated total, or the total is not the
+/// bound it claims to be.
+#[cfg(unix)]
+const _: () = assert!(
+    SETUP_BUDGET.as_secs()
+        + FG_PORT_BUDGET.as_secs()
+        + FG_SERVING_BUDGET.as_secs()
+        + FG_TEARDOWN_BUDGET.as_secs()
+        <= FG_BUDGET.as_secs(),
+    "the foreground-serve phase budgets must fit inside FG_BUDGET"
+);
+
+/// Sends `SIGKILL` to every process in the group `pgid` leads.
+///
+/// A negative PID in `kill(2)` addresses a process group, which is how the
+/// `jit-server` grandchild is reached: the foreground path spawns it from a
+/// plain `Command` with no `process_group` call of its own (unlike the
+/// daemonizing path in `commands::serve::start_server`), so it stays in the
+/// group this test creates for the `jit` parent. The conversion is guarded
+/// before the negation (`@/invariant/pid-safety`): a value that does not fit a
+/// positive `i32`, or one at or below 1, would turn the signal into
+/// `kill(-1, …)` — every process this user owns.
+#[cfg(unix)]
+fn kill_process_group(pgid: u32) -> nix::Result<()> {
+    use nix::sys::signal::{kill, Signal};
+    use nix::unistd::Pid;
+    match i32::try_from(pgid) {
+        Ok(leader) if leader > 1 => kill(Pid::from_raw(-leader), Signal::SIGKILL),
+        _ => Err(nix::errno::Errno::EINVAL),
     }
-    let status = Command::new(env!("CARGO"))
-        .args(["build", "-p", "jit-server"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("spawn cargo build -p jit-server");
-    assert!(
-        status.success() && server_bin.exists(),
-        "failed to build the jit-server sibling required by the serve --fg test"
-    );
+}
+
+/// Reports whether any process still belongs to the group `pgid` leads.
+///
+/// Signal 0 performs the kernel's existence and permission checks without
+/// delivering anything: `ESRCH` is the answer that the group has no members
+/// left, while `EPERM` means it has members this test may not signal — still a
+/// surviving process.
+#[cfg(unix)]
+fn process_group_survives(pgid: u32) -> bool {
+    use nix::sys::signal::kill;
+    use nix::unistd::Pid;
+    match i32::try_from(pgid) {
+        Ok(leader) if leader > 1 => !matches!(
+            kill(Pid::from_raw(-leader), None),
+            Err(nix::errno::Errno::ESRCH)
+        ),
+        _ => false,
+    }
 }
 
 /// `jit serve --fg` must serve end to end even though the parent process holds
@@ -252,16 +380,41 @@ fn ensure_jit_server_binary() {
 /// cross-process lock. Before the fix the parent retained the lock for its whole
 /// lifetime, so the child could never acquire it — it timed out and the server
 /// never came up. The parent must release its recovery session before waiting.
+///
+/// The case drives real processes, so it is bounded by construction: every wait
+/// takes its deadline from [`FG_BUDGET`], output is captured to files rather
+/// than pipes no reader can close, and teardown signals the whole spawned
+/// process group and then confirms the group drained.
 #[test]
 #[cfg(unix)]
 fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
-    use std::io::{BufRead, BufReader, Read, Write};
-    use std::net::TcpStream;
+    use std::io::{Read, Write};
+    use std::net::{SocketAddr, TcpStream};
     use std::os::unix::process::CommandExt;
-    use std::process::{Command, Stdio};
-    use std::sync::mpsc;
-    use std::thread;
-    use std::time::{Duration, Instant};
+
+    let started = Instant::now();
+    let overall = started + FG_BUDGET;
+    // Each phase gets its own share, clamped so no phase can push the case past
+    // the total this test states.
+    let phase = |budget: Duration| (Instant::now() + budget).min(overall);
+
+    // `commands::serve::find_server_binary` resolves a sibling of the running
+    // `jit` first, and `cargo test --workspace` builds that sibling. A narrower
+    // invocation such as `cargo test -p jit --features html,xml` never builds
+    // it, and this test must not build one for itself: the build it would spawn
+    // has to take the cargo lock the build running this very test already
+    // holds, and nothing bounds that wait (jit:76a4bd21).
+    let server_bin: std::path::PathBuf =
+        std::path::PathBuf::from(assert_cmd::cargo::cargo_bin!("jit")).with_file_name("jit-server");
+    if !server_bin.exists() {
+        eprintln!(
+            "SKIP: no jit-server at {}, so `jit serve --fg` has no server to \
+             spawn. `cargo test --workspace` builds it; a narrower invocation \
+             needs `cargo build -p jit-server` first.",
+            server_bin.display()
+        );
+        return;
+    }
 
     // A real HTTP round-trip, not a bare TCP connect: the parent binds the
     // listening socket and hands its fd to the child, so the kernel accepts
@@ -270,11 +423,12 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     // HTTP response proves the child actually adopted the socket and is
     // serving.
     let server_responds = |port: u16| -> bool {
-        let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) else {
+        let addr = SocketAddr::from(([127, 0, 0, 1], port));
+        let Ok(mut stream) = TcpStream::connect_timeout(&addr, FG_PROBE_TIMEOUT) else {
             return false;
         };
-        let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
-        let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
+        let _ = stream.set_read_timeout(Some(FG_PROBE_TIMEOUT));
+        let _ = stream.set_write_timeout(Some(FG_PROBE_TIMEOUT));
         if stream
             .write_all(b"GET /api/health HTTP/1.0\r\nHost: localhost\r\n\r\n")
             .is_err()
@@ -285,13 +439,14 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
         stream.read_exact(&mut buf).is_ok() && &buf == b"HTTP/"
     };
 
-    ensure_jit_server_binary();
     let temp = setup_repo();
+    let capture = TempDir::new().unwrap();
+    let (out_path, err_path) = (capture.path().join("out"), capture.path().join("err"));
 
     // Own process group so the whole tree — the `jit` parent AND the
-    // `jit-server` child it blocks on (which shares this group in foreground
-    // mode) — can be reaped together; killing only the parent would orphan a
-    // live server and wedge the stdout drain below on an open pipe.
+    // `jit-server` child it blocks on, which shares this group in foreground
+    // mode — is reaped together; killing only the parent would orphan a live
+    // server.
     let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     command
         .current_dir(temp.path())
@@ -300,82 +455,79 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
         // lock makes the child give up after this timeout instead of at the
         // 5s default, so the assertion below fails fast rather than dragging.
         .env("JIT_LOCK_TIMEOUT", "3")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
         .process_group(0);
-    let mut child = command.spawn().expect("spawn jit serve --fg");
+    let mut child =
+        spawn_capturing(&mut command, &out_path, &err_path).expect("spawn jit serve --fg");
     let pgid = child.id();
 
-    // Drain both pipes on their own threads: the parent prints the chosen port
-    // before spawning the server, and unread pipes would eventually block the
-    // server child. Each thread returns its captured text for failure output.
-    let stdout = child.stdout.take().expect("piped stdout");
-    let mut stderr = child.stderr.take().expect("piped stderr");
-    let (port_tx, port_rx) = mpsc::channel::<u16>();
-    let out_handle = thread::spawn(move || {
-        let mut collected = String::new();
-        let mut sent = false;
-        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-            if !sent {
-                if let Some(port) = parse_localhost_port(&line) {
-                    let _ = port_tx.send(port);
-                    sent = true;
-                }
-            }
-            collected.push_str(&line);
-            collected.push('\n');
-        }
-        collected
-    });
-    let err_handle = thread::spawn(move || {
-        let mut s = String::new();
-        let _ = stderr.read_to_string(&mut s);
-        s
-    });
-
-    let reap = |child: &mut std::process::Child| {
-        // Negative PID signals the whole process group (parent + server child).
-        let _ = Command::new("kill")
-            .arg("-KILL")
-            .arg(format!("-{pgid}"))
-            .status();
-        let _ = child.wait();
+    // The parent announces the chosen port before spawning the server.
+    let announced = || {
+        read_capture(&out_path)
+            .lines()
+            .find_map(parse_localhost_port)
     };
-
-    let port = match port_rx.recv_timeout(Duration::from_secs(20)) {
-        Ok(port) => port,
-        Err(_) => {
-            reap(&mut child);
-            panic!(
-                "jit serve --fg never announced a port\n--- stderr ---\n{}",
-                err_handle.join().unwrap_or_default()
-            );
-        }
-    };
+    let port_deadline = phase(FG_PORT_BUDGET);
+    let mut announced_port = None;
+    poll_until(port_deadline, || {
+        announced_port = announced();
+        // A parent that has exited will print nothing more, and the read above
+        // already took its final output.
+        announced_port.is_some() || matches!(child.try_wait(), Ok(Some(_)))
+    });
+    // Close the window between that last read and the exit check.
+    let port = announced_port.or_else(announced);
 
     // Poll until the server answers an HTTP request, or the parent exits early
     // (the pre-fix symptom: the child's lock wait times out and the parent's
     // child.wait() returns).
-    let deadline = Instant::now() + Duration::from_secs(20);
+    let serving_deadline = phase(FG_SERVING_BUDGET);
     let mut served = false;
-    while Instant::now() < deadline {
-        if server_responds(port) {
-            served = true;
-            break;
-        }
-        if matches!(child.try_wait(), Ok(Some(_))) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(100));
+    if let Some(port) = port {
+        poll_until(serving_deadline, || {
+            served = server_responds(port);
+            served || matches!(child.try_wait(), Ok(Some(_)))
+        });
     }
 
-    reap(&mut child);
-    let out = out_handle.join().unwrap_or_default();
-    let err = err_handle.join().unwrap_or_default();
+    // Signal the group before reaping the leader: once the leader is reaped its
+    // PID — which is this PGID — becomes recyclable, and a later group kill
+    // could then land on an unrelated group.
+    let killed = kill_process_group(pgid);
+    let teardown_deadline = phase(FG_TEARDOWN_BUDGET);
+    let reaped = exited_by(&mut child, teardown_deadline);
+    let drained = poll_until(teardown_deadline, || !process_group_survives(pgid));
+
+    let out = read_capture(&out_path);
+    let err = read_capture(&err_path);
+    let elapsed = started.elapsed();
+
+    assert!(
+        reaped,
+        "the jit parent survived SIGKILL to its own process group (kill: \
+         {killed:?}) and was still running {FG_TEARDOWN_BUDGET:?} later"
+    );
+    if !drained {
+        // Whether the announced port still answers separates a live survivor
+        // from a member the kernel has killed but nothing has reaped yet.
+        let still_serving = port.is_some_and(server_responds);
+        panic!(
+            "a process this test spawned outlived it: process group {pgid} still \
+             has members {FG_TEARDOWN_BUDGET:?} after SIGKILL (kill: {killed:?}); \
+             announced port still answers HTTP: {still_serving}"
+        );
+    }
+    assert!(
+        elapsed <= FG_BUDGET,
+        "the case took {elapsed:?}, past the {FG_BUDGET:?} it budgets"
+    );
     assert!(
         served,
-        "jit serve --fg never began serving on port {port}: the parent held the \
-         bootstrap recovery lock while the child needed it.\n\
-         --- stdout ---\n{out}\n--- stderr ---\n{err}"
+        "jit serve --fg never began serving within {FG_BUDGET:?} (took \
+         {elapsed:?}): {}. The parent held the bootstrap recovery lock while \
+         the child needed it.\n--- stdout ---\n{out}\n--- stderr ---\n{err}",
+        match port {
+            Some(port) => format!("it announced port {port} but never answered HTTP there"),
+            None => "it never announced a port".to_owned(),
+        }
     );
 }
