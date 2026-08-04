@@ -19,7 +19,11 @@ fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
         shared_jit: temp_dir.path().join(".git/jit"),
     };
 
-    let locker = FileLocker::new(std::time::Duration::from_secs(5));
+    // The lock wait decides how long a caller queues before asking the
+    // coordinator again, not what it is told, so the shipped default serves.
+    let locker = FileLocker::new(std::time::Duration::from_secs(
+        crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+    ));
     // fsync(false): these properties verify index/rebuild invariants, not crash
     // durability. An fsync per write costs ~10ms; with hundreds of cases each
     // doing several writes, leaving it on made these tests minutes long.
@@ -202,14 +206,16 @@ proptest! {
     ) {
         let temp_dir = Arc::new(TempDir::new().unwrap());
         let coordinator = Arc::new(setup_coordinator(&temp_dir));
+        let claimants = Claimants::new();
 
         // Spawn threads all trying to claim the same issue
         let handles: Vec<_> = (0..thread_count)
             .map(|_| {
                 let coord = Arc::clone(&coordinator);
+                let claimants = Arc::clone(&claimants);
                 let issue = issue_id.clone();
                 thread::spawn(move || {
-                    coord.acquire_claim(&issue, 600)
+                    acquire_claim_when_reached(&coord, &issue, 600, &claimants)
                 })
             })
             .collect();
@@ -220,14 +226,23 @@ proptest! {
             .map(|h| h.join().unwrap())
             .collect();
 
-        // Count successes and failures
-        let successes = results.iter().filter(|r| r.is_ok()).count();
-        let failures = results.iter().filter(|r| r.is_err()).count();
+        let granted = results.iter().filter(|outcome| outcome.is_ok()).count();
+        let refusals: Vec<_> = results
+            .iter()
+            .filter_map(|outcome| outcome.as_ref().err())
+            .collect();
 
-        prop_assert_eq!(successes, 1,
-            "Exactly one thread should acquire the claim");
-        prop_assert_eq!(failures, (thread_count - 1) as usize,
-            "All other threads should fail");
+        prop_assert_eq!(granted, 1,
+            "one claimant holds the issue");
+        prop_assert_eq!(refusals.len(), (thread_count - 1) as usize,
+            "every other claimant is turned away");
+        prop_assert!(
+            refusals
+                .iter()
+                .all(|error| !crate::storage::lock::is_lock_timeout(error)),
+            "each one is refused by the coordinator, rather than running out of \
+             time to ask it"
+        );
     }
 }
 
@@ -280,31 +295,31 @@ proptest! {
     ) {
         let temp_dir = Arc::new(TempDir::new().unwrap());
         let coordinator = Arc::new(setup_coordinator(&temp_dir));
-
-        let issue_vec: Vec<_> = issue_ids.into_iter().collect();
-        let thread_count = issue_vec.len();
+        let claimants = Claimants::new();
 
         // Each thread claims a different issue
-        let handles: Vec<_> = issue_vec
-            .into_iter()
+        let handles: Vec<_> = issue_ids
+            .iter()
+            .cloned()
             .map(|issue_id| {
                 let coord = Arc::clone(&coordinator);
+                let claimants = Arc::clone(&claimants);
                 thread::spawn(move || {
-                    coord.acquire_claim(&issue_id, 600)
+                    acquire_claim_when_reached(&coord, &issue_id, 600, &claimants)
                 })
             })
             .collect();
 
-        // All should succeed
-        let results: Vec<_> = handles
+        let granted: std::collections::HashSet<_> = handles
             .into_iter()
             .map(|h| h.join().unwrap())
+            .filter_map(|outcome| outcome.ok())
+            .map(|lease| lease.issue_id)
             .collect();
 
-        let successes = results.iter().filter(|r| r.is_ok()).count();
-
-        prop_assert_eq!(successes, thread_count,
-            "All threads claiming different issues should succeed");
+        prop_assert_eq!(granted, issue_ids,
+            "claims on distinct issues do not compete, so each one is granted \
+             however often its claimant was refused the lock");
     }
 }
 

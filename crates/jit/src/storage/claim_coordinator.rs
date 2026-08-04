@@ -1415,23 +1415,104 @@ impl ClaimCoordinator {
 /// question back to the coordinator. Load on the machine therefore changes how
 /// many attempts a caller makes and nothing else about the result.
 ///
-/// The retry is deliberately unbounded. Every outcome that is the coordinator's
-/// to give is returned by the first attempt that reaches the critical section,
-/// and that section is straight-line work under one non-reentrant lock released
-/// by RAII, so a caller that never reaches it has found a deadlock in the
-/// coordinator. That is worth hanging on; it is not worth reporting as a lost
-/// race.
+/// The retry ends when nothing at all is happening. `claimants` counts the
+/// callers this coordinator has answered, and any answer — a claim granted or a
+/// claim refused — is a critical section entered and left, so a rising count is
+/// proof the lock is still changing hands. While that count moves this caller
+/// waits, however long the machine takes about it. When it stops moving for
+/// [`CLAIMANT_STALL_LIMIT`] the lock is held by something that is not going to
+/// release it, and this caller says so and fails.
+///
+/// That bound measures the whole set of claimants for progress rather than
+/// racing this caller against a clock. Load slows claimants down without
+/// stopping them, so a stall of that length with claimants still queued is a
+/// stuck lock — the one shape of defect this loop could otherwise wait out
+/// forever.
 #[cfg(test)]
 fn acquire_claim_when_reached(
     coordinator: &ClaimCoordinator,
     issue_id: &str,
     ttl_secs: u64,
+    claimants: &Claimants,
 ) -> Result<Lease> {
+    let mut answered = claimants.answered_count();
+    let mut progressed_at = std::time::Instant::now();
     loop {
         match coordinator.acquire_claim(issue_id, ttl_secs) {
-            Err(error) if super::lock::is_lock_timeout(&error) => continue,
-            decided => return decided,
+            Err(error) if super::lock::is_lock_timeout(&error) => {
+                claimants.record_lock_refusal();
+                let now_answered = claimants.answered_count();
+                if now_answered != answered {
+                    answered = now_answered;
+                    progressed_at = std::time::Instant::now();
+                }
+                let stalled_for = progressed_at.elapsed();
+                assert!(
+                    stalled_for < CLAIMANT_STALL_LIMIT,
+                    "no claimant was answered in {stalled_for:?} while this one \
+                     waited for the claims lock, so nothing is releasing it; \
+                     the last wait ended with: {error}"
+                );
+            }
+            decided => {
+                claimants.record_answer();
+                return decided;
+            }
         }
+    }
+}
+
+/// How long every claimant may go unanswered before a caller waiting for the
+/// claims lock reports it stuck.
+///
+/// Generous on purpose: any claimant being answered resets it, so a healthy run
+/// never spends it, and a run that does spend it has stopped doing work rather
+/// than slowed down. The whole coordinator suite finishes in seconds.
+#[cfg(test)]
+const CLAIMANT_STALL_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// The claimants contending for one coordinator's claims lock, and what they
+/// have achieved against it.
+///
+/// Shared between the threads of one test so each can see the others making
+/// progress. `answered` counts the callers the coordinator decided about, so a
+/// claimant that dies without an answer stops contributing progress — which is
+/// what it should look like to everyone waiting behind it. `refused_the_lock`
+/// records which claimants have had a wait for the lock expire, so a test can
+/// establish that contention happened rather than assume a schedule produced it.
+#[cfg(test)]
+#[derive(Debug, Default)]
+struct Claimants {
+    answered: std::sync::atomic::AtomicUsize,
+    refused_the_lock: std::sync::Mutex<std::collections::HashSet<std::thread::ThreadId>>,
+}
+
+#[cfg(test)]
+impl Claimants {
+    fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    fn answered_count(&self) -> usize {
+        self.answered.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn record_answer(&self) {
+        self.answered
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Records that the calling claimant's wait for the claims lock expired.
+    fn record_lock_refusal(&self) {
+        self.refused_the_lock
+            .lock()
+            .unwrap()
+            .insert(std::thread::current().id());
+    }
+
+    /// How many distinct claimants have had a wait for the claims lock expire.
+    fn refused_claimant_count(&self) -> usize {
+        self.refused_the_lock.lock().unwrap().len()
     }
 }
 
@@ -1499,9 +1580,55 @@ mod tests {
         coordinator
     }
 
-    /// Short enough that a contended wait expires before the holder is done, so
-    /// every caller that meets contention is refused the lock at least once.
+    /// Shorter than any critical section, so a caller that meets the claims lock
+    /// held is refused it.
     const EXPIRING_LOCK_WAIT: StdDuration = StdDuration::from_millis(1);
+
+    /// Long enough for the claimants to be scheduled and short enough to leave
+    /// them the CPU while this thread waits for them.
+    const REFUSAL_POLL_INTERVAL: StdDuration = StdDuration::from_millis(1);
+
+    /// Takes the coordinator's claims lock, so every claimant that asks for it
+    /// while the returned guard lives is refused it.
+    ///
+    /// Nothing else holds the lock when a test calls this, so the take needs no
+    /// wait at all and an occupied lock is a defect in the test rather than
+    /// contention to sit out.
+    fn hold_claims_lock(temp_dir: &TempDir) -> crate::storage::lock::LockGuard {
+        let lock_path = temp_dir.path().join(".git/jit/locks/claims.lock");
+        fs::create_dir_all(lock_path.parent().unwrap()).unwrap();
+        FileLocker::new(EXPIRING_LOCK_WAIT)
+            .try_lock_exclusive(&lock_path)
+            .unwrap()
+            .expect("no claimant has started yet, so the claims lock is free")
+    }
+
+    /// Waits until `claimant_count` distinct claimants have each had a wait for
+    /// the claims lock expire.
+    ///
+    /// This returns on the claimants' own progress rather than on a clock: as
+    /// soon as they have all been refused the lock, however long the host took to
+    /// schedule them. [`CLAIMANT_STALL_LIMIT`] with no further claimant refused
+    /// means they are not asking for the lock, which this reports rather than
+    /// waits out.
+    fn await_lock_refusals(claimants: &Claimants, claimant_count: usize) {
+        let mut refused = claimants.refused_claimant_count();
+        let mut progressed_at = std::time::Instant::now();
+        while refused < claimant_count {
+            thread::sleep(REFUSAL_POLL_INTERVAL);
+            let now_refused = claimants.refused_claimant_count();
+            if now_refused != refused {
+                refused = now_refused;
+                progressed_at = std::time::Instant::now();
+            }
+            let stalled_for = progressed_at.elapsed();
+            assert!(
+                stalled_for < CLAIMANT_STALL_LIMIT,
+                "{refused} of {claimant_count} claimants were refused the claims \
+                 lock, and none of the rest asked for it in {stalled_for:?}"
+            );
+        }
+    }
 
     #[test]
     fn test_acquire_claim_succeeds() {
@@ -1714,12 +1841,14 @@ mod tests {
 
         let barrier = Arc::new(Barrier::new(20)); // Increased from 5 to 20
         let successes = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let claimants = Claimants::new();
 
         let handles: Vec<_> = (0..20) // Increased from 5 to 20
             .map(|i| {
                 let temp_path = Arc::clone(&temp_path);
                 let barrier = Arc::clone(&barrier);
                 let successes = Arc::clone(&successes);
+                let claimants = Arc::clone(&claimants);
 
                 thread::spawn(move || {
                     let paths = WorktreePaths {
@@ -1743,7 +1872,9 @@ mod tests {
                     barrier.wait();
 
                     // All try to claim same issue
-                    if let Ok(lease) = acquire_claim_when_reached(&coordinator, "issue-race", 600) {
+                    if let Ok(lease) =
+                        acquire_claim_when_reached(&coordinator, "issue-race", 600, &claimants)
+                    {
                         successes.lock().unwrap().push(lease);
                     }
                 })
@@ -1763,32 +1894,65 @@ mod tests {
         );
     }
 
+    /// An expired wait is the caller's report that it never reached the
+    /// coordinator, and the coordinator answers the same question once the lock
+    /// is free. This is the condition the two tests below hold their claimants
+    /// in, and the one an arbitrarily busy host produces on its own.
+    #[test]
+    fn test_acquire_claim_reports_an_expired_wait_while_the_claims_lock_is_held() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = coordinator_with_lock_wait(&temp_dir, EXPIRING_LOCK_WAIT);
+        let held = hold_claims_lock(&temp_dir);
+
+        let while_held = coordinator
+            .acquire_claim("issue-held", 600)
+            .expect_err("the lock is held, so this caller cannot reach the coordinator");
+
+        assert!(
+            crate::storage::lock::is_lock_timeout(&while_held),
+            "a caller still queued for the lock reports an expired wait rather \
+             than an outcome the coordinator decided: {while_held}"
+        );
+        drop(held);
+        assert!(
+            coordinator.acquire_claim("issue-held", 600).is_ok(),
+            "the same call is granted once the lock is free, so the expired wait \
+             said nothing about the issue"
+        );
+    }
+
     /// Coordination decides who gets a claim; the lock wait only decides how
     /// long a caller queues for the chance to be decided about. These two tests
-    /// pin that separation by making every contended wait expire, which is the
-    /// condition an arbitrarily busy host produces and no realistic timeout can
-    /// rule out. Both once failed here for want of time rather than for want of
-    /// coordination; whoever puts a bound back into the deciding path will see
-    /// them fail again.
+    /// pin that separation by holding the claims lock until every claimant's
+    /// wait for it has expired, so each one meets the condition an arbitrarily
+    /// busy host produces and no realistic timeout can rule out. Both once
+    /// failed here for want of time rather than for want of coordination;
+    /// whoever puts a bound back into the deciding path will see them fail
+    /// again.
     #[test]
     fn test_acquire_claim_grants_every_distinct_issue_when_every_lock_wait_expires() {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = Arc::new(coordinator_with_lock_wait(&temp_dir, EXPIRING_LOCK_WAIT));
         let issue_ids: Vec<String> = (0..8).map(|i| format!("iss-{i:03}")).collect();
-        let barrier = Arc::new(Barrier::new(issue_ids.len()));
+        let claimants = Claimants::new();
+        let held = hold_claims_lock(&temp_dir);
 
-        let granted = issue_ids
+        let contenders = issue_ids
             .iter()
             .map(|issue_id| {
                 let coordinator = Arc::clone(&coordinator);
-                let barrier = Arc::clone(&barrier);
+                let claimants = Arc::clone(&claimants);
                 let issue_id = issue_id.clone();
                 thread::spawn(move || {
-                    barrier.wait();
-                    acquire_claim_when_reached(&coordinator, &issue_id, 600)
+                    acquire_claim_when_reached(&coordinator, &issue_id, 600, &claimants)
                 })
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+
+        await_lock_refusals(&claimants, issue_ids.len());
+        drop(held);
+
+        let granted = contenders
             .into_iter()
             .map(|handle| handle.join().unwrap())
             .filter_map(|outcome| outcome.ok())
@@ -1801,7 +1965,7 @@ mod tests {
                 .into_iter()
                 .collect::<std::collections::HashSet<_>>(),
             "claims on distinct issues do not compete, so each one is granted \
-             however long its holder had to queue for the lock"
+             however often its holder was refused the lock"
         );
     }
 
@@ -1810,18 +1974,23 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let coordinator = Arc::new(coordinator_with_lock_wait(&temp_dir, EXPIRING_LOCK_WAIT));
         let claimant_count = 8;
-        let barrier = Arc::new(Barrier::new(claimant_count));
+        let claimants = Claimants::new();
+        let held = hold_claims_lock(&temp_dir);
 
-        let outcomes = (0..claimant_count)
+        let contenders = (0..claimant_count)
             .map(|_| {
                 let coordinator = Arc::clone(&coordinator);
-                let barrier = Arc::clone(&barrier);
+                let claimants = Arc::clone(&claimants);
                 thread::spawn(move || {
-                    barrier.wait();
-                    acquire_claim_when_reached(&coordinator, "issue-contended", 600)
+                    acquire_claim_when_reached(&coordinator, "issue-contended", 600, &claimants)
                 })
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+
+        await_lock_refusals(&claimants, claimant_count);
+        drop(held);
+
+        let outcomes = contenders
             .into_iter()
             .map(|handle| handle.join().unwrap())
             .collect::<Vec<_>>();
