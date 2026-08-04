@@ -13003,3 +13003,8 @@
 {"gate_key":"cargo-ci","id":"1775ec70-8b39-4c11-a8d1-77cd14b156da","issue_id":"6d496b8c-587f-4246-a7e7-4c7e1d6792cb","timestamp":"2026-08-04T14:08:39.812193910Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"51281f4c-fd06-40db-bdce-3ee7e2753359","issue_id":"ee02e514-11e1-448a-9f70-6d0647bdca4c","timestamp":"2026-08-04T14:23:21.179250294Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"b0ba1da6-0193-4a46-a0b5-aa5616aae366","issue_id":"76a4bd21-4afc-40ab-a2c0-376c296dc9ab","timestamp":"2026-08-04T14:34:36.307435683Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"e86d9bec-5f87-4dd2-8a80-520bc1523b30","issue_id":"57675b68-78dd-470b-a524-30061b488062","priority":"normal","timestamp":"2026-08-04T14:37:32.170933215Z","title":"Hold a concurrency property without racing a wall clock","type":"issue_created"}
+{"fields":["description"],"id":"0b123c6d-d3a6-4050-9488-ddf6bef46a81","issue_id":"57675b68-78dd-470b-a524-30061b488062","timestamp":"2026-08-04T14:37:38.087026065Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["dependencies"],"id":"d949805c-365c-4478-89e7-f2d01bfa4801","issue_id":"f3f7de97-7315-4780-8389-9c857da29239","timestamp":"2026-08-04T14:37:43.732072210Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"31acc8b6-f530-448c-b9ea-18862dcaaa92","issue_id":"57675b68-78dd-470b-a524-30061b488062","timestamp":"2026-08-04T14:37:46.396859609Z","type":"gate_added"}
+{"gate_key":"code-review","id":"86f70e9d-dedb-403f-b96e-191271e219ac","issue_id":"57675b68-78dd-470b-a524-30061b488062","timestamp":"2026-08-04T14:37:46.775910229Z","type":"gate_added"}
