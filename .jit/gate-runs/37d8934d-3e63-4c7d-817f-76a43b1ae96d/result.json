@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c626b5e16e402e42eb2b6502d923ec39512f329e",
+  "completed_at": "2026-08-04T21:36:22.450384917Z",
+  "duration_ms": 189376,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/server/src/shutdown.rs",
+        "id": "F1",
+        "line": 523,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/15afa1f8/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "No seeded-regression execution or durable evidence demonstrates that the new drained-at-boundary assertion fails when protected behavior breaks."
+      }
+    ],
+    "summary": "The required seeded-regression demonstration for the restated drain assertion is not evidenced.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "15afa1f8-5b3a-4c18-bc63-b7e237b837ee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "37d8934d-3e63-4c7d-817f-76a43b1ae96d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T21:33:13.073616418Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5241 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fceb1-e6ef-7270-8920-8367be1df89f\n--------\nuser\n--- 5228 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fd1dd006, 974b3b27, cd720a43 (`jit:15afa1f8`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/15afa1f8/requirement/REQ-03 (issue markdown); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T21:24:26Z); code-review pending\nTruncation recovery: narrowed current shutdown, gate-result, registry, merge-parent, and survey reads after discarding unrelated historical artifacts\n\n1. [blocking][issue-impact] REQ-03 requires a seeded-regression demonstration, but the tagged patches and the sole issue gate record show only the passing implementation/test; they contain no seed, failing run, or durable evidence that the new `Drained` assertion at [shutdown.rs:523](/home/vkaskivuo/Projects/just-in-time/crates/server/src/shutdown.rs:523) fails when its protected behavior breaks. The cited survey predates this restatement and explicitly files this shutdown test as separate work, so it cannot demonstrate this change.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required seeded-regression demonstration for the restated drain assertion is not evidenced.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No seeded-regression execution or durable evidence demonstrates that the new drained-at-boundary assertion fails when protected behavior breaks.\",\"file\":\"crates/server/src/shutdown.rs\",\"line\":523,\"references\":[\"@/issue/15afa1f8/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,56 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c626b5e16e402e42eb2b6502d923ec39512f329e",
+  "completed_at": "2026-08-04T21:33:11.248683201Z",
+  "duration_ms": 229099,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/contention_probe.rs",
+        "id": "F1",
+        "line": 160,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e3c6c767/requirement/REQ-02",
+          "@/issue/e3c6c767/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The refusal test can still fail after a fixed 30-second no-progress window when healthy contenders are not scheduled."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/lock.rs",
+        "id": "F2",
+        "line": 540,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e3c6c767/requirement/REQ-01",
+          "@/issue/e3c6c767/requirement/REQ-03",
+          "@/issue/e3c6c767/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The exclusivity test relies on a 10 ms overlap window and provides no seeded regression proving broken exclusion fails."
+      }
+    ],
+    "summary": "The revised lock tests still rely on scheduling-sensitive time bounds and lack the required seeded regression evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "56aa025c-5e2b-4c05-89d5-2103e3255da1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T21:29:22.148973196Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4700 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fceae-60da-7f41-b9bf-12ff7dc3d219\n--------\nuser\n--- 4687 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b90ad3eb, b1c5ddd4, 436e697b (`jit:e3c6c767`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e3c6c767/requirement/REQ-01–REQ-04 (issue description, markdown-first); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code unavailable); code-review pending (current judgment, non-blocking)\nTruncation recovery: separate per-commit and merge-parent patches; line-ranged reads of affected Rust files; excluded unrelated generated search output\n\n1. **F1 — 30-second scheduling assertion remains** (blocking; issue-impact; high). `await_refusals` still panics after `CONTENTION_STALL_LIMIT` when a contender has not reported a timeout ([contention_probe.rs:160](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/contention_probe.rs:160>)); the new refusal test relies on it before releasing the held lock ([lock.rs:500](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/lock.rs:500>)). If the polling thread runs while one or more healthy contenders are starved, the test fails after 30 seconds for scheduling rather than lock behavior. This leaves REQ-02 and REQ-04 unmet. References: `@/issue/e3c6c767/requirement/REQ-02`, `@/issue/e3c6c767/requirement/REQ-04`.\n\n2. **F2 — Exclusivity test retains a timing-dependent false-negative path and no seeded regression** (blocking; issue-impact; high). The test relies on a 10 ms sleep to create overlap ([lock.rs:540](</home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/lock.rs:540>)); without a start/admission synchronization, a broken lock can run the contenders serially and still observe a peak of one. No test double, seed, or recorded regression demonstrates that either new property fails under broken exclusion. This fails REQ-01, REQ-03, and REQ-04. References: `@/issue/e3c6c767/requirement/REQ-01`, `@/issue/e3c6c767/requirement/REQ-03`, `@/issue/e3c6c767/requirement/REQ-04`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The revised lock tests still rely on scheduling-sensitive time bounds and lack the required seeded regression evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The refusal test can still fail after a fixed 30-second no-progress window when healthy contenders are not scheduled.\",\"file\":\"crates/jit/src/storage/contention_probe.rs\",\"line\":160,\"references\":[\"@/issue/e3c6c767/requirement/REQ-02\",\"@/issue/e3c6c767/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The exclusivity test relies on a 10 ms overlap window and provides no seeded regression proving broken exclusion fails.\",\"file\":\"crates/jit/src/storage/lock.rs\",\"line\":540,\"references\":[\"@/issue/e3c6c767/requirement/REQ-01\",\"@/issue/e3c6c767/requirement/REQ-03\",\"@/issue/e3c6c767/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

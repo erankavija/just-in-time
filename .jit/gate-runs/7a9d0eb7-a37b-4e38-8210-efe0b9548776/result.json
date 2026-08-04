@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c626b5e16e402e42eb2b6502d923ec39512f329e",
+  "completed_at": "2026-08-04T21:29:02.474978724Z",
+  "duration_ms": 165370,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable change satisfies both hard criteria with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e516b4f8-506d-4b43-89a9-e72603aecaa6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7a9d0eb7-a37b-4e38-8210-efe0b9548776",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T21:26:17.104455440Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 284058fd, 95a7cce1\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml); @/issue/f3f7de97/requirement/REQ-07, @/issue/22826a75/requirement/REQ-11, @/issue/9d451c98/requirement/REQ-07 (issue descriptions)\nGate evidence: cargo-ci — passed, exit_code null, 2026-08-04T21:25:16Z\nTruncation recovery: narrowed merge per-parent diffs, current target file, and five remaining bare-identifier contexts\n\n1. No blocking or advisory findings. The stale `REQ-11` tags were removed, and the tagged commit states and substantiates the crate sweep required by REQ-02.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable change satisfies both hard criteria with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

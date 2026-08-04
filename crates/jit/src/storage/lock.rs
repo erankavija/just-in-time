@@ -547,6 +547,16 @@ mod tests {
         let holding = Arc::new(AtomicUsize::new(0));
         let peak_holding = Arc::new(AtomicUsize::new(0));
 
+        // Held until every contender has been refused it, so all of them are
+        // queued before any is admitted. Without that, a host free to run the
+        // contenders one after another would hold the peak at one whether the
+        // lock excludes or not, and the assertion below would pass a lock that
+        // does not.
+        let held = FileLocker::new(EXPIRING_LOCK_WAIT)
+            .try_lock_exclusive(&file_path)
+            .unwrap()
+            .expect("no contender has started yet, so the lock is free");
+
         let asking = (0..CONTENDER_COUNT)
             .map(|_| {
                 let file_path = Arc::clone(&file_path);
@@ -570,6 +580,9 @@ mod tests {
                 })
             })
             .collect::<Vec<_>>();
+
+        contenders.await_refusals(CONTENDER_COUNT);
+        drop(held);
 
         asking
             .into_iter()
