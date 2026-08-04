@@ -11,6 +11,49 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// The access a caller was waiting for when its lock wait expired.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LockMode {
+    /// Sole access, held by one caller at a time.
+    Exclusive,
+    /// Read access, held by any number of callers at once.
+    Shared,
+}
+
+impl std::fmt::Display for LockMode {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Exclusive => "exclusive",
+            Self::Shared => "shared",
+        })
+    }
+}
+
+/// A lock wait that expired before the lock became available.
+///
+/// This says the caller was still queued when its wait ran out. It is not the
+/// lock holder's answer, and it does not mean the resource was refused: a caller
+/// that waits again may well be admitted. Code that must tell those apart —
+/// "contention I have not cleared yet" from "the operation was rejected" —
+/// matches on this type through [`is_lock_timeout`] rather than reading the
+/// message, so the distinction survives any rewording.
+#[derive(Debug, thiserror::Error)]
+#[error("Lock timeout: could not acquire {mode} lock on {} after {waited:?}", path.display())]
+pub struct LockTimeout {
+    /// The access that was being waited for.
+    pub mode: LockMode,
+    /// The lock file the caller was queued on.
+    pub path: PathBuf,
+    /// The wait that expired.
+    pub waited: Duration,
+}
+
+/// True when `error` is a lock wait that expired rather than an outcome the
+/// locked operation decided.
+pub fn is_lock_timeout(error: &anyhow::Error) -> bool {
+    error.downcast_ref::<LockTimeout>().is_some()
+}
+
 /// Metadata for lock diagnostics
 ///
 /// Written alongside lock files to enable diagnosis of stuck processes.
@@ -120,11 +163,12 @@ impl FileLocker {
                 }
                 Ok(false) => {
                     if start.elapsed() >= self.timeout {
-                        anyhow::bail!(
-                            "Lock timeout: could not acquire exclusive lock on {} after {:?}",
-                            path.display(),
-                            self.timeout
-                        );
+                        return Err(LockTimeout {
+                            mode: LockMode::Exclusive,
+                            path: path.to_path_buf(),
+                            waited: self.timeout,
+                        }
+                        .into());
                     }
                     std::thread::sleep(poll_interval);
                 }
@@ -158,11 +202,12 @@ impl FileLocker {
                 }
                 Ok(false) => {
                     if start.elapsed() >= self.timeout {
-                        anyhow::bail!(
-                            "Lock timeout: could not acquire shared lock on {} after {:?}",
-                            path.display(),
-                            self.timeout
-                        );
+                        return Err(LockTimeout {
+                            mode: LockMode::Shared,
+                            path: path.to_path_buf(),
+                            waited: self.timeout,
+                        }
+                        .into());
                     }
                     std::thread::sleep(poll_interval);
                 }
@@ -267,11 +312,12 @@ impl FileLocker {
                 }
                 Ok(false) => {
                     if start.elapsed() >= self.timeout {
-                        anyhow::bail!(
-                            "Lock timeout: could not acquire exclusive lock on {} after {:?}",
-                            path.display(),
-                            self.timeout
-                        );
+                        return Err(LockTimeout {
+                            mode: LockMode::Exclusive,
+                            path: path.to_path_buf(),
+                            waited: self.timeout,
+                        }
+                        .into());
                     }
                     std::thread::sleep(poll_interval);
                 }

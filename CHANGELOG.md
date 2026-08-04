@@ -70,6 +70,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A concurrency property decides on coordination rather than on how busy the
+  host was.** The claim coordinator's concurrent-acquisition tests spawned a
+  thread per issue and asserted every one was granted, but a thread reached the
+  coordinator only through a lock wait measured in wall-clock seconds. A thread
+  that was still queued when its wait expired failed a property about mutual
+  exclusion for want of time, so the authoritative quality gate returned a
+  different verdict for the same tree depending on what else the machine was
+  doing — enough that the gate script capped its test threads below the core
+  count to narrow the window. An expired wait is now its own error type,
+  `storage::lock::LockTimeout`, distinct from any answer the locked operation
+  gave, and the tests treat it as "not there yet" and ask again. Load changes
+  how many times a caller asks and nothing about what it is told, so the cap and
+  the reason for it are both gone. Two tests hold the separation by making every
+  contended wait expire, the condition an arbitrarily busy host produces.
+
 - **Installing marks a binary stale only when a path it is built from is
   uncommitted.** `scripts/install-jit.sh` embeds a dirty flag that makes the
   installed binary report itself stale for its whole life, and it computed that
