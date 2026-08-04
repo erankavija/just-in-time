@@ -13125,3 +13125,4 @@
 {"assignee":"agent:worker","id":"3aac7d98-7414-48cd-bf69-89c4e909e143","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T19:27:53.280087163Z","type":"issue_claimed"}
 {"from":"ready","id":"0371e883-bbca-4f8b-9397-b37c4340a338","issue_id":"e516b4f8-506d-4b43-89a9-e72603aecaa6","timestamp":"2026-08-04T19:28:02.172551394Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"1a69b111-f7e2-4d96-886f-5c6aae5d56c2","issue_id":"e516b4f8-506d-4b43-89a9-e72603aecaa6","timestamp":"2026-08-04T19:28:02.172551394Z","type":"issue_claimed"}
+{"fields":["description"],"id":"00dc24cc-5908-4bfb-9129-5af213340f0b","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T20:19:05.199206813Z","type":"issue_updated","updated_by":"issue-update"}
