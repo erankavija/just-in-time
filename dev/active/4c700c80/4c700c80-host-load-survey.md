@@ -83,8 +83,9 @@ assertions about it, and are excluded.
 
 A property restated to ignore the clock is only worth restating while it can
 still fail, so every one was seeded and run. Each edit is one line, made to a
-clean worktree at this issue's HEAD, run with `CARGO_INCREMENTAL=0`, and
-reverted; `cargo test -p jit` is green before and after (4173 passed, 0 failed).
+clean worktree at this issue's final HEAD, run with `CARGO_INCREMENTAL=0`, and
+reverted; `cargo test -p jit` is green before and after (4161 passed, 0 failed),
+as is `cargo test --workspace`.
 
 **The lock stops excluding (REQ-01, REQ-02).** `RepoWriteLock::acquire`'s
 reentrancy check at `crates/jit/src/storage/repo_lock.rs:232` was changed from
