@@ -15,14 +15,14 @@
 //!    the graceful notification late.
 //!
 //! [`run_shutdown_sequence`] performs both, in that order, and reports what the
-//! drain deadline saw.
+//! drain deadline saw and how long the drain ran to see it.
 
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use tokio::time::sleep;
+use tokio::time::{sleep, Instant};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -106,6 +106,11 @@ pub async fn await_shutdown_signal() -> io::Result<ShutdownSignal> {
 /// invokes the handle's immediate shutdown if any connections survive. The
 /// serve future returns `Ok` on both paths.
 ///
+/// Either outcome is logged with `drained_for_ms`, the time the drain actually
+/// spent running. It is measured across the drain rather than restated from
+/// `drain_deadline`, so the log distinguishes a server that waited out its
+/// deadline from one that stopped as soon as it had nothing left to drain.
+///
 /// # Errors
 /// Returns `signal`'s error when the process could not register its signal
 /// handlers. A process that cannot be asked to stop is not left serving: the
@@ -137,16 +142,26 @@ where
         "Shutdown signal received; draining connections"
     );
 
+    // Stamp the start before the boundary exists, on the clock the boundary is
+    // scheduled against: `sleep` measures from its own creation and never
+    // completes early, so an elapsed time taken from here can only overstate the
+    // wait a connection received, never understate it.
+    let drain_started = Instant::now();
     // Create JIT's sole boundary before notification. axum-server drains
     // indefinitely; it cannot start a second deadline when its serving task
     // eventually observes the graceful notification.
     let boundary = sleep(drain_deadline);
     let outcome = drain_connections(&handle, &shutdown, boundary).await;
+    let drained_for = drain_started.elapsed();
     match outcome {
-        DrainOutcome::Drained => info!("All connections finished before the drain deadline"),
+        DrainOutcome::Drained => info!(
+            drained_for_ms = drained_for.as_millis(),
+            "All connections finished before the drain deadline"
+        ),
         DrainOutcome::ForcedClosed { connections } => warn!(
             open_connections = connections,
             drain_deadline_secs = drain_deadline.as_secs(),
+            drained_for_ms = drained_for.as_millis(),
             "Drain deadline expired; force-closing the connections that did not finish"
         ),
     }

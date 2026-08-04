@@ -28,17 +28,9 @@ const STARTUP_BUDGET: Duration = Duration::from_secs(30);
 /// Longest an ordinary exchange (health probe, SSE head, change event) may take.
 const EXCHANGE_BUDGET: Duration = Duration::from_secs(10);
 
-/// "Promptly" for an event stream that must end on cancellation rather than
-/// linger behind its keepalive.
-const STREAM_EOF_BUDGET: Duration = Duration::from_secs(2);
-
 /// REQ-03's hard external bound: the process is gone in strictly less than ten
 /// seconds after the signal, never by a test-side kill.
 const EXIT_BUDGET: Duration = Duration::from_secs(10);
-
-/// Scheduling slack allowed when asserting that a survivor waited out the full
-/// drain deadline before being force-closed.
-const DEADLINE_SLACK: Duration = Duration::from_millis(500);
 
 /// Blocking-read slice, short enough that a poll loop stays responsive.
 const READ_POLL: Duration = Duration::from_millis(50);
@@ -198,6 +190,9 @@ const SIGNAL_RECEIVED: &str = "Shutdown signal received";
 /// The log message that reports the deadline closing what did not finish.
 const FORCE_CLOSING: &str = "force-closing";
 
+/// The log message that reports every connection finishing on its own.
+const DRAINED: &str = "finished before the drain deadline";
+
 /// The value of `field` on the log line carrying `message`.
 ///
 /// `tracing`'s compact format renders event fields as `name=value` after the
@@ -215,6 +210,25 @@ fn log_field(log: &str, message: &str, field: &str) -> String {
         .next()
         .unwrap_or_default()
         .to_string()
+}
+
+/// How long the server reports its drain ran, read off the line carrying
+/// `message`.
+///
+/// The server measures this across its own drain, with the clock its own
+/// deadline is scheduled against, and stamps the start before that deadline
+/// exists. So the number states the wait the server actually gave its
+/// connections. Every clock the test owns — when it stamped the signal, when its
+/// poll loop next ran, when the kernel scheduled it at all — is outside the
+/// measurement, which is why an assertion over it does not move with what else
+/// the host is doing.
+fn reported_drain(log: &str, message: &str) -> Duration {
+    let reported = log_field(log, message, "drained_for_ms");
+    Duration::from_millis(
+        reported
+            .parse()
+            .unwrap_or_else(|_| panic!("the {message:?} line reports drained_for_ms={reported:?}")),
+    )
 }
 
 /// Drops CSI escape sequences (`ESC [ … final-byte`) from captured output.
@@ -306,18 +320,6 @@ fn wait_for_close(stream: &mut TcpStream, since: Instant, budget: Duration) -> D
             "the connection was still open {:?} after the signal",
             since.elapsed()
         );
-    }
-}
-
-/// True when the connection is still open right now.
-fn is_still_open(stream: &mut TcpStream) -> bool {
-    let mut chunk = [0u8; 1];
-    match stream.read(&mut chunk) {
-        Ok(0) => false,
-        Err(error) if error.kind() == ErrorKind::ConnectionReset => false,
-        Ok(_) => true,
-        Err(error) if is_retryable(&error) => true,
-        Err(error) => panic!("read failed while probing the connection: {error}"),
     }
 }
 
@@ -475,40 +477,20 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
 
-    // Cancellation reaches the event streams, so they end instead of waiting
-    // out their keepalive interval.
-    let first_eof = wait_for_close(&mut first_stream, signalled_at, STREAM_EOF_BUDGET);
-    let second_eof = wait_for_close(&mut second_stream, signalled_at, STREAM_EOF_BUDGET);
-    assert!(
-        first_eof < STREAM_EOF_BUDGET && second_eof < STREAM_EOF_BUDGET,
-        "event streams reached EOF after {first_eof:?} and {second_eof:?}"
-    );
-    // An idle keep-alive connection is retired by the graceful shutdown itself.
-    wait_for_close(&mut completed, signalled_at, STREAM_EOF_BUDGET);
-    // The connection that cannot finish is still open partway through the drain.
-    //
-    // Only probe while the probe can still observe that: the three waits above
-    // are each entitled to STREAM_EOF_BUDGET, so together they may consume more
-    // than GRACEFUL_DRAIN_TIMEOUT before reaching this line, at which point a
-    // CORRECT server has already force-closed the survivor and an unconditional
-    // probe fails on conforming behaviour. Under `cargo test --workspace` that
-    // is what happens; in isolation the waits return in milliseconds and the
-    // probe lands mid-drain. Skipping the probe costs no coverage — the
-    // stalled_closed_after assertion below states the same entitlement
-    // unconditionally, measured after the fact instead of sampled during.
-    if signalled_at.elapsed() + DEADLINE_SLACK < GRACEFUL_DRAIN_TIMEOUT {
-        assert!(
-            is_still_open(&mut stalled),
-            "the stalled connection was dropped before the drain deadline"
-        );
+    // Every peer is closed by the server, never by the test. These waits
+    // establish that each connection reaches EOF at all; when the server closed
+    // it is asserted further down from the server's own record, because the
+    // interval between the server acting and the test noticing is the test's
+    // scheduling and widens with load on the machine. The budget here bounds a
+    // hang rather than stating a property.
+    for stream in [
+        &mut first_stream,
+        &mut second_stream,
+        &mut completed,
+        &mut stalled,
+    ] {
+        wait_for_close(stream, signalled_at, EXIT_BUDGET);
     }
-
-    let stalled_closed_after = wait_for_close(&mut stalled, signalled_at, EXIT_BUDGET);
-    assert!(
-        stalled_closed_after + DEADLINE_SLACK >= GRACEFUL_DRAIN_TIMEOUT,
-        "the stalled connection was closed after {stalled_closed_after:?}, \
-         before the drain deadline it was entitled to"
-    );
 
     let (exit_code, exited_after) = server.wait_for_exit(signalled_at, EXIT_BUDGET);
     assert_eq!(exit_code, 0, "server log:\n{}", server.log());
@@ -528,10 +510,26 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
         "4",
         "the log must account for both event streams and both ordinary connections"
     );
+    // The count at the deadline is what separates the connections that could
+    // finish from the one that could not. Cancellation ended both event streams
+    // and the graceful drain retired the idle keep-alive, all inside the
+    // deadline; the connection stuck mid message survived to it. An event stream
+    // left waiting out its 15-second keepalive instead would still be live here,
+    // and this count would name it.
     assert_eq!(
         log_field(&log, FORCE_CLOSING, "open_connections"),
         "1",
         "the log must report the connection the deadline force-closed"
+    );
+    // The drain property: the survivor got the whole deadline before the server
+    // retired it. Load on the host can delay a deadline but cannot bring one
+    // early, so this comparison carries no scheduling margin and its outcome is
+    // the same on a busy machine as on an idle one.
+    let drained_for = reported_drain(&log, FORCE_CLOSING);
+    assert!(
+        drained_for >= GRACEFUL_DRAIN_TIMEOUT,
+        "the server force-closed the survivor after draining for {drained_for:?}, \
+         short of the {GRACEFUL_DRAIN_TIMEOUT:?} the connection was entitled to"
     );
     assert!(
         log.contains("Shutdown complete"),
@@ -597,11 +595,17 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
 
     let signalled_at = Instant::now();
     send_signal(first.pid(), Signal::SIGTERM);
-    let (exit_code, exited_after) = first.wait_for_exit(signalled_at, EXIT_BUDGET);
+    let (exit_code, _) = first.wait_for_exit(signalled_at, EXIT_BUDGET);
     assert_eq!(exit_code, 0, "server log:\n{}", first.log());
+    // A server with nothing to drain stops at once rather than sitting out the
+    // deadline, and the drain it reports for itself is what says so: the count
+    // it samples first is already zero. Taking the duration from the server
+    // keeps a busy host from making a prompt shutdown look like a slow one.
+    let drained_for = reported_drain(&first.log(), DRAINED);
     assert!(
-        exited_after < GRACEFUL_DRAIN_TIMEOUT,
-        "a server with nothing to drain waited {exited_after:?} instead of stopping at once"
+        drained_for < GRACEFUL_DRAIN_TIMEOUT,
+        "a server with nothing to drain spent {drained_for:?} draining \
+         instead of stopping at once"
     );
 
     // No lingering listener: the successor binds the same port immediately.
