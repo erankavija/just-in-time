@@ -13,9 +13,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-04T11:56:10.997970732Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T14:34:36.307435683Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling",
-  "updated_at": "2026-08-04T12:04:09.419097936Z"
+  "updated_at": "2026-08-04T14:34:36.307435683Z"
 }
