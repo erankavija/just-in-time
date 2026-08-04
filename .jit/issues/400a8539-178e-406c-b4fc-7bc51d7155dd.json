@@ -22,7 +22,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T22:49:26.019691095Z",
+      "updated_at": "2026-08-04T23:10:26.859845464Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Report server startup on what the child did, not on a fixed pause",
-  "updated_at": "2026-08-04T22:56:11.050818371Z"
+  "updated_at": "2026-08-04T23:10:26.859845464Z"
 }
