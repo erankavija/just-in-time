@@ -4,6 +4,13 @@
 /// Package-source prefix identifying assets that also project into this source tree.
 pub const JIT_DOGFOOD_LIVE_SOURCE_PREFIX: &str = "assets/live/";
 
+/// Repository-relative path of this checkout's workflow package manifest.
+///
+/// Every check that binds a packaged declaration to its repository copy names
+/// this as the packaged carrier, so a reader opens the same file the assembly
+/// draws the package from.
+pub const JIT_DOGFOOD_MANIFEST_PATH: &str = "profiles/jit-dogfood/manifest.toml";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -11,6 +18,7 @@ mod tests {
     use crate::config::ProjectionStyle;
     use crate::declarations::invariants::InvariantRegistry;
     use crate::declarations::GateRegistry;
+    use crate::profile::contribution_drift::{DeclaredOverride, OverrideScope};
     use crate::profile::{ExclusionPattern, LiveSourceDeclaration, ProfilePackage};
     use crate::repository_state::{
         render_rules_and_gates_markdown, Contribution, KeyedArrayTarget, MapEntryTarget,
@@ -1010,6 +1018,382 @@ mod tests {
             rendered,
             "a second rendering run changed the registry"
         );
+    }
+
+    /// The declarations this repository deliberately holds differently from
+    /// the packaged contribution that names them.
+    ///
+    /// Every other contribution is bound: a packaged value and the registry
+    /// entry it restates are two copies of one declaration, and an edit to
+    /// either alone is reported. An entry here says the two are not copies of
+    /// one declaration at all, and why. Each is as narrow as its reason —
+    /// unless the whole entry is this repository's own, only the single field
+    /// the two carriers state differently is named, and every remaining field
+    /// of that entry stays bound.
+    const DECLARED_OVERRIDES: &[DeclaredOverride] = &[
+        DeclaredOverride {
+            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
+            identity: None,
+            field: Some("checker"),
+            reason: "The package ships every review gate as a portable placeholder an \
+                     adopter replaces without changing the workflow graph, which the \
+                     manifest declares above its gate contributions. This checkout is \
+                     such an adopter: each of its gates runs a real command.",
+        },
+        DeclaredOverride {
+            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
+            identity: None,
+            field: Some("title"),
+            reason: "A replaced checker is titled for the command it runs rather than \
+                     for the placeholder it replaced.",
+        },
+        DeclaredOverride {
+            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
+            identity: None,
+            field: Some("description"),
+            reason: "A replaced checker is described by what it runs; the packaged \
+                     description is bound instead to the reference the package \
+                     installs, which is rendered from the same contributions.",
+        },
+        DeclaredOverride {
+            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Invariants),
+            identity: None,
+            field: Some("enforced-by"),
+            reason: "The checkout-only cargo-ci gate is not package content, so the \
+                     packaged enforcement claims bind to the portable repo-validate \
+                     gate instead, which the manifest declares above its invariant \
+                     contributions. The statement each entry carries stays bound.",
+        },
+        DeclaredOverride {
+            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Rules),
+            identity: None,
+            field: Some("origin"),
+            reason: "A rule's origin records which declaration authored it, so a rule \
+                     this repository authored before the package carries its own \
+                     provenance marker rather than the package's.",
+        },
+        DeclaredOverride {
+            scope: OverrideScope::KeyedArray(KeyedArrayTarget::Rules),
+            identity: None,
+            field: Some("description"),
+            reason: "Each carrier describes the rule for its own reader; the packaged \
+                     description is bound instead to the reference the package \
+                     installs, which is rendered from the same contributions. What the \
+                     rule asserts stays bound.",
+        },
+        DeclaredOverride {
+            scope: OverrideScope::MapEntry(MapEntryTarget::Namespaces),
+            identity: None,
+            field: Some("examples"),
+            reason: "Namespace examples are documentation and never enforced, so each \
+                     carrier names its own vocabulary: this repository's examples cite \
+                     its own issues, which an adopter has no counterpart for.",
+        },
+        DeclaredOverride {
+            scope: OverrideScope::Projection,
+            identity: Some("rules-and-gates"),
+            field: None,
+            reason: "The two are different projections of one registry rather than one \
+                     projection declared twice: this repository renders the reference \
+                     into a region of its published documentation, and the package \
+                     installs it as a separate file under .jit/reference/.",
+        },
+    ];
+
+    /// This repository's registries, keyed by the repository-relative path the
+    /// contributions target.
+    ///
+    /// Panics when a targeted registry cannot be read: a registry the
+    /// comparison cannot consult is a contribution left unbound, which is what
+    /// the check exists to prevent.
+    fn contributed_registries(contributions: &[Contribution]) -> BTreeMap<String, String> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        crate::profile::contribution_drift::contributed_registry_paths(contributions)
+            .into_iter()
+            .map(|registry| {
+                let text = fs::read_to_string(root.join(registry))
+                    .unwrap_or_else(|error| panic!("failed to read {registry}: {error}"));
+                (registry.to_string(), text)
+            })
+            .collect()
+    }
+
+    /// Every packaged contribution whose repository counterpart states
+    /// something else, given the registries the repository carries.
+    fn contribution_drift(
+        package: &ProfilePackage,
+        registries: &BTreeMap<String, String>,
+    ) -> Vec<crate::profile::drift_report::DriftReport> {
+        crate::profile::contribution_drift::contribution_drift_reports(
+            JIT_DOGFOOD_MANIFEST_PATH,
+            &package.manifest().contributions,
+            registries,
+            DECLARED_OVERRIDES,
+        )
+        .expect("every contributed registry entry is comparable")
+    }
+
+    /// Every packaged contribution agrees with the repository registry entry
+    /// it restates.
+    ///
+    /// This is the direction the manifest does not walk: a contribution and the
+    /// entry it restates are two copies of one declaration, and nothing else
+    /// keeps them in step. The repository's copy is what this checkout's own
+    /// validation reads and the packaged copy is what an adopter receives, so
+    /// once they come apart one of them carries a ruling the other never
+    /// recorded.
+    #[test]
+    fn test_contribution_drift_is_empty_across_every_packaged_contribution() {
+        let (_workspace, package) = assembled_package();
+        let registries = contributed_registries(&package.manifest().contributions);
+        assert!(
+            !registries.is_empty(),
+            "the package contributes to a registry"
+        );
+
+        let reported = contribution_drift(&package, &registries)
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            reported,
+            Vec::<String>::new(),
+            "each report names a packaged contribution and the repository entry it \
+             restates, which no longer state the same thing"
+        );
+    }
+
+    /// Every target the manifest contributes to is bound: an edit to the
+    /// packaged declaration alone is reported for each of them.
+    ///
+    /// A comparison that reached only some targets would pass this repository
+    /// while leaving the rest free to drift, which is the state the check
+    /// replaces. The seeded value is a field of the contribution itself, so no
+    /// target is bound by an expectation stated here about what it declares.
+    #[test]
+    fn test_contribution_drift_compares_a_seeded_edit_on_every_declared_target() {
+        let (_workspace, package) = assembled_package();
+        let contributions = &package.manifest().contributions;
+        let registries = contributed_registries(contributions);
+        let declared: BTreeSet<String> = contributions.iter().map(declared_target).collect();
+        assert!(!declared.is_empty(), "the package declares contributions");
+
+        let bound: BTreeSet<String> = contributions
+            .iter()
+            .filter(|contribution| {
+                seeded_packaged_edits(contribution).iter().any(|seeded| {
+                    seeded_drift(JIT_DOGFOOD_MANIFEST_PATH, seeded, &registries).len() == 1
+                })
+            })
+            .map(declared_target)
+            .collect();
+
+        assert_eq!(
+            bound, declared,
+            "each target the two sets differ by is one where a seeded edit to the \
+             packaged declaration went unreported, so nothing binds it"
+        );
+    }
+
+    /// An edit to the repository's registry alone is reported, naming both
+    /// carriers and the differing text.
+    ///
+    /// The edit is made the way a hand would make it — the entry's own text is
+    /// rewritten in the registry file — and the check reads the entry back out
+    /// of that text, so no seam stands between the seeded edit and the
+    /// comparison. The entry is the one whose amendment went unreported for
+    /// want of this check.
+    #[test]
+    fn test_contribution_drift_report_names_both_carriers_of_a_seeded_repository_edit() {
+        let (_workspace, package) = assembled_package();
+        let contributions = &package.manifest().contributions;
+        let registry = KeyedArrayTarget::Invariants.registry_path();
+        let mut registries = contributed_registries(contributions);
+        let committed = registries
+            .get(registry)
+            .expect("the invariant registry")
+            .clone();
+        registries.insert(
+            registry.to_string(),
+            seeded_invariant_statement(&committed, "domain-agnostic"),
+        );
+
+        let reported = contribution_drift(&package, &registries);
+
+        assert_eq!(reported.len(), 1, "{reported:?}");
+        let report = &reported[0];
+        assert_eq!(report.repository().path, registry);
+        assert_eq!(report.packaged().path, JIT_DOGFOOD_MANIFEST_PATH);
+        let rendered = report.to_string();
+        assert!(rendered.contains(SEEDED_EDIT), "{rendered}");
+        for carrier in [report.repository(), report.packaged()] {
+            assert!(rendered.contains(&carrier.path), "{rendered}");
+            assert!(rendered.contains(&carrier.entry), "{rendered}");
+        }
+    }
+
+    /// Every declared override still names a contribution the manifest makes
+    /// and, when it names a field, one that contribution declares.
+    ///
+    /// An override outliving the declaration it excuses would go on suppressing
+    /// a comparison nothing asked for.
+    #[test]
+    fn test_declared_overrides_each_name_a_contribution_the_package_still_declares() {
+        let (_workspace, package) = assembled_package();
+        let contributions = &package.manifest().contributions;
+
+        let stale: Vec<&str> = DECLARED_OVERRIDES
+            .iter()
+            .filter(|declared| {
+                !contributions
+                    .iter()
+                    .any(|contribution| declared.applies_to(contribution))
+            })
+            .map(|declared| declared.reason)
+            .collect();
+
+        assert_eq!(
+            stale,
+            Vec::<&str>::new(),
+            "each entry is a declared override whose contribution or field the package \
+             no longer declares"
+        );
+    }
+
+    /// The text a seeded edit writes into a declaration.
+    const SEEDED_EDIT: &str = "a value the package does not carry";
+
+    /// The target a contribution declares, spelled the way the manifest spells
+    /// it, so the walk above states its coverage in the manifest's vocabulary.
+    fn declared_target(contribution: &Contribution) -> String {
+        match serde_json::to_value(contribution) {
+            Ok(serde_json::Value::Object(fields)) => fields
+                .get("target")
+                .or_else(|| fields.get("kind"))
+                .and_then(|target| target.as_str().map(str::to_string)),
+            _ => None,
+        }
+        .expect("a contribution declares its target")
+    }
+
+    /// The reports one edited contribution produces against `registries`.
+    ///
+    /// A seed that leaves the declaration uninterpretable — a token that is not
+    /// one of a closed vocabulary, say — reports nothing here and the walk
+    /// above tries the next field.
+    fn seeded_drift(
+        manifest: &str,
+        contribution: &Contribution,
+        registries: &BTreeMap<String, String>,
+    ) -> Vec<crate::profile::drift_report::DriftReport> {
+        crate::profile::contribution_drift::contribution_drift_reports(
+            manifest,
+            std::slice::from_ref(contribution),
+            registries,
+            DECLARED_OVERRIDES,
+        )
+        .unwrap_or_default()
+    }
+
+    /// Every way this walk knows to edit one packaged declaration away from the
+    /// repository's, one edited contribution per field it can change.
+    ///
+    /// The field values are the contribution's own, changed in place and in
+    /// kind, so a declaration of any shape yields candidates without this
+    /// helper knowing what its fields mean.
+    fn seeded_packaged_edits(contribution: &Contribution) -> Vec<Contribution> {
+        let value = crate::profile::contribution_drift::contributed_value(contribution);
+        let candidates: Vec<serde_json::Value> = match &value {
+            serde_json::Value::Object(fields) => fields
+                .iter()
+                .filter_map(|(key, field)| {
+                    let mut edited = fields.clone();
+                    edited.insert(key.clone(), seeded_value(field)?);
+                    Some(serde_json::Value::Object(edited))
+                })
+                .collect(),
+            scalar => seeded_value(scalar).into_iter().collect(),
+        };
+        candidates
+            .into_iter()
+            .filter_map(|value| reseated(contribution, value))
+            .collect()
+    }
+
+    /// `value` changed in place and in kind, or `None` when this walk has no
+    /// change for its shape.
+    fn seeded_value(value: &serde_json::Value) -> Option<serde_json::Value> {
+        use serde_json::Value;
+        match value {
+            Value::String(_) => Some(Value::String(SEEDED_EDIT.to_string())),
+            Value::Bool(carried) => Some(Value::Bool(!carried)),
+            Value::Number(carried) => carried
+                .as_i64()
+                .map(|carried| Value::Number((carried + 1).into())),
+            Value::Array(carried) => Some(Value::Array(
+                [
+                    carried.clone(),
+                    vec![Value::String(SEEDED_EDIT.to_string())],
+                ]
+                .concat(),
+            )),
+            Value::Object(_) | Value::Null => None,
+        }
+    }
+
+    /// `contribution` carrying `value` instead of its own.
+    ///
+    /// A projection's value is a complete configuration rather than a free
+    /// value, so a seed that is not one is no candidate.
+    fn reseated(contribution: &Contribution, value: serde_json::Value) -> Option<Contribution> {
+        Some(match contribution {
+            Contribution::KeyedArray {
+                target, identity, ..
+            } => Contribution::KeyedArray {
+                target: *target,
+                identity: identity.clone(),
+                value,
+            },
+            Contribution::MapEntry {
+                target, identity, ..
+            } => Contribution::MapEntry {
+                target: *target,
+                identity: identity.clone(),
+                value,
+            },
+            Contribution::Projection { name, .. } => Contribution::Projection {
+                name: name.clone(),
+                value: serde_json::from_value(value).ok()?,
+            },
+            Contribution::Scalar { target, .. } => Contribution::Scalar {
+                target: *target,
+                value: value.as_str()?.to_string(),
+            },
+            Contribution::SetString { target, .. } => Contribution::SetString {
+                target: *target,
+                value: value.as_str()?.to_string(),
+            },
+        })
+    }
+
+    /// `registry` with the statement of invariant `identity` rewritten.
+    fn seeded_invariant_statement(registry: &str, identity: &str) -> String {
+        let mut document = registry
+            .parse::<toml_edit::DocumentMut>()
+            .expect("the invariant registry parses");
+        let entry = document[KeyedArrayTarget::Invariants.array_name()]
+            .as_array_of_tables_mut()
+            .expect("the registry declares an invariant array")
+            .iter_mut()
+            .find(|entry| {
+                entry
+                    .get(KeyedArrayTarget::Invariants.identity_field())
+                    .and_then(toml_edit::Item::as_str)
+                    == Some(identity)
+            })
+            .unwrap_or_else(|| panic!("the repository declares invariant '{identity}'"));
+        entry["statement"] = toml_edit::value(SEEDED_EDIT);
+        document.to_string()
     }
 
     /// This repository's committed template registry.

@@ -16,6 +16,15 @@ mod repository_package;
 // that pair keeps it out of an adopter build entirely.
 #[cfg(any(test, feature = "test-support"))]
 pub mod package_assembly;
+// Repository-local check seam: this checkout's packaged contributions bound to
+// the registry entries they restate, plus the report shape that and the
+// template-region drift assertion share. Neither has a production caller, and
+// both build with dev-dependencies active, so gating them on the same pair
+// keeps them out of an adopter build entirely.
+#[cfg(any(test, feature = "test-support"))]
+pub mod contribution_drift;
+#[cfg(any(test, feature = "test-support"))]
+pub mod drift_report;
 // Repository-local generator seam: the render of this repository's generated
 // template region has two consumers, the artifact registry the `regenerate`
 // example publishes through and the repository package module's drift
@@ -43,4 +52,4 @@ pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
-pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;
+pub use repository_package::{JIT_DOGFOOD_LIVE_SOURCE_PREFIX, JIT_DOGFOOD_MANIFEST_PATH};
