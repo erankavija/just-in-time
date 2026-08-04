@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "296c1da39d6df7c2536c810efddbe4774e4c0dda",
+  "completed_at": "2026-08-04T19:10:59.109247905Z",
+  "duration_ms": 236787,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/lock.rs",
+        "id": "F1",
+        "line": 476,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "A pre-existing lock test still relies on a 50 ms scheduling window, but the issue survey reports it as separate work and it does not affect this issue."
+      }
+    ],
+    "summary": "All hard criteria are satisfied; one documented host-load-sensitive lock test remains pre-existing advisory debt.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "57675b68-78dd-470b-a524-30061b488062",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "56f9e4d5-1e3a-406d-9234-b51dd5adfaff",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T19:07:02.321860997Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cb9cc86d, 6f4b96e8, 07ec3cd6, 47b7baa6, eca0a30f, 51c8e502, b60266f1, 05a36cd2, 51408435, 84ec4beb, 636443dd, 296c1da3\nPolicy sources: AGENTS.md\nResolved items: @/issue/57675b68/requirement/REQ-01..REQ-04 (issue description, markdown-first); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml, registry-first); @/invariant/semantic-test-assertions and @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T19:06:51Z); code-review failed (exit 1, 2026-08-04T18:50:53Z, superseded in substance by attributable corrections)\nTruncation recovery: split policy, gate-result, source, survey, and merge-patch reads by path/range\n\n1. **F1 — low, advisory, pre-existing:** `test_exclusive_lock_prevents_concurrent_writes` still depends on a 50 ms scheduling window before asserting its holder acquired the lock. The issue’s survey correctly records this as separate pre-existing work; it does not affect this issue’s satisfied criteria. `crates/jit/src/storage/lock.rs:476`\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; one documented host-load-sensitive lock test remains pre-existing advisory debt.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"A pre-existing lock test still relies on a 50 ms scheduling window, but the issue survey reports it as separate work and it does not affect this issue.\",\"file\":\"crates/jit/src/storage/lock.rs\",\"line\":476}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

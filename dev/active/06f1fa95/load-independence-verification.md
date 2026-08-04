@@ -146,9 +146,18 @@ out is the server's five seconds, and the host's state did not move it.
 
 `cargo-ci` takes a host-wide build lock, so the execution lead ran it over the
 merged tree — once with the host otherwise idle, once with a concurrent build
-beside it. Both runs judged the same tree, commit `1101c623`, with a clean
-working tree, and both executed their checker rather than reusing a projection
+beside it. Both runs executed their checker rather than reusing a projection
 (`jit gate evaluate 06f1fa95 cargo-ci --force`).
+
+Both runs judged the same content. Each records commit `1101c623` and
+`tree_dirty: true`: the working tree carried uncommitted tracker state under
+`.jit/` — the event log, issue records, and the gate-run output a run writes as
+it goes — every path of which the gate's own `inputs.exclude` list leaves out.
+What the gate hashed was therefore identical, and the records say so directly:
+both carry the inputs digest
+`1c913ae940ebe8082fb41d3f0fa40cffb28ac2e235f9f33fe8834793a0e80d57`. That
+equality is the claim this comparison needs — one content, two host conditions —
+and it is stronger than a `git status` at either moment.
 
 The load for run 2 was sustained across the whole run rather than started
 beside it: a loop rebuilding this workspace from scratch into a scratch target

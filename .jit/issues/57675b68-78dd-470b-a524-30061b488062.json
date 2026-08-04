@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "A concurrency property holds without racing a wall clock, so the authoritative quality gate carries no assertion whose outcome depends on how busy the host is.\n\n## Background\n\n`prop_concurrent_different_issues_succeed` in `crates/jit/src/storage/claim_coordinator_proptests.rs` spawns one thread per generated issue — up to nine — each acquiring a claim through the same coordinator, and asserts they all succeed. Acquisition is bounded by a file-lock timeout measured in wall-clock seconds, so a thread that does not reach the lock inside that window fails a property that is about mutual exclusion rather than about speed.\n\nThe gate script that runs it already names the problem. `scripts/cargo-ci.sh` caps test threads below the host's core count specifically to protect this test, recording that it \"can starve its file-lock timeout when every core is saturated by parallel build+test load\". The cap narrows the window; it does not remove the dependency, and the gate's verdict still turns on how much else the machine was doing.\n\nThis is the last known assertion of that shape inside the gate. The graceful-shutdown drain assertions that shared it now read the server's own measurement instead of the observer's clock, which is the pattern available here: a property about concurrent acquisition can be stated over what the coordinator did rather than over how long it took.\n\n## Success Criteria\n\n- [hard] REQ-01: The property's outcome is decided by what the coordinator did, not by whether a thread was scheduled inside a fixed window. A bound that fires only when no claimant at all has been answered, and fails loudly when it does, is not such a window.\n- [hard] REQ-02: The property still fails when concurrent acquisition genuinely breaks, demonstrated against a seeded regression.\n- [hard] REQ-03: The thread cap in the gate script no longer exists to protect this test; if the cap is retained, its stated reason is one that survives this change.\n- [hard] REQ-04: A survey of the gate's whole suite reports every remaining assertion whose outcome could turn on host load, and its result is stated.\n",
   "documents": [],
+  "done_at": "2026-08-04T19:11:29.262458881Z",
   "first_ready_at": "2026-08-04T14:37:32.170933215Z",
   "gates_required": [
     "cargo-ci",
@@ -18,8 +19,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T18:50:53.990303949Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T19:10:59.428940489Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,7 +33,7 @@
     "type:task"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Hold a concurrency property without racing a wall clock",
-  "updated_at": "2026-08-04T19:06:51.518958582Z"
+  "updated_at": "2026-08-04T19:11:29.262458881Z"
 }
