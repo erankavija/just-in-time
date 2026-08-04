@@ -147,6 +147,12 @@ fn test_schema_issue_create_details() {
     assert!(
         flags
             .iter()
+            .any(|f| f["name"] == "description-file" || f["name"] == "description_file"),
+        "issue create must expose --description-file in --schema"
+    );
+    assert!(
+        flags
+            .iter()
             .any(|f| f["name"] == "type" || f["name"] == "issue_type"),
         "issue create must expose a --type flag in --schema"
     );

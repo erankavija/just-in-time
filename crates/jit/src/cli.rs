@@ -624,6 +624,10 @@ pub enum IssueCommands {
     /// To verify what was recorded, see `jit events query --issue-id <id>` or
     /// `jit events tail`.
     ///
+    /// Description flags:
+    ///   --description TEXT       use TEXT as the initial description
+    ///   --description-file PATH  use PATH (or `-` for stdin) verbatim
+    ///
     /// Examples:
     ///   jit issue create "Fix login bug"
     ///   jit issue create "Fix login bug" --type bug --priority high
@@ -642,9 +646,24 @@ pub enum IssueCommands {
         title: Option<String>,
 
         /// Initial description (body) of the issue, stored verbatim. Defaults
-        /// to an empty string when omitted.
-        #[arg(short = 'd', long = "description", default_value = "")]
-        description: String,
+        /// to an empty string when omitted. Mutually exclusive with
+        /// `--description-file`.
+        #[arg(
+            short = 'd',
+            long = "description",
+            value_name = "TEXT",
+            conflicts_with = "description_file"
+        )]
+        description: Option<String>,
+
+        /// Initial description from PATH, used verbatim. Pass `-` to read
+        /// from standard input. Mutually exclusive with `--description`.
+        #[arg(
+            long = "description-file",
+            value_name = "PATH",
+            conflicts_with = "description"
+        )]
+        description_file: Option<String>,
 
         #[arg(short, long, default_value = "normal")]
         priority: String,
