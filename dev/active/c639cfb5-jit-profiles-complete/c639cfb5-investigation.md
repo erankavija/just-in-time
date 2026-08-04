@@ -634,8 +634,9 @@ v1.1 migrates a surviving consumer or merely asserts a cdc-owned predecessor sta
 - Generated CLI schema inventory:
   `crates/jit/tests/cli_repo_workflow/integration_schema.rs:59-89` and the runtime
   manifest-schema freshness test `crates/jit/src/schema.rs:1312-1323`.
-- Cross-platform CI invokes the acceptance suite at
-  `.github/workflows/ci.yml:181-209`.
+- Linux-only profile-adoption CI invokes the acceptance suite in
+  `.github/workflows/ci.yml`; Windows is not exercised because its defects are not being
+  acted on.
 
 ### MCP consumers
 
