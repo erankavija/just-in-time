@@ -9,6 +9,7 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -56,6 +57,8 @@ fn exited_by(child: &mut Child, deadline: Instant) -> bool {
 /// block: a pipe stays open for as long as *any* descendant holds its inherited
 /// write end, so one surviving grandchild keeps a reader from ever reaching end
 /// of file, while a regular file always reads to end of file (jit:76a4bd21).
+/// How much work reaching it takes is bounded separately, by
+/// [`CAPTURE_SEGMENT`].
 fn spawn_capturing(command: &mut Command, out: &Path, err: &Path) -> std::io::Result<Child> {
     command
         .stdin(Stdio::null())
@@ -64,9 +67,72 @@ fn spawn_capturing(command: &mut Command, out: &Path, err: &Path) -> std::io::Re
         .spawn()
 }
 
-/// Reads a capture file, answering with the empty string when it cannot be read.
+/// Ceiling on the bytes one capture read takes from either end of a capture
+/// file.
+///
+/// Bytes, not time, are what bound these reads. A capture file has a live
+/// writer for most of a case, and while a regular file always reads to end of
+/// file, the work that takes is whatever the writer has produced by then: a
+/// child writing faster than this process reads keeps a read-to-end going for
+/// as long as it keeps writing. A deadline around the call would not bound
+/// that, because nothing here cancels a read already issued — it would bound
+/// the observer while the read ran on. A cap bounds the work itself, and every
+/// loop repeating a capped read is bounded by a phase deadline besides
+/// (jit:76a4bd21).
+const CAPTURE_SEGMENT: u64 = 64 * 1024;
+
+/// Reads at most `limit` bytes of `path` from `offset`, answering with the
+/// empty string when the file cannot be opened, positioned, or read.
+///
+/// Decoding is lossy: a segment boundary can split a multi-byte character, and
+/// a capture that explains a failure is worth more than a strict decode that
+/// discards the whole capture over one split character.
+fn read_capture_segment(path: &Path, offset: u64, limit: u64) -> String {
+    let mut buffer = Vec::new();
+    fs::File::open(path)
+        .and_then(|mut file| {
+            file.seek(SeekFrom::Start(offset))?;
+            file.take(limit).read_to_end(&mut buffer)
+        })
+        .map(|_| String::from_utf8_lossy(&buffer).into_owned())
+        .unwrap_or_default()
+}
+
+/// Reads the complete lines at the head of a capture file, where a process
+/// announces itself.
+///
+/// The trailing partial line is dropped, so a caller parsing a value out of a
+/// line never reads a prefix of that value as the value. A read can stop
+/// mid-line two ways: at the [`CAPTURE_SEGMENT`] cap, or on a writer that has
+/// put down half a line and not yet the rest. Either way half of
+/// `http://localhost:41407` parses as a plausible wrong port rather than as
+/// nothing, which would send the probe below to an address the process never
+/// announced.
+fn read_capture_head(path: &Path) -> String {
+    let head = read_capture_segment(path, 0, CAPTURE_SEGMENT);
+    head.rfind('\n')
+        .map_or_else(String::new, |last| head[..=last].to_owned())
+}
+
+/// Reads a capture file for a failure message, keeping both ends of one too
+/// large to read whole and naming what it dropped.
+///
+/// These captures exist to explain failures, and the explanation sits at one of
+/// two ends: what the process announced as it started, and what it said last. A
+/// capture within the cap is answered entire, so an ordinary failure message
+/// carries exactly what it carried before; only a capture past the cap is
+/// abridged, into head, an elision naming the dropped bytes, and tail.
 fn read_capture(path: &Path) -> String {
-    fs::read_to_string(path).unwrap_or_default()
+    let len = fs::metadata(path)
+        .map(|meta| meta.len())
+        .unwrap_or_default();
+    if len <= 2 * CAPTURE_SEGMENT {
+        return read_capture_segment(path, 0, 2 * CAPTURE_SEGMENT);
+    }
+    let head = read_capture_segment(path, 0, CAPTURE_SEGMENT);
+    let tail = read_capture_segment(path, len - CAPTURE_SEGMENT, CAPTURE_SEGMENT);
+    let elided = len - 2 * CAPTURE_SEGMENT;
+    format!("{head}\n[… {elided} bytes of capture elided …]\n{tail}")
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -120,6 +186,82 @@ fn write_stale_pid(dir: &TempDir, pid: u32, port: u16) {
         serde_json::to_string_pretty(&pid_json).unwrap(),
     )
     .unwrap();
+}
+
+// ── capture reads: bounded without losing the explanation ────────────────────
+
+#[test]
+fn test_read_capture_answers_a_capture_within_the_cap_entire() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("out");
+    let written = "Starting server on http://localhost:41407\n  API: …\nboom\n";
+    fs::write(&path, written).unwrap();
+
+    // What a failure message quotes for an ordinary capture is the capture.
+    assert_eq!(read_capture(&path), written);
+}
+
+#[test]
+#[cfg(unix)]
+fn test_read_capture_head_omits_a_line_the_writer_has_not_finished() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("out");
+    // What a capture looks like mid-write: a complete line, then half of one.
+    fs::write(
+        &path,
+        "Starting server on http://localhost:41407\n  API: http://localhost:414",
+    )
+    .unwrap();
+
+    let head = read_capture_head(&path);
+
+    // The finished line is readable; the unfinished one is not offered to a
+    // parser that would read `414` as the port the process announced.
+    assert_eq!(
+        head.lines().find_map(parse_localhost_port),
+        Some(41407),
+        "the complete announcement must parse"
+    );
+    assert!(
+        head.lines()
+            .filter_map(parse_localhost_port)
+            .all(|port| port == 41407),
+        "no partial line may reach the parser: {head:?}"
+    );
+}
+
+#[test]
+fn test_read_capture_keeps_both_ends_of_a_capture_past_the_cap() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("out");
+    let (first, last) = ("Starting server on http://localhost:41407", "boom: no");
+    let filler = "f".repeat(3 * CAPTURE_SEGMENT as usize);
+    fs::write(&path, format!("{first}\n{filler}\n{last}")).unwrap();
+    let len = fs::metadata(&path).unwrap().len();
+
+    let abridged = read_capture(&path);
+
+    // Both ends of the explanation survive: what the process announced as it
+    // started and what it said last.
+    assert!(
+        abridged.starts_with(first),
+        "the head of the capture must survive: {abridged:.120}"
+    );
+    assert!(
+        abridged.ends_with(last),
+        "the tail of the capture must survive"
+    );
+    // What was dropped is named rather than silently swallowed, and the read
+    // stayed inside its cap.
+    let elided = len - 2 * CAPTURE_SEGMENT;
+    assert!(
+        abridged.contains(&elided.to_string()),
+        "an abridged capture must name the {elided} bytes it dropped"
+    );
+    assert!(
+        (abridged.len() as u64) < len,
+        "an abridged capture must be smaller than the file it abridges"
+    );
 }
 
 // ── --status: no server running ───────────────────────────────────────────────
@@ -383,12 +525,14 @@ fn process_group_survives(pgid: u32) -> bool {
 ///
 /// The case drives real processes, so it is bounded by construction: every wait
 /// takes its deadline from [`FG_BUDGET`], output is captured to files rather
-/// than pipes no reader can close, and teardown signals the whole spawned
-/// process group and then confirms the group drained.
+/// than pipes no reader can close, every read of a capture is capped at
+/// [`CAPTURE_SEGMENT`] and the reads that explain a failure are taken only once
+/// the group has drained, and teardown signals the whole spawned process group
+/// and then confirms the group drained.
 #[test]
 #[cfg(unix)]
 fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
-    use std::io::{Read, Write};
+    use std::io::Write;
     use std::net::{SocketAddr, TcpStream};
     use std::os::unix::process::CommandExt;
 
@@ -462,7 +606,7 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
 
     // The parent announces the chosen port before spawning the server.
     let announced = || {
-        read_capture(&out_path)
+        read_capture_head(&out_path)
             .lines()
             .find_map(parse_localhost_port)
     };
@@ -497,10 +641,6 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     let reaped = exited_by(&mut child, teardown_deadline);
     let drained = poll_until(teardown_deadline, || !process_group_survives(pgid));
 
-    let out = read_capture(&out_path);
-    let err = read_capture(&err_path);
-    let elapsed = started.elapsed();
-
     assert!(
         reaped,
         "the jit parent did not exit within its {FG_TEARDOWN_BUDGET:?} teardown \
@@ -517,6 +657,15 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
              {still_serving}"
         );
     }
+
+    // Only now read what the run said: the group drained above, so nothing is
+    // left to grow these files under the read, and each read is capped besides.
+    // The elapsed time is taken after them, so the budget asserted below covers
+    // every step up to the verdict.
+    let out = read_capture(&out_path);
+    let err = read_capture(&err_path);
+    let elapsed = started.elapsed();
+
     assert!(
         elapsed <= FG_BUDGET,
         "the case took {elapsed:?}, past the {FG_BUDGET:?} it budgets"
