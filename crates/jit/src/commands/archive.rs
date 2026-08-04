@@ -1317,11 +1317,13 @@ mod tests {
             .is_err());
         release_sender.send(()).unwrap();
         holder.join().unwrap();
-        assert!(done_receiver
-            .recv_timeout(std::time::Duration::from_secs(2))
-            .unwrap()
-            .is_ok());
+        // Join before receiving: the worker sends its outcome as its last act, so
+        // a joined worker has already sent and the receive completes without
+        // waiting. What remains blocking is the join, and a join that never
+        // returns is the archive deadlocked behind a released guard rather than a
+        // thread the host was slow to schedule.
         worker.join().unwrap();
+        assert!(done_receiver.recv().unwrap().is_ok());
     }
 
     #[test]
