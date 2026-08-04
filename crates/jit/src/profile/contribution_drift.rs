@@ -792,7 +792,7 @@ style = \"id-anchor\"
         let with_member = "[type_hierarchy]\nstrategic_types = [\"milestone\", \"epic\"]\n";
 
         let reported = reports(
-            &[contribution.clone()],
+            std::slice::from_ref(&contribution),
             &registries(&[(".jit/config.toml", without_member)]),
             &[],
         );
@@ -836,7 +836,7 @@ enforced-by = \"@/gate/checkout-only\"
         };
 
         assert!(reports(
-            &[contribution.clone()],
+            std::slice::from_ref(&contribution),
             &registries(&[(".jit/invariants.toml", repository)]),
             &[binding],
         )
