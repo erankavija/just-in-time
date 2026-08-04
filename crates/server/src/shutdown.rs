@@ -184,7 +184,10 @@ where
     // indefinitely; it cannot start a second deadline when its serving task
     // eventually observes the graceful notification.
     let boundary = sleep(drain_deadline);
-    let outcome = drain_connections(&handle, &shutdown, boundary).await;
+    let outcome = drain_connections(&handle, &shutdown, boundary, || {
+        sleep(DRAIN_SAMPLE_INTERVAL)
+    })
+    .await;
     let drained_for = drain_started.elapsed();
     match outcome {
         DrainOutcome::Drained => info!(
@@ -203,30 +206,39 @@ where
 
 /// Cancels application streams, initiates an unbounded graceful drain in
 /// axum-server, and enforces JIT's single configured boundary.
-async fn drain_connections<F>(
+///
+/// The drain's whole schedule arrives from the caller: `boundary` is the
+/// deadline, and `next_sample` is the wait between two live counts.
+async fn drain_connections<B, S, N>(
     handle: &ServerHandle,
     shutdown: &CancellationToken,
-    boundary: F,
+    boundary: B,
+    next_sample: S,
 ) -> DrainOutcome
 where
-    F: Future<Output = ()>,
+    B: Future<Output = ()>,
+    S: Fn() -> N,
+    N: Future<Output = ()>,
 {
     // Order matters: event streams end first, so the drain below is only ever
     // waiting on connections that have real work left.
     shutdown.cancel();
     handle.graceful_shutdown(None);
-    observe_drain(handle, boundary).await
+    observe_drain(handle, boundary, next_sample).await
 }
 
-/// Watches the live connection count until `boundary` resolves.
+/// Watches the live connection count until `boundary` resolves, waiting out one
+/// `next_sample` between counts.
 ///
 /// Every count is sampled after its preceding wait. In particular, the final
 /// count and the force-close action happen together at the boundary, so the
 /// reported count is exactly the set whose survival caused JIT to invoke the
 /// handle's immediate shutdown.
-async fn observe_drain<F>(handle: &ServerHandle, boundary: F) -> DrainOutcome
+async fn observe_drain<B, S, N>(handle: &ServerHandle, boundary: B, next_sample: S) -> DrainOutcome
 where
-    F: Future<Output = ()>,
+    B: Future<Output = ()>,
+    S: Fn() -> N,
+    N: Future<Output = ()>,
 {
     tokio::pin!(boundary);
 
@@ -247,7 +259,7 @@ where
                 handle.shutdown();
                 return DrainOutcome::ForcedClosed { connections };
             }
-            () = sleep(DRAIN_SAMPLE_INTERVAL) => {}
+            () = next_sample() => {}
         }
     }
 }
@@ -455,11 +467,16 @@ mod tests {
             let handle = handle.clone();
             let shutdown = shutdown.clone();
             async move {
-                drain_connections(&handle, &shutdown, async {
-                    boundary
-                        .await
-                        .expect("the test triggers the drain boundary")
-                })
+                drain_connections(
+                    &handle,
+                    &shutdown,
+                    async {
+                        boundary
+                            .await
+                            .expect("the test triggers the drain boundary")
+                    },
+                    || sleep(DRAIN_SAMPLE_INTERVAL),
+                )
                 .await
             }
         });
@@ -486,57 +503,90 @@ mod tests {
         }
     }
 
+    /// The count at the boundary decides between the two drain outcomes, and
+    /// this is the half of that decision where the deadline finds nothing left
+    /// to close.
+    ///
+    /// It is the last sampling interval that has to empty for the boundary to
+    /// reach a zero count, so the three events involved are ordered by
+    /// observation rather than laid out on a clock: the drain reports the sample
+    /// that found the connection live, the handle reports the retirement, and
+    /// only then does the deadline expire. Each step waits for the one before
+    /// it, so a host that runs any of them slowly delays the test instead of
+    /// changing what it decides.
+    ///
+    /// The sampling schedule is the reason the deadline is what samples zero:
+    /// with no periodic wake-up, the drain reaches its second count only through
+    /// the boundary, so this case cannot pass through the loop's own exit and
+    /// leave the boundary's count unexercised.
     #[tokio::test]
-    async fn test_run_shutdown_sequence_reports_drained_when_final_interval_empties() {
+    async fn test_drain_connections_reports_drained_when_the_boundary_finds_the_survivor_retired() {
         let handle = ServerHandle::new();
         let (addr, serving) = serve_on_loopback(&handle).await;
         let mut completing = open_stalled_connection(addr).await;
         wait_for_connection_count(&handle, 1).await;
-        let drain_deadline = DRAIN_SAMPLE_INTERVAL.saturating_mul(4);
-        let (signal_sent, signal_started) = oneshot::channel();
-        let shutdown_task = tokio::spawn(run_shutdown_sequence(
-            handle.clone(),
-            CancellationToken::new(),
-            drain_deadline,
+        let (sampled, first_sample) = oneshot::channel();
+        let (expire, boundary) = oneshot::channel();
+        let shutdown = CancellationToken::new();
+        let observer = tokio::spawn({
+            let handle = handle.clone();
+            let shutdown = shutdown.clone();
             async move {
-                signal_sent
-                    .send(())
-                    .expect("the test waits for the shutdown signal");
-                Ok(ShutdownSignal::Terminate)
-            },
-        ));
+                drain_connections(
+                    &handle,
+                    &shutdown,
+                    async {
+                        // The drain polls its boundary only after a count it
+                        // found non-zero, so this report is the live sample.
+                        sampled
+                            .send(())
+                            .expect("the test waits for the first drain sample");
+                        boundary
+                            .await
+                            .expect("the test triggers the drain boundary")
+                    },
+                    std::future::pending::<()>,
+                )
+                .await
+            }
+        });
 
-        signal_started
+        timeout(TEST_BUDGET, first_sample)
             .await
-            .expect("the shutdown sequence starts before the connection completes");
-        // The connection remains live through the first three 100 ms samples,
-        // then completes halfway through the final polling interval. The drain
-        // outcome therefore selects the non-forced-close logging branch.
-        sleep(DRAIN_SAMPLE_INTERVAL.saturating_mul(3) + DRAIN_SAMPLE_INTERVAL / 2).await;
+            .expect("the drain samples the live connection within the test budget")
+            .expect("the drain reaches its boundary with a connection still live");
+
+        // Completing the request is the peer's half of the retirement; the count
+        // reaching zero is the server's, and the test waits for that rather than
+        // for a duration in which it might happen.
         completing
             .write_all(b"\r\n")
             .await
-            .expect("complete the request during the final polling interval");
+            .expect("complete the request the drain is waiting on");
         completing
             .flush()
             .await
             .expect("flush the completed request");
+        wait_for_connection_count(&handle, 0).await;
 
-        let outcome = timeout(TEST_BUDGET, shutdown_task)
+        expire
+            .send(())
+            .expect("the drain observer is waiting on the boundary");
+        let outcome = timeout(TEST_BUDGET, observer)
             .await
-            .expect("the shutdown sequence completes within the test budget")
-            .expect("the shutdown task does not panic")
-            .expect("a delivered signal is not an error");
+            .expect("the drain observer finishes within the test budget")
+            .expect("the drain observer does not panic");
+
         assert_eq!(
             outcome,
             DrainOutcome::Drained,
-            "a connection that drains in the final interval must not report a forced close"
+            "a deadline that finds every connection retired must not report a forced close"
         );
         timeout(TEST_BUDGET, serving)
             .await
             .expect("the serve future ends within the test budget")
             .expect("the serve task does not panic")
-            .expect("the serve future returns Ok after the final-interval drain");
+            .expect("the serve future returns Ok after the connection finishes");
     }
 
     #[tokio::test]
