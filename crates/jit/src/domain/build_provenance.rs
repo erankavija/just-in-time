@@ -68,15 +68,23 @@ use crate::domain::repository_inputs::RepositoryInputs;
 /// repository it is validating.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StaleBinaryReason {
-    /// The repository has changed a path that can affect the binary since the
-    /// recorded build commit. This also represents a build-input change in an
-    /// otherwise unchanged `HEAD`, because the commit alone then no longer
-    /// describes the tree the gate is reviewing.
+    /// The repository's committed history has changed a path that can affect
+    /// the binary since the recorded build commit.
     CommitMismatch {
         /// Full commit hash the running binary was built from.
         built_from: String,
         /// The repository's current `HEAD` commit hash.
         head: String,
+    },
+    /// The repository has uncommitted changes to build inputs. The paths are
+    /// kept so the refusal can identify what must be committed or reverted;
+    /// unlike [`CommitMismatch`], this reason does not report the current
+    /// `HEAD` as a conflicting commit.
+    UncommittedBuildInputs {
+        /// Full commit hash the running binary was built from.
+        built_from: String,
+        /// Build-input paths changed in the working tree.
+        paths: Vec<String>,
     },
     /// The binary was built from a tree carrying an uncommitted build input.
     /// Such a build has no commit that fully describes its sources, so it can
@@ -151,16 +159,42 @@ pub fn is_binary_build_input(path: &str) -> bool {
         .is_some_and(|inputs| inputs.covers(path))
 }
 
-/// Whether any changed repository path can affect the production `jit`
-/// binary.
-pub fn binary_build_inputs_changed<I, P>(paths: I) -> bool
+/// Changed build-input paths, separated by whether they are committed or
+/// only present in the working tree.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BuildInputChanges {
+    /// Build-input paths changed between the binary's build commit and `HEAD`.
+    pub committed: Vec<String>,
+    /// Build-input paths changed in the working tree relative to `HEAD`.
+    pub working_tree: Vec<String>,
+}
+
+/// Select the changed paths that can affect the production `jit` binary while
+/// retaining whether each came from committed history or the working tree.
+pub fn binary_build_input_changes<CI, CP, WI, WP>(
+    committed_paths: CI,
+    working_tree_paths: WI,
+) -> BuildInputChanges
 where
-    I: IntoIterator<Item = P>,
-    P: AsRef<str>,
+    CI: IntoIterator<Item = CP>,
+    CP: AsRef<str>,
+    WI: IntoIterator<Item = WP>,
+    WP: AsRef<str>,
 {
-    paths
+    let committed = committed_paths
         .into_iter()
-        .any(|path| is_binary_build_input(path.as_ref()))
+        .filter(|path| is_binary_build_input(path.as_ref()))
+        .map(|path| path.as_ref().to_string())
+        .collect();
+    let working_tree = working_tree_paths
+        .into_iter()
+        .filter(|path| is_binary_build_input(path.as_ref()))
+        .map(|path| path.as_ref().to_string())
+        .collect();
+    BuildInputChanges {
+        committed,
+        working_tree,
+    }
 }
 
 /// Compare a running binary's build commit/dirty flag against a repository's
@@ -172,20 +206,21 @@ where
 /// `git rev-parse --verify <build_commit>^{commit}` against the repository
 /// root) — this function performs no I/O of its own.
 ///
-/// `build_inputs_changed` is supplied by the I/O boundary after comparing the
+/// `build_input_changes` is supplied by the I/O boundary after comparing the
 /// committed and working-tree path changes against
 /// [`is_binary_build_input`]. Returns [`BinaryProvenance::Stale`] when
 /// identity is established AND either the build was dirty
 /// ([`StaleBinaryReason::DirtyBuild`], regardless of whether `build_commit`
-/// equals `repo_head`) or a build-input path changed. A build whose dirty flag
-/// is `None` (unknown at build time) is not itself treated as evidence of
-/// staleness — only a *confirmed* dirty build (`Some(true)`) is.
+/// equals `repo_head`), an uncommitted build-input path changed, or a committed
+/// build-input path changed. A build whose dirty flag is `None` (unknown at
+/// build time) is not itself treated as evidence of staleness — only a
+/// *confirmed* dirty build (`Some(true)`) is.
 pub fn assess_binary_provenance(
     build_commit: Option<&str>,
     build_dirty: Option<bool>,
     repo_head: Option<&str>,
     build_commit_known_in_repo: bool,
-    build_inputs_changed: bool,
+    build_input_changes: &BuildInputChanges,
 ) -> BinaryProvenance {
     let (Some(build_commit), Some(repo_head)) = (build_commit, repo_head) else {
         return BinaryProvenance::NotApplicable;
@@ -198,7 +233,13 @@ pub fn assess_binary_provenance(
             built_from: build_commit.to_string(),
         });
     }
-    if build_inputs_changed {
+    if !build_input_changes.working_tree.is_empty() {
+        return BinaryProvenance::Stale(StaleBinaryReason::UncommittedBuildInputs {
+            built_from: build_commit.to_string(),
+            paths: build_input_changes.working_tree.clone(),
+        });
+    }
+    if !build_input_changes.committed.is_empty() {
         return BinaryProvenance::Stale(StaleBinaryReason::CommitMismatch {
             built_from: build_commit.to_string(),
             head: repo_head.to_string(),
@@ -222,7 +263,7 @@ mod tests {
             Some(false),
             Some(real.git_commit),
             true,
-            false,
+            &BuildInputChanges::default(),
         );
         assert_eq!(result, BinaryProvenance::Fresh);
     }
@@ -236,7 +277,7 @@ mod tests {
             None,
             Some(real.git_commit),
             true,
-            false,
+            &BuildInputChanges::default(),
         );
         assert_eq!(result, BinaryProvenance::Fresh);
     }
@@ -247,12 +288,14 @@ mod tests {
     fn test_assess_binary_provenance_stale_on_commit_mismatch() {
         let real = build_info::version_info();
         let other_head = "0000000000000000000000000000000000000000";
+        let build_input_changes =
+            binary_build_input_changes(["crates/jit/src/main.rs"], std::iter::empty::<&str>());
         let result = assess_binary_provenance(
             Some(real.git_commit),
             Some(false),
             Some(other_head),
             true,
-            true,
+            &build_input_changes,
         );
         assert_eq!(
             result,
@@ -273,7 +316,7 @@ mod tests {
             Some(true),
             Some(real.git_commit),
             true,
-            false,
+            &BuildInputChanges::default(),
         );
         assert_eq!(
             result,
@@ -289,7 +332,13 @@ mod tests {
     fn test_assess_binary_provenance_not_applicable_without_repo_head() {
         let real = build_info::version_info();
         assert_eq!(
-            assess_binary_provenance(Some(real.git_commit), Some(false), None, false, false),
+            assess_binary_provenance(
+                Some(real.git_commit),
+                Some(false),
+                None,
+                false,
+                &BuildInputChanges::default(),
+            ),
             BinaryProvenance::NotApplicable
         );
     }
@@ -298,7 +347,13 @@ mod tests {
     #[test]
     fn test_assess_binary_provenance_not_applicable_without_build_commit() {
         assert_eq!(
-            assess_binary_provenance(None, None, Some("deadbeef"), false, true),
+            assess_binary_provenance(
+                None,
+                None,
+                Some("deadbeef"),
+                false,
+                &BuildInputChanges::default(),
+            ),
             BinaryProvenance::NotApplicable
         );
     }
@@ -315,7 +370,7 @@ mod tests {
                 Some(false),
                 Some("cafef00d"),
                 false,
-                true,
+                &BuildInputChanges::default(),
             ),
             BinaryProvenance::NotApplicable
         );
@@ -333,10 +388,12 @@ mod tests {
         assert!(is_binary_build_input("scripts/hooks/pre-commit"));
         assert!(!is_binary_build_input("docs/new-reference.md"));
         assert!(!is_binary_build_input("scripts/new-tool.sh"));
-        assert!(!binary_build_inputs_changed([
-            "docs/new-reference.md",
-            "scripts/new-tool.sh",
-        ]));
+        assert!(binary_build_input_changes(
+            std::iter::empty::<&str>(),
+            ["docs/new-reference.md", "scripts/new-tool.sh"],
+        )
+        .working_tree
+        .is_empty());
     }
 
     /// REQ-02: changing a packaged live source leaves an installed clean
@@ -345,15 +402,17 @@ mod tests {
     #[test]
     fn test_assess_binary_provenance_fresh_for_profile_package_change() {
         let real = build_info::version_info();
-        let build_inputs_changed =
-            binary_build_inputs_changed(["profiles/jit-dogfood/manifest.toml"]);
+        let build_input_changes = binary_build_input_changes(
+            ["profiles/jit-dogfood/manifest.toml"],
+            std::iter::empty::<&str>(),
+        );
         assert_eq!(
             assess_binary_provenance(
                 Some(real.git_commit),
                 Some(false),
                 Some(real.git_commit),
                 true,
-                build_inputs_changed,
+                &build_input_changes,
             ),
             BinaryProvenance::Fresh
         );
@@ -365,14 +424,15 @@ mod tests {
     #[test]
     fn test_assess_binary_provenance_stale_for_crate_source_change() {
         let real = build_info::version_info();
-        let build_inputs_changed = binary_build_inputs_changed(["crates/jit/src/main.rs"]);
+        let build_input_changes =
+            binary_build_input_changes(["crates/jit/src/main.rs"], std::iter::empty::<&str>());
         assert_eq!(
             assess_binary_provenance(
                 Some(real.git_commit),
                 Some(false),
                 Some(real.git_commit),
                 true,
-                build_inputs_changed,
+                &build_input_changes,
             ),
             BinaryProvenance::Stale(StaleBinaryReason::CommitMismatch {
                 built_from: real.git_commit.to_string(),
@@ -440,7 +500,7 @@ mod tests {
                 Some(false),
                 Some("a-different-known-head"),
                 true,
-                false,
+                &BuildInputChanges::default(),
             ),
             BinaryProvenance::Fresh
         );
@@ -449,17 +509,40 @@ mod tests {
     #[test]
     fn test_assess_binary_provenance_stale_for_same_head_build_input_change() {
         let real = build_info::version_info();
+        let build_input_changes =
+            binary_build_input_changes(std::iter::empty::<&str>(), ["crates/jit/src/main.rs"]);
         assert_eq!(
             assess_binary_provenance(
                 Some(real.git_commit),
                 Some(false),
                 Some(real.git_commit),
                 true,
-                true,
+                &build_input_changes,
             ),
-            BinaryProvenance::Stale(StaleBinaryReason::CommitMismatch {
+            BinaryProvenance::Stale(StaleBinaryReason::UncommittedBuildInputs {
                 built_from: real.git_commit.to_string(),
-                head: real.git_commit.to_string(),
+                paths: vec!["crates/jit/src/main.rs".to_string()],
+            })
+        );
+    }
+
+    #[test]
+    fn test_assess_binary_provenance_prefers_uncommitted_inputs_when_head_also_moved() {
+        let real = build_info::version_info();
+        let build_input_changes =
+            binary_build_input_changes(["crates/jit/src/lib.rs"], ["crates/jit/src/main.rs"]);
+
+        assert_eq!(
+            assess_binary_provenance(
+                Some(real.git_commit),
+                Some(false),
+                Some("a-different-known-head"),
+                true,
+                &build_input_changes,
+            ),
+            BinaryProvenance::Stale(StaleBinaryReason::UncommittedBuildInputs {
+                built_from: real.git_commit.to_string(),
+                paths: vec!["crates/jit/src/main.rs".to_string()],
             })
         );
     }

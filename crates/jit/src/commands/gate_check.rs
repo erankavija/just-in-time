@@ -673,8 +673,9 @@ fn gate_findings_from_report(
 
 /// Compare the running binary's own build provenance
 /// ([`build_info::version_info`](crate::build_info::version_info)) against
-/// `repo_root`'s current `HEAD` and changed build-input paths, returning why it
-/// is stale, or `None` when it is fresh or the comparison does not apply
+/// `repo_root`'s current `HEAD` and changed build-input paths, retaining
+/// whether each path changed in committed history or the working tree, and
+/// returning why it is stale, or `None` when the comparison does not apply
 /// (REQ-03).
 ///
 /// I/O boundary for [`domain::build_provenance`](crate::domain::build_provenance):
@@ -683,7 +684,7 @@ fn gate_findings_from_report(
 /// `git rev-parse --verify <rev>^{commit}` semantics (the REQ-03 identity
 /// predicate — a plain string inequality is not enough, see the module docs),
 /// then enumerates committed and working-tree changes and hands the resulting
-/// build-input predicate to
+/// categorized build-input changes to
 /// [`assess_binary_provenance`](crate::domain::build_provenance::assess_binary_provenance)
 /// for the actual decision. The second resolution (whether the build commit
 /// is known) is skipped entirely when `HEAD` itself does not resolve, so a
@@ -710,16 +711,14 @@ fn stale_binary_reason_for_repo(
     // it does not need a diff query. For clean builds, an inability to inspect
     // either committed or working-tree changes keeps the guard silent rather
     // than guessing that an installed binary is safe or stale.
-    let build_inputs_changed = if info.git_dirty == Some(true) {
-        false
+    let build_input_changes = if info.git_dirty == Some(true) {
+        crate::domain::build_provenance::BuildInputChanges::default()
     } else {
         let committed = resolver
             .changed_paths_between(info.git_commit, repo_head.as_str())
             .ok()?;
         let working_tree = resolver.changed_worktree_paths().ok()?;
-        crate::domain::build_provenance::binary_build_inputs_changed(
-            committed.into_iter().chain(working_tree),
-        )
+        crate::domain::build_provenance::binary_build_input_changes(committed, working_tree)
     };
 
     match assess_binary_provenance(
@@ -727,7 +726,7 @@ fn stale_binary_reason_for_repo(
         info.git_dirty,
         Some(repo_head.as_str()),
         known_in_repo,
-        build_inputs_changed,
+        &build_input_changes,
     ) {
         BinaryProvenance::Stale(reason) => Some(reason),
         BinaryProvenance::Fresh | BinaryProvenance::NotApplicable => None,

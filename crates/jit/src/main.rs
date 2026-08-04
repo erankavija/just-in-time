@@ -731,11 +731,16 @@ fn stale_binary_json_error(stale: &jit::errors::StaleBinaryError) -> jit::output
     use jit::domain::build_provenance::StaleBinaryReason;
     use jit::output::{ErrorCode, JsonError};
 
-    let (reason_code, built_from) = match stale.reason() {
+    let (reason_code, built_from, paths) = match stale.reason() {
         StaleBinaryReason::CommitMismatch { built_from, .. } => {
-            ("commit_mismatch", built_from.clone())
+            ("commit_mismatch", built_from.clone(), None)
         }
-        StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone()),
+        StaleBinaryReason::UncommittedBuildInputs { built_from, paths } => (
+            "uncommitted_build_inputs",
+            built_from.clone(),
+            Some(paths.clone()),
+        ),
+        StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone(), None),
     };
     JsonError::new(ErrorCode::StaleBinary, stale.to_string())
         .with_details(serde_json::json!({
@@ -743,6 +748,7 @@ fn stale_binary_json_error(stale: &jit::errors::StaleBinaryError) -> jit::output
             "key": stale.gate_key(),
             "reason": reason_code,
             "built_from": built_from,
+            "paths": paths,
         }))
         .with_suggestion(
             "Rebuild and reinstall with build provenance: scripts/install-jit.sh \
