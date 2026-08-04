@@ -885,8 +885,10 @@ impl CommandSchema {
                 "*",
                 10,
                 "The repository's on-disk format is newer than this binary, a gate \
-                 checker refused to run because the binary predates the repository \
-                 under review, or a filesystem/subprocess I/O operation failed.",
+                 checker refused because committed build inputs changed, because \
+                 working-tree build inputs are uncommitted, or because build \
+                 provenance records an uncommitted build input, or a \
+                 filesystem/subprocess I/O operation failed.",
                 false,
             ),
             // Command-family classification (standard taxonomy meaning).

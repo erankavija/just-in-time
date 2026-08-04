@@ -28,7 +28,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `INVALID_ID_PREFIX` | The ID prefix is shorter than the accepted minimum. | `2` |
 | `REPOSITORY_NOT_FOUND` | No JIT repository exists at the resolved path. | `3` |
 | `REPOSITORY_FORMAT_TOO_NEW` | The repository format is newer than this binary supports. | `10` |
-| `STALE_BINARY` | The running binary predates the repository under review. | `10` |
+| `STALE_BINARY` | Committed build inputs changed, working-tree build inputs are uncommitted, or build provenance records an uncommitted build input. | `10` |
 | `DELETION_NOT_CONFIRMED` | Issue deletion lacks the required operator confirmation. | `2` |
 | `PROFILE_NOT_FOUND` | No resolution route found the requested profile. | `3` |
 | `PROFILE_CONFLICT` | Profile planning or validation found a conflict. | `4` |

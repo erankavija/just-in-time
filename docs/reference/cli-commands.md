@@ -1847,12 +1847,16 @@ checkers do not use this subprocess guard. The refusal condition is ALL of:
 1. the repository under validation can resolve the running binary's build
    commit in its own history (the repository the binary was built from, or a
    clone or fork that shares that history), AND
-2. either the repository's current `HEAD` differs from that build commit, or
-   the binary was built from a dirty working tree.
+2. at least one of these conditions holds:
+   - a committed build-input path changed between the build commit and the
+     repository's current `HEAD`; the refusal names both commits;
+   - an uncommitted build-input path is present in the working tree; the
+     refusal names the responsible paths; or
+   - build provenance records an uncommitted build input at build time; the
+     refusal names the build commit.
 
-Otherwise — an unrelated repository, no git at all, or a binary built without
-a resolvable commit — the check stays silent: it never fires for an ordinary
-installed release validating a repository it was not built from.
+When the repository cannot resolve the running binary's build commit, the
+identity prerequisite is absent and the check stays silent.
 
 This is checked in two places, which surface differently on `jit gate
 evaluate`/`evaluate-all`:

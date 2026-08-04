@@ -30,10 +30,11 @@
 //! for the production wiring, shared by both call sites below) precisely so a
 //! plain string comparison never drives the verdict. The full refusal
 //! condition is therefore always both parts together: (1) this identity
-//! predicate holds, AND (2) [`assess_binary_provenance`] finds either a
-//! build-input change or a dirty build; a repository that fails part (1) —
-//! unrelated, no git, or an unresolvable build commit — never refuses,
-//! regardless of part (2).
+//! predicate holds, AND (2) [`assess_binary_provenance`] finds a committed
+//! build-input change, an uncommitted build-input change, or a dirty build.
+//! The resulting reason carries the actionable evidence: both commits for a
+//! committed change, the changed paths for an uncommitted change, or the
+//! build commit for a dirty build.
 //!
 //! # Warn vs. fail (REQ-01)
 //!
@@ -64,8 +65,8 @@
 
 use crate::domain::repository_inputs::RepositoryInputs;
 
-/// Why a running binary is judged to predate, or no longer match, the
-/// repository it is validating.
+/// Why a running binary's build does not match the repository it is
+/// validating.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StaleBinaryReason {
     /// The repository's committed history has changed a path that can affect
