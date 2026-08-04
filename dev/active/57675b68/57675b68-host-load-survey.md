@@ -65,6 +65,46 @@ Production-code constructs
 `commands/serve.rs` startup probe) are the behaviour under test rather than
 assertions about it, and are excluded.
 
+## The restated properties still fail when the thing they protect breaks
+
+A property restated to ignore the clock is only worth restating while it can
+still fail, so both regressions were seeded and run. Each edit is one line, made
+to a clean worktree at `b4859c87` plus this issue's commits, run with
+`CARGO_INCREMENTAL=0 cargo test -p jit --lib storage::claim_coordinator`, and
+reverted; the suite is green before and after. Run by the execution lead.
+
+**Coordination breaks (REQ-02).** `acquire_claim`'s availability check at
+`crates/jit/src/storage/claim_coordinator.rs:470` was made to find nothing, so
+the coordinator grants an issue it has already granted. Four tests failed, and
+they are the ones that assert exclusion:
+
+```
+prop_concurrent_claims_exclusive ......................................... FAILED
+test_acquire_claim_grants_exactly_one_claimant_when_every_lock_wait_expires  FAILED
+test_concurrent_claim_attempts_serialize ................................. FAILED
+test_acquire_claim_already_claimed ....................................... FAILED
+test result: FAILED. 48 passed; 4 failed
+```
+
+The two properties this issue restated are among them, so the restatement reads
+coordination rather than the schedule: it still rejects a coordinator that lets
+two claimants hold one issue.
+
+**The bound goes back into the deciding path (REQ-01).** The retry's
+`is_lock_timeout` arm was disabled, making an expired wait a verdict again — the
+shape the issue exists to remove. Both tests that hold every wait expired
+failed:
+
+```
+test_acquire_claim_grants_every_distinct_issue_when_every_lock_wait_expires  FAILED
+test_acquire_claim_grants_exactly_one_claimant_when_every_lock_wait_expires  FAILED
+test result: FAILED. 50 passed; 2 failed
+```
+
+Those two tests are therefore not passing because the host happened to schedule
+their threads well: the condition they hold their claimants in is produced
+deliberately, and restoring the clock-bounded path is enough to fail them.
+
 ## Result — sites changed by this issue
 
 | Site | Assertion | Result |
