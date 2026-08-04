@@ -63,20 +63,23 @@ If leaks are detected:
 
 Re-run the leak check until it returns clean before doing any commits on main.
 
-### Step 5 — Per-merge build verification
+### Step 5 — Gate the merged tree
 
-Merge each worker branch into `main` sequentially, and after **each** merge — before the next merge and before any further commit lands on top — verify that the merged commit itself builds:
+Merge each worker branch into `main` sequentially, and after **each** merge — before the next merge and before any further commit lands on top — run the project's build-and-test gate on the result:
 
 ```bash
 git merge --no-ff worktree-agent-<short-id>
-scripts/verify-commit-builds.sh          # verify the merge commit (HEAD) itself builds
+git status --porcelain    # must be empty: what the gate judges below is then the merge commit's tree
+scripts/cargo-ci.sh       # this project's gate; use whichever one your project configures
 ```
 
-The verifier is a **project-provided** repository script, distinct from the skill-packaged dispatch and leak-check scripts above — what "builds" means belongs to the project. This protocol fixes its contract, not its implementation: given a commit, it must resolve THAT commit's sources in isolation — reading only the named commit (via `git archive` or an equivalent that never reads the caller's working tree and never stashes or cleans it) — and run the project's build command against them, exiting 0 when the commit builds and nonzero when it does not. A project satisfies this protocol by supplying the script at the conventional path `scripts/verify-commit-builds.sh`; the build command and any tool-specific detail live in that script, not here.
+This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a pre-merge working tree. A worker branch anchored before a module deletion, merged after it, cleanly re-adds a declaration referencing a file that no longer exists. A branch that changes a function's signature merges cleanly with a branch that adds a caller of the old form. In each case the merge finds no textual overlap and reports no conflict, the leak check reports no leak because the merge is legitimate, and every per-issue gate still reads green because each ran on a tree that predates the combination. Only a check run on the merged tree observes it.
 
-This closes a gap that the leak check (Step 4) and the per-issue gates cannot: both evidence a working tree. A worker branch anchored before a module deletion, merged after it, can cleanly re-add a declaration referencing a file that no longer exists — the merge sees the file removed on one side and the declaration untouched on the other, finds no textual overlap, and merges without a conflict. The leak check reports no leak (the merge is legitimate), every per-issue gate still reads green (the checker ran against a working tree that built), and the merged commit does not build. Run the build verification after every merge so a broken merge commit is caught at the merge, not by the next clone or reset.
+The gate must compile **and run** the project's tests. A build-only check is not enough: `cargo build` and its equivalents compile neither test targets nor dev-dependencies, so a merge that breaks only test code passes such a check, as does a merge that compiles and fails when the tests run. Both have been observed here.
 
-If the check reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
+State what this does and does not establish. The gate judges a working tree, so its verdict is the merge commit's verdict only while that tree is clean — check `git status --porcelain` first, and read a gate run over uncommitted edits as evidence about those edits, not about any commit. Gating once after several merges judges only the final tree: an intermediate merge commit that does not build is never observed, so gate after each merge whenever per-merge attribution matters.
+
+If the gate reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
 
 ### Step 6 — Reclaim worktrees once the wave closes
 
@@ -128,7 +131,7 @@ Document the rebase in the next handoff. The worker's spec compliance must be re
 |---|---|---|
 | Worktree branched from stale ancestor | Step 2 verifies `git rev-parse HEAD` of every worktree equals `main`'s | Pre-dispatch — a mismatch fails the script |
 | Worker writes files into main's checkout | Step 4 diffs `git status -uall` vs. snapshot | Post-dispatch — a leak shows up as "entries present now, not in snapshot" |
-| Clean merge leaves the merge commit non-building | Step 5 builds the named merge commit from sources resolved in isolation, not from the working tree | Post-merge — a broken merge commit exits nonzero even when gates and the leak check are green |
+| Clean merge leaves `main` broken | Step 5 runs the project's build-and-test gate on the merged tree, which no per-issue gate saw | Post-merge — the gate fails on the combination even when every per-issue gate and the leak check are green |
 | Lead forgets the post-dispatch check | The dispatch script's final line reminds the lead | Lead reads the reminder every time |
 | Worker bundles commits, then crashes mid-batch | Per-issue dispatch prompt rule: "commit each spiral step before proceeding" | Worker prompt — this is on the worker, not on the protocol |
 

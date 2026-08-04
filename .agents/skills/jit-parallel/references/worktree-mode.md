@@ -64,24 +64,24 @@ outside the versioned `.jit/` tree, so every worktree already reads and writes t
 physical file. Code conflicts require manual resolution.
 
 After **each** merge — before the next merge and before any further commit lands on top —
-verify that the merge commit itself builds:
+run the project's build-and-test gate on the result:
 
 ```bash
-scripts/verify-commit-builds.sh          # verify the merge commit (HEAD) itself builds
+git status --porcelain    # must be empty: what the gate judges is then the merge commit's tree
+scripts/cargo-ci.sh       # this project's gate; use whichever one your project configures
 ```
 
-This verifier is a project-provided repository script: given a commit, it resolves THAT
-commit's sources in isolation — reading only the named commit (via `git archive` or an
-equivalent that never reads the working tree and never stashes or cleans it) — and runs the
-project's build command against them, exiting 0 when the commit builds and nonzero when it
-does not. A project supplies it at the conventional path `scripts/verify-commit-builds.sh`;
-the build command lives in that script. A textually clean merge can otherwise leave the
-mainline broken: a worker branch anchored before a module deletion, merged after it, re-adds
-a declaration referencing a file that no longer exists — the merge sees the file removed on
-one side and the declaration untouched on the other, finds no overlap, and merges without a
-conflict. The per-issue gates and the leak check below both evidence a working tree, so they
-stay green while the committed mainline fails to build; this check is what catches it. On
-failure, amend or fix-forward the merge commit and re-run before merging the next branch.
+A textually clean merge can otherwise leave the mainline broken: a worker branch anchored
+before a module deletion, merged after it, re-adds a declaration referencing a file that no
+longer exists; a branch that changes a function's signature merges cleanly with a branch that
+adds a caller of the old form. Neither merge sees a textual overlap, so neither conflicts.
+The per-issue gates and the leak check below both evidence a pre-merge working tree, so they
+stay green while the merged mainline is broken; a gate run on the merged tree is what catches
+it. That gate must compile **and run** the tests — a build-only check compiles neither test
+targets nor dev-dependencies, so it passes a merge that breaks only test code. Its verdict is
+the merge's verdict only while the tree is clean, and gating once after several merges judges
+the final tree alone. On failure, amend or fix-forward the merge commit and re-run before
+merging the next branch.
 
 After the wave completes, run the leak check before committing anything on `main`:
 
