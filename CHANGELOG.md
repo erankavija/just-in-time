@@ -78,12 +78,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   exclusion for want of time, so the authoritative quality gate returned a
   different verdict for the same tree depending on what else the machine was
   doing — enough that the gate script capped its test threads below the core
-  count to narrow the window. An expired wait is now its own error type,
+  count to narrow the window, and named that proptest as the reason it
+  serializes builds host-wide. An expired wait is now its own error type,
   `storage::lock::LockTimeout`, distinct from any answer the locked operation
-  gave, and the tests treat it as "not there yet" and ask again. Load changes
-  how many times a caller asks and nothing about what it is told, so the cap and
-  the reason for it are both gone. Two tests hold the separation by making every
-  contended wait expire, the condition an arbitrarily busy host produces.
+  gave, and every concurrent-acquisition test — the two properties and the three
+  example-based cases — treats it as "not there yet" and asks again. Load
+  changes how many times a caller asks and nothing about what it is told, so the
+  cap and both stated reasons for it are gone; the build lock keeps the reasons
+  that survive, CPU oversubscription and peak RAM. The retry is bounded on the
+  claimants' own progress rather than on a clock: it fails loudly when no
+  claimant at all has been answered for thirty seconds, which is a stuck lock
+  rather than a lost race. Two tests hold the separation deterministically by
+  holding the claims lock until every claimant has been refused it, the
+  condition an arbitrarily busy host produces on its own, and a third observes
+  that a caller still queued for a held lock reports an expired wait and is
+  granted the same claim once the lock is free. A survey of every remaining
+  assertion in the gate's suite whose outcome could turn on host load, and the
+  result recorded for each, is in `dev/active/57675b68/`.
 
 - **Installing marks a binary stale only when a path it is built from is
   uncommitted.** `scripts/install-jit.sh` embeds a dirty flag that makes the
