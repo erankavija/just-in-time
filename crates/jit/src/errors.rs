@@ -395,9 +395,12 @@ impl ClaimRequiresGitError {
 }
 
 /// Error returned when running a gate checker would use a `jit` binary whose
-/// build no longer describes the tree under review — the build commit predates
-/// the repository's current `HEAD`, a build input is uncommitted, or the build
-/// itself was made from a dirty tree (jit:7446af34).
+/// build does not describe the tree under review. The refusal requires a
+/// repository that contains the build commit and one of these conditions:
+/// committed build-input paths changed between that commit and the current
+/// `HEAD`, uncommitted build-input paths are present in the working tree, or
+/// build provenance records an uncommitted build input at build time
+/// (jit:7446af34).
 ///
 /// Raised from two, independent places, both refusing BEFORE they do
 /// anything with the (potentially stale) binary that raises them:
@@ -435,11 +438,12 @@ impl ClaimRequiresGitError {
 /// The refusal condition is ALWAYS both: (1) the repository under validation
 /// can resolve the binary's build commit in its own history — the repository
 /// the binary was built from, or a clone/fork sharing that history — AND (2)
-/// either that commit no longer matches the repository's current `HEAD`, or
-/// the binary was built from a dirty tree. Otherwise (an unrelated
-/// repository, no git, or an unresolvable build commit) it never fires —
-/// REQ-03, an ordinary installed release validating an unrelated repository
-/// is unaffected. See
+/// one of these evidence-bearing conditions: committed build-input paths
+/// changed between the build commit and the repository's current `HEAD`,
+/// uncommitted build-input paths are present in the working tree, or build
+/// provenance records an uncommitted build input at build time. The refusal
+/// message names both commits for committed changes, the responsible paths for
+/// working-tree changes, and the build commit for a dirty build. See
 /// [`domain::build_provenance`](crate::domain::build_provenance) for the
 /// identity predicate (part 1) in full. Downcastable in `error_to_exit_code`
 /// (→ `ExitCode::ExternalError`, exit `10`), the same family as
@@ -463,12 +467,11 @@ impl StaleBinaryError {
     /// `reason` and the fix.
     ///
     /// Each [`StaleBinaryReason`](crate::domain::build_provenance::StaleBinaryReason)
-    /// renders the cause it names and nothing else: a commit mismatch reports
-    /// both commits, uncommitted build inputs report the paths responsible
-    /// rather than two equal commits, and a dirty build reports the commit it
-    /// was built on top of. The remedies follow the cause — committing or
-    /// reverting the named paths closes the uncommitted case, where the others
-    /// need a reinstall.
+    /// renders the evidence for its cause: committed build-input changes
+    /// report both commits, uncommitted build inputs report the responsible
+    /// paths, and a dirty build reports the commit it was built on top of. The
+    /// remedy follows the cause: commit or revert the named paths, or rebuild
+    /// and reinstall the binary.
     pub fn new(
         issue_id: &str,
         gate_key: &str,
@@ -549,8 +552,9 @@ impl StaleBinaryError {
         &self.gate_key
     }
 
-    /// Why the binary was judged stale: a commit mismatch, uncommitted build
-    /// inputs, or a build made from a dirty tree.
+    /// Why the binary was judged stale: committed build-input changes,
+    /// uncommitted build-input paths, or build provenance for an uncommitted
+    /// build input.
     pub fn reason(&self) -> &crate::domain::build_provenance::StaleBinaryReason {
         &self.reason
     }

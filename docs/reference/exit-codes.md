@@ -29,7 +29,7 @@ Most commands draw only from the global taxonomy above. The rows below identify 
 | `*` | `2` | Invalid arguments or usage error, including an unresolvable, ambiguous, or too-short id prefix. |  |
 | `*` | `3` | A referenced issue, gate, gate-run, preset, lease, repository, or file path was not found. |  |
 | `*` | `5` | A filesystem operation was denied. |  |
-| `*` | `10` | The repository's on-disk format is newer than this binary, a gate checker refused to run because the binary predates the repository under review, or a filesystem/subprocess I/O operation failed. |  |
+| `*` | `10` | The repository's on-disk format is newer than this binary, a gate checker refused because committed build inputs changed, because working-tree build inputs are uncommitted, or because build provenance records an uncommitted build input, or a filesystem/subprocess I/O operation failed. |  |
 | `any command that writes an issue` | `4` | An enforcing validation rule rejected the write (the shared write-validation path blocks on rule findings). |  |
 | `dep add` | `4` | The edge would create a cycle, or a redundant (transitively-implied) edge was rejected. |  |
 | `apply` | `4` | The template delta would close a dependency cycle through existing issues; the apply is rejected before any node is created. |  |

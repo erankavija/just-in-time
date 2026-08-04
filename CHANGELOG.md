@@ -672,10 +672,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   state transition's pre/postchecks) refuses to run a checker when BOTH (1)
   the repository under review can resolve the running binary's build commit
   in its own history (the repository the binary was built from, or a clone or
-  fork sharing that history), AND (2) that commit no longer matches the
-  repository's current `HEAD`, or the binary was built from a dirty tree — a
-  gate verdict from such a binary is not evidence about the tree under
-  review. This is checked in two places: the evaluator itself refuses before
+  fork sharing that history), AND (2) a committed build-input path changed
+  between that build commit and the repository's current `HEAD`, an
+  uncommitted build-input path is present in the working tree, or the binary
+  was built with an uncommitted build input — a gate verdict from such a
+  binary is not evidence about the tree under review. This is checked in two
+  places: the evaluator itself refuses before
   spawning any checker (a typed, exit-code-10 error naming the build commit
   and the fix, `scripts/install-jit.sh`; no gate run is recorded for
   that refusal), and — since a checker script that itself shells out to `jit`

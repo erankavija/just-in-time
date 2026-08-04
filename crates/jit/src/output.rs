@@ -695,7 +695,8 @@ pub enum ErrorCode {
     RepositoryNotFound,
     /// The repository format is newer than this binary supports.
     RepositoryFormatTooNew,
-    /// A gate checker was refused because the binary predates the repository.
+    /// A gate checker was refused because the running binary's build inputs do
+    /// not match the repository under review.
     StaleBinary,
     /// Issue deletion was refused because operator confirmation was absent.
     DeletionNotConfirmed,
@@ -937,7 +938,10 @@ impl ErrorCode {
             ErrorCode::RepositoryFormatTooNew => {
                 "The repository format is newer than this binary supports."
             }
-            ErrorCode::StaleBinary => "The running binary predates the repository under review.",
+            ErrorCode::StaleBinary => {
+                "Committed build inputs changed, working-tree build inputs are uncommitted, or \
+                 build provenance records an uncommitted build input."
+            }
             ErrorCode::DeletionNotConfirmed => {
                 "Issue deletion lacks the required operator confirmation."
             }
