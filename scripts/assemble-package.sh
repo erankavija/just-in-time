@@ -41,12 +41,45 @@ set -euo pipefail
 #   1 — the assembly or the publication failed
 #   2 — a usage or environment error
 
+usage() {
+  cat <<EOF
+Usage: ${0##*/} [--help] [--] <destination>
+
+Assemble the package tree at <destination>, replacing any existing destination.
+
+Options:
+  --help  print this usage information
+  --      allow a destination beginning with '-'
+EOF
+}
+
 die() {
   echo "${0##*/}: $*" >&2
   exit 2
 }
 
-[ "$#" -eq 1 ] || die "takes one argument, the destination (got: $*)"
+if [ "$#" -eq 0 ]; then
+  die "expected one destination argument (got: $*)"
+fi
+
+case "$1" in
+  --help)
+    [ "$#" -eq 1 ] || die "expected one destination argument (got: $*)"
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    [ "$#" -eq 1 ] || die "expected one destination argument (got: $*)"
+    ;;
+  -*)
+    die "unrecognised option '$1'; expected one destination argument (use -- before a destination beginning with '-')"
+    ;;
+  *)
+    [ "$#" -eq 1 ] || die "expected one destination argument (got: $*)"
+    ;;
+esac
+
 command -v cargo >/dev/null 2>&1 || die "'cargo' not found on PATH"
 
 # Resolved here so a relative destination means what the caller's shell means by
