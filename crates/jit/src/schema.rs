@@ -576,6 +576,10 @@ impl CommandSchema {
                 Some(schema_to_value::<GateCheckAllResponse>()),
                 "GateCheckAllResponse",
             ),
+            "gate_evaluate-many" => (
+                Some(schema_to_value::<GateEvaluateManyResponse>()),
+                "GateEvaluateManyResponse",
+            ),
 
             // Issue-record LIST surfaces emit two shapes: the default lean summary
             // (`MinimalIssue` entries, no gate fields) and, under `--full`, the
@@ -949,13 +953,13 @@ impl CommandSchema {
             ),
             // Gate evaluation: the code carries the checker's verdict.
             row(
-                "gate evaluate, gate evaluate-all",
+                "gate evaluate, gate evaluate-all, gate evaluate-many",
                 4,
                 "A checker ran and its verdict was fail.",
                 true,
             ),
             row(
-                "gate evaluate, gate evaluate-all",
+                "gate evaluate, gate evaluate-all, gate evaluate-many",
                 10,
                 "A checker could not run to a verdict (timeout, crash, or \
                  command not found).",
@@ -1490,6 +1494,26 @@ mod tests {
     }
 
     #[test]
+    fn test_schema_gate_evaluate_many_has_output_schema() {
+        let schema = CommandSchema::generate();
+        let evaluate_many = schema
+            .commands
+            .get("gate")
+            .and_then(|command| command.subcommands.as_ref())
+            .and_then(|commands| commands.get("evaluate-many"))
+            .expect("gate evaluate-many subcommand");
+        let output = evaluate_many
+            .output
+            .as_ref()
+            .expect("gate evaluate-many should have an output schema");
+        assert_eq!(output.success, "GateEvaluateManyResponse");
+        assert!(
+            output.success_schema.is_some(),
+            "gate evaluate-many success_schema should be present"
+        );
+    }
+
+    #[test]
     fn test_graph_deps_schema_matches_tree_response() {
         let schema = CommandSchema::generate();
 
@@ -1554,7 +1578,11 @@ mod tests {
         );
         // A few representative families must surface so the projection stays
         // discoverable.
-        for command in ["*", "gate evaluate, gate evaluate-all", "validate"] {
+        for command in [
+            "*",
+            "gate evaluate, gate evaluate-all, gate evaluate-many",
+            "validate",
+        ] {
             assert!(
                 schema
                     .command_exit_codes

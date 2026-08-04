@@ -862,6 +862,10 @@ await runTest('gate evaluate-all gets the long timeout', () => {
   assert.strictEqual(getTimeoutForCommand(['gate', 'evaluate-all']), LONG_TIMEOUT);
 });
 
+await runTest('gate evaluate-many gets the long timeout', () => {
+  assert.strictEqual(getTimeoutForCommand(['gate', 'evaluate-many']), LONG_TIMEOUT);
+});
+
 await runTest('gate status stays on the default timeout (inspection only)', () => {
   assert.strictEqual(getTimeoutForCommand(['gate', 'status']), DEFAULT_TIMEOUT);
 });

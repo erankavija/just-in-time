@@ -35,6 +35,7 @@
     "jit_gate_add": "Attaches a required gate to an issue during planning.",
     "jit_gate_evaluate": "Runs a gate checker or records a manual attestation.",
     "jit_gate_evaluate-all": "Runs every required gate on an issue, fail-fast, before requesting completion.",
+    "jit_gate_evaluate-many": "Runs one named gate across several issues, preserving one result per issue.",
     "jit_gate_status": "Reads recorded gate runs, including structured findings to act on.",
     "jit_gate_status-all": "Readiness of every required gate on an issue: the completion precondition.",
     "jit_gate_fail": "Records a failed gate when an agent detects the failure outside a checker run.",

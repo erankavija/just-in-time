@@ -2583,6 +2583,38 @@ pub struct GateCheckAllResponse {
     pub all_passed: bool,
 }
 
+/// One per-issue result from `jit gate evaluate-many`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateEvaluateManyResult {
+    /// Issue identifier as supplied to the command.
+    pub issue_id: String,
+    /// Gate key evaluated for this issue.
+    pub key: String,
+    /// `passed` when a verdict was recorded as passing, otherwise `failed`.
+    pub status: String,
+    /// `pass` or `fail`/`error` when a checker produced a verdict. Pre-verdict
+    /// lookup and argument errors leave this absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<String>,
+    /// Whether an automated checker was skipped because its current pass was reusable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub already_passed: Option<bool>,
+    /// Advisory warnings from the gate evaluation.
+    pub warnings: Vec<String>,
+    /// The single-issue gate error envelope's `error` object, when evaluation failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<Value>,
+}
+
+/// JSON payload of `jit gate evaluate-many --json`.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct GateEvaluateManyResponse {
+    /// Number of issue results returned.
+    pub count: usize,
+    /// One result per requested issue, in argument order.
+    pub results: Vec<GateEvaluateManyResult>,
+}
+
 /// JSON payload of `jit gate status --all` / `--limit` (the history view).
 ///
 /// `results` holds one [`GateRunSummary`] per matching run, newest-first, after

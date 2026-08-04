@@ -1267,7 +1267,8 @@ pub enum DepCommands {
 ///   `define`, `update`, `remove`, `add`, and `preset *`. These MUTATE the
 ///   registry or an issue's requirements.
 /// * Execution — produces a verdict and MUTATES per-issue gate state (and may
-///   advance issue state): `evaluate` (alias `eval`), `evaluate-all`, `fail`.
+///   advance issue state): `evaluate` (alias `eval`), `evaluate-all`,
+///   `evaluate-many`, `fail`.
 ///   `evaluate` runs an auto gate's checker or records a manual gate's
 ///   attestation; the verdict may be pass or fail.
 /// * Inspection — reports definitions or recorded state with NO side effects:
@@ -1282,6 +1283,7 @@ pub enum DepCommands {
 /// # Execution (mutating — produces a verdict)
 /// jit gate evaluate abc123 code-review       # run/attest, record a verdict
 /// jit gate evaluate-all abc123               # evaluate every required gate
+/// jit gate evaluate-many code-review abc123 def456 # one gate for many issues
 ///
 /// # Inspection (non-mutating — reports state)
 /// jit gate list                              # registered gate definitions
@@ -1601,6 +1603,39 @@ pub enum GateCommands {
 
         /// Execute every checker, even where a gate already passed at the
         /// current HEAD or declares inputs a prior run's verdict covers
+        #[arg(long)]
+        force: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Evaluate one named gate for several issues, continuing after failures
+    /// and reporting one result per issue.
+    ///
+    /// Mutating. Issues are evaluated in the order supplied, one at a time, so
+    /// each issue's per-issue lock is acquired and released before the next
+    /// evaluation begins. A checker failure for one issue does not prevent the
+    /// remaining issues from being evaluated.
+    ///
+    /// The gate key comes first, matching the common-argument-first shape of
+    /// other multi-issue gate commands such as `gate preset apply`.
+    ///
+    /// Exit codes use the same taxonomy as `gate evaluate`: zero when every
+    /// issue passes, otherwise the first failing issue's code.
+    EvaluateMany {
+        /// Gate key to evaluate for every issue
+        gate_key: String,
+
+        /// Issue IDs (full UUID, 8-character short ID, or unique prefix)
+        #[arg(required = true)]
+        ids: Vec<String>,
+
+        /// Who is passing the gate. Required for a manual gate; ignored for an automated gate.
+        #[arg(short, long)]
+        by: Option<String>,
+
+        /// Execute the checker even where the gate already passed or its declared inputs are reusable
         #[arg(long)]
         force: bool,
 
@@ -3055,6 +3090,7 @@ impl GateCommands {
             | Self::Add { .. }
             | Self::Evaluate { .. }
             | Self::EvaluateAll { .. }
+            | Self::EvaluateMany { .. }
             | Self::Fail { .. } => true,
             Self::Preset(command) => command.requires_recovery_dispatch(),
             Self::Rm { .. }
@@ -3227,6 +3263,7 @@ impl GateCommands {
             | Self::Add { .. }
             | Self::Evaluate { .. }
             | Self::EvaluateAll { .. }
+            | Self::EvaluateMany { .. }
             | Self::Fail { .. }
             | Self::List { .. }
             | Self::Show { .. }
@@ -3455,6 +3492,7 @@ mod recovery_dispatch_tests {
         "gate delete",
         "gate evaluate",
         "gate evaluate-all",
+        "gate evaluate-many",
         "gate fail",
         "gate list",
         "gate preset apply",
