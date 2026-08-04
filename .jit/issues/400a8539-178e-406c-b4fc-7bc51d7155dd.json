@@ -26,9 +26,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-04T21:22:24.441233299Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T22:56:11.050818371Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "400a8539-178e-406c-b4fc-7bc51d7155dd",
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Report server startup on what the child did, not on a fixed pause",
-  "updated_at": "2026-08-04T22:49:26.019691095Z"
+  "updated_at": "2026-08-04T22:56:11.050818371Z"
 }

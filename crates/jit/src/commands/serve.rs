@@ -432,7 +432,12 @@ fn watch_startup(child: &mut Child, port: u16, watch: &StartupWatch<'_>) -> Resu
             return Ok(StartupOutcome::Exited(status));
         }
         if (watch.is_serving)(port) {
-            return Ok(StartupOutcome::Serving);
+            // Asked again after the answer, because answering and exiting are
+            // not exclusive: a child can serve the probe and die before the
+            // read completes. Publishing on the probe alone would record a PID
+            // for a process that is already gone, which is the stale record
+            // this whole path exists to prevent.
+            return Ok(exit_status(child)?.map_or(StartupOutcome::Serving, StartupOutcome::Exited));
         }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -1120,6 +1125,30 @@ mod tests {
 
     /// Writes an executable shell script and returns its path.
     #[cfg(unix)]
+    /// Blocks until `pid` has left the running states, so a caller that
+    /// returns afterwards knows the process is gone rather than merely likely
+    /// to be.
+    ///
+    /// An exited child this process has not reaped is a zombie, so it still
+    /// answers a liveness signal and cannot be detected by signalling it. Its
+    /// state letter can be read instead: `Z` is exactly "ran to completion,
+    /// not yet reaped", which is the condition worth waiting for here.
+    #[cfg(unix)]
+    fn await_process_exit(pid: u32) {
+        loop {
+            let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) else {
+                return; // reaped or never visible: gone either way
+            };
+            // The state letter follows the parenthesised command name, which
+            // may itself contain spaces.
+            let after_name = stat.rsplit_once(')').map(|(_, rest)| rest.trim_start());
+            match after_name.and_then(|rest| rest.split_whitespace().next()) {
+                Some("Z") | None => return,
+                _ => std::thread::sleep(STARTUP_POLL_INTERVAL),
+            }
+        }
+    }
+
     fn executable_script(path: PathBuf, body: &str) -> PathBuf {
         use std::os::unix::fs::PermissionsExt;
         std::fs::write(&path, body).unwrap();
@@ -1246,6 +1275,60 @@ mod tests {
         assert!(
             !pid_file_path(data_dir).exists(),
             "PID file must not be written for a child that exited"
+        );
+    }
+
+    /// A child that answers the readiness probe and then dies is a child that
+    /// exited during startup, not a running server.
+    ///
+    /// Answering and exiting are not exclusive, so a start that concluded on
+    /// the probe alone would publish a PID for a process already gone. The
+    /// probe here returns only once the child has reached its post-run state,
+    /// so the answer it gives is true and stale together — the interleaving
+    /// that is otherwise a race, made the only one this case can take.
+    #[test]
+    #[cfg(unix)]
+    fn test_start_server_errors_when_the_child_answers_the_probe_and_then_exits() {
+        let tmp = TempDir::new().unwrap();
+        let data_dir = tmp.path();
+        let announced = data_dir.join("announced.pid");
+
+        // `exec` keeps the announced PID: the shell is replaced, so the process
+        // that exits is the one whose id was written.
+        let fake_server = executable_script(
+            data_dir.join("answer-then-exit.sh"),
+            &format!(
+                "#!/bin/sh\necho $$ > '{}'\nexec false\n",
+                announced.display()
+            ),
+        );
+
+        let answer_once_the_child_is_gone = |_port: u16| {
+            let pid = loop {
+                if let Ok(raw) = std::fs::read_to_string(&announced) {
+                    if let Ok(pid) = raw.trim().parse::<u32>() {
+                        break pid;
+                    }
+                }
+                std::thread::sleep(STARTUP_POLL_INTERVAL);
+            };
+            await_process_exit(pid);
+            true
+        };
+
+        let result = start_server(
+            opts_for(data_dir, fake_server),
+            watch_with(&answer_once_the_child_is_gone, startup_bound()),
+        );
+
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("exited during startup"),
+            "a child that answered and then exited is a startup failure, got: {msg}"
+        );
+        assert!(
+            !pid_file_path(data_dir).exists(),
+            "no PID file records a process that has already exited"
         );
     }
 

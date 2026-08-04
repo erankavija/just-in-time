@@ -13168,3 +13168,5 @@
 {"gate_key":"cargo-ci","id":"75c0bb37-0689-4453-afbe-3468ccc9209a","issue_id":"15afa1f8-5b3a-4c18-bc63-b7e237b837ee","timestamp":"2026-08-04T22:49:39.245578760Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"66e0cf45-ca01-4d45-a17d-9935ce65abb5","issue_id":"4c700c80-09af-4cd9-83b6-9a71309e9007","timestamp":"2026-08-04T22:49:39.828598778Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"73bdddbb-9bbb-4cdc-a994-aec639e37f02","issue_id":"e516b4f8-506d-4b43-89a9-e72603aecaa6","timestamp":"2026-08-04T22:49:40.393513237Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"f877e60c-90e4-480d-9899-12a48b786acb","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T22:52:21.400168169Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"ad35ee4f-8a6b-41f9-95c6-a02bbb9e5cdc","issue_id":"400a8539-178e-406c-b4fc-7bc51d7155dd","timestamp":"2026-08-04T22:56:11.050818371Z","type":"gate_failed","updated_by":"auto:executor"}

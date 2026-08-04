@@ -74,3 +74,34 @@ a schedule dependence, which is the defect class this container removes. Adding
 one would trade a real property for a flaky test. The promptness of the report is
 therefore held by the shape of `watch_startup`, which reads the exit at the top
 of every round, and by review of that shape, not by a test.
+
+## The probe's own race, and the test that holds it
+
+Review found that answering the readiness probe and exiting are not exclusive: a
+child can serve the probe and die before the parent finishes reading, and a start
+that concluded on the probe alone then published a PID for a process already
+gone — the stale record `REQ-02` forbids. `watch_startup` now reads the child's
+exit once more after a positive probe, and reports the exit when it finds one.
+
+`test_start_server_errors_when_the_child_answers_the_probe_and_then_exits` holds
+it. The interleaving that is otherwise a race is made the only one the case can
+take: the injected probe returns nothing until the announced child has reached
+its post-run state, so its "serving" answer is true and stale together.
+
+Waiting for that state is an observation rather than a clock. An exited child the
+parent has not reaped is a zombie, so signalling it still succeeds and liveness
+cannot detect it; its state letter in `/proc` reads `Z` exactly when it has run to
+completion, which is the condition worth waiting for.
+
+Removing the recheck fails this case and only this case:
+
+```
+test commands::serve::tests::test_start_server_errors_when_the_child_answers_the_probe_and_then_exits ... FAILED
+test result: FAILED. 25 passed; 1 failed
+```
+
+One note on the helper, because it cost a confusing round. Polling that state
+with `yield_now` starved the other tests in the module when the suite ran in
+parallel, and two unrelated cases failed — including one that reported a spawn
+failure, which reads like a defect in the code under test rather than in the
+test's own scheduling. It polls with the startup interval instead.

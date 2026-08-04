@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "de7442e1032d939e3de3fda9ded035d02c87acc5",
+  "completed_at": "2026-08-04T22:52:21.055417874Z",
+  "duration_ms": 153780,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; the direct while-held lock probe resolves the prior serial-scheduling finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2db6b6b4-4fb8-49ef-a4f5-52a7ea907268",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T22:49:47.274795061Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b90ad3eb, b1c5ddd4, 436e697b, f53f9414, 530a819c (`jit:e3c6c767`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/e3c6c767/requirement/REQ-01–REQ-04 and @/issue/f3f7de97/requirement/REQ-03 (issue descriptions, markdown-first); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/gate/cargo-ci, @/gate/jit-validate (registries, registry-first)\nGate evidence: cargo-ci passed (2026-08-04T22:49:38Z; exit code unavailable)\nTruncation recovery: bounded per-commit patches/statistics, merge-parent inspection, and narrow current source, policy, dependency, and seeded-regression reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; the direct while-held lock probe resolves the prior serial-scheduling finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

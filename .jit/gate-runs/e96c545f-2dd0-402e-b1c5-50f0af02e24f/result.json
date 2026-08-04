@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "de7442e1032d939e3de3fda9ded035d02c87acc5",
+  "completed_at": "2026-08-04T22:56:10.687873697Z",
+  "duration_ms": 220473,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/serve.rs",
+        "id": "F1",
+        "line": 434,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/400a8539/requirement/REQ-01",
+          "@/issue/400a8539/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The readiness path returns Serving without rechecking whether the child exited, allowing a response-then-exit child to receive a PID record."
+      }
+    ],
+    "summary": "A post-readiness exit race can still publish a stale server PID file.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "400a8539-178e-406c-b4fc-7bc51d7155dd",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e96c545f-2dd0-402e-b1c5-50f0af02e24f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T22:52:30.214679174Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5413 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcefa-7d4c-7f63-901e-bea4183d07da\n--------\nuser\n--- 5400 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: aa49a080 (implementation), aa0ba830 (merge; no default patch), 49c41e7b (seeded-regression evidence)\nPolicy sources: AGENTS.md\nResolved items: @/issue/400a8539/requirement/REQ-01 through REQ-05 and @/issue/f3f7de97/requirement/REQ-08 (issue Markdown, markdown-first); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml, registry-first); @/invariant/atomic-writes, @/invariant/architecture-dependency-direction, @/invariant/bounded-rust-build-footprint, @/invariant/convention-convergence, @/invariant/pid-safety, and @/invariant/semantic-test-assertions (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no recorded run)\nTruncation recovery: aa49a080’s serve.rs patch was reread in three bounded chunks; affected test, caller, documentation, configuration, and evidence patches were reread separately\n\n1. **F1 — blocking, issue-impact (high):** `watch_startup` checks for exit before the readiness probe, then returns `Serving` immediately when the probe reads an HTTP prefix ([serve.rs:434](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/serve.rs:434)). A child can send that response and exit before the parent finishes the read; the caller then writes its PID without another exit check ([serve.rs:607](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/serve.rs:607), [serve.rs:633](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/serve.rs:633)). This still publishes a stale PID file for a child that exited during startup, violating REQ-01 and REQ-02. The success test only injects readiness for a sleeping child, so it cannot expose this response-then-exit path. Recheck/reap the child after a successful readiness probe before publishing the PID, with a deterministic response-then-exit test. References: `@/issue/400a8539/requirement/REQ-01`, `@/issue/400a8539/requirement/REQ-02`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A post-readiness exit race can still publish a stale server PID file.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The readiness path returns Serving without rechecking whether the child exited, allowing a response-then-exit child to receive a PID record.\",\"file\":\"crates/jit/src/commands/serve.rs\",\"line\":434,\"references\":[\"@/issue/400a8539/requirement/REQ-01\",\"@/issue/400a8539/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

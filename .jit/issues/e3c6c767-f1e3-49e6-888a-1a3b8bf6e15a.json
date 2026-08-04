@@ -28,8 +28,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T22:27:09.626745007Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T22:52:21.400168169Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Decide the lock tests on lock behaviour, not on scheduling",
-  "updated_at": "2026-08-04T22:49:38.652589605Z"
+  "updated_at": "2026-08-04T22:52:21.400168169Z"
 }
