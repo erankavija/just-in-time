@@ -284,9 +284,9 @@ pub fn contribution_drift_reports(
     contributions
         .iter()
         .filter(|contribution| {
-            !overrides.iter().any(|declared| {
-                declared.field.is_none() && declared.covers(package, contribution)
-            })
+            !overrides
+                .iter()
+                .any(|declared| declared.field.is_none() && declared.covers(package, contribution))
         })
         .filter_map(|contribution| {
             contribution_report(package, &manifest, contribution, &documents, overrides).transpose()
@@ -652,10 +652,7 @@ kind = \"advisory\"
         assert_eq!(reported.len(), 1);
         let rendered = reported[0].to_string();
         assert_eq!(reported[0].repository().path, ".jit/invariants.toml");
-        assert_eq!(
-            reported[0].packaged().path,
-            packaged_manifest_path(PACKAGE)
-        );
+        assert_eq!(reported[0].packaged().path, packaged_manifest_path(PACKAGE));
         for named in [
             "a-property",
             "the ruling this repository recorded",

@@ -16,8 +16,8 @@
 //! and dev-dependency-active builds those two need, so an adopter build carries
 //! none of it.
 
-use crate::profile::drift_report::{DriftCarrier, DriftSubject};
 use crate::profile::contribution_drift::packaged_manifest_path;
+use crate::profile::drift_report::{DriftCarrier, DriftSubject};
 use crate::profile::ProfilePackage;
 use crate::repository_state::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
@@ -222,7 +222,8 @@ mod tests {
     /// reported at its own position, naming the side that lacks it.
     #[test]
     fn test_template_drift_report_names_a_template_only_the_repository_declares() {
-        let (_workspace, package) = crate::test_utils::temporary_repository_package(TEMPLATE_REGION_PACKAGE_ID);
+        let (_workspace, package) =
+            crate::test_utils::temporary_repository_package(TEMPLATE_REGION_PACKAGE_ID);
         let packaged = packaged_templates(&package).unwrap();
         let repository = [packaged.clone(), packaged.clone()].concat();
         let report = template_drift_report(&repository, &packaged)

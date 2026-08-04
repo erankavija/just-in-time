@@ -4,7 +4,6 @@
 /// Package-source prefix identifying assets that also project into this source tree.
 pub const JIT_DOGFOOD_LIVE_SOURCE_PREFIX: &str = "assets/live/";
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

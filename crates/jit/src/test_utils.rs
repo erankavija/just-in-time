@@ -217,8 +217,9 @@ pub fn published_package_ids() -> Vec<String> {
 pub fn stage_repository_packages(worktree: &Path, id: &str) -> PathBuf {
     let staged = worktree.join(PROFILE_PACKAGE_SOURCES);
     published_package_ids().into_iter().for_each(|package| {
-        assemble_repository_package(&package, &staged.join(&package))
-            .unwrap_or_else(|error| panic!("this repository's {package} package assembles: {error}"));
+        assemble_repository_package(&package, &staged.join(&package)).unwrap_or_else(|error| {
+            panic!("this repository's {package} package assembles: {error}")
+        });
     });
     let location = staged.join(id);
     assert!(
