@@ -14,19 +14,19 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:10.650972334Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:22:42.701104783Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:10.825631045Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:31:58.963134158Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:14.496768153Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:22:55.614086554Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "a2d7d212-33d7-4c56-9a17-126d9c8e2af1",
@@ -41,5 +41,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bind a packaged contribution to the registry entry it restates",
-  "updated_at": "2026-08-04T12:52:58.793071324Z"
+  "updated_at": "2026-08-04T15:31:58.963134158Z"
 }

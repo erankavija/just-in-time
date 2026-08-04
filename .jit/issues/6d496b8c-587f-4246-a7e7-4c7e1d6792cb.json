@@ -25,14 +25,14 @@
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:14.145551618Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:22:56.722594988Z",
+      "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:14.322304402Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:23:00.999540081Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "6d496b8c-587f-4246-a7e7-4c7e1d6792cb",
@@ -46,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Evaluate one gate across several issues in one invocation",
-  "updated_at": "2026-08-04T14:45:48.609274154Z"
+  "updated_at": "2026-08-04T15:23:00.999540081Z"
 }

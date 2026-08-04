@@ -14,12 +14,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T13:55:04.144726918Z",
+      "updated_at": "2026-08-04T15:22:42.151603348Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-04T14:41:00.211754179Z",
+      "updated_at": "2026-08-04T15:28:29.477505318Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Make the staleness refusal name the condition it detected",
-  "updated_at": "2026-08-04T14:41:00.211754179Z"
+  "updated_at": "2026-08-04T15:28:29.477505318Z"
 }

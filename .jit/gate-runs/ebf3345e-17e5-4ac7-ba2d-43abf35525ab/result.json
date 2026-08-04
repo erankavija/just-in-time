@@ -1,0 +1,25 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "cd mcp-server && npm test",
+  "commit": null,
+  "completed_at": "2026-08-04T15:23:00.991665538Z",
+  "duration_ms": 0,
+  "exit_code": null,
+  "gate_key": "mcp-ci",
+  "inputs_digest": "3aba6ad1c91104e5b20e1ffa20dcaf34cf4cf731610991394ac8e9d0a4a497d6",
+  "issue_id": "6d496b8c-587f-4246-a7e7-4c7e1d6792cb",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_run": "e3e0a921-3ce2-4a0f-b933-6b32adb7a97a"
+  },
+  "run_id": "ebf3345e-17e5-4ac7-ba2d-43abf35525ab",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T15:23:00.991665538Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "",
+  "tree_dirty": null
+}

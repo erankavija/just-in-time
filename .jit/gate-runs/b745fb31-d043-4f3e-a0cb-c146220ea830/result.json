@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ff4fff7d9b929d125dadab0a8d0739289745a117",
+  "completed_at": "2026-08-04T15:31:58.645449397Z",
+  "duration_ms": 207996,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied by the attributed contribution-drift check and its coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a2d7d212-33d7-4c56-9a17-126d9c8e2af1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b745fb31-d043-4f3e-a0cb-c146220ea830",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T15:28:30.649002513Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9e497028, 2b070c99, 076b3e78, 3797b6a4 (merge-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/domain-agnostic, @/invariant/single-source-prose, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code none, 2026-08-04T15:22:42Z); docs-mechanical passed (exit 0, 2026-08-04T15:22:44Z)\nTruncation recovery: split per-commit and merge-parent patches; reread current drift-check, report, and integration-test source ranges\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied by the attributed contribution-drift check and its coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

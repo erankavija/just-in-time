@@ -1,7 +1,7 @@
 {
   "epic_id": "f3f7de97-7315-4780-8389-9c857da29239",
   "epic_short_id": "f3f7de97",
-  "current_wave": 2,
+  "current_wave": 3,
   "lead_notes": [
     "Four wave-1 branches were merged before any of them was gated, and 6d496b8c's conformance failures then made cargo-ci red on main for every issue at once, blocking completion of five otherwise-finished issues. The protocol 3019eacd rewrote names exactly this: gate after each merge whenever per-merge attribution matters. Gate before merging the next branch from here on.",
     "A backgrounded `codex exec` blocks forever on 'Reading additional input from stdin...' unless stdin is redirected from /dev/null. The 6d496b8c rework sat 17 minutes with a live process, a clean worktree, no commits and 00:00:00 CPU before this was found. It is a harness defect, not a worker failure, and does not count against the rework budget."
@@ -10,49 +10,161 @@
     {
       "wave_number": 1,
       "issues": [
-        {"id": "5367fcba-09d5-4307-95d0-232a885533f6", "short_id": "5367fcba", "title": "Reject an unrecognised option instead of writing to it", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
-        {"id": "89a7e34e-11a1-4acf-810b-43d2a056005f", "short_id": "89a7e34e", "title": "Make the staleness refusal name the condition it detected", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
-        {"id": "6d496b8c-587f-4246-a7e7-4c7e1d6792cb", "short_id": "6d496b8c", "title": "Evaluate one gate across several issues in one invocation", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
-        {"id": "3019eacd-863a-428e-b25e-aede2cf37da7", "short_id": "3019eacd", "title": "Make the merge-integrity guard fail a merge that does not build and test", "classification": "implementation", "worker": "opus", "status": "pending"},
-        {"id": "ee02e514", "short_id": "ee02e514", "title": "Run the workflow only on platforms whose failures are acted on", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
-        {"id": "76a4bd21", "short_id": "76a4bd21", "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling", "classification": "implementation", "worker": "opus", "status": "pending"}
+        {
+          "short_id": "ee02e514",
+          "title": "Run the workflow only on platforms whose failures are acted on",
+          "worker": "codex/gpt-5.6-luna",
+          "status": "merged, gates green"
+        },
+        {
+          "short_id": "5367fcba",
+          "title": "Reject an unrecognised option instead of writing to it",
+          "worker": "codex/gpt-5.6-luna",
+          "status": "merged, reworked lead-direct, gates green"
+        },
+        {
+          "short_id": "89a7e34e",
+          "title": "Make the staleness refusal name the condition it detected",
+          "worker": "codex/gpt-5.6-luna",
+          "status": "merged, reworked lead-direct, code-review re-running"
+        },
+        {
+          "short_id": "6d496b8c",
+          "title": "Evaluate one gate across several issues in one invocation",
+          "worker": "codex/gpt-5.6-luna",
+          "status": "merged after one rework, gates green"
+        },
+        {
+          "short_id": "3019eacd",
+          "title": "Make the merge-integrity guard fail a merge that does not build and test",
+          "worker": "opus",
+          "status": "merged, gates green"
+        },
+        {
+          "short_id": "76a4bd21",
+          "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling",
+          "worker": "opus",
+          "status": "merged, reworked in worktree, awaiting merge of rework"
+        }
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "896b5b5d-f11f-48de-88b6-88cc1ba47588", "short_id": "896b5b5d", "title": "Read an issue description from a file or standard input on create", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
-        {"id": "a2d7d212-33d7-4c56-9a17-126d9c8e2af1", "short_id": "a2d7d212", "title": "Bind a packaged contribution to the registry entry it restates", "classification": "implementation", "worker": "opus", "status": "pending"},
-        {"id": "06f1fa95-2aa4-4493-a31e-1f149f3deee9", "short_id": "06f1fa95", "title": "Make the cargo-ci verdict independent of unrelated host load", "classification": "implementation", "worker": "opus", "status": "pending"}
+        {
+          "short_id": "06f1fa95",
+          "title": "Make the cargo-ci verdict independent of unrelated host load",
+          "worker": "opus",
+          "status": "merged, gates green"
+        },
+        {
+          "short_id": "a2d7d212",
+          "title": "Bind a packaged contribution to the registry entry it restates",
+          "worker": "opus",
+          "status": "merged, code-review re-running"
+        },
+        {
+          "short_id": "896b5b5d",
+          "title": "Read an issue description from a file or standard input on create",
+          "worker": "codex/gpt-5.6-luna",
+          "status": "merged, code-review re-running"
+        },
+        {
+          "short_id": "3923fd06",
+          "title": "Bind every published package to the registry it restates",
+          "worker": "opus",
+          "status": "complete, awaiting merge"
+        },
+        {
+          "short_id": "57675b68",
+          "title": "Hold a concurrency property without racing a wall clock",
+          "worker": "opus",
+          "status": "complete, open question on unbounded retry"
+        }
       ]
     },
     {
       "wave_number": 3,
       "issues": [
-        {"id": "176d14d3-e63b-4e99-af07-547be55e7072", "short_id": "176d14d3", "title": "Bind the packaged region source to the region rendered from it", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
-        {"id": "e516b4f8-506d-4b43-89a9-e72603aecaa6", "short_id": "e516b4f8", "title": "Remove the requirement tag naming another container", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"}
+        {
+          "short_id": "176d14d3",
+          "title": "Bind the packaged region source to the region rendered from it",
+          "worker": "unassigned",
+          "status": "blocked until a2d7d212 reaches done"
+        },
+        {
+          "short_id": "e516b4f8",
+          "title": "Remove the requirement tag naming another container",
+          "worker": "unassigned",
+          "status": "held until the tree settles"
+        }
       ]
     }
   ],
   "created_during_execution": [
-    {"short_id": "76a4bd21", "why": "CI scope expansion directed by the invoker: the test hanging four jobs to the execution ceiling"},
-    {"short_id": "25d25f2f", "why": "CI scope expansion: Windows initialization stack overflow", "status": "rejected", "reason": "Windows out of scope"},
-    {"short_id": "03566554", "why": "CI scope expansion: Windows package publication and manifest path escaping", "status": "rejected", "reason": "Windows out of scope"},
-    {"short_id": "ee02e514", "why": "Follow-on from the Windows rejection: the workflow must stop running a leg nobody acts on"}
+    {
+      "short_id": "76a4bd21",
+      "why": "CI scope expansion directed by the invoker: the test hanging four jobs to the execution ceiling"
+    },
+    {
+      "short_id": "25d25f2f",
+      "why": "CI scope expansion: Windows initialization stack overflow",
+      "status": "rejected",
+      "reason": "Windows out of scope by owner decision"
+    },
+    {
+      "short_id": "03566554",
+      "why": "CI scope expansion: Windows package publication and manifest path escaping",
+      "status": "rejected",
+      "reason": "Windows out of scope by owner decision"
+    },
+    {
+      "short_id": "ee02e514",
+      "why": "Follow-on from the Windows rejection: the workflow must stop running a leg nobody acts on"
+    },
+    {
+      "short_id": "57675b68",
+      "why": "Criterion violation surfaced by 06f1fa95's survey: a load-dependent proptest inside the authoritative gate, which the container's REQ-03 names"
+    },
+    {
+      "short_id": "3923fd06",
+      "why": "Criterion violation surfaced by a2d7d212's report: a second published package unbound to the registry it restates, which the container's REQ-01 names"
+    }
   ],
   "escalations": [
-    {"topic": "merge-integrity guard ending", "resolution": "removed rather than made to build and test; per-merge cost ruled out"},
-    {"topic": "carrier-binding mechanism shape", "resolution": "one home, shared drift-report shape"},
-    {"topic": "region issue stale Background", "resolution": "amended; criteria untouched"},
-    {"topic": "epic criteria for CI", "resolution": "REQ-08 added"},
-    {"topic": "Windows leg of the workflow", "resolution": "dropped from the matrix; the two Windows defects rejected"}
+    {
+      "topic": "merge-integrity guard ending",
+      "resolution": "removed rather than made to build and test; per-merge cost ruled out"
+    },
+    {
+      "topic": "carrier-binding mechanism shape",
+      "resolution": "one home, shared drift-report shape"
+    },
+    {
+      "topic": "region issue stale Background",
+      "resolution": "amended; criteria untouched"
+    },
+    {
+      "topic": "epic criteria for CI",
+      "resolution": "REQ-08 added"
+    },
+    {
+      "topic": "Windows leg of the workflow",
+      "resolution": "dropped from the matrix; the two Windows defects rejected"
+    },
+    {
+      "topic": "unbounded retry in 57675b68",
+      "resolution": "open: asked whether it reintroduces the six-hour-hang failure mode 76a4bd21 removed from the same gate, or whether an attempt-based bound keeps load-independence while failing loudly"
+    }
   ],
-  "rework_counts": {"6d496b8c": 1},
+  "rework_counts": {
+    "6d496b8c": 1
+  },
   "surfaced_pitfalls": [
     {
       "issue": "5367fcba",
-      "finding": "scripts/assemble-package-selftest.sh passes and covers every criterion, but nothing runs it: no gate, no CI job, and no Rust test invokes it, so the argument contract can regress without any check failing. The repository has both patterns — workflow-contract-selftest.sh runs from a CI step and verify-commit-builds-selftest.sh from a Rust test in crates/jit/tests/scratch_build, while install-jit-selftest.sh, benchmark-session-cost-selftest.sh and generate-shipped-policy-regions-selftest.sh are unwired.",
-      "disposition": "Open. The closest precedent lives in crates/jit/tests/scratch_build, which 3019eacd may delete along with the verifier it tests. Decide after that issue reports, so the wiring is not built on a target about to disappear.",
+      "finding": "scripts/assemble-package-selftest.sh passes and covers every criterion, but nothing runs it: no gate, no CI job, and no Rust test invokes it, so the argument contract can regress without any check failing. The repository has both patterns \u2014 workflow-contract-selftest.sh runs from a CI step and verify-commit-builds-selftest.sh from a Rust test in crates/jit/tests/scratch_build, while install-jit-selftest.sh, benchmark-session-cost-selftest.sh and generate-shipped-policy-regions-selftest.sh are unwired.",
+      "disposition": "Closed. The code-review gate independently raised it as blocking, citing the container's REQ-06. 3019eacd kept crates/jit/tests/scratch_build and put merged_tree_gate_verification_tests.rs there to run cargo-ci-selftest.sh from a Rust test, so the wiring precedent was alive rather than about to disappear. Fixed lead-direct at 7e1df315 by adding a module to that same suite; verified passing.",
       "criterion_subject": "5367fcba REQ-01..REQ-04 describe behaviour no gate currently observes"
     },
     {
@@ -63,7 +175,7 @@
     },
     {
       "issue": "6d496b8c",
-      "finding": "The merged change failed cargo-ci on main: adding a command surface requires registering it in every conformance suite that enumerates command surfaces, and four were missed — the classifier table in crates/jit/src/main.rs (repaired lead-direct), the row-set equality guard and both end-to-end subprocess bindings in command_exit_code_projection_tests, and the clap-arm probe in failure_probe_coverage_tests.",
+      "finding": "The merged change failed cargo-ci on main: adding a command surface requires registering it in every conformance suite that enumerates command surfaces, and four were missed \u2014 the classifier table in crates/jit/src/main.rs (repaired lead-direct), the row-set equality guard and both end-to-end subprocess bindings in command_exit_code_projection_tests, and the clap-arm probe in failure_probe_coverage_tests.",
       "disposition": "Rework dispatched with all four findings named and a constraint forbidding any weakening of the assertions. Rework count 1 of 2.",
       "criterion_subject": "6d496b8c REQ-01..REQ-03 via the cargo-ci gate"
     },
@@ -76,7 +188,7 @@
     {
       "issue": "76a4bd21",
       "finding": "The test's kill_process_group calls the same nix primitive under the same pid-safety guard as the private helper at crates/jit/src/gate_execution.rs:345, rather than sharing it. The worker named this against @/inv/convention-convergence rather than leaving it silent.",
-      "disposition": "Accepted. The product helper is private to its module and takes a Child, so an integration test cannot reach it; exporting production API for a test's use is the worse trade. The shared mechanism actually at stake — the guarded conversion that keeps a negation from becoming kill(-1) — is followed and cited.",
+      "disposition": "Accepted. The product helper is private to its module and takes a Child, so an integration test cannot reach it; exporting production API for a test's use is the worse trade. The shared mechanism actually at stake \u2014 the guarded conversion that keeps a negation from becoming kill(-1) \u2014 is followed and cited.",
       "criterion_subject": "76a4bd21 REQ-02"
     },
     {
@@ -84,6 +196,18 @@
       "finding": "setup_repo now bounds and captures its jit init, which widens the change to all ten tests in the module rather than the foreground case alone.",
       "disposition": "Accepted. REQ-03 says every wait the test performs is bounded, and the foreground case's own setup is one of those waits; a second parallel setup helper would have violated @/inv/convention-convergence. All ten tests pass.",
       "criterion_subject": "76a4bd21 REQ-03"
+    },
+    {
+      "issue": "76a4bd21",
+      "finding": "code-review found read_capture's fs::read_to_string bounded by no deadline, citing the container's REQ-08, while the issue's own REQ-03 says every wait, read and join is bounded.",
+      "disposition": "Reworked. A regular-file read terminates at EOF so it cannot hang like a pipe, and that argument is why the code looked correct \u2014 but the criterion says reads are bounded and this one was not. The worker chose a byte cap over a deadline and explained why the deadline is the illusion: nothing cancels a read already issued, so a deadline bounds the observer while the read runs on.",
+      "criterion_subject": "76a4bd21 REQ-03"
+    },
+    {
+      "issue": "3923fd06",
+      "finding": "docs/reference/example-config.toml carried team:core, the value the registry moved off, as a third carrier bound by no check.",
+      "disposition": "Fixed at 7b013c12, one line. Deliberately no check: that file illustrates the configuration format for adopters, so binding it would make every adopter example a carrier of this repository's live state. The worker declined two further edits I had asked for and was right both times \u2014 the description matched the file's own no-period convention rather than mirroring the registry, and milestone:2026-q1 illustrates the second half of its own sentence rather than mirroring superseded text.",
+      "criterion_subject": "container REQ-01"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z"

@@ -15,9 +15,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:12.408020792Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:22:43.260675743Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -25,14 +25,14 @@
       "updated_by": null
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:13.791536798Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:22:56.171485921Z",
+      "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:13.968034142Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T15:23:00.495402719Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "896b5b5d-f11f-48de-88b6-88cc1ba47588",
@@ -46,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Read an issue description from a file or standard input on create",
-  "updated_at": "2026-08-04T14:57:36.591753416Z"
+  "updated_at": "2026-08-04T15:23:00.495402719Z"
 }

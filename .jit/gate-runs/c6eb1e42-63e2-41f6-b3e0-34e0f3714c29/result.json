@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ff4fff7d9b929d125dadab0a8d0739289745a117",
+  "completed_at": "2026-08-04T15:28:29.163582113Z",
+  "duration_ms": 178779,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/errors.rs",
+        "id": "F1",
+        "line": 551,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "StaleBinaryError::reason documents only commit mismatch and dirty build, omitting the new UncommittedBuildInputs variant."
+      },
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/89a7e34e-11a1-4acf-810b-43d2a056005f.json",
+        "id": "F2",
+        "line": 32,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "The pre-existing satisfies:REQ-04 label cannot resolve because this issue declares no REQ-04 requirement."
+      }
+    ],
+    "summary": "One issue-impact blocking finding remains: public StaleBinaryError::reason documentation omits the UncommittedBuildInputs cause.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "89a7e34e-11a1-4acf-810b-43d2a056005f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c6eb1e42-63e2-41f6-b3e0-34e0f3714c29",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T15:25:30.384554439Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4554 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcd61-4081-71d1-8ade-0fe092b41dd7\n--------\nuser\n--- 4541 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:630575b implementation; jit:1b13cb6f merge; jit:21730831 documentation follow-up\nPolicy sources: AGENTS.md\nResolved items: @/gate/jit-validate (.jit/gates.toml); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (2026-08-04T15:22:42Z); prior code-review failed (exit 1, F1 addressed by jit:21730831)\nTruncation recovery: reread patches by commit/path and current files by line range; item search attempted an index lock, so resolution used `jit item show` and Git history\n\n1. [blocking][issue-impact] `crates/jit/src/errors.rs:551` — `StaleBinaryError::reason()` remains documented as returning only a “commit mismatch or dirty build,” but the issue added the public `UncommittedBuildInputs` variant. Update this public API contract to name all supported causes.\n\n2. [advisory][pre-existing] `.jit/issues/89a7e34e-11a1-4acf-810b-43d2a056005f.json:32` — `satisfies:REQ-04` cannot resolve because this issue declares only REQ-01 through REQ-03. The label predates this issue’s tagged commits, so it does not affect the verdict.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-impact blocking finding remains: public StaleBinaryError::reason documentation omits the UncommittedBuildInputs cause.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"StaleBinaryError::reason documents only commit mismatch and dirty build, omitting the new UncommittedBuildInputs variant.\",\"file\":\"crates/jit/src/errors.rs\",\"line\":551,\"references\":[]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The pre-existing satisfies:REQ-04 label cannot resolve because this issue declares no REQ-04 requirement.\",\"file\":\".jit/issues/89a7e34e-11a1-4acf-810b-43d2a056005f.json\",\"line\":32,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

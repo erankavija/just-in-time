@@ -14,12 +14,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T13:43:22.552296119Z",
+      "updated_at": "2026-08-04T15:22:41.416076425Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T14:38:04.812927586Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T15:25:28.712380618Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Reject an unrecognised option instead of writing to it",
-  "updated_at": "2026-08-04T14:38:04.812927586Z"
+  "updated_at": "2026-08-04T15:25:28.712380618Z"
 }

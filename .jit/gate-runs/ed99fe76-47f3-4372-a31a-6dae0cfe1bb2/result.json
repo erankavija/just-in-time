@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ff4fff7d9b929d125dadab0a8d0739289745a117",
+  "completed_at": "2026-08-04T15:25:27.907390363Z",
+  "duration_ms": 145892,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met and the previous validation-wiring finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5367fcba-09d5-4307-95d0-232a885533f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ed99fe76-47f3-4372-a31a-6dae0cfe1bb2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T15:23:02.014887325Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3f36e41e, c8bc5604 (merge; no unique combined delta), 7e1df315\nPolicy sources: AGENTS.md\nResolved items: @/issue/f3f7de97/requirement/REQ-06 (issue description); @/gate/jit-validate (.jit/gates.toml); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T15:12:49Z); prior code-review F1 is addressed by 7e1df315\nTruncation recovery: Re-read merge-parent deltas, AGENTS.md, and cargo-ci test invocation in bounded calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met and the previous validation-wiring finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
