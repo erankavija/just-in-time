@@ -14,7 +14,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-08-04T12:27:53.046066521Z",
+      "updated_at": "2026-08-04T12:38:00.271517683Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Reject an unrecognised option instead of writing to it",
-  "updated_at": "2026-08-04T12:27:53.046066521Z"
+  "updated_at": "2026-08-04T12:38:00.271517683Z"
 }

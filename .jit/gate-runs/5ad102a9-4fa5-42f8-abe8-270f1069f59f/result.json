@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "6f398d1f1dc90d83bd561a7daf81db39c6180298",
+  "completed_at": "2026-08-04T12:38:00.254304695Z",
+  "duration_ms": 342029,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "996f4eb2ef1814e946d36566e80afe2f0167cf1358176501fb2742e4872d1bca",
+  "issue_id": "5367fcba-09d5-4307-95d0-232a885533f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5ad102a9-4fa5-42f8-abe8-270f1069f59f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T12:32:18.224767050Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest command_exit_code_projection_tests::test_command_exit_codes_every_row_is_verified ... FAILED\ntest command_exit_code_projection_tests::test_command_exit_codes_gate_evaluate_failure_emits_4 ... FAILED\ntest command_exit_code_projection_tests::test_command_exit_codes_gate_evaluate_runner_error_emits_10 ... FAILED\ntest failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes ... FAILED\ntest result: FAILED. 324 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 103.32s\n---- command_exit_code_projection_tests::test_command_exit_codes_every_row_is_verified stdout ----\n\nthread 'command_exit_code_projection_tests::test_command_exit_codes_every_row_is_verified' (1636550) panicked at crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:1153:5:\nassertion `left == right` failed: every projected row must have a verifying binding; left = projection, right = verified set\n  left: {(\"*\", Some(2)), (\"*\", Some(1)), (\"gate evaluate, gate evaluate-all, gate evaluate-many\", Some(4)), (\"validate --branch-drift\", Some(1)), (\"doc check-links\", Some(2)), (\"config validate\", Some(4)), (\"*\", Some(3)), (\"*\", Some(141)), (\"serve --fg\", None), (\"claim\", Some(10)), (\"snapshot export\", Some(6)), (\"*\", Some(0)), (\"gate evaluate, gate evaluate-all, gate evaluate-many\", Some(10)), (\"gate preset apply\", Some(3)), (\"serve, serve --stop, serve --status\", Some(1)), (\"validate\", Some(1)), (\"gate status-all\", Some(4)), (\"any command that writes an issue\", Some(4)), (\"apply\", Some(4)), (\"doc check-links\", Some(1)), (\"gate define\", Some(6)), (\"validate --leases\", Some(1)), (\"*\", Some(5)), (\"issue delete\", Some(2)), (\"*\", Some(10)), (\"dep add\", Some(4)), (\"issue batch-create\", Some(2)), (\"validate\", Some(4)), (\"invariant check\", Some(4)), (\"issue update, issue claim, issue claim-next\", Some(4))}\n right: {(\"validate --leases\", Some(1)), (\"dep add\", Some(4)), (\"validate\", Some(1)), (\"*\", Some(1)), (\"serve --fg\", None), (\"claim\", Some(10)), (\"snapshot export\", Some(6)), (\"gate preset apply\", Some(3)), (\"issue update, issue claim, issue claim-next\", Some(4)), (\"validate\", Some(4)), (\"apply\", Some(4)), (\"*\", Some(5)), (\"doc check-links\", Some(1)), (\"*\", Some(3)), (\"*\", Some(0)), (\"issue batch-create\", Some(2)), (\"issue delete\", Some(2)), (\"any command that writes an issue\", Some(4)), (\"serve, serve --stop, serve --status\", Some(1)), (\"gate evaluate, gate evaluate-all\", Some(10)), (\"*\", Some(10)), (\"gate evaluate, gate evaluate-all\", Some(4)), (\"*\", Some(2)), (\"gate define\", Some(6)), (\"validate --branch-drift\", Some(1)), (\"gate status-all\", Some(4)), (\"config validate\", Some(4)), (\"*\", Some(141)), (\"invariant check\", Some(4)), (\"doc check-links\", Some(2))}\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- command_exit_code_projection_tests::test_command_exit_codes_gate_evaluate_failure_emits_4 stdout ----\n\n---- command_exit_code_projection_tests::test_command_exit_codes_gate_evaluate_runner_error_emits_10 stdout ----\n\n---- failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes stdout ----\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1502 bytes=28254666)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1428960688/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}
