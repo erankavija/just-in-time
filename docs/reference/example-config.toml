@@ -139,7 +139,7 @@ examples = ["component:api", "component:web", "component:cli"]
 [namespaces.team]
 description = "Owning team"
 unique = true
-examples = ["team:core", "team:platform"]
+examples = ["team:backend", "team:platform"]
 
 [namespaces.resolution]
 description = "Reason for issue closure (used with rejected state)"
