@@ -14,7 +14,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T21:24:26.158874572Z",
+      "updated_at": "2026-08-04T22:17:15.827550883Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
-  "updated_at": "2026-08-04T21:36:22.826546632Z"
+  "updated_at": "2026-08-04T22:17:15.827550883Z"
 }

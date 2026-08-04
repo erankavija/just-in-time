@@ -17,7 +17,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T21:25:17.356770336Z",
+      "updated_at": "2026-08-04T22:17:16.443972675Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -37,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Decide the gate suite's remaining timed tests on behaviour, not on scheduling",
-  "updated_at": "2026-08-04T21:25:17.356770336Z"
+  "updated_at": "2026-08-04T22:17:16.443972675Z"
 }
