@@ -27,9 +27,7 @@ set -euo pipefail
 # several agent sessions each calling `jit gate evaluate ... cargo-ci`) otherwise
 # oversubscribe the CPU — every `cargo build` fans out to all cores, so K runs
 # demand K×nproc — and multiply peak RAM into swap, making the host and any
-# interactive shell laggy. Serializing also protects the load-sensitive
-# concurrency proptest (prop_concurrent_different_issues_succeed) from starving
-# its file-lock timeout under saturation. We re-exec the script under a blocking
+# interactive shell laggy. We re-exec the script under a blocking
 # flock so concurrent runs queue rather than fail; the lock is held for the
 # whole run and released when the process exits. CARGO_CI_LOCKED guards against
 # infinite re-exec; CARGO_CI_NO_LOCK=1 disables (e.g. an isolated CI container
@@ -229,9 +227,10 @@ check_no_incremental_state() {
 # Deprioritize the build/test work so an interactive shell preempts it under
 # contention — this is what keeps the host responsive while the gate runs, not
 # just the serialization above. nice -n 19 = lowest CPU priority; ionice -c2 -n7
-# = best-effort lowest I/O priority (NOT the idle class -c3, which can be starved
-# indefinitely and would risk the timing-sensitive file-lock proptests). Both
-# are best-effort: a missing binary degrades gracefully to running normally.
+# = best-effort lowest I/O priority (NOT the idle class -c3, whose requests can be
+# starved for as long as any other class has I/O pending, leaving the gate itself
+# without a bound on when it finishes). Both are best-effort: a missing binary
+# degrades gracefully to running normally.
 # CARGO_CI_NO_NICE=1 disables; CARGO_CI_NICE overrides the niceness.
 NICE_PREFIX=()
 if [ -z "${CARGO_CI_NO_NICE:-}" ]; then
