@@ -894,14 +894,14 @@ mod tests {
         };
         let rendered = normalized_managed_region_body(rendered, packaged);
         let packaged = normalized_managed_region_body(packaged, packaged);
-        let differences = (rendered != packaged)
-            .then(|| {
-                vec![format!(
-                    "{}: the repository declares {rendered:?}, the package declares {packaged:?}",
-                    subject.field_root
-                )]
-            })
-            .unwrap_or_default();
+        let differences = if rendered == packaged {
+            Vec::new()
+        } else {
+            vec![format!(
+                "{}: the repository declares {rendered:?}, the package declares {packaged:?}",
+                subject.field_root
+            )]
+        };
 
         subject.reporting(differences)
     }

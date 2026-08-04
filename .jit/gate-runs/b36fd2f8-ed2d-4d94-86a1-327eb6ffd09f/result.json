@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "53fa83bffde611c3e2d2d55d25af9e27750ee10b",
+  "completed_at": "2026-08-04T17:13:40.607511193Z",
+  "duration_ms": 545449,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "631a47276c2e702b091f637e19689e4f9e53ef012a04dd73ee188e6f0fd46695",
+  "issue_id": "89a7e34e-11a1-4acf-810b-43d2a056005f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b36fd2f8-ed2d-4d94-86a1-327eb6ffd09f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T17:04:35.158247039Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nerror: this method chain can be written more clearly with `if .. else ..`\nerror: could not compile `jit` (lib test) due to 1 previous error\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✗ clippy: FAILED (exit 101)\n  ✓ test: 4373 passed, 0 failed, 10 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1506 bytes=28378549)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1433735552/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}
