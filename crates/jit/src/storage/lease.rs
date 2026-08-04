@@ -1,23 +1,29 @@
-//! Lease management with monotonic time semantics for automatic expiration.
+//! Lease expiration and staleness against a supplied clock.
 //!
-//! This module implements time-based lease expiration using monotonic clocks to avoid
-//! issues with system time adjustments (NTP, manual changes). Supports both finite
-//! leases (with TTL) and indefinite leases (TTL=0) with staleness detection.
+//! A lease records when it was acquired, when it expires, and when it last beat.
+//! Every question about those instants — has it expired, has it gone stale — is
+//! answered against a [`Clock`] the caller supplies, so the answer is a property
+//! of the lease and the instant rather than of when the process got around to
+//! asking. Production supplies [`SystemClock`](super::clock::SystemClock); a
+//! test supplies a clock it moves itself, and reaches any boundary without
+//! waiting for one.
 //!
 //! # Design Principles
 //!
-//! - **Monotonic time for expiry**: Use `Instant` for TTL checks, immune to wall-clock changes
-//! - **Wall-clock for audit**: Store `DateTime<Utc>` for human-readable timestamps
-//! - **Lazy expiration**: Check and evict expired leases during claim operations
-//! - **Staleness for TTL=0**: Indefinite leases marked stale but not auto-evicted
+//! - **Supplied time**: expiry and staleness read the caller's clock
+//! - **Wall-clock state**: instants are `DateTime<Utc>`, serializable and readable
+//! - **Lazy expiration**: check and evict expired leases during claim operations
+//! - **Staleness for TTL=0**: indefinite leases marked stale but not auto-evicted
 //!
 //! # Example
 //!
 //! ```no_run
+//! use jit::storage::clock::SystemClock;
 //! use jit::storage::lease::Lease;
-//! use chrono::Utc;
 //!
-//! // Create a finite lease with 600 second TTL
+//! let clock = SystemClock;
+//!
+//! // A finite lease with a 600 second TTL
 //! let lease = Lease::new(
 //!     "01ABC123".to_string(),
 //!     "issue-001".to_string(),
@@ -25,12 +31,11 @@
 //!     "wt:abc123".to_string(),
 //!     "main".to_string(),
 //!     600,
+//!     &clock,
 //! );
+//! assert!(!lease.is_expired(&clock));
 //!
-//! // Check if expired (uses monotonic time)
-//! assert!(!lease.is_expired());
-//!
-//! // Create indefinite lease (TTL=0)
+//! // An indefinite lease (TTL=0)
 //! let indefinite = Lease::new(
 //!     "01XYZ789".to_string(),
 //!     "issue-002".to_string(),
@@ -38,22 +43,22 @@
 //!     "wt:def456".to_string(),
 //!     "feature-branch".to_string(),
 //!     0,
+//!     &clock,
 //! );
-//! assert!(!indefinite.is_expired()); // Never expires
+//! assert!(!indefinite.is_expired(&clock));
 //! ```
 
+use super::clock::Clock;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use serde::{Deserialize, Serialize};
-use std::time::Instant;
 
 /// Default staleness threshold for indefinite leases (1 hour)
 pub const DEFAULT_STALE_THRESHOLD_SECS: u64 = 3600;
 
-/// A lease on an issue with time-based expiration.
+/// A lease on an issue, expiring against a supplied clock.
 ///
-/// Uses dual-clock approach:
-/// - `Instant` (monotonic) for reliable TTL checks
-/// - `DateTime<Utc>` (wall-clock) for audit trail
+/// Every instant it holds is wall-clock `DateTime<Utc>`, so a serialized lease
+/// round-trips complete and answers the same questions after a reload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Lease {
     /// Unique lease identifier (ULID)
@@ -68,20 +73,16 @@ pub struct Lease {
     pub branch: String,
     /// Time-to-live in seconds (0 = indefinite)
     pub ttl_secs: u64,
-    /// When lease was acquired (wall-clock, for audit)
+    /// When lease was acquired
     pub acquired_at: DateTime<Utc>,
-    /// When lease expires (wall-clock, for audit). None if TTL=0
+    /// When lease expires. None if TTL=0
     pub expires_at: Option<DateTime<Utc>>,
     /// Last heartbeat timestamp (for staleness checks)
     pub last_beat: DateTime<Utc>,
-
-    /// Monotonic clock reference (not serialized, reconstructed on load)
-    #[serde(skip)]
-    acquired_instant: Option<Instant>,
 }
 
 impl Lease {
-    /// Create a new lease with current timestamps.
+    /// Create a lease acquired at `clock`'s current instant.
     ///
     /// # Arguments
     ///
@@ -91,6 +92,7 @@ impl Lease {
     /// * `worktree_id` - Worktree identifier (format: "wt:hash")
     /// * `branch` - Branch name
     /// * `ttl_secs` - Time-to-live in seconds (0 = indefinite)
+    /// * `clock` - Source of the acquisition instant
     pub fn new(
         lease_id: String,
         issue_id: String,
@@ -98,16 +100,9 @@ impl Lease {
         worktree_id: String,
         branch: String,
         ttl_secs: u64,
+        clock: &dyn Clock,
     ) -> Self {
-        let now_utc = Utc::now();
-        let now_instant = Instant::now();
-
-        let expires_at = if ttl_secs > 0 {
-            Some(now_utc + ChronoDuration::seconds(ttl_secs as i64))
-        } else {
-            None
-        };
-
+        let now = clock.now();
         Self {
             lease_id,
             issue_id,
@@ -115,82 +110,43 @@ impl Lease {
             worktree_id,
             branch,
             ttl_secs,
-            acquired_at: now_utc,
-            expires_at,
-            last_beat: now_utc,
-            acquired_instant: Some(now_instant),
+            acquired_at: now,
+            expires_at: (ttl_secs > 0).then(|| now + ChronoDuration::seconds(ttl_secs as i64)),
+            last_beat: now,
         }
     }
 
-    /// Reconstruct lease from serialized data with monotonic time approximation.
-    ///
-    /// Since `Instant` cannot be serialized, we reconstruct it from the UTC timestamp
-    /// by calculating elapsed time and subtracting from current instant.
-    ///
-    /// This is a conservative approximation that may extend lease lifetime slightly
-    /// but never shortens it (safety-first approach).
-    pub fn from_serde(lease: Lease) -> Self {
-        let elapsed_secs = Utc::now()
-            .signed_duration_since(lease.acquired_at)
-            .num_seconds()
-            .max(0) as u64;
-
-        let acquired_instant = Instant::now()
-            .checked_sub(std::time::Duration::from_secs(elapsed_secs))
-            .or(Some(Instant::now()));
-
-        Self {
-            acquired_instant,
-            ..lease
-        }
-    }
-
-    /// Check if this lease has expired (for finite leases only).
-    ///
-    /// Uses monotonic `Instant` for reliable expiry checks immune to NTP adjustments.
-    /// Falls back to wall-clock comparison if `Instant` is unavailable.
+    /// Whether this lease has expired at `clock`'s current instant.
     ///
     /// # Returns
     ///
-    /// - `true` if TTL > 0 and lease has expired
+    /// - `true` if TTL > 0 and that instant has reached `expires_at`
     /// - `false` if TTL = 0 (indefinite lease never expires)
-    /// - `false` if lease is still valid
-    pub fn is_expired(&self) -> bool {
-        if self.ttl_secs == 0 {
-            return false; // Indefinite leases never expire
-        }
-
-        match self.acquired_instant {
-            Some(instant) => instant.elapsed().as_secs() >= self.ttl_secs,
-            None => {
-                // Fallback to wall-clock (less reliable but safe)
-                match self.expires_at {
-                    Some(expires_at) => Utc::now() >= expires_at,
-                    None => false,
-                }
-            }
+    /// - `false` if TTL > 0 with no recorded expiry
+    pub fn is_expired(&self, clock: &dyn Clock) -> bool {
+        match self.expires_at {
+            Some(expires_at) if self.ttl_secs > 0 => clock.now() >= expires_at,
+            _ => false,
         }
     }
 
-    /// Check if this lease is stale (for indefinite leases).
+    /// Whether this indefinite lease has gone stale at `clock`'s current instant.
     ///
-    /// An indefinite lease (TTL=0) is stale if too much time has passed since
-    /// the last heartbeat. Stale leases block structural edits but aren't auto-evicted.
-    ///
-    /// # Arguments
-    ///
-    /// * `stale_threshold_secs` - Maximum time since last heartbeat before marked stale
+    /// An indefinite lease (TTL=0) is stale once `stale_threshold_secs` have
+    /// passed since its last heartbeat. Stale leases block structural edits
+    /// without being auto-evicted.
     ///
     /// # Returns
     ///
-    /// - `true` if TTL = 0 and `now - last_beat > stale_threshold_secs`
-    /// - `false` otherwise
-    pub fn is_stale(&self, stale_threshold_secs: u64) -> bool {
+    /// - `true` if TTL = 0 and `now - last_beat >= stale_threshold_secs`
+    /// - `false` otherwise, including every finite lease, which expires instead
+    pub fn is_stale(&self, stale_threshold_secs: u64, clock: &dyn Clock) -> bool {
         if self.ttl_secs > 0 {
-            return false; // Finite leases use expiry, not staleness
+            return false;
         }
 
-        let elapsed_secs = Utc::now()
+        let elapsed_secs = clock
+            .now()
             .signed_duration_since(self.last_beat)
             .num_seconds()
             .max(0) as u64;
@@ -198,286 +154,235 @@ impl Lease {
         elapsed_secs >= stale_threshold_secs
     }
 
-    /// Update last heartbeat timestamp to current time.
+    /// Move the last heartbeat to `clock`'s current instant.
     ///
-    /// Used for renewing indefinite leases (TTL=0) without changing expiry.
-    pub fn update_heartbeat(&mut self) {
-        self.last_beat = Utc::now();
+    /// Renews an indefinite lease (TTL=0) without changing expiry.
+    pub fn update_heartbeat(&mut self, clock: &dyn Clock) {
+        self.last_beat = clock.now();
     }
 
-    /// Renew a finite lease by extending its TTL.
+    /// Renew a finite lease so it expires `additional_ttl_secs` after `clock`'s
+    /// current instant.
     ///
-    /// Updates `expires_at` by adding TTL duration from current time.
-    /// Also updates monotonic instant reference.
-    ///
-    /// # Arguments
-    ///
-    /// * `additional_ttl_secs` - Additional seconds to extend the lease
-    pub fn renew(&mut self, additional_ttl_secs: u64) {
+    /// An indefinite lease has no expiry to extend, so this beats it instead.
+    pub fn renew(&mut self, additional_ttl_secs: u64, clock: &dyn Clock) {
         if self.ttl_secs == 0 {
-            // For indefinite leases, just update heartbeat
-            self.update_heartbeat();
+            self.update_heartbeat(clock);
             return;
         }
 
-        let now_utc = Utc::now();
-        let now_instant = Instant::now();
-
-        self.expires_at = Some(now_utc + ChronoDuration::seconds(additional_ttl_secs as i64));
-        self.last_beat = now_utc;
-        self.acquired_instant = Some(now_instant);
+        let now = clock.now();
+        self.expires_at = Some(now + ChronoDuration::seconds(additional_ttl_secs as i64));
+        self.last_beat = now;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
-    use std::time::Duration;
+    use crate::storage::clock::FixedClock;
 
-    #[test]
-    fn test_new_lease_finite_ttl() {
-        let lease = Lease::new(
-            "01ABC123".to_string(),
+    /// A lease of `ttl_secs` acquired at the clock's current instant.
+    fn lease_at(clock: &FixedClock, ttl_secs: u64) -> Lease {
+        Lease::new(
+            "01LEASE".to_string(),
             "issue-001".to_string(),
-            "agent:agent-1".to_string(),
-            "wt:abc123".to_string(),
+            "agent:test".to_string(),
+            "wt:test".to_string(),
             "main".to_string(),
-            600,
-        );
+            ttl_secs,
+            clock,
+        )
+    }
 
-        assert_eq!(lease.lease_id, "01ABC123");
-        assert_eq!(lease.issue_id, "issue-001");
-        assert_eq!(lease.ttl_secs, 600);
-        assert!(lease.expires_at.is_some());
-        assert!(!lease.is_expired());
-        assert!(!lease.is_stale(DEFAULT_STALE_THRESHOLD_SECS));
+    /// A clock a test moves itself, with the instant it starts at read back
+    /// from the clock so both sides of an assertion share its resolution.
+    fn test_clock() -> (FixedClock, DateTime<Utc>) {
+        let clock = FixedClock::new(Utc::now());
+        let base = clock.now();
+        (clock, base)
     }
 
     #[test]
-    fn test_new_lease_indefinite_ttl() {
-        let lease = Lease::new(
-            "01XYZ789".to_string(),
-            "issue-002".to_string(),
-            "agent:agent-2".to_string(),
-            "wt:def456".to_string(),
-            "feature-branch".to_string(),
-            0,
+    fn test_new_records_the_acquisition_instant_and_derives_expiry_from_the_ttl() {
+        let (clock, base) = test_clock();
+        let ttl_secs = 600;
+
+        let lease = lease_at(&clock, ttl_secs);
+
+        assert_eq!(lease.acquired_at, base);
+        assert_eq!(lease.last_beat, base);
+        assert_eq!(
+            lease.expires_at,
+            Some(base + ChronoDuration::seconds(ttl_secs as i64)),
+            "a finite lease expires its whole TTL after it was acquired"
+        );
+    }
+
+    #[test]
+    fn test_new_indefinite_lease_records_no_expiry() {
+        let (clock, _) = test_clock();
+
+        let lease = lease_at(&clock, 0);
+
+        assert!(
+            lease.expires_at.is_none(),
+            "an indefinite lease has no instant to expire at"
+        );
+        assert!(!lease.is_expired(&clock));
+        assert!(!lease.is_stale(DEFAULT_STALE_THRESHOLD_SECS, &clock));
+    }
+
+    #[test]
+    fn test_is_expired_turns_over_exactly_at_the_recorded_expiry() {
+        let (clock, base) = test_clock();
+        let ttl_secs = 600;
+        let lease = lease_at(&clock, ttl_secs);
+        let expiry = lease.expires_at.unwrap();
+
+        clock.set(expiry - ChronoDuration::milliseconds(1));
+        assert!(
+            !lease.is_expired(&clock),
+            "a lease is live for every instant before its expiry"
         );
 
-        assert_eq!(lease.ttl_secs, 0);
+        clock.set(expiry);
+        assert!(
+            lease.is_expired(&clock),
+            "a lease is expired from its expiry onward"
+        );
+
+        clock.set(base + ChronoDuration::seconds(ttl_secs as i64 * 100));
+        assert!(lease.is_expired(&clock), "and stays expired after it");
+    }
+
+    #[test]
+    fn test_is_expired_is_false_for_an_indefinite_lease_at_any_instant() {
+        let (clock, base) = test_clock();
+        let lease = lease_at(&clock, 0);
+
+        clock.set(base + ChronoDuration::days(365));
+
+        assert!(!lease.is_expired(&clock));
+    }
+
+    #[test]
+    fn test_is_expired_is_false_for_a_finite_lease_with_no_recorded_expiry() {
+        let (clock, base) = test_clock();
+        let mut lease = lease_at(&clock, 600);
+        lease.expires_at = None;
+
+        clock.set(base + ChronoDuration::days(365));
+
+        assert!(
+            !lease.is_expired(&clock),
+            "with nothing recorded to expire at, no instant expires it"
+        );
+    }
+
+    #[test]
+    fn test_is_stale_turns_over_at_the_threshold_and_a_heartbeat_resets_it() {
+        let (clock, base) = test_clock();
+        let threshold_secs = 60;
+        let mut lease = lease_at(&clock, 0);
+
+        clock.set(base + ChronoDuration::seconds(threshold_secs as i64 - 1));
+        assert!(
+            !lease.is_stale(threshold_secs, &clock),
+            "a lease is fresh for every instant short of the threshold"
+        );
+
+        clock.set(base + ChronoDuration::seconds(threshold_secs as i64));
+        assert!(
+            lease.is_stale(threshold_secs, &clock),
+            "a lease is stale once the threshold has passed since its last beat"
+        );
+
+        lease.update_heartbeat(&clock);
+        assert!(
+            !lease.is_stale(threshold_secs, &clock),
+            "a heartbeat measures staleness from the instant it was taken"
+        );
+    }
+
+    #[test]
+    fn test_is_stale_is_false_for_a_finite_lease_however_far_the_clock_moves() {
+        let (clock, base) = test_clock();
+        let lease = lease_at(&clock, 600);
+
+        clock.set(base + ChronoDuration::days(365));
+
+        assert!(
+            !lease.is_stale(0, &clock),
+            "a finite lease expires rather than going stale"
+        );
+    }
+
+    #[test]
+    fn test_serialization_roundtrip_preserves_the_lease_and_its_verdicts() {
+        let (clock, base) = test_clock();
+        let original = lease_at(&clock, 600);
+
+        let restored: Lease = serde_json::from_str(&serde_json::to_string(&original).unwrap())
+            .expect("a lease round-trips through JSON");
+
+        assert_eq!(restored.acquired_at, original.acquired_at);
+        assert_eq!(restored.expires_at, original.expires_at);
+        assert_eq!(restored.last_beat, original.last_beat);
+        clock.set(base + ChronoDuration::seconds(599));
+        assert_eq!(restored.is_expired(&clock), original.is_expired(&clock));
+        clock.set(base + ChronoDuration::seconds(600));
+        assert_eq!(
+            restored.is_expired(&clock),
+            original.is_expired(&clock),
+            "a reloaded lease expires at the same instant as the one it was written from"
+        );
+    }
+
+    #[test]
+    fn test_renew_moves_a_finite_lease_expiry_to_the_renewal_instant_plus_the_ttl() {
+        let (clock, base) = test_clock();
+        let mut lease = lease_at(&clock, 1);
+        let renewed_at = base + ChronoDuration::milliseconds(900);
+        let additional_ttl_secs = 10;
+
+        clock.set(renewed_at);
+        lease.renew(additional_ttl_secs, &clock);
+
+        assert_eq!(
+            lease.expires_at,
+            Some(renewed_at + ChronoDuration::seconds(additional_ttl_secs as i64))
+        );
+        clock.set(base + ChronoDuration::seconds(1));
+        assert!(
+            !lease.is_expired(&clock),
+            "the instant the original TTL would have expired at is inside the renewed one"
+        );
+    }
+
+    #[test]
+    fn test_renew_beats_an_indefinite_lease_rather_than_giving_it_an_expiry() {
+        let (clock, base) = test_clock();
+        let mut lease = lease_at(&clock, 0);
+        let renewed_at = base + ChronoDuration::seconds(30);
+
+        clock.set(renewed_at);
+        lease.renew(0, &clock);
+
+        assert_eq!(lease.last_beat, renewed_at);
         assert!(lease.expires_at.is_none());
-        assert!(!lease.is_expired());
-        assert!(!lease.is_stale(DEFAULT_STALE_THRESHOLD_SECS));
+        assert!(!lease.is_stale(60, &clock));
     }
 
     #[test]
-    fn test_finite_lease_expiration_monotonic() {
-        // Create lease with 1 second TTL
-        let lease = Lease::new(
-            "01EXPIRE".to_string(),
-            "issue-exp".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            1,
-        );
+    fn test_update_heartbeat_records_the_clock_instant() {
+        let (clock, base) = test_clock();
+        let mut lease = lease_at(&clock, 0);
+        let beat_at = base + ChronoDuration::seconds(30);
 
-        assert!(!lease.is_expired());
+        clock.set(beat_at);
+        lease.update_heartbeat(&clock);
 
-        // Wait for expiration (with extra margin for reliability)
-        thread::sleep(Duration::from_millis(1200));
-
-        assert!(lease.is_expired());
-    }
-
-    #[test]
-    fn test_indefinite_lease_never_expires() {
-        let lease = Lease::new(
-            "01FOREVER".to_string(),
-            "issue-forever".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            0,
-        );
-
-        // Even after waiting, indefinite lease doesn't expire
-        thread::sleep(Duration::from_millis(100));
-        assert!(!lease.is_expired());
-    }
-
-    #[test]
-    fn test_indefinite_lease_staleness() {
-        let mut lease = Lease::new(
-            "01STALE".to_string(),
-            "issue-stale".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            0,
-        );
-
-        // Initially not stale
-        assert!(!lease.is_stale(1));
-
-        // Wait to become stale (with extra margin for reliability)
-        thread::sleep(Duration::from_millis(1200));
-        assert!(lease.is_stale(1)); // 1 second threshold
-
-        // Update heartbeat refreshes staleness
-        lease.update_heartbeat();
-        assert!(!lease.is_stale(1));
-    }
-
-    #[test]
-    fn test_finite_lease_not_stale() {
-        let lease = Lease::new(
-            "01FINITE".to_string(),
-            "issue-finite".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            600,
-        );
-
-        // Finite leases never marked stale (they expire instead)
-        assert!(!lease.is_stale(0));
-    }
-
-    #[test]
-    fn test_lease_serialization_roundtrip() {
-        let original = Lease::new(
-            "01SERIAL".to_string(),
-            "issue-serial".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            600,
-        );
-
-        // Serialize to JSON
-        let json = serde_json::to_string(&original).unwrap();
-
-        // Deserialize back
-        let deserialized: Lease = serde_json::from_str(&json).unwrap();
-
-        // Instant should be None after deserialization
-        assert!(deserialized.acquired_instant.is_none());
-
-        // Reconstruct instant
-        let reconstructed = Lease::from_serde(deserialized);
-        assert!(reconstructed.acquired_instant.is_some());
-
-        // Should still report not expired
-        assert!(!reconstructed.is_expired());
-    }
-
-    #[test]
-    fn test_instant_reconstruction_approximation() {
-        let lease = Lease::new(
-            "01APPROX".to_string(),
-            "issue-approx".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            10,
-        );
-
-        // Serialize and deserialize
-        let json = serde_json::to_string(&lease).unwrap();
-        let deserialized: Lease = serde_json::from_str(&json).unwrap();
-
-        // Wait a bit
-        thread::sleep(Duration::from_millis(100));
-
-        // Reconstruct
-        let reconstructed = Lease::from_serde(deserialized);
-
-        // Should still be valid (conservative approximation)
-        assert!(!reconstructed.is_expired());
-    }
-
-    #[test]
-    fn test_renew_finite_lease() {
-        let mut lease = Lease::new(
-            "01RENEW".to_string(),
-            "issue-renew".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            1,
-        );
-
-        // Wait almost to expiry
-        thread::sleep(Duration::from_millis(900));
-
-        // Renew with additional 10 seconds
-        lease.renew(10);
-
-        // Should not be expired now
-        assert!(!lease.is_expired());
-    }
-
-    #[test]
-    fn test_renew_indefinite_lease_updates_heartbeat() {
-        let mut lease = Lease::new(
-            "01RENEW-INF".to_string(),
-            "issue-renew-inf".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            0,
-        );
-
-        let original_heartbeat = lease.last_beat;
-        thread::sleep(Duration::from_millis(100));
-
-        lease.renew(0);
-
-        assert!(lease.last_beat > original_heartbeat);
-        assert!(!lease.is_stale(1));
-    }
-
-    #[test]
-    fn test_fallback_to_wall_clock_when_instant_missing() {
-        let mut lease = Lease::new(
-            "01FALLBACK".to_string(),
-            "issue-fallback".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            1,
-        );
-
-        // Remove instant to force fallback
-        lease.acquired_instant = None;
-
-        assert!(!lease.is_expired());
-
-        // Wait for expiration
-        thread::sleep(Duration::from_millis(1100));
-
-        // Should detect expiry via wall-clock fallback
-        assert!(lease.is_expired());
-    }
-
-    #[test]
-    fn test_update_heartbeat() {
-        let mut lease = Lease::new(
-            "01HEARTBEAT".to_string(),
-            "issue-heartbeat".to_string(),
-            "agent:test".to_string(),
-            "wt:test".to_string(),
-            "main".to_string(),
-            0,
-        );
-
-        let original_heartbeat = lease.last_beat;
-        thread::sleep(Duration::from_millis(100));
-
-        lease.update_heartbeat();
-
-        assert!(lease.last_beat > original_heartbeat);
+        assert_eq!(lease.last_beat, beat_at);
     }
 }
