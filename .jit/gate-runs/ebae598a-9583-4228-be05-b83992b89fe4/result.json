@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a54217d986a62ed366a64d3074bf7c9a4e03556d",
+  "completed_at": "2026-08-04T18:32:38.791157220Z",
+  "duration_ms": 220998,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/06f1fa95/load-independence-verification.md",
+        "id": "F1",
+        "line": 149,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/06f1fa95/requirement/REQ-03",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The REQ-03 verification record says both gate runs used a clean working tree, while both cited gate records report tree_dirty: true."
+      }
+    ],
+    "summary": "The REQ-03 verification record falsely claims both compared worktrees were clean.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "06f1fa95-2aa4-4493-a31e-1f149f3deee9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ebae598a-9583-4228-be05-b83992b89fe4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T18:28:57.792903693Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8572 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fce09-3668-7b43-a80a-1f4e3a5b7a0c\n--------\nuser\n--- 8559 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c4cff3bf, 4dabd511, 33b024df, 499f9ebf, 171df86b, d6fd77c5, 13d30789, a54217d9\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/06f1fa95/requirement/REQ-03 (issue description); @/gate/cargo-ci (.jit/gates.toml); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T18:21:20Z); prior code-review failed with F1\nTruncation recovery: individual attributed patches, current shutdown/test ranges, verification record, and cited gate records reread narrowly\n\n1. F1 — Blocking, high, issue-impact: The REQ-03 verification record says both comparison runs had a clean working tree at `dev/active/06f1fa95/load-independence-verification.md:149`, but each cited gate record says `tree_dirty: true`. The identical commit and declared-input digest still support the same-input comparison, but the attributed evidence document falsely states its cleanliness and must be reconciled with its authoritative records. References: @/issue/06f1fa95/requirement/REQ-03, @/invariant/single-source-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The REQ-03 verification record falsely claims both compared worktrees were clean.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The REQ-03 verification record says both gate runs used a clean working tree, while both cited gate records report tree_dirty: true.\",\"file\":\"dev/active/06f1fa95/load-independence-verification.md\",\"line\":149,\"references\":[\"@/issue/06f1fa95/requirement/REQ-03\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
