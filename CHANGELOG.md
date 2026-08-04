@@ -1103,18 +1103,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unaffected — both keep `gate_key` as an internal/audit field; only the
   `--json` command output surface changed.
 
-### Changed
+### Removed
 
-- **`Lease` takes a clock.** `jit::storage::lease::Lease` built itself from
-  `Instant::now()` and `Utc::now()` and answered `is_expired` and `is_stale`
-  from the system clock. Every time-dependent operation — `new`, `is_expired`,
-  `is_stale`, `update_heartbeat`, `renew` — now takes the
-  `jit::storage::clock::Clock` the claim coordinator already takes, and the
-  unserializable monotonic `Instant`, the wall-clock fallback that covered its
-  absence, and the `from_serde` reconstruction that approximated it across a
-  reload are gone with it. A lease's state is wall-clock throughout, so a
-  reloaded lease answers exactly as the one it was written from. Callers pass
-  `SystemClock` for the previous behaviour.
+- **The `jit::storage::lease` module.** It declared a second `Lease` type,
+  superseded by `claim_coordinator::Lease` — which is what `jit::storage::Lease`
+  re-exports and what every claim path uses. Nothing in the workspace reached
+  the older one. The two were different designs rather than two names for one:
+  the removed type carried an unserializable monotonic `Instant`, a wall-clock
+  fallback for when that `Instant` was absent, and a `from_serde` reconstruction
+  that approximated it across a reload, while the canonical type is plain data
+  whose `is_expired` takes the instant as a parameter. Callers use
+  `jit::storage::Lease` (`@/invariant/canonical-cutover`).
+
+### Changed
 
 - **`RepoWriteLock::acquire` reports an expired in-process wait by type.** A
   wait for another thread of the same process to release returned a plain

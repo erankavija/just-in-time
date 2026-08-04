@@ -126,27 +126,30 @@ The 100-millisecond "no result while the guard is held" assertion passed under
 this seed, so the archive did wait for the guard and then failed to complete —
 which is precisely the half the restatement reads.
 
-**The lease misses its own boundary (REQ-03).** Both boundaries were seeded
-separately, each by relaxing one comparison. `is_expired`'s
-`clock.now() >= expires_at` at `crates/jit/src/storage/lease.rs:128` became `>`:
+**The lease cluster takes no seed, and the reason is the evidence (REQ-03).**
+There is no `storage::lease` module to seed a regression into: it was deleted
+rather than restated, for the reason recorded in the section below. A deleted
+module cannot fail a test that no longer exists, so the honest demonstration is
+that no behaviour lost a guard — that the module was unreachable, and that every
+lease property the product actually holds is asserted elsewhere. Three facts
+establish it, each reproducible from this revision:
 
-```
-test storage::lease::tests::test_is_expired_turns_over_exactly_at_the_recorded_expiry ... FAILED
-test result: FAILED. 10 passed; 1 failed
-```
+- `grep -rn "storage::lease\|lease::Lease\|lease::" crates/ --include="*.rs"`
+  returned nothing outside `lease.rs` itself, at the anchor and at the deletion.
+  The same search over `scripts/`, `mcp-server/`, `web/`, `docs/` and `.github/`
+  is likewise empty, as is one for `DEFAULT_STALE_THRESHOLD_SECS`.
+- `crates/jit/src/storage/mod.rs:50` is
+  `pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};`.
+  The name `storage::Lease` resolved to the coordinator's type throughout;
+  `pub mod lease;` exposed a second type of the same name beside it.
+- The lease behaviour the product runs on is `claim_coordinator::Lease`, whose
+  expiry and staleness take the instant as a parameter
+  (`is_expired(now)`, `ClaimsIndex::is_stale_at(lease, now)`) and are asserted
+  by `storage::claim_coordinator` (52 tests) and
+  `storage::claim_coordinator::proptests`. `cargo test -p jit` is green across
+  the deletion, so nothing depended on the module compiling.
 
-`is_stale`'s `elapsed_secs >= stale_threshold_secs` at
-`crates/jit/src/storage/lease.rs:154` became `>`:
-
-```
-test storage::lease::tests::test_is_stale_turns_over_at_the_threshold_and_a_heartbeat_resets_it ... FAILED
-test result: FAILED. 10 passed; 1 failed
-```
-
-Each seed failed exactly one test, and it is the one holding that boundary. A
-supplied clock is what makes that possible: the tests set the instant one
-millisecond before an expiry and then the expiry itself, which a sleeping test
-cannot aim at.
+The seeds for the other three sites apply as written and are recorded above.
 
 ## Result — sites changed by this issue
 
@@ -155,12 +158,79 @@ cannot aim at.
 | `crates/jit/src/storage/repo_lock.rs:397` `test_second_thread_waits_for_the_holder` | the waiting thread enters only after the holder released | **Restated.** The contender retries a refused wait rather than unwrapping a five-second one, and reads the lock's answer. The holder releases once the contender has recorded being refused, so contention is produced rather than hoped for: the previous 150-millisecond sleep let a late contender pass the ordering assertion without ever meeting the lock held. |
 | `crates/jit/src/storage/repository_state_store_tests.rs:2592` `test_session_disjoint_sessions_serialize_on_worktree_bootstrap` | the second session opens only after the first released the worktree bootstrap lock | **Restated**, the same way. The shared worktree bootstrap lock is registered with a wait shorter than any critical section, so the contending session is refused promptly and says so. |
 | `crates/jit/src/commands/archive.rs:1297` `test_execute_waits_for_competing_repository_write_guard` | the archive completes once the competing write guard is released | **Restated.** The worker is joined before the result is received. A finished thread has already sent, so the receive completes without waiting, and the only remaining block is a join whose failure is a genuine deadlock. |
-| `crates/jit/src/storage/lease.rs` (whole module) | expiry and staleness turn over at their recorded boundaries | **Restated.** `Lease` takes the `storage::clock::Clock` the claim coordinator already takes, so every time-dependent operation reads a supplied instant. The eleven tests set a clock instead of sleeping toward a boundary, and the module's tests run in no measurable time against the 4.8 seconds of sleeps they replace. |
+| `storage::lease` (whole module) | expiry and staleness turn over at their recorded boundaries | **Deleted**, with `pub mod lease;`. See "The lease cluster was dead code" below: the module was unreachable and its `Lease` a superseded duplicate of the canonical one, so its twelve tests and its doctest were 4.8 seconds of sleeps guarding nothing. Deleting them removes the whole cluster from the gate's suite. |
 | `crates/jit/src/storage/repo_lock.rs:250` `RepoWriteLock::acquire` | (production) an expired in-process owner wait | **Changed.** It returns the typed `LockTimeout` the file-lock wait already returns, so a caller distinguishes "still queued" from "refused" by type rather than by message (`@/invariant/semantic-types`). Without it, a retrying contender cannot tell a wait that expired from an operation that failed. |
 | `crates/jit/src/storage/contention_probe.rs` | (mechanism) | **Added.** `Contenders`, `ProgressWatch` and `admitted_when_reached` carry the shape `57675b68` landed for the claim coordinator. `claim_coordinator::Claimants` composes them, so the coordinator, the repository lock and the worktree bootstrap lock share one mechanism rather than three copies (`@/invariant/convention-convergence`). |
 
 The stall bound the mechanism carries is itself an elapsed-time assertion, and
 it is recorded with the retained ones below rather than counted as clock-free.
+
+## The lease cluster was dead code
+
+The fourth site was the largest of the four and ended as a deletion rather than
+a restatement. The reasoning is recorded here so a reader does not have to
+reconstruct why a cluster of twelve tests left the suite instead of being
+rewritten against an injected clock.
+
+**What was found.** The module at crates/jit/src/storage/lease.rs declared a `Lease`
+superseded by `claim_coordinator::Lease`. The canonical `storage::Lease` is the
+coordinator's, re-exported at `crates/jit/src/storage/mod.rs:50`; the older type
+was reachable only through `pub mod lease;` and its own `#[cfg(test)]` module.
+No file in `crates/`, `scripts/`, `mcp-server/`, `web/`, `docs/` or `.github/`
+named it, `from_serde` and `DEFAULT_STALE_THRESHOLD_SECS` had no callers, and
+the two types were different designs rather than two spellings of one: the
+removed one carried an unserializable monotonic `Instant`, a wall-clock fallback
+for its absence, and a `from_serde` that approximated it across a reload, while
+the canonical one is plain data whose `is_expired(now)` and
+`ClaimsIndex::is_stale_at(lease, now)` take the instant as a parameter and whose
+`Arc<dyn Clock>` is held by the `ClaimCoordinator` service.
+
+**Why that decided it.** Injecting a clock would have satisfied the criterion as
+originally written while producing clock-injected dead code and leaving a
+duplicate representation of a canonical type standing — which
+`@/invariant/canonical-cutover` and `@/invariant/convention-convergence` both
+call a defect. The finding was raised as a blocking concern before the work was
+done rather than shipped silently.
+
+**The ruling.** The owner ruled the module deleted and amended
+`@/issue/4c700c80/requirement/REQ-03` to ask for the end state — "No assertion
+about lease expiry or staleness depends on the process reaching it inside a
+fraction of a second" — dropping its clause requiring an injected clock. The
+issue's Background carries the finding and the ruling.
+
+**What the deletion costs and what it does not.** Twelve tests, one doctest and
+4.8 seconds of sleeps leave the suite; no product behaviour loses a guard,
+because the lease behaviour the product runs on is the coordinator's and is
+asserted by `storage::claim_coordinator` and its proptests. `cargo test
+--workspace` is green across the deletion.
+
+**What the deletion leaves stale, deliberately.** Four kinds of reference to the
+removed module survive, none of them repaired:
+
+- `dev/active/57675b68/57675b68-host-load-survey.md:175,207,211` cite the module
+  by path. That survey states in its header that it describes a specific
+  revision, and this survey supersedes it; rewriting a dated record to match a
+  later tree would falsify it. `scripts/docs-mechanical.sh` passes the citation
+  checker a `docs/` footprint, so no gate reads those lines.
+- `dev/archive/ad601a15-parallel-work/sessions/session-claim-coordination-parallel.md:179`
+  cites it from an archived
+  session record.
+- `dev/active/7cbefe7c/findings.md:456` names
+  `storage::lease::DEFAULT_STALE_THRESHOLD_SECS` in a passage about a template
+  rendering that no longer exists — `hierarchy_templates.rs` contains no
+  stale-threshold default at this revision. That prose was stale before this
+  deletion, not because of it.
+- Both copies of the `73482aa1` test inventories
+  (`dev/benchmarks/rust-build-efficiency/` and its archived twin under
+  `dev/archive/6eb585bc-core-maintenance/`) list the removed test names. They are
+  a before/after measurement taken at one revision, generated by
+  `scripts/benchmark-rust-build.sh` and read by nothing; regenerating them for an
+  unrelated change would falsify the comparison they exist to record.
+
+`scripts/rust-build-budget.sh`, which the `cargo-ci` gate runs, needs no
+regeneration: it enforces an integration-test target count and total active
+test-executable bytes, and deleting a `src/` module leaves the first unchanged
+and reduces the second.
 
 ## Result — remaining sites, by disposition
 
@@ -232,16 +302,11 @@ itself increments. They are inert rather than load-sensitive.
 
 ## Observations
 
-Two things the searches surfaced that are neither load-sensitive assertions nor
-this issue's work, recorded so they are not rediscovered:
+One thing the searches surfaced that is neither a load-sensitive assertion nor
+this issue's work, recorded so it is not rediscovered. The dead-code finding the
+searches also surfaced is closed, and is written up under "The lease cluster was
+dead code" above.
 
-- **`storage::lease` has no caller.** Nothing in the workspace names
-  `storage::lease::Lease`; the crate's canonical `storage::Lease` is
-  `claim_coordinator::Lease`, re-exported at
-  `crates/jit/src/storage/mod.rs:52`. The module is reached only by
-  `pub mod lease;` and its own tests. REQ-03 names the injected clock, so it was
-  supplied as written, and this is recorded for the owner's decision on
-  `@/invariant/canonical-cutover`.
 - **Two clock abstractions.** `crates/jit/src/storage/clock.rs` declares `Clock`
   and `crates/jit/src/repository_state/mutation.rs:36` declares `MutationClock`.
   Both are injected wall-clock sources returning `DateTime<Utc>`, each with a
