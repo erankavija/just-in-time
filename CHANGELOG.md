@@ -1103,6 +1103,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unaffected — both keep `gate_key` as an internal/audit field; only the
   `--json` command output surface changed.
 
+### Changed
+
+- **`Lease` takes a clock.** `jit::storage::lease::Lease` built itself from
+  `Instant::now()` and `Utc::now()` and answered `is_expired` and `is_stale`
+  from the system clock. Every time-dependent operation — `new`, `is_expired`,
+  `is_stale`, `update_heartbeat`, `renew` — now takes the
+  `jit::storage::clock::Clock` the claim coordinator already takes, and the
+  unserializable monotonic `Instant`, the wall-clock fallback that covered its
+  absence, and the `from_serde` reconstruction that approximated it across a
+  reload are gone with it. A lease's state is wall-clock throughout, so a
+  reloaded lease answers exactly as the one it was written from. Callers pass
+  `SystemClock` for the previous behaviour.
+
+- **`RepoWriteLock::acquire` reports an expired in-process wait by type.** A
+  wait for another thread of the same process to release returned a plain
+  string error, while the cross-process file-lock wait returned
+  `jit::storage::lock::LockTimeout`. Both now return `LockTimeout`, so a caller
+  distinguishing "I am still queued" from "the operation was refused" matches
+  the type through `is_lock_timeout` rather than the message.
+
 ## [1.0.0] - 2026-07-30
 
 The first stable release. [The v1.0.0 release
