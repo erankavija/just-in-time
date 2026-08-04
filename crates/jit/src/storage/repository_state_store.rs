@@ -1679,25 +1679,10 @@ fn ensure_capability_identity(
 /// for the absent-root parent. `None` on platforms without stable inode identity,
 /// where the absent-root parent binding is skipped.
 pub(crate) fn capability_dir_identity(directory: &Dir) -> Option<String> {
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     {
         let metadata = directory.dir_metadata().ok()?;
-        Some(format!("{}:{}", metadata.dev(), metadata.ino()))
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt as _;
-        let metadata = directory
-            .try_clone()
-            .ok()?
-            .into_std_file()
-            .metadata()
-            .ok()?;
-        Some(format!(
-            "{}:{}",
-            metadata.volume_serial_number()?,
-            metadata.file_index()?
-        ))
+        capability_metadata_identity(&metadata).ok()
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -1779,7 +1764,7 @@ fn discover_root_evidence(
     match std::fs::symlink_metadata(path) {
         Ok(metadata) if metadata.is_dir() => Ok(RepositoryRootEvidence::new(
             path,
-            std_metadata_identity(&metadata)?,
+            std_metadata_identity(path)?,
             true,
         )),
         Ok(_) => Err(RepositoryStateStoreError::UnsafeTarget(
@@ -1789,7 +1774,6 @@ fn discover_root_evidence(
             let parent = path.parent().ok_or_else(|| {
                 RepositoryStateStoreError::UnsafeTarget(path.display().to_string())
             })?;
-            let metadata = std::fs::symlink_metadata(parent)?;
             let leaf = path.file_name().ok_or_else(|| {
                 RepositoryStateStoreError::UnsafeTarget(path.display().to_string())
             })?;
@@ -1797,7 +1781,7 @@ fn discover_root_evidence(
                 path,
                 format!(
                     "absent:{}:{}",
-                    std_metadata_identity(&metadata)?,
+                    std_metadata_identity(parent)?,
                     leaf.to_string_lossy()
                 ),
                 true,
@@ -1831,31 +1815,37 @@ fn ensure_symlink_free_ancestry(
 }
 
 #[cfg(unix)]
-fn std_metadata_identity(
-    metadata: &std::fs::Metadata,
-) -> Result<String, RepositoryStateStoreError> {
+fn std_metadata_identity(path: &Path) -> Result<String, RepositoryStateStoreError> {
     use std::os::unix::fs::MetadataExt as _;
+    let metadata = std::fs::symlink_metadata(path)?;
     Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
 }
 
+/// A `std::fs::Metadata`-only conversion leaves `volume_serial_number`/
+/// `file_index` `None` on Windows (they come from the open handle, not the
+/// stat), so this opens the path itself: `FILE_FLAG_OPEN_REPARSE_POINT`
+/// preserves the no-follow semantics the callers rely on, and
+/// `FILE_FLAG_BACKUP_SEMANTICS` is required to open a directory handle at
+/// all. Once a live handle is in hand, `capability_metadata_identity`
+/// already knows how to format the resulting Windows identity.
 #[cfg(windows)]
-fn std_metadata_identity(
-    metadata: &std::fs::Metadata,
-) -> Result<String, RepositoryStateStoreError> {
-    use std::os::windows::fs::MetadataExt as _;
-    let volume = metadata.volume_serial_number().ok_or_else(|| {
-        RepositoryStateStoreError::UnsafeTarget("Windows volume identity unavailable".into())
-    })?;
-    let index = metadata.file_index().ok_or_else(|| {
-        RepositoryStateStoreError::UnsafeTarget("Windows file identity unavailable".into())
-    })?;
-    Ok(format!("{volume}:{index}"))
+fn std_metadata_identity(path: &Path) -> Result<String, RepositoryStateStoreError> {
+    use std::os::windows::fs::OpenOptionsExt as _;
+
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)?;
+    let metadata = cap_primitives::fs::Metadata::from_file(&file)?;
+    capability_metadata_identity(&metadata)
 }
 
 #[cfg(not(any(unix, windows)))]
-fn std_metadata_identity(
-    metadata: &std::fs::Metadata,
-) -> Result<String, RepositoryStateStoreError> {
+fn std_metadata_identity(path: &Path) -> Result<String, RepositoryStateStoreError> {
+    let metadata = std::fs::symlink_metadata(path)?;
     Ok(format!(
         "{}:{}",
         metadata.len(),

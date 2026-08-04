@@ -445,6 +445,7 @@ fn rejected_entry(root: &Path, relative: String) -> ProfilePackageError {
 /// reports `ENXIO` — the kinds that cannot be opened for reading at all, as
 /// distinct from the pipes and devices that open non-blockingly and are refused
 /// by their handle's metadata.
+#[cfg(unix)]
 fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> ProfilePackageError {
     let unopenable_kind = matches!(
         source.raw_os_error(),
@@ -456,6 +457,13 @@ fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> Pr
     } else {
         unreadable(&root.join(relative), source)
     }
+}
+
+/// Non-Unix: the ELOOP/EMLINK/ENXIO errno classification above is POSIX- and
+/// BSD-specific, so every open failure is reported as unreadable.
+#[cfg(not(unix))]
+fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> ProfilePackageError {
+    unreadable(&root.join(relative), source)
 }
 
 /// Whether `path` resolves outside `root`.

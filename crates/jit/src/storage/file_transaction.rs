@@ -2260,7 +2260,7 @@ fn ensure_repository_published_data_root_is_live(
 fn ensure_ambient_directory_matches_capability(path: &Path, directory: &Dir) -> Result<()> {
     let live = std::fs::symlink_metadata(path)?;
     if !live.is_dir()
-        || ambient_metadata_identity(&live)?
+        || ambient_metadata_identity(path)?
             != capability_metadata_identity(&directory.dir_metadata()?)?
     {
         return Err(FileTransactionError::UnexpectedOccupant {
@@ -2302,30 +2302,46 @@ fn capability_metadata_identity(metadata: &cap_std::fs::Metadata) -> Result<Stri
 }
 
 #[cfg(unix)]
-fn ambient_metadata_identity(metadata: &std::fs::Metadata) -> Result<String> {
+fn ambient_metadata_identity(path: &Path) -> Result<String> {
     use std::os::unix::fs::MetadataExt as _;
+    let metadata = std::fs::symlink_metadata(path)?;
     Ok(format!("{}:{}", metadata.dev(), metadata.ino()))
 }
 
+/// A `std::fs::Metadata`-only conversion leaves `volume_serial_number`/
+/// `file_index` `None` on Windows (they come from the open handle, not the
+/// stat), so this opens the path itself: `FILE_FLAG_OPEN_REPARSE_POINT`
+/// preserves the no-follow semantics the caller relies on, and
+/// `FILE_FLAG_BACKUP_SEMANTICS` is required to open a directory handle at all.
 #[cfg(windows)]
-fn ambient_metadata_identity(metadata: &std::fs::Metadata) -> Result<String> {
-    use std::os::windows::fs::MetadataExt as _;
-    let volume = metadata.volume_serial_number().ok_or_else(|| {
+fn ambient_metadata_identity(path: &Path) -> Result<String> {
+    use std::os::windows::fs::OpenOptionsExt as _;
+
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)?;
+    let metadata = cap_primitives::fs::Metadata::from_file(&file)?;
+    let volume =
+        cap_primitives::fs::_WindowsByHandle::volume_serial_number(&metadata).ok_or_else(|| {
+            FileTransactionError::UnsupportedFilesystem {
+                operation: "Windows volume identity".into(),
+            }
+        })?;
+    let index = cap_primitives::fs::_WindowsByHandle::file_index(&metadata).ok_or_else(|| {
         FileTransactionError::UnsupportedFilesystem {
-            operation: "Windows volume identity".into(),
+            operation: "Windows file identity".into(),
         }
     })?;
-    let index =
-        metadata
-            .file_index()
-            .ok_or_else(|| FileTransactionError::UnsupportedFilesystem {
-                operation: "Windows file identity".into(),
-            })?;
     Ok(format!("{volume}:{index}"))
 }
 
 #[cfg(not(any(unix, windows)))]
-fn ambient_metadata_identity(metadata: &std::fs::Metadata) -> Result<String> {
+fn ambient_metadata_identity(path: &Path) -> Result<String> {
+    let metadata = std::fs::symlink_metadata(path)?;
     Ok(format!(
         "{}:{}",
         metadata.len(),

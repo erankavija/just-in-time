@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
