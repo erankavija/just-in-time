@@ -1,4 +1,4 @@
-//! Regression tests for the ai-review.sh verdict parser (REQ-11).
+//! Regression tests for the ai-review.sh verdict parser.
 //!
 //! Verifies that reviewer output whose VERDICT: PASS line is followed by
 //! additional prose is still recorded as a pass. The parser lives in the one
@@ -74,7 +74,6 @@ fn run_script_output(
         .unwrap_or_else(|error| panic!("failed to run {}: {error}", script.display()))
 }
 
-// REQ-11: VERDICT: PASS followed by trailing prose must still record PASS.
 #[test]
 fn test_verdict_pass_with_trailing_prose_records_a_pass() {
     let temp = TempDir::new().unwrap();
