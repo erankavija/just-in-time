@@ -335,17 +335,14 @@ fn contribution_report(
         let carried = members
             .as_array()
             .is_some_and(|members| members.iter().any(|member| member == value));
-        return Ok(subject(format!("{table}.{key}")).reporting(
-            (!carried)
-                .then(|| {
-                    vec![format!(
-                        "{table}.{key}: the repository's members do not carry \
-                         {}, which the package contributes",
-                        Value::String(value.clone())
-                    )]
-                })
-                .unwrap_or_default(),
-        ));
+        let missing = Vec::from_iter((!carried).then(|| {
+            format!(
+                "{table}.{key}: the repository's members do not carry {}, which the \
+                 package contributes",
+                Value::String(value.clone())
+            )
+        }));
+        return Ok(subject(format!("{table}.{key}")).reporting(missing));
     }
 
     let Some((entry, authored)) = repository_entry(registry, document, contribution)? else {
