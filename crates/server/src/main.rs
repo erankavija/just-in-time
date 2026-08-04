@@ -22,7 +22,7 @@ use tracing::{info, warn};
 
 use jit::commands::CommandExecutor;
 use jit_server::shutdown::{
-    await_shutdown_signal, run_shutdown_sequence, ServerHandle, GRACEFUL_DRAIN_TIMEOUT,
+    await_shutdown_signal, configured_drain_deadline, run_shutdown_sequence, ServerHandle,
 };
 use jit_server::{prepare_server_storage, resolve_listener, ListenerSource};
 use routes::AppState;
@@ -159,7 +159,7 @@ async fn main() -> Result<()> {
     let shutdown_sequence = tokio::spawn(run_shutdown_sequence(
         handle.clone(),
         shutdown,
-        GRACEFUL_DRAIN_TIMEOUT,
+        configured_drain_deadline(),
         await_shutdown_signal(),
     ));
 

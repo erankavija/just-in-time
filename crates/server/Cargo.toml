@@ -18,6 +18,11 @@ path = "src/main.rs"
 [features]
 default = ["embed-web"]
 embed-web = ["dep:rust-embed", "dep:mime_guess"]
+# Compiles the drain-deadline fault-injection seam in `shutdown`. The
+# graceful-shutdown suite spawns one server through it that force-closes a
+# stalled connection short of its entitlement, which is how the suite shows its
+# drain assertion still fails when that behaviour regresses.
+test-support = []
 
 [dependencies]
 jit = { path = "../jit" }
@@ -58,6 +63,11 @@ mime_guess = { version = "2", optional = true }
 # can reach jit's failure-injection surface (e.g. TransactionFailureInjector)
 # the same way the jit crate's own tests do.
 jit = { path = "../jit", features = ["test-support"] }
+# Enables this crate's own test-support feature for its test builds, so the
+# `jit-server` binary the integration suite spawns carries the drain-deadline
+# seam. Shipped builds resolve features without dev-dependencies and compile
+# neither the seam nor the variable it reads.
+jit-server = { path = ".", features = ["test-support"] }
 axum-test = "14.0"
 tempfile = "3.8"
 # SIGTERM delivery for the real-process shutdown test. Same crate and feature
