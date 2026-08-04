@@ -4,12 +4,6 @@
 /// Package-source prefix identifying assets that also project into this source tree.
 pub const JIT_DOGFOOD_LIVE_SOURCE_PREFIX: &str = "assets/live/";
 
-/// Repository-relative path of this checkout's workflow package manifest.
-///
-/// Every check that binds a packaged declaration to its repository copy names
-/// this as the packaged carrier, so a reader opens the same file the assembly
-/// draws the package from.
-pub const JIT_DOGFOOD_MANIFEST_PATH: &str = "profiles/jit-dogfood/manifest.toml";
 
 #[cfg(test)]
 mod tests {
@@ -1032,6 +1026,7 @@ mod tests {
     /// of that entry stays bound.
     const DECLARED_OVERRIDES: &[DeclaredOverride] = &[
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
             identity: None,
             field: Some("checker"),
@@ -1041,6 +1036,7 @@ mod tests {
                      such an adopter: each of its gates runs a real command.",
         },
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
             identity: None,
             field: Some("title"),
@@ -1048,6 +1044,7 @@ mod tests {
                      for the placeholder it replaced.",
         },
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::KeyedArray(KeyedArrayTarget::Gates),
             identity: None,
             field: Some("description"),
@@ -1056,6 +1053,7 @@ mod tests {
                      installs, which is rendered from the same contributions.",
         },
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::KeyedArray(KeyedArrayTarget::Invariants),
             identity: None,
             field: Some("enforced-by"),
@@ -1065,6 +1063,7 @@ mod tests {
                      contributions. The statement each entry carries stays bound.",
         },
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::KeyedArray(KeyedArrayTarget::Rules),
             identity: None,
             field: Some("origin"),
@@ -1073,6 +1072,7 @@ mod tests {
                      provenance marker rather than the package's.",
         },
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::KeyedArray(KeyedArrayTarget::Rules),
             identity: None,
             field: Some("description"),
@@ -1082,6 +1082,7 @@ mod tests {
                      rule asserts stays bound.",
         },
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::MapEntry(MapEntryTarget::Namespaces),
             identity: None,
             field: Some("examples"),
@@ -1090,6 +1091,7 @@ mod tests {
                      its own issues, which an adopter has no counterpart for.",
         },
         DeclaredOverride {
+            package: PACKAGE_ID,
             scope: OverrideScope::Projection,
             identity: Some("rules-and-gates"),
             field: None,
@@ -1118,14 +1120,32 @@ mod tests {
             .collect()
     }
 
-    /// Every packaged contribution whose repository counterpart states
+    /// Every package this repository publishes, assembled from the checkout,
+    /// with the directories holding the assembled trees.
+    ///
+    /// The set comes from the checkout's package-source listing, so a package
+    /// added there joins the walks below without an edit here — which is the
+    /// property that keeps a second published package from going unbound the
+    /// way the first one did.
+    fn published_packages() -> (Vec<TempDir>, Vec<(String, ProfilePackage)>) {
+        crate::test_utils::published_package_ids()
+            .into_iter()
+            .map(|id| {
+                let (workspace, package) = crate::test_utils::temporary_repository_package(&id);
+                (workspace, (id, package))
+            })
+            .unzip()
+    }
+
+    /// Every contribution of `package` whose repository counterpart states
     /// something else, given the registries the repository carries.
     fn contribution_drift(
+        id: &str,
         package: &ProfilePackage,
         registries: &BTreeMap<String, String>,
     ) -> Vec<crate::profile::drift_report::DriftReport> {
         crate::profile::contribution_drift::contribution_drift_reports(
-            JIT_DOGFOOD_MANIFEST_PATH,
+            id,
             &package.manifest().contributions,
             registries,
             DECLARED_OVERRIDES,
@@ -1133,25 +1153,39 @@ mod tests {
         .expect("every contributed registry entry is comparable")
     }
 
-    /// Every packaged contribution agrees with the repository registry entry
-    /// it restates.
+    /// Every contribution of every published package, and the reports they
+    /// produce against the registries this repository carries.
+    fn published_contribution_drift(
+        packages: &[(String, ProfilePackage)],
+    ) -> Vec<crate::profile::drift_report::DriftReport> {
+        packages
+            .iter()
+            .flat_map(|(id, package)| {
+                let registries = contributed_registries(&package.manifest().contributions);
+                contribution_drift(id, package, &registries)
+            })
+            .collect()
+    }
+
+    /// Every contribution of every package this repository publishes agrees
+    /// with the repository registry entry it restates.
     ///
-    /// This is the direction the manifest does not walk: a contribution and the
+    /// This is the direction the manifests do not walk: a contribution and the
     /// entry it restates are two copies of one declaration, and nothing else
     /// keeps them in step. The repository's copy is what this checkout's own
     /// validation reads and the packaged copy is what an adopter receives, so
     /// once they come apart one of them carries a ruling the other never
-    /// recorded.
+    /// recorded. Binding one package and not the next left exactly that gap.
     #[test]
-    fn test_contribution_drift_is_empty_across_every_packaged_contribution() {
-        let (_workspace, package) = assembled_package();
-        let registries = contributed_registries(&package.manifest().contributions);
+    fn test_contribution_drift_is_empty_across_every_published_package() {
+        let (_workspaces, packages) = published_packages();
         assert!(
-            !registries.is_empty(),
-            "the package contributes to a registry"
+            packages.len() >= 2,
+            "this repository publishes more than one package, which is what makes \
+             the walk over the published set distinct from a walk over one package"
         );
 
-        let reported = contribution_drift(&package, &registries)
+        let reported = published_contribution_drift(&packages)
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
@@ -1160,6 +1194,28 @@ mod tests {
             Vec::<String>::new(),
             "each report names a packaged contribution and the repository entry it \
              restates, which no longer state the same thing"
+        );
+    }
+
+    /// Every published package contributes to a registry the walk reads, so no
+    /// package is carried by the walk without being compared.
+    #[test]
+    fn test_every_published_package_contributes_to_a_registry_the_walk_reads() {
+        let (_workspaces, packages) = published_packages();
+
+        let uncompared: Vec<&str> = packages
+            .iter()
+            .filter(|(_, package)| {
+                contributed_registries(&package.manifest().contributions).is_empty()
+            })
+            .map(|(id, _)| id.as_str())
+            .collect();
+
+        assert_eq!(
+            uncompared,
+            Vec::<&str>::new(),
+            "each entry names a published package the walk visits and compares \
+             nothing for"
         );
     }
 
@@ -1172,26 +1228,47 @@ mod tests {
     /// target is bound by an expectation stated here about what it declares.
     #[test]
     fn test_contribution_drift_compares_a_seeded_edit_on_every_declared_target() {
-        let (_workspace, package) = assembled_package();
-        let contributions = &package.manifest().contributions;
-        let registries = contributed_registries(contributions);
-        let declared: BTreeSet<String> = contributions.iter().map(declared_target).collect();
-        assert!(!declared.is_empty(), "the package declares contributions");
+        let (_workspaces, packages) = published_packages();
 
-        let bound: BTreeSet<String> = contributions
+        // Each target is named with the package declaring it, so a target one
+        // package binds does not vouch for the same target in another.
+        let declared: BTreeSet<(String, String)> = packages
             .iter()
-            .filter(|contribution| {
-                seeded_packaged_edits(contribution).iter().any(|seeded| {
-                    seeded_drift(JIT_DOGFOOD_MANIFEST_PATH, seeded, &registries).len() == 1
-                })
+            .flat_map(|(id, package)| {
+                package
+                    .manifest()
+                    .contributions
+                    .iter()
+                    .map(|contribution| (id.clone(), declared_target(contribution)))
             })
-            .map(declared_target)
+            .collect();
+        assert!(
+            !declared.is_empty(),
+            "the published packages declare contributions"
+        );
+
+        let bound: BTreeSet<(String, String)> = packages
+            .iter()
+            .flat_map(|(id, package)| {
+                let contributions = &package.manifest().contributions;
+                let registries = contributed_registries(contributions);
+                contributions
+                    .iter()
+                    .filter(|contribution| {
+                        seeded_packaged_edits(contribution)
+                            .iter()
+                            .any(|seeded| seeded_drift(id, seeded, &registries).len() == 1)
+                    })
+                    .map(|contribution| (id.clone(), declared_target(contribution)))
+                    .collect::<Vec<_>>()
+            })
             .collect();
 
         assert_eq!(
             bound, declared,
-            "each target the two sets differ by is one where a seeded edit to the \
-             packaged declaration went unreported, so nothing binds it"
+            "each pair the two sets differ by names a package and a target where a \
+             seeded edit to the packaged declaration went unreported, so nothing \
+             binds it"
         );
     }
 
@@ -1218,12 +1295,15 @@ mod tests {
             seeded_invariant_statement(&committed, "domain-agnostic"),
         );
 
-        let reported = contribution_drift(&package, &registries);
+        let reported = contribution_drift(PACKAGE_ID, &package, &registries);
 
         assert_eq!(reported.len(), 1, "{reported:?}");
         let report = &reported[0];
         assert_eq!(report.repository().path, registry);
-        assert_eq!(report.packaged().path, JIT_DOGFOOD_MANIFEST_PATH);
+        assert_eq!(
+            report.packaged().path,
+            crate::profile::contribution_drift::packaged_manifest_path(PACKAGE_ID)
+        );
         let rendered = report.to_string();
         assert!(rendered.contains(SEEDED_EDIT), "{rendered}");
         for carrier in [report.repository(), report.packaged()] {
@@ -1232,31 +1312,37 @@ mod tests {
         }
     }
 
-    /// Every declared override still names a contribution the manifest makes
-    /// and, when it names a field, one that contribution declares.
+    /// Every declared override still names a contribution its own package
+    /// makes and, when it names a field, one that contribution declares.
     ///
     /// An override outliving the declaration it excuses would go on suppressing
-    /// a comparison nothing asked for.
+    /// a comparison nothing asked for. Because an override names its package,
+    /// an entry whose reason was written about one package and whose package no
+    /// longer declares the contribution is reported here even while another
+    /// package declares the same thing.
     #[test]
-    fn test_declared_overrides_each_name_a_contribution_the_package_still_declares() {
-        let (_workspace, package) = assembled_package();
-        let contributions = &package.manifest().contributions;
+    fn test_declared_overrides_each_name_a_contribution_its_package_still_declares() {
+        let (_workspaces, packages) = published_packages();
 
-        let stale: Vec<&str> = DECLARED_OVERRIDES
+        let stale: Vec<(&str, &str)> = DECLARED_OVERRIDES
             .iter()
             .filter(|declared| {
-                !contributions
-                    .iter()
-                    .any(|contribution| declared.applies_to(contribution))
+                !packages.iter().any(|(id, package)| {
+                    package
+                        .manifest()
+                        .contributions
+                        .iter()
+                        .any(|contribution| declared.applies_to(id, contribution))
+                })
             })
-            .map(|declared| declared.reason)
+            .map(|declared| (declared.package, declared.reason))
             .collect();
 
         assert_eq!(
             stale,
-            Vec::<&str>::new(),
-            "each entry is a declared override whose contribution or field the package \
-             no longer declares"
+            Vec::<(&str, &str)>::new(),
+            "each entry pairs a package with a declared override whose contribution \
+             or field that package no longer declares"
         );
     }
 
@@ -1282,12 +1368,12 @@ mod tests {
     /// one of a closed vocabulary, say — reports nothing here and the walk
     /// above tries the next field.
     fn seeded_drift(
-        manifest: &str,
+        package: &str,
         contribution: &Contribution,
         registries: &BTreeMap<String, String>,
     ) -> Vec<crate::profile::drift_report::DriftReport> {
         crate::profile::contribution_drift::contribution_drift_reports(
-            manifest,
+            package,
             std::slice::from_ref(contribution),
             registries,
             DECLARED_OVERRIDES,

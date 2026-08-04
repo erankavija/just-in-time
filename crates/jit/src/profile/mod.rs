@@ -52,4 +52,4 @@ pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
-pub use repository_package::{JIT_DOGFOOD_LIVE_SOURCE_PREFIX, JIT_DOGFOOD_MANIFEST_PATH};
+pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;

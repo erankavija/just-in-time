@@ -88,7 +88,7 @@ default_type = "task"
 # NO "strategic" flags - strategic is derived from type labels only
 
 [namespaces.type]
-description = "Issue type (hierarchical). Exactly one per issue."
+description = "Issue type (hierarchical). At most one per issue."
 unique = true
 examples = ["type:task", "type:story", "type:epic", "type:milestone"]
 
@@ -98,9 +98,9 @@ unique = false
 examples = ["epic:auth", "epic:production-stability"]
 
 [namespaces.milestone]
-description = "Release or time-bounded goal membership"
+description = "Release milestone membership (version tag)."
 unique = false
-examples = ["milestone:v1.0", "milestone:2026-q1"]
+examples = ["milestone:v1.0", "milestone:v1.2.3", "milestone:v2.0-rc1"]
 
 [namespaces.story]
 description = "Story membership (optional)"
@@ -108,17 +108,17 @@ unique = false
 examples = ["story:user-login", "story:checkout"]
 
 [namespaces.component]
-description = "Technical area or subsystem"
+description = "Technical area or subsystem affected."
 unique = false
 examples = ["component:backend", "component:frontend", "component:cli"]
 
 [namespaces.team]
-description = "Owning team"
+description = "Owning team."
 unique = true
-examples = ["team:core", "team:platform"]
+examples = ["team:backend", "team:platform"]
 
 [namespaces.resolution]
-description = "Reason for issue closure"
+description = "Reason for issue closure (used with rejected state)."
 unique = true
 examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"]
 
@@ -133,7 +133,7 @@ unique = false
 examples = ["satisfies:REQ-01"]
 
 [namespaces.enforces]
-description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces"
+description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces."
 unique = false
 examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
 
