@@ -503,8 +503,8 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
 
     assert!(
         reaped,
-        "the jit parent survived SIGKILL to its own process group (kill: \
-         {killed:?}) and was still running {FG_TEARDOWN_BUDGET:?} later"
+        "the jit parent did not exit within its {FG_TEARDOWN_BUDGET:?} teardown \
+         budget after SIGKILL to its own process group (kill: {killed:?})"
     );
     if !drained {
         // Whether the announced port still answers separates a live survivor
@@ -512,8 +512,9 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
         let still_serving = port.is_some_and(server_responds);
         panic!(
             "a process this test spawned outlived it: process group {pgid} still \
-             has members {FG_TEARDOWN_BUDGET:?} after SIGKILL (kill: {killed:?}); \
-             announced port still answers HTTP: {still_serving}"
+             has members after SIGKILL and a {FG_TEARDOWN_BUDGET:?} teardown \
+             budget (kill: {killed:?}); announced port still answers HTTP: \
+             {still_serving}"
         );
     }
     assert!(
@@ -523,11 +524,14 @@ fn test_serve_fg_serves_when_child_runs_bootstrap_recovery() {
     assert!(
         served,
         "jit serve --fg never began serving within {FG_BUDGET:?} (took \
-         {elapsed:?}): {}. The parent held the bootstrap recovery lock while \
-         the child needed it.\n--- stdout ---\n{out}\n--- stderr ---\n{err}",
+         {elapsed:?}): {}\n--- stdout ---\n{out}\n--- stderr ---\n{err}",
         match port {
-            Some(port) => format!("it announced port {port} but never answered HTTP there"),
-            None => "it never announced a port".to_owned(),
+            Some(port) => format!(
+                "it announced port {port} and never answered HTTP there, which is \
+                 what a parent still holding the bootstrap recovery lock its child \
+                 needs looks like."
+            ),
+            None => "it never announced a port.".to_owned(),
         }
     );
 }
