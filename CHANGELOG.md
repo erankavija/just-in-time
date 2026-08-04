@@ -1124,6 +1124,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   distinguishing "I am still queued" from "the operation was refused" matches
   the type through `is_lock_timeout` rather than the message.
 
+- **The shutdown drain takes its whole schedule from its caller.** The drain
+  samples the live connection count until its deadline expires, and the wait
+  between two counts was fixed inside the loop while the deadline arrived from
+  outside it. Both now arrive together, and the serving process passes the same
+  interval it has always enforced, so the deadline a stalled connection receives
+  is unchanged. The case for a connection that finishes in the last sampling
+  interval is what the seam is for: it used to give the drain four 100 ms
+  intervals of deadline, sleep 3.5 of them and then complete the connection, so
+  50 ms of host scheduling separated a reported drain from a reported forced
+  close. Supplying a boundary the case triggers itself, and no periodic wake-up,
+  orders its three events by observation — the drain reports the sample that
+  found the connection live, the handle reports the retirement, and only then
+  does the deadline expire — so a slow host delays each step instead of changing
+  which branch the drain takes.
+
 ## [1.0.0] - 2026-07-30
 
 The first stable release. [The v1.0.0 release
