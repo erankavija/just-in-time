@@ -2590,8 +2590,10 @@ fn test_session_foreign_owner_external_journal_is_skipped_not_failed() {
 
 #[test]
 fn test_session_disjoint_sessions_serialize_on_worktree_bootstrap() {
+    use crate::storage::contention_probe::{admitted_when_reached, Contenders};
+    use crate::storage::repo_lock::RepoWriteLock;
+    use crate::storage::repository_state_store::is_lock_timeout;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Barrier;
 
     // Two data roots under DIFFERENT parents, both sharing one worktree. Their
     // data-root-parent bootstrap locks differ, so only the worktree-root
@@ -2606,20 +2608,34 @@ fn test_session_disjoint_sessions_serialize_on_worktree_bootstrap() {
     let layout_one = discover_repository_layout(worktree.path(), &data_one).unwrap();
     let layout_two = discover_repository_layout(worktree.path(), &data_two).unwrap();
 
+    // Both sessions reach the worktree bootstrap lock through the process-wide
+    // registry, so registering it here with a wait shorter than any critical
+    // section makes the session that meets it held report itself refused rather
+    // than queue silently. Retained for the whole test to keep that entry live.
+    let _bootstrap_lock = RepoWriteLock::shared_for_lock_path(
+        layout_one.worktree_root().join(".jit-bootstrap.lock"),
+        std::time::Duration::from_millis(1),
+    );
+
     let first = JsonFileStorage::new(&data_one);
     let session_one = first.open_mutation_session(layout_one).unwrap();
 
-    let started = Arc::new(Barrier::new(2));
+    let contenders = Contenders::new();
     let holder_released = Arc::new(AtomicBool::new(false));
     let waiter = {
-        let started = Arc::clone(&started);
+        let contenders = Arc::clone(&contenders);
         let holder_released = Arc::clone(&holder_released);
         std::thread::spawn(move || {
-            started.wait();
             let second = JsonFileStorage::new(&data_two);
-            let _session_two = second.open_mutation_session(layout_two).unwrap();
-            // The second session opened only after the first released the
-            // worktree bootstrap lock — they never ran concurrently.
+            // An expired wait says this session was still queued, so it asks
+            // again; the session it eventually opens is the lock's answer.
+            let _session_two = admitted_when_reached(
+                &contenders,
+                "one worktree's bootstrap lock",
+                || second.open_mutation_session(layout_two.clone()),
+                is_lock_timeout,
+            )
+            .unwrap();
             assert!(
                 holder_released.load(Ordering::SeqCst),
                 "a disjoint-data-root session opened one worktree's bootstrap concurrently"
@@ -2627,8 +2643,9 @@ fn test_session_disjoint_sessions_serialize_on_worktree_bootstrap() {
         })
     };
 
-    started.wait();
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    // The second session has met the bootstrap lock held, so the one it opens
+    // next follows the release below rather than racing it.
+    contenders.await_refusals(1);
     holder_released.store(true, Ordering::SeqCst);
     drop(session_one);
     waiter.join().unwrap();

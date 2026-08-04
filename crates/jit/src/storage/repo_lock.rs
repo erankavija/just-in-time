@@ -29,7 +29,7 @@
 //! take shared index, issue, gate, or event locks; no reader acquires the outer
 //! mutation chain, so no cycle exists.
 
-use super::lock::{FileLocker, LockGuard};
+use super::lock::{FileLocker, LockGuard, LockMode, LockTimeout};
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
@@ -108,9 +108,11 @@ pub struct RepoWriteLock {
     /// order at bootstrap → repository → finer storage locks.
     predecessor: Option<Arc<RepoWriteLock>>,
     /// Bound on the in-process wait for another thread to release, matching the
-    /// file lock's cross-process timeout. `None` for a process-local lock, whose
-    /// single-lock exclusion cannot form the crossed-order in-process cycle that
-    /// makes a bounded wait necessary. See [`RepoWriteLock::acquire`].
+    /// file lock's cross-process timeout. Set exactly when `backing` is, so an
+    /// expired in-process wait names the same lock file the cross-process wait
+    /// would have. `None` for a process-local lock, whose single-lock exclusion
+    /// cannot form the crossed-order in-process cycle that makes a bounded wait
+    /// necessary. See [`RepoWriteLock::acquire`].
     owner_wait_timeout: Option<Duration>,
     state: Mutex<LockState>,
     /// Signalled when the outermost guard drops and `owner` becomes `None`.
@@ -211,8 +213,12 @@ impl RepoWriteLock {
     ///
     /// # Errors
     ///
-    /// Returns an error when the storage root cannot be created or the file lock
-    /// cannot be acquired within the configured timeout.
+    /// Returns an error when the storage root cannot be created, and a
+    /// [`LockTimeout`] when the configured wait expires with the lock still
+    /// held — by another thread of this process or by another process alike.
+    /// That is the caller reporting itself still queued rather than the lock
+    /// refusing it, so callers that must tell the two apart match it with
+    /// [`is_lock_timeout`](super::lock::is_lock_timeout) and may wait again.
     pub fn acquire(self: &Arc<Self>) -> Result<RepoWriteGuard> {
         let predecessor_guard = self
             .predecessor
@@ -239,16 +245,19 @@ impl RepoWriteLock {
         // acquisition order between two in-process sessions (e.g. the embedded
         // server holding two layouts whose worktree and data-parent locks invert)
         // fails with a timeout instead of hanging on an untimed condvar.
-        if let Some(timeout) = self.owner_wait_timeout {
-            let described = self
-                .path()
-                .map(|path| path.display().to_string())
-                .unwrap_or_else(|| "in-process lock".to_string());
+        // `owner_wait_timeout` and `backing` are set together, so the expired
+        // wait reports the lock file a caller queued on either side would name.
+        if let Some(((path, _), timeout)) = self.backing.as_ref().zip(self.owner_wait_timeout) {
+            let expired = || LockTimeout {
+                mode: LockMode::Exclusive,
+                path: path.clone(),
+                waited: timeout,
+            };
             let deadline = std::time::Instant::now() + timeout;
             while state.owner.is_some() {
                 let remaining = deadline.saturating_duration_since(std::time::Instant::now());
                 if remaining.is_zero() {
-                    anyhow::bail!("Lock timeout: could not acquire {described} within {timeout:?}");
+                    return Err(expired().into());
                 }
                 let (next, result) = self
                     .released
@@ -256,7 +265,7 @@ impl RepoWriteLock {
                     .unwrap_or_else(|poisoned| poisoned.into_inner());
                 state = next;
                 if result.timed_out() && state.owner.is_some() {
-                    anyhow::bail!("Lock timeout: could not acquire {described} within {timeout:?}");
+                    return Err(expired().into());
                 }
             }
         } else {
@@ -342,8 +351,9 @@ impl Drop for RepoWriteGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::contention_probe::{admitted_when_reached, Contenders};
+    use crate::storage::lock::is_lock_timeout;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Barrier;
     use tempfile::TempDir;
 
     #[test]
@@ -386,31 +396,40 @@ mod tests {
     #[test]
     fn test_second_thread_waits_for_the_holder() {
         let temp = TempDir::new().unwrap();
-        let lock = RepoWriteLock::for_storage_root(temp.path(), Duration::from_secs(5));
+        // Shorter than the holder's critical section, so a contender that meets
+        // the lock held is refused it and says so, rather than queueing silently.
+        let lock = RepoWriteLock::for_storage_root(temp.path(), Duration::from_millis(1));
 
-        let started = Arc::new(Barrier::new(2));
-        let holder_done = Arc::new(AtomicBool::new(false));
+        let contenders = Contenders::new();
+        let holder_released = Arc::new(AtomicBool::new(false));
 
         let guard = lock.acquire().unwrap();
 
         let waiter = {
             let lock = Arc::clone(&lock);
-            let started = Arc::clone(&started);
-            let holder_done = Arc::clone(&holder_done);
+            let contenders = Arc::clone(&contenders);
+            let holder_released = Arc::clone(&holder_released);
             std::thread::spawn(move || {
-                started.wait();
-                let _g = lock.acquire().unwrap();
-                // The holder released before this acquisition returned.
+                // An expired wait says this thread was still queued, so it asks
+                // again; the entry it eventually makes is the lock's answer.
+                let _entered = admitted_when_reached(
+                    &contenders,
+                    "the repository write lock",
+                    || lock.acquire(),
+                    is_lock_timeout,
+                )
+                .unwrap();
                 assert!(
-                    holder_done.load(Ordering::SeqCst),
+                    holder_released.load(Ordering::SeqCst),
                     "a second thread must not enter while the lock is held"
                 );
             })
         };
 
-        started.wait();
-        std::thread::sleep(Duration::from_millis(150));
-        holder_done.store(true, Ordering::SeqCst);
+        // The contender has met the lock held, so the entry it makes next is one
+        // the lock granted after the release below rather than one it raced.
+        contenders.await_refusals(1);
+        holder_released.store(true, Ordering::SeqCst);
         drop(guard);
 
         waiter.join().unwrap();

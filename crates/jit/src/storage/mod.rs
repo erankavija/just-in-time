@@ -13,6 +13,8 @@ pub mod artifact_planning;
 pub(crate) mod atomic_write;
 pub mod claim_coordinator;
 pub mod clock;
+#[cfg(test)]
+pub(crate) mod contention_probe;
 pub mod control_plane;
 pub mod discovery;
 pub mod errors;
@@ -23,7 +25,6 @@ pub mod gate_store;
 pub mod git_revision;
 pub mod guard_order;
 pub mod json;
-pub mod lease;
 pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;

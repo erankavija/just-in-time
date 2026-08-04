@@ -71,6 +71,23 @@ pub enum RepositoryStateStoreError {
     Other(#[from] anyhow::Error),
 }
 
+/// Whether this failure is a lock wait that expired rather than an outcome the
+/// session decided.
+///
+/// A session opens behind the worktree-bootstrap, bootstrap and repository
+/// locks, each of which reports a caller still queued as
+/// [`LockTimeout`](crate::storage::lock::LockTimeout) carried through
+/// [`RepositoryStateStoreError::Other`]. A caller that must tell "I have not
+/// reached the critical section yet" from "the session refused this" reads that
+/// distinction here; asking again is what puts the question back to the store.
+#[cfg(test)]
+pub(crate) fn is_lock_timeout(error: &RepositoryStateStoreError) -> bool {
+    matches!(
+        error,
+        RepositoryStateStoreError::Other(error) if crate::storage::lock::is_lock_timeout(error)
+    )
+}
+
 /// Whether an advisory capture may replace this failure with unreadable
 /// evidence. Semantic capture failures and non-permission I/O stay hard.
 pub(crate) fn is_advisory_permission_denied(error: &RepositoryStateStoreError) -> bool {
