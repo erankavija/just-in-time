@@ -27,10 +27,11 @@
     "epic:guards-and-ergonomics",
     "milestone:v1.0",
     "component:gates",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-03"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Make the cargo-ci verdict independent of unrelated host load",
-  "updated_at": "2026-08-03T21:55:11.871961459Z"
+  "updated_at": "2026-08-04T12:01:46.153535105Z"
 }

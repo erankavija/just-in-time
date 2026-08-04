@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-04T11:55:29.667064187Z",
+  "dependencies": [],
+  "description": "The test covering foreground serve reaches a verdict within a stated budget, so it cannot hold a continuous-integration job open until that job is cancelled.\n\n## Background\n\n`serve_cli_tests::test_serve_fg_serves_when_child_runs_bootstrap_recovery` logs \"has been running for over 60 seconds\" on the hosted runner and then emits nothing further. The job is cancelled almost six hours later at the runner's execution ceiling. Job cleanup reports `jit` and `jit-server` among the orphaned processes it terminates, so the process-group kill the test performs did not reach either of them. Four jobs of one workflow run — the whole-workspace test job, the minimum-supported-toolchain job, the feature-gated job and the coverage job — were each cancelled this way, and the workflow has failed this way on every push for several days. The test passes in isolation on a developer machine in well under a second.\n\nThe test's own waits are bounded: it waits twenty seconds for the announced port and twenty more for the first served response. What follows them is not. It kills the process group, waits on the parent, and then joins the two threads draining the parent's piped stdout and stderr. A surviving server holds the inherited write ends of both pipes open, so a draining thread never reaches end of file and its join never returns; a surviving parent makes the wait before it never return either. Any of those three steps blocks without a deadline.\n\nA second unbounded step precedes all of them. When the server binary is absent beside the harness binary, the test spawns a build to produce it. The feature-gated job never builds that binary, and the build the test spawns must wait for a lock the build already running the test holds, which no timeout in the test bounds.\n\n## Success Criteria\n\n- [hard] REQ-01: The test reaches a verdict within a wall-clock budget the test itself states, on a host where the server never comes up at all.\n- [hard] REQ-02: No process the test spawns, including a server started by the process the test spawns, outlives the test.\n- [hard] REQ-03: Every wait, read and thread join the test performs is bounded by a deadline.\n- [hard] REQ-04: The test obtains the server binary it needs without invoking a build whose lock the invoking build already holds.\n- [hard] REQ-05: The property the test protects still fails it: with the parent's release of the recovery lock removed, the test reports failure rather than passing or hanging.",
+  "documents": [],
+  "first_ready_at": "2026-08-04T11:55:29.667064187Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:56:10.997970732Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:56:11.295004070Z",
+      "updated_by": null
+    }
+  },
+  "id": "76a4bd21-4afc-40ab-a2c0-376c296dc9ab",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:cli",
+    "type:task",
+    "satisfies:REQ-08"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling",
+  "updated_at": "2026-08-04T12:02:17.873444513Z"
+}

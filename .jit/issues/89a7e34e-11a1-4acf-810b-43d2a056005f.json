@@ -27,10 +27,11 @@
     "epic:guards-and-ergonomics",
     "milestone:v1.0",
     "component:gates",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-04"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Make the staleness refusal name the condition it detected",
-  "updated_at": "2026-08-03T21:55:12.226715910Z"
+  "updated_at": "2026-08-04T12:01:51.430732848Z"
 }

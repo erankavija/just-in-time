@@ -28,10 +28,11 @@
     "milestone:v1.0",
     "component:core",
     "enforces:@/invariant/canonical-cutover",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-07"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Remove the requirement tag naming another container",
-  "updated_at": "2026-08-03T21:55:13.614582094Z"
+  "updated_at": "2026-08-04T12:02:12.582285568Z"
 }

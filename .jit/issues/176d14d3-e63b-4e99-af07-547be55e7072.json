@@ -2,8 +2,10 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-08-03T21:54:00.144326836Z",
-  "dependencies": [],
-  "description": "The packaged managed-region source and the region rendered into a repository file are held equal by a check, so neither can drift from the other unnoticed.\n\n## Background\n\n`profiles/jit-dogfood/assets/regions/agents-jit-guidance.md` is the package's authority for a managed region, and `AGENTS.md` carries that region rendered. `jit project render` does not touch the pair — only the charter, invariant and rules-and-gates projections are declared — so the two are maintained by hand.\n\nA package application materialises the region from the packaged source. An edit made to the rendered region alone therefore survives until the next apply and is then replaced, and an edit made to the packaged source alone never reaches the repository that already rendered it.\n\nThis shares its shape with the packaged-contribution-versus-registry pair, though the carriers and the fix site differ.\n\n## Success Criteria\n\n- [hard] REQ-01: A difference between the packaged region source and the region rendered into its target fails a check.\n- [hard] REQ-02: The check reports which carrier holds which text, rather than reporting only that they differ.\n- [hard] REQ-03: The pair the check compares is derived from the region declaration in the manifest, so a newly declared region is covered without a second edit.",
+  "dependencies": [
+    "a2d7d212-33d7-4c56-9a17-126d9c8e2af1"
+  ],
+  "description": "The packaged managed-region source and the region rendered into a repository file are held equal by a check, so neither can drift from the other unnoticed.\n\n## Background\n\n`profiles/jit-dogfood/assets/regions/agents-jit-guidance.md` is the package's authority for a managed region, and `AGENTS.md` carries that region rendered. A package application materialises the region from the packaged source, so an edit made to the rendered region alone survives until the next apply and is then replaced, and an edit made to the packaged source alone never reaches the repository that already rendered it.\n\nA check does bind the pair today. `test_managed_regions_match_every_declared_source_tree_consumer`, in `crates/jit/src/profile/repository_package.rs`, walks every region the manifest declares, reads the rendered body out of the declared target file, and compares it against the packaged source; a line inserted into the rendered region fails it.\n\nWhat that check does not do is say which side holds which text. It compares through a bare equality assertion, so a failure prints two bodies positionally, with nothing naming one as the repository's rendered region and the other as the packaged source. A reader who has just been told the two differ still has to work out which carrier to repair, and the assertion's own message does not carry the packaged source path at all.\n\nThis shares its shape with the packaged-contribution-versus-registry pair, though the carriers and the fix site differ.\n\n## Success Criteria\n\n- [hard] REQ-01: A difference between the packaged region source and the region rendered into its target fails a check.\n- [hard] REQ-02: The check reports which carrier holds which text, rather than reporting only that they differ.\n- [hard] REQ-03: The pair the check compares is derived from the region declaration in the manifest, so a newly declared region is covered without a second edit.\n",
   "documents": [],
   "first_ready_at": "2026-08-03T21:54:00.144326836Z",
   "gates_required": [
@@ -34,10 +36,11 @@
     "milestone:v1.0",
     "component:core",
     "enforces:@/invariant/single-source-prose",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-01"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Bind the packaged region source to the region rendered from it",
-  "updated_at": "2026-08-03T21:55:14.704105277Z"
+  "updated_at": "2026-08-04T12:01:35.585572698Z"
 }

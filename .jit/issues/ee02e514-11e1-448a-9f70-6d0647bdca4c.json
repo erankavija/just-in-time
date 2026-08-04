@@ -1,0 +1,43 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-04T11:59:16.905366417Z",
+  "dependencies": [],
+  "description": "The workflow exercises only platforms whose failures this repository acts on, so a red job means a defect someone will fix.\n\n## Background\n\nThe offline profile-adoption job runs on two platforms. The Windows leg fails on every test it runs, for defects the project has decided not to address for now, so the workflow reports failure indefinitely for a reason no one is acting on. A check that is expected to stay red teaches readers to ignore the workflow's verdict, which costs more than the coverage it nominally provides.\n\nRemoving the leg removes the repository's only Windows signal. Whatever the repository states about running on that platform is then unverified by any job, and saying so is part of removing it.\n\n## Success Criteria\n\n- [hard] REQ-01: The workflow runs no job on a platform whose failures the repository does not act on.\n- [hard] REQ-02: A reader of the workflow finds why the platform leg is absent, stated where the remaining legs are declared.\n- [hard] REQ-03: A sweep of adopter-facing and contributor-facing documentation reports every statement claiming support for the removed platform, its result is stated, and no surviving statement presents that support as verified.",
+  "documents": [],
+  "first_ready_at": "2026-08-04T11:59:16.905366417Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:59:24.235585584Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:59:24.530288738Z",
+      "updated_by": null
+    },
+    "docs-mechanical": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:59:24.825475613Z",
+      "updated_by": null
+    }
+  },
+  "id": "ee02e514-11e1-448a-9f70-6d0647bdca4c",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:gates",
+    "type:task",
+    "satisfies:REQ-08"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Run the workflow only on platforms whose failures are acted on",
+  "updated_at": "2026-08-04T12:02:23.176039427Z"
+}

@@ -1,0 +1,49 @@
+{
+  "epic_id": "f3f7de97-7315-4780-8389-9c857da29239",
+  "epic_short_id": "f3f7de97",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "5367fcba-09d5-4307-95d0-232a885533f6", "short_id": "5367fcba", "title": "Reject an unrecognised option instead of writing to it", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
+        {"id": "89a7e34e-11a1-4acf-810b-43d2a056005f", "short_id": "89a7e34e", "title": "Make the staleness refusal name the condition it detected", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
+        {"id": "6d496b8c-587f-4246-a7e7-4c7e1d6792cb", "short_id": "6d496b8c", "title": "Evaluate one gate across several issues in one invocation", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
+        {"id": "3019eacd-863a-428e-b25e-aede2cf37da7", "short_id": "3019eacd", "title": "Make the merge-integrity guard fail a merge that does not build and test", "classification": "implementation", "worker": "opus", "status": "pending"},
+        {"id": "ee02e514", "short_id": "ee02e514", "title": "Run the workflow only on platforms whose failures are acted on", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
+        {"id": "76a4bd21", "short_id": "76a4bd21", "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling", "classification": "implementation", "worker": "opus", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "896b5b5d-f11f-48de-88b6-88cc1ba47588", "short_id": "896b5b5d", "title": "Read an issue description from a file or standard input on create", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
+        {"id": "a2d7d212-33d7-4c56-9a17-126d9c8e2af1", "short_id": "a2d7d212", "title": "Bind a packaged contribution to the registry entry it restates", "classification": "implementation", "worker": "opus", "status": "pending"},
+        {"id": "06f1fa95-2aa4-4493-a31e-1f149f3deee9", "short_id": "06f1fa95", "title": "Make the cargo-ci verdict independent of unrelated host load", "classification": "implementation", "worker": "opus", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "176d14d3-e63b-4e99-af07-547be55e7072", "short_id": "176d14d3", "title": "Bind the packaged region source to the region rendered from it", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"},
+        {"id": "e516b4f8-506d-4b43-89a9-e72603aecaa6", "short_id": "e516b4f8", "title": "Remove the requirement tag naming another container", "classification": "implementation", "worker": "codex/gpt-5.6-luna", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [
+    {"short_id": "76a4bd21", "why": "CI scope expansion directed by the invoker: the test hanging four jobs to the execution ceiling"},
+    {"short_id": "25d25f2f", "why": "CI scope expansion: Windows initialization stack overflow", "status": "rejected", "reason": "Windows out of scope"},
+    {"short_id": "03566554", "why": "CI scope expansion: Windows package publication and manifest path escaping", "status": "rejected", "reason": "Windows out of scope"},
+    {"short_id": "ee02e514", "why": "Follow-on from the Windows rejection: the workflow must stop running a leg nobody acts on"}
+  ],
+  "escalations": [
+    {"topic": "merge-integrity guard ending", "resolution": "removed rather than made to build and test; per-merge cost ruled out"},
+    {"topic": "carrier-binding mechanism shape", "resolution": "one home, shared drift-report shape"},
+    {"topic": "region issue stale Background", "resolution": "amended; criteria untouched"},
+    {"topic": "epic criteria for CI", "resolution": "REQ-08 added"},
+    {"topic": "Windows leg of the workflow", "resolution": "dropped from the matrix; the two Windows defects rejected"}
+  ],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "started_at": "2026-08-04T12:00:00Z"
+}

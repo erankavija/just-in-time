@@ -39,10 +39,11 @@
     "epic:guards-and-ergonomics",
     "milestone:v1.0",
     "component:cli",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-05"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Evaluate one gate across several issues in one invocation",
-  "updated_at": "2026-08-03T21:55:14.322304402Z"
+  "updated_at": "2026-08-04T12:02:01.984082352Z"
 }

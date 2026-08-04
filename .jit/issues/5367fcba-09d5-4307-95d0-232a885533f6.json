@@ -27,10 +27,11 @@
     "epic:guards-and-ergonomics",
     "milestone:v1.0",
     "component:core",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-06"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Reject an unrecognised option instead of writing to it",
-  "updated_at": "2026-08-03T21:55:13.271045321Z"
+  "updated_at": "2026-08-04T12:02:07.279328674Z"
 }

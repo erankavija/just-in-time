@@ -27,10 +27,11 @@
     "epic:guards-and-ergonomics",
     "milestone:v1.0",
     "component:gates",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-02"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Make the merge-integrity guard fail a merge that does not build and test",
-  "updated_at": "2026-08-03T21:55:11.527224444Z"
+  "updated_at": "2026-08-04T12:01:40.857340332Z"
 }

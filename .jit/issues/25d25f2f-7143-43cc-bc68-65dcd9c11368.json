@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-04T11:55:33.327005207Z",
+  "dependencies": [],
+  "description": "Repository initialization completes on Windows, so the calls that begin with it do not fail before reaching what they test.\n\n## Background\n\nOn the hosted Windows runner, `jit init --json` terminates with exit status `0xc00000fd` and the message \"thread 'main' has overflowed its stack\" on standard error. That status is Windows' stack-overflow code. Stdout is empty, so the caller receives no report at all, and every acceptance test in the offline profile-adoption job that begins by initializing a repository fails on that one call.\n\nThe same call succeeds on Linux. Windows gives a main thread a smaller default stack than Linux does, so a path that recurses without a bound, or holds a frame proportional to something it reads, can survive one platform and not the other. Which path is unestablished: the process dies before it writes any diagnostic of its own, and no test currently exercises initialization on Windows outside this job.\n\nThe offline profile-adoption job is the only Windows coverage the workflow has, so the overflow is invisible to every other job and to the local quality gates.\n\n## Success Criteria\n\n- [hard] REQ-01: Repository initialization completes on Windows and reports its result on standard output.\n- [hard] REQ-02: The overflowing path is identified, and its depth is bounded by construction rather than by how much stack the platform happens to give the thread.\n- [hard] REQ-03: A test fails if that path becomes unbounded again, and the test states which path it covers.\n- [hard] REQ-04: Every profile-adoption acceptance test whose failure was this overflow passes on Windows.\n\n\n## Resolution\n\nWindows support is out of scope for the container that surfaced this: the workflow's Windows leg is removed rather than repaired, so no job observes the defect. The diagnosis above is retained for whoever restores that platform.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-04T11:55:33.327005207Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:56:11.592256718Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:56:11.891960261Z",
+      "updated_by": null
+    }
+  },
+  "id": "25d25f2f-7143-43cc-bc68-65dcd9c11368",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:core",
+    "type:task",
+    "resolution:wont-fix"
+  ],
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Complete repository initialization on Windows without overflowing the stack",
+  "updated_at": "2026-08-04T12:00:27.228828340Z"
+}

@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-04T11:55:36.975132228Z",
+  "dependencies": [],
+  "description": "A package tree assembles and publishes on Windows, and a manifest a test authors parses on the host that wrote it.\n\n## Background\n\nTwo independent defects fail the offline profile-adoption job on Windows.\n\nPublishing an assembled package tree reports \"filesystem operation required for durable transactions is unsupported: atomic no-replace directory publication\". The publication renames a staged directory onto an unoccupied destination through a capability-anchored no-replace rename, and refusing rather than overwriting an occupied destination is the property it exists to hold (`@/inv/atomic-writes`). The underlying rename reports the operation as unsupported on Windows, so staging the repository's own packages fails before any test using them runs. Windows does offer a no-replace directory rename, so the refusal reflects a missing platform path rather than a platform without the guarantee.\n\nSeparately, a helper that writes a manifest declaring an asset composes the asset's target with the host's path separator and writes the result into a TOML basic string. On Windows the separator is a backslash, so the value becomes an invalid escape sequence and the manifest the helper just wrote does not parse: the reported error names an unexpected escape and quotes the line. The declaration is meant to carry a repository-relative path, which is separator-independent by definition.\n\n## Success Criteria\n\n- [hard] REQ-01: Publishing a staged package tree at an unoccupied destination succeeds on Windows.\n- [hard] REQ-02: Publishing at an occupied destination is still refused rather than overwritten, on every platform.\n- [hard] REQ-03: A test manifest declares repository-relative target paths that parse as written, whatever separator the host uses.\n- [hard] REQ-04: The paths a test helper composes for a manifest are separator-independent by construction, rather than corrected at each call site.\n- [hard] REQ-05: Every profile-adoption acceptance test whose failure was either defect passes on Windows.\n\n\n## Resolution\n\nWindows support is out of scope for the container that surfaced this: the workflow's Windows leg is removed rather than repaired, so no job observes the defect. The diagnosis above is retained for whoever restores that platform.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-04T11:55:36.975132228Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:56:12.192948065Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-04T11:56:12.487637549Z",
+      "updated_by": null
+    }
+  },
+  "id": "03566554-0c09-48ce-bc13-95496c766d9f",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:core",
+    "type:task",
+    "resolution:wont-fix"
+  ],
+  "priority": "normal",
+  "state": "rejected",
+  "title": "Assemble and publish a package tree on Windows",
+  "updated_at": "2026-08-04T12:00:37.797139068Z"
+}

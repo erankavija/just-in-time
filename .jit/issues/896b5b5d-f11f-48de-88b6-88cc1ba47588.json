@@ -39,10 +39,11 @@
     "epic:guards-and-ergonomics",
     "milestone:v1.0",
     "component:cli",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-05"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Read an issue description from a file or standard input on create",
-  "updated_at": "2026-08-03T21:55:13.968034142Z"
+  "updated_at": "2026-08-04T12:01:56.700128638Z"
 }

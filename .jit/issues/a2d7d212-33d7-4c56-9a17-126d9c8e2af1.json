@@ -34,10 +34,11 @@
     "milestone:v1.0",
     "component:core",
     "enforces:@/invariant/single-source-prose",
-    "type:task"
+    "type:task",
+    "satisfies:REQ-01"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Bind a packaged contribution to the registry entry it restates",
-  "updated_at": "2026-08-03T21:55:14.496768153Z"
+  "updated_at": "2026-08-04T12:01:30.319969194Z"
 }
