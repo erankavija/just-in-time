@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4dabd511403f239fdb80cb6d80eb84eb5c5e4927",
+  "completed_at": "2026-08-04T14:55:39.254336663Z",
+  "duration_ms": 176382,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs",
+        "id": "F1",
+        "line": 465,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f3f7de97/requirement/REQ-08"
+        ],
+        "severity": "high",
+        "summary": "Unbounded read_to_string calls can exceed the test's phase and overall deadlines while the child writes capture output."
+      }
+    ],
+    "summary": "The foreground-serve test still has unbounded capture-file reads, so its deadline guarantee is incomplete.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "76a4bd21-4afc-40ab-a2c0-376c296dc9ab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8f8abb73-7c51-4796-aed8-c9e0b0296b56",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T14:52:42.871958426Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2813 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcd43-3ad6-7210-8e47-e14622b972ad\n--------\nuser\n--- 2800 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 326686eb, c6939e93, and merge 1a4826a1 (`jit:76a4bd21`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/pid-safety (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/f3f7de97/requirement/REQ-08 (issue Markdown success criteria)\nGate evidence: cargo-ci passed (reused projection; exit code unavailable); code-review pending\nTruncation recovery: reread the affected patches and AGENTS.md in narrower ranges after combined output truncation\n\n1. **[blocking, issue-impact]** `read_capture` uses unbounded `fs::read_to_string` while the child still owns the capture file, including inside the port polling closure at [serve_cli_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs:465). `poll_until` bounds only its sleeps; a continuously writing or sufficiently large child log can keep this read running past the phase and overall deadlines. The same unbounded reads occur after teardown. This leaves hard REQ-03 unmet and can still prevent the stated CI-bound guarantee. Reference: @/issue/f3f7de97/requirement/REQ-08.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The foreground-serve test still has unbounded capture-file reads, so its deadline guarantee is incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Unbounded read_to_string calls can exceed the test's phase and overall deadlines while the child writes capture output.\",\"file\":\"crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs\",\"line\":465,\"references\":[\"@/issue/f3f7de97/requirement/REQ-08\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

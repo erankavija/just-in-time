@@ -20,9 +20,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:12.927210217Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T14:45:48.609274154Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "pending",
@@ -46,5 +46,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Evaluate one gate across several issues in one invocation",
-  "updated_at": "2026-08-04T14:08:39.812193910Z"
+  "updated_at": "2026-08-04T14:45:48.609274154Z"
 }

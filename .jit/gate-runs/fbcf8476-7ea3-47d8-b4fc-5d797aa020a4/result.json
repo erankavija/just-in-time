@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4dabd511403f239fdb80cb6d80eb84eb5c5e4927",
+  "completed_at": "2026-08-04T14:52:41.376207699Z",
+  "duration_ms": 217087,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are covered by the replacement merged-tree cargo-ci gate and its seeded regression self-test.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3019eacd-863a-428e-b25e-aede2cf37da7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fbcf8476-7ea3-47d8-b4fc-5d797aa020a4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T14:49:04.288865486Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 21295f3c, 9c9dfe7a\nPolicy sources: AGENTS.md\nResolved items: @/issue/3019eacd/requirement/REQ-02 (issue description); @/gate/jit-validate (.jit/gates.toml); @/invariant/bounded-rust-build-footprint, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, commit c896e0ee (descends from 9c9dfe7a); fmt, clippy, tests, provenance, budget, and incremental-state passed\nTruncation recovery: reread scripts, tests, protocol, documentation, registry, and affected patches in path/line-bounded calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are covered by the replacement merged-tree cargo-ci gate and its seeded regression self-test.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

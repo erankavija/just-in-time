@@ -19,9 +19,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-04T11:59:24.530288738Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T14:49:03.109162277Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "pending",
@@ -40,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Run the workflow only on platforms whose failures are acted on",
-  "updated_at": "2026-08-04T14:23:21.179250294Z"
+  "updated_at": "2026-08-04T14:49:03.109162277Z"
 }

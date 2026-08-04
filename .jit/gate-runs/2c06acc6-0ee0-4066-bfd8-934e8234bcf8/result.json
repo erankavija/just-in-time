@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4dabd511403f239fdb80cb6d80eb84eb5c5e4927",
+  "completed_at": "2026-08-04T14:40:59.901744710Z",
+  "duration_ms": 173839,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/errors.rs",
+        "id": "F1",
+        "line": 462,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "Public StaleBinaryError documentation omits the new UncommittedBuildInputs reason."
+      }
+    ],
+    "summary": "Public StaleBinaryError documentation omits the newly added uncommitted-build-inputs refusal reason.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "89a7e34e-11a1-4acf-810b-43d2a056005f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2c06acc6-0ee0-4066-bfd8-934e8234bcf8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T14:38:06.062191567Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3458 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcd35-d9e1-7d60-8bcd-39763940eb39\n--------\nuser\n--- 3445 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 630575b0, 1b13cb6f (merge first-parent patch duplicates the four issue files; second-parent diff is pre-existing mainline work)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f3f7de97/requirement/REQ-04 (.jit/issues/f3f7de97-7315-4780-8389-9c857da29239.json); @/gate/cargo-ci (.jit/gates.toml); @/invariant/bounded-rust-build-footprint, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T13:43:23Z); code-review pending (no prior run)\nTruncation recovery: truncated combined patch recovered with per-file diffs and bounded current-file reads; broad issue search narrowed to the resolved parent requirement\n\n1. **F1 — blocking, issue-impact (medium):** The newly public `UncommittedBuildInputs` reason is omitted from `StaleBinaryError`’s API documentation, which still says the reason is only “a commit mismatch or a dirty build” at [crates/jit/src/errors.rs:462](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/errors.rs:462) and [crates/jit/src/errors.rs:543](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/errors.rs:543). Update these contracts to name the third refusal cause.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Public StaleBinaryError documentation omits the newly added uncommitted-build-inputs refusal reason.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Public StaleBinaryError documentation omits the new UncommittedBuildInputs reason.\",\"file\":\"crates/jit/src/errors.rs\",\"line\":462}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

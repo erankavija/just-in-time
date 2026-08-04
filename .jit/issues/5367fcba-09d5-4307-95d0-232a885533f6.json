@@ -18,9 +18,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:13.271045321Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T14:38:04.812927586Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "5367fcba-09d5-4307-95d0-232a885533f6",
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Reject an unrecognised option instead of writing to it",
-  "updated_at": "2026-08-04T13:43:22.552296119Z"
+  "updated_at": "2026-08-04T14:38:04.812927586Z"
 }

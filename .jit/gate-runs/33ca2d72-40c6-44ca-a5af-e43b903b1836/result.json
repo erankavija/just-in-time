@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3e21e33d5317a17d400b7106ab12df9bd41d460d",
+  "completed_at": "2026-08-04T14:38:04.459010776Z",
+  "duration_ms": 196413,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/assemble-package-selftest.sh",
+        "id": "F1",
+        "line": 80,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/semantic-test-assertions",
+          "@/issue/f3f7de97/requirement/REQ-06"
+        ],
+        "severity": "high",
+        "summary": "The new self-test is not invoked by cargo-ci, CI, or Rust tests, leaving the safety contract unobserved by required validation."
+      }
+    ],
+    "summary": "The argument-contract regression suite is not executed by any required validation path.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5367fcba-09d5-4307-95d0-232a885533f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "33ca2d72-40c6-44ca-a5af-e43b903b1836",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T14:34:48.045012393Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2258 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fcd33-05d3-75c3-a2d1-d900edc8de1d\n--------\nuser\n--- 2245 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 3f36e41e, c8bc5604\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-test-assertions (.jit/invariants.toml); @/issue/f3f7de97/requirement/REQ-06 (.jit/issues/f3f7de97-7315-4780-8389-9c857da29239.json)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T13:34:44Z); code-review pending\nTruncation recovery: re-read the merge patch, target issue source, config, gate registry, and invocation references after broad searches truncated; used Markdown source when JIT’s stale index lock blocked item search.\n\n1. **Blocking — issue-impact:** The new regression suite is never invoked. `scripts/assemble-package-selftest.sh` contains the only coverage for REQ-01–REQ-04, but neither `scripts/cargo-ci.sh`, CI, nor a Rust test calls it; the recorded scoped finding confirms the argument contract can regress without a required gate failing. Wire this self-test into a required executed test path, or move equivalent assertions into one. References: `@/invariant/semantic-test-assertions`, `@/issue/f3f7de97/requirement/REQ-06`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The argument-contract regression suite is not executed by any required validation path.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new self-test is not invoked by cargo-ci, CI, or Rust tests, leaving the safety contract unobserved by required validation.\",\"file\":\"scripts/assemble-package-selftest.sh\",\"line\":80,\"references\":[\"@/invariant/semantic-test-assertions\",\"@/issue/f3f7de97/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

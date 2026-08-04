@@ -18,9 +18,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-04T11:56:11.295004070Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T14:55:39.563764461Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "76a4bd21-4afc-40ab-a2c0-376c296dc9ab",
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bound the foreground-serve test so it cannot hold a job to its ceiling",
-  "updated_at": "2026-08-04T14:34:36.307435683Z"
+  "updated_at": "2026-08-04T14:55:39.563764461Z"
 }

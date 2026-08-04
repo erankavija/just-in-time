@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4dabd511403f239fdb80cb6d80eb84eb5c5e4927",
+  "completed_at": "2026-08-04T14:45:48.299617156Z",
+  "duration_ms": 286912,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed evaluate-many implementation satisfies the issue criteria and applicable policy.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6d496b8c-587f-4246-a7e7-4c7e1d6792cb",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2442b9da-2655-48b3-9723-7c2fb7fd7daf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T14:41:01.387562002Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7fa70099, fa22b43a, e84483fe, b57e5b06, c896e0ee (`jit:6d496b8c`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f3f7de97/requirement/REQ-05 (.jit issue Markdown); @/invariant/gate-semantics, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T13:55:04Z); docs-mechanical pending; mcp-ci pending\nTruncation recovery: Narrowed reads recovered relevant issue, patch, gate-result, schema, and concurrency evidence after broad repository output truncated; unrelated second-parent merge delta was outside this issue’s impact cone.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed evaluate-many implementation satisfies the issue criteria and applicable policy.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

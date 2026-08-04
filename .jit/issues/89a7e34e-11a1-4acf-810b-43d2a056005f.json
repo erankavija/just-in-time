@@ -18,9 +18,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:12.226715910Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T14:41:00.211754179Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "89a7e34e-11a1-4acf-810b-43d2a056005f",
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Make the staleness refusal name the condition it detected",
-  "updated_at": "2026-08-04T13:55:04.144726918Z"
+  "updated_at": "2026-08-04T14:41:00.211754179Z"
 }
