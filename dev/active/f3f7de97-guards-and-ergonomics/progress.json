@@ -44,6 +44,19 @@
     {"topic": "Windows leg of the workflow", "resolution": "dropped from the matrix; the two Windows defects rejected"}
   ],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "issue": "5367fcba",
+      "finding": "scripts/assemble-package-selftest.sh passes and covers every criterion, but nothing runs it: no gate, no CI job, and no Rust test invokes it, so the argument contract can regress without any check failing. The repository has both patterns — workflow-contract-selftest.sh runs from a CI step and verify-commit-builds-selftest.sh from a Rust test in crates/jit/tests/scratch_build, while install-jit-selftest.sh, benchmark-session-cost-selftest.sh and generate-shipped-policy-regions-selftest.sh are unwired.",
+      "disposition": "Open. The closest precedent lives in crates/jit/tests/scratch_build, which 3019eacd may delete along with the verifier it tests. Decide after that issue reports, so the wiring is not built on a target about to disappear.",
+      "criterion_subject": "5367fcba REQ-01..REQ-04 describe behaviour no gate currently observes"
+    },
+    {
+      "issue": "ee02e514",
+      "finding": "The worker corrected a now-false CI statement in dev/active/c639cfb5-jit-profiles-complete/c639cfb5-investigation.md, an investigation document owned by a different container, and dropped its line-number citation into the workflow file while doing so.",
+      "disposition": "Accepted. The brief's REQ-03 sweep reaches that surface and the statement was false after the change; the lost citation pointed at line numbers the edit moved anyway.",
+      "criterion_subject": "ee02e514 REQ-03"
+    }
+  ],
   "started_at": "2026-08-04T12:00:00Z"
 }
