@@ -80,6 +80,7 @@ pub enum RepositoryStateStoreError {
 /// [`RepositoryStateStoreError::Other`]. A caller that must tell "I have not
 /// reached the critical section yet" from "the session refused this" reads that
 /// distinction here; asking again is what puts the question back to the store.
+#[cfg(test)]
 pub(crate) fn is_lock_timeout(error: &RepositoryStateStoreError) -> bool {
     matches!(
         error,

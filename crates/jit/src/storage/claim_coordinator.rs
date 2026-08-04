@@ -1418,10 +1418,12 @@ impl ClaimCoordinator {
 /// The retry ends when nothing at all is happening. `claimants` counts the
 /// callers this coordinator has answered, and any answer — a claim granted or a
 /// claim refused — is a critical section entered and left, so a rising count is
-/// proof the lock is still changing hands. While that count moves this caller
-/// waits, however long the machine takes about it. When it stops moving for
-/// [`CLAIMANT_STALL_LIMIT`] the lock is held by something that is not going to
-/// release it, and this caller says so and fails.
+/// proof the lock is still changing hands. That count is the progress the
+/// [`ProgressWatch`] measures: while it moves this caller waits, however long
+/// the machine takes about it, and a stall of
+/// [`CONTENTION_STALL_LIMIT`](super::contention_probe::CONTENTION_STALL_LIMIT)
+/// means the lock is held by something that is not going to release it, which
+/// this caller says and fails on.
 ///
 /// That bound measures the whole set of claimants for progress rather than
 /// racing this caller against a clock. Load slows claimants down without
@@ -1435,24 +1437,22 @@ fn acquire_claim_when_reached(
     ttl_secs: u64,
     claimants: &Claimants,
 ) -> Result<Lease> {
+    let mut watch = super::contention_probe::ProgressWatch::new();
     let mut answered = claimants.answered_count();
-    let mut progressed_at = std::time::Instant::now();
     loop {
         match coordinator.acquire_claim(issue_id, ttl_secs) {
             Err(error) if super::lock::is_lock_timeout(&error) => {
-                claimants.record_lock_refusal();
+                claimants.contention.record_refusal();
                 let now_answered = claimants.answered_count();
-                if now_answered != answered {
-                    answered = now_answered;
-                    progressed_at = std::time::Instant::now();
-                }
-                let stalled_for = progressed_at.elapsed();
-                assert!(
-                    stalled_for < CLAIMANT_STALL_LIMIT,
-                    "no claimant was answered in {stalled_for:?} while this one \
-                     waited for the claims lock, so nothing is releasing it; \
-                     the last wait ended with: {error}"
-                );
+                let progressed = now_answered != answered;
+                answered = now_answered;
+                watch.observe(progressed, |stalled_for| {
+                    format!(
+                        "no claimant was answered in {stalled_for:?} while this one \
+                         waited for the claims lock, so nothing is releasing it; \
+                         the last wait ended with: {error}"
+                    )
+                });
             }
             decided => {
                 claimants.record_answer();
@@ -1462,29 +1462,21 @@ fn acquire_claim_when_reached(
     }
 }
 
-/// How long every claimant may go unanswered before a caller waiting for the
-/// claims lock reports it stuck.
-///
-/// Generous on purpose: any claimant being answered resets it, so a healthy run
-/// never spends it, and a run that does spend it has stopped doing work rather
-/// than slowed down. The whole coordinator suite finishes in seconds.
-#[cfg(test)]
-const CLAIMANT_STALL_LIMIT: std::time::Duration = std::time::Duration::from_secs(30);
-
 /// The claimants contending for one coordinator's claims lock, and what they
 /// have achieved against it.
 ///
 /// Shared between the threads of one test so each can see the others making
 /// progress. `answered` counts the callers the coordinator decided about, so a
 /// claimant that dies without an answer stops contributing progress — which is
-/// what it should look like to everyone waiting behind it. `refused_the_lock`
-/// records which claimants have had a wait for the lock expire, so a test can
-/// establish that contention happened rather than assume a schedule produced it.
+/// what it should look like to everyone waiting behind it. The
+/// [`Contenders`](super::contention_probe::Contenders) record beneath it holds
+/// which claimants have had a wait for the lock expire, so a test can establish
+/// that contention happened rather than assume a schedule produced it.
 #[cfg(test)]
 #[derive(Debug, Default)]
 struct Claimants {
     answered: std::sync::atomic::AtomicUsize,
-    refused_the_lock: std::sync::Mutex<std::collections::HashSet<std::thread::ThreadId>>,
+    contention: super::contention_probe::Contenders,
 }
 
 #[cfg(test)]
@@ -1500,19 +1492,6 @@ impl Claimants {
     fn record_answer(&self) {
         self.answered
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Records that the calling claimant's wait for the claims lock expired.
-    fn record_lock_refusal(&self) {
-        self.refused_the_lock
-            .lock()
-            .unwrap()
-            .insert(std::thread::current().id());
-    }
-
-    /// How many distinct claimants have had a wait for the claims lock expire.
-    fn refused_claimant_count(&self) -> usize {
-        self.refused_the_lock.lock().unwrap().len()
     }
 }
 
@@ -1584,10 +1563,6 @@ mod tests {
     /// held is refused it.
     const EXPIRING_LOCK_WAIT: StdDuration = StdDuration::from_millis(1);
 
-    /// Long enough for the claimants to be scheduled and short enough to leave
-    /// them the CPU while this thread waits for them.
-    const REFUSAL_POLL_INTERVAL: StdDuration = StdDuration::from_millis(1);
-
     /// Takes the coordinator's claims lock, so every claimant that asks for it
     /// while the returned guard lives is refused it.
     ///
@@ -1601,33 +1576,6 @@ mod tests {
             .try_lock_exclusive(&lock_path)
             .unwrap()
             .expect("no claimant has started yet, so the claims lock is free")
-    }
-
-    /// Waits until `claimant_count` distinct claimants have each had a wait for
-    /// the claims lock expire.
-    ///
-    /// This returns on the claimants' own progress rather than on a clock: as
-    /// soon as they have all been refused the lock, however long the host took to
-    /// schedule them. [`CLAIMANT_STALL_LIMIT`] with no further claimant refused
-    /// means they are not asking for the lock, which this reports rather than
-    /// waits out.
-    fn await_lock_refusals(claimants: &Claimants, claimant_count: usize) {
-        let mut refused = claimants.refused_claimant_count();
-        let mut progressed_at = std::time::Instant::now();
-        while refused < claimant_count {
-            thread::sleep(REFUSAL_POLL_INTERVAL);
-            let now_refused = claimants.refused_claimant_count();
-            if now_refused != refused {
-                refused = now_refused;
-                progressed_at = std::time::Instant::now();
-            }
-            let stalled_for = progressed_at.elapsed();
-            assert!(
-                stalled_for < CLAIMANT_STALL_LIMIT,
-                "{refused} of {claimant_count} claimants were refused the claims \
-                 lock, and none of the rest asked for it in {stalled_for:?}"
-            );
-        }
     }
 
     #[test]
@@ -1949,7 +1897,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        await_lock_refusals(&claimants, issue_ids.len());
+        claimants.contention.await_refusals(issue_ids.len());
         drop(held);
 
         let granted = contenders
@@ -1987,7 +1935,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        await_lock_refusals(&claimants, claimant_count);
+        claimants.contention.await_refusals(claimant_count);
         drop(held);
 
         let outcomes = contenders
