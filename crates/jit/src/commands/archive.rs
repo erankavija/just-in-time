@@ -641,7 +641,7 @@ impl CommandExecutor<JsonFileStorage> {
         session: &mut dyn RepositoryMutationSession,
         target: ArchiveTarget<'_>,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, ArtifactPlan)>> {
-        let Some(mut image) = self.capture_proposed_base_without_documents(session)?.filter(|_| false) else {
+        let Some(mut image) = self.capture_proposed_base_without_documents(session)? else {
             return Ok(None);
         };
         let config = crate::repository_state::assemble_config(&image)?;
