@@ -1,7 +1,7 @@
 {
   "epic_id": "f3f7de97-7315-4780-8389-9c857da29239",
   "epic_short_id": "f3f7de97",
-  "current_wave": 3,
+  "current_wave": 4,
   "lead_notes": [
     "Four wave-1 branches were merged before any of them was gated, and 6d496b8c's conformance failures then made cargo-ci red on main for every issue at once, blocking completion of five otherwise-finished issues. The protocol 3019eacd rewrote names exactly this: gate after each merge whenever per-merge attribution matters. Gate before merging the next branch from here on.",
     "A backgrounded `codex exec` blocks forever on 'Reading additional input from stdin...' unless stdin is redirected from /dev/null. The 6d496b8c rework sat 17 minutes with a live process, a clean worktree, no commits and 00:00:00 CPU before this was found. It is a harness defect, not a worker failure, and does not count against the rework budget.",
@@ -28,7 +28,7 @@
           "short_id": "89a7e34e",
           "title": "Make the staleness refusal name the condition it detected",
           "worker": "codex/gpt-5.6-luna",
-          "status": "merged, code-review failed on one doc-contract finding, rework dispatched (codex/gpt-5.6-luna)"
+          "status": "done; reworked twice, refusal now names all three conditions and every responsible path"
         },
         {
           "short_id": "6d496b8c",
@@ -57,7 +57,7 @@
           "short_id": "06f1fa95",
           "title": "Make the cargo-ci verdict independent of unrelated host load",
           "worker": "opus",
-          "status": "merged, code-review failed on REQ-02 and REQ-03 evidence, rework dispatched (opus)"
+          "status": "done; reworked, seeded regression via a test-build seam, whole-gate load comparison recorded"
         },
         {
           "short_id": "a2d7d212",
@@ -75,13 +75,13 @@
           "short_id": "3923fd06",
           "title": "Bind every published package to the registry it restates",
           "worker": "opus",
-          "status": "merged, code-review failed on the REQ-04 measured-result record, rework dispatched (codex/gpt-5.6-luna)"
+          "status": "done; reworked, measured-result register linked"
         },
         {
           "short_id": "57675b68",
           "title": "Hold a concurrency property without racing a wall clock",
           "worker": "opus",
-          "status": "merged, code-review failed on three findings, rework dispatched (opus)"
+          "status": "done; reworked, REQ-01 amended by the owner, three regressions seeded and run"
         }
       ]
     },
@@ -92,7 +92,7 @@
           "short_id": "176d14d3",
           "title": "Bind the packaged region source to the region rendered from it",
           "worker": "codex/gpt-5.6-luna",
-          "status": "dispatched, worktree agent-176d14d3-w2"
+          "status": "done; converged on the shared DriftReport shape"
         },
         {
           "short_id": "e3c6c767",
@@ -105,6 +105,29 @@
           "title": "Remove the requirement tag naming another container",
           "worker": "unassigned",
           "status": "held to last so its sweep observes the finished tree"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "short_id": "4c700c80",
+          "title": "Decide the gate suite's remaining timed tests on behaviour, not on scheduling",
+          "worker": "opus",
+          "status": "dispatched, worktree agent-4c700c80"
+        },
+        {
+          "short_id": "e3c6c767",
+          "title": "Decide the lock tests on lock behaviour, not on scheduling",
+          "worker": "opus",
+          "status": "dispatched, worktree agent-e3c6c767"
+        },
+        {
+          "short_id": "e516b4f8",
+          "title": "Remove the requirement tag naming another container",
+          "worker": "codex/gpt-5.6-luna",
+          "status": "dispatched, worktree agent-e516b4f8"
         }
       ]
     }
@@ -141,6 +164,10 @@
     {
       "short_id": "e3c6c767",
       "why": "REQ-04's suite survey in 57675b68 found the tightest remaining scheduling margins in test_exclusive_lock_prevents_concurrent_writes; filed as its own child rather than widened into 57675b68"
+    },
+    {
+      "short_id": "4c700c80",
+      "why": "57675b68's suite survey reported four load-sensitive sites it did not file; the container's REQ-03 names their subject, so the owner directed them into this container rather than into follow-up work"
     }
   ],
   "escalations": [
@@ -167,14 +194,22 @@
     {
       "topic": "unbounded retry in 57675b68",
       "resolution": "Decided by the lead rather than re-escalated: an unbounded retry is not acceptable. REQ-08 exists because one unbounded wait in this suite held four CI jobs to a six-hour ceiling, so reintroducing one into the same gate is the failure mode the container closes. The bound must not be a wall clock the caller races; the preserved session-1 design bounds on claimant progress and fails loudly on a stuck lock, and the rework worker was told to adopt, improve or replace it against that decision."
+    },
+    {
+      "topic": "57675b68 REQ-01 versus the container's REQ-08",
+      "resolution": "Owner amended REQ-01. The reviewer failed the 30-second progress bound as a wall clock, and removing it restores the unbounded wait REQ-08 exists to close. REQ-01 now permits a bound that fires only when no claimant at all has been answered and fails loudly; the code is unchanged and the survey records the bound as retained with its exposure stated."
+    },
+    {
+      "topic": "the four load-sensitive sites 57675b68's survey did not file",
+      "resolution": "Owner directed one remediation task inside this container: 4c700c80 covers repo_lock.rs, repository_state_store_tests.rs, archive.rs and the lease.rs clock injection."
     }
   ],
   "rework_counts": {
     "6d496b8c": 1,
-    "06f1fa95": 1,
-    "57675b68": 1,
+    "06f1fa95": 3,
+    "57675b68": 2,
     "3923fd06": 1,
-    "89a7e34e": 1
+    "89a7e34e": 2
   },
   "surfaced_pitfalls": [
     {
@@ -230,6 +265,24 @@
       "finding": "code-review reported the issue's `satisfies:REQ-04` label as a dangling item link because the issue declares no REQ-04 of its own.",
       "disposition": "Dismissed as a reviewer misreading. The `satisfies` namespace is declared in .jit/config.toml as coverage credit naming a *container* requirement, so the label resolves against f3f7de97's REQ-04, which this issue does deliver. `jit validate` passes. No label change.",
       "criterion_subject": "container REQ-04"
+    },
+    {
+      "issue": "57675b68",
+      "finding": "Five historical documents name the proptests as load-sensitive: another container's progress log, three archived completion/progress records, and two generated benchmark test inventories.",
+      "disposition": "Left as written, on the worker's judgement and confirmed by the lead. A dated log entry recording when a problem was observed is a record rather than a statement about the tree; editing it falsifies history. The benchmark inventories are generated and the test names in them remain correct.",
+      "criterion_subject": "57675b68 REQ-04"
+    },
+    {
+      "issue": "e3c6c767",
+      "finding": "The issue's Background claims its margins are an order of magnitude tighter than any other timing assertion in the gate's suite, and that every other candidate allows seconds of headroom. 57675b68's later survey found lease.rs margins in the same class, so the comparative claim is false.",
+      "disposition": "Open. The worker was told not to rely on the claim, and lease.rs is covered by 4c700c80. Amending the Background needs the owner's approval; raised, not yet applied. Criteria untouched either way.",
+      "criterion_subject": "e3c6c767 Background accuracy"
+    },
+    {
+      "issue": "06f1fa95",
+      "finding": "The lead's first whole-gate load comparison ran one concurrent build that finished in 46 seconds against a seven-minute gate run, leaving most of the run unloaded.",
+      "disposition": "Discarded and re-run with load sustained across the whole run \u2014 nine from-scratch workspace builds and a 12-way CPU load, host reaching load average 30.9. The discarded attempt is named in the record rather than omitted.",
+      "criterion_subject": "06f1fa95 REQ-03"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z"
