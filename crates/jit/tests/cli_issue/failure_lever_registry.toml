@@ -349,6 +349,15 @@ expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
+path = "gate evaluate-many"
+argv = ["gate", "evaluate-many", "missing-gate", "00000000-0000-0000-0000-000000000000", "--by", "agent:survey", "--json"]
+setup = ["git:absent"]
+expected_failure = "REPOSITORY_NOT_FOUND: JIT repository is absent before evaluate-many dispatch"
+expected_code = "REPOSITORY_NOT_FOUND"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
 path = "gate fail"
 argv = ["gate", "fail", "00000000-0000-0000-0000-000000000000", "missing-gate", "--json"]
 setup = ["init", "no-issue:00000000-0000-0000-0000-000000000000"]

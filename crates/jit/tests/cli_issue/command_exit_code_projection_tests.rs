@@ -296,7 +296,7 @@ fn test_command_exit_codes_gate_evaluate_failure_emits_4() {
     let temp = setup();
     let id = setup_auto_gate_issue(&temp, "false");
     assert_projected_exit_status_in_both_forms(
-        "gate evaluate, gate evaluate-all",
+        "gate evaluate, gate evaluate-all, gate evaluate-many",
         4,
         true,
         |json| {
@@ -323,7 +323,7 @@ fn test_command_exit_codes_gate_evaluate_runner_error_emits_10() {
     let temp = setup();
     let id = setup_auto_gate_issue(&temp, "jit-projection-command-does-not-exist");
     assert_projected_exit_status_in_both_forms(
-        "gate evaluate, gate evaluate-all",
+        "gate evaluate, gate evaluate-all, gate evaluate-many",
         10,
         true,
         |json| {
@@ -1111,8 +1111,14 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("*", Some(5)),
         ("*", Some(10)),
         ("any command that writes an issue", Some(4)),
-        ("gate evaluate, gate evaluate-all", Some(4)),
-        ("gate evaluate, gate evaluate-all", Some(10)),
+        (
+            "gate evaluate, gate evaluate-all, gate evaluate-many",
+            Some(4),
+        ),
+        (
+            "gate evaluate, gate evaluate-all, gate evaluate-many",
+            Some(10),
+        ),
         ("*", Some(0)),
         ("*", Some(2)),
         ("*", Some(3)),
