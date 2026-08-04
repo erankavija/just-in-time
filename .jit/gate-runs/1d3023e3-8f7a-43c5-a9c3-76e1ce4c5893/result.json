@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "fa22b43abb5fb4d1afbc3bf3ef675f91253feb68",
+  "completed_at": "2026-08-04T12:27:53.009786333Z",
+  "duration_ms": 238180,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "b0ca44e325ef755215113a22bec6cf1e71cf3f826aac6b6671ae3630619ceb3d",
+  "issue_id": "5367fcba-09d5-4307-95d0-232a885533f6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1d3023e3-8f7a-43c5-a9c3-76e1ce4c5893",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T12:23:54.829384044Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest exit_code_projection_tests::test_command_exit_codes_documents_every_classified_row ... FAILED\ntest result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n---- exit_code_projection_tests::test_command_exit_codes_documents_every_classified_row stdout ----\n\nthread 'exit_code_projection_tests::test_command_exit_codes_documents_every_classified_row' (1587922) panicked at crates/jit/src/main.rs:8415:13:\nclassifier emits code 4 for `Gate 'tests' failed for issue abc123. Checker status: Failed, exit code: Some(1). Inspect details with: jit gate status abc123 tests (add --all for run history, --findings for structured findings)`, but the command_exit_codes projection has no `gate evaluate, gate evaluate-all` row documenting it\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1502 bytes=28254626)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1428960672/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}

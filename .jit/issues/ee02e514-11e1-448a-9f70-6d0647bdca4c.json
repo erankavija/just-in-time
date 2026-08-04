@@ -14,9 +14,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-04T11:59:24.235585584Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-04T12:23:23.457073816Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -40,5 +40,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Run the workflow only on platforms whose failures are acted on",
-  "updated_at": "2026-08-04T12:03:58.811800615Z"
+  "updated_at": "2026-08-04T12:23:23.457073816Z"
 }
