@@ -177,11 +177,12 @@ model and subsystem:
 | --- | --- | --- |
 | `fast_issue`, `fast_rules`, `fast_docs_templates` | in-process (`CommandExecutor`) | issue lifecycle/graph, rules/labels/config, documents/templates |
 | `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` | CLI subprocess | the `jit` binary's command surface by area |
-| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (stale-binary and merged-commit checks), plus the build-footprint budget-checker fixtures |
+| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (stale-binary checks and the merged-tree gate self-test), plus the build-footprint budget-checker fixtures |
 | `provenance_contract` | `#[ignore]`d contracts | build-provenance stability, run by `scripts/cargo-ci.sh` under `--ignored` |
 
 The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
-its test step, on warm Cargo artifacts. The checker derives the integration-test
+its test step, on warm Cargo artifacts, pointing it with `--root` at the
+workspace that run compiled. The checker derives the integration-test
 target count and unique active test-executable bytes from `cargo metadata` and
 `cargo test --workspace --no-run --message-format=json`, and asserts the debug
 profile, gate incremental, and dependency-feature policies, failing the gate when
@@ -191,6 +192,20 @@ a budget or policy is exceeded (jit:3f73423b). Its inputs are injectable
 with synthetic JSON and sparse executables — no compilation. See "4. Build
 Footprint Budget" below for the exact budgets, the build-profile and
 dependency-feature policy they check, and how to diagnose a failure.
+
+`scratch_build/merged_tree_gate_verification_tests.rs` runs
+`scripts/cargo-ci-selftest.sh`, which is what keeps the `cargo-ci` gate honest as
+the post-merge check (jit:3019eacd). A textually clean merge can leave `main`
+broken in ways no per-issue gate saw, so the worktree dispatch protocol runs the
+gate on the merged tree. The self-test seeds four merges in throwaway git repos —
+one healthy, one declaring a deleted module, one whose `#[cfg(test)]` caller lost
+an argument, one that compiles and fails at test time — runs the shipped
+`scripts/cargo-ci.sh` against each, and asserts the verdict its build-and-test
+step reports. The last two also assert that `cargo build --workspace` still
+succeeds on the same tree: that is why a build-only merge check was vacuous, and
+substituting one makes the self-test fail. Every fixture is a dependency-free
+two-module crate with its own target directory, so the whole self-test costs
+seconds and never rebuilds this workspace.
 
 Shared helpers live below Cargo's auto-discovery boundary in `crates/jit/tests/common/`, so
 they never surface as their own test targets. Add a new integration case to the file that

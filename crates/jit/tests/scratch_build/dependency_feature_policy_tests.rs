@@ -125,7 +125,7 @@ fn test_ureq_manifest_selects_exactly_one_tls_backend_explicitly() {
 ///
 /// A missing `cargo` binary (spawn `NotFound` — a constrained environment,
 /// matching the skip convention used elsewhere in this suite, see
-/// `merged_commit_build_verification_tests.rs`) yields `None` so the caller
+/// `merged_tree_gate_verification_tests.rs`) yields `None` so the caller
 /// can skip. Every other failure — including a non-zero `cargo tree` exit —
 /// panics: it means the query itself failed, and skipping would silently
 /// waive REQ-06's resolved-graph guard.

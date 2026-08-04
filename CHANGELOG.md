@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **The per-merge build guard.** `scripts/verify-commit-builds.sh` extracted a
+  named commit with `git archive` and ran `cargo build --workspace` against it,
+  and the worktree dispatch protocol ran it after every merge. `cargo build`
+  compiles neither test targets nor dev-dependencies, so the guard passed a
+  merge that broke only test code — observed here, where one branch changed a
+  function's signature while another added a `#[cfg(test)]` caller of the old
+  form — and passed a merge that compiled and failed when its tests ran; its
+  implausibly short "cold build" was that blind spot showing. The protocol now
+  runs the project's build-and-test gate on the merged tree, work that gate
+  already performs, and states what a gate run does and does not establish about
+  a merge commit. `scripts/cargo-ci-selftest.sh` seeds clean merges that break in
+  each of those ways and asserts `scripts/cargo-ci.sh` reports them failing, so
+  the replacement cannot silently go vacuous: substituting the removed guard's
+  build-only command makes the self-test fail.
+
 - **The configuration the binary wrote for a new repository.** `jit init`
   rendered a whole `config.toml` into every repository it created: a four-level
   type hierarchy, seven label namespaces, six item kinds, validation defaults,

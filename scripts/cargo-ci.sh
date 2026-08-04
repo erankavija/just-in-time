@@ -182,6 +182,19 @@ run_step() {
   fi
 }
 
+# The workspace this run actually compiled. Cargo resolves it by walking up from
+# the current directory, so a run started from a subdirectory — or through
+# another checkout's scripts/ — still names the tree the steps below judge. The
+# budget checker is pointed at it rather than at this script's own checkout, so
+# one run judges one workspace.
+gate_workspace_root() {
+  command -v jq >/dev/null 2>&1 || {
+    echo "gate_workspace_root: 'jq' not found on PATH (needed to resolve the Cargo workspace root)" >&2
+    return 1
+  }
+  cargo metadata --format-version=1 --no-deps 2>/dev/null | jq -r '.workspace_root'
+}
+
 # REQ-04 (jit:57d0eb79): the target directory this run actually used —
 # CARGO_TARGET_DIR when the caller set one (e.g. the isolated-run
 # verification protocol), else Cargo's own resolved default. Reading it from
@@ -257,8 +270,9 @@ run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
 # paying that cost is exactly the point: REQ-06's hard metadata-only-invalidation
 # and injected-provenance contracts are unexercised unless a required CI step runs
 # them, so this step does. No lock interaction: these tests spawn plain `cargo`
-# only (never scripts/cargo-ci.sh or verify-commit-builds.sh), so they do not
-# re-acquire the CARGO_CI_BUILD_LOCK this run already holds.
+# only, so they do not re-acquire the CARGO_CI_BUILD_LOCK this run already holds.
+# (The `test` step's merged-tree gate self-test does re-enter this script, and
+# passes CARGO_CI_NO_LOCK=1 for the same reason.)
 # --nocapture (jit:83efbcb4 REQ-04): the metadata-stability test prints the
 # seeded-fixture file/byte count line before its cold build; this flag is what
 # lets that line reach $WORK/provenance.out for summarize_pass to fold into
@@ -274,11 +288,21 @@ run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
 # derives the integration-target count and unique active-executable bytes from
 # that Cargo output, and asserts the debug-profile, gate-incremental, and
 # dependency-feature policies against the committed manifests and this script.
-# It self-locates the workspace root from its own path, so no argument is needed
-# for a live gate run. CARGO_INCREMENTAL=0 (exported above) is inherited, so its
-# warm --no-run leaves no incremental state for the check below.
+# It is pointed at the workspace this run compiled rather than left to self-locate
+# from its own path, so the budget verdict describes the same tree the steps above
+# judged. CARGO_INCREMENTAL=0 (exported above) is inherited, so its warm --no-run
+# leaves no incremental state for the check below.
 CARGO_CI_SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-run_step budget "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh"
+run_budget_check() {
+  local root
+  root=$(gate_workspace_root) || return 1
+  if [ -z "$root" ]; then
+    echo "could not resolve this run's Cargo workspace root" >&2
+    return 1
+  fi
+  "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" --root "$root"
+}
+run_step budget run_budget_check
 
 # REQ-04 (jit:57d0eb79): fail the gate itself if the compilation steps above
 # left behind incremental state, rather than trusting that CARGO_INCREMENTAL=0
