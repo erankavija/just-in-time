@@ -17,23 +17,51 @@ use std::time::{Duration, Instant};
 use jit::commands::CommandExecutor;
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
-use jit_server::shutdown::GRACEFUL_DRAIN_TIMEOUT;
+use jit_server::shutdown::{DRAIN_DEADLINE_MS_ENV, GRACEFUL_DRAIN_TIMEOUT};
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::Pid;
 use tempfile::TempDir;
 
 /// Longest the fixture waits for a freshly spawned server to report its port.
+///
+/// Startup runs an already-built binary against a fresh temporary repository,
+/// work of milliseconds; the budget bounds a server that never binds. Reaching
+/// it takes thirty seconds of the host giving that process nothing, which is a
+/// stalled machine rather than a busy one, and the failure is loud.
 const STARTUP_BUDGET: Duration = Duration::from_secs(30);
 
 /// Longest an ordinary exchange (health probe, SSE head, change event) may take.
+///
+/// A loopback request and its response, bounded so a server that answers
+/// nothing fails instead of hanging. Same shape as [`STARTUP_BUDGET`]: the work
+/// is milliseconds, the budget is orders above it, and only a host that stops
+/// scheduling the pair for ten seconds reaches it.
 const EXCHANGE_BUDGET: Duration = Duration::from_secs(10);
 
-/// REQ-03's hard external bound: the process is gone in strictly less than ten
-/// seconds after the signal, never by a test-side kill.
+/// `@/issue/f04f7888/requirement/REQ-03`'s hard external bound: the process is
+/// gone in strictly less than ten seconds after the signal, never by a test-side
+/// kill.
+///
+/// This one is a property rather than only a hang bound, and it is timed by the
+/// observer because that is who an adopter's supervisor is. What separates it
+/// from a scheduling race is its margin: the server spends
+/// [`GRACEFUL_DRAIN_TIMEOUT`] of the budget draining by design, and the
+/// remaining five seconds cover signal delivery, the forced close, process
+/// teardown, and one [`READ_POLL`] slice before the fixture looks again. Load
+/// that pushed those past five seconds would have stopped scheduling the
+/// processes altogether.
 const EXIT_BUDGET: Duration = Duration::from_secs(10);
 
 /// Blocking-read slice, short enough that a poll loop stays responsive.
 const READ_POLL: Duration = Duration::from_millis(50);
+
+/// The drain deadline the seeded early-closing server enforces: none, so it
+/// retires the connection that cannot finish the moment it stops accepting.
+///
+/// The gap to [`GRACEFUL_DRAIN_TIMEOUT`] is the entitlement in full, and that
+/// gap is the margin the seeded demonstration holds against a host that stops
+/// scheduling the server mid-drain.
+const SEEDED_EARLY_CLOSE_DEADLINE: Duration = Duration::ZERO;
 
 /// How long the registration observation is watched for a premature result
 /// while the server is stopped. Any result inside the window is a defect, so the
@@ -94,12 +122,21 @@ impl RunningServer {
         strip_ansi(&std::fs::read_to_string(&self.log_path).unwrap_or_default())
     }
 
-    /// Waits for the process to exit, and returns how long that took measured
-    /// from `signalled_at`. Panics rather than killing the process: a test-side
-    /// kill would hide exactly the defect this suite exists to catch.
-    fn wait_for_exit(&mut self, signalled_at: Instant, budget: Duration) -> (i32, Duration) {
+    /// Waits for the process to exit and returns its exit code, holding
+    /// `budget` as the sole statement of how long after `signalled_at` the
+    /// process may still exist — on the iteration that finds it running and on
+    /// the one that finds it gone. Panics rather than killing the process: a
+    /// test-side kill would hide exactly the defect this suite exists to catch.
+    fn wait_for_exit(&mut self, signalled_at: Instant, budget: Duration) -> i32 {
         loop {
-            match self.child.try_wait().expect("poll the server process") {
+            let outcome = self.child.try_wait().expect("poll the server process");
+            assert!(
+                signalled_at.elapsed() < budget,
+                "the server was still running {:?} after the signal; log:\n{}",
+                signalled_at.elapsed(),
+                self.log()
+            );
+            match outcome {
                 Some(status) => {
                     assert_eq!(
                         status.signal(),
@@ -107,20 +144,11 @@ impl RunningServer {
                         "the server died from a signal instead of exiting on its own; log:\n{}",
                         self.log()
                     );
-                    let code = status
+                    return status
                         .code()
                         .expect("a process that was not signalled has an exit code");
-                    return (code, signalled_at.elapsed());
                 }
-                None => {
-                    assert!(
-                        signalled_at.elapsed() < budget,
-                        "the server was still running {:?} after the signal; log:\n{}",
-                        signalled_at.elapsed(),
-                        self.log()
-                    );
-                    std::thread::sleep(READ_POLL);
-                }
+                None => std::thread::sleep(READ_POLL),
             }
         }
     }
@@ -138,18 +166,47 @@ impl Drop for RunningServer {
 }
 
 /// Spawns the compiled `jit-server` binary against `worktree_root`, with no
-/// intermediate shell or supervisor, and waits until it reports its port.
+/// intermediate shell or supervisor, and waits until it reports its port. The
+/// server enforces the drain deadline it ships with.
 fn start_server(worktree_root: &Path, bind: &str, log_name: &str) -> RunningServer {
+    spawn_server(worktree_root, bind, log_name, None)
+}
+
+/// Spawns the same binary with the deadline it grants a draining connection
+/// replaced by `drain_deadline`.
+///
+/// Below [`GRACEFUL_DRAIN_TIMEOUT`] this is a server that retires a connection
+/// short of what the connection is entitled to — the regression the drain
+/// assertion exists to catch, produced by the shipped drain path rather than
+/// described.
+fn start_server_draining_for(
+    worktree_root: &Path,
+    bind: &str,
+    log_name: &str,
+    drain_deadline: Duration,
+) -> RunningServer {
+    spawn_server(worktree_root, bind, log_name, Some(drain_deadline))
+}
+
+fn spawn_server(
+    worktree_root: &Path,
+    bind: &str,
+    log_name: &str,
+    drain_deadline: Option<Duration>,
+) -> RunningServer {
     let log_path = worktree_root.join(log_name);
     let log = File::create(&log_path).expect("create the server log file");
-    let child = Command::new(env!("CARGO_BIN_EXE_jit-server"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_jit-server"));
+    command
         .current_dir(worktree_root)
         .args(["--data-dir", ".jit", "--bind", bind])
         .stdin(Stdio::null())
         .stdout(Stdio::from(log.try_clone().expect("clone the log handle")))
-        .stderr(Stdio::from(log))
-        .spawn()
-        .expect("spawn jit-server");
+        .stderr(Stdio::from(log));
+    if let Some(deadline) = drain_deadline {
+        command.env(DRAIN_DEADLINE_MS_ENV, deadline.as_millis().to_string());
+    }
+    let child = command.spawn().expect("spawn jit-server");
 
     let mut server = RunningServer {
         child,
@@ -452,6 +509,29 @@ fn assert_no_child_processes(pid: u32) {
     let _ = pid;
 }
 
+// ── The drain property ──────────────────────────────────────────────────────
+
+/// Asserts the connection that could not finish received the whole drain
+/// deadline before the server retired it.
+///
+/// Both terms are the server's: `drained_for_ms` is measured across its own
+/// drain, and [`GRACEFUL_DRAIN_TIMEOUT`] is the entitlement its own code grants.
+/// The fixture contributes no clock, and load can delay a deadline without
+/// bringing one early, so the comparison carries no scheduling margin and reads
+/// the same on a busy machine as on an idle one.
+///
+/// `test_the_drain_assertion_rejects_a_server_that_force_closes_early` runs this
+/// same function against a server seeded to close early, which is what keeps the
+/// comparison above from passing whatever it is shown.
+fn assert_survivor_drained_to_the_deadline(log: &str) {
+    let drained_for = reported_drain(log, FORCE_CLOSING);
+    assert!(
+        drained_for >= GRACEFUL_DRAIN_TIMEOUT,
+        "the server force-closed the survivor after draining for {drained_for:?}, \
+         short of the {GRACEFUL_DRAIN_TIMEOUT:?} the connection was entitled to"
+    );
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 #[test]
@@ -473,6 +553,13 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     read_until(&mut second_stream, "event: change", EXCHANGE_BUDGET);
     let mut completed = open_completed_connection(server.port);
     assert_no_child_processes(server.pid());
+    let connections = [
+        &mut first_stream,
+        &mut second_stream,
+        &mut completed,
+        &mut stalled,
+    ];
+    let opened = connections.len();
 
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
@@ -483,21 +570,12 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     // interval between the server acting and the test noticing is the test's
     // scheduling and widens with load on the machine. The budget here bounds a
     // hang rather than stating a property.
-    for stream in [
-        &mut first_stream,
-        &mut second_stream,
-        &mut completed,
-        &mut stalled,
-    ] {
+    for stream in connections {
         wait_for_close(stream, signalled_at, EXIT_BUDGET);
     }
 
-    let (exit_code, exited_after) = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
     assert_eq!(exit_code, 0, "server log:\n{}", server.log());
-    assert!(
-        exited_after < EXIT_BUDGET,
-        "the server took {exited_after:?} to exit"
-    );
 
     let log = server.log();
     assert_eq!(log_field(&log, SIGNAL_RECEIVED, "signal"), "SIGTERM");
@@ -507,8 +585,8 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
     );
     assert_eq!(
         log_field(&log, SIGNAL_RECEIVED, "open_connections"),
-        "4",
-        "the log must account for both event streams and both ordinary connections"
+        opened.to_string(),
+        "the log must account for every connection the fixture left open"
     );
     // The count at the deadline is what separates the connections that could
     // finish from the one that could not. Cancellation ended both event streams
@@ -521,19 +599,57 @@ fn test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero() {
         "1",
         "the log must report the connection the deadline force-closed"
     );
-    // The drain property: the survivor got the whole deadline before the server
-    // retired it. Load on the host can delay a deadline but cannot bring one
-    // early, so this comparison carries no scheduling margin and its outcome is
-    // the same on a busy machine as on an idle one.
-    let drained_for = reported_drain(&log, FORCE_CLOSING);
-    assert!(
-        drained_for >= GRACEFUL_DRAIN_TIMEOUT,
-        "the server force-closed the survivor after draining for {drained_for:?}, \
-         short of the {GRACEFUL_DRAIN_TIMEOUT:?} the connection was entitled to"
-    );
+    assert_survivor_drained_to_the_deadline(&log);
     assert!(
         log.contains("Shutdown complete"),
         "the shutdown log does not record clean completion:\n{log}"
+    );
+}
+
+/// The drain assertion above is only evidence while it can still fail, so the
+/// regression it protects against is seeded and run.
+///
+/// `jit-server` built for these tests takes its drain deadline from
+/// [`DRAIN_DEADLINE_MS_ENV`], and this case gives one server
+/// [`SEEDED_EARLY_CLOSE_DEADLINE`]. Everything else is the shipped path: the
+/// same binary, the same signal, the same drain, the same forced close, and the
+/// same log the healthy case reads. What that server produces is the regression
+/// in question — a connection stuck mid message retired far short of the
+/// [`GRACEFUL_DRAIN_TIMEOUT`] the crate grants it — and
+/// [`assert_survivor_drained_to_the_deadline`] must reject it.
+///
+/// Reaching the forced close is established before the rejection is: a log with
+/// no force-close record would make the assertion panic for want of a line to
+/// read, and that would satisfy a bare "it panicked" check without any early
+/// close having happened.
+#[test]
+fn test_the_drain_assertion_rejects_a_server_that_force_closes_early() {
+    let repository = TempDir::new().expect("create the fixture repository directory");
+    initialize_repository(repository.path());
+    let mut server = start_server_draining_for(
+        repository.path(),
+        "127.0.0.1:0",
+        "early-close.log",
+        SEEDED_EARLY_CLOSE_DEADLINE,
+    );
+    let mut stalled = open_registered_stalled_connection(server.port);
+
+    let signalled_at = Instant::now();
+    send_signal(server.pid(), Signal::SIGTERM);
+    wait_for_close(&mut stalled, signalled_at, EXIT_BUDGET);
+    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    assert_eq!(exit_code, 0, "server log:\n{}", server.log());
+
+    let log = server.log();
+    let seeded_drain = reported_drain(&log, FORCE_CLOSING);
+    // The panic this catches carries its own message to stderr; the run is
+    // healthy despite it.
+    let verdict = std::panic::catch_unwind(|| assert_survivor_drained_to_the_deadline(&log));
+    assert!(
+        verdict.is_err(),
+        "the drain assertion accepted a server that force-closed the survivor \
+         after draining for {seeded_drain:?}, short of the \
+         {GRACEFUL_DRAIN_TIMEOUT:?} the connection was entitled to"
     );
 }
 
@@ -582,7 +698,7 @@ fn test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop() {
     drop(stalled);
     let signalled_at = Instant::now();
     send_signal(server.pid(), Signal::SIGTERM);
-    let (exit_code, _) = server.wait_for_exit(signalled_at, EXIT_BUDGET);
+    let exit_code = server.wait_for_exit(signalled_at, EXIT_BUDGET);
     assert_eq!(exit_code, 0, "server log:\n{}", server.log());
 }
 
@@ -595,7 +711,7 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
 
     let signalled_at = Instant::now();
     send_signal(first.pid(), Signal::SIGTERM);
-    let (exit_code, _) = first.wait_for_exit(signalled_at, EXIT_BUDGET);
+    let exit_code = first.wait_for_exit(signalled_at, EXIT_BUDGET);
     assert_eq!(exit_code, 0, "server log:\n{}", first.log());
     // A server with nothing to drain stops at once rather than sitting out the
     // deadline, and the drain it reports for itself is what says so: the count
@@ -618,6 +734,6 @@ fn test_jit_server_shutdown_releases_the_port_for_an_immediate_restart() {
 
     let restart_signalled_at = Instant::now();
     send_signal(second.pid(), Signal::SIGTERM);
-    let (restart_exit_code, _) = second.wait_for_exit(restart_signalled_at, EXIT_BUDGET);
+    let restart_exit_code = second.wait_for_exit(restart_signalled_at, EXIT_BUDGET);
     assert_eq!(restart_exit_code, 0, "server log:\n{}", second.log());
 }

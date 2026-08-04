@@ -101,6 +101,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   repository, and an unreadable inventory records the tree as dirty rather than
   assuming it clean.
 
+- **The shutdown drain property is proven against a server that breaks it.** The
+  real-process graceful-shutdown case asserts that a connection stuck mid message
+  received the whole drain deadline before the server retired it, reading the
+  duration the server measured across its own drain. That comparison holds
+  whatever the host is doing, and it held equally against a server that never
+  drained at all, because nothing exercised the failure. `jit-server` built for
+  its own tests now resolves the drain deadline through a fault-injection seam,
+  and one case spawns that binary with no deadline at all: the same fixture, the
+  same signal, the same forced close, and the same assertion, which must reject
+  the log it produces. Neutralising either half — the seed or the comparison —
+  makes that case fail. The seam is compiled only when the crate's `test-support`
+  feature is on, which shipped builds resolve without.
+
 ### Added
 
 - **A profile package is applied together with the packages it depends on.** A

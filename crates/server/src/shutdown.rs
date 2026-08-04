@@ -32,6 +32,39 @@ use tracing::{info, warn};
 /// bounded schedule rather than waiting on a peer that never finishes.
 pub const GRACEFUL_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// The drain deadline the serving process enforces: [`GRACEFUL_DRAIN_TIMEOUT`].
+#[cfg(not(feature = "test-support"))]
+#[must_use]
+pub const fn configured_drain_deadline() -> Duration {
+    GRACEFUL_DRAIN_TIMEOUT
+}
+
+/// The variable a `test-support` build reads its drain deadline from, in whole
+/// milliseconds.
+#[cfg(feature = "test-support")]
+pub const DRAIN_DEADLINE_MS_ENV: &str = "JIT_SERVER_DRAIN_DEADLINE_MS";
+
+/// The drain deadline the serving process enforces.
+///
+/// A `test-support` build takes it from [`DRAIN_DEADLINE_MS_ENV`] when that
+/// variable holds a whole number of milliseconds, and from
+/// [`GRACEFUL_DRAIN_TIMEOUT`] otherwise. The feature is enabled by this crate's
+/// own test builds alone, so the variable reaches only a server a test spawned.
+///
+/// It exists as the fault-injection seam behind one demonstration: a server
+/// given a deadline short of [`GRACEFUL_DRAIN_TIMEOUT`] retires a stalled
+/// connection before the entitlement the graceful-shutdown suite asserts, which
+/// is how that suite shows its drain assertion still fails when the behaviour it
+/// protects regresses.
+#[cfg(feature = "test-support")]
+#[must_use]
+pub fn configured_drain_deadline() -> Duration {
+    std::env::var(DRAIN_DEADLINE_MS_ENV)
+        .ok()
+        .and_then(|milliseconds| milliseconds.parse().ok())
+        .map_or(GRACEFUL_DRAIN_TIMEOUT, Duration::from_millis)
+}
+
 /// How often the drain is sampled while the deadline runs down.
 const DRAIN_SAMPLE_INTERVAL: Duration = Duration::from_millis(100);
 

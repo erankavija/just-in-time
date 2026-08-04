@@ -1345,6 +1345,7 @@ dependencies = [
  "futures",
  "git2",
  "jit",
+ "jit-server",
  "listenfd",
  "mime_guess",
  "nix",
