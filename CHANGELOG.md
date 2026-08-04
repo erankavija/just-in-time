@@ -294,8 +294,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   released at once and ordinary connections get the full boundary to finish.
   At that boundary JIT samples the connection count and calls `shutdown()` to
   force-close only survivors. The process exits `0`, and its log records the
-  signal, the deadline, the connection count at the signal and at expiry, the
-  forced-close path, and clean completion.
+  signal, the deadline, the connection count at the signal and at expiry, how
+  long the drain actually ran before it ended, the forced-close path, and clean
+  completion.
 
 - **The declared MSRV is checked against current stable and proven by a test
   run.** `scripts/rust-version-policy.py` derives the declaration from
