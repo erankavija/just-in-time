@@ -144,14 +144,29 @@ out is the server's five seconds, and the host's state did not move it.
 
 ## Whole-gate comparison (REQ-03, gate scope)
 
-`cargo-ci` takes a host-wide build lock, so the execution lead runs it over the
+`cargo-ci` takes a host-wide build lock, so the execution lead ran it over the
 merged tree — once with the host otherwise idle, once with a concurrent build
-beside it — and records both here.
+beside it. Both runs judged the same tree, commit `1101c623`, with a clean
+working tree, and both executed their checker rather than reusing a projection
+(`jit gate evaluate 06f1fa95 cargo-ci --force`).
 
-| Run | Condition | Gate-run identifier | Verdict |
-| --- | --- | --- | --- |
-| 1 | Idle host | _(lead records)_ | _(lead records)_ |
-| 2 | Concurrent build | _(lead records)_ | _(lead records)_ |
+The load for run 2 was sustained across the whole run rather than started
+beside it: a loop rebuilding this workspace from scratch into a scratch target
+directory, which completed nine full builds while the gate ran, together with
+`openssl speed -multi 12 sha256`. A first attempt started one build alone and is
+not recorded, because that build finished in 46 s and left the remaining nine
+minutes of the gate run unloaded — it measured almost nothing.
+
+| Run | Condition | 1-minute load, start → end | Gate-run identifier | Duration | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Idle host | 0.61 → — | `e1363105-74f8-48f5-b778-2a3f703911fe` | 421 s | **passed** |
+| 2 | Nine concurrent from-scratch workspace builds and a 12-way CPU load | 5.27 → 30.87 | `73053fc6-fe87-4006-9c18-5017b1d3b0f9` | 537 s | **passed** |
+
+Both runs report the same verdict over every step: `incremental-preflight`,
+`fmt`, `clippy`, `test` (4374 passed, 0 failed, 10 ignored in each),
+`provenance`, `budget` and `incremental-state`. The loaded run took 28 % longer
+and decided the same thing, on a host whose load average reached 30.9 across 24
+cores — well past the 6–10 band at which this gate's verdict used to turn.
 
 ## What remains bounded, and why
 

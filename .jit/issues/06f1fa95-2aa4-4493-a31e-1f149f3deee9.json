@@ -14,12 +14,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T17:43:04.131693233Z",
+      "updated_at": "2026-08-04T18:20:25.263733478Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-04T16:01:42.702643090Z",
+      "updated_at": "2026-08-04T17:55:44.565408966Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "gated",
   "title": "Make the cargo-ci verdict independent of unrelated host load",
-  "updated_at": "2026-08-04T17:43:04.131693233Z"
+  "updated_at": "2026-08-04T18:20:25.263733478Z"
 }
