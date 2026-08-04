@@ -395,8 +395,9 @@ impl ClaimRequiresGitError {
 }
 
 /// Error returned when running a gate checker would use a `jit` binary whose
-/// build commit predates, or no longer matches, the repository's current
-/// `HEAD` (jit:7446af34).
+/// build no longer describes the tree under review — the build commit predates
+/// the repository's current `HEAD`, a build input is uncommitted, or the build
+/// itself was made from a dirty tree (jit:7446af34).
 ///
 /// Raised from two, independent places, both refusing BEFORE they do
 /// anything with the (potentially stale) binary that raises them:
@@ -548,7 +549,8 @@ impl StaleBinaryError {
         &self.gate_key
     }
 
-    /// Why the binary was judged stale (commit mismatch or dirty build).
+    /// Why the binary was judged stale: a commit mismatch, uncommitted build
+    /// inputs, or a build made from a dirty tree.
     pub fn reason(&self) -> &crate::domain::build_provenance::StaleBinaryReason {
         &self.reason
     }
