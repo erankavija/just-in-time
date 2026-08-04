@@ -24,7 +24,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T22:17:04.065610894Z",
+      "updated_at": "2026-08-04T22:49:38.652589605Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Decide the lock tests on lock behaviour, not on scheduling",
-  "updated_at": "2026-08-04T22:27:09.626745007Z"
+  "updated_at": "2026-08-04T22:49:38.652589605Z"
 }
