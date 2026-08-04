@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "A quality-gate verdict reflects the change under review rather than what else the host was doing while the gate ran.\n\n## Background\n\n`cargo-ci` is the authoritative gate for Rust changes, and it is not deterministic under host load. `crates/server/tests/server_integration/graceful_shutdown_tests.rs::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero` failed a gate with \"the stalled connection was dropped before the drain deadline\" at load average 6–10, with a concurrent build running beside the gate. It passes repeatedly on an idle host.\n\nThe consequence is procedural as well as technical: every issue's verdict becomes load-dependent, and the operational workaround adopted during the last container was to serialise all work behind the gate, which costs wall-clock on every issue in every wave.\n\nA timing-sensitive assertion inside the authoritative whole-workspace gate is the problem; whether the fix is a different assertion, an injected clock, or moving the property to a suite that is not the blocking gate is a design question.\n\n## Success Criteria\n\n- [hard] REQ-01: The drain property is asserted in a way whose outcome does not change with unrelated load on the host.\n- [hard] REQ-02: The assertion still fails when the behaviour it protects actually regresses, demonstrated against a seeded regression.\n- [hard] REQ-03: `cargo-ci` produces the same verdict for one tree whether or not another build runs concurrently.",
   "documents": [],
+  "done_at": "2026-08-04T19:25:54.711327068Z",
   "first_ready_at": "2026-08-03T21:54:11.560238028Z",
   "gates_required": [
     "cargo-ci",
@@ -18,8 +19,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T19:14:23.777056301Z",
+      "status": "passed",
+      "updated_at": "2026-08-04T19:25:42.604166673Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,7 +33,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "gated",
+  "state": "done",
   "title": "Make the cargo-ci verdict independent of unrelated host load",
-  "updated_at": "2026-08-04T19:22:25.770898075Z"
+  "updated_at": "2026-08-04T19:25:54.711327068Z"
 }

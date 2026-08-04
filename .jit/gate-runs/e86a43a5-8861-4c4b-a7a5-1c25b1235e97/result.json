@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8028354ec180b36289497b5d237591fa3b521685",
+  "completed_at": "2026-08-04T19:25:42.281395544Z",
+  "duration_ms": 183879,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied and the prior verification-record finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "06f1fa95-2aa4-4493-a31e-1f149f3deee9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e86a43a5-8861-4c4b-a7a5-1c25b1235e97",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T19:22:38.401439002Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c4cff3bf, 4dabd511, 33b024df, 499f9ebf, 171df86b, d6fd77c5, 13d30789, a54217d9, 8d669b73, 2cc42990, 8028354e\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/06f1fa95/requirement/REQ-01, REQ-02, REQ-03; @/issue/f04f7888/requirement/REQ-03; @/gate/cargo-ci; @/invariant/single-source-prose, semantic-test-assertions, bounded-rust-build-footprint, convention-convergence\nGate evidence: cargo-ci passed (exit 0, 2026-08-04T19:15:17Z); prior code-review F1 is addressed by the corrected verification record\nTruncation recovery: individual code, document, gate-record, merge, and current-file reads were recovered in narrow path/range calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied and the prior verification-record finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
