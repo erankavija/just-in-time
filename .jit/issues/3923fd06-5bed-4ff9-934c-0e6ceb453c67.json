@@ -7,7 +7,15 @@
     "a2d7d212-33d7-4c56-9a17-126d9c8e2af1"
   ],
   "description": "Every package this repository publishes is bound to the registry entries it restates, not only the one that carries this repository's own workflow.\n\n## Background\n\nThe mechanism that binds a packaged contribution to the repository registry entry it restates takes a contribution list, and it is currently given one package's. The other package this repository publishes contributes to the same registries and is bound by nothing.\n\nThe divergence this admits is not hypothetical, and it is not cosmetic. The unbound package declares the issue-type namespace as \"Issue type (hierarchical). At most one per issue.\" while the repository registry declares it \"Issue type (hierarchical). Exactly one per issue.\" Those state different rules about the same namespace — one permits an issue with no type, the other requires one — and an adopter receives whichever copy the package happens to ship.\n\nThe unbound package also contributes item kinds, documentation paths, validation settings and seven namespaces, none of which any check compares against what the repository holds.\n\n## Success Criteria\n\n- [hard] REQ-01: Every package this repository publishes has its contributions compared against the repository registry entries they restate, and the set of packages compared is derived from what the repository publishes rather than named in the check.\n- [hard] REQ-02: The issue-type namespace states one rule, and whichever text survives is the one that describes what the engine enforces.\n- [hard] REQ-03: Each surviving difference is either repaired or declared as an override carrying its reason, and no difference is passed over silently.\n- [hard] REQ-04: The measured result is stated: every difference found, which carrier held which text, and its disposition.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/3923fd06/measurement-report.md"
+    }
+  ],
   "done_at": "2026-08-04T17:53:01.408252764Z",
   "first_ready_at": "2026-08-04T14:48:08.764545599Z",
   "gates_required": [
@@ -38,5 +46,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Bind every published package to the registry it restates",
-  "updated_at": "2026-08-04T17:53:01.408252764Z"
+  "updated_at": "2026-08-04T22:20:41.961335218Z"
 }

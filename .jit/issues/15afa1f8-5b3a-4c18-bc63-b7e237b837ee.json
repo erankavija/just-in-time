@@ -5,7 +5,15 @@
   "created_at": "2026-08-04T20:28:16.312816572Z",
   "dependencies": [],
   "description": "The drain-outcome test decides on what the shutdown sequence did rather than on the host completing a connection inside a 50-millisecond window.\n\n## Background\n\n`test_run_shutdown_sequence_reports_drained_when_final_interval_empties` in `crates/server/src/shutdown.rs` gives the drain a deadline of four 100-millisecond sampling intervals, sleeps 3.5 of them, and then completes the stalled connection — expecting the sequence to report `Drained` rather than `ForcedClosed`. The margin between the sleep and the deadline is 50 milliseconds, and the test runs under a plain `#[tokio::test]`, so that sleep is measured against the real clock. A host that does not schedule the completion inside the remaining 50 milliseconds turns a correct drain into a forced close and fails an assertion about which branch the sequence took.\n\nFifty milliseconds is the tightest margin left in the gate's suite. It survived `57675b68`'s survey because that survey searched for `thread::sleep`, and this file imports `tokio::time::sleep` and calls it unqualified; `4c700c80`'s re-run added a search for aliased timing calls and found it.\n\nThe sampling schedule is production code: `drain_connections` polls on `DRAIN_SAMPLE_INTERVAL` through `tokio::time`, and `run_shutdown_sequence` measures the drain against a deadline built from the same clock. Whether the restatement is a test-side one — a runtime whose time is virtual, so the schedule advances deterministically — or a seam that supplies the sampling schedule from outside, is for the implementer to establish rather than for this description to decide.\n\n## Success Criteria\n\n- [hard] REQ-01: The test's outcome is decided by which branch the shutdown sequence took, not by whether the host completed a connection inside a fixed window.\n- [hard] REQ-02: The drain outcomes the suite distinguishes — a connection that finishes within the deadline against one force-closed at it — are each still asserted, and neither is dropped to remove the margin.\n- [hard] REQ-03: The assertion still fails when the behaviour it protects genuinely breaks, demonstrated against a seeded regression.\n- [hard] REQ-04: The shutdown semantics the container already holds are unchanged: a stalled connection still receives the whole drain deadline before it is retired, and every wait the suite performs stays bounded.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/15afa1f8/15afa1f8-seeded-regression.md"
+    }
+  ],
   "first_ready_at": "2026-08-04T20:28:16.312816572Z",
   "gates_required": [
     "cargo-ci",
@@ -19,7 +27,7 @@
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-04T21:36:22.826546632Z",
+      "updated_at": "2026-08-04T22:20:14.191675288Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
-  "updated_at": "2026-08-04T22:17:15.827550883Z"
+  "updated_at": "2026-08-04T22:20:40.416592792Z"
 }
