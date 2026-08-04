@@ -1,7 +1,11 @@
 {
   "epic_id": "f3f7de97-7315-4780-8389-9c857da29239",
   "epic_short_id": "f3f7de97",
-  "current_wave": 1,
+  "current_wave": 2,
+  "lead_notes": [
+    "Four wave-1 branches were merged before any of them was gated, and 6d496b8c's conformance failures then made cargo-ci red on main for every issue at once, blocking completion of five otherwise-finished issues. The protocol 3019eacd rewrote names exactly this: gate after each merge whenever per-merge attribution matters. Gate before merging the next branch from here on.",
+    "A backgrounded `codex exec` blocks forever on 'Reading additional input from stdin...' unless stdin is redirected from /dev/null. The 6d496b8c rework sat 17 minutes with a live process, a clean worktree, no commits and 00:00:00 CPU before this was found. It is a harness defect, not a worker failure, and does not count against the rework budget."
+  ],
   "waves": [
     {
       "wave_number": 1,
