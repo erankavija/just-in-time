@@ -11,11 +11,11 @@
     "3019eacd-863a-428e-b25e-aede2cf37da7",
     "3923fd06-5bed-4ff9-934c-0e6ceb453c67",
     "5367fcba-09d5-4307-95d0-232a885533f6",
-    "57675b68-78dd-470b-a524-30061b488062",
     "6d496b8c-587f-4246-a7e7-4c7e1d6792cb",
     "76a4bd21-4afc-40ab-a2c0-376c296dc9ab",
     "896b5b5d-f11f-48de-88b6-88cc1ba47588",
     "89a7e34e-11a1-4acf-810b-43d2a056005f",
+    "e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a",
     "e516b4f8-506d-4b43-89a9-e72603aecaa6",
     "ee02e514-11e1-448a-9f70-6d0647bdca4c"
   ],
@@ -56,5 +56,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Unguarded duplicate facts, unreliable verification, and tracker ergonomics",
-  "updated_at": "2026-08-04T14:48:36.355076811Z"
+  "updated_at": "2026-08-04T15:42:02.352235066Z"
 }

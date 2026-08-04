@@ -1,0 +1,39 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-04T15:41:51.548702439Z",
+  "dependencies": [
+    "57675b68-78dd-470b-a524-30061b488062"
+  ],
+  "description": "A lock test decides on lock behaviour rather than on whether the host scheduled its threads promptly, so the tightest timing margin left in the authoritative gate cannot flip a verdict.\n\n## Background\n\n`test_exclusive_lock_prevents_concurrent_writes` in `crates/jit/src/storage/lock.rs` spawns a holder, sleeps 50 milliseconds on the main thread, and then asserts the holder acquired. A host that has not scheduled the holder within that window fails an assertion about exclusion for a reason that is not about exclusion.\n\nThe second half inverts under the same pressure. The holder sleeps 200 milliseconds after acquiring, and a second thread with a 50 millisecond wait must be refused. If the main thread is delayed past the holder's release before the second thread starts, the second acquisition succeeds and the assertion that it was refused fails on correct behaviour.\n\nThose two margins, 50 and 200 milliseconds, are an order of magnitude tighter than any other timing assertion the gate's suite carries: the rest allow seconds. A survey of the whole suite recorded them as the tightest remaining, with every other candidate either allowing seconds of headroom or asserting a condition that load can only make more true.\n\nThe exposure was raised by the work that removed the test-thread cap from the gate script: that cap held parallelism below the host's core count, and without it the suite runs at full width.\n\n## Success Criteria\n\n- [hard] REQ-01: The exclusion property is decided by what the lock did, not by whether a thread was scheduled inside a fixed window.\n- [hard] REQ-02: The refusal property is decided the same way, and cannot invert because the holder released before the contender started.\n- [hard] REQ-03: Both properties still fail when exclusion genuinely breaks, demonstrated against a seeded regression.\n- [hard] REQ-04: No assertion in this test depends on a wall-clock margin chosen to be long enough.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-04T15:41:51.548702439Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-04T15:42:04.387026330Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-04T15:42:04.785467591Z",
+      "updated_by": null
+    }
+  },
+  "id": "e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:core",
+    "satisfies:REQ-03",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Decide the lock tests on lock behaviour, not on scheduling",
+  "updated_at": "2026-08-04T15:42:04.785467591Z"
+}

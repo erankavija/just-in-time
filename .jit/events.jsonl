@@ -13054,3 +13054,10 @@
 {"from":"backlog","id":"cd31716e-5dba-4bcd-acc7-6e68e3630914","issue_id":"3923fd06-5bed-4ff9-934c-0e6ceb453c67","timestamp":"2026-08-04T15:36:54.615110687Z","to":"ready","type":"issue_state_changed"}
 {"from":"in_progress","id":"ae01d9d9-6945-4b30-9a7c-71d34bf02514","issue_id":"896b5b5d-f11f-48de-88b6-88cc1ba47588","timestamp":"2026-08-04T15:37:01.629382325Z","to":"done","type":"issue_state_changed"}
 {"id":"436eb503-98d1-4a05-8de9-4747dac3a511","issue_id":"896b5b5d-f11f-48de-88b6-88cc1ba47588","timestamp":"2026-08-04T15:37:01.629382325Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"3c98cd83-2068-464b-8e07-bfc6e9bb9563","issue_id":"3923fd06-5bed-4ff9-934c-0e6ceb453c67","timestamp":"2026-08-04T15:38:27.782298043Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"ef6069ce-84c6-4b3e-9fdd-d56efc7a59ab","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","priority":"normal","timestamp":"2026-08-04T15:41:51.548702439Z","title":"Decide the lock tests on lock behaviour, not on scheduling","type":"issue_created"}
+{"from":"ready","id":"adea12c8-f32f-4622-b6f4-d19b464f9eca","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T15:41:57.009009447Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"3c19eb6a-9ad2-4fcc-8f0b-b51eaddd30e2","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T15:41:57.009009447Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"127aeeeb-eba1-4cd2-965d-bb97c920df59","issue_id":"f3f7de97-7315-4780-8389-9c857da29239","timestamp":"2026-08-04T15:42:02.352235066Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"a760f19c-0c98-4301-ab00-6a7a1a1dcdc6","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T15:42:04.387026330Z","type":"gate_added"}
+{"gate_key":"code-review","id":"595d4cd4-1f93-42f0-afcc-a4cd039b6d59","issue_id":"e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a","timestamp":"2026-08-04T15:42:04.785467591Z","type":"gate_added"}
