@@ -14,7 +14,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T15:55:17.417854023Z",
+      "updated_at": "2026-08-04T18:47:29.211662904Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Hold a concurrency property without racing a wall clock",
-  "updated_at": "2026-08-04T16:10:04.057368652Z"
+  "updated_at": "2026-08-04T18:47:29.211662904Z"
 }
