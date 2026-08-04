@@ -16,7 +16,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T15:55:16.903221535Z",
+      "updated_at": "2026-08-04T17:25:26.973686925Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -37,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bind every published package to the registry it restates",
-  "updated_at": "2026-08-04T16:35:57.339969995Z"
+  "updated_at": "2026-08-04T17:25:26.973686925Z"
 }

@@ -1,0 +1,25 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": null,
+  "completed_at": "2026-08-04T17:25:26.963884209Z",
+  "duration_ms": 0,
+  "exit_code": null,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "8ba85429b474c028da5d82599149cbf35f482cbc4bfb52f14c619411a48417b1",
+  "issue_id": "3923fd06-5bed-4ff9-934c-0e6ceb453c67",
+  "message": null,
+  "origin": {
+    "derivation": "reused",
+    "source_run": "1b3cfd29-17b8-4f4e-bc03-0fc680ecb860"
+  },
+  "run_id": "ec86c172-ffea-4460-9e6f-4149bda13ee1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-04T17:25:26.963884209Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "",
+  "tree_dirty": null
+}

@@ -16,9 +16,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:55:11.003509711Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-04T17:25:26.336968110Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Bind the packaged region source to the region rendered from it",
-  "updated_at": "2026-08-04T15:46:08.975733752Z"
+  "updated_at": "2026-08-04T17:25:26.336968110Z"
 }
