@@ -23,7 +23,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T19:22:25.770898075Z",
+      "updated_at": "2026-08-05T06:18:19.018376444Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Make the cargo-ci verdict independent of unrelated host load",
-  "updated_at": "2026-08-04T22:20:42.337946834Z"
+  "updated_at": "2026-08-05T06:18:19.018376444Z"
 }

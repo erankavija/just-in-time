@@ -1,0 +1,39 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-05T06:31:41.703075843Z",
+  "dependencies": [
+    "4c700c80-09af-4cd9-83b6-9a71309e9007"
+  ],
+  "description": "A test whose outcome the lock has already decided reaches its verdict at once instead of spending the contention stall bound first.\n\n## Background\n\n`Contenders::await_refusals` waits for a given number of distinct contenders to have been refused the lock, and treats \"no new refusal yet\" as the only thing that can be happening. When the lock under test is broken so that it admits a contender it had to refuse, that contender is admitted without ever recording a refusal, asserts its ordering property, and panics. The waiting thread's target is then unreachable — no contender is left to produce the refusal it waits for — but the wait cannot tell an unreachable target from one that has not arrived yet. It spends the whole `CONTENTION_STALL_LIMIT` and then reports a stall, which names neither the cause nor the thing that already failed.\n\nThe survey linked to `4c700c80` records this as observed rather than hypothetical: under the seeded regression that makes `RepoWriteLock::acquire` admit a second thread, both restated single-contender tests' main threads reached the stall bound after their workers had already panicked.\n\nFive call sites wait this way: `crates/jit/src/storage/repo_lock.rs:431`, `crates/jit/src/storage/repository_state_store_tests.rs:2648`, `crates/jit/src/storage/lock.rs:500`, `crates/jit/src/storage/lock.rs:592`, and `crates/jit/src/storage/claim_coordinator.rs:1900,1938`. A seeded-regression run pays the bound at several of them at once, for an answer every one of them already has.\n\n`Contenders` already records admissions, and a contender that records an admission having never recorded a refusal is exactly the signature of the broken lock. Nothing reads it for that purpose today, and `Claimants` in `claim_coordinator.rs` keeps a second progress counter of its own beside the shared record rather than using it.\n\n## Success Criteria\n\n- [hard] REQ-01: A wait for refusals whose target has become unreachable fails at once, naming the lock admitting a contender it had to refuse rather than reporting a stall.\n- [hard] REQ-02: The stall bound is reachable only while the contended set is producing neither an admission nor a refusal.\n- [hard] REQ-03: Every site that waits for refusals gets this, the claim coordinator's included, and no second progress counter stands beside the shared record.\n- [hard] REQ-04: A passing run costs what it costs now: no wait added, no assertion weakened, and the exclusion and ordering properties still decided by what the lock did.\n- [hard] REQ-05: Demonstrated against the seeded regression the linked survey used, with the elapsed time of the failing run before and after the change.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-05T06:31:41.703075843Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-05T06:31:48.714563167Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-05T06:31:48.874677744Z",
+      "updated_by": null
+    }
+  },
+  "id": "91cc038c-8897-482d-ac69-da72a30bd739",
+  "labels": [
+    "epic:guards-and-ergonomics",
+    "milestone:v1.0",
+    "component:core",
+    "type:task",
+    "satisfies:REQ-03"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Report a lock that admits a contender it must refuse without waiting out the stall bound",
+  "updated_at": "2026-08-05T06:31:52.433313421Z"
+}

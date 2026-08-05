@@ -10,12 +10,12 @@
     "25d25f2f-7143-43cc-bc68-65dcd9c11368",
     "3019eacd-863a-428e-b25e-aede2cf37da7",
     "3923fd06-5bed-4ff9-934c-0e6ceb453c67",
-    "4c700c80-09af-4cd9-83b6-9a71309e9007",
     "5367fcba-09d5-4307-95d0-232a885533f6",
     "6d496b8c-587f-4246-a7e7-4c7e1d6792cb",
     "76a4bd21-4afc-40ab-a2c0-376c296dc9ab",
     "896b5b5d-f11f-48de-88b6-88cc1ba47588",
     "89a7e34e-11a1-4acf-810b-43d2a056005f",
+    "91cc038c-8897-482d-ac69-da72a30bd739",
     "e3c6c767-f1e3-49e6-888a-1a3b8bf6e15a",
     "e516b4f8-506d-4b43-89a9-e72603aecaa6",
     "ee02e514-11e1-448a-9f70-6d0647bdca4c"
@@ -28,6 +28,55 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f3f7de97-guards-and-ergonomics/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416133",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416135",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416166",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416145",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30884326921",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md"
     }
   ],
   "first_ready_at": "2026-08-03T21:52:05.934637746Z",
@@ -37,13 +86,13 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "status": "pending",
-      "updated_at": "2026-08-03T21:52:15.010197451Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-05T06:07:46.897003517Z",
+      "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-08-03T21:55:35.134900707Z",
+      "updated_at": "2026-08-05T06:04:48.730235039Z",
       "updated_by": "auto:executor"
     }
   },
@@ -55,7 +104,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Unguarded duplicate facts, unreliable verification, and tracker ergonomics",
-  "updated_at": "2026-08-05T06:03:01.253453874Z"
+  "updated_at": "2026-08-05T06:31:57.655866106Z"
 }
