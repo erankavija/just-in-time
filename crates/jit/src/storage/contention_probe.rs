@@ -208,9 +208,9 @@ impl Contenders {
             let admitted_unrefused = self.admitted_unrefused_count();
             assert!(
                 admitted_unrefused == 0,
-                "the lock admitted {admitted_unrefused} contender it had to \
-                 refuse, so the {refused_so_far} of {contender_count} refusals \
-                 recorded are all there will ever be"
+                "the lock let {admitted_unrefused} of {contender_count} \
+                 contenders through without ever refusing them, so the \
+                 {refused_so_far} refusals recorded are all there will ever be"
             );
             std::thread::sleep(PROGRESS_POLL_INTERVAL);
             let now_achieved = self.achieved();
@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "the lock admitted 1 contender it had to refuse")]
+    #[should_panic(expected = "the lock let 1 of 2 contenders through without ever refusing them")]
     fn test_await_refusals_reports_an_unreachable_target_rather_than_waiting_out_the_bound() {
         let contenders = Contenders::new();
         let admitted = Arc::clone(&contenders);
