@@ -491,6 +491,13 @@ mod tests {
                     let outcome = FileLocker::new(EXPIRING_LOCK_WAIT).lock_exclusive(&file_path);
                     if outcome.as_ref().err().is_some_and(is_lock_timeout) {
                         contenders.record_refusal();
+                    } else {
+                        // Anything that is not an expired wait is the lock
+                        // deciding: this contender reached the critical
+                        // section. Recorded so a lock that lets it through
+                        // while the hold is live is reported by the wait below
+                        // rather than waited out.
+                        contenders.record_admission();
                     }
                     outcome.map(drop)
                 })

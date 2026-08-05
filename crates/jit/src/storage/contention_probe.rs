@@ -184,6 +184,11 @@ impl Contenders {
     /// recorded progress rather than on a clock: as soon as they have all been
     /// refused, however long the host took to schedule them.
     ///
+    /// The bound behind it is spent on the whole set going still, the same term
+    /// [`admitted_when_reached`] watches: a contender newly refused and a
+    /// contender the lock lets through are both the set moving, and either
+    /// restarts it.
+    ///
     /// # Panics
     ///
     /// Panics at once when the lock has let a contender through without ever
@@ -197,23 +202,25 @@ impl Contenders {
     /// waited out.
     pub(crate) fn await_refusals(&self, contender_count: usize) {
         let mut watch = ProgressWatch::new();
-        let mut refused = self.refused_count();
-        while refused < contender_count {
+        let mut achieved = self.achieved();
+        while achieved.0 < contender_count {
+            let refused_so_far = achieved.0;
             let admitted_unrefused = self.admitted_unrefused_count();
             assert!(
                 admitted_unrefused == 0,
                 "the lock admitted {admitted_unrefused} contender it had to \
-                 refuse, so the {refused} of {contender_count} refusals \
+                 refuse, so the {refused_so_far} of {contender_count} refusals \
                  recorded are all there will ever be"
             );
             std::thread::sleep(PROGRESS_POLL_INTERVAL);
-            let now_refused = self.refused_count();
-            let progressed = now_refused != refused;
-            refused = now_refused;
+            let now_achieved = self.achieved();
+            let progressed = now_achieved != achieved;
+            achieved = now_achieved;
+            let refused = achieved.0;
             watch.observe(progressed, |stalled_for| {
                 format!(
                     "{refused} of {contender_count} contenders were refused the \
-                     lock, and none of the rest asked for it in {stalled_for:?}"
+                     lock, and nothing the set does moved in {stalled_for:?}"
                 )
             });
         }
@@ -327,6 +334,30 @@ mod tests {
         // The expected message is the one this condition renders. The stall
         // bound renders a different one, so reaching that message instead is
         // what "waited the bound out" would look like here.
+    }
+
+    #[test]
+    fn test_the_progress_a_wait_watches_moves_when_the_lock_lets_a_contender_through() {
+        let contenders = Contenders::new();
+        let contender = Arc::clone(&contenders);
+        // Read from inside the contender so both records belong to one thread:
+        // a contender refused and then let through, with no further contender
+        // refused in between. A wait counting refusals alone sees nothing move
+        // across that interval; the term the wait actually watches must.
+        let (refused_only, then_admitted) = std::thread::spawn(move || {
+            contender.record_refusal();
+            let refused_only = contender.achieved();
+            contender.record_admission();
+            (refused_only, contender.achieved())
+        })
+        .join()
+        .unwrap();
+
+        assert_ne!(
+            refused_only, then_admitted,
+            "a contender the lock lets through is the set moving, so a waiter \
+             behind it does not spend its bound across that interval"
+        );
     }
 
     #[test]
