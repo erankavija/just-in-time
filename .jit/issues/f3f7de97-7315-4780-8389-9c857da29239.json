@@ -77,6 +77,13 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f3f7de97-guards-and-ergonomics/completion-report.md"
     }
   ],
   "first_ready_at": "2026-08-03T21:52:05.934637746Z",
@@ -87,12 +94,12 @@
   "gates_status": {
     "holistic-review": {
       "status": "failed",
-      "updated_at": "2026-08-05T06:07:46.897003517Z",
+      "updated_at": "2026-08-05T07:32:57.427121350Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-08-05T06:04:48.730235039Z",
+      "updated_at": "2026-08-05T07:28:05.920707092Z",
       "updated_by": "auto:executor"
     }
   },
@@ -106,5 +113,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Unguarded duplicate facts, unreliable verification, and tracker ergonomics",
-  "updated_at": "2026-08-05T07:27:43.402266372Z"
+  "updated_at": "2026-08-05T07:35:12.099268241Z"
 }
