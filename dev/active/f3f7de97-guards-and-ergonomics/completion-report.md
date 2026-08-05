@@ -13,8 +13,9 @@ two disagree. Every check the development workflow trusts either answers for
 itself or has been replaced: the merge-integrity guard that reported a cold
 build as passing is gone, the authoritative gate's verdict no longer turns on
 what else the host was doing, and a guard that refuses to run names the
-condition it detected. The hosted continuous-integration workflow passes on
-every job for the first time since before this container was filed.
+condition it detected. The hosted continuous-integration workflow, which had not
+passed since 2026-07-12 and failed on six consecutive pushes before this
+container reached it, now passes on every job.
 
 ## Metrics
 
@@ -62,10 +63,12 @@ platform nobody acts on.
 - [x] **REQ-07** — no file carries another container's requirement identifier —
   `e516b4f8`.
 - [x] **REQ-08** — the hosted workflow completes with every job passing and none
-  at its execution ceiling — `76a4bd21`, `ee02e514`. Evidenced in
-  `hosted-ci-evidence.md`: fourteen jobs, fourteen successes, longest 12.2
-  minutes against a six-hour ceiling. The run before this container's work had
-  four jobs cancelled at 5.36 hours each and a failing Windows job.
+  at its execution ceiling — `76a4bd21`, `ee02e514`. The run, its jobs, their
+  conclusions and their durations against the ceiling are recorded in
+  [`hosted-ci-evidence.md`](hosted-ci-evidence.md), which is where those numbers
+  live; this report cites it rather than restating it. The last run before this
+  container's work reached the workflow had four jobs cancelled at 5.36 hours
+  each and a failing Windows job.
 
 ## Wave Execution Log
 
@@ -156,6 +159,29 @@ below, because the repetition is the lesson rather than the resolutions.
 Six of these came from surveys rather than from review, and each survey needed a
 search shape the previous one did not have. The last two needed reading
 production code, because the sleep deciding the verdict was not in the test.
+
+## The hosted workflow's history, since the summary leans on it
+
+Read from `gh run list --workflow=ci.yml`, newest last:
+
+| Date | Commit | Conclusion |
+| --- | --- | --- |
+| 2026-07-12 | `b7176a1e` | success — the last one before the drought |
+| 2026-07-18 | `1faedc13` | failure |
+| 2026-07-25 | `7b6f24fa` | failure |
+| 2026-07-27 | `dc41ae39` | failure |
+| 2026-07-31 | `0e1c230f` | failure |
+| 2026-07-31 | `5dad802e` | failure |
+| 2026-08-03 | `59bfddfe` | failure — this container's first push |
+| 2026-08-04 | `a2de402c` | cancelled — four jobs held to 5.36 hours |
+| 2026-08-04 | `b4859c87` | success — the first, once `76a4bd21` landed |
+| 2026-08-05 | `33c89c44`, `b22ad9cb`, `b94bf7e2` | success |
+
+Two things this table corrects in earlier drafts of this report. The workflow's
+first pass came mid-container rather than at completion: `76a4bd21` bounded the
+foreground-serve case and `ee02e514` removed the Windows leg, and `b4859c87` is
+where that took effect. And the drought began on 2026-07-18, three weeks before
+this container was filed, not at its filing.
 
 ## Holistic Quality Notes
 

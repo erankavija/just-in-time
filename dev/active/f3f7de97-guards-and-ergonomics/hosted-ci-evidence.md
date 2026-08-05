@@ -92,13 +92,35 @@ and `84bb42f3` — `91cc038c`'s fix and its rework — changed
 `lock.rs`. The container's own holistic review caught it, which is why this
 record is anchored at `b94bf7e2` instead.
 
-Commits after `b94bf7e2` carry this record's own update and the container's
-closing tracker state. That they touch no compiled source is a claim a reader
-should check rather than accept, and one command checks it:
+## The commits after the run, and what covers them
+
+A container cannot get a hosted run for the commit that closes it: that commit
+records the closure, so it exists only after every gate has already answered.
+What can be done is to say exactly what the residue is and what checks it.
+
+Commits after `b94bf7e2` fall in two classes, and the workflow itself treats
+them differently.
+
+**Markdown.** `ci.yml`'s push trigger carries `paths-ignore: '**.md'`, so a
+commit touching only markdown creates no run by the workflow's own definition.
+This record and the completion report are in that class.
+
+**Tracker state under `.jit/`.** These do trigger the workflow. One job reads
+them: `Validate Repository Data`, which runs `jit validate` with no issue id —
+whole-repository rules plus the integrity checks. That is the same command this
+container's `repo-validate` gate runs, against the same tree, and its result is
+recorded on the container. For a `.jit`-only delta the hosted job and the local
+gate are one check, not two similar ones.
+
+Both claims are checkable rather than asserted:
 
 ```bash
+# Nothing compiled changed after the run this record names.
 git diff --stat b94bf7e2..HEAD -- crates/ Cargo.toml Cargo.lock .github/
+
+# What did change, and therefore which of the two classes covers it.
+git diff --stat b94bf7e2..HEAD
 ```
 
-An empty result is the evidence; anything else means this record needs a newer
-run.
+An empty first result is the evidence for the compiled surface; anything in it
+means this record needs a newer run.
