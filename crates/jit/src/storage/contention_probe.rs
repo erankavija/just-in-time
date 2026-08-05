@@ -17,6 +17,12 @@
 //! puts a refused contender's question back to the lock, so the answer the test
 //! reads is the lock's rather than the scheduler's.
 //!
+//! A wait that can no longer be satisfied ends there rather than in the bound
+//! below. A contender the lock let through without ever refusing it is past the
+//! lock and will never record the refusal a waiter is counting, so the waiter
+//! reports the lock admitting someone it had to refuse and stops, at the moment
+//! that becomes true.
+//!
 //! [`ProgressWatch`] carries the bound every one of those waits needs. It is
 //! spent only while its subject is entirely still: any observed progress resets
 //! it, so a run that keeps moving never reaches it however slowly the host runs
@@ -107,6 +113,7 @@ impl ProgressWatch {
 pub(crate) struct Contenders {
     refused: Mutex<HashSet<ThreadId>>,
     admitted: AtomicUsize,
+    admitted_unrefused: AtomicUsize,
 }
 
 impl Contenders {
@@ -130,13 +137,35 @@ impl Contenders {
     /// Record that the calling thread got through the lock, whatever the
     /// operation behind it then decided: the critical section was entered and
     /// left, so the lock is changing hands.
+    ///
+    /// A caller that got through without ever having been refused is counted
+    /// separately, because it is the one thing a waiter cannot wait out — see
+    /// [`Contenders::admitted_unrefused_count`].
     pub(crate) fn record_admission(&self) {
+        if !self
+            .locked_refusals()
+            .contains(&std::thread::current().id())
+        {
+            self.admitted_unrefused.fetch_add(1, Ordering::SeqCst);
+        }
         self.admitted.fetch_add(1, Ordering::SeqCst);
     }
 
     /// How many contenders the lock has let through.
     pub(crate) fn admitted_count(&self) -> usize {
         self.admitted.load(Ordering::SeqCst)
+    }
+
+    /// How many contenders the lock let through having never refused them.
+    ///
+    /// A contender records its refusal before it retries, so one that reaches
+    /// the critical section without a refusal to its name never met the lock
+    /// held. While a test holds the lock, that can only mean the lock admitted
+    /// someone it had to refuse — and that contender is now past the lock, so
+    /// the refusal a waiter is waiting for from it will never arrive. This is
+    /// what tells an unreachable wait apart from a slow one.
+    pub(crate) fn admitted_unrefused_count(&self) -> usize {
+        self.admitted_unrefused.load(Ordering::SeqCst)
     }
 
     /// What the set has achieved so far, as one comparable observation.
@@ -150,11 +179,17 @@ impl Contenders {
     /// Wait until `contender_count` distinct contenders have each been refused
     /// the lock.
     ///
-    /// Returns on the contenders' own recorded progress rather than on a clock:
-    /// as soon as they have all been refused, however long the host took to
-    /// schedule them.
+    /// `contender_count` is the whole contended set, every member of which the
+    /// caller expects to meet the lock held. Returns on the contenders' own
+    /// recorded progress rather than on a clock: as soon as they have all been
+    /// refused, however long the host took to schedule them.
     ///
     /// # Panics
+    ///
+    /// Panics at once when the lock has let a contender through without ever
+    /// refusing it. That contender is past the lock and will never record the
+    /// refusal this wait is counting, so the target is unreachable and the
+    /// broken exclusion is reported directly rather than waited out as a stall.
     ///
     /// Panics when no further contender is refused for
     /// [`CONTENTION_STALL_LIMIT`], which means the missing ones are not asking
@@ -164,6 +199,13 @@ impl Contenders {
         let mut watch = ProgressWatch::new();
         let mut refused = self.refused_count();
         while refused < contender_count {
+            let admitted_unrefused = self.admitted_unrefused_count();
+            assert!(
+                admitted_unrefused == 0,
+                "the lock admitted {admitted_unrefused} contender it had to \
+                 refuse, so the {refused} of {contender_count} refusals \
+                 recorded are all there will ever be"
+            );
             std::thread::sleep(PROGRESS_POLL_INTERVAL);
             let now_refused = self.refused_count();
             let progressed = now_refused != refused;
@@ -266,6 +308,43 @@ mod tests {
         assert!(
             threads.into_iter().all(|thread| thread.join().unwrap()),
             "each contender's first refusal is reported as progress"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "the lock admitted 1 contender it had to refuse")]
+    fn test_await_refusals_reports_an_unreachable_target_rather_than_waiting_out_the_bound() {
+        let contenders = Contenders::new();
+        let admitted = Arc::clone(&contenders);
+        // A contender that reaches the critical section having never met the
+        // lock held: what a lock that has stopped excluding produces. It can
+        // no longer contribute the refusal the wait below is counting.
+        std::thread::spawn(move || admitted.record_admission())
+            .join()
+            .unwrap();
+
+        contenders.await_refusals(2);
+        // The expected message is the one this condition renders. The stall
+        // bound renders a different one, so reaching that message instead is
+        // what "waited the bound out" would look like here.
+    }
+
+    #[test]
+    fn test_await_refusals_returns_for_a_contender_refused_before_the_lock_let_it_through() {
+        let contenders = Contenders::new();
+        let contender = Arc::clone(&contenders);
+        let asking = std::thread::spawn(move || {
+            contender.record_refusal();
+            contender.record_admission();
+        });
+
+        contenders.await_refusals(1);
+        asking.join().unwrap();
+
+        assert_eq!(
+            contenders.admitted_unrefused_count(),
+            0,
+            "a contender the lock refused before letting it through met the lock held"
         );
     }
 

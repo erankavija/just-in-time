@@ -1466,16 +1466,15 @@ fn acquire_claim_when_reached(
 /// have achieved against it.
 ///
 /// Shared between the threads of one test so each can see the others making
-/// progress. `answered` counts the callers the coordinator decided about, so a
+/// progress. The [`Contenders`](super::contention_probe::Contenders) record
+/// beneath it holds both halves: which claimants have had a wait for the lock
+/// expire, so a test can establish that contention happened rather than assume
+/// a schedule produced it, and how many the coordinator has decided about. A
 /// claimant that dies without an answer stops contributing progress — which is
-/// what it should look like to everyone waiting behind it. The
-/// [`Contenders`](super::contention_probe::Contenders) record beneath it holds
-/// which claimants have had a wait for the lock expire, so a test can establish
-/// that contention happened rather than assume a schedule produced it.
+/// what it should look like to everyone waiting behind it.
 #[cfg(test)]
 #[derive(Debug, Default)]
 struct Claimants {
-    answered: std::sync::atomic::AtomicUsize,
     contention: super::contention_probe::Contenders,
 }
 
@@ -1485,13 +1484,14 @@ impl Claimants {
         Arc::new(Self::default())
     }
 
+    /// How many callers the coordinator has decided about, granted and refused
+    /// alike: each entered the critical section and left it.
     fn answered_count(&self) -> usize {
-        self.answered.load(std::sync::atomic::Ordering::SeqCst)
+        self.contention.admitted_count()
     }
 
     fn record_answer(&self) {
-        self.answered
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.contention.record_admission();
     }
 }
 
