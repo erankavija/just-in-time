@@ -9,7 +9,8 @@
     "The lead pushed main to origin at b4859c87 to start a hosted CI run. REQ-08 can only be evidenced by a completed hosted run, and a run costs wall-clock the container does not control, so it starts as early as the tree allows rather than at completion.",
     "TRAP: a seeded regression reached main, through two faults that combined. The worker's REQ-04 re-verification ran in the parent checkout rather than its worktree \u2014 a `run_in_background` Bash call resets the session cwd, and every following command inherited the parent silently without a `cd` to reveal it. Its `sed -i` seed therefore landed on main. The lead then ran `git add -A` on main without reading `git status`, which committed the seed; the worker's `git checkout -- <path>` a moment later restored the file to that just-committed seeded state, and its `git diff --quiet` read clean because HEAD had moved under it. Neither fault alone would have shipped it: the revert would have worked, or there would have been nothing to sweep. Three habits follow \u2014 prefix every worker command with its worktree path rather than relying on session cwd; never `git add -A` on main unread while a worker is alive; and verify a revert against a known-good expected line rather than against `git diff --quiet`, which only says the tree matches HEAD and not that HEAD is right.",
     "Workers run plain `cargo` commands, which do not take the host build lock that `scripts/cargo-ci.sh` re-execs under \u2014 only concurrent cargo-ci runs queue. Two live workers therefore starved a lead gate run to its 900-second runner timeout. Gate on main only when no worker is building.",
-    "BLOCKER at the end of wave 4: 63 orphaned busy-wait processes from 15afa1f8's load experiment saturate the host, and the lead's shell cannot signal them \u2014 the kill reports success while the processes survive, and the harness refuses the pattern-matching form as a self-match hazard. They are spin loops the worker spawned to saturate the host for a 20-repetition experiment; their parent shell died before its cleanup ran, so init adopted them. They are niced, and scripts/cargo-ci.sh also runs niced, so the gate competed with them on equal footing and overran its 900-second runner budget. The operator clears them by selecting processes whose parent is init, whose command line names the agent-15afa1f8 worktree and contains the spin loop, and killing that pid list."
+    "BLOCKER at the end of wave 4: 63 orphaned busy-wait processes from 15afa1f8's load experiment saturate the host, and the lead's shell cannot signal them \u2014 the kill reports success while the processes survive, and the harness refuses the pattern-matching form as a self-match hazard. They are spin loops the worker spawned to saturate the host for a 20-repetition experiment; their parent shell died before its cleanup ran, so init adopted them. They are niced, and scripts/cargo-ci.sh also runs niced, so the gate competed with them on equal footing and overran its 900-second runner budget. The operator clears them by selecting processes whose parent is init, whose command line names the agent-15afa1f8 worktree and contains the spin loop, and killing that pid list.",
+    "Session 3 resumed with one child open and a code-review failure uncommitted. Two lessons. First, an adversarial reviewer will re-find an owner-approved mechanism under a later issue's criteria: the same thirty-second bound failed once under 57675b68 and again under 4c700c80, because 4c700c80's criteria were written before the mechanism was shared. When a container amends a criterion to permit a mechanism, sweep every sibling criterion that names the same subject in the same amendment. Second, the survey that closed REQ-05 contradicted itself \u2014 its Result claimed no flippable assertion while its own retained table recorded one \u2014 and the reviewer found the contradiction rather than the code. A document that both states a claim and tabulates its exceptions must have the claim read against the table before it is submitted."
   ],
   "waves": [
     {
@@ -118,25 +119,25 @@
           "short_id": "4c700c80",
           "title": "Decide the gate suite's remaining timed tests on behaviour, not on scheduling",
           "worker": "opus",
-          "status": "merged; blocked from done until 15afa1f8 closes, for REQ-05"
+          "status": "done; REQ-01 and REQ-05 amended by the owner after code-review failed the shared stall bound; survey Result restated, both gates green"
         },
         {
           "short_id": "e3c6c767",
           "title": "Decide the lock tests on lock behaviour, not on scheduling",
           "worker": "opus",
-          "status": "merged; rebased onto contention_probe and strengthened it with an admitted counter; awaiting cargo-ci and code-review"
+          "status": "done; rebased onto contention_probe, Background amended by the owner"
         },
         {
           "short_id": "e516b4f8",
           "title": "Remove the requirement tag naming another container",
           "worker": "codex/gpt-5.6-luna",
-          "status": "merged; awaiting cargo-ci and code-review"
+          "status": "done; both gates green"
         },
         {
           "short_id": "15afa1f8",
           "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
           "worker": "opus",
-          "status": "merged; the drain takes its boundary and sampling schedule from the caller; awaiting cargo-ci and code-review"
+          "status": "done; both gates green"
         }
       ]
     }
@@ -219,6 +220,14 @@
     {
       "topic": "the dead storage::lease module",
       "resolution": "Owner ruled the module deleted rather than clock-injected, and 4c700c80's REQ-03 was amended to the end state. Injecting a clock would have produced clock-injected dead code and left a duplicate of a canonical type standing against @/invariant/canonical-cutover."
+    },
+    {
+      "topic": "4c700c80's REQ-01 and REQ-05 versus the shared stall bound",
+      "resolution": "Owner amended both. code-review failed the thirty-second CONTENTION_STALL_LIMIT: where one contender waits alone the set stops moving after its first refusal, so the bound runs against the holder being scheduled to release. Removing it restores the unbounded wait the container's REQ-08 exists to close, which is the trade the owner already ruled on for 57675b68's REQ-01. REQ-01 now permits a bound that fires only when nothing the wait watches has progressed and fails loudly naming what it last saw; REQ-05 now asks the survey to report every remaining flippable assertion with the argument for its retention rather than to report their absence. Code unchanged apart from a doc comment that had claimed a healthy run never spends the bound."
+    },
+    {
+      "topic": "e3c6c767's Background accuracy",
+      "resolution": "Owner approved the amendment raised in session 2. Applied in session 3."
     }
   ],
   "rework_counts": {
@@ -292,7 +301,7 @@
     {
       "issue": "e3c6c767",
       "finding": "The issue's Background claims its margins are an order of magnitude tighter than any other timing assertion in the gate's suite, and that every other candidate allows seconds of headroom. 57675b68's later survey found lease.rs margins in the same class, so the comparative claim is false.",
-      "disposition": "Open. The worker was told not to rely on the claim, and lease.rs is covered by 4c700c80. Amending the Background needs the owner's approval; raised, not yet applied. Criteria untouched either way.",
+      "disposition": "Closed. The owner approved amending the Background in session 3. The comparative claim now says the two margins are among the tightest rather than an order of magnitude tighter than everything else, names the storage/lease.rs cluster the later survey found in the same class, and records that 4c700c80 deleted that cluster as dead code. Criteria untouched.",
       "criterion_subject": "e3c6c767 Background accuracy"
     },
     {
@@ -322,9 +331,10 @@
     {
       "issue": "15afa1f8",
       "finding": "The worker's load experiment spawned 64 busy-wait spinners to saturate the host, ran the test 20 times against them, and was to kill them afterwards. Its parent shell died before the cleanup ran, orphaning all 64 to init, where they kept burning CPU for over half an hour and starved the lead's gate run to its runner timeout.",
-      "disposition": "Open at session end; the operator reaps them. The generalisable fix is a dispatch rule: a worker that spawns load traps its cleanup so an interrupted run still reaps, and the lead checks for orphaned load before attributing a slow gate to anything else. The lead first misattributed this load to an unrelated foreground application on the same host.",
+      "disposition": "Closed. The operator reaped them between sessions; session 3 found no process whose parent is init naming the agent-15afa1f8 worktree, and a host load average of 0.08. The dispatch rule the finding implies stands: a worker that spawns load traps its cleanup, and the lead checks for orphaned load before attributing a slow gate to anything else.",
       "criterion_subject": "container REQ-08 in shape \u2014 an unbounded thing outliving the work that needed it"
     }
   ],
-  "started_at": "2026-08-04T12:00:00Z"
+  "started_at": "2026-08-04T12:00:00Z",
+  "completed_at_state": "all 19 children terminal (17 done, 2 rejected); epic gates pending"
 }
