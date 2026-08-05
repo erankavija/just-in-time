@@ -15,6 +15,7 @@
       "path": "dev/active/91cc038c/91cc038c-unreachable-wait-evidence.md"
     }
   ],
+  "done_at": "2026-08-05T07:27:38.145030042Z",
   "first_ready_at": "2026-08-05T06:31:41.703075843Z",
   "gates_required": [
     "cargo-ci",
@@ -23,13 +24,13 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-05T06:54:26.926724619Z",
+      "updated_at": "2026-08-05T07:24:08.178729448Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-05T06:31:48.874677744Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-05T07:27:13.728278167Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "91cc038c-8897-482d-ac69-da72a30bd739",
@@ -41,7 +42,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Report a lock that admits a contender it must refuse without waiting out the stall bound",
-  "updated_at": "2026-08-05T06:54:26.926724619Z"
+  "updated_at": "2026-08-05T07:27:38.145030042Z"
 }

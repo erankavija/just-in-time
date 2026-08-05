@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b794df427207bea8a15cee97dfdf174bff6b1f5f",
+  "completed_at": "2026-08-05T07:27:13.366358965Z",
+  "duration_ms": 180251,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/contention_probe.rs",
+        "id": "F1",
+        "line": 199,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91cc038c/requirement/REQ-02"
+        ],
+        "severity": "low",
+        "summary": "The await_refusals panic documentation says only refusals reset the bound, while the implementation resets it for admissions too."
+      }
+    ],
+    "summary": "All hard success criteria are met; one low advisory documentation mismatch remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91cc038c-8897-482d-ac69-da72a30bd739",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3e2c1491-635e-4d5c-a7e4-9ab15f06a1d3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-05T07:24:13.114871992Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 36fc326c, 250bab51, 84bb42f3, b794df42\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml\nResolved items: @/issue/91cc038c/requirement/REQ-01–REQ-05; @/issue/4c700c80/requirement/REQ-01,REQ-03; @/issue/f3f7de97/requirement/REQ-03,REQ-08; @/issue/57675b68/requirement/REQ-01; @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/architecture-dependency-direction\nGate evidence: cargo-ci passed (exit 0, 2026-08-05T07:17:35Z)\nTruncation recovery: separately recovered each tagged patch and current helper/call-site slices after combined reads truncated\n\n1. [advisory][issue-impact][low] `await_refusals`’s panic documentation still says the bound fires when no further contender is refused, but the implementation correctly resets it on either a refusal or admission. Update the contract at `crates/jit/src/storage/contention_probe.rs:199` to match REQ-02.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; one low advisory documentation mismatch remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The await_refusals panic documentation says only refusals reset the bound, while the implementation resets it for admissions too.\",\"file\":\"crates/jit/src/storage/contention_probe.rs\",\"line\":199,\"references\":[\"@/issue/91cc038c/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

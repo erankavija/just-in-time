@@ -1,0 +1,56 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e857aa17e5f40e18a241a9b9620bbcb5d058f8ef",
+  "completed_at": "2026-08-05T07:10:13.108815991Z",
+  "duration_ms": 194526,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/lock.rs",
+        "id": "F1",
+        "line": 491,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91cc038c/requirement/REQ-01",
+          "@/issue/91cc038c/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "The raw FileLocker refusal test never records a successful admission, so a broken lock admission still waits out the stall bound."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/contention_probe.rs",
+        "id": "F2",
+        "line": 210,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/91cc038c/requirement/REQ-02",
+          "@/issue/4c700c80/requirement/REQ-01",
+          "@/issue/f3f7de97/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "await_refusals treats only new refusals as progress, so a post-refusal admission can still be followed by a full stall-bound failure."
+      }
+    ],
+    "summary": "Two issue-impact gaps leave admissions unobserved by refusal waits, allowing the stall bound to remain reachable after lock progress.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91cc038c-8897-482d-ac69-da72a30bd739",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "01f6e672-49b6-495b-a647-7e6d513a724a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-05T07:06:58.582182725Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2721 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fd0bf-317b-70f2-ab41-ccfe1012192f\n--------\nuser\n--- 2708 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 36fc326c99cda096cbc19aeddac4a78b875998f9; 250bab516a1edc3806c9375070446cfe00f44a6f\nPolicy sources: AGENTS.md\nResolved items: @/issue/91cc038c/requirement/REQ-01, REQ-02, REQ-03; @/issue/4c700c80/requirement/REQ-01; @/issue/f3f7de97/requirement/REQ-03, REQ-08; @/issue/57675b68/requirement/REQ-01 (markdown-first issue descriptions); @/gate/jit-validate (.jit/gates.toml, registry-first); @/invariant/shared-test-contracts, semantic-test-assertions, convention-convergence (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci—passed (exit 0, 2026-08-05T06:47:59.627356579Z); code-review—pending (no run)\nTruncation recovery: none\n\n1. **F1 — high, blocking, issue-impact:** `test_lock_exclusive_refuses_every_contender_that_asks_while_the_lock_is_held` records only timeout refusals. If `FileLocker` admits a contender while `held` is live, the worker returns `Ok`, drops the guard, and records neither a refusal nor an admission; `await_refusals` at line 500 therefore waits out the 30-second stall bound. This leaves one of the required call sites unable to report the broken lock at once. Add admission recording for the successful path and an integration regression for it. References: `@/issue/91cc038c/requirement/REQ-01`, `@/issue/91cc038c/requirement/REQ-03`.\n\n2. **F2 — high, blocking, issue-impact:** `await_refusals` resets `ProgressWatch` only when the refusal count changes, despite `Contenders` explicitly tracking admissions. An admission following an earlier refusal while another required refusal remains absent is progress, but lines 210–213 still spend and eventually fail the stall bound. This violates the hard requirement that the bound be reachable only while neither admission nor refusal occurs. Observe the shared `(refused, admitted)` progress tuple and cover this sequence. References: `@/issue/91cc038c/requirement/REQ-02`, `@/issue/4c700c80/requirement/REQ-01`, `@/issue/f3f7de97/requirement/REQ-03`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-impact gaps leave admissions unobserved by refusal waits, allowing the stall bound to remain reachable after lock progress.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The raw FileLocker refusal test never records a successful admission, so a broken lock admission still waits out the stall bound.\",\"file\":\"crates/jit/src/storage/lock.rs\",\"line\":491,\"references\":[\"@/issue/91cc038c/requirement/REQ-01\",\"@/issue/91cc038c/requirement/REQ-03\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"await_refusals treats only new refusals as progress, so a post-refusal admission can still be followed by a full stall-bound failure.\",\"file\":\"crates/jit/src/storage/contention_probe.rs\",\"line\":210,\"references\":[\"@/issue/91cc038c/requirement/REQ-02\",\"@/issue/4c700c80/requirement/REQ-01\",\"@/issue/f3f7de97/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
