@@ -1,7 +1,7 @@
 {
   "epic_id": "f3f7de97-7315-4780-8389-9c857da29239",
   "epic_short_id": "f3f7de97",
-  "current_wave": 4,
+  "current_wave": 5,
   "lead_notes": [
     "Four wave-1 branches were merged before any of them was gated, and 6d496b8c's conformance failures then made cargo-ci red on main for every issue at once, blocking completion of five otherwise-finished issues. The protocol 3019eacd rewrote names exactly this: gate after each merge whenever per-merge attribution matters. Gate before merging the next branch from here on.",
     "A backgrounded `codex exec` blocks forever on 'Reading additional input from stdin...' unless stdin is redirected from /dev/null. The 6d496b8c rework sat 17 minutes with a live process, a clean worktree, no commits and 00:00:00 CPU before this was found. It is a harness defect, not a worker failure, and does not count against the rework budget.",
@@ -10,7 +10,8 @@
     "TRAP: a seeded regression reached main, through two faults that combined. The worker's REQ-04 re-verification ran in the parent checkout rather than its worktree \u2014 a `run_in_background` Bash call resets the session cwd, and every following command inherited the parent silently without a `cd` to reveal it. Its `sed -i` seed therefore landed on main. The lead then ran `git add -A` on main without reading `git status`, which committed the seed; the worker's `git checkout -- <path>` a moment later restored the file to that just-committed seeded state, and its `git diff --quiet` read clean because HEAD had moved under it. Neither fault alone would have shipped it: the revert would have worked, or there would have been nothing to sweep. Three habits follow \u2014 prefix every worker command with its worktree path rather than relying on session cwd; never `git add -A` on main unread while a worker is alive; and verify a revert against a known-good expected line rather than against `git diff --quiet`, which only says the tree matches HEAD and not that HEAD is right.",
     "Workers run plain `cargo` commands, which do not take the host build lock that `scripts/cargo-ci.sh` re-execs under \u2014 only concurrent cargo-ci runs queue. Two live workers therefore starved a lead gate run to its 900-second runner timeout. Gate on main only when no worker is building.",
     "BLOCKER at the end of wave 4: 63 orphaned busy-wait processes from 15afa1f8's load experiment saturate the host, and the lead's shell cannot signal them \u2014 the kill reports success while the processes survive, and the harness refuses the pattern-matching form as a self-match hazard. They are spin loops the worker spawned to saturate the host for a 20-repetition experiment; their parent shell died before its cleanup ran, so init adopted them. They are niced, and scripts/cargo-ci.sh also runs niced, so the gate competed with them on equal footing and overran its 900-second runner budget. The operator clears them by selecting processes whose parent is init, whose command line names the agent-15afa1f8 worktree and contains the spin loop, and killing that pid list.",
-    "Session 3 resumed with one child open and a code-review failure uncommitted. Two lessons. First, an adversarial reviewer will re-find an owner-approved mechanism under a later issue's criteria: the same thirty-second bound failed once under 57675b68 and again under 4c700c80, because 4c700c80's criteria were written before the mechanism was shared. When a container amends a criterion to permit a mechanism, sweep every sibling criterion that names the same subject in the same amendment. Second, the survey that closed REQ-05 contradicted itself \u2014 its Result claimed no flippable assertion while its own retained table recorded one \u2014 and the reviewer found the contradiction rather than the code. A document that both states a claim and tabulates its exceptions must have the claim read against the table before it is submitted."
+    "Session 3 resumed with one child open and a code-review failure uncommitted. Two lessons. First, an adversarial reviewer will re-find an owner-approved mechanism under a later issue's criteria: the same thirty-second bound failed once under 57675b68 and again under 4c700c80, because 4c700c80's criteria were written before the mechanism was shared. When a container amends a criterion to permit a mechanism, sweep every sibling criterion that names the same subject in the same amendment. Second, the survey that closed REQ-05 contradicted itself \u2014 its Result claimed no flippable assertion while its own retained table recorded one \u2014 and the reviewer found the contradiction rather than the code. A document that both states a claim and tabulates its exceptions must have the claim read against the table before it is submitted.",
+    "The owner's two mid-session questions did more for the container than the third review round did. Asked whether any test could wait thirty seconds for nothing, the answer was yes and no reviewer had named it; asked for the suite to be fast, the fix that followed cut two seeded failures from 30.00 s to 0.00 s. A lead that has just won a criteria amendment should ask what the mechanism actually costs before treating the argument as settled."
   ],
   "waves": [
     {
@@ -140,6 +141,17 @@
           "status": "done; both gates green"
         }
       ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "short_id": "91cc038c",
+          "title": "Report a lock that admits a contender it must refuse without waiting out the stall bound",
+          "worker": "opus (lead-direct)",
+          "status": "done; seeded regression falls from 30.00 s to 0.00 s at both restated sites"
+        }
+      ]
     }
   ],
   "created_during_execution": [
@@ -182,6 +194,10 @@
     {
       "short_id": "15afa1f8",
       "why": "4c700c80's re-run survey added a search for aliased timing calls and found a 50ms margin in crates/server/src/shutdown.rs that the thread::sleep search could not see; the container's REQ-03 names its subject and 4c700c80's REQ-05 cannot close until it does"
+    },
+    {
+      "short_id": "91cc038c",
+      "why": "The owner asked whether any test could wait thirty seconds for nothing. It could: when the lock admitted a contender it had to refuse, the waiter's target became unreachable and it spent the whole bound before reporting a stall that was neither the cause nor true. Three review rounds over the same mechanism had not named it."
     }
   ],
   "escalations": [
@@ -228,6 +244,10 @@
     {
       "topic": "e3c6c767's Background accuracy",
       "resolution": "Owner approved the amendment raised in session 2. Applied in session 3."
+    },
+    {
+      "topic": "the container's own REQ-03 versus the shared stall bound",
+      "resolution": "Owner amended REQ-03 with the carve-out its children already carried. holistic-review raised the same finding code-review had raised against 57675b68's REQ-01 and 4c700c80's REQ-01 and REQ-05 \u2014 one root cause, three criteria, three review rounds. The lesson is recorded in lead_notes: amend every sibling criterion naming the mechanism's subject in the same change."
     }
   ],
   "rework_counts": {
@@ -333,8 +353,26 @@
       "finding": "The worker's load experiment spawned 64 busy-wait spinners to saturate the host, ran the test 20 times against them, and was to kill them afterwards. Its parent shell died before the cleanup ran, orphaning all 64 to init, where they kept burning CPU for over half an hour and starved the lead's gate run to its runner timeout.",
       "disposition": "Closed. The operator reaped them between sessions; session 3 found no process whose parent is init naming the agent-15afa1f8 worktree, and a host load average of 0.08. The dispatch rule the finding implies stands: a worker that spawns load traps its cleanup, and the lead checks for orphaned load before attributing a slow gate to anything else.",
       "criterion_subject": "container REQ-08 in shape \u2014 an unbounded thing outliving the work that needed it"
+    },
+    {
+      "issue": "f3f7de97",
+      "finding": "holistic-review F3: the container claimed REQ-08 on a progress-record note that a hosted run had been started. No run identifier, job result or log proved that every job passed without reaching its execution ceiling.",
+      "disposition": "Closed. hosted-ci-evidence.md records all four workflow runs at 33c89c44 with every job's conclusion and duration against the six-hour ceiling \u2014 fourteen jobs, fourteen successes, longest 12.2 minutes \u2014 and cites run 30884326921, whose four jobs were cancelled at 5.36 hours each, as the before-state. Linked to the container.",
+      "criterion_subject": "container REQ-08"
+    },
+    {
+      "issue": "06f1fa95",
+      "finding": "holistic-review F2: the load-independence report stated the host load each run met as two hand-read numbers. The gate records substantiated verdicts, durations and an equal inputs digest, but nothing in the repository held the load condition itself.",
+      "disposition": "Closed. The comparison was run again over one frozen tree with /proc/loadavg sampled every five seconds into load-trace-2026-08-05.csv, written outside the repository so dev/ staying constant kept the two digests equal. Gate alone 387 s at load 4.48-24.36; under nine concurrent workspace rebuilds and a 12-way CPU load 522 s at 18.70-57.91 on 24 cores. Both passed, both digest 1b6acff4.",
+      "criterion_subject": "container REQ-03"
+    },
+    {
+      "issue": "91cc038c",
+      "finding": "The trace's first phase is labelled idle, and it is not: the gate's own compilation and test parallelism carries the host to a 1-minute load of 24.36 with nothing else running.",
+      "disposition": "Accepted and explained rather than relabelled. The CSV is the raw artifact and its numbers are what was measured; the report states that the phase named idle means no load beyond the gate's own, and gives the range. Rewriting a recorded artifact to match a better label is the worse trade.",
+      "criterion_subject": "container REQ-03 evidence quality"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z",
-  "completed_at_state": "all 19 children terminal (17 done, 2 rejected); epic gates pending"
+  "completed_at_state": "all 21 children terminal (19 done, 2 rejected); epic gates re-running"
 }

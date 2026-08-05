@@ -22,9 +22,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-05T06:31:48.714563167Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-05T06:54:26.926724619Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Report a lock that admits a contender it must refuse without waiting out the stall bound",
-  "updated_at": "2026-08-05T06:40:16.845480813Z"
+  "updated_at": "2026-08-05T06:54:26.926724619Z"
 }

@@ -192,3 +192,58 @@ verdict would change if the seeded server's drain task were starved for the full
 five seconds inside a window in which it is scheduled to do nothing. That is a
 stopped host rather than a loaded one, and the outcome is a loud failure rather
 than a silent pass.
+
+## Whole-gate comparison, re-run with the load recorded (REQ-03, gate scope)
+
+The comparison above states the host condition each run met — "1-minute load,
+start → end 5.27 → 30.87" — and nothing in the repository holds it. The gate-run
+records substantiate the verdicts, the durations and the equal inputs digest,
+but a load average read by hand at two moments is an assertion about the run
+rather than evidence from it. The container's own holistic review named that gap.
+This section closes it by running the comparison again with the load sampled
+throughout and the samples kept.
+
+### Method
+
+One tree, frozen for the whole experiment, and two host conditions.
+`/proc/loadavg` was sampled every five seconds into
+[`load-trace-2026-08-05.csv`](load-trace-2026-08-05.csv), written outside the
+repository while the runs were in flight and copied in afterwards: `dev` is on
+`cargo-ci`'s input roots, so a trace written in place would have changed the
+digest mid-comparison and destroyed the very equality the comparison rests on.
+
+The trace's `phase` column names three spans, and the first name needs reading
+carefully. **`idle` means no load beyond the gate's own** — the gate compiles and
+tests the workspace at full width, and reaches a 1-minute load of 24.36 doing it.
+`settling` is the minute after the load generators start, before the second gate
+run begins. `loaded` is the second run.
+
+The load itself was a loop rebuilding this workspace from scratch into a scratch
+target directory, together with `openssl speed -multi 12 sha256`. Nine full
+rebuilds completed while the second gate ran; their completion times are in the
+run log.
+
+### Result
+
+| Run | Condition | 1-minute load, min → max | Gate-run identifier | Duration | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| 1 | The gate alone | 4.48 → 24.36 | `95fa31d8-3d7c-476e-9a59-07446ef4638c` | 387 s | **passed** |
+| 2 | Nine concurrent from-scratch workspace rebuilds and a 12-way CPU load | 18.70 → 57.91 | `a649ae7e-0760-464b-aef9-ebc40d98bc34` | 522 s | **passed** |
+
+Both records carry commit `ada66a85` and the inputs digest
+`1b6acff4de9828a20ae6a14cc60b2850c9e912836f84623efd711d259bfcadf5`. That equality
+is what makes this one content under two conditions rather than two experiments.
+The host has 24 cores; 194 samples cover 16 minutes.
+
+The loaded run took 35 % longer and decided the same thing, on a host whose
+1-minute load average peaked at 57.91 — more than twice the core count, and well
+past the 6–10 band at which this gate's verdict used to turn.
+
+### What the trace does and does not establish
+
+It establishes that the second run met the load its row claims, because the
+samples are timestamped and kept rather than recalled. It does not establish that
+no load could ever flip this gate: the assertions that a sufficiently stopped host
+can still flip are enumerated in `4c700c80`'s survey, each with the argument for
+its retention, and `@/issue/f3f7de97/requirement/REQ-03` states the terms on which
+they are kept.
