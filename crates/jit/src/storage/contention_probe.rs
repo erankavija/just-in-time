@@ -32,11 +32,14 @@ use std::time::{Duration, Instant};
 /// How long a contended lock may go without any progress at all before a test
 /// waiting on it reports it stuck.
 ///
-/// Generous on purpose: progress of any kind resets the watch, so a healthy run
-/// never spends this however slowly the host schedules it, and a run that does
-/// spend it has stopped rather than slowed. The alternative to a bound is an
-/// unbounded wait, which turns a stuck lock into a continuous-integration job
-/// that runs to its execution ceiling instead of failing.
+/// Generous on purpose: progress of any kind resets the watch, so a run in which
+/// the lock keeps changing hands never spends this however slowly the host
+/// schedules it. Where one contender waits alone there is no other progress to
+/// observe, and the bound then runs against whatever must release the lock
+/// reaching its release — a run stopped for the whole limit rather than one
+/// merely slowed. The alternative to a bound is an unbounded wait, which turns a
+/// stuck lock into a continuous-integration job that runs to its execution
+/// ceiling instead of failing.
 pub(crate) const CONTENTION_STALL_LIMIT: Duration = Duration::from_secs(30);
 
 /// Interval between observations of a subject a test is waiting on.

@@ -115,7 +115,8 @@ The ordering assertions are what fired, not the bounds: the waiting threads
 panicked at `repo_lock.rs:422` ("a second thread must not enter while the lock
 is held") and at `repository_state_store_tests.rs:2639` ("a disjoint-data-root
 session opened one worktree's bootstrap concurrently"). Their main threads then
-reached the stall bound in `contention_probe.rs:85`, because a contender that is
+reached the stall bound in `ProgressWatch::observe`
+(`crates/jit/src/storage/contention_probe.rs:90`), because a contender that is
 never refused never records the refusal they wait for — the bound reporting
 exactly the condition it exists to report. The other two failures are the
 crossed-acquisition and shared-store contention tests, which read the same
@@ -293,13 +294,13 @@ detection, which is a missed defect rather than a false verdict.
 | `crates/jit/src/storage/claim_coordinator.rs:2028,2049,2303,2623`, `crates/jit/src/commands/claim.rs:1308,1368,1546`, `crates/jit/src/commands/gate_check.rs:4704`, `crates/jit/tests/cli_repo_workflow/integration_test.rs:1077` | monotonic timestamp comparisons after a short sleep |
 | `crates/jit/src/storage/temp_cleanup.rs:129,149,167,181,217` | cleanup by file age against a zero-second threshold |
 | `crates/jit/src/commands/serve.rs:961` | asserts a blocking directory still exists; nothing removes it |
-| `crates/jit/src/storage/contention_probe.rs:140` | the poll interval between observations of a subject; a longer one costs observations, never the verdict |
+| `crates/jit/src/storage/contention_probe.rs:49` `PROGRESS_POLL_INTERVAL` | the poll interval between observations of a subject; a longer one costs observations, never the verdict |
 
 ### Retained, with the argument
 
 | Site | Assertion | Margin | Argument |
 | --- | --- | --- | --- |
-| `crates/jit/src/storage/contention_probe.rs:38,84` `CONTENTION_STALL_LIMIT`, `ProgressWatch::observe` | nothing the wait is watching has progressed for the limit | 30 s | An elapsed-time assertion, and the mechanism `57675b68` introduced, now shared. It is not a window a caller has to be scheduled inside: any observed progress resets it, so a run in which the lock keeps changing hands never spends it however slowly it does so. A host that starves every contender for thirty consecutive seconds does flip it, and that is the exposure this retention carries. The alternative is an unbounded wait, which returns the failure mode `@/issue/f3f7de97/requirement/REQ-08` exists to close: a stuck lock would hold a continuous-integration job to its execution ceiling instead of failing. `@/issue/57675b68/requirement/REQ-01` was amended by the owner to permit a bound of this shape — one that fires only when nothing at all is progressing, and fails loudly when it does. |
+| `crates/jit/src/storage/contention_probe.rs:43,80` `CONTENTION_STALL_LIMIT`, `ProgressWatch::observe` | nothing the wait is watching has progressed for the limit | 30 s | An elapsed-time assertion, and the mechanism `57675b68` introduced, now shared. Any observed progress resets it, so a run in which the lock keeps changing hands never spends it however slowly it does so. Where one contender waits alone, the set stops moving between that contender's first refusal and its admission, so the bound then runs against the holder being scheduled to release: thirty consecutive seconds without the holder reaching its release does flip it, and that is the exposure this retention carries. The alternative is an unbounded wait, which returns the failure mode `@/issue/f3f7de97/requirement/REQ-08` exists to close: a stuck lock would hold a continuous-integration job to its execution ceiling instead of failing. The owner amended `@/issue/57675b68/requirement/REQ-01` and this issue's REQ-01 to permit a bound of this shape — one that fires only when nothing the wait watches has progressed, and fails loudly naming what it last saw. |
 | `crates/server/tests/server_integration/graceful_shutdown_tests.rs:497` | the server exits strictly inside ten seconds of the signal | product requirement | The bound is the shipped contract the test exists to hold, not a margin chosen to be long enough. Weakening it would weaken the requirement. |
 | `crates/server/tests/server_integration/graceful_shutdown_tests.rs:116,178,296,318` | startup, read and close waits give up at their budgets | 10–30 s | Stated at the call sites as hang bounds rather than properties; the properties themselves are asserted from the server's own record. Removing them restores an unbounded wait, which is the failure mode `76a4bd21` closed. |
 | `crates/server/src/shutdown.rs:270` `TEST_BUDGET` | every await in the drain suite reaches a verdict inside five seconds | 5 s | A hang bound on awaits that would otherwise never return, not the property under test. Distinct from `:515`, which is a schedule the test's own timing has to hit. |
@@ -332,7 +333,23 @@ dead code" above.
 
 ## Result
 
-No assertion in the gate's suite has a verdict a busy host can flip.
+No assertion in the gate's suite decides a property on a window a thread has to
+be scheduled inside. The sites that a saturated host can still flip are the ones
+listed under "Retained, with the argument", each with the argument for keeping
+it: a bound that fires only once the thing it watches has stopped, a budget
+stated at its call site as a hang bound rather than as the property, the shipped
+contract the test exists to hold, or a margin orders of magnitude from the
+behaviour it catches. None of them is a margin chosen to be long enough for a
+thread to be scheduled.
+
+The largest, `CONTENTION_STALL_LIMIT`, is the one this issue's own work rests on.
+Any progress by the contended lock resets it, so only thirty consecutive seconds
+of complete stillness spend it, and removing it restores the unbounded wait
+`@/issue/f3f7de97/requirement/REQ-08` exists to close — a stuck lock holding a
+continuous-integration job to its execution ceiling instead of failing. The owner
+amended `@/issue/57675b68/requirement/REQ-01` and this issue's REQ-01 to permit a
+bound of that shape, and REQ-05 to ask for every such bound to be reported here
+with its argument rather than for their absence.
 
 Every site this survey found is accounted for above: restated so its outcome is
 decided by what the code did, closed under a filed issue, argued as one load can
