@@ -118,12 +118,22 @@ commit touching only markdown creates no run by the workflow's own definition.
 This record and the completion report are in that class.
 
 **Tracker state under `.jit/`.** These do trigger the workflow, and the run
-above is on a tree that carries every one of them except the last. That last one
-is the container's own transition to `done`, which cannot precede the gate that
-authorises it. `Validate Repository Data` is the job that would read it, running
-`jit validate` with no issue id — the same command this container's
-`repo-validate` gate runs, whose result is recorded on the container against the
-transitioned tree.
+above is on a tree that carries every one of them except the last: the
+container's own transition to `done`, which cannot precede the gate that
+authorises it.
+
+That transition landed as `7c7e3f56` and was pushed, and the workflow is green on
+it as well —
+[30988318879](https://github.com/erankavija/just-in-time/actions/runs/30988318879)
+(CI),
+[30988318819](https://github.com/erankavija/just-in-time/actions/runs/30988318819)
+(Container Image) and
+[30988318744](https://github.com/erankavija/just-in-time/actions/runs/30988318744)
+(Deploy Rustdoc), queued at 2026-08-05T08:16:02Z. So the residue this section
+exists to bound turns out to be empty: every commit of this container that the
+workflow runs on has a green run, the closing one included. The reasoning above
+is kept because it is what a reader needs when the closing run has not landed
+yet, which is the state every container is in at the moment its gate answers.
 
 Both claims are checkable rather than asserted:
 
