@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "33c89c44580d22ebc7d46987b71f388ee645988d",
+  "completed_at": "2026-08-05T06:01:57.159573416Z",
+  "duration_ms": 184387,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are met; the prior blocking finding is addressed by the explicit amended bound policy and the documented retained-bound survey.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4c700c80-09af-4cd9-83b6-9a71309e9007",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "91870c31-8eb4-4dff-bff5-fa6e51c079e4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-05T05:58:52.772532728Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0f67b44e, b1485b0e, 9fa1cb23, 0e70edec, 3f354403, dca97f16, 85e1c529, 6a9f109f, 444fc4e9, b4f258e1, 30efe642, 9db677a0, ef387997, b9fa198d, 72d4b122, b25590f0, 33c89c44 (`jit:4c700c80`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4c700c80/requirement/REQ-01–REQ-05 (issue content, markdown-first); @/issue/57675b68/requirement/REQ-01 and @/issue/f3f7de97/requirement/REQ-08 (issue content, markdown-first); @/invariant/canonical-cutover, @/invariant/convention-convergence, @/invariant/semantic-types (.jit/invariants.toml, registry-first); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-05T05:52:46Z); code-review previously failed (exit 1, 2026-08-04T23:25:35Z)\nTruncation recovery: reread all truncated source, documentation, merge, metadata, and current-file evidence in bounded path/line ranges\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are met; the prior blocking finding is addressed by the explicit amended bound policy and the documented retained-bound survey.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

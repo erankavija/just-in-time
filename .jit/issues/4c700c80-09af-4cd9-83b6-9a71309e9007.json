@@ -17,6 +17,7 @@
       "path": "dev/active/4c700c80/4c700c80-host-load-survey.md"
     }
   ],
+  "done_at": "2026-08-05T06:02:56.045205172Z",
   "first_ready_at": "2026-08-04T19:26:47.813286226Z",
   "gates_required": [
     "cargo-ci",
@@ -25,12 +26,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-04T23:21:38.538708502Z",
+      "updated_at": "2026-08-05T05:58:48.227081973Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-04T23:25:35.589862744Z",
+      "status": "passed",
+      "updated_at": "2026-08-05T06:01:57.524596834Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,7 +44,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Decide the gate suite's remaining timed tests on behaviour, not on scheduling",
-  "updated_at": "2026-08-05T05:44:43.051361342Z"
+  "updated_at": "2026-08-05T06:02:56.045205172Z"
 }

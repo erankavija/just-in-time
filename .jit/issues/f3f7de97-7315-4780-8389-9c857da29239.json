@@ -55,7 +55,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Unguarded duplicate facts, unreliable verification, and tracker ergonomics",
-  "updated_at": "2026-08-04T20:28:56.809410164Z"
+  "updated_at": "2026-08-05T06:03:01.253453874Z"
 }
