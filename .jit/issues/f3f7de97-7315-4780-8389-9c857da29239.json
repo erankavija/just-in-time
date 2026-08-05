@@ -92,6 +92,7 @@
       "path": "dev/active/f3f7de97-guards-and-ergonomics/progress.json"
     }
   ],
+  "done_at": "2026-08-05T08:15:40.883616279Z",
   "first_ready_at": "2026-08-03T21:52:05.934637746Z",
   "gates_required": [
     "repo-validate",
@@ -117,7 +118,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Unguarded duplicate facts, unreliable verification, and tracker ergonomics",
-  "updated_at": "2026-08-05T08:15:12.015509951Z"
+  "updated_at": "2026-08-05T08:15:40.883616279Z"
 }
