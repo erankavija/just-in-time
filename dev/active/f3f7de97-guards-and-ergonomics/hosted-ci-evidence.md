@@ -2,9 +2,9 @@
 
 > **Diátaxis Type:** Reference (evidence record)
 > Recorded from the GitHub Actions API on 2026-08-05 for the push of `main` at
-> `b94bf7e2`, the commit at which this container's last change to a compiled
-> source landed. Every field below is read from `gh run view <id> --json
-> name,jobs`; nothing is restated from memory.
+> `7b6e0160`, this container's last commit carrying anything the workflow runs
+> on. Every field below is read from `gh run view <id> --json name,jobs`;
+> nothing is restated from memory.
 
 ## What REQ-08 asks
 
@@ -26,11 +26,16 @@ ceiling.
 
 | Workflow | Run | Conclusion |
 | --- | --- | --- |
-| CI | [30985528861](https://github.com/erankavija/just-in-time/actions/runs/30985528861) | success |
-| Container Image | [30985528840](https://github.com/erankavija/just-in-time/actions/runs/30985528840) | success |
-| Deploy Rustdoc | [30985528852](https://github.com/erankavija/just-in-time/actions/runs/30985528852) | success |
+| CI | [30987011841](https://github.com/erankavija/just-in-time/actions/runs/30987011841) | success |
+| Container Image | [30987011696](https://github.com/erankavija/just-in-time/actions/runs/30987011696) | success |
+| Deploy Rustdoc | [30987012456](https://github.com/erankavija/just-in-time/actions/runs/30987012456) | success |
 
-All three were queued at 2026-08-05T07:34:04Z by the push of `b94bf7e2`.
+All three were queued at 2026-08-05T07:57:03Z by the push of `7b6e0160`. The
+push before it, `b94bf7e2`, carried this container's last change to a compiled
+source and was green across the same three workflows
+([30985528861](https://github.com/erankavija/just-in-time/actions/runs/30985528861),
+[30985528840](https://github.com/erankavija/just-in-time/actions/runs/30985528840),
+[30985528852](https://github.com/erankavija/just-in-time/actions/runs/30985528852)).
 
 Security Audit is absent by design rather than by omission. Its `push` trigger is
 filtered to `**/Cargo.lock` and `**/package-lock.json`, and this push changed
@@ -42,21 +47,25 @@ and passed all three of its jobs.
 
 | Workflow | Job | Conclusion | Duration | Share of the 360-minute ceiling |
 | --- | --- | --- | --- | --- |
-| CI | Test Rust Components | success | 12.1 min | 3.4 % |
-| CI | MSRV (build and test on declared rust-version) | success | 8.2 min | 2.3 % |
-| CI | Test Rust (html + xml features) | success | 7.0 min | 1.9 % |
-| CI | Coverage Badges | success | 6.3 min | 1.7 % |
-| CI | Test MCP Server | success | 4.8 min | 1.3 % |
-| CI | Validate Repository Data | success | 1.7 min | 0.5 % |
-| CI | Profile adoption (Linux) | success | 1.5 min | 0.4 % |
-| CI | Test Web UI | success | 0.9 min | 0.2 % |
-| CI | Workflow Contract | success | 0.3 min | 0.1 % |
-| Container Image | Build and Smoke the Server Image | success | 6.7 min | 1.9 % |
-| Deploy Rustdoc | build-and-deploy | success | 2.6 min | 0.7 % |
+| CI | Test Rust Components | success | 11.5 min | 3.2 % |
+| CI | MSRV (build and test on declared rust-version) | success | 7.9 min | 2.2 % |
+| CI | Test Rust (html + xml features) | success | 7.1 min | 2.0 % |
+| CI | Coverage Badges | success | 6.2 min | 1.7 % |
+| CI | Test MCP Server | success | 4.0 min | 1.1 % |
+| CI | Validate Repository Data | success | 1.8 min | 0.5 % |
+| CI | Profile adoption (Linux) | success | 1.6 min | 0.5 % |
+| CI | Test Web UI | success | 0.9 min | 0.3 % |
+| CI | Workflow Contract | success | 0.2 min | 0.1 % |
+| Container Image | Build and Smoke the Server Image | success | 8.4 min | 2.3 % |
+| Deploy Rustdoc | build-and-deploy | success | 2.7 min | 0.8 % |
 
 Eleven jobs, eleven successes, no cancellation and no timeout. The longest took
-12.1 minutes, which is 3.4 % of the ceiling; the whole set of three runs finished
+11.5 minutes, which is 3.2 % of the ceiling; the whole set of three runs finished
 inside 13 minutes of wall clock.
+
+`Validate Repository Data` is the job that reads `.jit/`. It ran on this tree and
+passed, so the container's tracker state is covered by the hosted workflow and
+not only by the local gate that runs the same command.
 
 ## What changed to make this possible
 
@@ -69,7 +78,7 @@ the table above.
   ran `Test Rust Components`, `Test Rust (html + xml features)`, `MSRV` and
   `Coverage Badges` for 5.36 hours each before GitHub cancelled all four; the
   run's own conclusion is `cancelled`. The rows above are those same four jobs
-  at 12.1, 7.0, 8.2 and 6.3 minutes.
+  at 11.5, 7.1, 7.9 and 6.2 minutes.
 - `ee02e514` removed the Windows leg after the owner ruled Windows out of scope.
   In that same run, `Profile adoption (windows-latest)` failed while
   `Profile adoption (ubuntu-latest)` passed. Its two defects (`25d25f2f`,
@@ -83,14 +92,17 @@ the table above.
 ## What this record does not establish
 
 One green set of runs is evidence that the workflow passes on this commit, not
-that it passes on every future one. The claim is bounded to `b94bf7e2`.
+that it passes on every future one. The claim is bounded to `7b6e0160`.
 
-An earlier version of this record made the same claim for `33c89c44` and added
-that the commits after it touched no compiled source. That was false: `36fc326c`
-and `84bb42f3` — `91cc038c`'s fix and its rework — changed
+This record was anchored twice before and wrong both times, each caught by the
+container's own holistic review. It first named `33c89c44` and claimed the
+commits after it touched no compiled source; `36fc326c` and `84bb42f3` —
+`91cc038c`'s fix and its rework — had changed
 `crates/jit/src/storage/contention_probe.rs`, `claim_coordinator.rs` and
-`lock.rs`. The container's own holistic review caught it, which is why this
-record is anchored at `b94bf7e2` instead.
+`lock.rs`. Re-anchored to `b94bf7e2`, it then argued that the `.jit/` commits
+after that were covered by the local `repo-validate` gate running the same
+command as the hosted job. The same command is not the same run, and the review
+declined it. Hence a hosted run on the tree that carries them.
 
 ## The commits after the run, and what covers them
 
@@ -98,28 +110,29 @@ A container cannot get a hosted run for the commit that closes it: that commit
 records the closure, so it exists only after every gate has already answered.
 What can be done is to say exactly what the residue is and what checks it.
 
-Commits after `b94bf7e2` fall in two classes, and the workflow itself treats
+Commits after `7b6e0160` fall in two classes, and the workflow itself treats
 them differently.
 
 **Markdown.** `ci.yml`'s push trigger carries `paths-ignore: '**.md'`, so a
 commit touching only markdown creates no run by the workflow's own definition.
 This record and the completion report are in that class.
 
-**Tracker state under `.jit/`.** These do trigger the workflow. One job reads
-them: `Validate Repository Data`, which runs `jit validate` with no issue id —
-whole-repository rules plus the integrity checks. That is the same command this
-container's `repo-validate` gate runs, against the same tree, and its result is
-recorded on the container. For a `.jit`-only delta the hosted job and the local
-gate are one check, not two similar ones.
+**Tracker state under `.jit/`.** These do trigger the workflow, and the run
+above is on a tree that carries every one of them except the last. That last one
+is the container's own transition to `done`, which cannot precede the gate that
+authorises it. `Validate Repository Data` is the job that would read it, running
+`jit validate` with no issue id — the same command this container's
+`repo-validate` gate runs, whose result is recorded on the container against the
+transitioned tree.
 
 Both claims are checkable rather than asserted:
 
 ```bash
 # Nothing compiled changed after the run this record names.
-git diff --stat b94bf7e2..HEAD -- crates/ Cargo.toml Cargo.lock .github/
+git diff --stat 7b6e0160..HEAD -- crates/ Cargo.toml Cargo.lock .github/
 
 # What did change, and therefore which of the two classes covers it.
-git diff --stat b94bf7e2..HEAD
+git diff --stat 7b6e0160..HEAD
 ```
 
 An empty first result is the evidence for the compiled surface; anything in it
