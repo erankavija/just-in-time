@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7b6e0160bacd2c593132404da9088dca6df5730d",
+  "completed_at": "2026-08-05T07:56:24.938657140Z",
+  "duration_ms": 172596,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md",
+        "id": "F1",
+        "line": 4,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f3f7de97/requirement/REQ-08"
+        ],
+        "severity": "high",
+        "summary": "Hosted evidence covers b94bf7e2, but final HEAD 7b6e0160 includes later .jit changes that trigger CI; a local validation result does not prove the hosted workflow completed successfully for that tree."
+      }
+    ],
+    "summary": "REQ-08 lacks hosted-CI evidence for the final committed tree.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "f3f7de97-7315-4780-8389-9c857da29239",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dc3c081c-4b48-4ce9-bf8a-3f1871ed82dd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-05T07:53:32.342425947Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8086 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.146.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fd0e9-d280-7f83-84c6-b6aedb3a360a\n--------\nuser\n--- 8073 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, high:** REQ-08 is still not verified for the final committed tree. Hosted evidence covers `b94bf7e2`, while `HEAD` is `7b6e0160` and includes later `.jit/` changes that trigger CI. A local `jit validate` result does not establish that the hosted workflow completed every job successfully for that final tree. Evidence: `dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md:4`, `.github/workflows/ci.yml:4`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-08 lacks hosted-CI evidence for the final committed tree.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Hosted evidence covers b94bf7e2, but final HEAD 7b6e0160 includes later .jit changes that trigger CI; a local validation result does not prove the hosted workflow completed successfully for that tree.\",\"file\":\"dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md\",\"line\":4,\"references\":[\"@/issue/f3f7de97/requirement/REQ-08\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

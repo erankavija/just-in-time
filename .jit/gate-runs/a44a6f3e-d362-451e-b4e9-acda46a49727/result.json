@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f53980063667fb5c8c76c28ed2691a6dcd94e49f",
+  "completed_at": "2026-08-05T08:14:39.535071749Z",
+  "duration_ms": 289713,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f3f7de97-guards-and-ergonomics/completion-report.md",
+        "id": "F1",
+        "line": 6,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The completion report's session, wave, rework-cycle, and escalation metrics are self-attested and lack a linked independent record or reproducible derivation."
+      }
+    ],
+    "summary": "All hard criteria are verifiably met; one advisory evidence-traceability finding remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "f3f7de97-7315-4780-8389-9c857da29239",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a44a6f3e-d362-451e-b4e9-acda46a49727",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-05T08:09:49.821174506Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [Low, advisory] The completion report’s session, wave, rework-cycle, and escalation metrics are self-attested without a linked independent record or reproducible derivation.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met; one advisory evidence-traceability finding remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The completion report's session, wave, rework-cycle, and escalation metrics are self-attested and lack a linked independent record or reproducible derivation.\",\"file\":\"dev/active/f3f7de97-guards-and-ergonomics/completion-report.md\",\"line\":6}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

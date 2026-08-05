@@ -19,14 +19,23 @@ container reached it, now passes on every job.
 
 ## Metrics
 
-| Metric | Value |
-|---|---|
-| Children terminal | 20 of 20 (18 done, 2 rejected) |
-| Waves executed | 4, plus a fifth remediation raised by the container gate |
-| Rework cycles | 9 across 5 issues |
-| Escalations | 12 |
-| Issues created during execution | enumerated under "Issues Discovered During Execution" |
-| Findings deferred and later reconciled | recorded in `progress.json` under `surfaced_pitfalls` |
+Every figure below is derived rather than remembered, and the command that
+derives it is given so a reader can disagree with the number rather than with
+the author. `progress.json` is this container's execution record and is linked
+to it alongside this report.
+
+| Metric | Value | Derived from |
+|---|---|---|
+| Children terminal | 20 (18 done, 2 rejected) | `jit issue search "" --label epic:guards-and-ergonomics --json` |
+| Waves executed | 5 | `.waves \| length` in `progress.json` |
+| Rework cycles | 9 across 5 issues | `.rework_counts` in `progress.json` |
+| Escalations | 12 | `.escalations \| length` in `progress.json` |
+| Issues created during execution | 11 | `.created_during_execution` in `progress.json`, enumerated below |
+| Findings deferred and later reconciled | 19 | `.surfaced_pitfalls` in `progress.json` |
+
+The fifth wave is not a planned one: it is the remediation `91cc038c`, raised by
+the container's own gate and by the owner's question about what the stall bound
+costs.
 
 Two children were rejected rather than delivered: `25d25f2f` and `03566554`,
 both Windows defects, after the owner ruled Windows out of the v1.0 matrix.

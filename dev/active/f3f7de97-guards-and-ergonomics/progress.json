@@ -11,7 +11,8 @@
     "Workers run plain `cargo` commands, which do not take the host build lock that `scripts/cargo-ci.sh` re-execs under \u2014 only concurrent cargo-ci runs queue. Two live workers therefore starved a lead gate run to its 900-second runner timeout. Gate on main only when no worker is building.",
     "BLOCKER at the end of wave 4: 63 orphaned busy-wait processes from 15afa1f8's load experiment saturate the host, and the lead's shell cannot signal them \u2014 the kill reports success while the processes survive, and the harness refuses the pattern-matching form as a self-match hazard. They are spin loops the worker spawned to saturate the host for a 20-repetition experiment; their parent shell died before its cleanup ran, so init adopted them. They are niced, and scripts/cargo-ci.sh also runs niced, so the gate competed with them on equal footing and overran its 900-second runner budget. The operator clears them by selecting processes whose parent is init, whose command line names the agent-15afa1f8 worktree and contains the spin loop, and killing that pid list.",
     "Session 3 resumed with one child open and a code-review failure uncommitted. Two lessons. First, an adversarial reviewer will re-find an owner-approved mechanism under a later issue's criteria: the same thirty-second bound failed once under 57675b68 and again under 4c700c80, because 4c700c80's criteria were written before the mechanism was shared. When a container amends a criterion to permit a mechanism, sweep every sibling criterion that names the same subject in the same amendment. Second, the survey that closed REQ-05 contradicted itself \u2014 its Result claimed no flippable assertion while its own retained table recorded one \u2014 and the reviewer found the contradiction rather than the code. A document that both states a claim and tabulates its exceptions must have the claim read against the table before it is submitted.",
-    "The owner's two mid-session questions did more for the container than the third review round did. Asked whether any test could wait thirty seconds for nothing, the answer was yes and no reviewer had named it; asked for the suite to be fast, the fix that followed cut two seeded failures from 30.00 s to 0.00 s. A lead that has just won a criteria amendment should ask what the mechanism actually costs before treating the argument as settled."
+    "The owner's two mid-session questions did more for the container than the third review round did. Asked whether any test could wait thirty seconds for nothing, the answer was yes and no reviewer had named it; asked for the suite to be fast, the fix that followed cut two seeded failures from 30.00 s to 0.00 s. A lead that has just won a criteria amendment should ask what the mechanism actually costs before treating the argument as settled.",
+    "holistic-review passed on the fourth round, and three of its four failures were about evidence rather than about the work. Two rules follow. Anchor hosted-CI evidence after the last commit the workflow runs on, not at the first green run you see. And do not offer a local check as a stand-in for a hosted one: the same command is not the same run, and a reviewer enforcing a criterion will say so."
   ],
   "waves": [
     {
@@ -375,8 +376,14 @@
       "finding": "The trace's first phase is labelled idle, and it is not: the gate's own compilation and test parallelism carries the host to a 1-minute load of 24.36 with nothing else running.",
       "disposition": "Accepted and explained rather than relabelled. The CSV is the raw artifact and its numbers are what was measured; the report states that the phase named idle means no load beyond the gate's own, and gives the range. Rewriting a recorded artifact to match a better label is the worse trade.",
       "criterion_subject": "container REQ-03 evidence quality"
+    },
+    {
+      "issue": "f3f7de97",
+      "finding": "holistic-review needed four rounds. Round 1 failed on REQ-03 (the stall bound), on an unevidenced load condition and on an unevidenced hosted run. Rounds 2 and 3 failed on the hosted evidence being anchored to a tree the container had since moved past \u2014 first because 91cc038c changed compiled sources after it, then because the tracker commits after it trigger the workflow too.",
+      "disposition": "Closed. The lesson is ordering: a container gate that asks for hosted evidence must be the last thing to run before the transition, and the evidence must be anchored after the last commit the workflow runs on. Anchoring it earlier guarantees a re-round for every commit that follows. The final record is at 7b6e0160 with all three workflows green, Validate Repository Data among them.",
+      "criterion_subject": "container REQ-08"
     }
   ],
   "started_at": "2026-08-04T12:00:00Z",
-  "completed_at_state": "all 21 children terminal (19 done, 2 rejected); epic gates re-running"
+  "completed_at_state": "closed: 20 children terminal (18 done, 2 rejected), both epic gates passed"
 }
