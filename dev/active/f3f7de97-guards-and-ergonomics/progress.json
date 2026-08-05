@@ -196,6 +196,10 @@
       "why": "4c700c80's re-run survey added a search for aliased timing calls and found a 50ms margin in crates/server/src/shutdown.rs that the thread::sleep search could not see; the container's REQ-03 names its subject and 4c700c80's REQ-05 cannot close until it does"
     },
     {
+      "short_id": "400a8539",
+      "why": "4c700c80's re-run survey found a 300-millisecond startup pause in production code that no search over test sources could reach; the container's REQ-03 names its subject"
+    },
+    {
       "short_id": "91cc038c",
       "why": "The owner asked whether any test could wait thirty seconds for nothing. It could: when the lock admitted a contender it had to refuse, the waiter's target became unreachable and it spent the whole bound before reporting a stall that was neither the cause nor true. Three review rounds over the same mechanism had not named it."
     }

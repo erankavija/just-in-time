@@ -24,8 +24,8 @@ every job for the first time since before this container was filed.
 | Waves executed | 4, plus a fifth remediation raised by the container gate |
 | Rework cycles | 9 across 5 issues |
 | Escalations | 12 |
-| Issues created during execution | 10 |
-| Findings deferred and later reconciled | 16 |
+| Issues created during execution | enumerated under "Issues Discovered During Execution" |
+| Findings deferred and later reconciled | recorded in `progress.json` under `surfaced_pitfalls` |
 
 Two children were rejected rather than delivered: `25d25f2f` and `03566554`,
 both Windows defects, after the owner ruled Windows out of the v1.0 matrix.
