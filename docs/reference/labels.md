@@ -164,7 +164,7 @@ examples = ["resolution:wont-fix", "resolution:duplicate"]
 [namespaces.enforces]
 description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces."
 unique = false
-examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
+examples = ["enforces:@/invariant/<self-id>", "enforces:@/rule/label-format", "enforces:@/gate/<self-id>"]
 ```
 
 Membership namespaces for parent types (`epic:*`, `story:*`, `milestone:*`
@@ -199,7 +199,7 @@ rule is addressable at `@/rule/<self-id>` (`self-id` being its `name`), e.g.
 
 Work that changes an enforcement mechanism links to what it enforces with the
 `enforces:` namespace, whose value is an item address: `enforces:@/rule/label-format`,
-`enforces:@/gate/cargo-ci`, or `enforces:@/invariant/label-format`. The label
+`enforces:@/gate/<self-id>`, or `enforces:@/invariant/<self-id>`. The label
 carries the address of the rule, gate, or invariant the issue implements or
 maintains, so the mechanism and the work that backs it cross-reference by a
 stable id rather than by copied text. The namespace is non-unique: one issue may

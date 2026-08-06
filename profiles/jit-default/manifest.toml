@@ -173,9 +173,9 @@ kind = "map-entry"
 target = "namespaces"
 identity = "enforces"
 value = { description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces.", unique = false, examples = [
-  "enforces:@/invariant/label-format",
+  "enforces:@/invariant/<self-id>",
   "enforces:@/rule/label-format",
-  "enforces:@/gate/cargo-ci",
+  "enforces:@/gate/<self-id>",
 ] }
 
 # =============================================================================

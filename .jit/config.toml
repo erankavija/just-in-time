@@ -135,7 +135,7 @@ examples = ["satisfies:REQ-01"]
 [namespaces.enforces]
 description = "Enforcement link: names an invariant, rule, or gate item that the labeled issue enforces."
 unique = false
-examples = ["enforces:@/invariant/label-format", "enforces:@/rule/label-format", "enforces:@/gate/cargo-ci"]
+examples = ["enforces:@/invariant/<self-id>", "enforces:@/rule/label-format", "enforces:@/gate/<self-id>"]
 
 [namespaces.per]
 description = "Decision link: names a decision item (issue-scope `decision` or project-scope `charter`) the labeled issue is done in accordance with. Several issues may cite one decision; the label denotes conformance, not delivery of the decision whole."
