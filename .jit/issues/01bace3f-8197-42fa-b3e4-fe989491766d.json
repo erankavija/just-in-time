@@ -7,6 +7,7 @@
   ],
   "description": "Breakdown node bracketing Complete profile lifecycle, composition, and upgrades (c639cfb5). After the plan-review checkpoint passes, holds the decomposition into well-ordered child issues that cover the container's [hard] success criteria.",
   "documents": [],
+  "done_at": "2026-08-08T23:32:47.321124251Z",
   "first_ready_at": "2026-07-18T09:28:56.133839252Z",
   "gates_required": [
     "coverage-preview",
@@ -35,7 +36,7 @@
     "brackets:c639cfb5"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "breakdown: Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-08T23:31:15.789289444Z"
+  "updated_at": "2026-08-08T23:32:47.321124251Z"
 }
