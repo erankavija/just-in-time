@@ -310,6 +310,27 @@ shipped/local dogfood boundary in `AGENTS.md`.
 - The write-once trap was hit in a downstream repository before it was traced
   here; the four walls above are the mechanism behind that report.
 
+## Source reference ids
+
+The breakdown manifest cites its grounding by id. Criterion ids `REQ-01`–`REQ-14`
+are the container's own success criteria. The remaining ids resolve here:
+
+| Id | What it names | Grounded at |
+|---|---|---|
+| `inv-write-once-trap` | The four mutually exclusive walls that leave a drifted repository with no valid state | [The write-once trap](#the-write-once-trap-motivating-defect) |
+| `inv-capture-assembler` | The existing assembler: correct refresh semantics, test-gated, hardcoded, no symlink or executable screening | [Capture: what exists](#capture-what-exists-req-13) |
+| `inv-archive-deps` | `tar` already a non-dev dependency, snapshot creation present, extraction and verification absent | [Exchange: what exists](#exchange-what-exists-req-14) |
+| `inv-build-budget` | 12 integration-test targets enforced, 11 currently used; new coverage must reuse existing suites | [Architecture fit](#architecture-fit) |
+| `inv-multi-package-separate-calls` | Application is transactional per package, so a multi-package selection is not all-or-nothing | [Primitive verification](#primitive-verification) |
+| `inv-record-v1-shape` | The applied record is five package-level fields with no per-identity ownership and no base | [Claim classification](#claim-classification), REQ-05 row |
+| `inv-worktree-confinement` | Package directories must classify as worktree content, excluding the data root and anything outside | [Exchange: what exists](#exchange-what-exists-req-14) |
+
+Decision ids name entries in the container's own decision log, which the plan's
+owner-decision table restates: `d-02-discovery` (D-02, discovery stays embedded
+plus explicit local directory), `d-05-removal-deferred` (D-05, general removal
+deferred), `d-07-ssot` (D-07, no staged cleanup), `d-08-capture` (D-08, one
+capture operation), and `d-09-exchange` (D-09, offline pack and verified add).
+
 ## Residual uncertainty
 
 - Active test-executable bytes were not recomputed: the checker measures them by

@@ -114,7 +114,8 @@
     ],
     "depends_on": [
       "profile-lifecycle-documentation",
-      "lifecycle-behavior-evidence",
+      "lifecycle-journey-evidence",
+      "lifecycle-resilience-evidence",
       "lifecycle-structural-absence"
     ],
     "planning": {
@@ -282,6 +283,58 @@
     }
   },
   {
+    "key": "profile-variables",
+    "title": "Resolve declared non-secret variables into package content",
+    "description": "Let a package declare named non-secret variables, resolve them by a fixed\nprecedence, and substitute them into the content the package contributes.\n\n## Background\n\nA package is fully literal, so one workflow that differs only in a project name or\na path needs a forked package. Making that parametric requires a declaration, an\ninput channel, and one bounded substitution syntax that cannot become a general\ntemplate language or a secret channel.\n\n## Success Criteria\n\n- [hard] REQ-01: A package declares variables with a name, an optional default, and an optional environment-variable name, and an undeclared or duplicated declaration is rejected.\n- [hard] REQ-02: A value resolves from the declared default, then a supplied values file, then the declared environment variable, then a repeated command-line assignment, with each later source overriding the earlier.\n- [hard] REQ-03: One reference syntax substitutes resolved values into string values and into asset and region bodies that opt in; an identifier, a path, a mode, and a body that did not opt in reject a reference.\n- [hard] REQ-04: Resolution is deterministic, so the same declarations and the same supplied inputs yield identical content, and the resolved values are returned for a caller to persist.\n- [hard] REQ-05: No input is treated as sensitive: there is no secret flag, no redaction path, and no resolved value reaches the audit trail.\n- [hard] REQ-06: Package identity covers the unresolved package bytes only, so supplying different values does not change which package was applied.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:cli",
+      "component:storage",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "package-graph-resolution"
+    ],
+    "planning": {
+      "outcome": "Declared variables resolve by fixed precedence and substitute through one bounded reference syntax.",
+      "contract_refs": [
+        "package-model",
+        "package-graph"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "d-07-ssot"
+      ],
+      "produces_contracts": [
+        "variable-model"
+      ],
+      "terminal": {
+        "consumer_family": "variable consumers",
+        "test_boundary": "variable precedence unit tests",
+        "worker_sized_reason": "One resolver plus one substitution pass with precedence table coverage.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/profile/variables.rs"
+          ],
+          "touches": [
+            "crates/jit/src/profile/wire.rs",
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/commands/profile.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "semantic-contribution-ownership",
     "title": "Compose contributions by semantic identity with shared ownership",
     "description": "Decide contribution conflicts by comparing resolved definitions and recording who\nowns each one, so two packages contributing the same definition coexist and a\npackage no longer collides with itself.\n\n## Background\n\nMerging compares a candidate contribution against the live registry value and\nfails whenever they differ, and occupancy is resolved per file from the applied\nrecords without excluding the candidate package. A package that changed one\ncontribution therefore reports a conflict against its own prior record.\n\n## Success Criteria\n\n- [hard] REQ-01: Two packages contributing a structurally equal resolved definition compose successfully and the result records both as owners in a stable order.\n- [hard] REQ-02: Two packages contributing different definitions for one identity conflict, and selector order does not decide a winner.\n- [hard] REQ-03: Ownership is resolved per contribution identity rather than per file, and a package re-contributing an identity it already owns is not reported as conflicting with itself.\n- [hard] REQ-04: A conflict names the contributing packages and the semantic identity, and distinguishes a package-owned identity from one the repository owns with no package behind it.\n",
@@ -300,12 +353,13 @@
       "code-review"
     ],
     "depends_on": [
-      "package-graph-resolution"
+      "profile-variables"
     ],
     "planning": {
       "outcome": "Equal contribution definitions share sorted owners while differing definitions conflict without an order winner.",
       "contract_refs": [
-        "package-graph"
+        "package-graph",
+        "variable-model"
       ],
       "source_refs": [
         "REQ-03",
@@ -428,58 +482,6 @@
     }
   },
   {
-    "key": "profile-variables",
-    "title": "Resolve declared non-secret variables into package content",
-    "description": "Let a package declare named non-secret variables, resolve them by a fixed\nprecedence, and substitute them into the content the package contributes.\n\n## Background\n\nA package is fully literal, so one workflow that differs only in a project name or\na path needs a forked package. Making that parametric requires a declaration, an\ninput channel, and one bounded substitution syntax that cannot become a general\ntemplate language or a secret channel.\n\n## Success Criteria\n\n- [hard] REQ-01: A package declares variables with a name, an optional default, and an optional environment-variable name, and an undeclared or duplicated declaration is rejected.\n- [hard] REQ-02: A value resolves from the declared default, then a supplied values file, then the declared environment variable, then a repeated command-line assignment, with each later source overriding the earlier.\n- [hard] REQ-03: One reference syntax substitutes resolved values into string values and into asset and region bodies that opt in; an identifier, a path, a mode, and a body that did not opt in reject a reference.\n- [hard] REQ-04: Resolved values are recorded so a later operation reproduces the same content, and no input is treated as sensitive: there is no secret flag, no redaction path, and no resolved value in the audit trail.\n- [hard] REQ-05: Package identity covers the unresolved package bytes only, so supplying different values does not change which package was applied.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:jit-profiles-complete",
-      "milestone:v1.1",
-      "per:@/charter/D-8",
-      "story:ownership-and-safe-change",
-      "component:cli",
-      "component:storage",
-      "satisfies:REQ-04"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "applied-record-ownership-claims"
-    ],
-    "planning": {
-      "outcome": "Declared variables resolve by fixed precedence and substitute through one bounded reference syntax.",
-      "contract_refs": [
-        "applied-record",
-        "package-model"
-      ],
-      "source_refs": [
-        "REQ-04",
-        "d-07-ssot"
-      ],
-      "produces_contracts": [
-        "variable-model"
-      ],
-      "terminal": {
-        "consumer_family": "variable consumers",
-        "test_boundary": "variable precedence unit tests",
-        "worker_sized_reason": "One resolver plus one substitution pass with precedence table coverage.",
-        "footprint": {
-          "creates": [
-            "crates/jit/src/profile/variables.rs"
-          ],
-          "touches": [
-            "crates/jit/src/profile/wire.rs",
-            "crates/jit/src/cli.rs",
-            "crates/jit/src/commands/profile.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
     "key": "three-way-reconfigure-upgrade",
     "title": "Decide each target from base, current, and candidate",
     "description": "Compare the base a claim was published from, the current repository value, and the\nresolved candidate, so an applied profile can be changed, reconfigured, or\nupgraded instead of being frozen at its first application.\n\n## Background\n\nAn applied profile is effectively write-once: a record whose content differs is\nrejected outright, so a package edited after application cannot be applied again,\nand the repository is left reporting drift with no sanctioned way back. This is\nthe defect the container exists to remove.\n\n## Success Criteria\n\n- [hard] REQ-01: A target whose current value still matches its recorded base updates to the candidate value.\n- [hard] REQ-02: A target whose current value diverges from both its base and the candidate reports an actionable conflict naming the target, the owning package, and the three values, and publishes nothing.\n- [hard] REQ-03: Content owned by several profiles retains its surviving owners when one of them stops contributing it.\n- [hard] REQ-04: Content that is unchanged, solely owned, and not marked retained may be removed as part of replacing an installed version; content that is changed, shared, or retained is never removed.\n- [hard] REQ-05: Re-applying a package whose content changed succeeds and rewrites its record, and repository content no package owns survives that operation.\n",
@@ -498,8 +500,7 @@
       "code-review"
     ],
     "depends_on": [
-      "aggregate-lifecycle-publication",
-      "profile-variables"
+      "aggregate-lifecycle-publication"
     ],
     "planning": {
       "outcome": "Reconfiguration and upgrade decide each target from its recorded base, current value, and resolved candidate.",
@@ -648,9 +649,56 @@
     }
   },
   {
-    "key": "profile-diff-surface",
-    "title": "Report profile state and differences on one surface",
-    "description": "Give the profile command family one presentation contract: what is applied, what\neach package would change, and what currently diverges.\n\n## Background\n\nThe family exposes three subcommands and has no way to answer what an operation\nwould change before running it. The lifecycle adds several mutating operations, so\nthe read surface that explains them has to exist alongside.\n\n## Success Criteria\n\n- [hard] REQ-01: A difference report states, for each participating profile, the targets and identities that would update, conflict, be retained, or be removed, without writing anything.\n- [hard] REQ-02: Every profile subcommand emits machine-readable output under the project's collection envelope, and the generated command schema and the bridge tool inventory expose the family without hand-written duplication.\n- [hard] REQ-03: Each mutating subcommand supports a rehearsal mode that reports the same decisions it would publish and writes nothing.\n- [hard] REQ-04: Human output states profile id, version, origin, and per-target decision consistently across the family, and no subcommand reports a decision vocabulary the others do not use.\n",
+    "key": "profile-difference-report",
+    "title": "Report what an operation would change before it runs",
+    "description": "Add the read-only report that answers what a selection would do to this\nrepository, so an adopter can inspect a decision before publishing it.\n\n## Background\n\nThe command family cannot answer what an operation would change. Once\nreconfiguration and upgrade exist, every mutation has a decision behind it that a\nreader needs to see before it is published.\n\n## Success Criteria\n\n- [hard] REQ-01: A difference report states, for each participating profile, the targets and identities that would update, conflict, be retained, or be removed, and writes nothing.\n- [hard] REQ-02: The report distinguishes a target no package owns from one a package owns, and names the owning packages for shared content.\n- [hard] REQ-03: The report is produced from the same decision the mutating path would publish, so a reported decision and the published outcome cannot disagree.\n- [hard] REQ-04: The report is available for a selection that is not yet applied, so an adopter can inspect a package before applying it.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:cli",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "three-way-reconfigure-upgrade"
+    ],
+    "planning": {
+      "outcome": "A read-only report states what a selection would change before anything is published.",
+      "contract_refs": [
+        "three-way-decision",
+        "applied-record"
+      ],
+      "source_refs": [
+        "REQ-06"
+      ],
+      "landing_group": "lifecycle-surface",
+      "terminal": {
+        "consumer_family": "difference report callers",
+        "test_boundary": "difference report unit tests",
+        "worker_sized_reason": "One read-only projection over decisions the prior work already computes.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/profile/difference.rs"
+          ],
+          "touches": [
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/cli.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-surface-contract",
+    "title": "Give the profile subcommands one presentation contract",
+    "description": "Unify how every profile subcommand presents itself: human output, machine\nenvelopes, rehearsal mode, generated schema, and the bridge tool inventory.\n\n## Background\n\nThe family grows from three subcommands to the full lifecycle, and each new one\narrives with its own wiring. Left alone they drift into different envelopes,\ndifferent rehearsal semantics, and hand-maintained bridge entries. This work runs\nafter the subcommands exist so it can standardize what is actually there.\n\n## Success Criteria\n\n- [hard] REQ-01: Every profile subcommand emits machine-readable output under the project's collection envelope, and list-emitting subcommands share one envelope shape.\n- [hard] REQ-02: Each mutating subcommand supports a rehearsal mode that reports the decisions it would publish and writes nothing.\n- [hard] REQ-03: Human output states profile id, version, origin, and per-target decision consistently, and no subcommand uses a decision vocabulary the others do not.\n- [hard] REQ-04: The generated command schema and the bridge tool inventory expose the family from the command definitions, with no hand-written duplicate of a subcommand's arguments.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -667,14 +715,16 @@
       "code-review"
     ],
     "depends_on": [
-      "three-way-reconfigure-upgrade"
+      "profile-difference-report",
+      "package-capture",
+      "package-archive-exchange"
     ],
     "planning": {
-      "outcome": "The profile command family reports state and differences through one stable human and machine surface.",
+      "outcome": "The profile subcommands present themselves through one envelope, rehearsal, and schema contract.",
       "contract_refs": [
-        "three-way-decision",
-        "applied-record",
-        "profile-selector"
+        "profile-selector",
+        "capture-tree",
+        "package-archive"
       ],
       "source_refs": [
         "REQ-06"
@@ -683,14 +733,13 @@
       "terminal": {
         "consumer_family": "profile surface adapters",
         "test_boundary": "JSON envelope contract tests",
-        "worker_sized_reason": "One presentation layer over decisions the prior work already computes.",
+        "worker_sized_reason": "One presentation pass over subcommands that already exist.",
         "footprint": {
           "touches": [
             "crates/jit/src/cli.rs",
             "crates/jit/src/main.rs",
             "crates/jit/src/output.rs",
             "crates/jit/src/schema.rs",
-            "crates/jit/src/commands/profile.rs",
             "mcp-server/curated-tools.json"
           ]
         }
@@ -716,8 +765,7 @@
       "code-review"
     ],
     "depends_on": [
-      "aggregate-lifecycle-publication",
-      "profile-variables"
+      "aggregate-lifecycle-publication"
     ],
     "planning": {
       "outcome": "A changed mutation appends one lifecycle event naming the operation, per-profile action, and variable sources.",
@@ -765,10 +813,8 @@
       "doc-review"
     ],
     "depends_on": [
-      "profile-diff-surface",
-      "lifecycle-audit-events",
-      "package-capture",
-      "package-archive-exchange"
+      "profile-surface-contract",
+      "lifecycle-audit-events"
     ],
     "planning": {
       "outcome": "The canonical profile reference states the lifecycle that now ships and neighbouring pages cite it.",
@@ -801,9 +847,9 @@
     }
   },
   {
-    "key": "lifecycle-behavior-evidence",
-    "title": "Prove lifecycle behaviour under failure and recovery",
-    "description": "Extend the existing acceptance coverage so the shipped lifecycle is exercised\nwhere it is most likely to break: interrupted publication, concurrent callers,\nhostile archives, and repositories without Git.\n\n## Background\n\nExisting suites cover the apply-only surface. The build-footprint budget allows\nalmost no new integration-test targets, so this coverage belongs in the suites\nthat already exist rather than in new ones.\n\n## Success Criteria\n\n- [hard] REQ-01: Coverage exercises interleaved id and directory selection, dependency and incompatibility failures, shared and conflicting ownership, variable precedence, conversion of a record in the shipped format, capture of a newly authored package, capture of a package edited in place, an archive round trip, and a rejected archive.\n- [hard] REQ-02: Failure injection during publication leaves either the complete prior state or the complete new state, and retrying the same operation converges to the same result.\n- [hard] REQ-03: Concurrent lifecycle operations on one repository serialize rather than interleave, and every covered operation runs in a repository with no Git directory.\n- [hard] REQ-04: New coverage lands in existing test targets, and the enforced build-footprint budget still passes.\n",
+    "key": "lifecycle-journey-evidence",
+    "title": "Cover the lifecycle journeys an adopter follows",
+    "description": "Exercise the shipped lifecycle along the paths an adopter actually walks, from\nselecting a package to capturing and exchanging one.\n\n## Background\n\nExisting suites cover the apply-only surface. The build-footprint budget leaves\nalmost no room for new integration targets, so this coverage belongs in the suites\nthat already exist.\n\n## Success Criteria\n\n- [hard] REQ-01: Coverage exercises interleaved id and directory selection, a missing dependency, a declared incompatibility, and a compatible-engine range the running engine falls outside of.\n- [hard] REQ-02: Coverage exercises shared ownership between two packages, a conflicting definition, variable precedence across all four sources, and a record in the shipped format being converted.\n- [hard] REQ-03: Coverage exercises capturing a newly authored package, capturing a package whose content was edited in place, an archive round trip, and an archive rejected for a mismatched digest.\n- [hard] REQ-04: New cases land in existing test targets rather than new ones.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -819,13 +865,11 @@
       "code-review"
     ],
     "depends_on": [
-      "profile-diff-surface",
-      "lifecycle-audit-events",
-      "package-capture",
-      "package-archive-exchange"
+      "profile-surface-contract",
+      "lifecycle-audit-events"
     ],
     "planning": {
-      "outcome": "Acceptance coverage exercises the lifecycle under capture, concurrency, rollback, and Git-free conditions.",
+      "outcome": "Acceptance coverage walks selection, resolution, ownership, capture, and exchange journeys.",
       "contract_refs": [
         "capture-tree",
         "package-archive",
@@ -836,14 +880,58 @@
         "inv-build-budget"
       ],
       "terminal": {
-        "consumer_family": "acceptance suites",
+        "consumer_family": "journey acceptance suites",
         "test_boundary": "profile acceptance suite",
-        "worker_sized_reason": "Cases added to existing suites under a fixed target budget.",
+        "worker_sized_reason": "Journey cases appended to one existing acceptance suite.",
         "footprint": {
           "touches": [
             "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs",
             "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
             "crates/jit/tests/fixtures/profile-packages"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lifecycle-resilience-evidence",
+    "title": "Cover interruption, concurrency, and Git-free operation",
+    "description": "Exercise the lifecycle where correctness is hardest to see: a publication that\nfails part-way, two callers at once, and a repository with no version control.\n\n## Background\n\nThe lifecycle publishes through one recoverable transaction and claims\nall-or-nothing behavior, idempotent retry, serialized concurrent access, and\noperation without Git. Each of those is a property that only failure injection\ndemonstrates.\n\n## Success Criteria\n\n- [hard] REQ-01: Failure injected at each publication stage leaves either the complete prior repository state or the complete new state, across repository bytes, records, and audit state.\n- [hard] REQ-02: Retrying an interrupted operation converges to the same result as an uninterrupted run, and repeating a completed operation changes nothing.\n- [hard] REQ-03: Two lifecycle operations issued concurrently against one repository serialize, and neither observes a partial state from the other.\n- [hard] REQ-04: Every lifecycle operation runs in a repository with no version-control directory present.\n- [hard] REQ-05: New cases land in existing test targets rather than new ones.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:testing",
+      "satisfies:REQ-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "profile-surface-contract",
+      "lifecycle-audit-events"
+    ],
+    "planning": {
+      "outcome": "Failure injection, concurrent callers, and a Git-free repository exercise the lifecycle.",
+      "contract_refs": [
+        "aggregate-plan",
+        "materialization-transaction"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "inv-build-budget"
+      ],
+      "terminal": {
+        "consumer_family": "resilience acceptance suites",
+        "test_boundary": "failure injection suite",
+        "worker_sized_reason": "Injection points added to one existing transaction suite.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs"
           ]
         }
       }
@@ -868,10 +956,8 @@
       "code-review"
     ],
     "depends_on": [
-      "profile-diff-surface",
-      "lifecycle-audit-events",
-      "package-capture",
-      "package-archive-exchange"
+      "profile-surface-contract",
+      "lifecycle-audit-events"
     ],
     "planning": {
       "outcome": "Mechanical checks reject a duplicate resolver, a compatibility shim, or a surviving predecessor path.",
