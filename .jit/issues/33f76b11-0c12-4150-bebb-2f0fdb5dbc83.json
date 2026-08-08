@@ -62,15 +62,16 @@
       "path": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json"
     }
   ],
+  "done_at": "2026-08-08T23:10:45.777078245Z",
   "first_ready_at": "2026-07-18T09:28:56.124409415Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-07-18T09:28:56.133684642Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-08T23:10:35.523025501Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "33f76b11-0c12-4150-bebb-2f0fdb5dbc83",
@@ -83,7 +84,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-08T21:59:22.931397243Z"
+  "updated_at": "2026-08-08T23:10:45.777078245Z"
 }

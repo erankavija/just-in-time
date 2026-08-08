@@ -1,0 +1,70 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cd887059cf21cb1344d61e71a7bd1295e15eb9d3",
+  "completed_at": "2026-08-08T23:04:11.650897984Z",
+  "duration_ms": 271005,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F1",
+        "line": 181,
+        "severity": "high",
+        "summary": "No manifest leaf owns the required jit profile validate command or its selector, schema, bridge, and test contract."
+      },
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F2",
+        "line": 538,
+        "references": [
+          "@/inv/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Capture is required to use the recoverable materialization transaction, but its footprint omits the transaction extension required because the current request set has no capture operation and the existing publisher can lose a retired destination."
+      },
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F3",
+        "line": 850,
+        "severity": "high",
+        "summary": "The journey-evidence terminal combines independent selection/graph, ownership/variables/migration, capture/exchange, and build-topology acceptance clusters and is not worker-sized."
+      },
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F4",
+        "line": 897,
+        "references": [
+          "@/inv/bounded-rust-build-footprint"
+        ],
+        "severity": "high",
+        "summary": "The resilience-evidence terminal still combines recovery/retry, concurrency, Git-free operation, and build-topology proof, so the prior oversized evidence finding is not fully resolved."
+      },
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F5",
+        "line": 581,
+        "severity": "high",
+        "summary": "Multiple unordered terminal pairs claim the same CLI, command, and acceptance-test paths without a visible partition, ordering edge, or per-code override; landing_group does not resolve the overlaps."
+      }
+    ],
+    "summary": "Coverage, recoverable-publication planning, terminal sizing, and unordered footprint ownership remain blocking.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "33f76b11-0c12-4150-bebb-2f0fdb5dbc83",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "395bb380-bbdf-4302-a79f-503b0ed4f563",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-08T22:59:40.645270179Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6714 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe39a-7e95-7131-ac73-9ac4787bdec0\n--------\nuser\n--- 6701 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. `jit profile validate` has no owning leaf. The container explicitly requires it (REQ-01/REQ-06), but the current CLI exposes only `list`, `show`, and `apply` ([cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:2928)); the selector and surface tasks never require a validate subcommand ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/breakdown.json:181)). Add a focused validate-command task, its selector/graph dependencies, command/schema/bridge coverage, and make the surface task depend on it.\n\n2. Capture cannot meet its settled recoverable-publication contract with the disclosed footprint. The plan requires capture to consume `materialization-transaction` ([plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/plan.md:114)), yet that transaction has no capture request ([mod.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mod.rs:671)) and the current assembler retires the destination before publishing, so publication failure loses the retired tree ([package_assembly.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/profile/package_assembly.rs:289)). The capture leaf omits the transaction/planner/storage paths needed to fix this ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/breakdown.json:538)). Add a bounded transaction-extension producer with its real footprint and make capture consume it; do not retain a second publisher. [@/inv/derived-state-coherence]\n\n3. `lifecycle-journey-evidence` is not worker-sized. It combines four independent acceptance clusters—selection/graph, ownership/variables/migration, capture/exchange, and test-topology proof—in one terminal ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/breakdown.json:850)). Split it by coherent observable journey/test boundary.\n\n4. `lifecycle-resilience-evidence` remains an oversized terminal and does not fully resolve the prior evidence finding. Publication-stage recovery and retry, concurrent serialization, Git-free operation, and test-topology proof are separate behavior families, despite one stated suite ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/breakdown.json:897)). Split recovery/retry, concurrency, and Git-free evidence into focused leaves with their own boundaries. [@/inv/bounded-rust-build-footprint]\n\n5. The manifest leaves unresolved unordered footprint collisions. For example, `package-capture`, `package-archive-exchange`, and `profile-difference-report` independently touch `cli.rs` and `commands/profile.rs` while sharing no ordering edge ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/breakdown.json:581), [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/breakdown.json:642), [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/c639cfb5-jit-profiles-complete/breakdown.json:690)); the two evidence leaves also concurrently own the same acceptance test file. `landing_group` does not resolve these. Assign each shared surface to one integration leaf or add concrete, visible per-code partitioning/ordering.\n\nTotal findings: 5\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Coverage, recoverable-publication planning, terminal sizing, and unordered footprint ownership remain blocking.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"No manifest leaf owns the required jit profile validate command or its selector, schema, bridge, and test contract.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":181},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Capture is required to use the recoverable materialization transaction, but its footprint omits the transaction extension required because the current request set has no capture operation and the existing publisher can lose a retired destination.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":538,\"references\":[\"@/inv/derived-state-coherence\"]},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"The journey-evidence terminal combines independent selection/graph, ownership/variables/migration, capture/exchange, and build-topology acceptance clusters and is not worker-sized.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":850},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"The resilience-evidence terminal still combines recovery/retry, concurrency, Git-free operation, and build-topology proof, so the prior oversized evidence finding is not fully resolved.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":897,\"references\":[\"@/inv/bounded-rust-build-footprint\"]},{\"id\":\"F5\",\"severity\":\"high\",\"summary\":\"Multiple unordered terminal pairs claim the same CLI, command, and acceptance-test paths without a visible partition, ordering edge, or per-code override; landing_group does not resolve the overlaps.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":581}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

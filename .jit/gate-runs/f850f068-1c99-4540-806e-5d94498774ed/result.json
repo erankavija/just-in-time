@@ -1,0 +1,66 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5b46f8248b638e9ccad46d327bb608c689716a14",
+  "completed_at": "2026-08-08T22:55:56.263693593Z",
+  "duration_ms": 231360,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F1",
+        "line": 209,
+        "severity": "high",
+        "summary": "Twelve non-criterion source references are not defined or mapped by either linked investigation artifact; validation accepted them only through manually supplied known-source arguments."
+      },
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F2",
+        "line": 285,
+        "references": [
+          "@/inv/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "Resolved-variable production is scheduled after both semantic composition and record work that require resolved definitions or inputs, and correcting the missing dependency directly creates a cycle."
+      },
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F3",
+        "line": 651,
+        "references": [
+          "@/inv/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "The universal profile-surface task is oversized and precedes independent capture and archive/add command producers whose output and dry-run behavior it claims to standardize."
+      },
+      {
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F4",
+        "line": 804,
+        "references": [
+          "@/inv/bounded-rust-build-footprint"
+        ],
+        "severity": "high",
+        "summary": "The lifecycle evidence terminal combines numerous independent behavior families, recovery, concurrency, Git-free operation, and build-budget proof, so it fails the one-worker assignment simulation."
+      }
+    ],
+    "summary": "The artifacts validate structurally, but unresolved source aliases, a contract-order cycle, and non-worker-sized terminal work block approval.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "33f76b11-0c12-4150-bebb-2f0fdb5dbc83",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f850f068-1c99-4540-806e-5d94498774ed",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-08T22:52:04.902924210Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4168 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe393-90d9-7793-8188-6ec3f2317b5d\n--------\nuser\n--- 4155 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — Unresolved manifest source references.** `breakdown.json` cites twelve non-criterion IDs (for example `d-02-discovery`, `inv-worktree-confinement`, and `inv-write-once-trap`) but neither investigation nor research defines or maps them; the plan only links the documents generically. The helper passes only because these IDs were supplied manually as `--known-source`. Add a compact authoritative source index or replace every alias with resolvable source/decision references. [breakdown.json](dev/active/c639cfb5-jit-profiles-complete/breakdown.json:209), [plan.md](dev/active/c639cfb5-jit-profiles-complete/plan.md:224)\n\n2. **F2 — Variable, ownership, and record contracts have an impossible implementation order.** The plan requires ownership comparison over “resolved definitions,” while the variable model that resolves definitions is produced only after the applied-record task; the record itself requires resolved inputs. `semantic-contribution-ownership` neither consumes `variable-model` nor depends on its producer, and adding that edge directly would cycle through `applied-record-ownership-claims`. Split variable declaration/resolution from downstream persistence, produce the resolver before composition, and make both composition and record work consume it. [plan.md](dev/active/c639cfb5-jit-profiles-complete/plan.md:62), [breakdown.json](dev/active/c639cfb5-jit-profiles-complete/breakdown.json:285), [breakdown.json](dev/active/c639cfb5-jit-profiles-complete/breakdown.json:431)\n\n3. **F3 — `profile-diff-surface` is both oversized and scheduled before command producers it must cover.** Its universal criteria require consistent output and rehearsal support for every profile subcommand, but it depends only on reconfiguration; capture and archive/add command work are separate, later-independent terminals. One task cannot provide the completed-family contract without either implementing those commands itself or leaving later tasks to bypass it. Split a shared presentation/rehearsal contract from per-command adapters, and wire each command producer through that contract. [breakdown.json](dev/active/c639cfb5-jit-profiles-complete/breakdown.json:651)\n\n4. **F4 — `lifecycle-behavior-evidence` is not worker-sized.** One terminal combines at least nine unrelated lifecycle behaviors, transaction failure/retry, concurrency serialization, Git-free operation, and build-budget enforcement under a single acceptance boundary. This has several independent acceptance clusters and needs decomposition, for example core composition/reconfiguration evidence, capture/archive adversarial evidence, and publication/concurrency evidence. [breakdown.json](dev/active/c639cfb5-jit-profiles-complete/breakdown.json:804)\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The artifacts validate structurally, but unresolved source aliases, a contract-order cycle, and non-worker-sized terminal work block approval.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"Twelve non-criterion source references are not defined or mapped by either linked investigation artifact; validation accepted them only through manually supplied known-source arguments.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":209},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"Resolved-variable production is scheduled after both semantic composition and record work that require resolved definitions or inputs, and correcting the missing dependency directly creates a cycle.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":285,\"references\":[\"@/inv/architecture-dependency-direction\"]},{\"id\":\"F3\",\"severity\":\"high\",\"summary\":\"The universal profile-surface task is oversized and precedes independent capture and archive/add command producers whose output and dry-run behavior it claims to standardize.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":651,\"references\":[\"@/inv/architecture-dependency-direction\"]},{\"id\":\"F4\",\"severity\":\"high\",\"summary\":\"The lifecycle evidence terminal combines numerous independent behavior families, recovery, concurrency, Git-free operation, and build-budget proof, so it fails the one-worker assignment simulation.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":804,\"references\":[\"@/inv/bounded-rust-build-footprint\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
