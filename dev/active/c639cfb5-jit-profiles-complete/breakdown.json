@@ -80,7 +80,6 @@
       "repo-validate"
     ],
     "depends_on": [
-      "package-capture",
       "package-archive-exchange"
     ],
     "planning": {
@@ -114,8 +113,7 @@
     ],
     "depends_on": [
       "profile-lifecycle-documentation",
-      "lifecycle-journey-evidence",
-      "lifecycle-resilience-evidence",
+      "git-free-lifecycle-evidence",
       "lifecycle-structural-absence"
     ],
     "planning": {
@@ -189,7 +187,8 @@
       "per:@/charter/D-8",
       "story:canonical-package-graph",
       "component:cli",
-      "satisfies:REQ-01"
+      "satisfies:REQ-01",
+      "satisfies:REQ-11"
     ],
     "gates": [
       "cargo-ci",
@@ -208,7 +207,8 @@
       "source_refs": [
         "REQ-01",
         "d-02-discovery",
-        "inv-worktree-confinement"
+        "inv-worktree-confinement",
+        "REQ-11"
       ],
       "produces_contracts": [
         "profile-selector"
@@ -243,7 +243,8 @@
       "per:@/charter/D-8",
       "story:canonical-package-graph",
       "component:storage",
-      "satisfies:REQ-02"
+      "satisfies:REQ-02",
+      "satisfies:REQ-11"
     ],
     "gates": [
       "cargo-ci",
@@ -260,7 +261,8 @@
       ],
       "source_refs": [
         "REQ-02",
-        "inv-multi-package-separate-calls"
+        "inv-multi-package-separate-calls",
+        "REQ-11"
       ],
       "produces_contracts": [
         "package-graph"
@@ -295,7 +297,8 @@
       "story:ownership-and-safe-change",
       "component:cli",
       "component:storage",
-      "satisfies:REQ-04"
+      "satisfies:REQ-04",
+      "satisfies:REQ-11"
     ],
     "gates": [
       "cargo-ci",
@@ -312,7 +315,8 @@
       ],
       "source_refs": [
         "REQ-04",
-        "d-07-ssot"
+        "d-07-ssot",
+        "REQ-11"
       ],
       "produces_contracts": [
         "variable-model"
@@ -346,7 +350,8 @@
       "per:@/charter/D-8",
       "story:ownership-and-safe-change",
       "component:storage",
-      "satisfies:REQ-03"
+      "satisfies:REQ-03",
+      "satisfies:REQ-11"
     ],
     "gates": [
       "cargo-ci",
@@ -363,7 +368,8 @@
       ],
       "source_refs": [
         "REQ-03",
-        "inv-write-once-trap"
+        "inv-write-once-trap",
+        "REQ-11"
       ],
       "produces_contracts": [
         "ownership-composition"
@@ -394,7 +400,8 @@
       "story:ownership-and-safe-change",
       "component:storage",
       "satisfies:REQ-05",
-      "satisfies:REQ-09"
+      "satisfies:REQ-09",
+      "satisfies:REQ-11"
     ],
     "gates": [
       "cargo-ci",
@@ -412,7 +419,8 @@
         "REQ-05",
         "REQ-09",
         "inv-record-v1-shape",
-        "d-07-ssot"
+        "d-07-ssot",
+        "REQ-11"
       ],
       "produces_contracts": [
         "applied-record"
@@ -537,7 +545,7 @@
   {
     "key": "package-capture",
     "title": "Capture a package tree from declared repository targets",
-    "description": "Turn the repository-local package assembler into a supported operation that\npublishes a package tree from the repository files its manifest declares.\n\n## Background\n\nThe assembler already reads declared live targets, stages a tree, validates it as\na package, and publishes it whole, and a changed live file changes the resulting\npackage identity. It is compiled only for this crate's tests, is hardcoded to this\nrepository's own package path, follows symlinks, and does not screen executable\ncontent. Without it, a package is hand-authored and an in-place edit to\nprofile-owned content cannot be folded back into the package that owns it.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture reads the repository targets a manifest declares and publishes a package tree containing exactly the manifest, the declared asset sources, and the declared region sources; a source the manifest stopped declaring does not survive.\n- [hard] REQ-02: Capture serves any repository and any package id from supplied arguments; no repository path, package id, or entry-point script is compiled in, and the operation is present in an ordinary binary rather than behind a test feature.\n- [hard] REQ-03: A declared target that is a symlink, resolves outside the worktree, or carries executable permission the manifest did not declare is refused before anything is staged.\n- [hard] REQ-04: The published tree decodes and validates as a package, and a failed capture leaves the destination as it was.\n- [hard] REQ-05: Capturing a package whose owned content was edited in place produces a tree whose identity reflects that edit, so re-applying it reconciles the repository.\n",
+    "description": "Turn the repository-local package assembler into a supported operation that\npublishes a package tree from the repository files its manifest declares.\n\n## Background\n\nThe assembler already reads declared live targets, stages a tree, validates it as\na package, and publishes it whole, and a changed live file changes the resulting\npackage identity. It is compiled only for this crate's tests, is hardcoded to this\nrepository's own package path, follows symlinks, and does not screen executable\ncontent. Without it, a package is hand-authored and an in-place edit to\nprofile-owned content cannot be folded back into the package that owns it.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture reads the repository targets a manifest declares and publishes a package tree containing exactly the manifest, the declared asset sources, and the declared region sources; a source the manifest stopped declaring does not survive.\n- [hard] REQ-02: Capture serves any repository and any package id from supplied arguments; no repository path, package id, or entry-point script is compiled in, and the operation is present in an ordinary binary rather than behind a test feature.\n- [hard] REQ-03: A declared target that is a symlink, resolves outside the worktree, or carries executable permission the manifest did not declare is refused before anything is staged.\n- [hard] REQ-04: The published tree decodes and validates as a package, and capture publishes through the shared recoverable transaction rather than its own publication path, so a failure cannot lose an occupied destination.\n- [hard] REQ-05: Capturing a package whose owned content was edited in place produces a tree whose identity reflects that edit, so re-applying it reconciles the repository.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -547,7 +555,8 @@
       "story:authoring-and-exchange",
       "component:cli",
       "component:storage",
-      "satisfies:REQ-13"
+      "satisfies:REQ-13",
+      "satisfies:REQ-11"
     ],
     "gates": [
       "cargo-ci",
@@ -555,7 +564,7 @@
       "code-review"
     ],
     "depends_on": [
-      "versioned-package-decoder"
+      "three-way-reconfigure-upgrade"
     ],
     "planning": {
       "outcome": "Capture publishes a package tree from the repository targets a manifest declares.",
@@ -567,7 +576,8 @@
       "source_refs": [
         "REQ-13",
         "d-08-capture",
-        "inv-capture-assembler"
+        "inv-capture-assembler",
+        "REQ-11"
       ],
       "produces_contracts": [
         "capture-tree"
@@ -582,6 +592,8 @@
             "crates/jit/src/profile/package_assembly.rs",
             "crates/jit/src/profile/mod.rs",
             "crates/jit/src/profile/repository_package.rs",
+            "crates/jit/src/repository_state/mod.rs",
+            "crates/jit/src/storage/repository_state_store.rs",
             "crates/jit/src/cli.rs",
             "crates/jit/src/commands/profile.rs",
             "crates/jit/examples/assemble-package.rs",
@@ -604,7 +616,8 @@
       "story:authoring-and-exchange",
       "component:cli",
       "component:storage",
-      "satisfies:REQ-14"
+      "satisfies:REQ-14",
+      "satisfies:REQ-11"
     ],
     "gates": [
       "cargo-ci",
@@ -613,7 +626,7 @@
       "security-review"
     ],
     "depends_on": [
-      "versioned-package-decoder"
+      "package-capture"
     ],
     "planning": {
       "outcome": "A package packs into one digest-carrying archive that add verifies before placing it in the worktree.",
@@ -625,7 +638,8 @@
         "REQ-14",
         "d-09-exchange",
         "inv-archive-deps",
-        "inv-worktree-confinement"
+        "inv-worktree-confinement",
+        "REQ-11"
       ],
       "produces_contracts": [
         "package-archive"
@@ -643,6 +657,53 @@
             "crates/jit/src/cli.rs",
             "crates/jit/src/commands/profile.rs",
             "crates/jit/src/profile/package.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-state-validation",
+    "title": "Check applied profiles against their packages and the repository",
+    "description": "Report whether the profiles this repository records still agree with the packages\nthey came from and with the repository content they own.\n\n## Background\n\nRepository-wide validation reports profile provenance and derived-state drift\namong everything else it checks. Once profiles carry per-identity ownership and a\nbase fingerprint, a profile-scoped check can say which profile diverged and how,\nwhich is what an adopter needs before choosing to reconfigure or upgrade.\n\n## Success Criteria\n\n- [hard] REQ-01: The check reports, per recorded profile, whether its package is readable at the location the record names, whether the package still matches the recorded identity, and whether each owned target still matches its recorded base.\n- [hard] REQ-02: An ownership claim naming a target that no longer exists, and a target claimed by a record whose package is gone, are each reported rather than ignored.\n- [hard] REQ-03: The check writes nothing and reports a non-zero status when any profile diverges, so it is usable as a repository check.\n- [hard] REQ-04: Repository-wide validation keeps reporting the same divergences through the shared logic, with no second implementation of the comparison.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:cli",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "mcp-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "package-archive-exchange"
+    ],
+    "planning": {
+      "outcome": "A profile-scoped check reports which recorded profile diverged from its package or its owned content.",
+      "contract_refs": [
+        "applied-record",
+        "package-model"
+      ],
+      "source_refs": [
+        "REQ-06",
+        "inv-write-once-trap"
+      ],
+      "landing_group": "lifecycle-surface",
+      "terminal": {
+        "consumer_family": "profile state checkers",
+        "test_boundary": "profile validation unit tests",
+        "worker_sized_reason": "One comparison over claims the record already carries.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/commands/validate.rs"
           ]
         }
       }
@@ -667,7 +728,7 @@
       "code-review"
     ],
     "depends_on": [
-      "three-way-reconfigure-upgrade"
+      "profile-state-validation"
     ],
     "planning": {
       "outcome": "A read-only report states what a selection would change before anything is published.",
@@ -715,9 +776,7 @@
       "code-review"
     ],
     "depends_on": [
-      "profile-difference-report",
-      "package-capture",
-      "package-archive-exchange"
+      "profile-difference-report"
     ],
     "planning": {
       "outcome": "The profile subcommands present themselves through one envelope, rehearsal, and schema contract.",
@@ -847,9 +906,9 @@
     }
   },
   {
-    "key": "lifecycle-journey-evidence",
-    "title": "Cover the lifecycle journeys an adopter follows",
-    "description": "Exercise the shipped lifecycle along the paths an adopter actually walks, from\nselecting a package to capturing and exchanging one.\n\n## Background\n\nExisting suites cover the apply-only surface. The build-footprint budget leaves\nalmost no room for new integration targets, so this coverage belongs in the suites\nthat already exist.\n\n## Success Criteria\n\n- [hard] REQ-01: Coverage exercises interleaved id and directory selection, a missing dependency, a declared incompatibility, and a compatible-engine range the running engine falls outside of.\n- [hard] REQ-02: Coverage exercises shared ownership between two packages, a conflicting definition, variable precedence across all four sources, and a record in the shipped format being converted.\n- [hard] REQ-03: Coverage exercises capturing a newly authored package, capturing a package whose content was edited in place, an archive round trip, and an archive rejected for a mismatched digest.\n- [hard] REQ-04: New cases land in existing test targets rather than new ones.\n",
+    "key": "publication-recovery-evidence",
+    "title": "Prove publication survives interruption",
+    "description": "Inject failures into lifecycle publication and show the repository lands on one\ncomplete state.\n\n## Background\n\nThe lifecycle publishes through one recoverable transaction and claims\nall-or-nothing behavior with idempotent retry. Only injected failure demonstrates\nthat claim. The suite is a module of the existing workflow target, so the enforced\nintegration-target budget is unaffected.\n\n## Success Criteria\n\n- [hard] REQ-01: A failure injected at each publication stage leaves either the complete prior repository state or the complete new state across repository bytes, ownership records, and audit state.\n- [hard] REQ-02: Retrying an interrupted operation reaches the same result as an uninterrupted run.\n- [hard] REQ-03: Repeating a completed operation reports it as unchanged and writes nothing further.\n- [hard] REQ-04: The suite is a module of an existing integration-test target.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -869,54 +928,7 @@
       "lifecycle-audit-events"
     ],
     "planning": {
-      "outcome": "Acceptance coverage walks selection, resolution, ownership, capture, and exchange journeys.",
-      "contract_refs": [
-        "capture-tree",
-        "package-archive",
-        "three-way-decision"
-      ],
-      "source_refs": [
-        "REQ-11",
-        "inv-build-budget"
-      ],
-      "terminal": {
-        "consumer_family": "journey acceptance suites",
-        "test_boundary": "profile acceptance suite",
-        "worker_sized_reason": "Journey cases appended to one existing acceptance suite.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
-            "crates/jit/tests/fixtures/profile-packages"
-          ]
-        }
-      }
-    }
-  },
-  {
-    "key": "lifecycle-resilience-evidence",
-    "title": "Cover interruption, concurrency, and Git-free operation",
-    "description": "Exercise the lifecycle where correctness is hardest to see: a publication that\nfails part-way, two callers at once, and a repository with no version control.\n\n## Background\n\nThe lifecycle publishes through one recoverable transaction and claims\nall-or-nothing behavior, idempotent retry, serialized concurrent access, and\noperation without Git. Each of those is a property that only failure injection\ndemonstrates.\n\n## Success Criteria\n\n- [hard] REQ-01: Failure injected at each publication stage leaves either the complete prior repository state or the complete new state, across repository bytes, records, and audit state.\n- [hard] REQ-02: Retrying an interrupted operation converges to the same result as an uninterrupted run, and repeating a completed operation changes nothing.\n- [hard] REQ-03: Two lifecycle operations issued concurrently against one repository serialize, and neither observes a partial state from the other.\n- [hard] REQ-04: Every lifecycle operation runs in a repository with no version-control directory present.\n- [hard] REQ-05: New cases land in existing test targets rather than new ones.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:jit-profiles-complete",
-      "milestone:v1.1",
-      "per:@/charter/D-8",
-      "story:surface-and-evidence",
-      "component:testing",
-      "satisfies:REQ-11"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "profile-surface-contract",
-      "lifecycle-audit-events"
-    ],
-    "planning": {
-      "outcome": "Failure injection, concurrent callers, and a Git-free repository exercise the lifecycle.",
+      "outcome": "Injected publication failures leave the repository on one complete state and retry converges.",
       "contract_refs": [
         "aggregate-plan",
         "materialization-transaction"
@@ -926,12 +938,106 @@
         "inv-build-budget"
       ],
       "terminal": {
-        "consumer_family": "resilience acceptance suites",
+        "consumer_family": "publication recovery suite",
         "test_boundary": "failure injection suite",
-        "worker_sized_reason": "Injection points added to one existing transaction suite.",
+        "worker_sized_reason": "Injection cases over one already-delivered transaction boundary.",
         "footprint": {
+          "creates": [
+            "crates/jit/tests/cli_repo_workflow/profile_recovery_tests.rs"
+          ],
           "touches": [
-            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs"
+            "crates/jit/tests/cli_repo_workflow/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lifecycle-concurrency-evidence",
+    "title": "Prove concurrent lifecycle callers serialize",
+    "description": "Show that two lifecycle operations issued against one repository at the same time\nserialize rather than interleave.\n\n## Background\n\nRepository mutation is guarded, and the lifecycle adds operations that plan against\na captured image before publishing. A second caller arriving between capture and\npublication is the case that has to be demonstrated rather than assumed. The suite\nis a module of the existing workflow target.\n\n## Success Criteria\n\n- [hard] REQ-01: Two lifecycle operations issued concurrently against one repository complete in some serial order, and neither observes a state the other left partially written.\n- [hard] REQ-02: A caller that loses the race either waits and proceeds against the updated state or fails with a message naming the contention, and never publishes a plan built on a stale capture.\n- [hard] REQ-03: The suite is a module of an existing integration-test target.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:testing",
+      "satisfies:REQ-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "publication-recovery-evidence"
+    ],
+    "planning": {
+      "outcome": "Concurrent lifecycle callers complete in a serial order without observing partial state.",
+      "contract_refs": [
+        "aggregate-plan"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "inv-build-budget"
+      ],
+      "terminal": {
+        "consumer_family": "concurrency suite",
+        "test_boundary": "concurrent mutation suite",
+        "worker_sized_reason": "Contention cases over one already-guarded mutation path.",
+        "footprint": {
+          "creates": [
+            "crates/jit/tests/cli_repo_workflow/profile_concurrency_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "git-free-lifecycle-evidence",
+    "title": "Prove the lifecycle runs without version control",
+    "description": "Show every lifecycle operation working in a repository that has no version-control\ndirectory.\n\n## Background\n\nCore commands must work without Git, with claims and leases the documented\nexception. The lifecycle adds operations that read package directories and publish\nrepository content, none of which needs version control, so the guarantee has to be\nextended to them by evidence. The suite is a module of the existing workflow target.\n\n## Success Criteria\n\n- [hard] REQ-01: Selection, resolution, application, reconfiguration, upgrade, capture, packing, adding, difference reporting, and the profile check each complete in a repository with no version-control directory.\n- [hard] REQ-02: No lifecycle operation reports a version-control error or silently degrades when version control is absent.\n- [hard] REQ-03: The suite is a module of an existing integration-test target.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:testing",
+      "satisfies:REQ-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "lifecycle-concurrency-evidence"
+    ],
+    "planning": {
+      "outcome": "Each lifecycle operation completes in a repository with no version-control directory.",
+      "contract_refs": [
+        "capture-tree",
+        "package-archive"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "inv-build-budget"
+      ],
+      "terminal": {
+        "consumer_family": "git-free suite",
+        "test_boundary": "version-control-absent suite",
+        "worker_sized_reason": "Environment cases over operations the prior work delivered.",
+        "footprint": {
+          "creates": [
+            "crates/jit/tests/cli_repo_workflow/profile_git_free_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/main.rs"
           ]
         }
       }
