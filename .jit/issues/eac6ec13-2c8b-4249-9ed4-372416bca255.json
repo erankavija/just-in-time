@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "f2ef652a-e192-4d37-ad7e-51be2b077fd6"
+  ],
+  "description": "Replace the single-profile argument with a repeatable ordered selector that names\neither a recorded profile id or a package directory in the worktree.\n\n## Background\n\nSelection is one id plus an optional separate location flag, so a caller cannot\nname several profiles, cannot interleave id and directory selections, and cannot\nexpress the order it wants them considered in.\n\n## Success Criteria\n\n- [hard] REQ-01: Selecting commands accept a repeatable selector naming either a profile id or a worktree-relative package directory, and the request preserves occurrence order exactly, including interleaved forms.\n- [hard] REQ-02: A directory selection that shadows the id of an embedded package is rejected by name rather than silently preferred.\n- [hard] REQ-03: The previous single-id argument and its separate location flag are gone from the command line, the generated schema, and the bridge tool inventory, with no alias retained.\n- [hard] REQ-04: Selection reads only the worktree; a package outside it, or under the data root, is refused with the existing confinement error.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "mcp-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:canonical-package-graph",
+    "component:cli",
+    "satisfies:REQ-01",
+    "satisfies:REQ-11"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Select profiles through repeatable ordered selectors",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "f2389b18-5ce3-4e55-ab22-c7807c2ab62c"
+  ],
+  "description": "Add the read-only report that answers what a selection would do to this\nrepository, so an adopter can inspect a decision before publishing it.\n\n## Background\n\nThe command family cannot answer what an operation would change. Once\nreconfiguration and upgrade exist, every mutation has a decision behind it that a\nreader needs to see before it is published.\n\n## Success Criteria\n\n- [hard] REQ-01: A difference report states, for each participating profile, the targets and identities that would update, conflict, be retained, or be removed, and writes nothing.\n- [hard] REQ-02: The report distinguishes a target no package owns from one a package owns, and names the owning packages for shared content.\n- [hard] REQ-03: The report is produced from the same decision the mutating path would publish, so a reported decision and the published outcome cannot disagree.\n- [hard] REQ-04: The report is available for a selection that is not yet applied, so an adopter can inspect a package before applying it.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "96268a98-ef75-487d-acab-22a813ff7803",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:surface-and-evidence",
+    "component:cli",
+    "satisfies:REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Report what an operation would change before it runs",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

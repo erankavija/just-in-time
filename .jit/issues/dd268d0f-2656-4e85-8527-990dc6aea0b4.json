@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3",
+    "8021d507-2f7b-4580-af2c-da242c831d75",
+    "b3d92595-a878-478c-825d-529b9a15572e"
+  ],
+  "description": "The completed lifecycle reaches adopters through one command surface, one\ncanonical reference, and evidence that the surface behaves as documented.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands the profile command surface, its audit event, the canonical adopter reference, behavioural acceptance coverage, and mechanical proof that no superseded lifecycle path survives.\n",
+  "documents": [],
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "dd268d0f-2656-4e85-8527-990dc6aea0b4",
+  "labels": [
+    "type:story",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:surface-and-evidence",
+    "component:cli",
+    "component:docs",
+    "component:testing"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Surface, documentation, and evidence",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

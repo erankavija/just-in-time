@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "474a90a8-7c96-47d7-b652-5b0eba589182"
+  ],
+  "description": "Let a package declare named non-secret variables, resolve them by a fixed\nprecedence, and substitute them into the content the package contributes.\n\n## Background\n\nA package is fully literal, so one workflow that differs only in a project name or\na path needs a forked package. Making that parametric requires a declaration, an\ninput channel, and one bounded substitution syntax that cannot become a general\ntemplate language or a secret channel.\n\n## Success Criteria\n\n- [hard] REQ-01: A package declares variables with a name, an optional default, and an optional environment-variable name, and an undeclared or duplicated declaration is rejected.\n- [hard] REQ-02: A value resolves from the declared default, then a supplied values file, then the declared environment variable, then a repeated command-line assignment, with each later source overriding the earlier.\n- [hard] REQ-03: One reference syntax substitutes resolved values into string values and into asset and region bodies that opt in; an identifier, a path, a mode, and a body that did not opt in reject a reference.\n- [hard] REQ-04: Resolution is deterministic, so the same declarations and the same supplied inputs yield identical content, and the resolved values are returned for a caller to persist.\n- [hard] REQ-05: No input is treated as sensitive: there is no secret flag, no redaction path, and no resolved value reaches the audit trail.\n- [hard] REQ-06: Package identity covers the unresolved package bytes only, so supplying different values does not change which package was applied.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:ownership-and-safe-change",
+    "component:cli",
+    "component:storage",
+    "satisfies:REQ-04",
+    "satisfies:REQ-11"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Resolve declared non-secret variables into package content",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

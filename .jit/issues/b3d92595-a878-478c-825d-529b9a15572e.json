@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "9f493686-82b8-40cd-889c-3821c1066c59",
+    "cb26de35-de6b-4297-983b-00aa8ef4c64f"
+  ],
+  "description": "Make the canonical profile reference describe the lifecycle that now ships, and\nkeep neighbouring pages citing it rather than restating it.\n\n## Background\n\nThe canonical reference currently states an apply-only boundary and lists the\ncapabilities this container delivers as explicitly absent. Several other pages\ndescribe obtaining and applying a package, so the facts have to move as one set.\n\n## Success Criteria\n\n- [hard] REQ-01: The canonical profile reference describes authoring, capture, exchange, composition, variables, ownership, drift, reconfiguration, and upgrade as current behavior, and the section declaring those capabilities absent is gone.\n- [hard] REQ-02: Pages that mention profiles link to the canonical reference instead of restating lifecycle facts, and volatile inventories are generated or cited rather than hand-copied.\n- [hard] REQ-03: Documentation states current behavior only, with no narration of what the surface used to do.\n- [hard] REQ-04: Every path and command named in the changed pages resolves, and the repository's citation check reports no missing target.\n",
+  "documents": [],
+  "gates_required": [
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "b3d92595-a878-478c-825d-529b9a15572e",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:surface-and-evidence",
+    "component:docs",
+    "satisfies:REQ-10"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Document the completed profile lifecycle for adopters",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

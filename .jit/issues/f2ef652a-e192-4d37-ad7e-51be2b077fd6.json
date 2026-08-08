@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "01bace3f-8197-42fa-b3e4-fe989491766d"
+  ],
+  "description": "Give the profile engine one strict decoder that turns either package manifest\nversion into the single canonical package model the rest of the lifecycle reads.\n\n## Background\n\nThe manifest type is read directly as the runtime model today, so a new manifest\nfield is also a new runtime field and the shipped package tree constrains every\nlater addition. The lifecycle needs manifest fields the shipped wire does not\ncarry, and the shipped package must keep decoding byte-for-byte unchanged.\n\n## Success Criteria\n\n- [hard] REQ-01: A version-dispatching decoder accepts the shipped manifest wire and a second wire that adds dependency requirements, incompatibilities, a compatible-jit range, and variable declarations, and returns one canonical package model for both.\n- [hard] REQ-02: An unknown field, an unknown manifest version, or a field absent from the wire it appears in is rejected with a message naming the offending field.\n- [hard] REQ-03: The shipped package tree decodes without edits, and its package identity hash is unchanged from the value the current implementation produces for the same bytes.\n- [hard] REQ-04: The manifest type is no longer the runtime model; every reader consumes the canonical model, and no second decoder or parallel package representation remains.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-08T23:11:26.421913953Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:canonical-package-graph",
+    "component:storage",
+    "satisfies:REQ-09"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Normalize both package manifest versions into one canonical model",
+  "updated_at": "2026-08-08T23:11:38.671053078Z"
+}

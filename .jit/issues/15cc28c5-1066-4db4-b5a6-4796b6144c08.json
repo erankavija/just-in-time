@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "6a479c58-77ed-4592-8140-9afde0118664"
+  ],
+  "description": "Give a package one portable file that carries its identity and digest, and one\noperation that verifies that file before placing the package in the worktree.\n\n## Background\n\nSharing a package means copying a directory, with nothing that states what was\ncopied or confirms it arrived intact. Package identity is already a content digest\nover the manifest and every file, and an archive dependency is already present, so\nthe exchange format can reuse both rather than introduce a second digest or a new\ncontainer library.\n\n## Success Criteria\n\n- [hard] REQ-01: Packing a package directory produces one archive file carrying the package id, its version, and the package identity digest, and packing the same package twice produces byte-identical output.\n- [hard] REQ-02: Adding an archive recomputes the package identity from the extracted content and refuses the archive when it disagrees with the digest the archive carries.\n- [hard] REQ-03: An archive entry with an absolute path, a parent-directory traversal, a symlink, or an unexpected mode is refused, and nothing is written outside the named destination.\n- [hard] REQ-04: A refused or interrupted add leaves no partially extracted package, and an occupied destination is never overwritten.\n- [hard] REQ-05: Packing and adding read and write local files only: no network access, no registry lookup, and no search of undeclared filesystem locations.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "mcp-ci",
+    "code-review",
+    "security-review"
+  ],
+  "gates_status": {},
+  "id": "15cc28c5-1066-4db4-b5a6-4796b6144c08",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:authoring-and-exchange",
+    "component:cli",
+    "component:storage",
+    "satisfies:REQ-14",
+    "satisfies:REQ-11"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Pack a package into a verifiable archive",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

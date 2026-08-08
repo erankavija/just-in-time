@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "15cc28c5-1066-4db4-b5a6-4796b6144c08"
+  ],
+  "description": "A configured repository becomes a package, and a package reaches another\nrepository as one verifiable file.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands capture from declared repository targets and an offline pack/add pair, so a package can be authored, refreshed, and handed to another repository without network access.\n",
+  "documents": [],
+  "gates_required": [
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0",
+  "labels": [
+    "type:story",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:authoring-and-exchange",
+    "component:cli",
+    "component:storage"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Package authoring and offline exchange",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

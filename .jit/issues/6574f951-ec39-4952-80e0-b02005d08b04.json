@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "9f493686-82b8-40cd-889c-3821c1066c59",
+    "cb26de35-de6b-4297-983b-00aa8ef4c64f"
+  ],
+  "description": "Inject failures into lifecycle publication and show the repository lands on one\ncomplete state.\n\n## Background\n\nThe lifecycle publishes through one recoverable transaction and claims\nall-or-nothing behavior with idempotent retry. Only injected failure demonstrates\nthat claim. The suite is a module of the existing workflow target, so the enforced\nintegration-target budget is unaffected.\n\n## Success Criteria\n\n- [hard] REQ-01: A failure injected at each publication stage leaves either the complete prior repository state or the complete new state across repository bytes, ownership records, and audit state.\n- [hard] REQ-02: Retrying an interrupted operation reaches the same result as an uninterrupted run.\n- [hard] REQ-03: Repeating a completed operation reports it as unchanged and writes nothing further.\n- [hard] REQ-04: The suite is a module of an existing integration-test target.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "6574f951-ec39-4952-80e0-b02005d08b04",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:surface-and-evidence",
+    "component:testing",
+    "satisfies:REQ-11"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Prove publication survives interruption",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

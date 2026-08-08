@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "9f493686-82b8-40cd-889c-3821c1066c59",
+    "cb26de35-de6b-4297-983b-00aa8ef4c64f"
+  ],
+  "description": "Add mechanical checks that fail if a second package reader, a compatibility shim,\nor a superseded lifecycle path reappears.\n\n## Background\n\nThe container forbids adapters, dual formats, fallback behavior, and duplicated\ninventories, and this repository already enforces one such absence with a\nstructural contract test. That mechanism is the way the constraint stays true\nafter the work lands.\n\n## Success Criteria\n\n- [hard] REQ-01: A structural check fails if a second package decoder, package model, or applied-record reader is present alongside the canonical one.\n- [hard] REQ-02: A structural check fails if the superseded single-profile selection argument, the per-package application entry point, or the prior application event constructor reappears.\n- [hard] REQ-03: A structural check fails if any input is described as secret or sensitive across the manifest, the command line, the generated schema, the bridge inventory, or the audit trail.\n- [hard] REQ-04: The checks name what they forbid and why, so a failure tells a reader which constraint was breached rather than only which symbol matched.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:surface-and-evidence",
+    "component:testing",
+    "satisfies:REQ-12"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Prove no superseded lifecycle path survives",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}

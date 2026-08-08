@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-08T23:11:26.421913953Z",
+  "dependencies": [
+    "9fad8581-0ce0-4f26-af9d-55425e2a5a9e"
+  ],
+  "description": "Compare the base a claim was published from, the current repository value, and the\nresolved candidate, so an applied profile can be changed, reconfigured, or\nupgraded instead of being frozen at its first application.\n\n## Background\n\nAn applied profile is effectively write-once: a record whose content differs is\nrejected outright, so a package edited after application cannot be applied again,\nand the repository is left reporting drift with no sanctioned way back. This is\nthe defect the container exists to remove.\n\n## Success Criteria\n\n- [hard] REQ-01: A target whose current value still matches its recorded base updates to the candidate value.\n- [hard] REQ-02: A target whose current value diverges from both its base and the candidate reports an actionable conflict naming the target, the owning package, and the three values, and publishes nothing.\n- [hard] REQ-03: Content owned by several profiles retains its surviving owners when one of them stops contributing it.\n- [hard] REQ-04: Content that is unchanged, solely owned, and not marked retained may be removed as part of replacing an installed version; content that is changed, shared, or retained is never removed.\n- [hard] REQ-05: Re-applying a package whose content changed succeeds and rewrites its record, and repository content no package owns survives that operation.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "44ec7192-f3bd-470a-bc6b-a20f6362230e",
+  "labels": [
+    "type:task",
+    "epic:jit-profiles-complete",
+    "milestone:v1.1",
+    "per:@/charter/D-8",
+    "story:ownership-and-safe-change",
+    "component:storage",
+    "satisfies:REQ-07"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Decide each target from base, current, and candidate",
+  "updated_at": "2026-08-08T23:11:26.421913953Z"
+}
