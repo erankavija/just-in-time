@@ -14,14 +14,14 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-07-18T09:28:56.152913306Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-08T23:20:56.795573478Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-07-18T09:28:56.143816530Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-08T23:13:08.528605806Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "01bace3f-8197-42fa-b3e4-fe989491766d",
@@ -37,5 +37,5 @@
   "priority": "high",
   "state": "ready",
   "title": "breakdown: Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-08T23:10:52.731953605Z"
+  "updated_at": "2026-08-08T23:20:56.795573478Z"
 }

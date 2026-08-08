@@ -25,7 +25,7 @@ recoverable publisher, and profile application already runs through them
 | REQ-04 | Variables are declared in the manifest, resolved by a fixed four-step precedence, and substituted through one bounded reference syntax that only opted-in bodies accept. Package identity stays over unresolved bytes. Resolution lands before composition, because composition compares *resolved* definitions; persisting the resolved values belongs to REQ-05. | No variable surface exists: `crates/jit/src/profile/manifest.rs:71-122`. |
 | REQ-05 | The record grows from package-level hashes to per-target and per-identity claims carrying the base each was published from, plus a retained marker for content no package owns. The shipped format is read once and converted in the same transaction. | Current five-field record: `crates/jit/src/repository_state/profile_apply.rs:304-343`. |
 | REQ-06 | Four separable pieces: a profile-scoped check reporting which recorded profile diverged; a read-only difference report; one presentation contract unifying envelopes, rehearsal mode, schema, and the bridge inventory once the subcommands exist; and one lifecycle event replacing the per-application record. | Three subcommands wired; `ProfileApplied` still emitted: `crates/jit/src/repository_state/mutation.rs:1170-1193`. |
-| REQ-07 | Every target decision compares recorded base, current value, and resolved candidate. Divergence conflicts with all three values named; shared content retains surviving owners; only unchanged, solely-owned, unretained content may be removed. | The write-once wall: `crates/jit/src/repository_state/initialize.rs:566-580`. |
+| REQ-07 | The decision function compares recorded base, current value, and resolved candidate; reconfiguration and upgrade reach the command line over it as a separate terminal, keeping the decision pure. Divergence conflicts with all three values named; shared content retains surviving owners; only unchanged, solely-owned, unretained content may be removed. | The write-once wall: `crates/jit/src/repository_state/initialize.rs:566-580`. |
 | REQ-08 | A selection is planned once over the whole applied closure and published through one recoverable transaction, replacing the per-package application calls. | Single-package path already transactional; multi-package is not: `crates/jit/src/commands/profile.rs:241-377`. |
 | REQ-09 | A version-dispatching decoder accepts both manifest wires with the shipped tree decoding unchanged and its identity hash frozen; the shipped record format is a private conversion input, never an ordinary reader. | Frozen hash domain: `crates/jit/src/profile/package.rs:18-19`, `:788-854`. |
 | REQ-10 | The canonical profile reference is rewritten to state the shipped lifecycle, and the section declaring these capabilities absent is deleted; neighbouring pages link rather than restate. | The absent-capability list is `docs/reference/profiles.md:249-267`. |
@@ -133,21 +133,22 @@ archive placements obey the same rule.
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
 | canonical-package-graph | Canonical package model, selection, and graph | story | One package model, one selection grammar, and one resolved graph back the lifecycle. | — | REQ-01, REQ-02, REQ-09 | — | — | package-graph-resolution |
-| ownership-and-safe-change | Ownership, records, and safe change | story | Ownership claims and three-way decisions make a change to an applied profile safe. | — | REQ-03, REQ-04, REQ-05, REQ-07, REQ-08, inv-write-once-trap | — | — | three-way-reconfigure-upgrade |
+| ownership-and-safe-change | Ownership, records, and safe change | story | Ownership claims and three-way decisions make a change to an applied profile safe. | — | REQ-03, REQ-04, REQ-05, REQ-07, REQ-08, inv-write-once-trap | — | — | reconfigure-and-upgrade-commands |
 | authoring-and-exchange | Package authoring and offline exchange | story | A repository becomes a package and a package travels to another repository. | — | REQ-13, REQ-14, d-08-capture, d-09-exchange | — | — | package-archive-exchange |
 | surface-and-evidence | Surface, documentation, and evidence | story | The lifecycle reaches adopters through one surface with documentation and evidence. | — | REQ-06, REQ-10, REQ-11, REQ-12 | — | — | profile-lifecycle-documentation, git-free-lifecycle-evidence, lifecycle-structural-absence |
 | versioned-package-decoder | Normalize both package manifest versions into one canonical model | task | One strict decoder turns either package manifest wire into the single canonical package model. | — | REQ-09, REQ-02, inv-record-v1-shape | creates 1, touches 3 | package-foundation | — |
 | ordered-profile-selection | Select profiles through repeatable ordered selectors | task | Selecting commands take repeatable ordered selectors naming a profile id or a package directory. | package-model, worktree-confinement | REQ-01, d-02-discovery, inv-worktree-confinement, REQ-11 | touches 6 | package-foundation | versioned-package-decoder |
-| package-graph-resolution | Resolve the selected package set against its declared graph | task | A selection resolves with its dependencies, incompatibilities, and compatible-jit ranges before publication. | package-model, profile-selector | REQ-02, inv-multi-package-separate-calls, REQ-11 | creates 1, touches 2 | package-foundation | ordered-profile-selection |
-| profile-variables | Resolve declared non-secret variables into package content | task | Declared variables resolve by fixed precedence and substitute through one bounded reference syntax. | package-model, package-graph | REQ-04, d-07-ssot, REQ-11 | creates 1, touches 3 | — | package-graph-resolution |
+| package-graph-resolution | Resolve the selected package set against its declared graph | task | A selection resolves with its dependencies, incompatibilities, and compatible-jit ranges before publication. | package-model, profile-selector | REQ-02, inv-multi-package-separate-calls, REQ-11 | creates 1, touches 3 | package-foundation | ordered-profile-selection |
+| profile-variables | Resolve declared non-secret variables into package content | task | Declared variables resolve by fixed precedence and substitute through one bounded reference syntax. | package-model, package-graph | REQ-04, d-07-ssot, REQ-11 | creates 1, touches 4 | — | package-graph-resolution |
 | semantic-contribution-ownership | Compose contributions by semantic identity with shared ownership | task | Equal contribution definitions share sorted owners while differing definitions conflict without an order winner. | package-graph, variable-model | REQ-03, inv-write-once-trap, REQ-11 | touches 2 | — | profile-variables |
 | applied-record-ownership-claims | Carry ownership claims in the applied profile record | task | The applied record states per-target ownership claims with base fingerprints and reads the shipped format as input. | ownership-composition | REQ-05, REQ-09, inv-record-v1-shape, d-07-ssot, REQ-11 | touches 4 | — | semantic-contribution-ownership |
 | aggregate-lifecycle-publication | Publish one selection through one recoverable transaction | task | A whole selection reaches the repository through one recoverable transaction over the applied closure. | applied-record, package-graph, materialization-transaction | REQ-08, inv-multi-package-separate-calls | touches 3 | — | applied-record-ownership-claims |
-| three-way-reconfigure-upgrade | Decide each target from base, current, and candidate | task | Reconfiguration and upgrade decide each target from its recorded base, current value, and resolved candidate. | applied-record, aggregate-plan, variable-model, ownership-composition | REQ-07, inv-write-once-trap, d-05-removal-deferred | creates 1, touches 2 | — | aggregate-lifecycle-publication |
-| package-capture | Capture a package tree from declared repository targets | task | Capture publishes a package tree from the repository targets a manifest declares. | package-model, worktree-confinement, materialization-transaction | REQ-13, d-08-capture, inv-capture-assembler, REQ-11 | touches 9 | authoring-surface | three-way-reconfigure-upgrade |
-| package-archive-exchange | Pack a package into a verifiable archive | task | A package packs into one digest-carrying archive that add verifies before placing it in the worktree. | package-model, worktree-confinement | REQ-14, d-09-exchange, inv-archive-deps, inv-worktree-confinement, REQ-11 | creates 1, touches 3 | authoring-surface | package-capture |
-| profile-state-validation | Check applied profiles against their packages and the repository | task | A profile-scoped check reports which recorded profile diverged from its package or its owned content. | applied-record, package-model | REQ-06, inv-write-once-trap | touches 3 | lifecycle-surface | package-archive-exchange |
-| profile-difference-report | Report what an operation would change before it runs | task | A read-only report states what a selection would change before anything is published. | three-way-decision, applied-record | REQ-06 | creates 1, touches 2 | lifecycle-surface | profile-state-validation |
+| three-way-reconfigure-upgrade | Decide each target from base, current, and candidate | task | Reconfiguration and upgrade decide each target from its recorded base, current value, and resolved candidate. | applied-record, aggregate-plan, variable-model, ownership-composition | REQ-07, inv-write-once-trap, d-05-removal-deferred | creates 1, touches 3 | — | aggregate-lifecycle-publication |
+| reconfigure-and-upgrade-commands | Expose reconfiguration and upgrade as commands | task | Reconfiguration and upgrade reach the command line over the three-way decision. | three-way-decision, aggregate-plan, variable-model | REQ-06, REQ-11, REQ-07 | touches 3 | lifecycle-surface | three-way-reconfigure-upgrade |
+| package-capture | Capture a package tree from declared repository targets | task | Capture publishes a package tree from the repository targets a manifest declares. | package-model, worktree-confinement, materialization-transaction | REQ-13, d-08-capture, inv-capture-assembler, REQ-11 | touches 10 | authoring-surface | reconfigure-and-upgrade-commands |
+| package-archive-exchange | Pack a package into a verifiable archive | task | A package packs into one digest-carrying archive that add verifies before placing it in the worktree. | package-model, worktree-confinement | REQ-14, d-09-exchange, inv-archive-deps, inv-worktree-confinement, REQ-11 | creates 1, touches 5 | authoring-surface | package-capture |
+| profile-state-validation | Check applied profiles against their packages and the repository | task | A profile-scoped check reports which recorded profile diverged from its package or its owned content. | applied-record, package-model | REQ-06, inv-write-once-trap | touches 4 | lifecycle-surface | package-archive-exchange |
+| profile-difference-report | Report what an operation would change before it runs | task | A read-only report states what a selection would change before anything is published. | three-way-decision, applied-record | REQ-06 | creates 1, touches 4 | lifecycle-surface | profile-state-validation |
 | profile-surface-contract | Give the profile subcommands one presentation contract | task | The profile subcommands present themselves through one envelope, rehearsal, and schema contract. | profile-selector, capture-tree, package-archive | REQ-06 | touches 5 | lifecycle-surface | profile-difference-report |
 | lifecycle-audit-events | Record one lifecycle event per changed mutation | task | A changed mutation appends one lifecycle event naming the operation, per-profile action, and variable sources. | aggregate-plan, variable-model, applied-record | REQ-06 | touches 5 | lifecycle-surface | aggregate-lifecycle-publication |
 | profile-lifecycle-documentation | Document the completed profile lifecycle for adopters | task | The canonical profile reference states the lifecycle that now ships and neighbouring pages cite it. | capture-tree, package-archive, three-way-decision | REQ-10, d-02-discovery | touches 8 | — | profile-surface-contract, lifecycle-audit-events |
@@ -170,23 +171,24 @@ flowchart LR
     N9["applied-record-ownership-claims: Carry ownership claims in the applied profile record"]
     N10["aggregate-lifecycle-publication: Publish one selection through one recoverable transaction"]
     N11["three-way-reconfigure-upgrade: Decide each target from base, current, and candidate"]
-    N12["package-capture: Capture a package tree from declared repository targets"]
-    N13["package-archive-exchange: Pack a package into a verifiable archive"]
-    N14["profile-state-validation: Check applied profiles against their packages and the repository"]
-    N15["profile-difference-report: Report what an operation would change before it runs"]
-    N16["profile-surface-contract: Give the profile subcommands one presentation contract"]
-    N17["lifecycle-audit-events: Record one lifecycle event per changed mutation"]
-    N18["profile-lifecycle-documentation: Document the completed profile lifecycle for adopters"]
-    N19["publication-recovery-evidence: Prove publication survives interruption"]
-    N20["lifecycle-concurrency-evidence: Prove concurrent lifecycle callers serialize"]
-    N21["git-free-lifecycle-evidence: Prove the lifecycle runs without version control"]
-    N22["lifecycle-structural-absence: Prove no superseded lifecycle path survives"]
+    N12["reconfigure-and-upgrade-commands: Expose reconfiguration and upgrade as commands"]
+    N13["package-capture: Capture a package tree from declared repository targets"]
+    N14["package-archive-exchange: Pack a package into a verifiable archive"]
+    N15["profile-state-validation: Check applied profiles against their packages and the repository"]
+    N16["profile-difference-report: Report what an operation would change before it runs"]
+    N17["profile-surface-contract: Give the profile subcommands one presentation contract"]
+    N18["lifecycle-audit-events: Record one lifecycle event per changed mutation"]
+    N19["profile-lifecycle-documentation: Document the completed profile lifecycle for adopters"]
+    N20["publication-recovery-evidence: Prove publication survives interruption"]
+    N21["lifecycle-concurrency-evidence: Prove concurrent lifecycle callers serialize"]
+    N22["git-free-lifecycle-evidence: Prove the lifecycle runs without version control"]
+    N23["lifecycle-structural-absence: Prove no superseded lifecycle path survives"]
     N6 --> N0
-    N11 --> N1
-    N13 --> N2
-    N18 --> N3
-    N21 --> N3
+    N12 --> N1
+    N14 --> N2
+    N19 --> N3
     N22 --> N3
+    N23 --> N3
     N4 --> N5
     N5 --> N6
     N6 --> N7
@@ -199,15 +201,16 @@ flowchart LR
     N13 --> N14
     N14 --> N15
     N15 --> N16
-    N10 --> N17
-    N16 --> N18
-    N17 --> N18
-    N16 --> N19
+    N16 --> N17
+    N10 --> N18
     N17 --> N19
-    N19 --> N20
+    N18 --> N19
+    N17 --> N20
+    N18 --> N20
     N20 --> N21
-    N16 --> N22
-    N17 --> N22
+    N21 --> N22
+    N17 --> N23
+    N18 --> N23
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -223,7 +226,7 @@ flowchart LR
 | Test topology has almost no headroom | The enforced budget is 12 integration-test targets and the tree is at 11 (`scripts/rust-build-budget.sh:31-37`). Evidence lands in existing suites and its criteria require the budget to keep passing. |
 | Ownership records become a shadow configuration database | Records state contribution identity, base fingerprints, and observed owners only; effective behavior keeps loading the declared registries (D-04). |
 | Variables are mistaken for a secret channel | Every value is declared non-secret and persistable (D-06). A structural check fails if any surface describes an input as secret or sensitive. |
-| Nineteen terminals risk a stranded intermediate state | Each terminal replaces its predecessor in the same change (D-07), and this is a greenfield project with no compatibility obligation, so an intermediate landing may break callers as long as it is green. No terminal introduces a path another terminal is expected to clean up. |
+| Twenty terminals risk a stranded intermediate state | Each terminal replaces its predecessor in the same change (D-07), and this is a greenfield project with no compatibility obligation, so an intermediate landing may break callers as long as it is green. No terminal introduces a path another terminal is expected to clean up. |
 | The command layer is one file every capability edits | `crates/jit/src/cli.rs` and `crates/jit/src/commands/profile.rs` are touched by nearly every capability, so footprint partition is not available there. The graph resolves it by ordering instead: the capability terminals form one serial track, and no two terminals that share a path are unordered with respect to each other. Parallelism lives in the tail, where documentation, structural checks, and the evidence chain have disjoint footprints. |
 | A capability lands before the surface that presents it | The presentation contract runs after the difference report, capture, and exchange exist, so it standardizes subcommands that are already there rather than reserving shapes for them. Each capability still wires its own subcommand when it lands. |
 | General profile removal | Deferred beyond this container (D-05). Upgrade-time deletion stays the narrow three-way action. |

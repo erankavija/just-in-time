@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d84e6f55680ca534e7d2678c104e7b7ce4170136",
+  "completed_at": "2026-08-08T23:20:56.457921942Z",
+  "duration_ms": 463065,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F1",
+        "line": 493,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c639cfb5/requirement/REQ-06",
+          "@/issue/c639cfb5/requirement/REQ-11"
+        ],
+        "severity": "high",
+        "summary": "No manifest entry delivers the required jit profile upgrade command before the presentation-contract task."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json",
+        "id": "F2",
+        "line": 276,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/architecture-dependency-direction",
+          "@/inv/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "Seven terminal footprints omit mandatory Rust module-registration or CLI-dispatch files."
+      }
+    ],
+    "summary": "The breakdown omits explicit upgrade-command work and understates mandatory implementation footprints for seven terminal issues.",
+    "verdict": "fail"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "01bace3f-8197-42fa-b3e4-fe989491766d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bcadefd4-6517-422f-af79-97c2c07c25e9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-08T23:13:13.392151938Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14179 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-sol\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe3a6-e57b-7e72-9c51-08b9ceca9c36\n--------\nuser\n--- 14166 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Authoritative manifest: `dev/active/c639cfb5-jit-profiles-complete/breakdown.json`.\n\nMechanical checks passed: manifest validation reported zero warnings or overrides; renderer `--check` passed; native dry-run validated 23 issues and 27 intra-manifest edges; `jit validate` exited successfully. Stored records match all 23 manifest entries exactly, `planning` is absent from storage and batch export, source/sink bracket wiring is exact, contract producers are uniquely reachable, and cumulative `run_history` is empty.\n\nAssignment simulation (`Y` = pass, `N` = fail):\n\n| Key | One outcome | Bounded consumer | Observable test | Footprint credible | One cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---:|---:|---:|---:|---:|---:|---:|---|\n| versioned-package-decoder | Y | Y | Y | Y | Y | Y | Y | PASS |\n| ordered-profile-selection | Y | Y | Y | Y | Y | Y | Y | PASS |\n| package-graph-resolution | Y | Y | Y | N | Y | Y | Y | FAIL |\n| profile-variables | Y | Y | Y | N | Y | Y | Y | FAIL |\n| semantic-contribution-ownership | Y | Y | Y | Y | Y | Y | Y | PASS |\n| applied-record-ownership-claims | Y | Y | Y | Y | Y | Y | Y | PASS |\n| aggregate-lifecycle-publication | Y | Y | Y | Y | Y | Y | Y | PASS |\n| three-way-reconfigure-upgrade | Y | Y | Y | N | Y | Y | Y | FAIL |\n| package-capture | Y | Y | Y | N | Y | Y | Y | FAIL |\n| package-archive-exchange | Y | Y | Y | N | Y | Y | Y | FAIL |\n| profile-state-validation | Y | Y | Y | N | Y | Y | Y | FAIL |\n| profile-difference-report | Y | Y | Y | N | Y | Y | Y | FAIL |\n| profile-surface-contract | Y | Y | Y | Y | Y | Y | Y | PASS |\n| lifecycle-audit-events | Y | Y | Y | Y | Y | Y | Y | PASS |\n| profile-lifecycle-documentation | Y | Y | Y | Y | Y | Y | Y | PASS |\n| publication-recovery-evidence | Y | Y | Y | Y | Y | Y | Y | PASS |\n| lifecycle-concurrency-evidence | Y | Y | Y | Y | Y | Y | Y | PASS |\n| git-free-lifecycle-evidence | Y | Y | Y | Y | Y | Y | Y | PASS |\n| lifecycle-structural-absence | Y | Y | Y | Y | Y | Y | Y | PASS |\n\n1. The graph has no implementation entry that creates the required `jit profile upgrade` command. `three-way-reconfigure-upgrade` delivers a pure decision function and does not touch CLI dispatch, while `profile-surface-contract` explicitly runs only after subcommands already exist. Correct the manifest by adding a worker-sized `profile-change-commands` task depending on `three-way-reconfigure-upgrade`, consuming `three-way-decision` and covering explicit reapply/reconfigure and `upgrade` command wiring and tests. Rewire `ownership-and-safe-change` to depend on this new task instead of directly on `three-way-reconfigure-upgrade`, and add it as a dependency of `profile-surface-contract`. Create the corresponding stored issue, record its key→UUID mapping, add those two edges, regenerate the plan overview, and rerun validation and breakdown review.\n\n2. Seven terminal footprints omit files that their declared outcomes necessarily modify, making the implementation estimates non-credible. Add `crates/jit/src/profile/mod.rs` to `package-graph-resolution`, `profile-variables`, `three-way-reconfigure-upgrade`, and `profile-difference-report`; add `crates/jit/src/storage/mod.rs` to `package-archive-exchange`; and add `crates/jit/src/main.rs` to `profile-variables`, `package-capture`, `package-archive-exchange`, `profile-state-validation`, and `profile-difference-report`. These are required Rust module registrations or exhaustive CLI dispatch sites. Regenerate the overview and revalidate; no existing stored issue fields or edges need reconciliation for this planning-metadata-only correction.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The breakdown omits explicit upgrade-command work and understates mandatory implementation footprints for seven terminal issues.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No manifest entry delivers the required jit profile upgrade command before the presentation-contract task.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":493,\"references\":[\"@/issue/c639cfb5/requirement/REQ-06\",\"@/issue/c639cfb5/requirement/REQ-11\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Seven terminal footprints omit mandatory Rust module-registration or CLI-dispatch files.\",\"file\":\"dev/active/c639cfb5-jit-profiles-complete/breakdown.json\",\"line\":276,\"references\":[\"@/inv/architecture-dependency-direction\",\"@/inv/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

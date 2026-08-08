@@ -47,7 +47,7 @@
       "repo-validate"
     ],
     "depends_on": [
-      "three-way-reconfigure-upgrade"
+      "reconfigure-and-upgrade-commands"
     ],
     "planning": {
       "outcome": "Ownership claims and three-way decisions make a change to an applied profile safe.",
@@ -278,7 +278,8 @@
           ],
           "touches": [
             "crates/jit/src/profile/package.rs",
-            "crates/jit/src/commands/profile.rs"
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/profile/mod.rs"
           ]
         }
       }
@@ -332,7 +333,8 @@
           "touches": [
             "crates/jit/src/profile/wire.rs",
             "crates/jit/src/cli.rs",
-            "crates/jit/src/commands/profile.rs"
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/profile/mod.rs"
           ]
         }
       }
@@ -536,7 +538,58 @@
           ],
           "touches": [
             "crates/jit/src/commands/profile.rs",
-            "crates/jit/src/repository_state/profile_apply.rs"
+            "crates/jit/src/repository_state/profile_apply.rs",
+            "crates/jit/src/profile/mod.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "reconfigure-and-upgrade-commands",
+    "title": "Expose reconfiguration and upgrade as commands",
+    "description": "Put the three-way decision behind the two commands an adopter runs when an\napplied profile has to change: reconfigure it with new inputs, or move it to a\nnew package version.\n\n## Background\n\nThe decision that compares recorded base, current value, and resolved candidate\nis domain logic with no way to invoke it. Reconfiguration replays an applied\nprofile with different supplied values; upgrade replaces the installed version\nwith a newer package. Both publish through the aggregate transaction, and both\nneed a rehearsal that shows the decision without writing.\n\n## Success Criteria\n\n- [hard] REQ-01: Reconfiguring an applied profile with changed supplied values republishes the content those values affect and leaves every other owned target untouched.\n- [hard] REQ-02: Upgrading a profile to a newer package version applies the three-way decision to each owned target, and refuses when the new version would break a range or an incompatibility that a surviving applied profile depends on.\n- [hard] REQ-03: Each command reports a conflict rather than overwriting divergent content, and exits non-zero when it publishes nothing because of one.\n- [hard] REQ-04: Each command supports a rehearsal that reports the decisions it would publish and writes nothing.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:cli",
+      "satisfies:REQ-06",
+      "satisfies:REQ-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "mcp-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "three-way-reconfigure-upgrade"
+    ],
+    "planning": {
+      "outcome": "Reconfiguration and upgrade reach the command line over the three-way decision.",
+      "contract_refs": [
+        "three-way-decision",
+        "aggregate-plan",
+        "variable-model"
+      ],
+      "source_refs": [
+        "REQ-06",
+        "REQ-11",
+        "REQ-07"
+      ],
+      "landing_group": "lifecycle-surface",
+      "terminal": {
+        "consumer_family": "profile change commands",
+        "test_boundary": "lifecycle change CLI tests",
+        "worker_sized_reason": "Two commands over one decision function already delivered.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/src/commands/profile.rs"
           ]
         }
       }
@@ -564,7 +617,7 @@
       "code-review"
     ],
     "depends_on": [
-      "three-way-reconfigure-upgrade"
+      "reconfigure-and-upgrade-commands"
     ],
     "planning": {
       "outcome": "Capture publishes a package tree from the repository targets a manifest declares.",
@@ -597,7 +650,8 @@
             "crates/jit/src/cli.rs",
             "crates/jit/src/commands/profile.rs",
             "crates/jit/examples/assemble-package.rs",
-            "scripts/assemble-package.sh"
+            "scripts/assemble-package.sh",
+            "crates/jit/src/main.rs"
           ]
         }
       }
@@ -656,7 +710,9 @@
           "touches": [
             "crates/jit/src/cli.rs",
             "crates/jit/src/commands/profile.rs",
-            "crates/jit/src/profile/package.rs"
+            "crates/jit/src/profile/package.rs",
+            "crates/jit/src/storage/mod.rs",
+            "crates/jit/src/main.rs"
           ]
         }
       }
@@ -703,7 +759,8 @@
           "touches": [
             "crates/jit/src/commands/profile.rs",
             "crates/jit/src/cli.rs",
-            "crates/jit/src/commands/validate.rs"
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/main.rs"
           ]
         }
       }
@@ -750,7 +807,9 @@
           ],
           "touches": [
             "crates/jit/src/commands/profile.rs",
-            "crates/jit/src/cli.rs"
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/profile/mod.rs",
+            "crates/jit/src/main.rs"
           ]
         }
       }
