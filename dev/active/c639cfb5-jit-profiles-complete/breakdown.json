@@ -1,0 +1,899 @@
+[
+  {
+    "key": "canonical-package-graph",
+    "title": "Canonical package model, selection, and graph",
+    "description": "One package model, one selection grammar, and one resolved package graph carry\nevery later lifecycle capability.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands one canonical package model, one repeatable ordered selection grammar, and one resolved package graph, with no second reader or resolver surviving.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:canonical-package-graph",
+      "component:cli",
+      "component:storage"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "package-graph-resolution"
+    ],
+    "planning": {
+      "outcome": "One package model, one selection grammar, and one resolved graph back the lifecycle.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-01",
+        "REQ-02",
+        "REQ-09"
+      ]
+    }
+  },
+  {
+    "key": "ownership-and-safe-change",
+    "title": "Ownership, records, and safe change",
+    "description": "Ownership claims, variable resolution, and three-way decisions together make a\nchange to an already-applied profile safe instead of impossible.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands per-target ownership claims, one aggregate publication, resolved variables, and three-way reconfiguration and upgrade, so an applied profile can change without stranding the repository.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:storage",
+      "component:cli"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "three-way-reconfigure-upgrade"
+    ],
+    "planning": {
+      "outcome": "Ownership claims and three-way decisions make a change to an applied profile safe.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-03",
+        "REQ-04",
+        "REQ-05",
+        "REQ-07",
+        "REQ-08",
+        "inv-write-once-trap"
+      ]
+    }
+  },
+  {
+    "key": "authoring-and-exchange",
+    "title": "Package authoring and offline exchange",
+    "description": "A configured repository becomes a package, and a package reaches another\nrepository as one verifiable file.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands capture from declared repository targets and an offline pack/add pair, so a package can be authored, refreshed, and handed to another repository without network access.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:authoring-and-exchange",
+      "component:cli",
+      "component:storage"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "package-capture",
+      "package-archive-exchange"
+    ],
+    "planning": {
+      "outcome": "A repository becomes a package and a package travels to another repository.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-13",
+        "REQ-14",
+        "d-08-capture",
+        "d-09-exchange"
+      ]
+    }
+  },
+  {
+    "key": "surface-and-evidence",
+    "title": "Surface, documentation, and evidence",
+    "description": "The completed lifecycle reaches adopters through one command surface, one\ncanonical reference, and evidence that the surface behaves as documented.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands the profile command surface, its audit event, the canonical adopter reference, behavioural acceptance coverage, and mechanical proof that no superseded lifecycle path survives.\n",
+    "type": "story",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:cli",
+      "component:docs",
+      "component:testing"
+    ],
+    "gates": [
+      "repo-validate"
+    ],
+    "depends_on": [
+      "profile-lifecycle-documentation",
+      "lifecycle-behavior-evidence",
+      "lifecycle-structural-absence"
+    ],
+    "planning": {
+      "outcome": "The lifecycle reaches adopters through one surface with documentation and evidence.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-06",
+        "REQ-10",
+        "REQ-11",
+        "REQ-12"
+      ]
+    }
+  },
+  {
+    "key": "versioned-package-decoder",
+    "title": "Normalize both package manifest versions into one canonical model",
+    "description": "Give the profile engine one strict decoder that turns either package manifest\nversion into the single canonical package model the rest of the lifecycle reads.\n\n## Background\n\nThe manifest type is read directly as the runtime model today, so a new manifest\nfield is also a new runtime field and the shipped package tree constrains every\nlater addition. The lifecycle needs manifest fields the shipped wire does not\ncarry, and the shipped package must keep decoding byte-for-byte unchanged.\n\n## Success Criteria\n\n- [hard] REQ-01: A version-dispatching decoder accepts the shipped manifest wire and a second wire that adds dependency requirements, incompatibilities, a compatible-jit range, and variable declarations, and returns one canonical package model for both.\n- [hard] REQ-02: An unknown field, an unknown manifest version, or a field absent from the wire it appears in is rejected with a message naming the offending field.\n- [hard] REQ-03: The shipped package tree decodes without edits, and its package identity hash is unchanged from the value the current implementation produces for the same bytes.\n- [hard] REQ-04: The manifest type is no longer the runtime model; every reader consumes the canonical model, and no second decoder or parallel package representation remains.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:canonical-package-graph",
+      "component:storage",
+      "satisfies:REQ-09"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "One strict decoder turns either package manifest wire into the single canonical package model.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-09",
+        "REQ-02",
+        "inv-record-v1-shape"
+      ],
+      "produces_contracts": [
+        "package-model"
+      ],
+      "landing_group": "package-foundation",
+      "terminal": {
+        "consumer_family": "package readers",
+        "test_boundary": "decoder unit tests",
+        "worker_sized_reason": "One decoder module with a frozen hash contract and colocated unit coverage.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/profile/wire.rs"
+          ],
+          "touches": [
+            "crates/jit/src/profile/manifest.rs",
+            "crates/jit/src/profile/package.rs",
+            "crates/jit/src/profile/mod.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "ordered-profile-selection",
+    "title": "Select profiles through repeatable ordered selectors",
+    "description": "Replace the single-profile argument with a repeatable ordered selector that names\neither a recorded profile id or a package directory in the worktree.\n\n## Background\n\nSelection is one id plus an optional separate location flag, so a caller cannot\nname several profiles, cannot interleave id and directory selections, and cannot\nexpress the order it wants them considered in.\n\n## Success Criteria\n\n- [hard] REQ-01: Selecting commands accept a repeatable selector naming either a profile id or a worktree-relative package directory, and the request preserves occurrence order exactly, including interleaved forms.\n- [hard] REQ-02: A directory selection that shadows the id of an embedded package is rejected by name rather than silently preferred.\n- [hard] REQ-03: The previous single-id argument and its separate location flag are gone from the command line, the generated schema, and the bridge tool inventory, with no alias retained.\n- [hard] REQ-04: Selection reads only the worktree; a package outside it, or under the data root, is refused with the existing confinement error.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:canonical-package-graph",
+      "component:cli",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "mcp-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "versioned-package-decoder"
+    ],
+    "planning": {
+      "outcome": "Selecting commands take repeatable ordered selectors naming a profile id or a package directory.",
+      "contract_refs": [
+        "package-model",
+        "worktree-confinement"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "d-02-discovery",
+        "inv-worktree-confinement"
+      ],
+      "produces_contracts": [
+        "profile-selector"
+      ],
+      "landing_group": "package-foundation",
+      "terminal": {
+        "consumer_family": "profile selecting commands",
+        "test_boundary": "CLI selection contract tests",
+        "worker_sized_reason": "One argument grammar threaded through existing request types with contract tests.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/commands/init.rs",
+            "crates/jit/src/schema.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "package-graph-resolution",
+    "title": "Resolve the selected package set against its declared graph",
+    "description": "Resolve a selection together with the profiles already applied, so declared\ndependencies, incompatibilities, and version ranges are settled before anything\nis written.\n\n## Background\n\nDependency closures resolve today, but nothing expresses that two packages must\nnot coexist, nothing constrains which engine versions a package supports, and the\nresolution does not consider profiles that are already applied but unselected.\n\n## Success Criteria\n\n- [hard] REQ-01: Resolution evaluates the selected packages together with every already-applied profile, so an unselected applied profile participates in dependency, incompatibility, and range decisions.\n- [hard] REQ-02: A missing dependency, a dependency cycle, a declared incompatibility between two participating packages, and a compatible-jit range the running engine falls outside of each fail before publication with a message naming the packages involved.\n- [hard] REQ-03: An unsafe relative path, a symlinked package source, and an executable asset the manifest did not declare executable each fail at read time.\n- [hard] REQ-04: Resolution is deterministic: the same selection and applied set produce the same resolved graph regardless of selector order.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:canonical-package-graph",
+      "component:storage",
+      "satisfies:REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "ordered-profile-selection"
+    ],
+    "planning": {
+      "outcome": "A selection resolves with its dependencies, incompatibilities, and compatible-jit ranges before publication.",
+      "contract_refs": [
+        "package-model",
+        "profile-selector"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "inv-multi-package-separate-calls"
+      ],
+      "produces_contracts": [
+        "package-graph"
+      ],
+      "landing_group": "package-foundation",
+      "terminal": {
+        "consumer_family": "package resolution callers",
+        "test_boundary": "graph resolution unit tests",
+        "worker_sized_reason": "One pure resolver over an existing closure walk with property coverage.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/profile/graph.rs"
+          ],
+          "touches": [
+            "crates/jit/src/profile/package.rs",
+            "crates/jit/src/commands/profile.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "semantic-contribution-ownership",
+    "title": "Compose contributions by semantic identity with shared ownership",
+    "description": "Decide contribution conflicts by comparing resolved definitions and recording who\nowns each one, so two packages contributing the same definition coexist and a\npackage no longer collides with itself.\n\n## Background\n\nMerging compares a candidate contribution against the live registry value and\nfails whenever they differ, and occupancy is resolved per file from the applied\nrecords without excluding the candidate package. A package that changed one\ncontribution therefore reports a conflict against its own prior record.\n\n## Success Criteria\n\n- [hard] REQ-01: Two packages contributing a structurally equal resolved definition compose successfully and the result records both as owners in a stable order.\n- [hard] REQ-02: Two packages contributing different definitions for one identity conflict, and selector order does not decide a winner.\n- [hard] REQ-03: Ownership is resolved per contribution identity rather than per file, and a package re-contributing an identity it already owns is not reported as conflicting with itself.\n- [hard] REQ-04: A conflict names the contributing packages and the semantic identity, and distinguishes a package-owned identity from one the repository owns with no package behind it.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:storage",
+      "satisfies:REQ-03"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "package-graph-resolution"
+    ],
+    "planning": {
+      "outcome": "Equal contribution definitions share sorted owners while differing definitions conflict without an order winner.",
+      "contract_refs": [
+        "package-graph"
+      ],
+      "source_refs": [
+        "REQ-03",
+        "inv-write-once-trap"
+      ],
+      "produces_contracts": [
+        "ownership-composition"
+      ],
+      "terminal": {
+        "consumer_family": "contribution composers",
+        "test_boundary": "composition unit tests",
+        "worker_sized_reason": "One merge function replaced in place with table-driven conflict coverage.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/repository_state/profile_apply.rs",
+            "crates/jit/src/profile/apply_claims.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "applied-record-ownership-claims",
+    "title": "Carry ownership claims in the applied profile record",
+    "description": "Extend the applied profile record from package-level hashes to per-target and\nper-identity ownership claims with the base each claim was published from.\n\n## Background\n\nThe record states a package hash and a flat map of target hashes. Nothing records\nwhich contribution identity a package owns, what the content looked like when the\npackage published it, or that a target is repository-owned and must survive. A\nthree-way decision has no base to compare against without that.\n\n## Success Criteria\n\n- [hard] REQ-01: The record states origin, profile version, compatible-jit range, package identity, resolved non-secret inputs, and sorted per-target and per-identity ownership claims, each carrying the base fingerprint it was published from.\n- [hard] REQ-02: A claim can mark content as retained when no package owns it, so repository content that no package contributed survives a later application.\n- [hard] REQ-03: A record in the shipped format is read once, converted into the current format, and written back in the same transaction as the operation that encountered it; ordinary reads accept only the current format.\n- [hard] REQ-04: Records remain provenance: no configured behavior is served from a record, and effective configuration continues to load from the declared registries.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:storage",
+      "satisfies:REQ-05",
+      "satisfies:REQ-09"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "semantic-contribution-ownership"
+    ],
+    "planning": {
+      "outcome": "The applied record states per-target ownership claims with base fingerprints and reads the shipped format as input.",
+      "contract_refs": [
+        "ownership-composition"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "REQ-09",
+        "inv-record-v1-shape",
+        "d-07-ssot"
+      ],
+      "produces_contracts": [
+        "applied-record"
+      ],
+      "terminal": {
+        "consumer_family": "applied record readers",
+        "test_boundary": "record conversion unit tests",
+        "worker_sized_reason": "One record type plus a private conversion path with round-trip coverage.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/repository_state/profile_apply.rs",
+            "crates/jit/src/repository_state/initialize.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/commands/validate.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "aggregate-lifecycle-publication",
+    "title": "Publish one selection through one recoverable transaction",
+    "description": "Plan a whole selection once and publish it through a single recoverable\ntransaction, replacing the per-package application calls.\n\n## Background\n\nApplication already derives a shared plan and submits it through the shared\nmutation session, but a selection naming several packages runs that path once per\npackage. A failure part-way therefore leaves some packages applied and others not.\n\n## Success Criteria\n\n- [hard] REQ-01: A selection naming several packages produces one plan over the whole applied closure and publishes it through one recoverable transaction.\n- [hard] REQ-02: A failure at any point leaves either the complete prior repository state or the complete new state, including repository bytes, records, and audit state.\n- [hard] REQ-03: Repeating an operation whose result is already present changes nothing and reports the selection as unchanged.\n- [hard] REQ-04: The per-package application entry point is gone, and no caller reaches publication except through the aggregate path.\n- [hard] REQ-05: Every operation works in a repository with no Git directory.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:storage",
+      "satisfies:REQ-08"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "applied-record-ownership-claims"
+    ],
+    "planning": {
+      "outcome": "A whole selection reaches the repository through one recoverable transaction over the applied closure.",
+      "contract_refs": [
+        "applied-record",
+        "package-graph",
+        "materialization-transaction"
+      ],
+      "source_refs": [
+        "REQ-08",
+        "inv-multi-package-separate-calls"
+      ],
+      "produces_contracts": [
+        "aggregate-plan"
+      ],
+      "terminal": {
+        "consumer_family": "profile mutation commands",
+        "test_boundary": "transaction integration tests",
+        "worker_sized_reason": "One orchestration path collapsed onto the existing session with failure injection.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/repository_state/profile_apply.rs",
+            "crates/jit/src/storage/repository_state_store.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-variables",
+    "title": "Resolve declared non-secret variables into package content",
+    "description": "Let a package declare named non-secret variables, resolve them by a fixed\nprecedence, and substitute them into the content the package contributes.\n\n## Background\n\nA package is fully literal, so one workflow that differs only in a project name or\na path needs a forked package. Making that parametric requires a declaration, an\ninput channel, and one bounded substitution syntax that cannot become a general\ntemplate language or a secret channel.\n\n## Success Criteria\n\n- [hard] REQ-01: A package declares variables with a name, an optional default, and an optional environment-variable name, and an undeclared or duplicated declaration is rejected.\n- [hard] REQ-02: A value resolves from the declared default, then a supplied values file, then the declared environment variable, then a repeated command-line assignment, with each later source overriding the earlier.\n- [hard] REQ-03: One reference syntax substitutes resolved values into string values and into asset and region bodies that opt in; an identifier, a path, a mode, and a body that did not opt in reject a reference.\n- [hard] REQ-04: Resolved values are recorded so a later operation reproduces the same content, and no input is treated as sensitive: there is no secret flag, no redaction path, and no resolved value in the audit trail.\n- [hard] REQ-05: Package identity covers the unresolved package bytes only, so supplying different values does not change which package was applied.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:cli",
+      "component:storage",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "applied-record-ownership-claims"
+    ],
+    "planning": {
+      "outcome": "Declared variables resolve by fixed precedence and substitute through one bounded reference syntax.",
+      "contract_refs": [
+        "applied-record",
+        "package-model"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "d-07-ssot"
+      ],
+      "produces_contracts": [
+        "variable-model"
+      ],
+      "terminal": {
+        "consumer_family": "variable consumers",
+        "test_boundary": "variable precedence unit tests",
+        "worker_sized_reason": "One resolver plus one substitution pass with precedence table coverage.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/profile/variables.rs"
+          ],
+          "touches": [
+            "crates/jit/src/profile/wire.rs",
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/commands/profile.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "three-way-reconfigure-upgrade",
+    "title": "Decide each target from base, current, and candidate",
+    "description": "Compare the base a claim was published from, the current repository value, and the\nresolved candidate, so an applied profile can be changed, reconfigured, or\nupgraded instead of being frozen at its first application.\n\n## Background\n\nAn applied profile is effectively write-once: a record whose content differs is\nrejected outright, so a package edited after application cannot be applied again,\nand the repository is left reporting drift with no sanctioned way back. This is\nthe defect the container exists to remove.\n\n## Success Criteria\n\n- [hard] REQ-01: A target whose current value still matches its recorded base updates to the candidate value.\n- [hard] REQ-02: A target whose current value diverges from both its base and the candidate reports an actionable conflict naming the target, the owning package, and the three values, and publishes nothing.\n- [hard] REQ-03: Content owned by several profiles retains its surviving owners when one of them stops contributing it.\n- [hard] REQ-04: Content that is unchanged, solely owned, and not marked retained may be removed as part of replacing an installed version; content that is changed, shared, or retained is never removed.\n- [hard] REQ-05: Re-applying a package whose content changed succeeds and rewrites its record, and repository content no package owns survives that operation.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:ownership-and-safe-change",
+      "component:storage",
+      "satisfies:REQ-07"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "aggregate-lifecycle-publication",
+      "profile-variables"
+    ],
+    "planning": {
+      "outcome": "Reconfiguration and upgrade decide each target from its recorded base, current value, and resolved candidate.",
+      "contract_refs": [
+        "applied-record",
+        "aggregate-plan",
+        "variable-model",
+        "ownership-composition"
+      ],
+      "source_refs": [
+        "REQ-07",
+        "inv-write-once-trap",
+        "d-05-removal-deferred"
+      ],
+      "produces_contracts": [
+        "three-way-decision"
+      ],
+      "terminal": {
+        "consumer_family": "profile change planners",
+        "test_boundary": "three-way decision unit tests",
+        "worker_sized_reason": "One pure decision function with an exhaustive base-current-candidate table.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/profile/three_way.rs"
+          ],
+          "touches": [
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/repository_state/profile_apply.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "package-capture",
+    "title": "Capture a package tree from declared repository targets",
+    "description": "Turn the repository-local package assembler into a supported operation that\npublishes a package tree from the repository files its manifest declares.\n\n## Background\n\nThe assembler already reads declared live targets, stages a tree, validates it as\na package, and publishes it whole, and a changed live file changes the resulting\npackage identity. It is compiled only for this crate's tests, is hardcoded to this\nrepository's own package path, follows symlinks, and does not screen executable\ncontent. Without it, a package is hand-authored and an in-place edit to\nprofile-owned content cannot be folded back into the package that owns it.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture reads the repository targets a manifest declares and publishes a package tree containing exactly the manifest, the declared asset sources, and the declared region sources; a source the manifest stopped declaring does not survive.\n- [hard] REQ-02: Capture serves any repository and any package id from supplied arguments; no repository path, package id, or entry-point script is compiled in, and the operation is present in an ordinary binary rather than behind a test feature.\n- [hard] REQ-03: A declared target that is a symlink, resolves outside the worktree, or carries executable permission the manifest did not declare is refused before anything is staged.\n- [hard] REQ-04: The published tree decodes and validates as a package, and a failed capture leaves the destination as it was.\n- [hard] REQ-05: Capturing a package whose owned content was edited in place produces a tree whose identity reflects that edit, so re-applying it reconciles the repository.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:authoring-and-exchange",
+      "component:cli",
+      "component:storage",
+      "satisfies:REQ-13"
+    ],
+    "gates": [
+      "cargo-ci",
+      "mcp-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "versioned-package-decoder"
+    ],
+    "planning": {
+      "outcome": "Capture publishes a package tree from the repository targets a manifest declares.",
+      "contract_refs": [
+        "package-model",
+        "worktree-confinement",
+        "materialization-transaction"
+      ],
+      "source_refs": [
+        "REQ-13",
+        "d-08-capture",
+        "inv-capture-assembler"
+      ],
+      "produces_contracts": [
+        "capture-tree"
+      ],
+      "landing_group": "authoring-surface",
+      "terminal": {
+        "consumer_family": "package authors",
+        "test_boundary": "capture integration tests",
+        "worker_sized_reason": "One existing assembler generalized and exposed with integration coverage.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/profile/package_assembly.rs",
+            "crates/jit/src/profile/mod.rs",
+            "crates/jit/src/profile/repository_package.rs",
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/examples/assemble-package.rs",
+            "scripts/assemble-package.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "package-archive-exchange",
+    "title": "Pack a package into a verifiable archive",
+    "description": "Give a package one portable file that carries its identity and digest, and one\noperation that verifies that file before placing the package in the worktree.\n\n## Background\n\nSharing a package means copying a directory, with nothing that states what was\ncopied or confirms it arrived intact. Package identity is already a content digest\nover the manifest and every file, and an archive dependency is already present, so\nthe exchange format can reuse both rather than introduce a second digest or a new\ncontainer library.\n\n## Success Criteria\n\n- [hard] REQ-01: Packing a package directory produces one archive file carrying the package id, its version, and the package identity digest, and packing the same package twice produces byte-identical output.\n- [hard] REQ-02: Adding an archive recomputes the package identity from the extracted content and refuses the archive when it disagrees with the digest the archive carries.\n- [hard] REQ-03: An archive entry with an absolute path, a parent-directory traversal, a symlink, or an unexpected mode is refused, and nothing is written outside the named destination.\n- [hard] REQ-04: A refused or interrupted add leaves no partially extracted package, and an occupied destination is never overwritten.\n- [hard] REQ-05: Packing and adding read and write local files only: no network access, no registry lookup, and no search of undeclared filesystem locations.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:authoring-and-exchange",
+      "component:cli",
+      "component:storage",
+      "satisfies:REQ-14"
+    ],
+    "gates": [
+      "cargo-ci",
+      "mcp-ci",
+      "code-review",
+      "security-review"
+    ],
+    "depends_on": [
+      "versioned-package-decoder"
+    ],
+    "planning": {
+      "outcome": "A package packs into one digest-carrying archive that add verifies before placing it in the worktree.",
+      "contract_refs": [
+        "package-model",
+        "worktree-confinement"
+      ],
+      "source_refs": [
+        "REQ-14",
+        "d-09-exchange",
+        "inv-archive-deps",
+        "inv-worktree-confinement"
+      ],
+      "produces_contracts": [
+        "package-archive"
+      ],
+      "landing_group": "authoring-surface",
+      "terminal": {
+        "consumer_family": "package recipients",
+        "test_boundary": "archive round-trip tests",
+        "worker_sized_reason": "One archive reader and writer over the existing dependency with adversarial fixtures.",
+        "footprint": {
+          "creates": [
+            "crates/jit/src/storage/package_archive.rs"
+          ],
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/profile/package.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-diff-surface",
+    "title": "Report profile state and differences on one surface",
+    "description": "Give the profile command family one presentation contract: what is applied, what\neach package would change, and what currently diverges.\n\n## Background\n\nThe family exposes three subcommands and has no way to answer what an operation\nwould change before running it. The lifecycle adds several mutating operations, so\nthe read surface that explains them has to exist alongside.\n\n## Success Criteria\n\n- [hard] REQ-01: A difference report states, for each participating profile, the targets and identities that would update, conflict, be retained, or be removed, without writing anything.\n- [hard] REQ-02: Every profile subcommand emits machine-readable output under the project's collection envelope, and the generated command schema and the bridge tool inventory expose the family without hand-written duplication.\n- [hard] REQ-03: Each mutating subcommand supports a rehearsal mode that reports the same decisions it would publish and writes nothing.\n- [hard] REQ-04: Human output states profile id, version, origin, and per-target decision consistently across the family, and no subcommand reports a decision vocabulary the others do not use.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:cli",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "mcp-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "three-way-reconfigure-upgrade"
+    ],
+    "planning": {
+      "outcome": "The profile command family reports state and differences through one stable human and machine surface.",
+      "contract_refs": [
+        "three-way-decision",
+        "applied-record",
+        "profile-selector"
+      ],
+      "source_refs": [
+        "REQ-06"
+      ],
+      "landing_group": "lifecycle-surface",
+      "terminal": {
+        "consumer_family": "profile surface adapters",
+        "test_boundary": "JSON envelope contract tests",
+        "worker_sized_reason": "One presentation layer over decisions the prior work already computes.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/src/schema.rs",
+            "crates/jit/src/commands/profile.rs",
+            "mcp-server/curated-tools.json"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lifecycle-audit-events",
+    "title": "Record one lifecycle event per changed mutation",
+    "description": "Replace the per-application audit record with one event describing what a\nlifecycle operation actually changed.\n\n## Background\n\nMutations append an application event per package, which cannot describe a\nselection that reconfigured one profile, upgraded another, and left a third alone.\nThe event also has to carry variable provenance without carrying values.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation that changes the aggregate appends exactly one event naming the requested operation and, per profile in a stable order, whether it was installed, unchanged, reconfigured, or upgraded.\n- [hard] REQ-02: A rehearsal, and a mutation that leaves the aggregate entirely unchanged, append no event.\n- [hard] REQ-03: The event names variables by name and by which source supplied them, and carries no resolved value and no rendered content.\n- [hard] REQ-04: Conversion of a record in the shipped format is reported inside the event for the operation that encountered it rather than as an operation of its own.\n- [hard] REQ-05: The prior per-application event is no longer constructed or appended; the existing log continues to decode historical entries.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:storage",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "aggregate-lifecycle-publication",
+      "profile-variables"
+    ],
+    "planning": {
+      "outcome": "A changed mutation appends one lifecycle event naming the operation, per-profile action, and variable sources.",
+      "contract_refs": [
+        "aggregate-plan",
+        "variable-model",
+        "applied-record"
+      ],
+      "source_refs": [
+        "REQ-06"
+      ],
+      "landing_group": "lifecycle-surface",
+      "terminal": {
+        "consumer_family": "event log readers",
+        "test_boundary": "event catalog tests",
+        "worker_sized_reason": "One event variant replacing another with catalog and parser coverage.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/event_catalog.rs",
+            "crates/jit/src/domain/event_log.rs",
+            "crates/jit/src/domain/types.rs",
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/repository_state/initialize.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-lifecycle-documentation",
+    "title": "Document the completed profile lifecycle for adopters",
+    "description": "Make the canonical profile reference describe the lifecycle that now ships, and\nkeep neighbouring pages citing it rather than restating it.\n\n## Background\n\nThe canonical reference currently states an apply-only boundary and lists the\ncapabilities this container delivers as explicitly absent. Several other pages\ndescribe obtaining and applying a package, so the facts have to move as one set.\n\n## Success Criteria\n\n- [hard] REQ-01: The canonical profile reference describes authoring, capture, exchange, composition, variables, ownership, drift, reconfiguration, and upgrade as current behavior, and the section declaring those capabilities absent is gone.\n- [hard] REQ-02: Pages that mention profiles link to the canonical reference instead of restating lifecycle facts, and volatile inventories are generated or cited rather than hand-copied.\n- [hard] REQ-03: Documentation states current behavior only, with no narration of what the surface used to do.\n- [hard] REQ-04: Every path and command named in the changed pages resolves, and the repository's citation check reports no missing target.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:docs",
+      "satisfies:REQ-10"
+    ],
+    "gates": [
+      "docs-mechanical",
+      "doc-review"
+    ],
+    "depends_on": [
+      "profile-diff-surface",
+      "lifecycle-audit-events",
+      "package-capture",
+      "package-archive-exchange"
+    ],
+    "planning": {
+      "outcome": "The canonical profile reference states the lifecycle that now ships and neighbouring pages cite it.",
+      "contract_refs": [
+        "capture-tree",
+        "package-archive",
+        "three-way-decision"
+      ],
+      "source_refs": [
+        "REQ-10",
+        "d-02-discovery"
+      ],
+      "terminal": {
+        "consumer_family": "adopter documentation readers",
+        "test_boundary": "documentation citation checks",
+        "worker_sized_reason": "One canonical page rewritten with linked pages swept in the same pass.",
+        "footprint": {
+          "touches": [
+            "docs/reference/profiles.md",
+            "docs/reference/cli-commands.md",
+            "docs/reference/cli-command-grammar.md",
+            "docs/reference/storage-records.md",
+            "docs/reference/events.md",
+            "docs/index.md",
+            "README.md",
+            "INSTALL.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lifecycle-behavior-evidence",
+    "title": "Prove lifecycle behaviour under failure and recovery",
+    "description": "Extend the existing acceptance coverage so the shipped lifecycle is exercised\nwhere it is most likely to break: interrupted publication, concurrent callers,\nhostile archives, and repositories without Git.\n\n## Background\n\nExisting suites cover the apply-only surface. The build-footprint budget allows\nalmost no new integration-test targets, so this coverage belongs in the suites\nthat already exist rather than in new ones.\n\n## Success Criteria\n\n- [hard] REQ-01: Coverage exercises interleaved id and directory selection, dependency and incompatibility failures, shared and conflicting ownership, variable precedence, conversion of a record in the shipped format, capture of a newly authored package, capture of a package edited in place, an archive round trip, and a rejected archive.\n- [hard] REQ-02: Failure injection during publication leaves either the complete prior state or the complete new state, and retrying the same operation converges to the same result.\n- [hard] REQ-03: Concurrent lifecycle operations on one repository serialize rather than interleave, and every covered operation runs in a repository with no Git directory.\n- [hard] REQ-04: New coverage lands in existing test targets, and the enforced build-footprint budget still passes.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:testing",
+      "satisfies:REQ-11"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "profile-diff-surface",
+      "lifecycle-audit-events",
+      "package-capture",
+      "package-archive-exchange"
+    ],
+    "planning": {
+      "outcome": "Acceptance coverage exercises the lifecycle under capture, concurrency, rollback, and Git-free conditions.",
+      "contract_refs": [
+        "capture-tree",
+        "package-archive",
+        "three-way-decision"
+      ],
+      "source_refs": [
+        "REQ-11",
+        "inv-build-budget"
+      ],
+      "terminal": {
+        "consumer_family": "acceptance suites",
+        "test_boundary": "profile acceptance suite",
+        "worker_sized_reason": "Cases added to existing suites under a fixed target budget.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+            "crates/jit/tests/fixtures/profile-packages"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "lifecycle-structural-absence",
+    "title": "Prove no superseded lifecycle path survives",
+    "description": "Add mechanical checks that fail if a second package reader, a compatibility shim,\nor a superseded lifecycle path reappears.\n\n## Background\n\nThe container forbids adapters, dual formats, fallback behavior, and duplicated\ninventories, and this repository already enforces one such absence with a\nstructural contract test. That mechanism is the way the constraint stays true\nafter the work lands.\n\n## Success Criteria\n\n- [hard] REQ-01: A structural check fails if a second package decoder, package model, or applied-record reader is present alongside the canonical one.\n- [hard] REQ-02: A structural check fails if the superseded single-profile selection argument, the per-package application entry point, or the prior application event constructor reappears.\n- [hard] REQ-03: A structural check fails if any input is described as secret or sensitive across the manifest, the command line, the generated schema, the bridge inventory, or the audit trail.\n- [hard] REQ-04: The checks name what they forbid and why, so a failure tells a reader which constraint was breached rather than only which symbol matched.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:jit-profiles-complete",
+      "milestone:v1.1",
+      "per:@/charter/D-8",
+      "story:surface-and-evidence",
+      "component:testing",
+      "satisfies:REQ-12"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "profile-diff-surface",
+      "lifecycle-audit-events",
+      "package-capture",
+      "package-archive-exchange"
+    ],
+    "planning": {
+      "outcome": "Mechanical checks reject a duplicate resolver, a compatibility shim, or a surviving predecessor path.",
+      "contract_refs": [
+        "package-model",
+        "applied-record",
+        "profile-selector"
+      ],
+      "source_refs": [
+        "REQ-12",
+        "d-07-ssot"
+      ],
+      "terminal": {
+        "consumer_family": "structural contract tests",
+        "test_boundary": "provenance contract suite",
+        "worker_sized_reason": "Assertions appended to the existing structural suite with named rationale.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/provenance_contract/repository_state_cutover_tests.rs"
+          ]
+        }
+      }
+    }
+  }
+]
