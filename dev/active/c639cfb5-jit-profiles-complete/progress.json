@@ -432,14 +432,14 @@
         }
       ],
       "criteria": {
-        "REQ-01": "met: current v2 records carry sorted unique typed claims, provenance, compatibility, package identity, and resolved public variables",
+        "REQ-01": "unmet: current v2 records carry sorted unique typed claims, provenance, compatibility, and resolved public variables, but the exported record id remains an unconstrained String",
         "REQ-02": "met: semantic, asset, and managed-region claims derive and preserve retained repository baselines",
-        "REQ-03": "unmet: CLI profile apply source loading and every profiled-init resolution path reject v1/Embedded provenance before conversion; initialization also carries no migration map or same-delta migration actions",
+        "REQ-03": "unmet: CLI profile apply source loading and every profiled-init resolution path reject v1/Embedded provenance before conversion; initialization also carries no migration map or same-delta migration actions, and duplicate-member rejection needs explicit v1/v2 regression proof",
         "REQ-04": "met: ownership records remain provenance and effective values load from registries"
       },
       "stale_narrative_sweep": "zero actionable matches; target_hashes remains only in the isolated v1 boundary and current audit-event inputs",
       "deferred_items_audit": "no linked documents",
-      "holistic_review": "the unconditional second base capture when no legacy candidate exists also regresses the final-closure race test; reuse the first capture on the ordinary path rather than weakening the concurrency assertion",
+      "holistic_review": "the unconditional second base capture when no legacy candidate exists also regresses the final-closure race test; reuse the first capture on the ordinary path rather than weakening the concurrency assertion. The final rework must also type AppliedProfileRecord.id as ProfileId and prove both strict record wires reject duplicate JSON members.",
       "reviewed_at": "2026-08-09T23:19:00+03:00"
     }
   ],
