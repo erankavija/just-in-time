@@ -137,6 +137,12 @@
       "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
       "status": "resolved",
       "summary": "Session 2 handed off after the release smoke workflow exposed one stale dry-run consumer. A final authorized Luna xhigh repair updated that workflow and its acceptance test; all configured gates passed, and the exact merged main tree passed cargo-ci plus the MCP suite."
+    },
+    {
+      "category": "rework-exceeded-max-attempts",
+      "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
+      "status": "open",
+      "summary": "After two substantive rework rounds produced a fully tested final commit, the lead Tier 2.5 sweep found one remaining stale neighbouring phrase at docs/reference/storage-format.md:67 ('minimal provenance record'). Invoker guidance is required before one further targeted correction."
     }
   ],
   "rework_counts": {
