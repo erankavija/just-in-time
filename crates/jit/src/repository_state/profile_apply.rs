@@ -1,4 +1,4 @@
-//! ApplyProfile materialization: compose a profile package's canonical claims
+//! Profile-selection materialization: compose a profile package's canonical claims
 //! (declaration-overlay registry edits, exact assets, and managed regions) plus the
 //! configured projections those declarations imply into the exact set of
 //! profile-owned targets.
@@ -7,8 +7,8 @@
 //! neutral [`ProfileClaims`] and the command captures the base image and applies the
 //! resulting delta. The applied record carries the profile layer's canonical
 //! resolved-variable provenance, but package parsing, storage, and command code
-//! remain outside this module; the typed `ApplyProfile` materialization request
-//! sits between them.
+//! remain outside this module; the typed aggregate profile-selection
+//! materialization request sits between them.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -1293,8 +1293,8 @@ pub(super) struct ProfileTargetComposition {
 ///
 /// The result equals the byte-for-byte final image of every profile-owned target
 /// regardless of whether it changed from the captured occupant; the caller
-/// (the typed `ApplyProfile` materialization request) decides which targets to
-/// write.
+/// (the typed aggregate profile-selection materialization request) decides
+/// which targets to write.
 pub(super) fn compose_profile_targets(
     base: &RepositoryImage,
     claims: ProfileClaims,

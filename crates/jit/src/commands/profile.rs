@@ -698,7 +698,7 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Resolve the semantic candidates that every selected package contributes.
     ///
-    /// The candidate vector is kept through the sequential publication loop so
+    /// The candidate vector is carried into the one aggregate materialization so
     /// each affected record derives its shared ownership from the same selection.
     pub(super) fn profile_contribution_candidates(
         &self,
