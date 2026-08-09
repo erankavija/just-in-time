@@ -1,9 +1,10 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
-    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
-    ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
-    ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
-    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    build_profile_claims, EngineVersion, ProfileApplicationStatus, ProfileApplyResult,
+    ProfileComposedApplyResult, ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin,
+    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
+    ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange, ResolvedProfileGraph,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -14,7 +15,7 @@ use crate::repository_state::{
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -176,11 +177,67 @@ pub enum ProfileDependencyError {
         /// Why every resolution route refused it.
         cause: anyhow::Error,
     },
+    /// A dependency is present but outside the version range its declarer
+    /// requires.
+    #[error(
+        "profile '{package}' requires dependency '{dependency}' at '{required}', but the participating package provides '{found}'"
+    )]
+    DependencyVersionMismatch {
+        /// Package whose manifest declares the dependency.
+        package: String,
+        /// Dependency whose version did not satisfy the requirement.
+        dependency: String,
+        /// Authored dependency range.
+        required: String,
+        /// Resolved dependency version.
+        found: String,
+    },
     /// The declared dependencies close a cycle, which has no application order.
     #[error("profile dependency cycle: {}", .cycle.join(" -> "))]
     DependencyCycle {
         /// The cycle as a closed path: the first id repeats as the last.
         cycle: Vec<String>,
+    },
+    /// The running engine is outside a participating package's compatibility
+    /// range.
+    #[error(
+        "profile '{package}' requires compatible JIT '{required}', but the running engine is '{actual}'"
+    )]
+    IncompatibleEngine {
+        /// Package whose compatibility range rejected the engine.
+        package: String,
+        /// Authored engine range.
+        required: String,
+        /// Running engine version.
+        actual: String,
+    },
+    /// Two participating packages declare an incompatibility that applies to
+    /// the other package's version.
+    #[error(
+        "profile '{package}' is incompatible with profile '{other}' (requirement '{requirement}', other version '{other_version}')"
+    )]
+    IncompatiblePackages {
+        /// Package declaring the incompatibility.
+        package: String,
+        /// Participating package named by the declaration.
+        other: String,
+        /// Authored incompatible-package range.
+        requirement: String,
+        /// Version of the other package.
+        other_version: String,
+    },
+    /// Two different package images claim one profile identity during graph
+    /// construction.
+    #[error(
+        "profile id '{id}' resolves to different package images '{first_hash}' and '{second_hash}'"
+    )]
+    ConflictingPackageIdentity {
+        /// Profile identity with multiple images.
+        id: String,
+        /// First package digest.
+        first_hash: String,
+        /// Second package digest.
+        second_hash: String,
     },
 }
 
@@ -358,7 +415,10 @@ impl CommandExecutor<JsonFileStorage> {
         // Validate the complete request first so dry-run uses the same
         // selector-level ambiguity and confinement rules as show/apply before
         // constructing any individual preview.
-        self.resolve_profile_selectors(selectors)?;
+        let selected = self.resolve_profile_selectors(selectors)?;
+        if !selected.is_empty() {
+            self.resolve_profile_graph(&selected)?;
+        }
         selectors
             .iter()
             .map(|selector| self.plan_profile(selector))
@@ -396,7 +456,15 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         selectors: &[ProfileSelector],
     ) -> Result<ProfileComposedApplyResult> {
-        self.resolve_profile_selectors(selectors)?
+        let selected = self.resolve_profile_selectors(selectors)?;
+        // Resolve every selected root and every already-applied package before
+        // the first per-package publication. The later calls preserve the
+        // repeatable selector result surface; this preflight makes graph
+        // failures independent of that occurrence order.
+        if !selected.is_empty() {
+            self.resolve_profile_graph(&selected)?;
+        }
+        selected
             .into_iter()
             .map(|package| self.apply_profile_package(&package))
             .collect::<Result<Vec<_>>>()
@@ -424,82 +492,154 @@ impl CommandExecutor<JsonFileStorage> {
     /// dependency is raised over the whole closure before its first package is
     /// applied.
     pub fn resolve_profile_closure(&self, package: &ProfilePackage) -> Result<Vec<ProfilePackage>> {
-        let root = package.model().id.to_string();
-        let mut resolved = BTreeMap::from([(root.clone(), package.clone())]);
-        let mut adjacency: Vec<(String, Vec<String>)> = Vec::new();
-        let mut pending = std::collections::VecDeque::from([root]);
+        self.resolve_profile_graph(std::slice::from_ref(package))
+            .map(|graph| graph.selected_packages())
+    }
 
+    /// Resolve selected packages together with every package already recorded
+    /// as applied, then settle all dependency, incompatibility, and engine
+    /// range claims before a caller prepares a publication.
+    pub fn resolve_profile_graph(
+        &self,
+        selected: &[ProfilePackage],
+    ) -> Result<ResolvedProfileGraph> {
+        let applied = self.resolve_applied_profile_packages()?;
+        let mut packages = BTreeMap::new();
+        let mut selected_ids = BTreeSet::new();
+        let mut pending = VecDeque::new();
+
+        for package in selected {
+            selected_ids.insert(package.model().id.clone());
+            insert_candidate_package(&mut packages, package.clone())?;
+        }
+        pending.extend(selected_ids.iter().cloned());
+
+        // Load the selected closure first. A package explicitly obtained beside
+        // a selector is the candidate for that dependency; an applied record is
+        // the fallback when no such sibling exists.
+        self.load_package_dependencies(&mut packages, &applied, &mut pending)?;
+
+        // Applied packages that were not selected still participate in every
+        // graph decision. A selected closure candidate with the same id is the
+        // deliberate replacement; two different candidates discovered for one
+        // id never win by occurrence order.
+        for (id, package) in applied {
+            if packages.contains_key(&id) {
+                continue;
+            }
+            insert_candidate_package(&mut packages, package)?;
+            pending.push_back(id);
+        }
+        self.load_package_dependencies(&mut packages, &BTreeMap::new(), &mut pending)?;
+
+        let engine = EngineVersion::running()
+            .map_err(|source| anyhow::anyhow!("running JIT engine version is invalid: {source}"))?;
+        ResolvedProfileGraph::resolve(packages, selected_ids, &engine).map_err(profile_graph_error)
+    }
+
+    /// Load every package the repository's applied records currently name.
+    fn resolve_applied_profile_packages(&self) -> Result<BTreeMap<ProfileId, ProfilePackage>> {
+        let layout = self.require_layout()?;
+        with_mutation_session(self.storage(), &layout, "profile graph read", |session| {
+            let Some((image, ids)) = capture_applied_records(session, &VirtualPath::PROFILES)?
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            let mut packages = BTreeMap::new();
+            for id in ids {
+                let record_path = applied_record_path(&id)?;
+                let record = read_applied_record(&image, &record_path, &id)?.ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "applied profile record '{}' disappeared while resolving the profile graph",
+                        record_path.repository_relative()
+                    )
+                })?;
+                let package = recorded_package(&record, &record_path, &layout)?;
+                if package.model().id.as_str() != id {
+                    return Err(anyhow::anyhow!(
+                        "applied profile record '{id}' names package '{}'",
+                        package.model().id
+                    ));
+                }
+                insert_candidate_package(&mut packages, package)?;
+            }
+            Ok(SessionStep::Done(packages))
+        })
+    }
+
+    /// Extend `packages` with dependencies in canonical id order.
+    fn load_package_dependencies(
+        &self,
+        packages: &mut BTreeMap<ProfileId, ProfilePackage>,
+        applied: &BTreeMap<ProfileId, ProfilePackage>,
+        pending: &mut VecDeque<ProfileId>,
+    ) -> Result<()> {
         while let Some(id) = pending.pop_front() {
-            let declaring = resolved
+            let declaring = packages
                 .get(&id)
-                .ok_or_else(|| anyhow::anyhow!("package '{id}' left the closure being built"))?
-                .clone();
-            let declared: Vec<String> = declaring
-                .model()
-                .dependencies
-                .iter()
-                .map(|dependency| dependency.id.to_string())
-                .collect();
-            for dependency in &declared {
-                if resolved.contains_key(dependency) {
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("profile '{id}' left the graph being built"))?;
+            let mut dependencies = declaring.model().dependencies.clone();
+            dependencies.sort_by(|left, right| {
+                left.id
+                    .cmp(&right.id)
+                    .then_with(|| left.version.cmp(&right.version))
+            });
+            for dependency in dependencies {
+                if packages.contains_key(&dependency.id) {
                     continue;
                 }
                 let package = self
-                    .resolve_dependency_package(&declaring, dependency)
+                    .resolve_dependency_package_from(&declaring, dependency.id.as_str(), applied)
                     .map_err(|cause| ProfileDependencyError::UnresolvableDependency {
-                        package: id.clone(),
-                        dependency: dependency.clone(),
+                        package: id.to_string(),
+                        dependency: dependency.id.to_string(),
                         cause,
                     })?;
-                resolved.insert(dependency.clone(), package);
-                pending.push_back(dependency.clone());
+                let dependency_id = package.model().id.clone();
+                insert_candidate_package(packages, package)?;
+                pending.push_back(dependency_id);
             }
-            adjacency.push((id, declared));
         }
-
-        crate::graph::keyed_topological_order(&adjacency)
-            .map_err(|cycle| ProfileDependencyError::DependencyCycle { cycle })?
-            .into_iter()
-            .map(|id| {
-                resolved
-                    .remove(&id)
-                    .ok_or_else(|| anyhow::anyhow!("ordered package '{id}' left the closure"))
-            })
-            .collect()
+        Ok(())
     }
 
-    /// Read the package one declared dependency names.
+    /// Resolve a dependency from a sibling package, then from the coherent
+    /// applied-package map, and finally from the record route for callers that
+    /// are resolving an individual closure.
     ///
     /// A package read from a directory states where its dependencies are by
     /// where it sits: the dependency is looked for beside it, in a directory
-    /// named by the dependency's own id. That is the location the caller named
-    /// for the declaring package, carried to what that package declares, and it
-    /// is what lets one obtained directory of packages apply as a set before
-    /// any of them has a record.
-    ///
-    /// A directory that is not there, or that holds a package declaring another
-    /// profile, is not that dependency, so resolution continues through the
-    /// route every other command takes
-    /// ([`resolve_profile_package`](Self::resolve_profile_package) without a
-    /// location): this repository's own applied-profile record. A directory
-    /// that is there and cannot be read as a package is reported rather than
-    /// passed over, because falling through would answer with a package the
-    /// adopter did not put there.
-    fn resolve_dependency_package(
+    /// named by the dependency's own id. A directory that is not there, or that
+    /// holds a package declaring another profile, is not that dependency, so
+    /// resolution continues through the applied-profile record route. A
+    /// directory that is there and cannot be read as a package is reported
+    /// rather than passed over, because falling through would answer with a
+    /// package the adopter did not put there.
+    fn resolve_dependency_package_from(
         &self,
         declaring: &ProfilePackage,
         dependency: &str,
+        applied: &BTreeMap<ProfileId, ProfilePackage>,
     ) -> Result<ProfilePackage> {
         let ProfilePackageSource::Directory(directory) = declaring.source();
+        let fallback = || -> Result<ProfilePackage> {
+            if let Some(package) = applied
+                .iter()
+                .find_map(|(id, package)| (id.as_str() == dependency).then_some(package))
+            {
+                Ok(package.clone())
+            } else {
+                Ok(self.resolve_profile_package(&ProfileSelector::id(dependency)?)?)
+            }
+        };
         let Some(location) = directory.parent().map(|parent| parent.join(dependency)) else {
-            return self.resolve_profile_package(&ProfileSelector::id(dependency)?);
+            return fallback();
         };
         match supplied_package(&location, &self.require_layout()?) {
             Ok(package) if package.model().id.as_str() == dependency => Ok(package),
-            Ok(_) => Ok(self.resolve_profile_package(&ProfileSelector::id(dependency)?)?),
-            Err(error) if is_unreadable_location(&error) => {
-                Ok(self.resolve_profile_package(&ProfileSelector::id(dependency)?)?)
-            }
+            Ok(_) => fallback(),
+            Err(error) if is_unreadable_location(&error) => fallback(),
             Err(error) => Err(error),
         }
     }
@@ -512,9 +652,12 @@ impl CommandExecutor<JsonFileStorage> {
     /// unresolvable dependency and a dependency cycle fail here too rather than
     /// at the publication the check exists to precede.
     pub fn validate_profile_selection(&self, selectors: &[ProfileSelector]) -> Result<()> {
-        self.resolve_profile_selectors(selectors)?
-            .into_iter()
-            .try_for_each(|package| self.resolve_profile_closure(&package).map(drop))
+        let selected = self.resolve_profile_selectors(selectors)?;
+        if selected.is_empty() {
+            Ok(())
+        } else {
+            self.resolve_profile_graph(&selected).map(drop)
+        }
     }
 
     /// Apply one validated package together with the packages it depends on.
@@ -749,6 +892,105 @@ impl CommandExecutor<JsonFileStorage> {
     }
 }
 
+/// Insert one package image without allowing selector or dependency traversal
+/// order to choose between different images for one semantic profile id.
+fn insert_candidate_package(
+    packages: &mut BTreeMap<ProfileId, ProfilePackage>,
+    package: ProfilePackage,
+) -> Result<()> {
+    let id = package.model().id.clone();
+    if let Some(existing) = packages.get(&id) {
+        if existing.hashes().package != package.hashes().package {
+            let (first_hash, second_hash) = if existing.hashes().package < package.hashes().package
+            {
+                (
+                    existing.hashes().package.clone(),
+                    package.hashes().package.clone(),
+                )
+            } else {
+                (
+                    package.hashes().package.clone(),
+                    existing.hashes().package.clone(),
+                )
+            };
+            return Err(ProfileDependencyError::ConflictingPackageIdentity {
+                id: id.to_string(),
+                first_hash,
+                second_hash,
+            }
+            .into());
+        }
+        if package_source_key(&package) < package_source_key(existing) {
+            packages.insert(id, package);
+        }
+        return Ok(());
+    }
+    packages.insert(id, package);
+    Ok(())
+}
+
+/// Stable source spelling used only to choose between byte-identical package
+/// copies. Package bytes and graph claims remain the semantic identity.
+fn package_source_key(package: &ProfilePackage) -> String {
+    match package.source() {
+        ProfilePackageSource::Directory(path) => path.to_string_lossy().into_owned(),
+    }
+}
+
+/// Convert the pure graph's typed refusal into the command-layer dependency
+/// error vocabulary, retaining every package named by the failed claim.
+fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
+    match error {
+        ProfileGraphError::MissingDependency {
+            package,
+            dependency,
+        } => ProfileDependencyError::UnresolvableDependency {
+            package: package.clone(),
+            dependency: dependency.clone(),
+            cause: anyhow::anyhow!("profile graph is missing participating package '{dependency}'"),
+        }
+        .into(),
+        ProfileGraphError::DependencyVersionMismatch {
+            package,
+            dependency,
+            required,
+            found,
+        } => ProfileDependencyError::DependencyVersionMismatch {
+            package,
+            dependency,
+            required,
+            found,
+        }
+        .into(),
+        ProfileGraphError::DependencyCycle { cycle } => {
+            ProfileDependencyError::DependencyCycle { cycle }.into()
+        }
+        ProfileGraphError::IncompatibleEngine {
+            package,
+            required,
+            actual,
+        } => ProfileDependencyError::IncompatibleEngine {
+            package,
+            required,
+            actual,
+        }
+        .into(),
+        ProfileGraphError::IncompatiblePackages {
+            package,
+            other,
+            requirement,
+            other_version,
+        } => ProfileDependencyError::IncompatiblePackages {
+            package,
+            other,
+            requirement,
+            other_version,
+        }
+        .into(),
+        other => anyhow::anyhow!(other),
+    }
+}
+
 /// Bounds for the applied-record captures.
 ///
 /// One record per applied profile, each a small JSON document directly under
@@ -847,9 +1089,9 @@ fn supplied_package(location: &Path, layout: &RepositoryLayout) -> Result<Profil
         layout.worktree_root().join(location)
     };
     let package = match fs::canonicalize(&requested) {
-        Ok(resolved) => {
-            ensure_worktree_package_directory(&resolved, layout)?;
-            ProfilePackage::from_directory(&resolved)
+        Ok(_) => {
+            ensure_worktree_package_directory(&requested, layout)?;
+            ProfilePackage::from_directory(&requested)
         }
         Err(_) => ProfilePackage::from_directory(&requested),
     }
@@ -878,9 +1120,9 @@ pub(super) fn recorded_package(
     let ProfileOrigin::Directory(location) = &record.origin;
     let requested = layout.worktree_root().join(location.as_path());
     let package = match fs::canonicalize(&requested) {
-        Ok(resolved) => {
-            ensure_worktree_package_directory(&resolved, layout)?;
-            ProfilePackage::from_directory(&resolved)
+        Ok(_) => {
+            ensure_worktree_package_directory(&requested, layout)?;
+            ProfilePackage::from_directory(&requested)
         }
         Err(_) => ProfilePackage::from_directory(&requested),
     };
@@ -1250,6 +1492,57 @@ mod tests {
             id,
             dependencies,
         )
+    }
+
+    /// A v2 package with explicit dependency, incompatibility, and engine
+    /// range declarations for graph-resolution tests.
+    fn package_v2(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        version: &str,
+        compatible_jit: &str,
+        dependencies: &[(&str, &str)],
+        incompatibilities: &[(&str, &str)],
+    ) -> ProfilePackage {
+        let tree = crate::test_utils::copy_package_tree(
+            &fixture_package_tree(),
+            &temp.path().join(relative),
+        );
+        let source = ProfilePackage::parse_manifest(
+            &fs::read(tree.join(crate::profile::MANIFEST_FILE_NAME)).unwrap(),
+        )
+        .expect("the source package manifest parses");
+        let asset = source
+            .assets
+            .first()
+            .expect("the fixture declares an asset");
+        let mut manifest = format!(
+            "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"{version}\"\ncompatible-jit = \"{compatible_jit}\"\n"
+        );
+        for (dependency, requirement) in dependencies {
+            manifest.push_str(&format!(
+                "\n[[dependency]]\nid = \"{dependency}\"\nversion = \"{requirement}\"\n"
+            ));
+        }
+        for (incompatible, requirement) in incompatibilities {
+            manifest.push_str(&format!(
+                "\n[[incompatibility]]\nid = \"{incompatible}\"\nversion = \"{requirement}\"\n"
+            ));
+        }
+        manifest.push_str(&format!(
+            "\n[[asset]]\nsource = \"{}\"\ntarget = \"docs/{id}.txt\"\n",
+            asset.source
+        ));
+        fs::write(tree.join(crate::profile::MANIFEST_FILE_NAME), manifest)
+            .expect("write the v2 graph manifest");
+        ProfilePackage::from_directory(&tree).expect("the v2 graph package is valid")
+    }
+
+    /// Select a package through the worktree location it was read from.
+    fn package_selector(package: &ProfilePackage) -> ProfileSelector {
+        let ProfilePackageSource::Directory(path) = package.source();
+        ProfileSelector::path(path.clone())
     }
 
     /// The profile ids this repository's audit log records as applied, in the
@@ -2848,6 +3141,240 @@ mod tests {
         assert!(!temp.path().join("docs/workflow.txt").exists());
         assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_rejects_a_dependency_version_mismatch_before_publication() {
+        let (temp, storage, executor, _fixture) = fixture();
+        package_v2(
+            &temp,
+            "vendor/base",
+            "base",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[],
+        );
+        let workflow = package_v2(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[("base", ">=2.0.0")],
+            &[],
+        );
+
+        let error = executor
+            .apply_profile(&[package_selector(&workflow)])
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::DependencyVersionMismatch {
+                    package,
+                    dependency,
+                    ..
+                }) if package == "workflow" && dependency == "base"
+            ),
+            "the dependency and declaring package must be named: {error:#}"
+        );
+        assert!(!temp.path().join("docs/workflow.txt").exists());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_rejects_a_package_outside_the_running_engine_range() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = package_v2(
+            &temp,
+            "vendor/future",
+            "future",
+            "1.0.0",
+            ">=2.0.0",
+            &[],
+            &[],
+        );
+
+        let error = executor
+            .apply_profile(&[package_selector(&package)])
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::IncompatibleEngine { package, .. })
+                    if package == "future"
+            ),
+            "the incompatible package must be named: {error:#}"
+        );
+        assert!(!temp.path().join("docs/future.txt").exists());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_rejects_incompatibilities_symmetrically_and_independently_of_selector_order(
+    ) {
+        let (temp, storage, executor, _fixture) = fixture();
+        let left = package_v2(
+            &temp,
+            "vendor/left",
+            "left",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[("right", "*")],
+        );
+        let right = package_v2(
+            &temp,
+            "vendor/right",
+            "right",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[],
+        );
+        let left_selector = package_selector(&left);
+        let right_selector = package_selector(&right);
+
+        let first = executor
+            .apply_profile(&[left_selector.clone(), right_selector.clone()])
+            .unwrap_err();
+        let second = executor
+            .apply_profile(&[right_selector, left_selector])
+            .unwrap_err();
+
+        assert_eq!(format!("{first:#}"), format!("{second:#}"));
+        let message = format!("{first:#}");
+        assert!(message.contains("left"), "{message}");
+        assert!(message.contains("right"), "{message}");
+        assert!(!temp.path().join("docs/left.txt").exists());
+        assert!(!temp.path().join("docs/right.txt").exists());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_includes_an_unselected_applied_profile_in_incompatibility_checks() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let base = package_v2(
+            &temp,
+            "vendor/base",
+            "base",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[],
+        );
+        executor.apply_profile(&[package_selector(&base)]).unwrap();
+        let candidate = package_v2(
+            &temp,
+            "vendor/candidate",
+            "candidate",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[("base", "*")],
+        );
+
+        let error = executor
+            .apply_profile(&[package_selector(&candidate)])
+            .unwrap_err();
+
+        let message = format!("{error:#}");
+        assert!(message.contains("candidate"), "{message}");
+        assert!(message.contains("base"), "{message}");
+        assert!(!temp.path().join("docs/candidate.txt").exists());
+        assert_eq!(storage.read_events().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_apply_profile_includes_an_unselected_applied_profile_in_engine_range_checks() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let applied = package_v2(
+            &temp,
+            "vendor/applied",
+            "applied",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[],
+        );
+        executor
+            .apply_profile(&[package_selector(&applied)])
+            .unwrap();
+        let manifest = fs::read_to_string(temp.path().join("vendor/applied/manifest.toml"))
+            .unwrap()
+            .replace(
+                "compatible-jit = \">=0.2.0, <2.0.0\"",
+                "compatible-jit = \">=2.0.0\"",
+            );
+        fs::write(temp.path().join("vendor/applied/manifest.toml"), manifest).unwrap();
+        let candidate = package_v2(
+            &temp,
+            "vendor/candidate",
+            "candidate",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[],
+        );
+
+        let error = executor
+            .apply_profile(&[package_selector(&candidate)])
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::IncompatibleEngine { package, .. })
+                    if package == "applied"
+            ),
+            "the unselected applied package must be named: {error:#}"
+        );
+        assert!(!temp.path().join("docs/candidate.txt").exists());
+        assert_eq!(storage.read_events().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_apply_profile_includes_an_unselected_applied_profile_in_dependency_checks() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let applied = package_v2(
+            &temp,
+            "vendor/applied",
+            "applied",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[],
+        );
+        executor
+            .apply_profile(&[package_selector(&applied)])
+            .unwrap();
+        let manifest = format!(
+            "{}\n[[dependency]]\nid = \"missing-base\"\nversion = \"*\"\n",
+            fs::read_to_string(temp.path().join("vendor/applied/manifest.toml")).unwrap()
+        );
+        fs::write(temp.path().join("vendor/applied/manifest.toml"), manifest).unwrap();
+        let candidate = package_v2(
+            &temp,
+            "vendor/candidate",
+            "candidate",
+            "1.0.0",
+            ">=0.2.0, <2.0.0",
+            &[],
+            &[],
+        );
+
+        let error = executor
+            .apply_profile(&[package_selector(&candidate)])
+            .unwrap_err();
+
+        let message = format!("{error:#}");
+        assert!(message.contains("applied"), "{message}");
+        assert!(message.contains("missing-base"), "{message}");
+        assert!(!temp.path().join("docs/candidate.txt").exists());
+        assert_eq!(storage.read_events().unwrap().len(), 1);
     }
 
     #[test]

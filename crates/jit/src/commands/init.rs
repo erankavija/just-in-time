@@ -116,17 +116,7 @@ impl CommandExecutor<JsonFileStorage> {
             (Vec::new(), Vec::new())
         } else {
             let selected = self.resolve_profile_selectors(selectors)?;
-            let packages = selected.iter().try_fold(Vec::new(), |mut packages, root| {
-                for package in self.resolve_profile_closure(root)? {
-                    if packages
-                        .iter()
-                        .all(|existing: &ProfilePackage| existing.model().id != package.model().id)
-                    {
-                        packages.push(package);
-                    }
-                }
-                Ok::<_, anyhow::Error>(packages)
-            })?;
+            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
             (selected, packages)
         };
         let (package, dependants) = match packages.as_slice() {
