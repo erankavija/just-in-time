@@ -14,7 +14,13 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-09T04:28:35.886026745Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
   "labels": [
     "type:task",
@@ -29,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Select profiles through repeatable ordered selectors",
-  "updated_at": "2026-08-09T03:48:06.592966899Z"
+  "updated_at": "2026-08-09T04:28:35.886026745Z"
 }
