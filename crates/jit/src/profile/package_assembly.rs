@@ -29,7 +29,7 @@
 //! example needs, so an adopter build carries none of it.
 
 use super::{
-    ProfileManifest, ProfilePackage, ProfilePackageError, JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
+    ProfilePackage, ProfilePackageError, ProfilePackageModel, JIT_DOGFOOD_LIVE_SOURCE_PREFIX,
     MANIFEST_FILE_NAME,
 };
 use crate::errors::AlreadyExistsError;
@@ -198,7 +198,7 @@ fn is_live_source(declared: &str) -> bool {
 /// managed region's source is a fragment spliced into its target rather than a
 /// copy of it, so it is package-authored whatever prefix it carries.
 fn drawn_files(
-    manifest: &ProfileManifest,
+    manifest: &ProfilePackageModel,
     manifest_bytes: Vec<u8>,
     package_source: &Path,
     repository_root: &Path,
@@ -556,14 +556,14 @@ target = "docs/guide.md"
         let declared: BTreeSet<String> = std::iter::once(MANIFEST_FILE_NAME.to_string())
             .chain(
                 assembled
-                    .manifest()
+                    .model()
                     .assets
                     .iter()
                     .map(|asset| asset.source.clone()),
             )
             .chain(
                 assembled
-                    .manifest()
+                    .model()
                     .regions
                     .iter()
                     .map(|region| region.source.clone()),
@@ -584,7 +584,7 @@ target = "docs/guide.md"
         // The live assets' bytes are drawn from the repository files named by
         // their declarations.
         let live: Vec<&crate::profile::AssetDeclaration> = assembled
-            .manifest()
+            .model()
             .assets
             .iter()
             .filter(|asset| is_live_source(&asset.source))
@@ -650,10 +650,7 @@ target = "docs/guide.md"
             .map(|(path, _)| path)
             .collect();
         assert_eq!(executable, vec!["assets/live/bin/check.sh"]);
-        assert_eq!(
-            assembled.manifest().profile.id.as_str(),
-            "synthetic-assembly"
-        );
+        assert_eq!(assembled.model().id.as_str(), "synthetic-assembly");
     }
 
     /// Two assemblies of the same sources produce the same package tree and
@@ -816,16 +813,16 @@ target = "docs/guide.md"
         let reread = ProfilePackage::from_directory(&destination)
             .expect("the published tree reads back as a package");
         assert_eq!(reread.hashes(), assembled.hashes());
-        assert_eq!(reread.manifest(), assembled.manifest());
+        assert_eq!(reread.model(), assembled.model());
 
         let declared: Vec<&str> = assembled
-            .manifest()
+            .model()
             .assets
             .iter()
             .map(|asset| asset.source.as_str())
             .chain(
                 assembled
-                    .manifest()
+                    .model()
                     .regions
                     .iter()
                     .map(|region| region.source.as_str()),

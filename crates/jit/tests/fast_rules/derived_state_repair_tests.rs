@@ -335,7 +335,7 @@ impl DirectoryPackageRepo {
 
     /// The profile id the fixture package's own manifest declares.
     fn id(&self) -> &str {
-        self.package.manifest().profile.id.as_str()
+        self.package.model().id.as_str()
     }
 
     /// The one target the fixture package owns, as an absolute path.
@@ -346,7 +346,7 @@ impl DirectoryPackageRepo {
     /// The fixture package's single declared asset.
     fn asset(&self) -> &jit::profile::AssetDeclaration {
         self.package
-            .manifest()
+            .model()
             .assets
             .first()
             .expect("the fixture package declares one asset")
@@ -383,7 +383,7 @@ impl DirectoryPackageRepo {
     fn record_the_current_package(&self) {
         let record = jit::repository_state::AppliedProfileRecord::new(
             self.id(),
-            self.package.manifest().profile.version.clone(),
+            self.package.model().version.clone(),
             jit::profile::ProfileOrigin::Directory(
                 jit::repository_state::RootRelativePath::parse(PACKAGE_DIRECTORY)
                     .expect("a worktree-relative package location"),
@@ -758,7 +758,7 @@ fn test_harness_validate_fix_repairs_mode_only_profile_drift() {
     let (_source, mut harness) = profiled_harness(false);
     let (_workspace, package) = shipped_workflow_package();
     let executable = package
-        .manifest()
+        .model()
         .assets
         .iter()
         .filter(|asset| asset.executable)

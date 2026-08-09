@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f2ef652a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4264d91521398edf5f47e01b4fff122d71b11db1",
+  "completed_at": "2026-08-09T03:37:29.156959537Z",
+  "duration_ms": 228728,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The versioned decoder, canonical-model cutover, strict validation, and independent v1 identity continuity check satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5879e704-d641-4968-846e-105c3e5b7086",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T03:33:40.428576277Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 532189dc, ddc01e62, 3259874d, c3fbf765, b1772b4b, 47e731de, 87827042, c89f6932 (`jit:f2ef652a`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; issue requirement sources\nResolved items: @/charter/D-8; @/issue/f2ef652a/requirement/REQ-03; @/issue/c639cfb5/requirement/REQ-09; @/inv/canonical-cutover\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T03:29:39Z); prior code-review failed (F1), addressed by c89f6932’s independent v1 hash-continuity oracle\nTruncation recovery: bounded per-commit patches, wire decoder remainder, caller/test diffs, package-hash logic, and gate-result reads\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The versioned decoder, canonical-model cutover, strict validation, and independent v1 identity continuity check satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

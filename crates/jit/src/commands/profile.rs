@@ -1,9 +1,9 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
     build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
-    ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
-    ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
-    ProfileTargetAction, ProfileTargetChange,
+    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError, ProfilePackageSource,
+    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -202,7 +202,7 @@ impl CommandExecutor<JsonFileStorage> {
         let package = self.resolve_profile_package(id, location)?;
         let layout = self.require_layout()?;
         Ok(ProfileShowResult {
-            manifest: package.manifest().clone(),
+            manifest: package.model().clone(),
             origin: package_origin(&package, &layout)?,
             package_hash: package.hashes().package.clone(),
             target_hashes: package.hashes().targets.clone(),
@@ -215,7 +215,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// Build the exact non-mutating target plan for one resolved profile.
     pub fn plan_profile(&self, id: &str, location: Option<&Path>) -> Result<ProfilePlanResult> {
         let package = self.resolve_profile_package(id, location)?;
-        let metadata = &package.manifest().profile;
+        let metadata = package.model();
         let layout = self.require_layout()?;
         let context = MutationContext::preview();
         with_mutation_session(self.storage(), &layout, "profile planning", |session| {
@@ -261,7 +261,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// dependency is raised over the whole closure before its first package is
     /// applied.
     pub fn resolve_profile_closure(&self, package: &ProfilePackage) -> Result<Vec<ProfilePackage>> {
-        let root = package.manifest().profile.id.to_string();
+        let root = package.model().id.to_string();
         let mut resolved = BTreeMap::from([(root.clone(), package.clone())]);
         let mut adjacency: Vec<(String, Vec<String>)> = Vec::new();
         let mut pending = std::collections::VecDeque::from([root]);
@@ -272,10 +272,10 @@ impl CommandExecutor<JsonFileStorage> {
                 .ok_or_else(|| anyhow::anyhow!("package '{id}' left the closure being built"))?
                 .clone();
             let declared: Vec<String> = declaring
-                .manifest()
+                .model()
                 .dependencies
                 .iter()
-                .map(ProfileId::to_string)
+                .map(|dependency| dependency.id.to_string())
                 .collect();
             for dependency in &declared {
                 if resolved.contains_key(dependency) {
@@ -332,7 +332,7 @@ impl CommandExecutor<JsonFileStorage> {
             return self.resolve_profile_package(dependency, None);
         };
         match ProfilePackage::from_directory(&location) {
-            Ok(package) if package.manifest().profile.id.as_str() == dependency => Ok(package),
+            Ok(package) if package.model().id.as_str() == dependency => Ok(package),
             Ok(_) | Err(ProfilePackageError::UnreadableDirectory { .. }) => {
                 self.resolve_profile_package(dependency, None)
             }
@@ -395,7 +395,7 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         package: &ProfilePackage,
     ) -> Result<ProfileApplyResult> {
-        let metadata = &package.manifest().profile;
+        let metadata = package.model();
         let layout = self.require_layout()?;
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so the appended ProfileApplied event's id/timestamp stay stable.
@@ -452,7 +452,7 @@ impl CommandExecutor<JsonFileStorage> {
         package: &ProfilePackage,
         context: &MutationContext,
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
-        let metadata = &package.manifest().profile;
+        let metadata = package.model();
         reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
         let record_path = applied_record_path(metadata.id.as_str())?;
         let profiles_dir = VirtualPath::PROFILES;
@@ -687,7 +687,7 @@ fn supplied_package(location: &Path, id: &str) -> Result<ProfilePackage> {
             source,
         }
     })?;
-    let found = package.manifest().profile.id.as_str();
+    let found = package.model().id.as_str();
     if found == id {
         Ok(package)
     } else {
@@ -747,12 +747,12 @@ fn recorded_summary(
         return Ok(None);
     };
     let package = recorded_package(&record, &record_path, layout)?;
-    let metadata = &package.manifest().profile;
+    let metadata = package.model();
     Ok(Some(ProfileSummary {
         id: metadata.id.to_string(),
         version: metadata.version.clone(),
         origin: package_origin(&package, layout)?,
-        jit: metadata.jit.clone(),
+        jit: metadata.compatible_jit.clone(),
         applied: record == expected_record(&package, layout)?,
     }))
 }
@@ -790,7 +790,7 @@ pub(super) fn expected_record(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
 ) -> Result<AppliedProfileRecord> {
-    let metadata = &package.manifest().profile;
+    let metadata = package.model();
     Ok(AppliedProfileRecord::new(
         metadata.id.to_string(),
         metadata.version.clone(),
@@ -806,7 +806,7 @@ fn profile_application_input(
     layout: &RepositoryLayout,
     record_path: VirtualPath,
 ) -> Result<ProfileApplicationInput> {
-    let metadata = &package.manifest().profile;
+    let metadata = package.model();
     Ok(ProfileApplicationInput {
         id: metadata.id.to_string(),
         version: metadata.version.clone(),
@@ -1025,8 +1025,7 @@ mod tests {
     fn fixture_id() -> String {
         ProfilePackage::from_directory(&fixture_package_tree())
             .expect("the checked-in fixture tree is a valid package")
-            .manifest()
-            .profile
+            .model()
             .id
             .to_string()
     }
@@ -1106,7 +1105,7 @@ mod tests {
         fs::write(tree.join(&asset.source), content).expect("write the package asset content");
         let rewritten = authored
             .replace(
-                &format!("id = \"{}\"", source.profile.id),
+                &format!("id = \"{}\"", source.id),
                 &format!("id = \"{id}\""),
             )
             .replace(
@@ -1256,7 +1255,7 @@ mod tests {
     fn test_resolve_profile_package_reads_the_recorded_package_not_another_declaring_that_id() {
         let (temp, _storage, executor, _package) = fixture();
         let (_workspace, authored) = crate::test_utils::temporary_repository_package("jit-dogfood");
-        let id = authored.manifest().profile.id.to_string();
+        let id = authored.model().id.to_string();
 
         // A directory package declaring the id this repository also authors, so
         // nothing but the record decides which of the two answers.
@@ -1268,13 +1267,13 @@ mod tests {
                 &format!("id = \"{id}\""),
             );
         let recorded = repackage(&temp, "vendor/dogfood", "manifest.toml", &manifest);
-        assert_eq!(recorded.manifest().profile.id.as_str(), id);
+        assert_eq!(recorded.model().id.as_str(), id);
         assert_ne!(recorded.hashes(), authored.hashes());
         store_record(
             &temp,
             &AppliedProfileRecord::new(
                 id.clone(),
-                recorded.manifest().profile.version.clone(),
+                recorded.model().version.clone(),
                 ProfileOrigin::Directory(RootRelativePath::parse("vendor/dogfood").unwrap()),
                 recorded.hashes().package.clone(),
                 recorded.hashes().targets.clone(),
@@ -1502,15 +1501,12 @@ mod tests {
                 "version = \"2.0.0\"",
             );
         let rewritten = repackage(&temp, "vendor/recorded", "manifest.toml", &manifest);
-        assert_ne!(rewritten.manifest().profile.version, recorded_version);
+        assert_ne!(rewritten.model().version, recorded_version);
 
         let listed = executor.list_recorded_profiles().unwrap();
 
         assert_eq!(listed.count, 1);
-        assert_eq!(
-            listed.profiles[0].version,
-            rewritten.manifest().profile.version
-        );
+        assert_eq!(listed.profiles[0].version, rewritten.model().version);
         assert!(
             !listed.profiles[0].applied,
             "a record that no longer describes the package at its location is not applied state"
@@ -1696,7 +1692,7 @@ mod tests {
         package: &ProfilePackage,
     ) -> Vec<(MapEntryTarget, &str, &serde_json::Value)> {
         package
-            .manifest()
+            .model()
             .contributions
             .iter()
             .filter_map(|contribution| match contribution {
@@ -1752,7 +1748,7 @@ mod tests {
     #[test]
     fn test_jit_default_carries_no_asset_and_no_workflow_registry_content() {
         let (_workspace, package) = assembled_default_package();
-        let manifest = package.manifest();
+        let manifest = package.model();
 
         // The manifest is the whole package: no file is published with it, so
         // no gate prompt, checker, or template body arrives either.
@@ -1786,7 +1782,7 @@ mod tests {
             // one initialization already wrote.
             assert!(
                 package
-                    .manifest()
+                    .model()
                     .assets
                     .iter()
                     .all(|asset| asset.target != source),
@@ -1904,7 +1900,7 @@ mod tests {
         // Every declaration the manifest carries reaches the table it targets,
         // under the identity and value the manifest gave it.
         package
-            .manifest()
+            .model()
             .contributions
             .iter()
             .for_each(|contribution| match contribution {
@@ -1982,10 +1978,10 @@ mod tests {
 
         assert_eq!(
             dogfood
-                .manifest()
+                .model()
                 .dependencies
                 .iter()
-                .map(ToString::to_string)
+                .map(|dependency| dependency.id.to_string())
                 .collect::<Vec<_>>(),
             vec!["jit-default"]
         );
@@ -2077,8 +2073,8 @@ mod tests {
                 .map(|profile| (profile.id.clone(), profile.status))
                 .collect::<Vec<_>>()
         };
-        let default_id = explicit_default.manifest().profile.id.to_string();
-        let dogfood_id = explicit_dogfood.manifest().profile.id.to_string();
+        let default_id = explicit_default.model().id.to_string();
+        let dogfood_id = explicit_dogfood.model().id.to_string();
         assert_eq!(
             published_by(&explicit_default_result),
             vec![(default_id.clone(), ProfileApplicationStatus::Applied)]
@@ -2456,12 +2452,12 @@ mod tests {
         assert_eq!(
             conflict.occupant,
             ProfileConflictOccupant::Package(ProfilePackageId::new(
-                occupant.manifest().profile.id.to_string()
+                occupant.model().id.to_string()
             ))
         );
         assert_eq!(
             conflict.candidate,
-            ProfilePackageId::new(candidate.manifest().profile.id.to_string())
+            ProfilePackageId::new(candidate.model().id.to_string())
         );
         assert_eq!(conflict.path.repository_relative(), target);
         // The occupant's bytes stand: a conflict applies nothing.
@@ -2506,12 +2502,12 @@ mod tests {
         assert_eq!(
             *held_by,
             ProfileConflictOccupant::Package(ProfilePackageId::new(
-                occupant.manifest().profile.id.to_string()
+                occupant.model().id.to_string()
             ))
         );
         assert_eq!(
             *conflicting,
-            ProfilePackageId::new(candidate.manifest().profile.id.to_string())
+            ProfilePackageId::new(candidate.model().id.to_string())
         );
     }
 

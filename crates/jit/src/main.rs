@@ -2302,11 +2302,11 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let profile = &result.manifest.profile;
+                            let profile = &result.manifest;
                             println!("Profile: {}", profile.id);
                             println!("Version: {}", profile.version);
                             println!("Origin: {}", profile_origin_label(&result.origin));
-                            println!("Compatible JIT: {}", profile.jit);
+                            println!("Compatible JIT: {}", profile.compatible_jit);
                             println!("Package hash: {}", result.package_hash);
                             println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
                             println!("Targets: {}", result.target_hashes.len());

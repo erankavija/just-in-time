@@ -189,10 +189,8 @@ impl CommandExecutor<JsonFileStorage> {
                     return Ok(SessionStep::Retry);
                 }
                 let profile_status = package.as_ref().map(|package| {
-                    let record_path = VirtualPath::data(format!(
-                        "profiles/{}.json",
-                        package.manifest().profile.id
-                    ));
+                    let record_path =
+                        VirtualPath::data(format!("profiles/{}.json", package.model().id));
                     let changed_target = plan
                         .profile_targets()
                         .iter()
@@ -225,8 +223,8 @@ impl CommandExecutor<JsonFileStorage> {
                     .zip(package.as_ref())
                     .map(|(status, package)| {
                         ProfileComposedApplyResult::new(vec![ProfileApplyResult {
-                            id: package.manifest().profile.id.to_string(),
-                            version: package.manifest().profile.version.clone(),
+                            id: package.model().id.to_string(),
+                            version: package.model().version.clone(),
                             status,
                             plan_hash: plan.hash().to_string(),
                             // The applied transaction hash is the plan hash by construction.
@@ -320,7 +318,7 @@ impl CommandExecutor<JsonFileStorage> {
         super::profile::reject_reserved_application_targets(
             package.hashes().targets.keys().map(String::as_str),
         )?;
-        let metadata = &package.manifest().profile;
+        let metadata = package.model();
         let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
         let layout = self.require_layout()?;
         Ok(ProfileApplicationInput {
@@ -791,7 +789,7 @@ source-of-truth = \"registry-first\"\n";
 
         let ids = closure
             .iter()
-            .map(|package| package.manifest().profile.id.as_str())
+            .map(|package| package.model().id.as_str())
             .collect::<Vec<_>>();
         assert_eq!(
             result
@@ -891,7 +889,7 @@ source-of-truth = \"registry-first\"\n";
             .expect("the published configuration declares a type hierarchy")
             .types;
         let missing = dependency
-            .manifest()
+            .model()
             .contributions
             .iter()
             .filter_map(|contribution| match contribution {

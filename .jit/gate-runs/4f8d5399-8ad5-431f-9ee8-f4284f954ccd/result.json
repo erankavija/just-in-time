@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-f2ef652a",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d07c223478a4611e76b63ab49a60a44abe0a145d",
+  "completed_at": "2026-08-09T02:47:08.750946532Z",
+  "duration_ms": 290739,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "1857e36618842f05e1afd08d597c9a2b7d3b34aa42d9d625c46752426b29a83a",
+  "issue_id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4f8d5399-8ad5-431f-9ee8-f4284f954ccd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T02:42:18.011564601Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest profile::package::tests::test_shipped_package_decodes_without_edits_and_preserves_identity_hash ... FAILED\ntest result: FAILED. 2440 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.90s\n---- profile::package::tests::test_shipped_package_decodes_without_edits_and_preserves_identity_hash stdout ----\n\nthread 'profile::package::tests::test_shipped_package_decodes_without_edits_and_preserves_identity_hash' (1006785) panicked at crates/jit/src/profile/package.rs:1079:9:\nassertion `left == right` failed\n  left: \"5c7c1540706350e6c28452ed6fa7500a679a21b511515f52065da6f60aef62f0\"\n right: \"74610484cf7d64084390803597966ee75f675014013ad251ae21be115ea8bcd7\"\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1519 bytes=28638725)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1442891184/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

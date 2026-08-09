@@ -1,6 +1,5 @@
-use super::manifest::{
-    is_lowercase_kebab, ProfileManifest, MANIFEST_FILE_NAME, PROFILE_MANIFEST_VERSION,
-};
+use super::manifest::{is_lowercase_kebab, ProfilePackageModel, MANIFEST_FILE_NAME};
+use super::wire::ManifestWireError;
 use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
 use cap_primitives::fs::FollowSymlinks;
@@ -57,7 +56,7 @@ pub enum ProfilePackageSource {
 /// records for the bytes it admitted.
 #[derive(Debug, Clone)]
 pub struct ProfilePackage {
-    manifest: ProfileManifest,
+    model: ProfilePackageModel,
     files: BTreeMap<String, Vec<u8>>,
     hashes: ProfilePackageHashes,
     source: ProfilePackageSource,
@@ -100,15 +99,35 @@ impl ProfilePackage {
     /// which is what lets a caller join one onto a directory. The cross-check
     /// against the files a package actually holds needs those files and stays
     /// with the constructor.
+    #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn parse_manifest(
         manifest_bytes: &[u8],
-    ) -> Result<ProfileManifest, ProfilePackageError> {
-        let manifest_text = std::str::from_utf8(manifest_bytes)
-            .map_err(|source| ProfilePackageError::ManifestUtf8 { source })?;
-        let manifest: ProfileManifest =
-            toml::from_str(manifest_text).map_err(ProfilePackageError::ManifestToml)?;
-        validate_manifest_declarations(&manifest)?;
-        Ok(manifest)
+    ) -> Result<ProfilePackageModel, ProfilePackageError> {
+        Ok(Self::read_manifest(manifest_bytes)?.model)
+    }
+
+    fn read_manifest(
+        manifest_bytes: &[u8],
+    ) -> Result<super::wire::DecodedManifest, ProfilePackageError> {
+        let decoded =
+            super::wire::decode_manifest(manifest_bytes).map_err(|error| match error {
+                ManifestWireError::Utf8(source) => ProfilePackageError::ManifestUtf8 { source },
+                ManifestWireError::Toml(source) => ProfilePackageError::ManifestToml(source),
+                ManifestWireError::UnsupportedVersion(actual) => {
+                    ProfilePackageError::ManifestVersion {
+                        actual,
+                        expected: "1 or 2",
+                    }
+                }
+                ManifestWireError::InvalidVersionField(field) => {
+                    ProfilePackageError::ManifestField { field }
+                }
+                ManifestWireError::Serialization(source) => {
+                    ProfilePackageError::CanonicalSerialization(source)
+                }
+            })?;
+        validate_manifest_declarations(&decoded.model)?;
+        Ok(decoded)
     }
 
     fn from_files(
@@ -119,22 +138,23 @@ impl ProfilePackage {
         let manifest_bytes = files
             .get(MANIFEST_FILE_NAME)
             .ok_or(ProfilePackageError::MissingManifest)?;
-        let manifest = Self::parse_manifest(manifest_bytes)?;
+        let decoded = Self::read_manifest(manifest_bytes)?;
+        let model = decoded.model;
 
-        validate_declared_content(&manifest, &files)?;
-        let hashes = compute_hashes(&manifest, &files)?;
+        validate_declared_content(&model, &files)?;
+        let hashes = compute_hashes(&model, &files, &decoded.identity_manifest)?;
 
         Ok(Self {
-            manifest,
+            model,
             files,
             hashes,
             source,
         })
     }
 
-    /// Parsed runtime manifest.
-    pub fn manifest(&self) -> &ProfileManifest {
-        &self.manifest
+    /// Canonical package model produced by the manifest decoder.
+    pub fn model(&self) -> &ProfilePackageModel {
+        &self.model
     }
 
     /// Where this package's validated bytes were read from.
@@ -195,16 +215,25 @@ pub enum ProfilePackageError {
         /// UTF-8 parser error.
         source: std::str::Utf8Error,
     },
-    /// TOML does not match the runtime manifest wire type.
+    /// TOML does not match the recognized manifest wire.
     #[error("invalid profile manifest: {0}")]
     ManifestToml(#[source] toml::de::Error),
+    /// A required discriminator field is absent or malformed.
+    #[error("profile manifest field '{field}' is missing or invalid")]
+    ManifestField {
+        /// Offending field name.
+        field: &'static str,
+    },
     /// Unsupported wire version.
-    #[error("unsupported profile manifest version {actual}; expected {expected}")]
+    #[error(
+        "unsupported profile manifest version {actual} in field 'manifest-version'; \
+         expected {expected}"
+    )]
     ManifestVersion {
         /// Parsed version.
         actual: u32,
-        /// Supported version.
-        expected: u32,
+        /// Supported versions.
+        expected: &'static str,
     },
     /// A package declares itself as a dependency.
     #[error("profile '{package}' cannot depend on itself ('{dependency}')")]
@@ -228,6 +257,26 @@ pub enum ProfilePackageError {
         /// Authored value.
         value: String,
         /// Semver parser error.
+        source: semver::Error,
+    },
+    /// Invalid semantic dependency requirement.
+    #[error("invalid dependency requirement for '{dependency}' '{value}': {source}")]
+    InvalidDependencyRequirement {
+        /// Dependency identity.
+        dependency: String,
+        /// Authored requirement.
+        value: String,
+        /// Underlying semver failure.
+        source: semver::Error,
+    },
+    /// Invalid semantic incompatibility requirement.
+    #[error("invalid incompatibility requirement for '{package}' '{value}': {source}")]
+    InvalidIncompatibilityRequirement {
+        /// Incompatible package identity.
+        package: String,
+        /// Authored requirement.
+        value: String,
+        /// Underlying semver failure.
         source: semver::Error,
     },
     /// Unsafe absolute, traversal, platform-prefix, or empty path.
@@ -515,35 +564,47 @@ fn package_bounds_failure(file_count: usize, byte_size: usize) -> Option<Profile
 ///
 /// See [`ProfilePackage::parse_manifest`] for what this settles and what it
 /// deliberately leaves to [`validate_declared_content`].
-fn validate_manifest_declarations(manifest: &ProfileManifest) -> Result<(), ProfilePackageError> {
-    if manifest.profile.manifest_version != PROFILE_MANIFEST_VERSION {
-        return Err(ProfilePackageError::ManifestVersion {
-            actual: manifest.profile.manifest_version,
-            expected: PROFILE_MANIFEST_VERSION,
-        });
-    }
+fn validate_manifest_declarations(
+    manifest: &ProfilePackageModel,
+) -> Result<(), ProfilePackageError> {
     if let Some(dependency) = manifest
         .dependencies
         .iter()
-        .find(|dependency| *dependency == &manifest.profile.id)
+        .find(|dependency| dependency.id == manifest.id)
     {
         return Err(ProfilePackageError::SelfDependency {
-            package: manifest.profile.id.to_string(),
-            dependency: dependency.to_string(),
+            package: manifest.id.to_string(),
+            dependency: dependency.id.to_string(),
         });
     }
-    Version::parse(&manifest.profile.version).map_err(|source| {
-        ProfilePackageError::InvalidVersion {
-            value: manifest.profile.version.clone(),
-            source,
-        }
+    Version::parse(&manifest.version).map_err(|source| ProfilePackageError::InvalidVersion {
+        value: manifest.version.clone(),
+        source,
     })?;
-    VersionReq::parse(&manifest.profile.jit).map_err(|source| {
+    VersionReq::parse(&manifest.compatible_jit).map_err(|source| {
         ProfilePackageError::InvalidCompatibility {
-            value: manifest.profile.jit.clone(),
+            value: manifest.compatible_jit.clone(),
             source,
         }
     })?;
+    for dependency in &manifest.dependencies {
+        VersionReq::parse(&dependency.version).map_err(|source| {
+            ProfilePackageError::InvalidDependencyRequirement {
+                dependency: dependency.id.to_string(),
+                value: dependency.version.clone(),
+                source,
+            }
+        })?;
+    }
+    for incompatibility in &manifest.incompatibilities {
+        VersionReq::parse(&incompatibility.version).map_err(|source| {
+            ProfilePackageError::InvalidIncompatibilityRequirement {
+                package: incompatibility.id.to_string(),
+                value: incompatibility.version.clone(),
+                source,
+            }
+        })?;
+    }
 
     let mut contribution_ids = BTreeSet::new();
     for (index, contribution) in manifest.contributions.iter().enumerate() {
@@ -578,7 +639,9 @@ fn validate_manifest_declarations(manifest: &ProfileManifest) -> Result<(), Prof
 ///
 /// The single enumeration of what a package is made of: the assembly draws
 /// these, and the constructors hold a package's files against them.
-fn declared_sources(manifest: &ProfileManifest) -> Result<BTreeSet<String>, ProfilePackageError> {
+fn declared_sources(
+    manifest: &ProfilePackageModel,
+) -> Result<BTreeSet<String>, ProfilePackageError> {
     manifest
         .assets
         .iter()
@@ -591,7 +654,7 @@ fn declared_sources(manifest: &ProfileManifest) -> Result<BTreeSet<String>, Prof
 }
 
 /// Reject two declarations writing the same repository path.
-fn validate_content_targets(manifest: &ProfileManifest) -> Result<(), ProfilePackageError> {
+fn validate_content_targets(manifest: &ProfilePackageModel) -> Result<(), ProfilePackageError> {
     manifest
         .assets
         .iter()
@@ -610,7 +673,7 @@ fn validate_content_targets(manifest: &ProfileManifest) -> Result<(), ProfilePac
 /// Hold a package's files against what its manifest declares: every declared
 /// source is present, and no file beyond the manifest is undeclared.
 fn validate_declared_content(
-    manifest: &ProfileManifest,
+    manifest: &ProfilePackageModel,
     files: &BTreeMap<String, Vec<u8>>,
 ) -> Result<(), ProfilePackageError> {
     let declared = declared_sources(manifest)?;
@@ -636,7 +699,7 @@ fn validate_declared_content(
 /// beneath one of them falls under exactly one. A repeated root, or a root
 /// beneath another, would give one path two exclusion lists and no rule for
 /// choosing between them.
-fn validate_live_source_roots(manifest: &ProfileManifest) -> Result<(), ProfilePackageError> {
+fn validate_live_source_roots(manifest: &ProfilePackageModel) -> Result<(), ProfilePackageError> {
     let mut declared = BTreeSet::new();
     for declaration in &manifest.live_sources {
         let root = declaration.root.as_str();
@@ -786,8 +849,9 @@ fn contribution_identity(contribution: &Contribution) -> String {
 }
 
 fn compute_hashes(
-    manifest: &ProfileManifest,
+    manifest: &ProfilePackageModel,
     files: &BTreeMap<String, Vec<u8>>,
+    identity_manifest: &[u8],
 ) -> Result<ProfilePackageHashes, ProfilePackageError> {
     let mut target_frames: BTreeMap<String, Vec<Vec<u8>>> = BTreeMap::new();
 
@@ -839,7 +903,7 @@ fn compute_hashes(
 
     let mut package = Sha256::new();
     package.update(PACKAGE_HASH_DOMAIN);
-    hash_frame(&mut package, &canonical_bytes(manifest)?);
+    hash_frame(&mut package, identity_manifest);
     for (path, contents) in files
         .iter()
         .filter(|(path, _)| path.as_str() != MANIFEST_FILE_NAME)
@@ -893,12 +957,99 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::{profile_manifest_schema, ProfileId};
+    use crate::profile::{
+        profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
+        ProfileDependencyRequirement, ProfileId, RegionDeclaration,
+    };
     use crate::repository_state::{
         Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;
+
+    /// Test-only reference for the released v1 package-identity input.
+    ///
+    /// The shipped v1 contract hashed this wire-shaped value after TOML
+    /// deserialization and canonical JSON serialization. It is deliberately
+    /// confined to this test module: it is not a runtime manifest reader or a
+    /// second package model. Keeping the reference independent from the
+    /// production decoder makes a decoder change fail the continuity check.
+    #[derive(Debug, serde::Deserialize, serde::Serialize)]
+    #[serde(deny_unknown_fields)]
+    struct LegacyV1IdentityManifest {
+        profile: LegacyV1IdentityProfile,
+        #[serde(default)]
+        dependencies: Vec<ProfileId>,
+        #[serde(default, rename = "contribution")]
+        contributions: Vec<Contribution>,
+        #[serde(default, rename = "asset")]
+        assets: Vec<AssetDeclaration>,
+        #[serde(default, rename = "region")]
+        regions: Vec<RegionDeclaration>,
+        #[serde(default, rename = "live-source")]
+        live_sources: Vec<LiveSourceDeclaration>,
+    }
+
+    #[derive(Debug, serde::Deserialize, serde::Serialize)]
+    #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+    struct LegacyV1IdentityProfile {
+        manifest_version: u32,
+        id: ProfileId,
+        version: String,
+        jit: String,
+    }
+
+    /// Independently reproduce the released v1 package hash for `files`.
+    ///
+    /// This consumes exactly the bytes that the package under test owns. The
+    /// typed value exists only as a test oracle for the superseded v1 hash
+    /// contract; no production code can call it.
+    fn legacy_v1_identity_hash(files: &BTreeMap<String, Vec<u8>>) -> String {
+        let manifest_bytes = files
+            .get(MANIFEST_FILE_NAME)
+            .expect("the package under test has a manifest");
+        let manifest_text = std::str::from_utf8(manifest_bytes).expect("manifest is UTF-8");
+        let manifest: LegacyV1IdentityManifest =
+            toml::from_str(manifest_text).expect("current shipped manifest is released v1 wire");
+        let identity_manifest = serde_json::to_vec(&legacy_v1_canonicalize(
+            serde_json::to_value(manifest).expect("v1 identity oracle serializes"),
+        ))
+        .expect("v1 identity oracle serializes canonical JSON");
+
+        let mut hasher = Sha256::new();
+        hasher.update(PACKAGE_HASH_DOMAIN);
+        legacy_v1_hash_frame(&mut hasher, &identity_manifest);
+        files
+            .iter()
+            .filter(|(path, _)| path.as_str() != MANIFEST_FILE_NAME)
+            .for_each(|(path, contents)| {
+                legacy_v1_hash_frame(&mut hasher, path.as_bytes());
+                legacy_v1_hash_frame(&mut hasher, contents);
+            });
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn legacy_v1_canonicalize(value: Value) -> Value {
+        match value {
+            Value::Array(values) => {
+                Value::Array(values.into_iter().map(legacy_v1_canonicalize).collect())
+            }
+            Value::Object(values) => Value::Object(
+                values
+                    .into_iter()
+                    .map(|(key, value)| (key, legacy_v1_canonicalize(value)))
+                    .collect::<BTreeMap<_, _>>()
+                    .into_iter()
+                    .collect::<Map<_, _>>(),
+            ),
+            scalar => scalar,
+        }
+    }
+
+    fn legacy_v1_hash_frame(hasher: &mut Sha256, frame: &[u8]) {
+        hasher.update((frame.len() as u64).to_be_bytes());
+        hasher.update(frame);
+    }
 
     /// The checked-in synthetic fixture tree every case below is read from.
     fn fixture_tree() -> PathBuf {
@@ -946,8 +1097,10 @@ mod tests {
             .expect("the fixture manifest is readable UTF-8")
     }
 
-    fn parse_modified(old: &str, new: &str) -> Result<ProfileManifest, toml::de::Error> {
-        toml::from_str(&manifest_text().replace(old, new))
+    fn parse_modified(old: &str, new: &str) -> Result<ProfilePackageModel, String> {
+        crate::profile::wire::decode_manifest(manifest_text().replace(old, new).as_bytes())
+            .map(|decoded| decoded.model)
+            .map_err(|error| error.to_string())
     }
 
     fn schema_has_property(value: &Value, property: &str) -> bool {
@@ -975,10 +1128,10 @@ mod tests {
         assert_eq!(package.file_count(), 4);
         assert!(package.file_count() <= MAX_PROFILE_PACKAGE_FILES);
         assert!(package.byte_size() <= MAX_PROFILE_PACKAGE_BYTES);
-        assert_eq!(package.manifest().profile.id.as_str(), "synthetic-workflow");
-        assert_eq!(package.manifest().contributions.len(), 10);
+        assert_eq!(package.model().id.as_str(), "synthetic-workflow");
+        assert_eq!(package.model().contributions.len(), 10);
         assert!(matches!(
-            package.manifest().contributions.first(),
+            package.model().contributions.first(),
             Some(Contribution::MapEntry {
                 target: MapEntryTarget::TypeHierarchyTypes,
                 identity,
@@ -986,7 +1139,7 @@ mod tests {
             }) if identity == taxonomy.type_at_level(2)
         ));
         assert!(matches!(
-            package.manifest().contributions.get(6),
+            package.model().contributions.get(6),
             Some(Contribution::KeyedArray {
                 target: KeyedArrayTarget::Gates,
                 identity,
@@ -994,22 +1147,41 @@ mod tests {
             }) if identity == "synthetic-review"
         ));
         assert!(matches!(
-            package.manifest().contributions.last(),
+            package.model().contributions.last(),
             Some(Contribution::Projection { name, .. }) if name == "rules-and-gates"
         ));
         assert_eq!(
             package.source_bytes("nested/scripts/check.sh"),
             Some(b"#!/bin/sh\nexit 0\n".as_slice())
         );
-        assert!(package.manifest().assets[1].executable);
-        assert!(package.manifest().dependencies.is_empty());
+        assert!(package.model().assets[1].executable);
+        assert!(package.model().dependencies.is_empty());
     }
 
     #[test]
-    fn test_manifest_schema_is_generated_from_runtime_wire_type() {
+    fn test_shipped_package_decodes_without_edits_and_preserves_identity_hash() {
+        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
+
+        assert_eq!(package.model().id.as_str(), "jit-dogfood");
+        // Fixed oracle for the current shipped v1 package bytes. The
+        // independent comparison below is the continuity proof; this literal
+        // remains a useful stable-contract check rather than its replacement.
+        assert_eq!(
+            package.hashes().package,
+            "5c7c1540706350e6c28452ed6fa7500a679a21b511515f52065da6f60aef62f0"
+        );
+        assert_eq!(
+            package.hashes().package,
+            legacy_v1_identity_hash(&package.files),
+            "the canonical decoder changed the released v1 identity algorithm"
+        );
+    }
+
+    #[test]
+    fn test_package_schema_is_generated_from_canonical_model_type() {
         let package = package();
-        let schema = serde_json::to_value(profile_manifest_schema()).unwrap();
-        let instance = serde_json::to_value(package.manifest()).unwrap();
+        let schema = serde_json::to_value(profile_package_model_schema()).unwrap();
+        let instance = serde_json::to_value(package.model()).unwrap();
         jsonschema::validator_for(&schema)
             .unwrap()
             .validate(&instance)
@@ -1019,8 +1191,8 @@ mod tests {
         assert!(schema_text.contains("manifest-version"));
         assert!(schema_text.contains("projection"));
         assert!(!schema_has_property(&schema, "hook"));
-        assert!(schema_has_property(&schema, "dependencies"));
-        assert!(!schema_has_property(&schema, "variables"));
+        assert!(schema_has_property(&schema, "dependency"));
+        assert!(schema_has_property(&schema, "variable"));
     }
 
     #[test]
@@ -1032,17 +1204,20 @@ mod tests {
 
         let package = validated_package(files).unwrap();
         assert_eq!(
-            package.manifest().dependencies,
-            vec![ProfileId::try_from("jit-default").unwrap()]
+            package.model().dependencies,
+            vec![ProfileDependencyRequirement {
+                id: ProfileId::try_from("jit-default").unwrap(),
+                version: "*".to_string(),
+            }]
         );
 
-        let schema = serde_json::to_value(profile_manifest_schema()).unwrap();
-        let instance = serde_json::to_value(package.manifest()).unwrap();
+        let schema = serde_json::to_value(profile_package_model_schema()).unwrap();
+        let instance = serde_json::to_value(package.model()).unwrap();
         jsonschema::validator_for(&schema)
             .unwrap()
             .validate(&instance)
             .expect("manifest with dependency must satisfy generated schema");
-        assert_eq!(instance["dependencies"][0], "jit-default");
+        assert_eq!(instance["dependency"][0]["id"], "jit-default");
     }
 
     /// A package built from the synthetic fixture with `declaration` appended
@@ -1069,7 +1244,7 @@ mod tests {
         )
         .unwrap();
 
-        let declared = &package.manifest().live_sources;
+        let declared = &package.model().live_sources;
         assert_eq!(
             declared
                 .iter()
@@ -1080,8 +1255,8 @@ mod tests {
         assert!(declared[0].excludes("docs/guide/drafts/next.md"));
         assert!(declared[1].exclude.is_empty());
 
-        let schema = serde_json::to_value(profile_manifest_schema()).unwrap();
-        let instance = serde_json::to_value(package.manifest()).unwrap();
+        let schema = serde_json::to_value(profile_package_model_schema()).unwrap();
+        let instance = serde_json::to_value(package.model()).unwrap();
         jsonschema::validator_for(&schema)
             .unwrap()
             .validate(&instance)
@@ -1149,12 +1324,12 @@ mod tests {
         )
         .expect("siblings sharing a name prefix are separate roots");
 
-        assert_eq!(package.manifest().live_sources.len(), 2);
+        assert_eq!(package.model().live_sources.len(), 2);
     }
 
     #[test]
     fn test_manifest_inspection_carries_scalar_and_set_configuration_contributions() {
-        let manifest: ProfileManifest = toml::from_str(
+        let manifest = ProfilePackage::parse_manifest(
             r#"
 [profile]
 manifest-version = 1
@@ -1176,7 +1351,8 @@ value = "work-item"
 kind = "set-string"
 target = "documentation-managed-paths"
 value = "workspace/active"
-"#,
+"#
+            .as_bytes(),
         )
         .expect("configuration contribution vocabulary parses");
 
@@ -1377,7 +1553,7 @@ value = "workspace/active"
             ),
             (
                 "manifest-version = 1",
-                "manifest-version = 2",
+                "manifest-version = 9",
                 "unsupported profile manifest version",
             ),
         ];
@@ -1492,7 +1668,7 @@ value = "workspace/active"
         let package = package();
         let parsed = ProfilePackage::parse_manifest(manifest_text().as_bytes())
             .expect("the fixture manifest parses");
-        assert_eq!(&parsed, package.manifest());
+        assert_eq!(&parsed, package.model());
 
         // A declared path a package could never hold is refused by the parse
         // itself, so no caller reaches a join against it.
@@ -1516,13 +1692,13 @@ value = "workspace/active"
         let copy = ProfilePackage::from_directory(&writable_package_tree(&temp))
             .expect("valid package tree");
 
-        assert_eq!(copy.manifest(), authored.manifest());
+        assert_eq!(copy.model(), authored.model());
         assert_eq!(copy.hashes().package, authored.hashes().package);
         assert_eq!(copy.hashes().targets, authored.hashes().targets);
         assert_eq!(copy.file_count(), authored.file_count());
         assert_eq!(copy.byte_size(), authored.byte_size());
         assert!(copy
-            .manifest()
+            .model()
             .assets
             .iter()
             .all(|asset| copy.source_bytes(&asset.source) == authored.source_bytes(&asset.source)));
@@ -1538,7 +1714,7 @@ value = "workspace/active"
         assert_eq!(owned.hashes(), authored.hashes());
         assert!(
             owned
-                .manifest()
+                .model()
                 .assets
                 .iter()
                 .all(|asset| owned.source_bytes(&asset.source)

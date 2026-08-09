@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-f2ef652a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3259874d6533f565f03c8095cda04682ef1fa655",
+  "completed_at": "2026-08-09T02:38:57.649718037Z",
+  "duration_ms": 149581,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The versioned decoder, canonical model cutover, strict wire validation, and v1 package-hash regression coverage satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c0d89fb1-d8d2-405d-a0d9-ed32497ba447",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T02:36:28.067976421Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 532189dc, ddc01e6, 3259874d (`jit:f2ef652a`)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json\nResolved items: @/charter/D-8; @/issue/c639cfb5/requirement/REQ-09; @/invariant/canonical-cutover; @/invariant/architecture-dependency-direction; @/invariant/semantic-types; @/invariant/semantic-test-assertions; @/gate/cargo-ci; @/invariant/bounded-rust-build-footprint\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T02:31:51Z); code-review pending\nTruncation recovery: recovered truncated broad patches with bounded reads of wire.rs, package.rs, model, callers, and regression tests\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The versioned decoder, canonical model cutover, strict wire validation, and v1 package-hash regression coverage satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

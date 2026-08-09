@@ -9,6 +9,7 @@ mod apply_claims;
 mod manifest;
 mod package;
 mod repository_package;
+mod wire;
 // Repository-local generator seam: the package tree this repository assembles
 // is produced by one entry point and read back by nothing, so the render has no
 // production caller. It builds with dev-dependencies active, which turns on
@@ -44,9 +45,9 @@ pub use application::{
 };
 pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
 pub use manifest::{
-    profile_manifest_schema, AssetDeclaration, LiveSourceDeclaration, ProfileId, ProfileManifest,
-    ProfileMetadata, RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME,
-    PROFILE_MANIFEST_VERSION,
+    profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
+    ProfileDependencyRequirement, ProfileId, ProfileIncompatibility, ProfilePackageModel,
+    ProfileVariableDeclaration, RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME,
 };
 pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,

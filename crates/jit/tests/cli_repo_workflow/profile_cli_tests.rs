@@ -142,7 +142,7 @@ fn test_profile_list_and_show_work_without_repository() {
     );
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
-    assert_eq!(show["manifest"]["profile"]["id"], "jit-dogfood");
+    assert_eq!(show["manifest"]["id"], "jit-dogfood");
     assert_eq!(
         show["origin"],
         serde_json::json!({ "source": "directory", "location": location })
@@ -173,7 +173,7 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
     let show = json(&show);
     // Nothing but the supplied location holds a package declaring this
     // profile, so reporting it at all is that location having been read.
-    assert_eq!(show["manifest"]["profile"]["id"], FIXTURE_PROFILE);
+    assert_eq!(show["manifest"]["id"], FIXTURE_PROFILE);
     assert_eq!(
         show["origin"],
         serde_json::json!({ "source": "directory", "location": location })
@@ -331,7 +331,7 @@ fn test_profile_show_prefers_a_supplied_location_over_the_recorded_one() {
     );
     assert!(shown.status.success(), "{shown:?}");
     let shown = json(&shown);
-    assert_eq!(shown["manifest"]["profile"]["version"], "2.0.0");
+    assert_eq!(shown["manifest"]["version"], "2.0.0");
     assert_eq!(
         shown["origin"],
         serde_json::json!({ "source": "directory", "location": supplied })
@@ -342,7 +342,7 @@ fn test_profile_show_prefers_a_supplied_location_over_the_recorded_one() {
     let recorded_show = jit(repo.path(), &["profile", "show", FIXTURE_PROFILE, "--json"]);
     assert!(recorded_show.status.success(), "{recorded_show:?}");
     let recorded_show = json(&recorded_show);
-    assert_eq!(recorded_show["manifest"]["profile"]["version"], "1.0.0");
+    assert_eq!(recorded_show["manifest"]["version"], "1.0.0");
     assert_eq!(
         recorded_show["origin"],
         serde_json::json!({ "source": "directory", "location": recorded })

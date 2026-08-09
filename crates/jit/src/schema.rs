@@ -752,8 +752,9 @@ impl CommandSchema {
             serde_json::to_value(schema_for!(GateChecker)).unwrap_or(json!({})),
         );
         types.insert(
-            "ProfileManifest".to_string(),
-            serde_json::to_value(crate::profile::profile_manifest_schema()).unwrap_or(json!({})),
+            "ProfilePackageModel".to_string(),
+            serde_json::to_value(crate::profile::profile_package_model_schema())
+                .unwrap_or(json!({})),
         );
 
         types.insert(
@@ -1368,12 +1369,12 @@ mod tests {
     }
 
     #[test]
-    fn test_schema_publishes_profile_manifest_runtime_contract() {
+    fn test_schema_publishes_canonical_profile_package_model_contract() {
         let schema = CommandSchema::generate();
         let profile = schema
             .types
-            .get("ProfileManifest")
-            .expect("ProfileManifest schema");
+            .get("ProfilePackageModel")
+            .expect("ProfilePackageModel schema");
         let text = profile.to_string();
         assert!(text.contains("manifest-version"));
         assert!(text.contains("map-entry"));

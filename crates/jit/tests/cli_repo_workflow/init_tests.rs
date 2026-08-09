@@ -3,7 +3,7 @@
 use jit::config::DocumentationConfig;
 use jit::declarations::parse_configuration;
 use jit::domain::artifact_classifier::contains_path;
-use jit::profile::ProfileManifest;
+use jit::profile::ProfilePackageModel;
 use jit::repository_state::{Contribution, ScalarTarget, SetStringTarget};
 use std::collections::BTreeSet;
 use std::fs;
@@ -837,7 +837,7 @@ fn test_init_documentation_policy_is_the_default_package_declaration() {
 
     let policy = packaged_documentation_policy(temp.path());
     let (_workspace, package) = jit::test_utils::temporary_repository_package(DEFAULT_PACKAGE);
-    let manifest = package.manifest();
+    let manifest = package.model();
 
     assert_eq!(
         policy.development_root(),
@@ -862,7 +862,7 @@ fn test_init_documentation_policy_is_the_default_package_declaration() {
 }
 
 /// The one scalar value a manifest contributes to `target`.
-fn declared_scalar(manifest: &ProfileManifest, target: ScalarTarget) -> String {
+fn declared_scalar(manifest: &ProfilePackageModel, target: ScalarTarget) -> String {
     manifest
         .contributions
         .iter()
@@ -870,14 +870,14 @@ fn declared_scalar(manifest: &ProfileManifest, target: ScalarTarget) -> String {
             Contribution::Scalar {
                 target: declared,
                 value,
-            } if *declared == target => Some(value.clone()),
+            } if declared == &target => Some(value.clone()),
             _ => None,
         })
         .unwrap_or_else(|| panic!("the package declares {target:?}"))
 }
 
 /// Every value a manifest contributes to `target`, in declaration order.
-fn declared_set(manifest: &ProfileManifest, target: SetStringTarget) -> Vec<String> {
+fn declared_set(manifest: &ProfilePackageModel, target: SetStringTarget) -> Vec<String> {
     let declared = manifest
         .contributions
         .iter()
@@ -885,7 +885,7 @@ fn declared_set(manifest: &ProfileManifest, target: SetStringTarget) -> Vec<Stri
             Contribution::SetString {
                 target: declared,
                 value,
-            } if *declared == target => Some(value.clone()),
+            } if declared == &target => Some(value.clone()),
             _ => None,
         })
         .collect::<Vec<_>>();

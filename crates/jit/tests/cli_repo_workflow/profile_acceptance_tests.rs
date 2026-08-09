@@ -424,7 +424,7 @@ fn test_validate_repairs_a_profile_applied_from_a_directory() {
         jit::test_utils::copy_package_tree(&composition_package(), &repo.path.join(LOCATION));
     let package = jit::profile::ProfilePackage::from_directory(&directory)
         .expect("a valid package tree")
-        .manifest()
+        .model()
         .clone();
     let declared = package
         .assets
@@ -437,7 +437,7 @@ fn test_validate_repairs_a_profile_applied_from_a_directory() {
         &[
             "init",
             "--profile",
-            package.profile.id.as_str(),
+            package.id.as_str(),
             "--from",
             LOCATION,
             "--json",
@@ -869,25 +869,25 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         ])
     );
     assert_eq!(
-        property_keys(show_schema, "ProfileManifest"),
+        property_keys(show_schema, "ProfilePackageModel"),
         expected_keys(&[
             "asset",
+            "compatible-jit",
             "contribution",
-            "dependencies",
+            "dependency",
+            "id",
+            "incompatibility",
             "live-source",
-            "profile",
             "region",
+            "variable",
+            "version",
         ])
-    );
-    assert_eq!(
-        property_keys(show_schema, "ProfileMetadata"),
-        expected_keys(&["id", "jit", "manifest-version", "version"])
     );
     assert_eq!(
         property_keys(show_schema, "AppliedProfileRecord"),
         expected_keys(&["id", "origin", "package_hash", "target_hashes", "version"])
     );
-    for definition in ["ProfileManifest", "ProfileMetadata", "AppliedProfileRecord"] {
+    for definition in ["ProfilePackageModel", "AppliedProfileRecord"] {
         assert_eq!(
             show_schema["definitions"][definition]["additionalProperties"], false,
             "{definition} must reject undeclared lifecycle fields"

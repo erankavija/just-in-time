@@ -288,7 +288,7 @@ pub fn write_package_declaring(
     let rewritten = source.assets.iter().fold(
         authored
             .replace(
-                &format!("id = \"{}\"", source.profile.id),
+                &format!("id = \"{}\"", source.id),
                 &format!("id = \"{id}\""),
             )
             .replace(
@@ -444,7 +444,7 @@ mod tests {
             .map(|id| {
                 let package = assemble_repository_package(id, &workspace.path().join(id))
                     .unwrap_or_else(|error| panic!("{id} does not assemble: {error}"));
-                (id.clone(), package.manifest().profile.id.to_string())
+                (id.clone(), package.model().id.to_string())
             })
             .filter(|(directory, declared)| directory != declared)
             .collect();
@@ -482,10 +482,7 @@ mod tests {
         };
 
         let package = assembled.expect("the package assembles from an unrelated working directory");
-        assert_eq!(
-            package.manifest().profile.id.as_str(),
-            assembled_package_id()
-        );
+        assert_eq!(package.model().id.as_str(), assembled_package_id());
         assert!(
             package.file_count() > 1,
             "the assembled package carries more than a manifest"

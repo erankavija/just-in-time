@@ -863,10 +863,10 @@ fn declaring_records(
         .filter_map(|(id, _, package)| package.as_ref().ok().map(|package| (id, package)))
         .flat_map(|(id, package)| {
             package
-                .manifest()
+                .model()
                 .dependencies
                 .iter()
-                .map(move |dependency| (dependency.to_string(), id.clone()))
+                .map(move |dependency| (dependency.id.to_string(), id.clone()))
         })
         .collect()
 }
@@ -899,7 +899,7 @@ fn captured_profile_repair_claims(
 
     let mut claims = Vec::with_capacity(packages.len());
     for (record_path, package) in packages {
-        let metadata = &package.manifest().profile;
+        let metadata = package.model();
         let Some(record) = captured_applied_record(image, record_path)? else {
             return Ok(None);
         };

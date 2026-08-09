@@ -1,5 +1,5 @@
 use crate::domain::ProfileOrigin;
-use crate::profile::ProfileManifest;
+use crate::profile::ProfilePackageModel;
 use crate::repository_state::{AppliedProfileRecord, FileMode};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -108,8 +108,8 @@ pub struct ProfileListResult {
 /// Complete package inspection response.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ProfileShowResult {
-    /// Parsed immutable manifest.
-    pub manifest: ProfileManifest,
+    /// Canonical package model produced from the immutable manifest bytes.
+    pub manifest: ProfilePackageModel,
     /// Package discovery origin.
     pub origin: ProfileOrigin,
     /// Hash of the complete canonical package.
