@@ -41,7 +41,8 @@ fn jit_init_with_default_package(dir: &Path) -> std::process::Output {
     let location = format!("{PACKAGE_LOCATION}/{DEFAULT_PACKAGE}");
     jit::test_utils::assemble_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
         .expect("this repository's default package assembles");
-    jit_init(dir, &["--profile", DEFAULT_PACKAGE, "--from", &location])
+    let selector = format!("path:{location}");
+    jit_init(dir, &["--profile", &selector])
 }
 
 // ---------------------------------------------------------------------------

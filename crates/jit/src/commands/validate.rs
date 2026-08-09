@@ -2987,15 +2987,12 @@ mod tests {
         let source_layout =
             crate::storage::discover_repository_layout(source.path(), source_storage.root())
                 .unwrap();
+        let selectors = location
+            .as_ref()
+            .map(|location| vec![crate::commands::ProfileSelector::path(location)]);
         CommandExecutor::new(source_storage)
             .with_layout(source_layout)
-            .initialize_fresh_repository(
-                source.path(),
-                profile.map(|id| crate::commands::ProfileSelection {
-                    id,
-                    location: location.as_deref(),
-                }),
-            )
+            .initialize_fresh_repository(source.path(), selectors.as_deref())
             .unwrap();
 
         let storage = crate::storage::InMemoryStorage::rooted_at(source.path());
@@ -3137,13 +3134,9 @@ depends_on = ["planning"]
             .with_layout(layout)
             .initialize_fresh_repository(
                 repo.path(),
-                Some(crate::commands::ProfileSelection {
-                    id: "jit-dogfood",
-                    location: Some(&crate::test_utils::stage_repository_packages(
-                        repo.path(),
-                        "jit-dogfood",
-                    )),
-                }),
+                Some(&[crate::commands::ProfileSelector::path(
+                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
+                )]),
             )
             .unwrap();
 
@@ -3231,13 +3224,9 @@ depends_on = ["planning"]
             .with_layout(layout)
             .initialize_fresh_repository(
                 repo.path(),
-                Some(crate::commands::ProfileSelection {
-                    id: "jit-dogfood",
-                    location: Some(&crate::test_utils::stage_repository_packages(
-                        repo.path(),
-                        "jit-dogfood",
-                    )),
-                }),
+                Some(&[crate::commands::ProfileSelector::path(
+                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
+                )]),
             )
             .unwrap();
 
@@ -3485,13 +3474,9 @@ depends_on = ["planning"]
         executor
             .initialize_fresh_repository(
                 repo.path(),
-                Some(crate::commands::ProfileSelection {
-                    id: "jit-dogfood",
-                    location: Some(&crate::test_utils::stage_repository_packages(
-                        repo.path(),
-                        "jit-dogfood",
-                    )),
-                }),
+                Some(&[crate::commands::ProfileSelector::path(
+                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
+                )]),
             )
             .unwrap();
         let rules_path = repo.path().join(".jit/rules.toml");

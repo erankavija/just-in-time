@@ -490,10 +490,9 @@ impl CommandSchema {
                         schema_to_value::<crate::profile::ProfilePlanResult>(),
                     ],
                     "description": "Normal execution returns ProfileComposedApplyResult, \
-                        one ProfileApplyResult per applied package: the packages the \
-                        named one depends on, then the named one. With --dry-run, \
-                        returns the exact non-mutating ProfilePlanResult for the \
-                        named package."
+                        one ProfileApplyResult per package in dependency-first application \
+                        order for the ordered selectors. With --dry-run, returns the exact \
+                        non-mutating ProfilePlanResult for the selected package."
                 });
                 (Some(union), "ProfileComposedApplyResult")
             }

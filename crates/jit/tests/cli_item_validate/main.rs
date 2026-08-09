@@ -57,7 +57,7 @@ pub(crate) fn initialize_with_default_vocabulary(dir: &std::path::Path) {
     jit::test_utils::assemble_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
         .expect("this repository's default package assembles");
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(["init", "--profile", DEFAULT_PACKAGE, "--from", &location])
+        .args(["init", "--profile", &format!("path:{location}")])
         .current_dir(dir)
         .output()
         .expect("failed to run jit init");

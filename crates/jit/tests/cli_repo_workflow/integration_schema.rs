@@ -89,6 +89,34 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
 }
 
 #[test]
+fn test_schema_exposes_only_repeatable_profile_selectors() {
+    let output = cmd!().arg("--schema").output().unwrap();
+    let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let profile = &parsed["commands"]["profile"]["subcommands"];
+
+    for command in ["show", "apply"] {
+        let flags = profile[command]["flags"].as_array().unwrap();
+        let selector = flags
+            .iter()
+            .find(|flag| flag["name"] == "profile")
+            .unwrap_or_else(|| panic!("profile {command} must expose --profile"));
+        assert_eq!(selector["type"], "array<string>");
+        assert_eq!(selector["required"], true);
+        assert!(!flags.iter().any(|flag| flag["name"] == "from"));
+        assert!(profile[command]["args"].as_array().unwrap().is_empty());
+    }
+
+    let init_flags = parsed["commands"]["init"]["flags"].as_array().unwrap();
+    let selector = init_flags
+        .iter()
+        .find(|flag| flag["name"] == "profile")
+        .expect("init must expose --profile");
+    assert_eq!(selector["type"], "array<string>");
+    assert_eq!(selector["required"], false);
+    assert!(!init_flags.iter().any(|flag| flag["name"] == "from"));
+}
+
+#[test]
 fn test_schema_exposes_only_dependency_aware_archive_family() {
     let output = cmd!().arg("--schema").output().unwrap();
     let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();

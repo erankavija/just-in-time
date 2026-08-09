@@ -533,7 +533,7 @@ canonicalize unusual-but-valid TOML syntax spellings elsewhere in the file —
 semantically lossless, with every rule, comment, and unrelated table preserved.
 
 ```bash
-jit init [--profile <profile-id>] [--from <PATH>] [--json]
+jit init [--profile <SELECTOR>]... [--json]
 ```
 
 A plain `jit init` writes the structural minimum: `config.toml` carries the
@@ -545,14 +545,15 @@ by applying a profile package that carries them — `jit-default` for the generi
 vocabulary. Read a package directory's `manifest.toml` to see which taxonomy it
 declares before choosing one.
 
-`--profile <profile-id>` applies a profile package as part of
-initialization. `jit init --profile jit-dogfood --from packages/jit-dogfood` is
-the preferred setup for JIT's portable workflow; plain init remains
-methodology-neutral. `--from <PATH>` names the repository directory holding that
-profile package and requires `--profile`. On a first application from a
-repository package, supply this location because a fresh repository has no
+`--profile <SELECTOR>` applies a profile package as part of initialization.
+Selectors are repeatable and preserve occurrence order: `id:<PROFILE_ID>` reads
+the repository's applied-profile record, while `path:<DIR>` reads a package
+directory relative to the worktree. `jit init --profile
+path:packages/jit-dogfood` is the preferred setup for JIT's portable workflow;
+plain init remains methodology-neutral. On a first application from a
+repository package, use a `path:` selector because a fresh repository has no
 applied-profile record to read. The
-resolution order and recorded-location failure behavior are defined below. For a
+resolution and recorded-location failure behavior are defined below. For a
 fresh repository, the neutral scaffold and profile projection are planned,
 validated, and published together. If the data root is absent, JIT stages the complete root
 beside its destination and publishes it with an atomic no-replace rename; an
@@ -621,12 +622,12 @@ Profile inspection works without an initialized repository. Application targets
 the current JIT repository and runs mandatory transaction recovery before
 planning or writing.
 
-`show` and `apply` take `--from <PATH>`: a repository directory holding the
-package to read, which must hold a package declaring the requested profile ID.
-Profiled `jit init` accepts the same form. For each of these commands, a
-supplied location wins. If `--from` is absent, JIT reads the location named by
-the repository's applied-profile record; a repository with neither reports
-`PROFILE_NOT_FOUND` (exit 3). The applied-profile record is
+`show` and `apply` take one or more repeatable `--profile <SELECTOR>` flags.
+`id:<PROFILE_ID>` reads the location named by the repository's applied-profile
+record; `path:<DIR>` reads a package directory relative to the worktree.
+`jit init` accepts the same ordered selector stream. A path selector is confined
+to the worktree, including when the data root is nested there. A path package
+whose declared id shadows a selected recorded id is rejected. The applied-profile record is
 defined in [Repository Profiles](profiles.md#publication-rollback-and-recovery),
 including where it lives and what it stores, so a package obtained from a
 repository directory can be found again on later runs. A recorded location is
@@ -637,8 +638,10 @@ profile as absent.
 A package the resolved one declares a dependency on is looked for beside it,
 in a directory named by that dependency's own ID, before the record answers.
 One obtained directory of packages therefore applies as a set:
-`jit profile apply <PROFILE_ID> --from packages/<PROFILE_ID>` reaches
-`packages/<DEPENDENCY_ID>` without naming it.
+`jit profile apply --profile path:packages/<PROFILE_ID>` reaches
+`packages/<DEPENDENCY_ID>` without naming it. Multiple selectors are resolved
+and applied in their occurrence order, including interleaved `id:` and `path:`
+selectors.
 
 ### `jit profile list`
 
@@ -666,7 +669,7 @@ from prose.
 Show one profile manifest and package identity from a repository package:
 
 ```bash
-jit profile show <PROFILE_ID> [--from <PATH>] [--json]
+jit profile show --profile <SELECTOR> [--json]
 ```
 
 Human output summarizes package identity, compatibility, hashes, contribution
@@ -674,7 +677,7 @@ and asset counts, and installed state. JSON returns `ProfileShowResult`: the
 complete parsed manifest, `origin`, `package_hash`, `target_hashes`,
 `file_count`, `byte_size`, and the parseable stored `applied` provenance record
 when one is present. `show` does not compare that record with current target
-bytes; use `jit profile apply <PROFILE_ID> --dry-run` for exact current-state
+bytes; use `jit profile apply --profile <SELECTOR> --dry-run` for exact current-state
 verification.
 
 ### `jit profile apply`
@@ -683,7 +686,7 @@ Apply a profile package read from a repository location through one
 recoverable multi-target transaction:
 
 ```bash
-jit profile apply <PROFILE_ID> [--from <PATH>] [--dry-run] [--json]
+jit profile apply --profile <SELECTOR>... [--dry-run] [--json]
 ```
 
 `--dry-run` builds and validates the exact plan without writing. JSON returns
@@ -691,14 +694,14 @@ jit profile apply <PROFILE_ID> [--from <PATH>] [--dry-run] [--json]
 `plan_hash`, and the sorted target list with each action (`create`, `update`, or
 `unchanged`) and executable intent.
 
-`--dry-run` previews the named package. Applying it applies the packages it
-declares a dependency on as well, so a preview accounts for the named package's
-own targets.
+`--dry-run` previews one selected package. Applying selectors applies the
+packages each declares a dependency on as well, so a preview accounts for the
+selected package's own targets.
 
 Without `--dry-run`, JSON returns `ProfileComposedApplyResult`, the standard
 count-wrapped envelope `{"count": N, "profiles": [...]}` holding one
-`ProfileApplyResult` per applied package: the packages the named one depends on,
-then the named one. Each entry carries profile identity, `status` (`applied` or
+`ProfileApplyResult` per applied package in dependency-first selector order.
+Each entry carries profile identity, `status` (`applied` or
 `unchanged`), `plan_hash`, an optional `transaction_id`, and non-fatal cleanup
 warnings. Exact reapplication of a whole set is a successful no-op. Application
 and all coupled derived targets use the canonical recoverable multi-target

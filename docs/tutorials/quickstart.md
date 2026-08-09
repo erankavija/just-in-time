@@ -81,7 +81,7 @@ mkdir my-project && cd my-project
 
 # Place the workflow package the release archive carries, then initialize with it
 cp -R <extracted-archive>/packages .
-jit init --profile jit-dogfood --from packages/jit-dogfood
+jit init --profile path:packages/jit-dogfood
 
 # Check initial status
 jit status

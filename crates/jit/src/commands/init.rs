@@ -27,23 +27,8 @@ pub struct FreshInitResult {
     pub modified_paths: Vec<String>,
 }
 
-/// The profile one initialization applies, and where its package is read from.
-///
-/// A repository being created has no applied-profile record to read, so the
-/// caller supplies the location its bytes are at; omitting it leaves
-/// resolution to the routes
-/// [`resolve_profile_package`](CommandExecutor::resolve_profile_package)
-/// takes for any other command.
-#[derive(Debug, Clone, Copy)]
-pub struct ProfileSelection<'a> {
-    /// Stable profile id to apply.
-    pub id: &'a str,
-    /// Repository directory holding the package, when the caller names one.
-    pub location: Option<&'a Path>,
-}
-
 impl CommandExecutor<JsonFileStorage> {
-    /// Atomically complete neutral initialization and apply one profile.
+    /// Atomically complete neutral initialization and apply the selected profiles.
     ///
     /// An absent data directory is published through the recovered session's
     /// staged-root machinery; an existing partial repository fills only its missing
@@ -51,9 +36,9 @@ impl CommandExecutor<JsonFileStorage> {
     pub fn initialize_profiled_repository(
         &self,
         repo_dir: &Path,
-        profile: ProfileSelection<'_>,
+        selectors: &[super::profile::ProfileSelector],
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, Some(profile))
+        self.run_initialization(repo_dir, selectors)
     }
 
     /// Publish a fresh neutral or profiled repository through the recovered
@@ -66,9 +51,9 @@ impl CommandExecutor<JsonFileStorage> {
     pub fn initialize_fresh_repository(
         &self,
         repo_dir: &Path,
-        profile: Option<ProfileSelection<'_>>,
+        selectors: Option<&[super::profile::ProfileSelector]>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, profile)
+        self.run_initialization(repo_dir, selectors.unwrap_or_default())
     }
 
     /// Capture the base under one recovered session, validate the proposed
@@ -84,17 +69,28 @@ impl CommandExecutor<JsonFileStorage> {
     fn run_initialization(
         &self,
         repo_dir: &Path,
-        profile: Option<ProfileSelection<'_>>,
+        selectors: &[super::profile::ProfileSelector],
     ) -> Result<FreshInitResult> {
-        let closure = profile
-            .map(|profile| {
-                let package = self.resolve_profile_package(profile.id, profile.location)?;
-                self.resolve_profile_closure(&package)
-            })
-            .transpose()?;
-        let (package, dependants) = match closure.as_deref() {
-            Some([scaffolded, dependants @ ..]) => (Some(scaffolded.clone()), dependants),
-            Some([]) | None => (None, &[][..]),
+        let packages = if selectors.is_empty() {
+            Vec::new()
+        } else {
+            let selected = self.resolve_profile_selectors(selectors)?;
+            selected
+                .into_iter()
+                .try_fold(Vec::new(), |mut packages, root| {
+                    for package in self.resolve_profile_closure(&root)? {
+                        if packages.iter().all(|existing: &ProfilePackage| {
+                            existing.model().id != package.model().id
+                        }) {
+                            packages.push(package);
+                        }
+                    }
+                    Ok::<_, anyhow::Error>(packages)
+                })?
+        };
+        let (package, dependants) = match packages.as_slice() {
+            [scaffolded, dependants @ ..] => (Some(scaffolded.clone()), dependants),
+            [] => (None, &[][..]),
         };
         let layout = self.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
@@ -497,6 +493,7 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::ProfileSelector;
     use crate::profile::ProfileOrigin;
     use crate::repository_state::{AppliedProfileRecord, Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
@@ -737,10 +734,7 @@ source-of-truth = \"registry-first\"\n";
         let result = executor_with_layout(&storage, repo.path())
             .initialize_profiled_repository(
                 repo.path(),
-                ProfileSelection {
-                    id: "workflow",
-                    location: Some(&repo.path().join("packages/workflow")),
-                },
+                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
             .unwrap();
 
@@ -778,13 +772,7 @@ source-of-truth = \"registry-first\"\n";
         let closure = executor.resolve_profile_closure(&workflow).unwrap();
 
         let result = executor
-            .initialize_fresh_repository(
-                repo.path(),
-                Some(ProfileSelection {
-                    id: "jit-dogfood",
-                    location: Some(&location),
-                }),
-            )
+            .initialize_fresh_repository(repo.path(), Some(&[ProfileSelector::path(&location)]))
             .unwrap();
 
         let ids = closure
@@ -848,10 +836,7 @@ source-of-truth = \"registry-first\"\n";
             .with_layout(layout)
             .initialize_profiled_repository(
                 repo.path(),
-                ProfileSelection {
-                    id: "workflow",
-                    location: Some(&repo.path().join("packages/workflow")),
-                },
+                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
             .unwrap();
 
@@ -925,10 +910,7 @@ source-of-truth = \"registry-first\"\n";
         let error = executor_with_layout(&storage, repo.path())
             .initialize_profiled_repository(
                 repo.path(),
-                ProfileSelection {
-                    id: "workflow",
-                    location: Some(&repo.path().join("packages/workflow")),
-                },
+                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
             )
             .unwrap_err();
 
@@ -950,13 +932,9 @@ source-of-truth = \"registry-first\"\n";
         let result = executor
             .initialize_fresh_repository(
                 repo.path(),
-                Some(ProfileSelection {
-                    id: "jit-dogfood",
-                    location: Some(&crate::test_utils::stage_repository_packages(
-                        repo.path(),
-                        "jit-dogfood",
-                    )),
-                }),
+                Some(&[ProfileSelector::path(
+                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
+                )]),
             )
             .unwrap();
 
@@ -1002,13 +980,9 @@ source-of-truth = \"registry-first\"\n";
         executor
             .initialize_fresh_repository(
                 repo.path(),
-                Some(ProfileSelection {
-                    id: "jit-dogfood",
-                    location: Some(&crate::test_utils::stage_repository_packages(
-                        repo.path(),
-                        "jit-dogfood",
-                    )),
-                }),
+                Some(&[ProfileSelector::path(
+                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
+                )]),
             )
             .unwrap();
         let compact_record = {
@@ -1032,10 +1006,7 @@ source-of-truth = \"registry-first\"\n";
         let again = reinit
             .initialize_profiled_repository(
                 repo.path(),
-                ProfileSelection {
-                    id: "jit-dogfood",
-                    location: None,
-                },
+                &[ProfileSelector::id("jit-dogfood").unwrap()],
             )
             .unwrap();
 
@@ -1210,10 +1181,7 @@ assert = { require-section = { heading = \"Goals\" } }\n";
                     barrier.wait();
                     executor.initialize_fresh_repository(
                         repo.path(),
-                        Some(ProfileSelection {
-                            id: "jit-dogfood",
-                            location: Some(location.as_path()),
-                        }),
+                        Some(&[ProfileSelector::path(location.as_path())]),
                     )
                 })
             })

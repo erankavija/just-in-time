@@ -113,7 +113,7 @@ fn test_profile_help_describes_repository_package_locations() {
     for command in ["show", "apply"] {
         let help = help_text(&["profile", command, "--help"]);
         assert!(
-            help.contains("Repository directory holding the package"),
+            help.contains("worktree package directory"),
             "profile {command} --help should describe the repository package directory, got: {help}"
         );
     }

@@ -80,12 +80,15 @@ pub use gate::{
 };
 pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
-pub use init::{FreshInitResult, ProfileSelection};
+pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
 pub use issue::DescriptionUpdate;
 pub use item::{ItemListResult, ItemShowResult};
 pub use migrate::LifecycleBackfillResult;
-pub use profile::{ProfileApplyError, ProfileDependencyError, ProfileResolutionError};
+pub use profile::{
+    ProfileApplyError, ProfileDependencyError, ProfileResolutionError, ProfileSelector,
+    ProfileSelectorError,
+};
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use template::TemplateApplyResult;
 pub use template_expand::{
