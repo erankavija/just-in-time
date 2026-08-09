@@ -41,7 +41,7 @@ fn main() -> ExitCode {
             println!(
                 "OK: {} carries {} files drawn from {PACKAGE_SOURCE_PATH} and the \
                  repository files its live assets name",
-                package.manifest().profile.id,
+                package.model().id,
                 package.file_count()
             );
             ExitCode::SUCCESS

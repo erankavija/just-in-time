@@ -8,9 +8,6 @@ use crate::repository_state::Contribution;
 /// The only manifest filename recognized at the root of a profile package.
 pub const MANIFEST_FILE_NAME: &str = "manifest.toml";
 
-/// Version of the immutable v1 profile-manifest wire contract.
-pub const PROFILE_MANIFEST_VERSION: u32 = 1;
-
 /// Stable lowercase-kebab identifier used to name a profile package.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
 #[serde(transparent)]
@@ -68,18 +65,30 @@ impl<'de> Deserialize<'de> for ProfileId {
     }
 }
 
-/// A complete declarative profile manifest.
+/// The single runtime package model produced by every supported manifest wire.
 ///
-/// Unknown fields are rejected so hook, lifecycle, and future composition
-/// syntax cannot silently enter the v1 contract.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// This type intentionally contains no manifest-version discriminator. Wire
+/// versions are an input concern owned by [`crate::profile::wire`]; lifecycle
+/// readers consume this source-neutral model instead.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct ProfileManifest {
-    /// Stable package identity, version, and compatible JIT range.
-    pub profile: ProfileMetadata,
-    /// Ordered package identifiers whose contributions this package extends.
-    #[serde(default)]
-    pub dependencies: Vec<ProfileId>,
+pub struct ProfilePackageModel {
+    /// Stable lowercase-kebab package identity.
+    pub id: ProfileId,
+    /// Semantic package version.
+    pub version: String,
+    /// Semantic range of compatible JIT engine versions.
+    #[serde(rename = "compatible-jit")]
+    pub compatible_jit: String,
+    /// Ordered dependency requirements.
+    #[serde(rename = "dependency")]
+    pub dependencies: Vec<ProfileDependencyRequirement>,
+    /// Ordered incompatibility requirements.
+    #[serde(rename = "incompatibility")]
+    pub incompatibilities: Vec<ProfileIncompatibility>,
+    /// Ordered non-secret variable declarations.
+    #[serde(rename = "variable")]
+    pub variables: Vec<ProfileVariableDeclaration>,
     /// Ordered semantic contributions. Order is part of package identity.
     #[serde(default, rename = "contribution")]
     pub contributions: Vec<Contribution>,
@@ -94,18 +103,35 @@ pub struct ProfileManifest {
     pub live_sources: Vec<LiveSourceDeclaration>,
 }
 
-/// Stable package metadata.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct ProfileMetadata {
-    /// Manifest wire-version discriminator.
-    pub manifest_version: u32,
-    /// Stable lowercase-kebab package identifier.
+/// A package dependency and the version requirement it declares.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileDependencyRequirement {
+    /// Stable lowercase-kebab dependency identity.
     pub id: ProfileId,
-    /// Semantic package version.
+    /// Semantic version requirement for the dependency.
     pub version: String,
-    /// Semantic JIT version requirement.
-    pub jit: String,
+}
+
+/// A package incompatibility and the version requirement it declares.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileIncompatibility {
+    /// Stable lowercase-kebab incompatible package identity.
+    pub id: ProfileId,
+    /// Semantic version requirement for the incompatible package.
+    pub version: String,
+}
+
+/// A non-secret variable declaration carried by a package.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileVariableDeclaration {
+    /// Portable variable name.
+    pub name: String,
+    /// Optional authored default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<String>,
+    /// Optional environment variable name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub env: Option<String>,
 }
 
 /// A one-to-one file asset.
@@ -179,9 +205,9 @@ pub enum RegionPlacement {
     Append,
 }
 
-/// Generate the JSON Schema from the same runtime type used to parse manifests.
-pub fn profile_manifest_schema() -> RootSchema {
-    schema_for!(ProfileManifest)
+/// Generate the JSON Schema for the canonical package model.
+pub fn profile_package_model_schema() -> RootSchema {
+    schema_for!(ProfilePackageModel)
 }
 
 pub(crate) fn is_lowercase_kebab(value: &str) -> bool {
@@ -205,15 +231,20 @@ mod tests {
     use super::*;
 
     /// One manifest whose metadata is fixed and whose body is under test.
-    fn manifest_of(body: &str) -> Result<ProfileManifest, toml::de::Error> {
-        toml::from_str(&format!(
-            "[profile]\n\
+    fn manifest_of(body: &str) -> Result<ProfilePackageModel, String> {
+        crate::profile::wire::decode_manifest(
+            format!(
+                "[profile]\n\
              manifest-version = 1\n\
              id = \"example\"\n\
              version = \"1.0.0\"\n\
              jit = \">=1.0.0\"\n\
              {body}"
-        ))
+            )
+            .as_bytes(),
+        )
+        .map(|decoded| decoded.model)
+        .map_err(|error| error.to_string())
     }
 
     /// The parse failure `body` produces, or a panic naming what parsed.
@@ -365,9 +396,8 @@ mod tests {
             ".agents/skills/*/evals/**"
         );
 
-        // The wire form is the parsed value's own form: reading it back is exact.
-        let restored: ProfileManifest =
-            serde_json::from_value(wire).expect("the serialized manifest parses");
-        assert_eq!(restored, manifest);
+        // The canonical model preserves the declaration values readers use.
+        assert_eq!(wire["id"], "example");
+        assert_eq!(wire["compatible-jit"], ">=1.0.0");
     }
 }

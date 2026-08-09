@@ -81,7 +81,7 @@ pub fn packaged_templates(
 ) -> Result<Vec<GraphTemplate>, TemplateRegionError> {
     use crate::repository_state::{Contribution, KeyedArrayTarget};
     package
-        .manifest()
+        .model()
         .contributions
         .iter()
         .filter_map(|contribution| match contribution {

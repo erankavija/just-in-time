@@ -49,7 +49,7 @@ mod tests {
     /// or does not match that type panics naming the key.
     fn declared_gate(package: &ProfilePackage, key: &str) -> crate::declarations::GateDefinition {
         let value = package
-            .manifest()
+            .model()
             .contributions
             .iter()
             .find_map(|contribution| match contribution {
@@ -71,12 +71,12 @@ mod tests {
     #[test]
     fn test_jit_dogfood_package_validates_and_has_expected_workflow_inventory() {
         let (_workspace, package) = assembled_package();
-        assert_eq!(package.manifest().profile.id.as_str(), "jit-dogfood");
+        assert_eq!(package.model().id.as_str(), "jit-dogfood");
         assert!(package.file_count() <= super::super::MAX_PROFILE_PACKAGE_FILES);
         assert!(package.byte_size() <= super::super::MAX_PROFILE_PACKAGE_BYTES);
 
         let gates = package
-            .manifest()
+            .model()
             .contributions
             .iter()
             .filter_map(|contribution| match contribution {
@@ -101,7 +101,7 @@ mod tests {
         );
 
         let invariants = package
-            .manifest()
+            .model()
             .contributions
             .iter()
             .filter_map(|contribution| match contribution {
@@ -118,7 +118,7 @@ mod tests {
         assert!(invariants.contains("convention-convergence"));
 
         let skill_roots = package
-            .manifest()
+            .model()
             .assets
             .iter()
             .filter_map(|asset| {
@@ -146,13 +146,13 @@ mod tests {
     fn test_jit_dogfood_package_contains_no_deferred_or_checkout_local_content() {
         let (_workspace, package) = assembled_package();
         for declaration in package
-            .manifest()
+            .model()
             .assets
             .iter()
             .map(|asset| (&asset.source, &asset.target))
             .chain(
                 package
-                    .manifest()
+                    .model()
                     .regions
                     .iter()
                     .map(|region| (&region.source, &region.target)),
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test_packaged_skills_only_require_declared_project_item_kinds() {
         let (_workspace, package) = assembled_package();
-        let declares_charter = package.manifest().contributions.iter().any(|contribution| {
+        let declares_charter = package.model().contributions.iter().any(|contribution| {
             matches!(
                 contribution,
                 Contribution::MapEntry {
@@ -205,7 +205,7 @@ mod tests {
             )
         });
         let requires_charter_address = package
-            .manifest()
+            .model()
             .assets
             .iter()
             .filter(|asset| asset.target.starts_with(".agents/skills/jit-project-lead/"))
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn test_installed_paths_do_not_require_jq() {
         let (_workspace, package) = assembled_package();
-        for asset in &package.manifest().assets {
+        for asset in &package.model().assets {
             let text = std::str::from_utf8(package.source_bytes(&asset.source).unwrap())
                 .unwrap_or_default();
             let mentions_jq = text
@@ -255,7 +255,7 @@ mod tests {
     fn test_packaged_qualified_item_citations_resolve_from_installed_registries() {
         let (_workspace, package) = assembled_package();
         let mut known = BTreeMap::<String, BTreeSet<String>>::new();
-        for contribution in &package.manifest().contributions {
+        for contribution in &package.model().contributions {
             if let Contribution::KeyedArray {
                 target, identity, ..
             } = contribution
@@ -278,13 +278,13 @@ mod tests {
             regex::Regex::new(r"@/([a-z][a-z0-9-]*)/([A-Za-z0-9][A-Za-z0-9-]*)").unwrap();
 
         for (source, target) in package
-            .manifest()
+            .model()
             .assets
             .iter()
             .map(|asset| (&asset.source, &asset.target))
             .chain(
                 package
-                    .manifest()
+                    .model()
                     .regions
                     .iter()
                     .map(|region| (&region.source, &region.target)),
@@ -317,7 +317,7 @@ mod tests {
         let live: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
         assert!(!live.is_empty(), "the package declares live assets");
         let regions: BTreeSet<&str> = package
-            .manifest()
+            .model()
             .regions
             .iter()
             .map(|region| region.target.as_str())
@@ -332,7 +332,7 @@ mod tests {
     /// Every live asset's repository-relative target.
     fn live_asset_targets(package: &ProfilePackage) -> Vec<&str> {
         package
-            .manifest()
+            .model()
             .assets
             .iter()
             .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
@@ -345,14 +345,14 @@ mod tests {
     /// repository counterpart the assembly could draw them from.
     fn package_authored_sources(package: &ProfilePackage) -> Vec<&str> {
         package
-            .manifest()
+            .model()
             .assets
             .iter()
             .filter(|asset| !asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
             .map(|asset| asset.source.as_str())
             .chain(
                 package
-                    .manifest()
+                    .model()
                     .regions
                     .iter()
                     .map(|region| region.source.as_str()),
@@ -366,7 +366,7 @@ mod tests {
     #[test]
     fn test_declared_live_source_roots_claim_every_live_asset_target_exactly_once() {
         let (_workspace, package) = assembled_package();
-        let roots = &package.manifest().live_sources;
+        let roots = &package.model().live_sources;
         assert!(
             !roots.is_empty(),
             "the package declares its live-source roots"
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn test_declared_live_source_roots_claim_no_package_authored_source() {
         let (_workspace, package) = assembled_package();
-        let roots = &package.manifest().live_sources;
+        let roots = &package.model().live_sources;
         let authored = package_authored_sources(&package);
         assert!(
             !authored.is_empty(),
@@ -442,7 +442,7 @@ mod tests {
 
         assert!(
             package
-                .manifest()
+                .model()
                 .assets
                 .iter()
                 .filter(|asset| !asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
@@ -555,7 +555,7 @@ mod tests {
     fn test_unpackaged_files_under_declared_roots_is_empty_across_the_tracked_repository_tree() {
         let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let (_workspace, package) = assembled_package();
-        let roots = &package.manifest().live_sources;
+        let roots = &package.model().live_sources;
         let tracked = tracked_repository_paths(&worktree);
         let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
 
@@ -596,7 +596,7 @@ mod tests {
     #[test]
     fn test_unpackaged_files_under_declared_roots_names_a_tracked_file_no_declaration_covers() {
         let (_workspace, package) = assembled_package();
-        let roots = &package.manifest().live_sources;
+        let roots = &package.model().live_sources;
         assert!(!roots.is_empty(), "the package declares live-source roots");
         let packaged: BTreeSet<&str> = live_asset_targets(&package).into_iter().collect();
 
@@ -636,7 +636,7 @@ mod tests {
     #[test]
     fn test_unpackaged_files_under_declared_roots_consults_only_the_declaration_owning_the_path() {
         let (_workspace, package) = assembled_package();
-        let declared = &package.manifest().live_sources;
+        let declared = &package.model().live_sources;
         assert!(
             declared.len() >= 2,
             "the package declares two roots to reach between"
@@ -708,7 +708,7 @@ mod tests {
     fn test_excluded_files_under_declared_roots_covers_more_files_than_there_are_patterns() {
         let worktree = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let (_workspace, package) = assembled_package();
-        let roots = &package.manifest().live_sources;
+        let roots = &package.model().live_sources;
         let tracked = tracked_repository_paths(&worktree);
         let covered = excluded_files_under_declared_roots(roots, &tracked);
         let patterns: usize = roots
@@ -752,7 +752,7 @@ mod tests {
     fn test_excluded_files_under_declared_roots_matches_only_patterns_authored_beneath_their_root()
     {
         let (_workspace, package) = assembled_package();
-        let roots = &package.manifest().live_sources;
+        let roots = &package.model().live_sources;
 
         let stray: Vec<(&str, &str)> = roots
             .iter()
@@ -810,9 +810,9 @@ mod tests {
     #[test]
     fn test_managed_region_sources_stay_outside_live_asset_prefix() {
         let (_workspace, package) = assembled_package();
-        assert!(!package.manifest().regions.is_empty());
+        assert!(!package.model().regions.is_empty());
         assert!(package
-            .manifest()
+            .model()
             .regions
             .iter()
             .all(|region| !region.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX)));
@@ -1001,13 +1001,13 @@ mod tests {
     fn test_managed_region_drift_report_compares_every_manifest_region_declaration() {
         let (_workspace, package) = assembled_package();
         let expected = package
-            .manifest()
+            .model()
             .regions
             .iter()
             .map(|region| (region.target.clone(), region.source.clone()))
             .collect::<BTreeSet<_>>();
         let compared = package
-            .manifest()
+            .model()
             .regions
             .iter()
             .map(|region| {
@@ -1039,7 +1039,7 @@ mod tests {
         // that the package leaves as a placeholder. Normalizing both sides' invariants
         // sub-region through the same splice makes prose drift the only difference the
         // comparison can surface.
-        for region in &package.manifest().regions {
+        for region in &package.model().regions {
             let live = fs::read_to_string(root.join(&region.target)).unwrap();
             let begin = format!("<!-- jit:{}:begin -->", region.region_id);
             let end = format!("<!-- jit:{}:end -->", region.region_id);
@@ -1277,7 +1277,7 @@ mod tests {
     ) -> Vec<crate::profile::drift_report::DriftReport> {
         crate::profile::contribution_drift::contribution_drift_reports(
             id,
-            &package.manifest().contributions,
+            &package.model().contributions,
             registries,
             DECLARED_OVERRIDES,
         )
@@ -1292,7 +1292,7 @@ mod tests {
         packages
             .iter()
             .flat_map(|(id, package)| {
-                let registries = contributed_registries(&package.manifest().contributions);
+                let registries = contributed_registries(&package.model().contributions);
                 contribution_drift(id, package, &registries)
             })
             .collect()
@@ -1337,7 +1337,7 @@ mod tests {
         let uncompared: Vec<&str> = packages
             .iter()
             .filter(|(_, package)| {
-                contributed_registries(&package.manifest().contributions).is_empty()
+                contributed_registries(&package.model().contributions).is_empty()
             })
             .map(|(id, _)| id.as_str())
             .collect();
@@ -1367,7 +1367,7 @@ mod tests {
             .iter()
             .flat_map(|(id, package)| {
                 package
-                    .manifest()
+                    .model()
                     .contributions
                     .iter()
                     .map(|contribution| (id.clone(), declared_target(contribution)))
@@ -1381,7 +1381,7 @@ mod tests {
         let bound: BTreeSet<(String, String)> = packages
             .iter()
             .flat_map(|(id, package)| {
-                let contributions = &package.manifest().contributions;
+                let contributions = &package.model().contributions;
                 let registries = contributed_registries(contributions);
                 contributions
                     .iter()
@@ -1414,7 +1414,7 @@ mod tests {
     #[test]
     fn test_contribution_drift_report_names_both_carriers_of_a_seeded_repository_edit() {
         let (_workspace, package) = assembled_package();
-        let contributions = &package.manifest().contributions;
+        let contributions = &package.model().contributions;
         let registry = KeyedArrayTarget::Invariants.registry_path();
         let mut registries = contributed_registries(contributions);
         let committed = registries
@@ -1460,7 +1460,7 @@ mod tests {
             .filter(|declared| {
                 !packages.iter().any(|(id, package)| {
                     package
-                        .manifest()
+                        .model()
                         .contributions
                         .iter()
                         .any(|contribution| declared.applies_to(id, contribution))
@@ -1819,7 +1819,7 @@ mod tests {
         // one: the application contributes entries into it and does not publish a
         // replacement asset.
         assert!(!package
-            .manifest()
+            .model()
             .assets
             .iter()
             .any(|asset| asset.target == ".jit/invariants.toml"));
@@ -1877,7 +1877,7 @@ mod tests {
     fn test_installed_rules_gates_reference_is_derived_from_manifest_registries() {
         let (_workspace, package) = assembled_package();
         let rule_values = package
-            .manifest()
+            .model()
             .contributions
             .iter()
             .filter_map(|contribution| match contribution {
@@ -1998,7 +1998,7 @@ mod tests {
     #[cfg(unix)]
     fn live_asset_executable_declarations(package: &ProfilePackage) -> Vec<(&str, bool)> {
         package
-            .manifest()
+            .model()
             .assets
             .iter()
             .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))

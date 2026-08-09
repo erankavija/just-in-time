@@ -46,7 +46,7 @@ fn build_claims(
     validate_interpolation(package)?;
     validate_target_overlaps(package)?;
     let assets = package
-        .manifest()
+        .model()
         .assets
         .iter()
         .map(|asset| {
@@ -68,7 +68,7 @@ fn build_claims(
         })
         .collect::<Result<Vec<_>, ProfileClaimError>>()?;
     let regions = package
-        .manifest()
+        .model()
         .regions
         .iter()
         .map(|region| {
@@ -89,11 +89,11 @@ fn build_claims(
         })
         .collect::<Result<Vec<_>, ProfileClaimError>>()?;
     Ok(ProfileClaims {
-        package_id: ProfilePackageId::new(package.manifest().profile.id.to_string()),
+        package_id: ProfilePackageId::new(package.model().id.to_string()),
         contributions: if replace_owned {
             Vec::new()
         } else {
-            package.manifest().contributions.clone()
+            package.model().contributions.clone()
         },
         assets,
         regions,
@@ -102,13 +102,13 @@ fn build_claims(
 
 fn validate_interpolation(package: &ProfilePackage) -> Result<(), ProfileClaimError> {
     for source in package
-        .manifest()
+        .model()
         .assets
         .iter()
         .map(|asset| asset.source.as_str())
         .chain(
             package
-                .manifest()
+                .model()
                 .regions
                 .iter()
                 .map(|region| region.source.as_str()),
@@ -123,7 +123,7 @@ fn validate_interpolation(package: &ProfilePackage) -> Result<(), ProfileClaimEr
             });
         }
     }
-    for (index, contribution) in package.manifest().contributions.iter().enumerate() {
+    for (index, contribution) in package.model().contributions.iter().enumerate() {
         if json_contains_interpolation(&serde_json::to_value(contribution).expect("serializes")) {
             return Err(ProfileClaimError::InvalidInterpolation {
                 location: format!("contribution[{index}]"),
@@ -135,19 +135,19 @@ fn validate_interpolation(package: &ProfilePackage) -> Result<(), ProfileClaimEr
 
 fn validate_target_overlaps(package: &ProfilePackage) -> Result<(), ProfileClaimError> {
     let semantic = package
-        .manifest()
+        .model()
         .contributions
         .iter()
         .map(|contribution| contribution.registry_path().to_string())
         .collect::<BTreeSet<_>>();
     let content = package
-        .manifest()
+        .model()
         .assets
         .iter()
         .map(|asset| asset.target.clone())
         .chain(
             package
-                .manifest()
+                .model()
                 .regions
                 .iter()
                 .map(|region| region.target.clone()),

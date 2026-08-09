@@ -70,7 +70,7 @@ fn item_list(repo: &Path, kind: Option<&str>) -> Value {
 fn declared_item_kinds() -> BTreeMap<String, Value> {
     let (_workspace, package) = jit::test_utils::temporary_repository_package(DEFAULT_PACKAGE);
     package
-        .manifest()
+        .model()
         .contributions
         .iter()
         .filter_map(|contribution| match contribution {
