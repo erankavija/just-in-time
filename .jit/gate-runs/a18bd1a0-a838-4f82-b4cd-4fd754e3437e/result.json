@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9a4a5f0070852c985d60d8eb0d190711a65ce1c0",
+  "completed_at": "2026-08-09T05:08:35.345929516Z",
+  "duration_ms": 293232,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/init.rs",
+        "id": "F1",
+        "line": 80,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Init deduplicates selected package IDs, losing repeated selector occurrences."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F2",
+        "line": 2299,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Profile show rejects repeated selectors although its CLI, schema, and bridge advertise an array selector."
+      }
+    ],
+    "summary": "Init collapses repeated selectors and profile show rejects repeated selectors despite the advertised contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a18bd1a0-a838-4f82-b4cd-4fd754e3437e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T05:03:42.113287041Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 16231 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe4e7-c52a-7951-816b-caeda04f578c\n--------\nuser\n--- 16218 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 31cd9894, 6f9da1b1, 8256590b4, 2b550db9, 6ec1ca90, 9a4a5f00 (`jit:eac6ec13`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/inv/canonical-cutover, @/inv/architecture-dependency-direction, @/inv/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); mcp-ci passed (exit unavailable); prior code-review passed (exit 0)\nTruncation recovery: Recovered aggregate-diff truncation with per-file and line-ranged patch reads; excluded unrelated uncommitted JIT run metadata.\n\n1. [blocking, issue-impact] `init` silently deduplicates selected package IDs at [crates/jit/src/commands/init.rs:80](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/init.rs:80), so repeated/interleaved occurrences do not reach its result exactly as requested. For example, two `path:` occurrences for the same package produce one application, unlike `profile apply`’s occurrence-preserving behavior.\n\n2. [blocking, issue-impact] `profile show` advertises a repeatable `--profile` array in the CLI, schema, and bridge, but rejects a second selector at [crates/jit/src/main.rs:2299](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2299). This violates the repeatable-selector contract and the updated command reference’s “one or more” wording.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Init collapses repeated selectors and profile show rejects repeated selectors despite the advertised contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Init deduplicates selected package IDs, losing repeated selector occurrences.\",\"file\":\"crates/jit/src/commands/init.rs\",\"line\":80,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Profile show rejects repeated selectors although its CLI, schema, and bridge advertise an array selector.\",\"file\":\"crates/jit/src/main.rs\",\"line\":2299,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
