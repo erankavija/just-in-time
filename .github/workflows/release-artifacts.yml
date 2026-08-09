@@ -257,11 +257,10 @@ jobs:
           # resolver reads the published package bytes in place.
           workspace="$prefix"
           cd "$workspace"
-          jit init --profile jit-dogfood \
-            --from "$prefix/packages/jit-dogfood" --json > init.json
+          jit init --profile path:packages/jit-dogfood --json > init.json
           jit validate
           jit profile list --json > profiles.json
-          jit profile apply jit-dogfood --dry-run --json > plan.json
+          jit profile apply --profile id:jit-dogfood --dry-run --json > plan.json
           python3 - <<'PY'
           import json
 
@@ -290,7 +289,8 @@ jobs:
           # Re-planning an exact installation reports no work, which is what
           # makes the quickstart's result observable rather than merely quiet.
           plan = json.load(open("plan.json"))
-          assert plan["status"] == "unchanged", plan
+          assert plan["count"] == len(plan["profiles"]) == 1, plan
+          assert plan["profiles"][0]["status"] == "unchanged", plan
           PY
 
       - name: Verify the machine contract the archive carries

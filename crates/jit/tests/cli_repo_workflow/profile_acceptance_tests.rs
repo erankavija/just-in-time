@@ -925,3 +925,33 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         expected_keys(&["action", "executable", "path"])
     );
 }
+
+#[test]
+fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
+    let workflow_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../.github/workflows/release-artifacts.yml");
+    let workflow = fs::read_to_string(&workflow_path)
+        .unwrap_or_else(|error| panic!("read {workflow_path:?}: {error}"));
+
+    assert!(
+        workflow.contains("jit init --profile path:packages/jit-dogfood --json > init.json"),
+        "release smoke must use the repeatable selector syntax for init"
+    );
+    assert!(
+        workflow
+            .contains("jit profile apply --profile id:jit-dogfood --dry-run --json > plan.json"),
+        "release smoke must use the repeatable selector syntax for dry-run"
+    );
+    assert!(
+        workflow.contains("assert plan[\"count\"] == len(plan[\"profiles\"]) == 1, plan"),
+        "release smoke must validate the count-wrapped dry-run envelope"
+    );
+    assert!(
+        workflow.contains("assert plan[\"profiles\"][0][\"status\"] == \"unchanged\", plan"),
+        "release smoke must validate the per-profile dry-run status"
+    );
+    assert!(
+        !workflow.contains("assert plan[\"status\"] == \"unchanged\", plan"),
+        "release smoke must not read the removed top-level dry-run status"
+    );
+}
