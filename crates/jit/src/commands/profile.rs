@@ -1861,6 +1861,8 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
     use tempfile::TempDir;
 
     struct RecaptureRaceSession {
@@ -1874,6 +1876,34 @@ mod tests {
         captures: usize,
         config_path: std::path::PathBuf,
         source_path: std::path::PathBuf,
+    }
+
+    /// Observe actual recoverable publications without coupling the test to
+    /// preparatory graph or capture sessions. This transaction-kernel edge runs
+    /// once for each delta that reaches `session.apply`.
+    struct PublicationCounter(AtomicUsize);
+
+    impl PublicationCounter {
+        fn new() -> Arc<Self> {
+            Arc::new(Self(AtomicUsize::new(0)))
+        }
+
+        fn count(&self) -> usize {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    impl crate::storage::TransactionFailureInjector for PublicationCounter {
+        fn check(
+            &self,
+            point: &crate::storage::TransactionFailurePoint,
+        ) -> std::io::Result<()> {
+            if point == &crate::storage::TransactionFailurePoint::RepositoryBeforeControlCreation
+            {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(())
+        }
     }
 
     impl RepositoryMutationSession for RecaptureRaceSession {
@@ -3765,6 +3795,52 @@ template = true
             dependant.hashes().package
         );
         assert_ne!(dependency.hashes().package, dependant.hashes().package);
+    }
+
+    #[test]
+    fn test_apply_profile_selection_publishes_multiple_packages_through_one_transaction() {
+        let temp = TempDir::new().unwrap();
+        let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
+        CommandExecutor::new(bootstrap.clone())
+            .with_layout(discover_repository_layout(temp.path(), bootstrap.root()).unwrap())
+            .initialize_fresh_repository(temp.path(), None)
+            .unwrap();
+        let left = package_declaring(&temp, "vendor/left", "left", &[]);
+        let right = package_declaring(&temp, "vendor/right", "right", &[]);
+        let publications = PublicationCounter::new();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            temp.path().join(".jit"),
+            publications.clone(),
+        );
+        let executor = CommandExecutor::new(storage.clone()).with_layout(
+            discover_repository_layout(temp.path(), storage.root()).unwrap(),
+        );
+
+        let applied = executor
+            .apply_profile(&[package_selector(&left), package_selector(&right)])
+            .unwrap();
+
+        assert_eq!(
+            publications.count(),
+            1,
+            "one selection must reach the recoverable publication boundary once"
+        );
+        assert_eq!(
+            applied
+                .profiles
+                .iter()
+                .map(|profile| (profile.id.as_str(), profile.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("left", ProfileApplicationStatus::Applied),
+                ("right", ProfileApplicationStatus::Applied),
+            ]
+        );
+        for id in ["left", "right"] {
+            assert!(temp.path().join(format!(".jit/profiles/{id}.json")).is_file());
+            assert!(temp.path().join(format!("docs/{id}.txt")).is_file());
+        }
+        assert_eq!(applied_event_ids(&storage), vec!["left", "right"]);
     }
 
     #[test]
