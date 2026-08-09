@@ -25,7 +25,7 @@
       "wave_number": 4,
       "issues": [
         {"id": "f73d54a2-14bd-4641-bcfe-be5f1431c133", "short_id": "f73d54a2", "title": "Canonical package model, selection, and graph", "classification": "implementation", "status": "done"},
-        {"id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6", "short_id": "fc47a7bf", "title": "Resolve declared non-secret variables into package content", "classification": "implementation", "status": "pending"}
+        {"id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6", "short_id": "fc47a7bf", "title": "Resolve declared non-secret variables into package content", "classification": "implementation", "status": "in_progress"}
       ]
     },
     {
