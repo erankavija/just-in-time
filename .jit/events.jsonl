@@ -13374,3 +13374,8 @@
 {"id":"ded02d31-c37e-4f18-b6e5-16417a5788e5","issue_id":"f73d54a2-14bd-4641-bcfe-be5f1431c133","timestamp":"2026-08-09T10:49:06.197257668Z","type":"issue_completed"}
 {"from":"ready","id":"48b0fe94-7500-4a81-bc9e-42f0b6fedb24","issue_id":"fc47a7bf-1e2a-43b1-8887-4546375c35c6","timestamp":"2026-08-09T10:50:55.211882337Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker-fc47a7bf","id":"318062f2-9cf1-4e5d-8f74-3ea7038d871a","issue_id":"fc47a7bf-1e2a-43b1-8887-4546375c35c6","timestamp":"2026-08-09T10:50:55.211882337Z","type":"issue_claimed"}
+{"gate_key":"holistic-review","id":"7becda60-2dfa-4461-a19c-25e5a78a7cb3","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-09T12:07:31.383889512Z","type":"gate_added"}
+{"gate_key":"holistic-review","id":"69db4f1e-6ead-4cab-858c-04ce945fcbe3","issue_id":"42c8c9c1-737d-48a6-b8b4-911aafa1a263","timestamp":"2026-08-09T12:07:31.807918203Z","type":"gate_added"}
+{"gate_key":"holistic-review","id":"8b144e4e-4b6c-4840-94c0-3286b75c4e49","issue_id":"dd268d0f-2656-4e85-8527-990dc6aea0b4","timestamp":"2026-08-09T12:07:32.226321813Z","type":"gate_added"}
+{"gate_key":"holistic-review","id":"7768f275-a312-4676-92f2-25d14dccf0ce","issue_id":"f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0","timestamp":"2026-08-09T12:07:32.700526869Z","type":"gate_added"}
+{"gate_key":"holistic-review","id":"0a17fc46-cb64-4f43-b3d3-acebea933cc5","issue_id":"f73d54a2-14bd-4641-bcfe-be5f1431c133","timestamp":"2026-08-09T12:07:33.119651079Z","type":"gate_added"}

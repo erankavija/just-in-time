@@ -11,9 +11,15 @@
   "done_at": "2026-08-09T10:49:06.197257668Z",
   "first_ready_at": "2026-08-09T10:47:39.542391936Z",
   "gates_required": [
-    "repo-validate"
+    "repo-validate",
+    "holistic-review"
   ],
   "gates_status": {
+    "holistic-review": {
+      "status": "pending",
+      "updated_at": "2026-08-09T12:07:33.119651079Z",
+      "updated_by": null
+    },
     "repo-validate": {
       "status": "passed",
       "updated_at": "2026-08-09T10:48:51.434431934Z",
@@ -33,5 +39,5 @@
   "priority": "high",
   "state": "done",
   "title": "Canonical package model, selection, and graph",
-  "updated_at": "2026-08-09T10:49:06.197257668Z"
+  "updated_at": "2026-08-09T12:07:33.119651079Z"
 }
