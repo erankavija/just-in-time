@@ -196,7 +196,9 @@ pub use profile_apply::{
     ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflictError,
     ScalarTarget, SetStringTarget,
 };
-pub(crate) use profile_apply::{preflight_profile_contributions, profile_capture_closure};
+pub(crate) use profile_apply::{
+    preflight_profile_contributions, profile_capture_closure, profile_contribution_target_paths,
+};
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
 };

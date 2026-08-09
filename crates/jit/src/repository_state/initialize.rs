@@ -426,9 +426,20 @@ impl InitializationScaffold {
         let Some(profile) = &self.profile else {
             return Ok(Vec::new());
         };
-        let proposed = super::apply_overlay(base, desired_overrides(base, &self.desired_files()?)?)
-            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
-        super::profile_apply::profile_capture_closure(&proposed, &profile.claims)
+        let proposed = self.profile_composition_base(base)?;
+        super::profile_apply::profile_capture_closure(&proposed, profile)
+            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
+    }
+
+    /// Overlay only the neutral scaffold files that initialization will actually
+    /// publish, preserving existing `IfAbsent` authored files. This is the
+    /// repository view against which profile composition is both captured and
+    /// preflighted before the scaffold can publish.
+    pub(crate) fn profile_composition_base(
+        &self,
+        base: &RepositoryImage,
+    ) -> Result<RepositoryImage, InitializationError> {
+        super::apply_overlay(base, desired_overrides(base, &self.desired_files()?)?)
             .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
     }
 
@@ -481,9 +492,10 @@ pub(super) fn derive_initialization(
     let mut profile_changed = false;
     let mut profile_record = None;
     if let Some(profile) = &scaffold.profile {
-        let composed = super::profile_apply::compose_profile_targets(
+        let composed = super::profile_apply::compose_profile_targets_with_context(
             &neutral_proposed,
             profile.claims.clone(),
+            profile.contribution_context.clone(),
         )
         .map_err(profile_composition_error)?;
         let record = profile.record(composed.contributions);
@@ -822,8 +834,12 @@ pub(super) fn derive_profile_application(
     profile: &ProfileApplicationInput,
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
-    let composed = super::profile_apply::compose_profile_targets(base, profile.claims.clone())
-        .map_err(profile_composition_error)?;
+    let composed = super::profile_apply::compose_profile_targets_with_context(
+        base,
+        profile.claims.clone(),
+        profile.contribution_context.clone(),
+    )
+    .map_err(profile_composition_error)?;
     let record = profile.record(composed.contributions);
     let mut targets = Vec::with_capacity(composed.targets.len());
     let files = composed

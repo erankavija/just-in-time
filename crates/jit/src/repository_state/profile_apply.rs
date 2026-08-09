@@ -757,10 +757,36 @@ pub struct ProfileApplicationInput {
     pub target_hashes: BTreeMap<String, String>,
     pub origin: ProfileOrigin,
     pub claims: ProfileClaims,
+    /// Resolved candidates sharing one of this package's semantic identities.
+    ///
+    /// The command supplies this scoped selection or dependency-closure context
+    /// before sequential publication begins. It lets every affected record
+    /// retain the same complete owner set without making unrelated package
+    /// declarations part of this package's materialization.
+    pub(crate) contribution_context: Vec<ProfileContributionClaim>,
     pub record_path: VirtualPath,
 }
 
 impl ProfileApplicationInput {
+    /// Scope a selected package set to the semantic identities this input owns.
+    pub(crate) fn with_contribution_context(
+        mut self,
+        candidates: &[ProfileContributionClaim],
+    ) -> Self {
+        let identities = self
+            .claims
+            .contributions
+            .iter()
+            .map(|claim| claim.contribution.semantic_identity())
+            .collect::<BTreeSet<_>>();
+        self.contribution_context = candidates
+            .iter()
+            .filter(|claim| identities.contains(&claim.contribution.semantic_identity()))
+            .cloned()
+            .collect();
+        self
+    }
+
     /// Whether this package contributes either authored input of the coupled
     /// default-rule/schema materialization.
     ///
@@ -791,7 +817,7 @@ impl ProfileApplicationInput {
 /// Enumerate paths implied by a profile's proposed declarations before rendering.
 pub(crate) fn profile_capture_closure(
     base: &RepositoryImage,
-    claims: &ProfileClaims,
+    profile: &ProfileApplicationInput,
 ) -> Result<Vec<VirtualPath>, RepositoryStateError> {
     let record_paths = applied_profile_record_paths(base)?;
     if record_paths
@@ -800,7 +826,8 @@ pub(crate) fn profile_capture_closure(
     {
         return Ok(record_paths);
     }
-    let composed = compose_profile_contributions(base, claims)?;
+    let composed = compose_profile_contributions(base, &profile.contribution_context)?;
+    let composed = owned_composed_contributions(composed, &profile.claims.package_id);
     let registries = render_composed_contributions(base, &composed)?;
     let proposed = apply_overlay(
         base,
@@ -852,7 +879,21 @@ pub(super) fn compose_profile_targets(
     base: &RepositoryImage,
     claims: ProfileClaims,
 ) -> Result<ProfileTargetComposition, RepositoryStateError> {
-    let composed = compose_profile_contributions(base, &claims)?;
+    let contribution_context = claims.contributions.clone();
+    compose_profile_targets_with_context(base, claims, contribution_context)
+}
+
+/// Derive profile-owned targets with a preflighted, identity-scoped candidate
+/// context. Definitions outside the package's own identities remain outside its
+/// per-package publication, while equal definitions retain their full owner set
+/// in every affected provenance record.
+pub(super) fn compose_profile_targets_with_context(
+    base: &RepositoryImage,
+    claims: ProfileClaims,
+    contribution_context: Vec<ProfileContributionClaim>,
+) -> Result<ProfileTargetComposition, RepositoryStateError> {
+    let composed = compose_profile_contributions(base, &contribution_context)?;
+    let composed = owned_composed_contributions(composed, &claims.package_id);
     let mut targets = render_composed_contributions(base, &composed)?;
     let package_id = claims.package_id.clone();
     let projection_targets = configured_projection_targets(base, &targets)?;
@@ -955,14 +996,37 @@ pub(crate) fn preflight_profile_contributions(
         .map_err(Into::into)
 }
 
-/// Compose a candidate package's claims with the repository's per-identity
-/// ownership evidence before any registry renderer receives a definition.
+/// Return every registry path whose semantic definition contributes to this
+/// operation's preflight context.
+pub(crate) fn profile_contribution_target_paths(
+    candidates: &[ProfileContributionClaim],
+) -> Result<Vec<VirtualPath>, super::RepositoryLayoutError> {
+    Ok(candidates
+        .iter()
+        .map(|claim| claim.contribution.registry_target())
+        .collect::<Result<BTreeSet<_>, _>>()?
+        .into_iter()
+        .collect())
+}
+
+/// Compose a candidate context with the repository's per-identity ownership
+/// evidence before any registry renderer receives a definition.
 fn compose_profile_contributions(
     base: &RepositoryImage,
-    claims: &ProfileClaims,
+    candidates: &[ProfileContributionClaim],
 ) -> Result<Vec<ComposedContribution>, RepositoryStateError> {
-    let existing = existing_contribution_claims(base, &claims.contributions)?;
-    compose_resolved_contributions(existing, claims.contributions.clone()).map_err(Into::into)
+    let existing = existing_contribution_claims(base, candidates)?;
+    compose_resolved_contributions(existing, candidates.iter().cloned()).map_err(Into::into)
+}
+
+fn owned_composed_contributions(
+    contributions: Vec<ComposedContribution>,
+    package_id: &ProfilePackageId,
+) -> Vec<ComposedContribution> {
+    contributions
+        .into_iter()
+        .filter(|contribution| contribution.owners.contains(package_id))
+        .collect()
 }
 
 /// Render definitions that have already passed one semantic ownership

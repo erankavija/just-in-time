@@ -965,6 +965,7 @@ kind = "advisory"
                 assets: Vec::new(),
                 regions: Vec::new(),
             },
+            contribution_context: Vec::new(),
             record_path: VirtualPath::data("profiles/identity-test.json").unwrap(),
         };
         let profile_image = image(&[

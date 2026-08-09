@@ -1,4 +1,6 @@
-use super::{with_mutation_session, CommandExecutor, SessionStep};
+use super::{
+    profile::validate_variable_inputs, with_mutation_session, CommandExecutor, SessionStep,
+};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::profile::{
     build_profile_claims_from_resolved, resolve_package, ProfileApplicationStatus,
@@ -169,6 +171,9 @@ impl CommandExecutor<JsonFileStorage> {
             [scaffolded, dependants @ ..] => (Some(scaffolded.clone()), dependants),
             [] => (None, &[][..]),
         };
+        validate_variable_inputs(&packages, variable_inputs)?;
+        let contribution_context =
+            self.profile_contribution_candidates(&packages, variable_inputs)?;
         let layout = self.require_layout()?;
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
@@ -182,15 +187,19 @@ impl CommandExecutor<JsonFileStorage> {
             |session| {
                 let (config, project_name) = self.resolve_init_config(&mut *session, repo_dir)?;
                 let profile = match package.as_ref() {
-                    Some(package) => {
-                        Some(self.profile_input_with_inputs(package, variable_inputs)?)
-                    }
+                    Some(package) => Some(
+                        self.profile_input_with_inputs(package, variable_inputs)?
+                            .with_contribution_context(&contribution_context),
+                    ),
                     None => None,
                 };
                 let scaffold = InitializationScaffold::from_config(config, project_name, profile)?
                     .with_gitattributes(gitattributes.clone());
 
                 let mut extra_paths = scaffold.delta_paths()?;
+                extra_paths.extend(crate::repository_state::profile_contribution_target_paths(
+                    &contribution_context,
+                )?);
                 // Probe capture: the deliberately over-inclusive scaffold overlay yields
                 // a base good enough to finalize the exact delta. That delta's overlay
                 // is the AUTHORITATIVE proposed state — only the files init writes — so a
@@ -221,6 +230,13 @@ impl CommandExecutor<JsonFileStorage> {
                         return Ok(SessionStep::Retry);
                     }
                     probe = expanded;
+                }
+                if !contribution_context.is_empty() {
+                    let profile_base = scaffold.profile_composition_base(&probe)?;
+                    crate::repository_state::preflight_profile_contributions(
+                        &profile_base,
+                        contribution_context.clone(),
+                    )?;
                 }
                 let delta_overlay = super::validation_overlay(
                     derive_materialization(
@@ -332,7 +348,7 @@ impl CommandExecutor<JsonFileStorage> {
                     package,
                     &variable_inputs.for_declarations(&package.model().variables),
                 )?;
-                self.apply_one_profile_package(package, &resolved)
+                self.apply_one_profile_package(package, &resolved, &contribution_context)
             })
             .collect::<Result<Vec<_>>>()?;
         let mut applied_results = result
@@ -421,6 +437,7 @@ impl CommandExecutor<JsonFileStorage> {
             package,
             &variable_inputs.for_declarations(&package.model().variables),
         )?;
+        let claims = build_profile_claims_from_resolved(&resolved, &layout, false)?;
         Ok(ProfileApplicationInput {
             id: metadata.id.to_string(),
             version: metadata.version.clone(),
@@ -428,7 +445,8 @@ impl CommandExecutor<JsonFileStorage> {
             variables: resolved.variables().clone(),
             target_hashes: resolved.target_hashes()?,
             origin: super::profile::package_origin(package, &layout)?,
-            claims: build_profile_claims_from_resolved(&resolved, &layout, false)?,
+            contribution_context: claims.contributions.clone(),
+            claims,
             record_path,
         })
     }
@@ -817,6 +835,32 @@ source-of-truth = \"registry-first\"\n";
         crate::test_utils::profile_package_fixture("planner-asset-only")
     }
 
+    fn composition_package_with_namespace(
+        repository: &TempDir,
+        location: &str,
+        id: &str,
+        dependencies: &[&str],
+        description: &str,
+    ) -> ProfilePackage {
+        let directory = repository.path().join(location);
+        crate::test_utils::write_package_declaring(
+            &composition_package(),
+            &directory,
+            id,
+            dependencies,
+        );
+        let manifest = directory.join(crate::profile::MANIFEST_FILE_NAME);
+        let authored = fs::read_to_string(&manifest).unwrap();
+        fs::write(
+            &manifest,
+            format!(
+                "{authored}\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\nidentity = \"init-shared\"\nvalue = {{ description = \"{description}\", unique = false }}\n"
+            ),
+        )
+        .unwrap();
+        ProfilePackage::from_directory(&directory).unwrap()
+    }
+
     #[test]
     fn test_fresh_profile_init_applies_the_packages_the_named_one_depends_on() {
         let repo = TempDir::new().unwrap();
@@ -862,6 +906,82 @@ source-of-truth = \"registry-first\"\n";
         assert!(repo.path().join("docs/workflow.txt").is_file());
         assert!(repo.path().join(".jit/profiles/base.json").is_file());
         assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+    }
+
+    #[test]
+    fn test_fresh_profile_init_records_shared_owners_across_its_closure() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        composition_package_with_namespace(
+            &repo,
+            "packages/base",
+            "base",
+            &[],
+            "Shared initialization definition.",
+        );
+        composition_package_with_namespace(
+            &repo,
+            "packages/workflow",
+            "workflow",
+            &["base"],
+            "Shared initialization definition.",
+        );
+
+        executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
+            )
+            .unwrap();
+
+        for id in ["base", "workflow"] {
+            let record: AppliedProfileRecord = serde_json::from_slice(
+                &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(record.contributions.len(), 1);
+            assert_eq!(
+                record.contributions[0].owners,
+                vec![
+                    crate::repository_state::ProfilePackageId::new("base"),
+                    crate::repository_state::ProfilePackageId::new("workflow"),
+                ],
+                "{id} retains complete ownership on initialization's first publication"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fresh_profile_init_preflights_a_conflicting_closure_before_scaffolding() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        composition_package_with_namespace(
+            &repo,
+            "packages/base",
+            "base",
+            &[],
+            "Base initialization definition.",
+        );
+        composition_package_with_namespace(
+            &repo,
+            "packages/workflow",
+            "workflow",
+            &["base"],
+            "Workflow initialization definition.",
+        );
+
+        let error = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
+            )
+            .unwrap_err();
+
+        assert!(format!("{error:#}").contains("init-shared"));
+        assert!(
+            !repo.path().join(".jit").exists(),
+            "a conflicting closure must fail before scaffold publication"
+        );
     }
 
     #[test]

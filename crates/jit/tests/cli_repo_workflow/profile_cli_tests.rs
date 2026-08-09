@@ -348,7 +348,7 @@ fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publica
 }
 
 #[test]
-fn test_profile_apply_reapplies_equal_packages_after_shared_ownership_expands() {
+fn test_profile_apply_records_complete_shared_ownership_on_first_apply() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
     let base =
@@ -372,20 +372,6 @@ fn test_profile_apply_reapplies_equal_packages_after_shared_ownership_expands() 
     ];
     let first = jit(repo.path(), &args);
     assert!(first.status.success(), "{first:?}");
-
-    let repeated = jit(repo.path(), &args);
-    assert!(repeated.status.success(), "{repeated:?}");
-    let repeated_json = json(&repeated);
-    assert_eq!(
-        repeated_json["profiles"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|profile| profile["status"].as_str().unwrap())
-            .collect::<Vec<_>>(),
-        vec!["applied", "unchanged"],
-        "the first record converges ownership evidence and the second is already exact"
-    );
 
     for id in ["base", "workflow"] {
         let record: Value = serde_json::from_slice(
