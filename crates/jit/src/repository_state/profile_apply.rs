@@ -23,7 +23,7 @@ use super::{
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
 use crate::domain::ProfileOrigin;
-use crate::profile::{RegionId, ResolvedVariables};
+use crate::profile::{ProfileId, RegionId, ResolvedVariables};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -923,7 +923,7 @@ pub struct AppliedProfileRecord {
     #[serde(deserialize_with = "deserialize_current_record_version")]
     pub record_version: u8,
     /// Stable package identity.
-    pub id: String,
+    pub id: ProfileId,
     /// Installed package version.
     pub version: String,
     /// Compatible JIT range authored by the package manifest.
@@ -975,7 +975,7 @@ where
 impl AppliedProfileRecord {
     /// Construct the only current installed-profile provenance representation.
     pub fn new(
-        id: impl Into<String>,
+        id: ProfileId,
         version: impl Into<String>,
         compatible_jit: impl Into<String>,
         origin: ProfileOrigin,
@@ -985,7 +985,7 @@ impl AppliedProfileRecord {
     ) -> Self {
         Self {
             record_version: APPLIED_PROFILE_RECORD_VERSION,
-            id: id.into(),
+            id,
             version: version.into(),
             compatible_jit: compatible_jit.into(),
             origin,
@@ -1027,7 +1027,7 @@ pub(crate) fn validate_applied_record_path(
         .then_some(())
         .ok_or_else(|| ProducerError::ProfileRecordPathMismatch {
             path: path.repository_relative(),
-            id: record.id.clone(),
+            id: record.id.to_string(),
             expected: expected.repository_relative(),
         })
 }
@@ -1035,7 +1035,8 @@ pub(crate) fn validate_applied_record_path(
 /// Neutral profile package input consumed by the one materialization dispatcher.
 #[derive(Clone)]
 pub struct ProfileApplicationInput {
-    pub id: String,
+    /// Stable package identity carried from the resolved manifest.
+    pub id: ProfileId,
     pub version: String,
     /// Compatible JIT range authored by this package's manifest.
     pub compatible_jit: String,
@@ -1259,7 +1260,7 @@ pub(crate) fn migrate_shipped_v1_records(
                         .then_some((path.clone(), record.clone()))
                         .ok_or_else(|| ShippedV1MigrationError::RecordPathMismatch {
                             path: path.repository_relative(),
-                            id: record.id,
+                            id: record.id.to_string(),
                             expected: expected.repository_relative(),
                         })
                 }))
@@ -1641,7 +1642,7 @@ fn existing_contribution_claims(
                         if candidate_identities.contains(&identity) =>
                     {
                         Some(RecordedSemanticClaim {
-                            package_id: ProfilePackageId::new(record.id.clone()),
+                            package_id: ProfilePackageId::new(record.id.to_string()),
                             identity,
                             base_fingerprint: claim.base_fingerprint,
                         })
@@ -1692,16 +1693,16 @@ fn retained_claim_identities_for_package(
                 }
             })?;
             validate_applied_record_path(&path, &record)?;
-            Ok((record.id == package_id.as_str())
-                .then(|| {
-                    record
-                        .claims
-                        .into_iter()
-                        .filter(|claim| claim.retain_if_unowned)
-                        .map(|claim| claim.identity)
-                        .collect()
-                })
-                .unwrap_or_default())
+            Ok(if record.id.as_str() == package_id.as_str() {
+                record
+                    .claims
+                    .into_iter()
+                    .filter(|claim| claim.retain_if_unowned)
+                    .map(|claim| claim.identity)
+                    .collect()
+            } else {
+                BTreeSet::new()
+            })
         })
         .collect::<Result<Vec<BTreeSet<_>>, RepositoryStateError>>()
         .map(|sets| sets.into_iter().flatten().collect())
@@ -2148,7 +2149,7 @@ fn profile_conflict_occupant(
             })?;
         validate_applied_record_path(&record_path, &record)?;
         if record.claims.iter().any(|claim| match &claim.identity {
-            AppliedProfileClaimIdentity::Semantic { .. } => return false,
+            AppliedProfileClaimIdentity::Semantic { .. } => false,
             AppliedProfileClaimIdentity::Asset {
                 target: claimed_target,
             } => {
@@ -2164,7 +2165,7 @@ fn profile_conflict_occupant(
             }
         }) {
             return Ok(ProfileConflictOccupant::Package(ProfilePackageId::new(
-                record.id,
+                record.id.to_string(),
             )));
         }
     }
@@ -2385,7 +2386,9 @@ mod tests {
             .into_iter()
             .collect();
         let record = AppliedProfileRecord::new(
-            "base-package",
+            "base-package"
+                .try_into()
+                .expect("test profile id is canonical"),
             "1.0.0",
             "*",
             ProfileOrigin::Directory(
@@ -2519,7 +2522,7 @@ mod tests {
         .into_iter()
         .collect::<BTreeSet<_>>();
         let record = AppliedProfileRecord::new(
-            "example",
+            "example".try_into().expect("test profile id is canonical"),
             "1.2.3",
             ">=1.0.0",
             ProfileOrigin::Directory(
@@ -2576,7 +2579,7 @@ mod tests {
         let target = VirtualPath::worktree("docs/example.md").expect("canonical target");
         let claim = AppliedProfileClaim::asset(&target, b"content", FileMode::Regular, false);
         let record = AppliedProfileRecord::new(
-            "example",
+            "example".try_into().expect("test profile id is canonical"),
             "1.0.0",
             "*",
             ProfileOrigin::Embedded,
@@ -2595,9 +2598,31 @@ mod tests {
     }
 
     #[test]
+    fn test_applied_profile_record_wire_rejects_duplicate_json_member_names() {
+        let record = AppliedProfileRecord::new(
+            "example".try_into().expect("test profile id is canonical"),
+            "1.0.0",
+            "*",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            ResolvedVariables::default(),
+            BTreeSet::new(),
+        );
+        let wire = String::from_utf8(record.to_bytes().expect("record serializes"))
+            .expect("record wire is UTF-8");
+        let duplicate = wire.replacen(
+            "\"record_version\": 2,",
+            "\"record_version\": 2,\n  \"record_version\": 2,",
+            1,
+        );
+
+        assert!(serde_json::from_str::<AppliedProfileRecord>(&duplicate).is_err());
+    }
+
+    #[test]
     fn test_validate_applied_record_path_rejects_a_record_under_another_package_id() {
         let record = AppliedProfileRecord::new(
-            "example",
+            "example".try_into().expect("test profile id is canonical"),
             "1.0.0",
             "*",
             ProfileOrigin::Embedded,
@@ -2634,7 +2659,7 @@ mod tests {
             regions: Vec::new(),
         };
         let input = ProfileApplicationInput {
-            id: "example".into(),
+            id: "example".try_into().expect("test profile id is canonical"),
             version: "1.0.0".into(),
             compatible_jit: "*".into(),
             package_hash: "a".repeat(64),
@@ -2980,7 +3005,9 @@ mod tests {
         let composition = compose_profile_targets(&image, claims.clone())
             .expect("identical repository asset is adoptable");
         let input = ProfileApplicationInput {
-            id: "workflow-package".to_string(),
+            id: "workflow-package"
+                .try_into()
+                .expect("test profile id is canonical"),
             version: "1.0.0".to_string(),
             compatible_jit: "*".to_string(),
             package_hash: "a".repeat(64),

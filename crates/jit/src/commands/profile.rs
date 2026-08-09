@@ -547,12 +547,7 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
-            self.resolve_profile_graph_with_applied(
-                &selected,
-                self.resolve_applied_profile_packages_except(&provenance_only)?,
-            )?
-            .selected_packages()
+            self.resolve_profile_graph(&selected)?.selected_packages()
         };
         let inputs = load_profile_variable_inputs(
             &packages,
@@ -645,10 +640,8 @@ impl CommandExecutor<JsonFileStorage> {
         let contribution_context = if selected.is_empty() {
             Vec::new()
         } else {
-            let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
-            let applied = self.resolve_applied_profile_packages_except(&provenance_only)?;
             let packages = self
-                .resolve_profile_graph_with_applied(&selected, applied)?
+                .resolve_profile_graph_for_mutation(&selected)?
                 .selected_packages();
             validate_variable_inputs(&packages, inputs)?;
             let candidates = self.profile_contribution_candidates(&packages, inputs)?;
@@ -749,7 +742,8 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            self.resolve_profile_graph(&selected)?.selected_packages()
+            self.resolve_profile_graph_for_mutation(&selected)?
+                .selected_packages()
         };
         let inputs = load_profile_variable_inputs(
             &packages,
@@ -893,7 +887,7 @@ impl CommandExecutor<JsonFileStorage> {
                         let embedded_current =
                             match serde_json::from_slice::<AppliedProfileRecord>(bytes) {
                                 Ok(record) => {
-                                    record.id == id
+                                    record.id.as_str() == id
                                         && matches!(record.origin, ProfileOrigin::Embedded)
                                 }
                                 Err(_) => false,
@@ -914,11 +908,24 @@ impl CommandExecutor<JsonFileStorage> {
     fn resolve_profile_closure_for_mutation(
         &self,
         package: &ProfilePackage,
-        provenance_only: &BTreeSet<String>,
     ) -> Result<Vec<ProfilePackage>> {
-        let applied = self.resolve_applied_profile_packages_except(provenance_only)?;
-        self.resolve_profile_graph_with_applied(std::slice::from_ref(package), applied)
+        self.resolve_profile_graph_for_mutation(std::slice::from_ref(package))
             .map(|graph| graph.selected_packages())
+    }
+
+    /// Resolve a package graph for a pending repository mutation.
+    ///
+    /// Current embedded records and the named shipped-v1 boundary remain
+    /// ownership evidence in the materialization image, but do not describe
+    /// rediscoverable packages. Ordinary graph readers intentionally continue
+    /// through [`Self::resolve_profile_graph`] and reject those records.
+    pub(crate) fn resolve_profile_graph_for_mutation(
+        &self,
+        selected: &[ProfilePackage],
+    ) -> Result<ResolvedProfileGraph> {
+        let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
+        let applied = self.resolve_applied_profile_packages_except(&provenance_only)?;
+        self.resolve_profile_graph_with_applied(selected, applied)
     }
 
     /// Extend `packages` with dependencies in canonical id order.
@@ -1014,6 +1021,21 @@ impl CommandExecutor<JsonFileStorage> {
         }
     }
 
+    /// Prove a pending profile mutation can resolve without accepting embedded
+    /// provenance as a package source. Strict validation remains available
+    /// through [`Self::validate_profile_selection`].
+    pub fn validate_profile_selection_for_mutation(
+        &self,
+        selectors: &[ProfileSelector],
+    ) -> Result<()> {
+        let selected = self.resolve_profile_selectors(selectors)?;
+        if selected.is_empty() {
+            Ok(())
+        } else {
+            self.resolve_profile_graph_for_mutation(&selected).map(drop)
+        }
+    }
+
     /// Apply one validated package together with the packages it depends on.
     ///
     /// The whole closure is resolved and ordered first
@@ -1041,8 +1063,7 @@ impl CommandExecutor<JsonFileStorage> {
         package: &ProfilePackage,
         inputs: &VariableInputs,
     ) -> Result<ProfileComposedApplyResult> {
-        let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
-        let packages = self.resolve_profile_closure_for_mutation(package, &provenance_only)?;
+        let packages = self.resolve_profile_closure_for_mutation(package)?;
         validate_variable_inputs(&packages, inputs)?;
         let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
         self.preflight_profile_contributions(&contribution_context)?;
@@ -1057,8 +1078,7 @@ impl CommandExecutor<JsonFileStorage> {
         inputs: &VariableInputs,
         contribution_context: &[ProfileContributionClaim],
     ) -> Result<ProfileComposedApplyResult> {
-        let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
-        let packages = self.resolve_profile_closure_for_mutation(package, &provenance_only)?;
+        let packages = self.resolve_profile_closure_for_mutation(package)?;
         self.apply_profile_packages_with_context(&packages, inputs, contribution_context)
     }
 
@@ -1252,15 +1272,19 @@ impl CommandExecutor<JsonFileStorage> {
             }
         }
         let mut authenticated_paths = content_paths.clone();
-        authenticated_paths.extend(migration_paths);
-        let base = match self.capture_proposed_base(
-            session,
-            &BTreeMap::new(),
-            &authenticated_paths,
-            None,
-        )? {
-            None => return Ok(None),
-            Some(base) => base,
+        let base = if migration_paths.is_empty() {
+            base
+        } else {
+            authenticated_paths.extend(migration_paths);
+            match self.capture_proposed_base(
+                session,
+                &BTreeMap::new(),
+                &authenticated_paths,
+                None,
+            )? {
+                None => return Ok(None),
+                Some(base) => base,
+            }
         };
         // This is the sole exact legacy decode/conversion for this operation.
         // The authenticated rewrite map stays immutable through closure,
@@ -1734,7 +1758,7 @@ pub(super) fn expected_record(
     let metadata = package.model();
     let _resolved = resolve_package_from_record(package, variables)?;
     Ok(AppliedProfileRecord::new(
-        metadata.id.to_string(),
+        metadata.id.clone(),
         metadata.version.clone(),
         metadata.compatible_jit.clone(),
         package_origin(package, layout)?,
@@ -1754,7 +1778,7 @@ fn profile_application_input(
     let metadata = resolved.model();
     let claims = build_profile_claims_from_resolved(resolved, layout, false)?;
     Ok(ProfileApplicationInput {
-        id: metadata.id.to_string(),
+        id: metadata.id.clone(),
         version: metadata.version.clone(),
         compatible_jit: metadata.compatible_jit.clone(),
         package_hash: package.hashes().package.clone(),
@@ -1779,7 +1803,7 @@ fn read_applied_record(
         RepositoryEntry::File { bytes, .. } => {
             serde_json::from_slice::<AppliedProfileRecord>(bytes)
                 .and_then(|record| {
-                    (record.id == id).then_some(record).ok_or_else(|| {
+                    (record.id.as_str() == id).then_some(record).ok_or_else(|| {
                         serde_json::Error::io(std::io::Error::other(
                             "record id does not match its canonical path",
                         ))
@@ -2330,7 +2354,9 @@ mod tests {
         store_record(
             &temp,
             &AppliedProfileRecord::new(
-                id.clone(),
+                id.clone()
+                    .try_into()
+                    .expect("fixture profile id is canonical"),
                 "1.0.0",
                 ">=1.0.0, <2.0.0",
                 ProfileOrigin::Embedded,
@@ -2356,7 +2382,9 @@ mod tests {
         store_record(
             &temp,
             &AppliedProfileRecord::new(
-                "jit-dogfood",
+                "jit-dogfood"
+                    .try_into()
+                    .expect("fixture profile id is canonical"),
                 "1.0.0",
                 ">=1.0.0, <2.0.0",
                 ProfileOrigin::Embedded,
@@ -2382,7 +2410,9 @@ mod tests {
         store_record(
             &temp,
             &AppliedProfileRecord::new(
-                "jit-dogfood",
+                "jit-dogfood"
+                    .try_into()
+                    .expect("fixture profile id is canonical"),
                 "1.0.0",
                 ">=1.0.0, <2.0.0",
                 ProfileOrigin::Embedded,
@@ -2513,7 +2543,9 @@ placement = "append"
         store_record(
             &temp,
             &AppliedProfileRecord::new(
-                id.clone(),
+                id.clone()
+                    .try_into()
+                    .expect("fixture profile id is canonical"),
                 recorded.model().version.clone(),
                 recorded.model().compatible_jit.clone(),
                 ProfileOrigin::Directory(RootRelativePath::parse("vendor/dogfood").unwrap()),
@@ -3404,7 +3436,7 @@ placement = "append"
             &fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
         )
         .unwrap();
-        assert_eq!(record.id, "planner-asset-only");
+        assert_eq!(record.id.as_str(), "planner-asset-only");
         assert_eq!(
             record.origin,
             ProfileOrigin::Directory(RootRelativePath::parse(FIXTURE_LOCATION).unwrap())
@@ -3759,7 +3791,7 @@ template = true
             vec!["vocabulary", "base", "workflow"]
         );
         for id in ["vocabulary", "base", "workflow"] {
-            assert_eq!(record_for(&temp, id).id, id);
+            assert_eq!(record_for(&temp, id).id.as_str(), id);
         }
     }
 
@@ -4095,9 +4127,9 @@ template = true
             fs::read_to_string(temp.path().join(target)).unwrap(),
             "identical\n"
         );
-        assert_eq!(record_for(&temp, "stated").id, "stated");
+        assert_eq!(record_for(&temp, "stated").id.as_str(), "stated");
         let record = record_for(&temp, "restated");
-        assert_eq!(record.id, "restated");
+        assert_eq!(record.id.as_str(), "restated");
         assert_eq!(
             record
                 .claims

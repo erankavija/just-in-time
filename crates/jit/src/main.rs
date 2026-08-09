@@ -2199,7 +2199,10 @@ fn run() -> Result<()> {
             let output_ctx = OutputContext::new(quiet, *json);
             let selectors = parse_profile_selectors(profile, *json)?;
             let assignments = parse_profile_variable_assignments(set, *json)?;
-            profile_result(executor.validate_profile_selection(&selectors), *json)?;
+            profile_result(
+                executor.validate_profile_selection_for_mutation(&selectors),
+                *json,
+            )?;
 
             // Every init and re-init — plain, profiled, or over an existing root —
             // publishes through the recovered session: `run_initialization` fills

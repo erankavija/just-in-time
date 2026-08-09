@@ -492,8 +492,11 @@ pub(super) fn derive_initialization(
     let mut profile_changed = false;
     let mut profile_record = None;
     if let Some(profile) = &scaffold.profile {
+        let composition_base =
+            super::profile_apply::profile_composition_base(&neutral_proposed, profile)
+                .map_err(profile_composition_error)?;
         let composed = super::profile_apply::compose_profile_targets_with_context(
-            &neutral_proposed,
+            &composition_base,
             profile.claims.clone(),
             profile.contribution_context.clone(),
         )
@@ -520,6 +523,7 @@ pub(super) fn derive_initialization(
             }
         }
         profile_changed |= profile_record_changed(base, profile, &record)?;
+        profile_changed |= !profile.shipped_v1_migrations.is_empty();
         profile_record = Some(record);
     }
     let desired = dedup_last_wins(desired);
@@ -534,6 +538,21 @@ pub(super) fn derive_initialization(
         compose_existing_default_rules(base, final_authority, &mut actions)?;
     }
     if let (Some(profile), Some(record)) = (&scaffold.profile, &profile_record) {
+        let migrated_records = profile
+            .shipped_v1_migrations
+            .iter()
+            .filter(|(path, _)| *path != &profile.record_path)
+            .map(|(path, record)| {
+                Ok(DesiredFile {
+                    path: path.clone(),
+                    bytes: serialize_profile_record(record)?,
+                    mode: FileMode::Regular,
+                    policy: WritePolicy::Always,
+                    owner: PROFILE_OWNER,
+                })
+            })
+            .collect::<Result<Vec<_>, InitializationError>>()?;
+        push_file_actions(base, &migrated_records, &mut actions)?;
         push_record_action(base, profile, record, profile_changed, &mut actions)?;
     }
     if let Some(action) = events_action(base, scaffold.profile.as_ref(), profile_changed, context)?
@@ -611,7 +630,7 @@ fn profile_record_changed(
                 Ok(existing) if existing.matches_package_provenance(record) => Ok(true),
                 _ => Err(InitializationError::InstalledRecordConflict {
                     path: profile.record_path.clone(),
-                    id: profile.id.clone(),
+                    id: profile.id.to_string(),
                     version: profile.version.clone(),
                 }),
             }
@@ -752,7 +771,7 @@ fn profile_event_action(
     context: &MutationContext,
 ) -> Result<Option<RepositoryAction>, InitializationError> {
     let event = profile_applied_event(
-        profile.id.clone(),
+        profile.id.to_string(),
         profile.version.clone(),
         profile.origin.clone(),
         profile.package_hash.clone(),
@@ -938,7 +957,7 @@ pub(super) fn derive_profile_application(
     }
     if !actions.is_empty() {
         let event = profile_applied_event(
-            profile.id.clone(),
+            profile.id.to_string(),
             profile.version.clone(),
             profile.origin.clone(),
             profile.package_hash.clone(),
@@ -957,10 +976,10 @@ pub(super) fn derive_profile_application(
     let mut all = directory_actions(base, &actions, &explicit)?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
-    let facts = BTreeMap::from([("profile".to_string(), profile.id.clone())]);
+    let facts = BTreeMap::from([("profile".to_string(), profile.id.to_string())]);
     let seed = RepositorySeed::new(
         RepositorySeedKind::Profile {
-            name: profile.id.clone(),
+            name: profile.id.to_string(),
             version: profile.version.clone(),
             package_hash: profile.package_hash.clone(),
         },

@@ -1,5 +1,6 @@
 use super::{
-    profile::validate_variable_inputs, with_mutation_session, CommandExecutor, SessionStep,
+    profile::{recorded_profile_ids, validate_variable_inputs},
+    with_mutation_session, CommandExecutor, SessionStep,
 };
 use crate::config::{slugify_project_name, ProjectName};
 use crate::profile::{
@@ -9,7 +10,8 @@ use crate::profile::{
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
-    ProfileApplicationInput, ProfileTargetDisposition, RepositoryAction, VirtualPath,
+    ProfileApplicationInput, ProfileTargetDisposition, RepositoryAction, RepositoryEntry,
+    VirtualPath,
 };
 use crate::storage::JsonFileStorage;
 use anyhow::{Context, Result};
@@ -134,7 +136,8 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            self.resolve_profile_graph(&selected)?.selected_packages()
+            self.resolve_profile_graph_for_mutation(&selected)?
+                .selected_packages()
         };
         let inputs = super::profile::load_profile_variable_inputs(
             &packages,
@@ -164,7 +167,9 @@ impl CommandExecutor<JsonFileStorage> {
             (Vec::new(), Vec::new())
         } else {
             let selected = self.resolve_profile_selectors(selectors)?;
-            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
+            let packages = self
+                .resolve_profile_graph_for_mutation(&selected)?
+                .selected_packages();
             (selected, packages)
         };
         let (package, dependants) = match packages.as_slice() {
@@ -193,8 +198,12 @@ impl CommandExecutor<JsonFileStorage> {
                     ),
                     None => None,
                 };
-                let scaffold = InitializationScaffold::from_config(config, project_name, profile)?
-                    .with_gitattributes(gitattributes.clone());
+                let scaffold = InitializationScaffold::from_config(
+                    config.clone(),
+                    project_name.clone(),
+                    profile,
+                )?
+                .with_gitattributes(gitattributes.clone());
 
                 let mut extra_paths = scaffold.delta_paths()?;
                 extra_paths.extend(crate::repository_state::profile_contribution_target_paths(
@@ -214,6 +223,65 @@ impl CommandExecutor<JsonFileStorage> {
                 )?
                 else {
                     return Ok(SessionStep::Retry);
+                };
+                // Candidate detection deliberately stays shallow. Only after this
+                // held session captures every pinned historical unit do we invoke
+                // the exact shipped-v1 decoder and carry its immutable v2 overlay
+                // through the remainder of initialization.
+                let mut migration_paths = Vec::new();
+                if scaffold.profile().is_some() {
+                    let mut has_candidate = false;
+                    for id in recorded_profile_ids(&probe, &VirtualPath::PROFILES)? {
+                        let path = VirtualPath::data(format!("profiles/{id}.json"))?;
+                        if matches!(
+                            probe.entry(&path)?,
+                            RepositoryEntry::File { bytes, .. }
+                                if crate::repository_state::is_shipped_v1_candidate(bytes)
+                        ) {
+                            has_candidate = true;
+                            break;
+                        }
+                    }
+                    if has_candidate {
+                        migration_paths = crate::repository_state::shipped_v1_migration_paths()?
+                            .into_iter()
+                            .map(|path| layout.classify_repository_relative(&path))
+                            .collect::<Result<Vec<_>, _>>()?;
+                    }
+                }
+                if !migration_paths.is_empty() {
+                    extra_paths.extend(migration_paths);
+                    let Some(expanded) = self.capture_proposed_base(
+                        &mut *session,
+                        &probe_overrides,
+                        &extra_paths,
+                        None,
+                    )?
+                    else {
+                        return Ok(SessionStep::Retry);
+                    };
+                    if !expanded.has_stable_overlap(&probe) {
+                        return Ok(SessionStep::Retry);
+                    }
+                    probe = expanded;
+                }
+                let migrations = if scaffold.profile().is_some() {
+                    crate::repository_state::migrate_shipped_v1_records(&probe)?
+                } else {
+                    BTreeMap::new()
+                };
+                let scaffold = if migrations.is_empty() {
+                    scaffold
+                } else {
+                    InitializationScaffold::from_config(
+                        config,
+                        project_name,
+                        scaffold
+                            .profile()
+                            .cloned()
+                            .map(|profile| profile.with_shipped_v1_migrations(migrations)),
+                    )?
+                    .with_gitattributes(gitattributes.clone())
                 };
                 if scaffold.profile().is_some() {
                     extra_paths.extend(scaffold.profile_capture_closure(&probe)?);
@@ -439,7 +507,7 @@ impl CommandExecutor<JsonFileStorage> {
         )?;
         let claims = build_profile_claims_from_resolved(&resolved, &layout, false)?;
         Ok(ProfileApplicationInput {
-            id: metadata.id.to_string(),
+            id: metadata.id.clone(),
             version: metadata.version.clone(),
             compatible_jit: metadata.compatible_jit.clone(),
             package_hash: package.hashes().package.clone(),
@@ -618,7 +686,7 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::ProfileSelector;
+    use crate::commands::{ProfileSelector, ProfileVariableOptions};
     use crate::profile::ProfileOrigin;
     use crate::repository_state::{AppliedProfileRecord, Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
@@ -837,6 +905,41 @@ source-of-truth = \"registry-first\"\n";
         crate::test_utils::profile_package_fixture("planner-asset-only")
     }
 
+    fn exact_shipped_dogfood_v1_record() -> Vec<u8> {
+        let evidence: serde_json::Value = serde_json::from_slice(include_bytes!(
+            "../repository_state/shipped_v1_dogfood_evidence.json"
+        ))
+        .expect("pinned evidence is JSON");
+        let mut bytes = serde_json::to_vec_pretty(&serde_json::json!({
+            "id": "jit-dogfood",
+            "version": "1.0.0",
+            "origin": { "source": "embedded" },
+            "package_hash": "43829e7e032e5e9ec40776103b1996f15e7291664c8b11e403c20b7f54af905c",
+            "target_hashes": evidence["target_hashes"],
+        }))
+        .expect("v1 fixture serializes");
+        bytes.push(b'\n');
+        bytes
+    }
+
+    fn write_embedded_record(repo: &TempDir, id: &str) {
+        let record = AppliedProfileRecord::new(
+            id.try_into().expect("fixture profile id is canonical"),
+            "1.0.0",
+            "*",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            Default::default(),
+            Default::default(),
+        );
+        fs::create_dir_all(repo.path().join(".jit/profiles")).unwrap();
+        fs::write(
+            repo.path().join(format!(".jit/profiles/{id}.json")),
+            record.to_bytes().unwrap(),
+        )
+        .unwrap();
+    }
+
     fn composition_package_with_namespace(
         repository: &TempDir,
         location: &str,
@@ -908,6 +1011,68 @@ source-of-truth = \"registry-first\"\n";
         assert!(repo.path().join("docs/workflow.txt").is_file());
         assert!(repo.path().join(".jit/profiles/base.json").is_file());
         assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+    }
+
+    #[test]
+    fn test_profiled_init_from_sources_keeps_embedded_provenance_out_of_mutating_graph_resolution()
+    {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        executor_with_layout(&storage, repo.path())
+            .initialize_fresh_repository(repo.path(), None)
+            .unwrap();
+        write_embedded_record(&repo, "jit-dogfood");
+        let location = repo.path().join("packages/later");
+        crate::test_utils::write_package_declaring(&composition_package(), &location, "later", &[]);
+
+        let result = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository_from_sources(
+                repo.path(),
+                &[ProfileSelector::path(&location)],
+                &ProfileVariableOptions::default(),
+            )
+            .expect("profiled init treats Embedded provenance as ownership only");
+
+        assert_eq!(
+            result
+                .profile
+                .expect("profiled init reports the package")
+                .profiles
+                .len(),
+            1
+        );
+        assert!(repo.path().join(".jit/profiles/later.json").is_file());
+    }
+
+    #[test]
+    fn test_profiled_init_authenticates_shipped_v1_once_before_any_publication() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        executor_with_layout(&storage, repo.path())
+            .initialize_fresh_repository(repo.path(), None)
+            .unwrap();
+        let raw_v1 = exact_shipped_dogfood_v1_record();
+        let record_path = repo.path().join(".jit/profiles/jit-dogfood.json");
+        fs::create_dir_all(record_path.parent().unwrap()).unwrap();
+        fs::write(&record_path, &raw_v1).unwrap();
+        let location = repo.path().join("packages/later");
+        crate::test_utils::write_package_declaring(&composition_package(), &location, "later", &[]);
+
+        crate::repository_state::reset_shipped_v1_conversion_count();
+        let error = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(repo.path(), &[ProfileSelector::path(&location)])
+            .expect_err("the partial repository cannot authenticate the pinned evidence");
+
+        assert!(error.to_string().contains("shipped-v1 migration"));
+        assert_eq!(crate::repository_state::shipped_v1_conversion_count(), 1);
+        assert_eq!(fs::read(&record_path).unwrap(), raw_v1);
+        assert!(!repo.path().join(".jit/profiles/later.json").exists());
+        assert!(
+            fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+                .unwrap()
+                .is_empty(),
+            "a failed migration publishes no partial profile event"
+        );
     }
 
     #[test]

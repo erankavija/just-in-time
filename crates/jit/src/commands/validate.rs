@@ -768,7 +768,7 @@ fn record_filed_under_its_own_id(
     record: crate::repository_state::AppliedProfileRecord,
     record_path: &crate::repository_state::VirtualPath,
 ) -> Result<crate::repository_state::AppliedProfileRecord> {
-    let declared = super::profile::applied_record_path(&record.id)?;
+    let declared = super::profile::applied_record_path(record.id.as_str())?;
     if &declared == record_path {
         Ok(record)
     } else {
@@ -3370,7 +3370,7 @@ depends_on = ["planning"]
     /// A syntactically valid applied-profile provenance record naming `id`.
     fn applied_record_json(id: &str) -> String {
         serde_json::to_string_pretty(&crate::repository_state::AppliedProfileRecord::new(
-            id,
+            id.try_into().expect("test profile id is canonical"),
             "1.0.0",
             "*",
             crate::profile::ProfileOrigin::Directory(

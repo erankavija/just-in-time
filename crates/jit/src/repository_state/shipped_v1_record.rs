@@ -230,7 +230,9 @@ fn migrate_with_evidence(
         .map(|pin| region_claim(base, pin))
         .collect::<Result<BTreeSet<_>, _>>()?;
     Ok(AppliedProfileRecord::new(
-        SHIPPED_ID,
+        SHIPPED_ID
+            .try_into()
+            .map_err(ShippedV1MigrationError::InvalidEvidence)?,
         SHIPPED_VERSION,
         SHIPPED_COMPATIBLE_JIT,
         crate::domain::ProfileOrigin::Embedded,
@@ -637,6 +639,15 @@ mod tests {
         });
         assert!(serde_json::from_value::<ShippedV1AppliedProfileRecord>(missing).is_err());
         assert!(serde_json::from_value::<ShippedV1AppliedProfileRecord>(unknown).is_err());
+    }
+
+    #[test]
+    fn test_shipped_v1_decoder_rejects_duplicate_json_member_names() {
+        let duplicate = format!(
+            r#"{{"id":"{SHIPPED_ID}","id":"{SHIPPED_ID}","version":"{SHIPPED_VERSION}","origin":{{"source":"embedded"}},"package_hash":"{SHIPPED_PACKAGE_HASH}","target_hashes":{{}}}}"#
+        );
+
+        assert!(serde_json::from_str::<ShippedV1AppliedProfileRecord>(&duplicate).is_err());
     }
 
     #[test]

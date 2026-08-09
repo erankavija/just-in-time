@@ -237,7 +237,7 @@ mod tests {
 
     fn record(origin: ProfileOrigin) -> AppliedProfileRecord {
         AppliedProfileRecord::new(
-            "example",
+            "example".try_into().expect("test profile id is canonical"),
             "1.0.0",
             "*",
             origin,
