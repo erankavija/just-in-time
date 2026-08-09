@@ -157,7 +157,7 @@
     "474a90a8": 0,
     "fc47a7bf": 2,
     "cbcd9318": 2,
-    "9a9a4cfc": 1
+    "9a9a4cfc": 2
   },
   "review_verdicts": [
     {
@@ -375,6 +375,72 @@
       "deferred_items_audit": "no linked documents",
       "holistic_review": "actual migration reachability, same-profile replacement, filename/id coherence, ambiguous region markers, claim uniqueness/typed identity, public wire-type reachability, and one vacuous event assertion require one cumulative rework pass",
       "reviewed_at": "2026-08-09T22:31:39+03:00"
+    },
+    {
+      "issue_id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944",
+      "reviewed_commit": "d2b4448fff4f5e5a1a0f39bf977b4cd72811d659",
+      "verdict": "fail",
+      "gate_status": {"cargo-ci": "pending", "code-review": "pending"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "lead-mutation-routing",
+          "status": "partially closed: direct package apply is mutation-aware, but CLI source loading and profiled init still use ordinary graph resolution",
+          "evidence": "crates/jit/src/commands/profile.rs:743"
+        },
+        {
+          "round": 1,
+          "id": "lead-held-session-evidence",
+          "status": "closed for direct package apply",
+          "evidence": "crates/jit/src/commands/profile.rs:1224"
+        },
+        {
+          "round": 1,
+          "id": "lead-single-conversion",
+          "status": "closed for direct package apply",
+          "evidence": "crates/jit/src/commands/profile.rs:1265"
+        },
+        {
+          "round": 1,
+          "id": "lead-final-asset-base",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:1119"
+        },
+        {
+          "round": 1,
+          "id": "lead-managed-retention",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:1314"
+        },
+        {
+          "round": 1,
+          "id": "lead-record-canonicality",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:943"
+        },
+        {
+          "round": 1,
+          "id": "lead-region-evidence",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/shipped_v1_record.rs:475"
+        },
+        {
+          "round": 1,
+          "id": "lead-public-wire-and-stale-tests",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/mod.rs:190"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "met: current v2 records carry sorted unique typed claims, provenance, compatibility, package identity, and resolved public variables",
+        "REQ-02": "met: semantic, asset, and managed-region claims derive and preserve retained repository baselines",
+        "REQ-03": "unmet: CLI profile apply source loading and every profiled-init resolution path reject v1/Embedded provenance before conversion; initialization also carries no migration map or same-delta migration actions",
+        "REQ-04": "met: ownership records remain provenance and effective values load from registries"
+      },
+      "stale_narrative_sweep": "zero actionable matches; target_hashes remains only in the isolated v1 boundary and current audit-event inputs",
+      "deferred_items_audit": "no linked documents",
+      "holistic_review": "the unconditional second base capture when no legacy candidate exists also regresses the final-closure race test; reuse the first capture on the ordinary path rather than weakening the concurrency assertion",
+      "reviewed_at": "2026-08-09T23:19:00+03:00"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00"
