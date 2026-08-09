@@ -130,3 +130,39 @@ fn test_cargo_ci_fails_the_gate_on_non_empty_incremental_state_after_compiling()
          a variable is exported"
     );
 }
+
+#[test]
+fn test_cargo_build_scripts_share_the_host_lock_and_enable_available_sccache() {
+    let root = workspace_root();
+    let gate =
+        fs::read_to_string(root.join("scripts/cargo-ci.sh")).expect("read scripts/cargo-ci.sh");
+
+    assert!(
+        gate.contains("${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock"),
+        "the gate must default to the cross-repository host build lock"
+    );
+    assert!(
+        gate.contains("CARGO_CI_NO_SCCACHE")
+            && gate.contains("[ -z \"${RUSTC_WRAPPER:-}\" ]")
+            && gate.contains("command -v sccache")
+            && gate.contains("export RUSTC_WRAPPER=sccache"),
+        "the gate must use host sccache when available while preserving an explicit wrapper and an opt-out"
+    );
+    assert!(
+        gate.contains("[ \"${1:-}\" = \"--cargo\" ]")
+            && gate.contains("exec cargo \"$@\""),
+        "focused Cargo checks must be able to reuse the gate's host lock and cache setup without running the full gate"
+    );
+
+    for script in [
+        "scripts/benchmark-rust-build.sh",
+        "scripts/benchmark-session-cost.sh",
+    ] {
+        let contents = fs::read_to_string(root.join(script))
+            .unwrap_or_else(|error| panic!("read {script}: {error}"));
+        assert!(
+            contents.contains("${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock"),
+            "{script} must serialize against the same cross-repository host build lock as cargo-ci.sh"
+        );
+    }
+}

@@ -60,7 +60,7 @@ set -euo pipefail
 #                               harness self-test; when unset, the release
 #                               binary is always built as required above.
 #   CARGO_CI_BUILD_LOCK         build lock shared with cargo-ci.sh (default
-#                               ${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock); held
+#                               ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock); held
 #                               only around the release build.
 #
 # Exit codes:
@@ -72,7 +72,7 @@ ISSUE_COUNT="${SESSION_BENCH_ISSUE_COUNT:-665}"
 WARMUP="${SESSION_BENCH_WARMUP:-3}"
 SAMPLES="${SESSION_BENCH_SAMPLES:-20}"
 OUT_DIR="${SESSION_BENCH_OUT_DIR:-dev/studies/perf}"
-BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock}"
+BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
 
 # Reject malformed numeric overrides rather than letting arithmetic or jq fail
 # later with an unrelated message. The fixture always contains at least the

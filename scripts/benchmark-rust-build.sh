@@ -63,7 +63,7 @@ set -euo pipefail
 #   BENCH_PROBE_FILE        file the rebuild probe is appended to
 #                           (default crates/jit/src/lib.rs)
 #   CARGO_CI_BUILD_LOCK     lock path shared with cargo-ci.sh
-#                           (default ${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock)
+#                           (default ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock)
 #   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
 #                           baseline.json directly from the
 #                           raw/{clean,rebuild}-samples.jsonl already present
@@ -99,7 +99,7 @@ TARGET_BASE="${BENCH_TARGET_BASE:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-benchmark-
 INVENTORY_SAMPLE="${BENCH_INVENTORY_SAMPLE:-1}"
 PROBE_FILE="${BENCH_PROBE_FILE:-crates/jit/src/lib.rs}"
 PROBE_COMMENT="// jit-benchmark-rebuild-probe: reversible comment-only source touch (jit:4e22a20d)"
-BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock}"
+BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
 
 # Resolve the real cargo binary. Mirrors scripts/cargo-ci.sh: some local setups
 # place a debugging shim at ~/.cargo/bin/cargo that exits 0 for every
