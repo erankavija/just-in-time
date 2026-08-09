@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-09T12:26:11.635706339Z",
+  "dependencies": [],
+  "description": "Gate history exposes structured findings in machine output, but the focused findings view is limited to the latest run. Rework audits therefore need an external parser to enumerate findings from every matching historical failure; the history view should provide that projection directly.\n\n## Background\n\nThe gate-status surface already supports latest-run findings, filtered run history, and JSON history records that retain structured findings. Combining the findings projection with history selection is currently rejected, while the ordinary text history prints only a findings count and the full stored report. A native history findings projection keeps inspection read-only and makes complete multi-run audits concise and reliable.\n\n## Success Criteria\n\n- [hard] REQ-01: The `gate status` findings projection combines with `--all` and `--limit`, preserves the optional gate-key and `--status` history filters, and retains the existing latest-run behavior when no history selector is present.\n- [hard] REQ-02: Text history findings output groups findings by run and identifies each run's gate key, run id, recorded status, timestamp, verdict, and finding count before emitting one stable greppable line per structured finding.\n- [hard] REQ-03: JSON history findings output uses a count-bearing list envelope and returns a lean per-run projection containing run identity, recorded status, structured-findings availability, verdict, summary, and findings without duplicating stored stdout or stderr.\n- [hard] REQ-04: Runs without a machine-readable findings block and history queries with no matches are represented unambiguously in both text and JSON output without failing inspection.\n- [hard] REQ-05: Findings history remains mutually exclusive with flat stdout, stderr, and tail views; failed recorded verdicts do not make the read-only status command exit nonzero.\n- [hard] REQ-06: CLI help, generated schema contracts, and automated tests cover latest and historical findings, gate and status filtering, limits, empty results, unstructured runs, incompatible flag combinations, text rendering, JSON shape, and exit behavior.\n\n## Notes\n\nThis extends the unified gate-status inspection surface rather than adding a separate command family. Existing unprojected history output and its full JSON records remain available when the findings projection is not requested.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-09T12:26:11.635706339Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "e57095a4-0500-4bb5-adde-8734d2b64602",
+  "labels": [
+    "milestone:v1.0",
+    "component:cli",
+    "component:gates",
+    "type:enhancement"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Project structured findings across gate-run history",
+  "updated_at": "2026-08-09T12:26:11.635706339Z"
+}

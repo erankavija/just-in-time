@@ -13379,3 +13379,5 @@
 {"gate_key":"holistic-review","id":"8b144e4e-4b6c-4840-94c0-3286b75c4e49","issue_id":"dd268d0f-2656-4e85-8527-990dc6aea0b4","timestamp":"2026-08-09T12:07:32.226321813Z","type":"gate_added"}
 {"gate_key":"holistic-review","id":"7768f275-a312-4676-92f2-25d14dccf0ce","issue_id":"f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0","timestamp":"2026-08-09T12:07:32.700526869Z","type":"gate_added"}
 {"gate_key":"holistic-review","id":"0a17fc46-cb64-4f43-b3d3-acebea933cc5","issue_id":"f73d54a2-14bd-4641-bcfe-be5f1431c133","timestamp":"2026-08-09T12:07:33.119651079Z","type":"gate_added"}
+{"id":"090c5c0a-cfbe-4169-995f-310480fe38e1","issue_id":"e57095a4-0500-4bb5-adde-8734d2b64602","priority":"normal","timestamp":"2026-08-09T12:26:11.635706339Z","title":"Project structured findings across gate-run history","type":"issue_created"}
+{"fields":["dependencies"],"id":"bd6ff720-082a-492c-957a-50ad3d31953d","issue_id":"9db27a3a-86c5-4d79-9582-9ad68364ea36","timestamp":"2026-08-09T12:26:21.985924680Z","type":"issue_updated","updated_by":"dependency-add"}
