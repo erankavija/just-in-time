@@ -199,8 +199,8 @@ pub use profile_apply::{
 };
 pub(crate) use profile_apply::{
     is_shipped_v1_candidate, migrate_shipped_v1_records, preflight_profile_contributions,
-    preflight_profile_contributions_for_mutation, profile_capture_closure,
-    profile_contribution_target_paths, shipped_v1_migration_paths,
+    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
+    shipped_v1_migration_paths,
 };
 #[cfg(test)]
 pub(crate) use profile_apply::{reset_shipped_v1_conversion_count, shipped_v1_conversion_count};
@@ -711,10 +711,13 @@ pub enum MaterializationRequest<'a> {
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
     },
-    /// Derive one profile application over an existing repository.
-    ApplyProfile {
-        /// Parsed package metadata and neutral canonical claims.
-        profile: Box<ProfileApplicationInput>,
+    /// Derive one complete profile-selection application over an existing
+    /// repository. The collection is dependency-first and unique; selector
+    /// occurrence handling remains at the command boundary.
+    ApplyProfileSelection {
+        /// Parsed package metadata and neutral canonical claims for the whole
+        /// selected closure.
+        profiles: Vec<ProfileApplicationInput>,
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
     },
@@ -775,8 +778,8 @@ pub fn derive_materialization(
             initialize::derive_initialization(image, scaffold, context)?,
             Default::default(),
         ),
-        MaterializationRequest::ApplyProfile { profile, context } => (
-            initialize::derive_profile_application(image, &profile, context)?,
+        MaterializationRequest::ApplyProfileSelection { profiles, context } => (
+            initialize::derive_profile_applications(image, &profiles, context)?,
             Default::default(),
         ),
     };

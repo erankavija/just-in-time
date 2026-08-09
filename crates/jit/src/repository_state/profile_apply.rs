@@ -1463,25 +1463,24 @@ pub(crate) fn preflight_profile_contributions(
     compose_profile_contributions(base, &candidates).map(|_| ())
 }
 
-/// Preflight a mutating application while deferring the sole historical v1
-/// decoder to that application's held publication session. Candidate legacy
-/// records are excluded here only; their claims are authenticated and restored
-/// before the selected package can derive or publish a delta.
-pub(crate) fn preflight_profile_contributions_for_mutation(
+/// Render the complete selected contribution set into a proposed registry view.
+///
+/// Capture planning uses this view before it asks each profile to close over its
+/// configured projections. A dependent profile can therefore resolve a
+/// projection whose item kind is supplied by another member of the same
+/// selection, without treating that proposed registry state as a separately
+/// publishable materialization.
+pub(crate) fn profile_contribution_overrides(
     base: &RepositoryImage,
-    candidates: Vec<ProfileContributionClaim>,
-) -> Result<(), RepositoryStateError> {
-    let legacy = applied_profile_record_paths(base)?
-        .into_iter()
-        .filter_map(|path| match base.entry(&path) {
-            Ok(RepositoryEntry::File { bytes, .. }) if is_shipped_v1_candidate(bytes) => {
-                Some((path, None))
-            }
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    let base = apply_overlay(base, legacy)?;
-    compose_profile_contributions(&base, &candidates).map(|_| ())
+    candidates: &[ProfileContributionClaim],
+) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, RepositoryStateError> {
+    let composed = compose_profile_contributions(base, candidates)?;
+    render_composed_contributions(base, &composed).map(|registries| {
+        registries
+            .into_iter()
+            .map(|(path, (bytes, _))| (path, Some(bytes)))
+            .collect()
+    })
 }
 
 /// Return every registry path whose semantic definition contributes to this
