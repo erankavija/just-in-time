@@ -147,8 +147,8 @@
     {
       "category": "rework-exceeded-max-attempts",
       "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
-      "status": "awaiting-invoker",
-      "summary": "After two rework rounds, exact cargo-ci passed at abea9028 but code-review found that the first successful apply of two equal contributors records shared ownership only in the later package record; the first record converges only on a second apply. The isolated branch and all gate evidence are preserved at 4228d655."
+      "status": "resolved",
+      "summary": "After two rework rounds, exact cargo-ci passed at abea9028 but code-review found that the first successful apply of two equal contributors records shared ownership only in the later package record; the first record converges only on a second apply. The invoker selected option 1 and authorized one targeted Terra xhigh retry spanning command, initialization, and provenance boundaries without pulling Wave 7's transaction redesign forward."
     }
   ],
   "rework_counts": {
