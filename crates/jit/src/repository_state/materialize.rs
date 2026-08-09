@@ -572,8 +572,8 @@ mod tests {
         MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
         MaterializationRequest, MutationContext, ProfileApplicationInput, ProfileAssetClaim,
         ProfileClaims, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
-        RepositoryImage, RepositoryLayout, RepositoryRootEvidence, RepositorySeed,
-        RepositorySeedKind, TargetClaim,
+        RepositoryAction, RepositoryImage, RepositoryLayout, RepositoryRootEvidence,
+        RepositorySeed, RepositorySeedKind, TargetClaim,
     };
     use std::collections::BTreeMap;
 
@@ -950,8 +950,11 @@ kind = "advisory"
         .unwrap();
 
         let profile = ProfileApplicationInput {
-            id: "identity-test".into(),
+            id: "identity-test"
+                .try_into()
+                .expect("test profile id is canonical"),
             version: "1.0.0".into(),
+            compatible_jit: "*".into(),
             package_hash: "package-hash".into(),
             variables: crate::profile::ResolvedVariables::default(),
             target_hashes: BTreeMap::new(),
@@ -966,6 +969,7 @@ kind = "advisory"
                 regions: Vec::new(),
             },
             contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::new(),
             record_path: VirtualPath::data("profiles/identity-test.json").unwrap(),
         };
         let profile_image = image(&[
@@ -1005,6 +1009,337 @@ kind = "advisory"
                 "{variant} plan identity must be hexadecimal"
             );
         }
+    }
+
+    #[test]
+    fn test_apply_profile_materialization_writes_converted_record_with_encountered_operation() {
+        let context = MutationContext::preview();
+        let migrated_path = VirtualPath::data("profiles/jit-dogfood.json").unwrap();
+        let migrated = crate::repository_state::AppliedProfileRecord::new(
+            "jit-dogfood"
+                .try_into()
+                .expect("test profile id is canonical"),
+            "1.0.0",
+            ">=1.0.0, <2.0.0",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            crate::profile::ResolvedVariables::default(),
+            Default::default(),
+        );
+        let profile = ProfileApplicationInput {
+            id: "encountered"
+                .try_into()
+                .expect("test profile id is canonical"),
+            version: "1.0.0".into(),
+            compatible_jit: "*".into(),
+            package_hash: "b".repeat(64),
+            variables: crate::profile::ResolvedVariables::default(),
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/encountered").unwrap(),
+            ),
+            claims: ProfileClaims {
+                package_id: ProfilePackageId::new("encountered"),
+                contributions: Vec::new(),
+                assets: Vec::new(),
+                regions: Vec::new(),
+            },
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::from([(migrated_path.clone(), migrated)]),
+            record_path: VirtualPath::data("profiles/encountered.json").unwrap(),
+        };
+        let image = image(&[
+            (
+                ".jit/config.toml",
+                Some("[project]\nname = \"identity-test\"\n"),
+            ),
+            (".jit/gates.toml", None),
+            (".jit/rules.toml", None),
+            (".jit/profiles", None),
+            (".jit/profiles/jit-dogfood.json", Some("legacy-v1")),
+            (".jit/profiles/encountered.json", None),
+            (".jit/events.jsonl", None),
+        ]);
+        let plan = derive_materialization(
+            &image,
+            MaterializationRequest::ApplyProfile {
+                profile: Box::new(profile),
+                context: &context,
+            },
+        )
+        .expect("one plan carries both record writes");
+        let writes = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter_map(|action| match action {
+                RepositoryAction::WriteFile { path, bytes, .. }
+                    if path == &migrated_path
+                        || path.repository_relative() == ".jit/profiles/encountered.json" =>
+                {
+                    Some((path.repository_relative(), bytes))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            writes.len(),
+            2,
+            "one delta writes conversion and application records"
+        );
+        let converted = writes
+            .iter()
+            .find(|(path, _)| path == ".jit/profiles/jit-dogfood.json")
+            .expect("converted v1 path is written");
+        assert!(
+            serde_json::from_slice::<crate::repository_state::AppliedProfileRecord>(converted.1)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_materialization_replaces_its_own_migrated_record_once() {
+        let context = MutationContext::preview();
+        let record_path = VirtualPath::data("profiles/jit-dogfood.json").unwrap();
+        let migrated = crate::repository_state::AppliedProfileRecord::new(
+            "jit-dogfood"
+                .try_into()
+                .expect("test profile id is canonical"),
+            "1.0.0",
+            ">=1.0.0, <2.0.0",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            crate::profile::ResolvedVariables::default(),
+            Default::default(),
+        );
+        let profile = ProfileApplicationInput {
+            id: "jit-dogfood"
+                .try_into()
+                .expect("test profile id is canonical"),
+            version: "1.0.1".into(),
+            compatible_jit: "*".into(),
+            package_hash: "b".repeat(64),
+            variables: crate::profile::ResolvedVariables::default(),
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/jit-dogfood").unwrap(),
+            ),
+            claims: ProfileClaims {
+                package_id: ProfilePackageId::new("jit-dogfood"),
+                contributions: Vec::new(),
+                assets: Vec::new(),
+                regions: Vec::new(),
+            },
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::from([(record_path.clone(), migrated)]),
+            record_path: record_path.clone(),
+        };
+        let image = image(&[
+            (
+                ".jit/config.toml",
+                Some("[project]\nname = \"identity-test\"\n"),
+            ),
+            (".jit/gates.toml", None),
+            (".jit/rules.toml", None),
+            (".jit/profiles", None),
+            (".jit/profiles/jit-dogfood.json", Some("legacy-v1")),
+            (".jit/events.jsonl", None),
+        ]);
+
+        let plan = derive_materialization(
+            &image,
+            MaterializationRequest::ApplyProfile {
+                profile: Box::new(profile),
+                context: &context,
+            },
+        )
+        .expect("the selected replacement accepts its authenticated v1 preimage");
+        let writes = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter(|action| action.path() == &record_path)
+            .collect::<Vec<_>>();
+        assert_eq!(writes.len(), 1, "the path has one final v2 record write");
+        let RepositoryAction::WriteFile { bytes, .. } = writes[0] else {
+            panic!("the replacement is a record write");
+        };
+        let record: crate::repository_state::AppliedProfileRecord =
+            serde_json::from_slice(bytes).expect("the selected record is v2");
+        assert_eq!(
+            record.origin,
+            ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/jit-dogfood").unwrap()
+            )
+        );
+    }
+
+    #[test]
+    fn test_initialization_materialization_copublishes_migrated_and_selected_records() {
+        let context = MutationContext::preview();
+        let migrated_path = VirtualPath::data("profiles/jit-dogfood.json").unwrap();
+        let migrated = crate::repository_state::AppliedProfileRecord::new(
+            "jit-dogfood"
+                .try_into()
+                .expect("test profile id is canonical"),
+            "1.0.0",
+            "*",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            crate::profile::ResolvedVariables::default(),
+            Default::default(),
+        );
+        let profile = ProfileApplicationInput {
+            id: "encountered"
+                .try_into()
+                .expect("test profile id is canonical"),
+            version: "1.0.0".into(),
+            compatible_jit: "*".into(),
+            package_hash: "b".repeat(64),
+            variables: crate::profile::ResolvedVariables::default(),
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/encountered").unwrap(),
+            ),
+            claims: ProfileClaims {
+                package_id: ProfilePackageId::new("encountered"),
+                contributions: Vec::new(),
+                assets: Vec::new(),
+                regions: Vec::new(),
+            },
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::from([(migrated_path.clone(), migrated)]),
+            record_path: VirtualPath::data("profiles/encountered.json").unwrap(),
+        };
+        let scaffold = crate::repository_state::InitializationScaffold::from_config(
+            "[project]\nname = \"identity-test\"\n".to_string(),
+            "identity-test".parse().unwrap(),
+            Some(profile),
+        )
+        .unwrap();
+        let image = image(&[
+            (
+                ".jit/config.toml",
+                Some("[project]\nname = \"identity-test\"\n"),
+            ),
+            (".jit/index.json", None),
+            (".jit/gates.toml", None),
+            (".jit/invariants.toml", None),
+            (".jit/rules.toml", None),
+            (".jit/schemas", None),
+            (".jit/schemas/default-label-format.json", None),
+            (".jit/schemas/default-namespace-registry.json", None),
+            (".jit/schemas/default-type-hierarchy-known.json", None),
+            (".jit/issues", None),
+            (".jit/profiles", None),
+            (".jit/profiles/jit-dogfood.json", Some("legacy-v1")),
+            (".jit/profiles/encountered.json", None),
+            (".jit/events.jsonl", None),
+        ]);
+
+        let plan = derive_materialization(
+            &image,
+            MaterializationRequest::Initialize {
+                scaffold: &scaffold,
+                context: &context,
+            },
+        )
+        .expect("initialization carries both provenance writes in its one delta");
+        let records = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter(|action| {
+                matches!(
+                    action,
+                    RepositoryAction::WriteFile { path, .. }
+                        if path == &migrated_path
+                            || path.repository_relative() == ".jit/profiles/encountered.json"
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(records.len(), 2);
+    }
+
+    #[test]
+    fn test_initialization_materialization_replaces_its_own_migrated_record_once() {
+        let context = MutationContext::preview();
+        let record_path = VirtualPath::data("profiles/jit-dogfood.json").unwrap();
+        let migrated = crate::repository_state::AppliedProfileRecord::new(
+            "jit-dogfood"
+                .try_into()
+                .expect("test profile id is canonical"),
+            "1.0.0",
+            "*",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            crate::profile::ResolvedVariables::default(),
+            Default::default(),
+        );
+        let profile = ProfileApplicationInput {
+            id: "jit-dogfood"
+                .try_into()
+                .expect("test profile id is canonical"),
+            version: "1.0.1".into(),
+            compatible_jit: "*".into(),
+            package_hash: "b".repeat(64),
+            variables: crate::profile::ResolvedVariables::default(),
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("packages/jit-dogfood").unwrap(),
+            ),
+            claims: ProfileClaims {
+                package_id: ProfilePackageId::new("jit-dogfood"),
+                contributions: Vec::new(),
+                assets: Vec::new(),
+                regions: Vec::new(),
+            },
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::from([(record_path.clone(), migrated)]),
+            record_path: record_path.clone(),
+        };
+        let scaffold = crate::repository_state::InitializationScaffold::from_config(
+            "[project]\nname = \"identity-test\"\n".to_string(),
+            "identity-test".parse().unwrap(),
+            Some(profile),
+        )
+        .unwrap();
+        let image = image(&[
+            (
+                ".jit/config.toml",
+                Some("[project]\nname = \"identity-test\"\n"),
+            ),
+            (".jit/index.json", None),
+            (".jit/gates.toml", None),
+            (".jit/invariants.toml", None),
+            (".jit/rules.toml", None),
+            (".jit/schemas", None),
+            (".jit/schemas/default-label-format.json", None),
+            (".jit/schemas/default-namespace-registry.json", None),
+            (".jit/schemas/default-type-hierarchy-known.json", None),
+            (".jit/issues", None),
+            (".jit/profiles", None),
+            (".jit/profiles/jit-dogfood.json", Some("legacy-v1")),
+            (".jit/events.jsonl", None),
+        ]);
+
+        let plan = derive_materialization(
+            &image,
+            MaterializationRequest::Initialize {
+                scaffold: &scaffold,
+                context: &context,
+            },
+        )
+        .expect("selected migration replacement derives a complete initialization delta");
+        assert_eq!(
+            plan.delta()
+                .actions()
+                .iter()
+                .filter(|action| action.path() == &record_path)
+                .count(),
+            1,
+            "the selected record has one final v2 write"
+        );
     }
 
     #[test]
@@ -1737,7 +2072,7 @@ kind = "advisory"
                     "profile-region:test",
                 )
                 .unwrap(),
-                region_id: region_id.to_string(),
+                region_id: region_id.try_into().expect("test region id is canonical"),
                 content: b"CORRECT REGION CONTENT".to_vec(),
             }],
         };

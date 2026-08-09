@@ -940,8 +940,12 @@ fn parse_profile_variable_assignments(
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
 fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
-    let jit::profile::ProfileOrigin::Directory(location) = origin;
-    format!("directory {}", location.as_path().display())
+    match origin {
+        jit::profile::ProfileOrigin::Embedded => "embedded".to_string(),
+        jit::profile::ProfileOrigin::Directory(location) => {
+            format!("directory {}", location.as_path().display())
+        }
+    }
 }
 
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
@@ -2195,7 +2199,10 @@ fn run() -> Result<()> {
             let output_ctx = OutputContext::new(quiet, *json);
             let selectors = parse_profile_selectors(profile, *json)?;
             let assignments = parse_profile_variable_assignments(set, *json)?;
-            profile_result(executor.validate_profile_selection(&selectors), *json)?;
+            profile_result(
+                executor.validate_profile_selection_for_mutation(&selectors),
+                *json,
+            )?;
 
             // Every init and re-init — plain, profiled, or over an existing root —
             // publishes through the recovered session: `run_initialization` fills

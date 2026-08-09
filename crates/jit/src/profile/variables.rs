@@ -460,7 +460,7 @@ pub(crate) fn validate_model_references(model: &ProfilePackageModel) -> Result<(
         )?;
         reject_references(
             &format!("region id '{}'", region.region_id),
-            &region.region_id,
+            region.region_id.as_str(),
         )
     })?;
     model.live_sources.iter().try_for_each(|live_source| {
@@ -1148,7 +1148,7 @@ mod tests {
             regions: vec![RegionDeclaration {
                 source: "region.txt".to_string(),
                 target: "AGENTS.md".to_string(),
-                region_id: "guidance".to_string(),
+                region_id: "guidance".try_into().expect("test region id is canonical"),
                 placement: RegionPlacement::Append,
                 template: false,
             }],

@@ -7,7 +7,19 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Write};
 
 /// Platform-neutral file mode.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum FileMode {
     /// Non-executable ordinary file.

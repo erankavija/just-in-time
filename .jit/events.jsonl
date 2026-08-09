@@ -13406,3 +13406,5 @@
 {"from":"backlog","id":"31de688c-6e76-4109-9165-b7d0c0bd31ba","issue_id":"9a9a4cfc-38a1-42e4-94bd-6dd15cd46944","timestamp":"2026-08-09T17:57:42.619181193Z","to":"ready","type":"issue_state_changed"}
 {"from":"ready","id":"5673723d-bd58-4541-b0c7-624571281ce8","issue_id":"9a9a4cfc-38a1-42e4-94bd-6dd15cd46944","timestamp":"2026-08-09T18:01:29.993782225Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker-9a9a4cfc","id":"335f25ec-90a1-41b4-a6e0-5e6878a82e4f","issue_id":"9a9a4cfc-38a1-42e4-94bd-6dd15cd46944","timestamp":"2026-08-09T18:01:29.993782225Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"f1372ea1-7a9f-4b1b-bf5f-5c7be40c332a","issue_id":"9a9a4cfc-38a1-42e4-94bd-6dd15cd46944","timestamp":"2026-08-09T21:01:47.061951232Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"093ef3ec-0b81-44f7-b8ee-566f9e08559e","issue_id":"9a9a4cfc-38a1-42e4-94bd-6dd15cd46944","timestamp":"2026-08-09T21:05:45.560253987Z","type":"gate_passed","updated_by":"auto:executor"}

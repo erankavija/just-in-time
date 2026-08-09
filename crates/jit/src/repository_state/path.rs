@@ -118,7 +118,19 @@ impl schemars::JsonSchema for RootRelativePath {
 }
 
 /// Selected repository root class for a canonical virtual path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RepositoryRootClass {
     /// Authored worktree root.
@@ -327,8 +339,9 @@ impl VirtualPath {
     /// a data-root identity renders under the logical `.jit/` prefix and every
     /// other identity renders worktree-relative. Both directions live beside the
     /// identity they convert so no consumer maintains its own `.jit` prefix
-    /// adapter — profile packages address targets, applied-profile records key
-    /// their target hashes, and messages name paths in exactly this spelling.
+    /// adapter — profile packages address targets, applied-profile claim
+    /// identities persist targets, and messages name paths in exactly this
+    /// spelling.
     pub fn repository_relative(&self) -> String {
         let relative = self.relative().as_str();
         match self.root_class() {

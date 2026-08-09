@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-9a9a4cfc",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "78752b83ca0d4feec35618d205db0da9ac6c61f0",
+  "completed_at": "2026-08-09T21:01:47.041319757Z",
+  "duration_ms": 813606,
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "700d9c1c236d2d159936fc993d782876ff42f74b25e910f5e04cebd02d955bd6",
+  "issue_id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "628e2db5-17da-4c0a-9043-5814df3286ef",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T20:48:13.434886992Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 4482 passed, 0 failed, 10 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1527 bytes=29045051)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1548688152/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

@@ -241,9 +241,12 @@ event. Every applied package writes its own record and appends its own event,
 so applying a package that declares a dependency leaves one record and one
 event per package of the set. The record stores the profile ID, version, origin,
 package hash, resolved public variable values with their source kinds, and
-per-target hashes used to recognize the exact resolved application. Validation
-and repair reuse those stored values; they do not read the current process
-environment. The audit event carries the hashes but never the resolved values.
+sorted ownership claims. Each claim names one semantic declaration, file target,
+or managed region together with its published-base fingerprint and retention
+intent. Validation and repair reuse the stored resolved variable values but load
+effective configuration from the declared registries; they do not read the
+current process environment. The audit event carries the resolved target hashes
+but never the resolved values.
 The record does not state why a package was applied, so it reads the same
 whether the adopter named that package or received it as another's dependency.
 

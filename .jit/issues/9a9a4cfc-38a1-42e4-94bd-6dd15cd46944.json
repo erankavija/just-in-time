@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T21:01:47.061951232Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-09T21:05:45.560253987Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944",
   "labels": [
     "type:task",
@@ -29,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Carry ownership claims in the applied profile record",
-  "updated_at": "2026-08-09T18:01:29.993782225Z"
+  "updated_at": "2026-08-09T21:05:45.560253987Z"
 }
