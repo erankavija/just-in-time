@@ -156,7 +156,8 @@
     "eac6ec13": 2,
     "474a90a8": 0,
     "fc47a7bf": 2,
-    "cbcd9318": 2
+    "cbcd9318": 2,
+    "9a9a4cfc": 1
   },
   "review_verdicts": [
     {
@@ -357,6 +358,23 @@
       "holistic_review": "ordinary repeatable-selector apply, public dependency-closure apply, and profiled initialization share the same scoped ownership context without pulling forward Wave 7's aggregate transaction",
       "post_merge_validation": "exact merged-main cargo-ci passed in gate run 2fd99ed6-b428-4428-8e7c-57e43c2367f9; MCP server 64 unit and 13 integration tests passed",
       "reviewed_at": "2026-08-09T17:58:15Z"
+    },
+    {
+      "issue_id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944",
+      "reviewed_commit": "uncommitted worktree at 2eb0dcbd",
+      "verdict": "fail",
+      "gate_status": {"cargo-ci": "pending", "code-review": "pending"},
+      "prior_findings": [],
+      "criteria": {
+        "REQ-01": "unmet: asset bases can fingerprint pre-projection bytes rather than the published target and managed identities do not match the frozen target-plus-region-id contract",
+        "REQ-02": "unmet: ordinary managed-region adoption and retained-claim continuity are not represented",
+        "REQ-03": "unmet: the shipped CLI rejects v1 before the boundary, the final session lacks the pinned captures, and the decoder/converter runs repeatedly instead of once",
+        "REQ-04": "met: effective configuration continues to load registries rather than record claims"
+      },
+      "stale_narrative_sweep": "one stale target_hashes-era record docstring remains at crates/jit/src/repository_state/profile_apply.rs:1942",
+      "deferred_items_audit": "no linked documents",
+      "holistic_review": "actual migration reachability, same-profile replacement, filename/id coherence, ambiguous region markers, claim uniqueness/typed identity, public wire-type reachability, and one vacuous event assertion require one cumulative rework pass",
+      "reviewed_at": "2026-08-09T22:31:39+03:00"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00"
