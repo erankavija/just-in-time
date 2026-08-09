@@ -150,7 +150,7 @@
     "eac6ec13": 2,
     "474a90a8": 0,
     "fc47a7bf": 2,
-    "cbcd9318": 1
+    "cbcd9318": 2
   },
   "review_verdicts": [
     {
@@ -203,6 +203,36 @@
       "deferred_items_audit": "no linked documents",
       "holistic_review": "canonical contribution identity derives from unstable Debug spellings",
       "reviewed_at": "2026-08-09T14:57:30Z"
+    },
+    {
+      "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
+      "reviewed_commit": "97a9c19d0f6d3026729f17b972c2a187b4a543b5",
+      "verdict": "fail",
+      "gate_status": {"cargo-ci": "failed", "code-review": "not rerun after cargo failure"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "F1",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:855"
+        },
+        {
+          "round": 1,
+          "id": "lead-F2",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:77"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "met",
+        "REQ-02": "unmet: repeatable conflicting selectors publish the first package before rejecting the second",
+        "REQ-03": "unmet: unchanged shared owners cannot re-contribute after ownership expansion because the existing record is rejected",
+        "REQ-04": "met"
+      },
+      "stale_narrative_sweep": "no actionable stale product narrative; current research correctly still describes sequential publication",
+      "deferred_items_audit": "no linked documents",
+      "holistic_review": "cargo-ci exposed declaration-order regression; three new production unreachable/expect panic sites violate repository guidance",
+      "reviewed_at": "2026-08-09T15:47:00Z"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00"
