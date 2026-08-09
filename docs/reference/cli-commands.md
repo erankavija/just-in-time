@@ -533,7 +533,7 @@ canonicalize unusual-but-valid TOML syntax spellings elsewhere in the file —
 semantically lossless, with every rule, comment, and unrelated table preserved.
 
 ```bash
-jit init [--profile <SELECTOR>]... [--json]
+jit init [--profile <SELECTOR>]... [--values-file <PATH>] [--set NAME=VALUE]... [--json]
 ```
 
 A plain `jit init` writes the structural minimum: `config.toml` carries the
@@ -561,6 +561,11 @@ occupied destination is never overwritten. The same flag can complete and apply
 the profile to an existing partial repository. See
 [Repository Profiles](profiles.md) for the canonical package, conflict,
 transaction, recovery, and lifecycle contract.
+
+Profile variables can be supplied with `--values-file <PATH>` (a TOML file with
+one `[variables]` string table) and repeated `--set NAME=VALUE` flags. Values
+resolve in declaration-default, values-file, declared-environment, then
+command-line order; later `--set` occurrences win.
 
 Inside a git repository, init also creates a worktree identity
 (`repository_id`, format `wt:<8-hex>`) used for lease/claim coordination, and
@@ -689,9 +694,10 @@ Apply a profile package read from a repository location through one
 recoverable multi-target transaction:
 
 ```bash
-jit profile apply --profile <SELECTOR>... [--dry-run] [--json]
+jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run] [--json]
 ```
 
+`--values-file` and `--set` use the same variable inputs as profiled init.
 `--dry-run` builds and validates the exact plans without writing. JSON returns
 the count-wrapped `ProfilePlanResult` collection
 `{"count": N, "profiles": [...]}` with one `ProfilePlanEntry` per selector

@@ -77,6 +77,13 @@ jit profile apply --profile path:packages/jit-dogfood
 jit profile apply --profile id:jit-dogfood --dry-run
 ```
 
+Packages may declare non-secret variables. Supply a TOML values file containing
+`[variables]` or repeat `--set NAME=VALUE`; precedence is declaration default,
+values file, declared environment variable, then `--set`, with the last
+`--set` winning. Variable references are available in templated asset and
+region bodies and declared free-form prose fields; package paths, identities,
+modes, and other constrained fields reject them.
+
 The selector syntax and package-resolution contract are defined in [Profile
 Commands](cli-commands.md#profile-commands). This page
 describes the package and its lifecycle; the command reference covers how a
@@ -255,15 +262,15 @@ deferred to the post-1.0 profile epic and do not exist in this release:
 
 - applying several profiles the adopter names in one operation;
 - profile incompatibilities;
-- variables and sensitive-value handling;
+- sensitive-value handling;
 - semantic shared ownership;
 - reconfiguration;
 - detailed diff;
 - three-way upgrade;
 - safe removal.
 
-There is no composition flag, variable input, profile-upgrade command, or
-profile-removal command hidden behind the v1.0 interface. Package lookup follows
+There is no profile-upgrade command or profile-removal command hidden behind the
+v1.0 interface. Package lookup follows
 the command contract in [Profile Commands](cli-commands.md#profile-commands);
 no configured search path discovers a package. Edit repository configuration
 directly for advanced customization, or start from the manual guides below.

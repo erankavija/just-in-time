@@ -4,8 +4,8 @@ use crate::profile::{
     ProfileApplyResult, ProfileComposedApplyResult, ProfileGraphError, ProfileId,
     ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError, ProfilePackageSource,
     ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult,
-    ProfileSummary, ProfileTargetAction, ProfileTargetChange, ResolvedProfileContent,
-    ResolvedProfileGraph, VariableInputs,
+    ProfileSummary, ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment,
+    ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph, VariableInputs,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -291,21 +291,21 @@ pub enum ProfileApplyError {
 pub struct ProfileVariableOptions {
     /// Optional TOML file containing exactly one `[variables]` string table.
     pub values_file: Option<PathBuf>,
-    /// Repeated `NAME=VALUE` assignments in command-line occurrence order.
-    pub assignments: Vec<String>,
+    /// Repeated typed assignments in command-line occurrence order.
+    pub assignments: Vec<ProfileVariableAssignment>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ProfileValuesFile {
-    variables: BTreeMap<String, String>,
+    variables: BTreeMap<ProfileVariableName, String>,
 }
 
 /// Capture profile variable inputs from the command boundary.
 pub(super) fn load_profile_variable_inputs(
     packages: &[ProfilePackage],
     values_file: Option<&Path>,
-    assignments: &[String],
+    assignments: &[ProfileVariableAssignment],
 ) -> Result<VariableInputs> {
     let values_file = values_file
         .map(fs::read_to_string)
@@ -314,20 +314,6 @@ pub(super) fn load_profile_variable_inputs(
         .transpose()?
         .map(|file| file.variables)
         .unwrap_or_default();
-    let command_line = assignments
-        .iter()
-        .map(|assignment| {
-            assignment.split_once('=').map_or_else(
-                || {
-                    anyhow::bail!(
-                        "invalid profile variable assignment '{assignment}'; expected NAME=VALUE"
-                    )
-                },
-                |(name, value)| Ok((name.to_string(), value.to_string())),
-            )
-        })
-        .collect::<Result<Vec<_>>>()?;
-
     let declarations = packages
         .iter()
         .flat_map(|package| package.model().variables.iter())
@@ -336,25 +322,29 @@ pub(super) fn load_profile_variable_inputs(
         .iter()
         .map(|declaration| declaration.name.clone())
         .collect::<BTreeSet<_>>();
+    let environment_names = declarations
+        .iter()
+        .filter_map(|declaration| declaration.env.clone())
+        .collect::<BTreeSet<_>>();
     let mut inputs = VariableInputs {
         values_file,
         environment: BTreeMap::new(),
-        command_line,
+        command_line: assignments.to_vec(),
     };
-    inputs.validate_against_names(&names)?;
+    inputs.validate_against_names(&names, &environment_names)?;
 
     for declaration in declarations {
-        let Some(env_name) = declaration.env.as_deref() else {
+        let Some(env_name) = declaration.env.as_ref() else {
             continue;
         };
-        if let Some(value) = std::env::var_os(env_name) {
+        if let Some(value) = std::env::var_os(env_name.as_str()) {
             let value = value.into_string().map_err(|_| {
                 anyhow::anyhow!(
                     "environment variable '{env_name}' for profile variable '{}' is not valid UTF-8",
                     declaration.name
                 )
             })?;
-            inputs.environment.insert(declaration.name.clone(), value);
+            inputs.environment.insert(env_name.clone(), value);
         }
     }
     Ok(inputs)
@@ -366,7 +356,12 @@ fn validate_variable_inputs(packages: &[ProfilePackage], inputs: &VariableInputs
         .flat_map(|package| package.model().variables.iter())
         .map(|declaration| declaration.name.clone())
         .collect::<BTreeSet<_>>();
-    inputs.validate_against_names(&names)?;
+    let environment_names = packages
+        .iter()
+        .flat_map(|package| package.model().variables.iter())
+        .filter_map(|declaration| declaration.env.clone())
+        .collect::<BTreeSet<_>>();
+    inputs.validate_against_names(&names, &environment_names)?;
     Ok(())
 }
 
@@ -520,7 +515,10 @@ impl CommandExecutor<JsonFileStorage> {
         }
         selectors
             .iter()
-            .map(|selector| self.plan_profile_with_inputs(selector, inputs))
+            .map(|selector| {
+                let package = self.resolve_profile_package(selector)?;
+                self.plan_profile_package_with_inputs(&package, inputs)
+            })
             .collect::<Result<Vec<_>>>()
             .map(ProfilePlanResult::new)
     }
@@ -559,8 +557,16 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<ProfilePlanEntry> {
         let package = self.resolve_profile_package(selector)?;
         validate_variable_inputs(std::slice::from_ref(&package), inputs)?;
+        self.plan_profile_package_with_inputs(&package, inputs)
+    }
+
+    fn plan_profile_package_with_inputs(
+        &self,
+        package: &ProfilePackage,
+        inputs: &VariableInputs,
+    ) -> Result<ProfilePlanEntry> {
         let resolved = resolve_package(
-            &package,
+            package,
             &inputs.for_declarations(&package.model().variables),
         )?;
         let metadata = package.model();
@@ -568,7 +574,7 @@ impl CommandExecutor<JsonFileStorage> {
         let context = MutationContext::preview();
         with_mutation_session(self.storage(), &layout, "profile planning", |session| {
             let Some((plan, changes)) =
-                self.prepare_profile_resolved(session, &package, &resolved, &context)?
+                self.prepare_profile_resolved(session, package, &resolved, &context)?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -1395,7 +1401,7 @@ fn recorded_summary(
         version: metadata.version.clone(),
         origin: package_origin(&package, layout)?,
         jit: metadata.compatible_jit.clone(),
-        applied: record == expected_record(&package, layout)?,
+        applied: record == expected_record(&package, layout, &record.target_hashes)?,
     }))
 }
 
@@ -1431,6 +1437,7 @@ pub(super) fn package_origin(
 pub(super) fn expected_record(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
+    target_hashes: &BTreeMap<String, String>,
 ) -> Result<AppliedProfileRecord> {
     let metadata = package.model();
     Ok(AppliedProfileRecord::new(
@@ -1438,7 +1445,7 @@ pub(super) fn expected_record(
         metadata.version.clone(),
         package_origin(package, layout)?,
         package.hashes().package.clone(),
-        package.hashes().targets.clone(),
+        target_hashes.clone(),
     ))
 }
 
@@ -1454,7 +1461,7 @@ fn profile_application_input(
         id: metadata.id.to_string(),
         version: metadata.version.clone(),
         package_hash: package.hashes().package.clone(),
-        target_hashes: package.hashes().targets.clone(),
+        target_hashes: resolved.target_hashes()?,
         origin: package_origin(package, layout)?,
         claims: build_profile_claims_from_resolved(resolved, layout, false)?,
         record_path,
@@ -2915,13 +2922,22 @@ template = true
             std::slice::from_ref(&package),
             Some(&values_file),
             &[
-                format!("NAME={resolved_value}"),
-                format!("NAME={resolved_value}-last"),
+                ProfileVariableAssignment::new("NAME".try_into().unwrap(), resolved_value),
+                ProfileVariableAssignment::new(
+                    "NAME".try_into().unwrap(),
+                    format!("{resolved_value}-last"),
+                ),
             ],
         )
         .unwrap();
-        assert_eq!(inputs.values_file["NAME"], "values-file-value");
-        assert_eq!(inputs.command_line.last().unwrap().1, "resolved-value-last");
+        assert_eq!(
+            inputs.values_file[&"NAME".try_into().unwrap()],
+            "values-file-value"
+        );
+        assert_eq!(
+            inputs.command_line.last().unwrap().value,
+            "resolved-value-last"
+        );
 
         executor
             .apply_profile_package_with_inputs(&package, &inputs)
@@ -2934,6 +2950,18 @@ template = true
         let event_bytes = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         let record_bytes =
             fs::read(temp.path().join(".jit/profiles/planner-variable.json")).unwrap();
+        let record: AppliedProfileRecord = serde_json::from_slice(&record_bytes).unwrap();
+        assert_ne!(
+            record.target_hashes,
+            package.hashes().targets,
+            "applied target fingerprints must include resolved content"
+        );
+        assert!(
+            record.target_hashes.values().all(|hash| event_bytes
+                .windows(hash.len())
+                .any(|window| window == hash.as_bytes())),
+            "the profile_applied event must carry the same resolved target fingerprints"
+        );
         assert!(!event_bytes
             .windows(resolved_value.len())
             .any(|window| window == resolved_value.as_bytes()));

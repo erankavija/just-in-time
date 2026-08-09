@@ -118,6 +118,31 @@ fn set_package_version(repo: &Path, location: &str, version: &str) -> PathBuf {
     manifest
 }
 
+/// Write a small v2 package whose templated asset makes the resolved value
+/// observable without putting that value in package identity or provenance.
+struct VariablePackageSpec<'a> {
+    id: &'a str,
+    variable: &'a str,
+    default: &'a str,
+    target: &'a str,
+    body: &'a str,
+    dependency: Option<&'a str>,
+}
+
+fn write_variable_package(repo: &Path, location: &str, spec: VariablePackageSpec<'_>) {
+    let root = repo.join(location);
+    fs::create_dir_all(root.join("assets")).unwrap();
+    let dependency = spec.dependency.map_or(String::new(), |dependency| {
+        format!("\n[[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n")
+    });
+    let manifest = format!(
+        "[profile]\nmanifest-version = 2\nid = \"{}\"\nversion = \"1.0.0\"\ncompatible-jit = \"*\"\n{dependency}\n[[variable]]\nname = \"{}\"\ndefault = \"{}\"\n\n[[asset]]\nsource = \"assets/content.txt\"\ntarget = \"{}\"\ntemplate = true\n",
+        spec.id, spec.variable, spec.default, spec.target
+    );
+    fs::write(root.join("manifest.toml"), manifest).unwrap();
+    fs::write(root.join("assets/content.txt"), spec.body).unwrap();
+}
+
 /// Rewrite the package tree at `location` to declare a dependency on `id`.
 ///
 /// No package this repository ships declares a dependency, so a composition
@@ -476,6 +501,128 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
     // A preview writes nothing, the record included.
     assert!(!repo.path().join(".jit/profiles").exists());
     assert!(!repo.path().join("docs/profile.txt").exists());
+}
+
+#[test]
+fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_precedence() {
+    let init_repo = TempDir::new().unwrap();
+    write_variable_package(
+        init_repo.path(),
+        "packages/init-vars",
+        VariablePackageSpec {
+            id: "init-vars",
+            variable: "NAME",
+            default: "default",
+            target: "docs/init-vars.txt",
+            body: "NAME={{jit:var:NAME}}\n",
+            dependency: None,
+        },
+    );
+    let init_values = init_repo.path().join("values.toml");
+    fs::write(&init_values, "[variables]\nNAME = \"from-file\"\n").unwrap();
+    let init_values = init_values.to_str().unwrap();
+    let init = jit(
+        init_repo.path(),
+        &[
+            "init",
+            "--profile",
+            "path:packages/init-vars",
+            "--values-file",
+            init_values,
+            "--set",
+            "NAME=first",
+            "--set",
+            "NAME=last",
+            "--json",
+        ],
+    );
+    assert!(init.status.success(), "{init:?}");
+    assert_eq!(
+        fs::read_to_string(init_repo.path().join("docs/init-vars.txt")).unwrap(),
+        "NAME=last\n"
+    );
+
+    let apply_repo = TempDir::new().unwrap();
+    write_variable_package(
+        apply_repo.path(),
+        "packages/dependency-vars",
+        VariablePackageSpec {
+            id: "dependency-vars",
+            variable: "TOKEN",
+            default: "dependency-default",
+            target: "docs/dependency-vars.txt",
+            body: "TOKEN={{jit:var:TOKEN}}\n",
+            dependency: None,
+        },
+    );
+    write_variable_package(
+        apply_repo.path(),
+        "packages/root-vars",
+        VariablePackageSpec {
+            id: "root-vars",
+            variable: "NAME",
+            default: "root-default",
+            target: "docs/root-vars.txt",
+            body: "NAME={{jit:var:NAME}}\n",
+            dependency: Some("dependency-vars"),
+        },
+    );
+    assert!(jit(apply_repo.path(), &["init"]).status.success());
+    let values = apply_repo.path().join("values.toml");
+    fs::write(&values, "[variables]\nNAME = \"from-file\"\n").unwrap();
+    let values = values.to_str().unwrap();
+    let selector = "path:packages/root-vars";
+    let preview = jit(
+        apply_repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            selector,
+            "--values-file",
+            values,
+            "--set",
+            "NAME=first",
+            "--set",
+            "NAME=last",
+            "--set",
+            "TOKEN=dependency-value",
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(preview.status.success(), "{preview:?}");
+    assert_eq!(json(&preview)["profiles"][0]["status"], "would_apply");
+    assert!(!apply_repo.path().join("docs/root-vars.txt").exists());
+    assert!(!apply_repo.path().join("docs/dependency-vars.txt").exists());
+
+    let applied = jit(
+        apply_repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            selector,
+            "--values-file",
+            values,
+            "--set",
+            "NAME=first",
+            "--set",
+            "NAME=last",
+            "--set",
+            "TOKEN=dependency-value",
+            "--json",
+        ],
+    );
+    assert!(applied.status.success(), "{applied:?}");
+    assert_eq!(
+        fs::read_to_string(apply_repo.path().join("docs/root-vars.txt")).unwrap(),
+        "NAME=last\n"
+    );
+    assert_eq!(
+        fs::read_to_string(apply_repo.path().join("docs/dependency-vars.txt")).unwrap(),
+        "TOKEN=dependency-value\n"
+    );
 }
 
 #[test]

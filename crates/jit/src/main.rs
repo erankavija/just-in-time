@@ -26,6 +26,7 @@ use jit::cli::{
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext};
+use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::path::{Component, Path, PathBuf};
@@ -905,6 +906,29 @@ fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileS
             value
                 .parse::<ProfileSelector>()
                 .map_err(|error| invalid_argument(format!("{error}"), json))
+        })
+        .collect()
+}
+
+/// Parse command-line profile assignments before entering command orchestration.
+fn parse_profile_variable_assignments(
+    values: &[String],
+    json: bool,
+) -> Result<Vec<ProfileVariableAssignment>> {
+    values
+        .iter()
+        .map(|assignment| {
+            let (name, value) = assignment.split_once('=').ok_or_else(|| {
+                invalid_argument(
+                    format!(
+                        "invalid profile variable assignment '{assignment}'; expected NAME=VALUE"
+                    ),
+                    json,
+                )
+            })?;
+            let name = ProfileVariableName::try_from(name.to_string())
+                .map_err(|error| invalid_argument(error, json))?;
+            Ok(ProfileVariableAssignment::new(name, value))
         })
         .collect()
 }
@@ -2163,6 +2187,7 @@ fn run() -> Result<()> {
         } => {
             let output_ctx = OutputContext::new(quiet, *json);
             let selectors = parse_profile_selectors(profile, *json)?;
+            let assignments = parse_profile_variable_assignments(set, *json)?;
             profile_result(executor.validate_profile_selection(&selectors), *json)?;
 
             // Every init and re-init — plain, profiled, or over an existing root —
@@ -2179,7 +2204,7 @@ fn run() -> Result<()> {
                     Some(&selectors),
                     &ProfileVariableOptions {
                         values_file: values_file.clone(),
-                        assignments: set.clone(),
+                        assignments,
                     },
                 ),
                 *json,
@@ -2353,6 +2378,7 @@ fn run() -> Result<()> {
                 json,
             } => {
                 let selectors = parse_profile_selectors(&profile, json)?;
+                let assignments = parse_profile_variable_assignments(&set, json)?;
                 if selectors.is_empty() {
                     return Err(invalid_argument(
                         "profile apply requires at least one --profile id:ID or path:DIR selector"
@@ -2365,7 +2391,7 @@ fn run() -> Result<()> {
                         &selectors,
                         &ProfileVariableOptions {
                             values_file: values_file.clone(),
-                            assignments: set.clone(),
+                            assignments: assignments.clone(),
                         },
                     ) {
                         Ok(plans) => {
@@ -2406,7 +2432,7 @@ fn run() -> Result<()> {
                         &selectors,
                         &ProfileVariableOptions {
                             values_file: values_file.clone(),
-                            assignments: set.clone(),
+                            assignments,
                         },
                     ) {
                         Ok(applied) => {

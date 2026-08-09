@@ -52,9 +52,10 @@ pub use apply_claims::{
 };
 pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{
-    profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
+    profile_package_model_schema, AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration,
     ProfileDependencyRequirement, ProfileId, ProfileIncompatibility, ProfilePackageModel,
-    ProfileVariableDeclaration, RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME,
+    ProfileVariableDeclaration, ProfileVariableName, RegionDeclaration, RegionPlacement,
+    MANIFEST_FILE_NAME,
 };
 pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
@@ -62,6 +63,6 @@ pub use package::{
 };
 pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;
 pub use variables::{
-    resolve_package, resolve_variables, ResolvedProfileContent, ResolvedVariable,
-    ResolvedVariables, VariableError, VariableInputs, VariableSource,
+    resolve_package, resolve_variables, ProfileVariableAssignment, ResolvedProfileContent,
+    ResolvedVariable, ResolvedVariables, VariableError, VariableInputs, VariableSource,
 };

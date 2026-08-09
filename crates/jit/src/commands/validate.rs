@@ -912,7 +912,9 @@ fn captured_profile_repair_claims(
                     ))))
                 }
             };
-        if actual != super::profile::expected_record(package, image.layout())? {
+        if actual
+            != super::profile::expected_record(package, image.layout(), &actual.target_hashes)?
+        {
             return Ok(Some(Err(RepositoryValidationFailure::materialization(
                 anyhow!(
                     "applied profile provenance for '{}@{}' does not match the package its record resolves to",

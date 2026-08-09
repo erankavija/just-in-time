@@ -121,17 +121,134 @@ pub struct ProfileIncompatibility {
     pub version: String,
 }
 
+/// A canonical profile-variable name.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
+#[serde(transparent)]
+#[schemars(with = "String")]
+pub struct ProfileVariableName(String);
+
+impl ProfileVariableName {
+    /// Borrow the validated variable name.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for ProfileVariableName {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        validate_variable_name("profile variable name", value)?;
+        Ok(Self(value.to_string()))
+    }
+}
+
+impl TryFrom<String> for ProfileVariableName {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl AsRef<str> for ProfileVariableName {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for ProfileVariableName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl<'de> Deserialize<'de> for ProfileVariableName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::try_from(value).map_err(de::Error::custom)
+    }
+}
+
+/// A canonical environment-variable name used by a profile declaration.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
+#[serde(transparent)]
+#[schemars(with = "String")]
+pub struct EnvironmentVariableName(String);
+
+impl EnvironmentVariableName {
+    /// Borrow the validated environment-variable name.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for EnvironmentVariableName {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        validate_variable_name("environment variable name", value)?;
+        Ok(Self(value.to_string()))
+    }
+}
+
+impl TryFrom<String> for EnvironmentVariableName {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl AsRef<str> for EnvironmentVariableName {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for EnvironmentVariableName {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl<'de> Deserialize<'de> for EnvironmentVariableName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::try_from(value).map_err(de::Error::custom)
+    }
+}
+
+fn validate_variable_name(field: &'static str, name: &str) -> Result<(), String> {
+    let valid = name
+        .chars()
+        .next()
+        .is_some_and(|first| first.is_ascii_uppercase())
+        && name.chars().all(|character| {
+            character.is_ascii_uppercase() || character.is_ascii_digit() || character == '_'
+        });
+    valid
+        .then_some(())
+        .ok_or_else(|| format!("invalid {field} '{name}'; expected [A-Z][A-Z0-9_]*"))
+}
+
 /// A non-secret variable declaration carried by a package.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileVariableDeclaration {
     /// Portable variable name.
-    pub name: String,
+    pub name: ProfileVariableName,
     /// Optional authored default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
     /// Optional environment variable name.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub env: Option<String>,
+    pub env: Option<EnvironmentVariableName>,
 }
 
 /// A one-to-one file asset.

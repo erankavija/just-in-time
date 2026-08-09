@@ -1033,7 +1033,9 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::variables::{resolve_package, VariableError, VariableInputs};
+    use crate::profile::variables::{
+        resolve_package, ProfileVariableAssignment, VariableError, VariableInputs,
+    };
     use crate::profile::{
         profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
         ProfileDependencyRequirement, ProfileId, RegionDeclaration,
@@ -1532,9 +1534,10 @@ name = "NAME"
 default = "default"
 
 [[contribution]]
-kind = "scalar"
-target = "documentation-development-root"
-value = "docs/{{jit:var:NAME}}"
+kind = "map-entry"
+target = "namespaces"
+identity = "component"
+value = { description = "docs/{{jit:var:NAME}}" }
 
 [[asset]]
 source = "assets/profile.txt"
@@ -1556,7 +1559,10 @@ template = true
         let first = resolve_package(
             &package,
             &VariableInputs {
-                command_line: vec![("NAME".to_string(), "first".to_string())],
+                command_line: vec![ProfileVariableAssignment::new(
+                    "NAME".try_into().unwrap(),
+                    "first",
+                )],
                 ..VariableInputs::default()
             },
         )
@@ -1564,7 +1570,10 @@ template = true
         let first_again = resolve_package(
             &package,
             &VariableInputs {
-                command_line: vec![("NAME".to_string(), "first".to_string())],
+                command_line: vec![ProfileVariableAssignment::new(
+                    "NAME".try_into().unwrap(),
+                    "first",
+                )],
                 ..VariableInputs::default()
             },
         )
@@ -1572,7 +1581,10 @@ template = true
         let second = resolve_package(
             &package,
             &VariableInputs {
-                command_line: vec![("NAME".to_string(), "second".to_string())],
+                command_line: vec![ProfileVariableAssignment::new(
+                    "NAME".try_into().unwrap(),
+                    "second",
+                )],
                 ..VariableInputs::default()
             },
         )
@@ -1580,8 +1592,14 @@ template = true
 
         assert_eq!(package.hashes().package, package_hash);
         assert_eq!(first, first_again);
-        assert_eq!(first.variables().values()["NAME"], "first");
-        assert_eq!(second.variables().values()["NAME"], "second");
+        assert_eq!(
+            first.variables().values()[&"NAME".try_into().unwrap()],
+            "first"
+        );
+        assert_eq!(
+            second.variables().values()[&"NAME".try_into().unwrap()],
+            "second"
+        );
         assert_eq!(
             first.source_bytes("assets/profile.txt"),
             Some(b"profile=first\n".as_slice())
@@ -1591,6 +1609,11 @@ template = true
             Some(b"profile=second\n".as_slice())
         );
         assert_ne!(first.model(), second.model());
+        assert_ne!(
+            first.target_hashes().unwrap(),
+            second.target_hashes().unwrap(),
+            "resolved target fingerprints must change with resolved content"
+        );
     }
 
     #[test]

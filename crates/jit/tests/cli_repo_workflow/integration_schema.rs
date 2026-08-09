@@ -86,6 +86,16 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
         .unwrap()
         .iter()
         .any(|flag| flag["name"] == "dry-run"));
+    for name in ["set", "values-file"] {
+        assert!(
+            profile["apply"]["flags"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|flag| flag["name"] == name),
+            "profile apply must expose --{name}"
+        );
+    }
 }
 
 #[test]
@@ -123,6 +133,12 @@ fn test_schema_exposes_only_repeatable_profile_selectors() {
     assert_eq!(selector["type"], "array<string>");
     assert_eq!(selector["required"], false);
     assert!(!init_flags.iter().any(|flag| flag["name"] == "from"));
+    for name in ["set", "values-file"] {
+        assert!(
+            init_flags.iter().any(|flag| flag["name"] == name),
+            "init must expose --{name}"
+        );
+    }
 }
 
 #[test]

@@ -425,7 +425,7 @@ impl CommandExecutor<JsonFileStorage> {
             id: metadata.id.to_string(),
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
-            target_hashes: package.hashes().targets.clone(),
+            target_hashes: resolved.target_hashes()?,
             origin: super::profile::package_origin(package, &layout)?,
             claims: build_profile_claims_from_resolved(&resolved, &layout, false)?,
             record_path,

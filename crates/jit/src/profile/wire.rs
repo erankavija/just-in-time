@@ -5,8 +5,9 @@
 //! never carry a versioned manifest representation.
 
 use super::manifest::{
-    AssetDeclaration, LiveSourceDeclaration, ProfileDependencyRequirement, ProfileId,
-    ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration, RegionDeclaration,
+    AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration, ProfileDependencyRequirement,
+    ProfileId, ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration,
+    ProfileVariableName, RegionDeclaration,
 };
 use crate::repository_state::Contribution;
 use serde::{Deserialize, Serialize};
@@ -228,11 +229,11 @@ struct ManifestIncompatibility {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ManifestVariable {
-    name: String,
+    name: ProfileVariableName,
     #[serde(default)]
     default: Option<String>,
     #[serde(default)]
-    env: Option<String>,
+    env: Option<EnvironmentVariableName>,
 }
 
 /// Canonicalize a JSON object recursively without changing array order.
@@ -316,13 +317,16 @@ env = "PROJECT_NAME"
             "legacy-package"
         );
         assert_eq!(decoded.model.incompatibilities[0].version, ">=4.0.0");
-        assert_eq!(decoded.model.variables[0].name, "PROJECT_NAME");
+        assert_eq!(decoded.model.variables[0].name.as_str(), "PROJECT_NAME");
         assert_eq!(
             decoded.model.variables[0].default.as_deref(),
             Some("example")
         );
         assert_eq!(
-            decoded.model.variables[0].env.as_deref(),
+            decoded.model.variables[0]
+                .env
+                .as_ref()
+                .map(|name| name.as_str()),
             Some("PROJECT_NAME")
         );
     }

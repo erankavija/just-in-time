@@ -4,24 +4,48 @@
 //! module only consumes that canonical package plus already-captured inputs;
 //! filesystem and environment access stay at the command boundary.
 
-use super::manifest::{ProfilePackageModel, ProfileVariableDeclaration};
+use super::manifest::{
+    EnvironmentVariableName, ProfilePackageModel, ProfileVariableDeclaration, ProfileVariableName,
+};
 use super::package::ProfilePackage;
-use crate::repository_state::Contribution;
+use crate::repository_state::{Contribution, KeyedArrayTarget, MapEntryTarget};
+use serde::Serialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 const REFERENCE_PREFIX: &str = "{{jit:";
 const REFERENCE_KIND: &str = "var:";
+const RESOLVED_TARGET_HASH_DOMAIN: &[u8] = b"jit-profile-resolved-target-v1\0";
 
 /// Inputs captured by a command before it enters pure package resolution.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct VariableInputs {
     /// Values read from the optional values file, keyed by declared variable.
-    pub values_file: BTreeMap<String, String>,
-    /// Environment values keyed by the package variable they supply.
-    pub environment: BTreeMap<String, String>,
+    pub values_file: BTreeMap<ProfileVariableName, String>,
+    /// Environment values keyed by the declared operating-system name.
+    pub environment: BTreeMap<EnvironmentVariableName, String>,
     /// Repeated `--set NAME=VALUE` assignments in occurrence order.
-    pub command_line: Vec<(String, String)>,
+    pub command_line: Vec<ProfileVariableAssignment>,
+}
+
+/// One typed command-line assignment after the CLI adapter has parsed NAME=VALUE.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProfileVariableAssignment {
+    /// Declared profile-variable name.
+    pub name: ProfileVariableName,
+    /// Non-secret value supplied by the caller.
+    pub value: String,
+}
+
+impl ProfileVariableAssignment {
+    /// Construct an assignment from already-validated semantic pieces.
+    pub fn new(name: ProfileVariableName, value: impl Into<String>) -> Self {
+        Self {
+            name,
+            value: value.into(),
+        }
+    }
 }
 
 impl VariableInputs {
@@ -31,41 +55,49 @@ impl VariableInputs {
     pub fn for_declarations(&self, declarations: &[ProfileVariableDeclaration]) -> Self {
         let names = declarations
             .iter()
-            .map(|declaration| declaration.name.as_str())
+            .map(|declaration| &declaration.name)
+            .collect::<BTreeSet<_>>();
+        let environment_names = declarations
+            .iter()
+            .filter_map(|declaration| declaration.env.as_ref())
             .collect::<BTreeSet<_>>();
         Self {
             values_file: self
                 .values_file
                 .iter()
-                .filter(|(name, _)| names.contains(name.as_str()))
+                .filter(|(name, _)| names.contains(name))
                 .map(|(name, value)| (name.clone(), value.clone()))
                 .collect(),
             environment: self
                 .environment
                 .iter()
-                .filter(|(name, _)| names.contains(name.as_str()))
+                .filter(|(name, _)| environment_names.contains(name))
                 .map(|(name, value)| (name.clone(), value.clone()))
                 .collect(),
             command_line: self
                 .command_line
                 .iter()
-                .filter(|(name, _)| names.contains(name.as_str()))
+                .filter(|assignment| names.contains(&assignment.name))
                 .cloned()
                 .collect(),
         }
     }
 
     /// Reject input names that are not in a participating package set.
-    pub fn validate_against_names(&self, names: &BTreeSet<String>) -> Result<(), VariableError> {
+    pub fn validate_against_names(
+        &self,
+        names: &BTreeSet<ProfileVariableName>,
+        environment_names: &BTreeSet<EnvironmentVariableName>,
+    ) -> Result<(), VariableError> {
         self.values_file
             .keys()
             .try_for_each(|name| validate_input_name(names, name, "values file"))?;
         self.environment
             .keys()
-            .try_for_each(|name| validate_input_name(names, name, "environment"))?;
+            .try_for_each(|name| validate_environment_name(environment_names, name))?;
         self.command_line
             .iter()
-            .try_for_each(|(name, _)| validate_input_name(names, name, "--set"))
+            .try_for_each(|assignment| validate_input_name(names, &assignment.name, "--set"))
     }
 }
 
@@ -93,26 +125,26 @@ pub struct ResolvedVariable {
 
 /// Deterministic resolved variables, ordered by variable name.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ResolvedVariables(BTreeMap<String, ResolvedVariable>);
+pub struct ResolvedVariables(BTreeMap<ProfileVariableName, ResolvedVariable>);
 
 impl ResolvedVariables {
-    /// Return resolved values in a stable map suitable for a later record.
-    pub fn values(&self) -> BTreeMap<String, String> {
+    /// Return resolved values in a stable typed-name map.
+    pub fn values(&self) -> BTreeMap<ProfileVariableName, String> {
         self.0
             .iter()
             .map(|(name, resolved)| (name.clone(), resolved.value.clone()))
             .collect()
     }
 
-    /// Return source classifications in the same stable variable order.
-    pub fn sources(&self) -> BTreeMap<String, VariableSource> {
+    /// Return source classifications in the same stable typed-name order.
+    pub fn sources(&self) -> BTreeMap<ProfileVariableName, VariableSource> {
         self.0
             .iter()
             .map(|(name, resolved)| (name.clone(), resolved.source))
             .collect()
     }
 
-    fn get(&self, name: &str) -> Option<&ResolvedVariable> {
+    fn get(&self, name: &ProfileVariableName) -> Option<&ResolvedVariable> {
         self.0.get(name)
     }
 }
@@ -152,13 +184,17 @@ pub fn resolve_variables(
         .iter()
         .map(|declaration| declaration.name.clone())
         .collect::<BTreeSet<_>>();
-    inputs.validate_against_names(&declared)?;
+    let environment_names = declarations
+        .iter()
+        .filter_map(|declaration| declaration.env.clone())
+        .collect::<BTreeSet<_>>();
+    inputs.validate_against_names(&declared, &environment_names)?;
 
     // A repeated --set intentionally has last-occurrence-wins semantics.
     let command_line = inputs
         .command_line
         .iter()
-        .cloned()
+        .map(|assignment| (assignment.name.clone(), assignment.value.clone()))
         .collect::<BTreeMap<_, _>>();
     let resolved = declarations
         .iter()
@@ -167,10 +203,12 @@ pub fn resolve_variables(
                 .get(&declaration.name)
                 .map(|value| (value.clone(), VariableSource::Set))
                 .or_else(|| {
-                    inputs
-                        .environment
-                        .get(&declaration.name)
-                        .map(|value| (value.clone(), VariableSource::Environment))
+                    declaration.env.as_ref().and_then(|environment| {
+                        inputs
+                            .environment
+                            .get(environment)
+                            .map(|value| (value.clone(), VariableSource::Environment))
+                    })
                 })
                 .or_else(|| {
                     inputs
@@ -247,6 +285,83 @@ pub fn resolve_package(
     })
 }
 
+impl ResolvedProfileContent {
+    /// Hash resolved semantic contributions and resolved file bytes by their
+    /// repository target without exposing the resolved values themselves.
+    pub(crate) fn target_hashes(&self) -> Result<BTreeMap<String, String>, VariableError> {
+        let mut frames = BTreeMap::<String, Vec<Vec<u8>>>::new();
+        for contribution in &self.model.contributions {
+            frames
+                .entry(contribution.registry_path().to_string())
+                .or_default()
+                .push(canonical_json_bytes(contribution)?);
+        }
+        for asset in &self.model.assets {
+            let mut frame = canonical_json_bytes(asset)?;
+            append_frame(
+                &mut frame,
+                self.source_bytes(&asset.source)
+                    .ok_or_else(|| VariableError::MissingSource(asset.source.clone()))?,
+            );
+            frames.entry(asset.target.clone()).or_default().push(frame);
+        }
+        for region in &self.model.regions {
+            let mut frame = canonical_json_bytes(region)?;
+            append_frame(
+                &mut frame,
+                self.source_bytes(&region.source)
+                    .ok_or_else(|| VariableError::MissingSource(region.source.clone()))?,
+            );
+            frames.entry(region.target.clone()).or_default().push(frame);
+        }
+        frames
+            .into_iter()
+            .map(|(target, target_frames)| {
+                let mut hasher = Sha256::new();
+                hasher.update(RESOLVED_TARGET_HASH_DOMAIN);
+                hash_frame(&mut hasher, target.as_bytes());
+                target_frames
+                    .iter()
+                    .for_each(|frame| hash_frame(&mut hasher, frame));
+                Ok((target, format!("{:x}", hasher.finalize())))
+            })
+            .collect()
+    }
+}
+
+fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, VariableError> {
+    serde_json::to_vec(&canonicalize_json(
+        serde_json::to_value(value)
+            .map_err(|error| VariableError::Serialization(error.to_string()))?,
+    ))
+    .map_err(|error| VariableError::Serialization(error.to_string()))
+}
+
+fn canonicalize_json(value: Value) -> Value {
+    match value {
+        Value::Array(values) => Value::Array(values.into_iter().map(canonicalize_json).collect()),
+        Value::Object(values) => Value::Object(
+            values
+                .into_iter()
+                .map(|(key, value)| (key, canonicalize_json(value)))
+                .collect::<BTreeMap<_, _>>()
+                .into_iter()
+                .collect(),
+        ),
+        scalar => scalar,
+    }
+}
+
+fn append_frame(frame: &mut Vec<u8>, bytes: &[u8]) {
+    frame.extend_from_slice(&(bytes.len() as u64).to_be_bytes());
+    frame.extend_from_slice(bytes);
+}
+
+fn hash_frame<D: Digest>(hasher: &mut D, bytes: &[u8]) {
+    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+
 /// Validate reference syntax and positions without requiring input values.
 pub(crate) fn validate_model_references(model: &ProfilePackageModel) -> Result<(), VariableError> {
     validate_declarations(&model.variables)?;
@@ -276,6 +391,18 @@ pub(crate) fn validate_model_references(model: &ProfilePackageModel) -> Result<(
             &format!("region id '{}'", region.region_id),
             &region.region_id,
         )
+    })?;
+    model.live_sources.iter().try_for_each(|live_source| {
+        reject_references(
+            &format!("live-source root '{}'", live_source.root),
+            live_source.root.as_str(),
+        )?;
+        live_source.exclude.iter().try_for_each(|exclude| {
+            reject_references(
+                &format!("live-source exclusion '{}'", exclude),
+                exclude.as_str(),
+            )
+        })
     })
 }
 
@@ -312,22 +439,18 @@ where
 fn validate_declarations(declarations: &[ProfileVariableDeclaration]) -> Result<(), VariableError> {
     let mut names = BTreeSet::new();
     declarations.iter().try_for_each(|declaration| {
-        validate_name("variable name", &declaration.name)?;
         if !names.insert(declaration.name.clone()) {
             return Err(VariableError::DuplicateDeclaration(
-                declaration.name.clone(),
+                declaration.name.to_string(),
             ));
-        }
-        if let Some(env) = &declaration.env {
-            validate_name("environment variable name", env)?;
         }
         Ok(())
     })
 }
 
 fn validate_input_name(
-    declared: &BTreeSet<String>,
-    name: &str,
+    declared: &BTreeSet<ProfileVariableName>,
+    name: &ProfileVariableName,
     source: &'static str,
 ) -> Result<(), VariableError> {
     if declared.contains(name) {
@@ -336,6 +459,20 @@ fn validate_input_name(
         Err(VariableError::UndeclaredInput {
             name: name.to_string(),
             tier: source,
+        })
+    }
+}
+
+fn validate_environment_name(
+    declared: &BTreeSet<EnvironmentVariableName>,
+    name: &EnvironmentVariableName,
+) -> Result<(), VariableError> {
+    if declared.contains(name) {
+        Ok(())
+    } else {
+        Err(VariableError::UndeclaredInput {
+            name: name.to_string(),
+            tier: "environment",
         })
     }
 }
@@ -365,16 +502,33 @@ fn validate_contribution_references(
     let field = |suffix: &str| format!("contribution[{index}].{suffix}");
     match contribution {
         Contribution::Scalar { value, .. } | Contribution::SetString { value, .. } => {
-            reference_names(value, &field("value")).map(|_| ())
+            reject_references(&field("value"), value)
         }
         Contribution::MapEntry {
-            identity, value, ..
-        }
-        | Contribution::KeyedArray {
-            identity, value, ..
+            target,
+            identity,
+            value,
         } => {
             reject_references(&field("identity"), identity)?;
-            validate_json_references(value, &field("value"), false)
+            validate_json_references(
+                value,
+                &field("value"),
+                json_reference_policy_for_map(*target),
+                Vec::new(),
+            )
+        }
+        Contribution::KeyedArray {
+            target,
+            identity,
+            value,
+        } => {
+            reject_references(&field("identity"), identity)?;
+            validate_json_references(
+                value,
+                &field("value"),
+                JsonReferencePolicy::KeyedArray(*target),
+                Vec::new(),
+            )
         }
         Contribution::Projection { name, value } => {
             reject_references(&field("name"), name)?;
@@ -383,46 +537,73 @@ fn validate_contribution_references(
     }
 }
 
-fn validate_json_references(
-    value: &Value,
-    field: &str,
-    forbidden_key: bool,
-) -> Result<(), VariableError> {
-    match value {
-        Value::String(value) => {
-            if forbidden_key {
-                reject_references(field, value)
-            } else {
-                reference_names(value, field).map(|_| ())
-            }
-        }
-        Value::Array(values) => values.iter().enumerate().try_for_each(|(index, value)| {
-            validate_json_references(value, &format!("{field}[{index}]"), forbidden_key)
-        }),
-        Value::Object(values) => values.iter().try_for_each(|(key, value)| {
-            let child = format!("{field}.{key}");
-            validate_json_references(value, &child, forbidden_key || forbidden_json_key(key))
-        }),
-        Value::Null | Value::Bool(_) | Value::Number(_) => Ok(()),
+#[derive(Debug, Clone, Copy)]
+enum JsonReferencePolicy {
+    None,
+    Namespace,
+    KeyedArray(KeyedArrayTarget),
+}
+
+fn json_reference_policy_for_map(target: MapEntryTarget) -> JsonReferencePolicy {
+    match target {
+        MapEntryTarget::Namespaces => JsonReferencePolicy::Namespace,
+        MapEntryTarget::TypeHierarchyTypes
+        | MapEntryTarget::LabelAssociations
+        | MapEntryTarget::ItemKinds => JsonReferencePolicy::None,
     }
 }
 
-fn forbidden_json_key(key: &str) -> bool {
-    matches!(
-        key,
-        "id" | "key"
-            | "name"
-            | "target"
-            | "source"
-            | "path"
-            | "mode"
-            | "placement"
-            | "style"
-            | "kind"
-            | "region-id"
-            | "executable"
-            | "template"
-    )
+fn allows_free_form_reference(policy: JsonReferencePolicy, path: &[String]) -> bool {
+    match (policy, path) {
+        (JsonReferencePolicy::Namespace, [field]) => field == "description",
+        (JsonReferencePolicy::KeyedArray(KeyedArrayTarget::Gates), [field]) => {
+            field == "title" || field == "description"
+        }
+        (JsonReferencePolicy::KeyedArray(KeyedArrayTarget::Gates), [parent, field]) => {
+            parent == "checker" && field == "prompt"
+        }
+        (
+            JsonReferencePolicy::KeyedArray(
+                KeyedArrayTarget::Invariants
+                | KeyedArrayTarget::Rules
+                | KeyedArrayTarget::Templates,
+            ),
+            [field],
+        ) => field == "description",
+        (JsonReferencePolicy::None, _)
+        | (JsonReferencePolicy::Namespace, _)
+        | (JsonReferencePolicy::KeyedArray(_), _) => false,
+    }
+}
+
+fn validate_json_references(
+    value: &Value,
+    field: &str,
+    policy: JsonReferencePolicy,
+    path: Vec<String>,
+) -> Result<(), VariableError> {
+    match value {
+        Value::String(value) => {
+            if allows_free_form_reference(policy, &path) {
+                reference_names(value, field).map(|_| ())
+            } else {
+                reject_references(field, value)
+            }
+        }
+        Value::Array(values) => values.iter().enumerate().try_for_each(|(index, value)| {
+            let mut child_path = path.clone();
+            child_path.push(index.to_string());
+            validate_json_references(value, &format!("{field}[{index}]"), policy, child_path)
+        }),
+        Value::Object(values) => values.iter().try_for_each(|(key, value)| {
+            reject_references(&format!("{field} key"), key)?;
+            let mut child_path = path.clone();
+            child_path.push(key.clone());
+            let child = format!("{field}.{key}");
+            validate_json_references(value, &child, policy, child_path)
+        }),
+        Value::Null | Value::Bool(_) | Value::Number(_) => Ok(()),
+    }
 }
 
 fn reject_references(field: &str, value: &str) -> Result<(), VariableError> {
@@ -485,11 +666,11 @@ fn substitute_contribution(
     match contribution {
         Contribution::Scalar { target, value } => Ok(Contribution::Scalar {
             target: *target,
-            value: substitute_string(&field("value"), value, variables)?,
+            value: reject_and_clone(&field("value"), value)?,
         }),
         Contribution::SetString { target, value } => Ok(Contribution::SetString {
             target: *target,
-            value: substitute_string(&field("value"), value, variables)?,
+            value: reject_and_clone(&field("value"), value)?,
         }),
         Contribution::MapEntry {
             target,
@@ -498,7 +679,13 @@ fn substitute_contribution(
         } => Ok(Contribution::MapEntry {
             target: *target,
             identity: reject_and_clone(&field("identity"), identity)?,
-            value: substitute_json(value, &field("value"), variables, false)?,
+            value: substitute_json(
+                value,
+                &field("value"),
+                variables,
+                json_reference_policy_for_map(*target),
+                Vec::new(),
+            )?,
         }),
         Contribution::KeyedArray {
             target,
@@ -507,7 +694,13 @@ fn substitute_contribution(
         } => Ok(Contribution::KeyedArray {
             target: *target,
             identity: reject_and_clone(&field("identity"), identity)?,
-            value: substitute_json(value, &field("value"), variables, false)?,
+            value: substitute_json(
+                value,
+                &field("value"),
+                variables,
+                JsonReferencePolicy::KeyedArray(*target),
+                Vec::new(),
+            )?,
         }),
         Contribution::Projection { name, value } => Ok(Contribution::Projection {
             name: reject_and_clone(&field("name"), name)?,
@@ -525,26 +718,30 @@ fn substitute_json(
     value: &Value,
     field: &str,
     variables: &ResolvedVariables,
-    forbidden_key: bool,
+    policy: JsonReferencePolicy,
+    path: Vec<String>,
 ) -> Result<Value, VariableError> {
     match value {
         Value::String(value) => {
-            if forbidden_key || field.rsplit('.').next().is_some_and(forbidden_json_key) {
+            if allows_free_form_reference(policy, &path) {
+                substitute_string(field, value, variables).map(Value::String)
+            } else {
                 reject_references(field, value)?;
                 Ok(Value::String(value.clone()))
-            } else {
-                substitute_string(field, value, variables).map(Value::String)
             }
         }
         Value::Array(values) => values
             .iter()
             .enumerate()
             .map(|(index, value)| {
+                let mut child_path = path.clone();
+                child_path.push(index.to_string());
                 substitute_json(
                     value,
                     &format!("{field}[{index}]"),
                     variables,
-                    forbidden_key,
+                    policy,
+                    child_path,
                 )
             })
             .collect::<Result<Vec<_>, _>>()
@@ -552,11 +749,15 @@ fn substitute_json(
         Value::Object(values) => values
             .iter()
             .map(|(key, value)| {
+                reject_references(&format!("{field} key"), key)?;
+                let mut child_path = path.clone();
+                child_path.push(key.clone());
                 substitute_json(
                     value,
                     &format!("{field}.{key}"),
                     variables,
-                    forbidden_key || forbidden_json_key(key),
+                    policy,
+                    child_path,
                 )
                 .map(|value| (key.clone(), value))
             })
@@ -592,8 +793,12 @@ pub fn substitute_string(
                 field: field.to_string(),
             }
         })?;
+        let name =
+            ProfileVariableName::try_from(name).map_err(|_| VariableError::MalformedReference {
+                field: field.to_string(),
+            })?;
         let resolved = variables
-            .get(name)
+            .get(&name)
             .ok_or_else(|| VariableError::MissingValue {
                 field: field.to_string(),
                 name: name.to_string(),
@@ -666,6 +871,9 @@ pub enum VariableError {
     /// A declared package source was absent from the package image.
     #[error("declared package source '{0}' is unavailable")]
     MissingSource(String),
+    /// A resolved semantic definition could not be serialized for hashing.
+    #[error("failed to serialize resolved profile content for hashing: {0}")]
+    Serialization(String),
 }
 
 #[cfg(test)]
@@ -682,9 +890,9 @@ mod tests {
         env: Option<&str>,
     ) -> ProfileVariableDeclaration {
         ProfileVariableDeclaration {
-            name: name.to_string(),
+            name: name.try_into().unwrap(),
             default: default.map(str::to_string),
-            env: env.map(str::to_string),
+            env: env.map(|env| env.try_into().unwrap()),
         }
     }
 
@@ -699,25 +907,67 @@ mod tests {
         let inputs = VariableInputs {
             values_file: [("VALUES_FILE", "file"), ("ENVIRONMENT", "file")]
                 .into_iter()
-                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .map(|(name, value)| (name.try_into().unwrap(), value.to_string()))
                 .collect(),
-            environment: [("ENVIRONMENT", "environment")]
+            environment: [("PROFILE_ENV", "environment")]
                 .into_iter()
-                .map(|(name, value)| (name.to_string(), value.to_string()))
+                .map(|(name, value)| (name.try_into().unwrap(), value.to_string()))
                 .collect(),
             command_line: vec![
-                ("COMMAND_LINE".to_string(), "first".to_string()),
-                ("COMMAND_LINE".to_string(), "last".to_string()),
+                ProfileVariableAssignment::new("COMMAND_LINE".try_into().unwrap(), "first"),
+                ProfileVariableAssignment::new("COMMAND_LINE".try_into().unwrap(), "last"),
             ],
         };
 
         let resolved = resolve_variables(&declarations, &inputs).unwrap();
 
-        assert_eq!(resolved.values()["DEFAULT_ONLY"], "default");
-        assert_eq!(resolved.values()["VALUES_FILE"], "file");
-        assert_eq!(resolved.values()["ENVIRONMENT"], "environment");
-        assert_eq!(resolved.values()["COMMAND_LINE"], "last");
-        assert_eq!(resolved.sources()["COMMAND_LINE"], VariableSource::Set);
+        assert_eq!(
+            resolved.values()[&"DEFAULT_ONLY".try_into().unwrap()],
+            "default"
+        );
+        assert_eq!(
+            resolved.values()[&"VALUES_FILE".try_into().unwrap()],
+            "file"
+        );
+        assert_eq!(
+            resolved.values()[&"ENVIRONMENT".try_into().unwrap()],
+            "environment"
+        );
+        assert_eq!(
+            resolved.values()[&"COMMAND_LINE".try_into().unwrap()],
+            "last"
+        );
+        assert_eq!(
+            resolved.sources()[&"COMMAND_LINE".try_into().unwrap()],
+            VariableSource::Set
+        );
+    }
+
+    #[test]
+    fn test_variable_inputs_route_same_name_through_each_package_environment_declaration() {
+        let inputs = VariableInputs {
+            environment: [("ENV_A", "value-from-a"), ("ENV_B", "value-from-b")]
+                .into_iter()
+                .map(|(name, value)| (name.try_into().unwrap(), value.to_string()))
+                .collect(),
+            ..VariableInputs::default()
+        };
+        let package_a = [declaration("NAME", None, Some("ENV_A"))];
+        let package_b = [declaration("NAME", None, Some("ENV_B"))];
+
+        let resolved_a =
+            resolve_variables(&package_a, &inputs.for_declarations(&package_a)).unwrap();
+        let resolved_b =
+            resolve_variables(&package_b, &inputs.for_declarations(&package_b)).unwrap();
+
+        assert_eq!(
+            resolved_a.values()[&"NAME".try_into().unwrap()],
+            "value-from-a"
+        );
+        assert_eq!(
+            resolved_b.values()[&"NAME".try_into().unwrap()],
+            "value-from-b"
+        );
     }
 
     #[test]
@@ -736,7 +986,10 @@ mod tests {
         let undeclared = resolve_variables(
             &[declaration("NAME", None, None)],
             &VariableInputs {
-                command_line: vec![("OTHER".to_string(), "value".to_string())],
+                command_line: vec![ProfileVariableAssignment::new(
+                    "OTHER".try_into().unwrap(),
+                    "value",
+                )],
                 ..VariableInputs::default()
             },
         )
@@ -802,7 +1055,7 @@ mod tests {
             variables: vec![declaration("NAME", Some("value"), None)],
             contributions: vec![Contribution::Scalar {
                 target: ScalarTarget::DocumentationDevelopmentRoot,
-                value: "{{jit:var:NAME}}".to_string(),
+                value: "docs".to_string(),
             }],
             assets: vec![AssetDeclaration {
                 source: "asset.txt".to_string(),
@@ -843,7 +1096,48 @@ mod tests {
     }
 
     #[test]
-    fn test_substitute_allowed_scalar_and_set_string_values() {
+    fn test_substitute_rejects_every_nested_semantic_key_and_object_key_reference() {
+        let resolved = resolve_variables(
+            &[declaration("NAME", Some("value"), None)],
+            &VariableInputs::default(),
+        )
+        .unwrap();
+        for key in [
+            "working_dir",
+            "prompt_file",
+            "roots",
+            "applies_to",
+            "mode",
+            "path",
+            "target",
+            "source",
+            "name",
+            "key",
+        ] {
+            let contribution = Contribution::KeyedArray {
+                target: KeyedArrayTarget::Gates,
+                identity: "gate".to_string(),
+                value: serde_json::json!({key: "{{jit:var:NAME}}"}),
+            };
+            let error = substitute_contribution(0, &contribution, &resolved).unwrap_err();
+            assert!(
+                error.to_string().contains(key),
+                "semantic key {key} must reject references: {error}"
+            );
+        }
+
+        let keyed_object = Contribution::KeyedArray {
+            target: KeyedArrayTarget::Templates,
+            identity: "template".to_string(),
+            value: serde_json::json!({
+                "{{jit:var:NAME}}": "literal",
+            }),
+        };
+        assert!(substitute_contribution(0, &keyed_object, &resolved).is_err());
+    }
+
+    #[test]
+    fn test_substitute_rejects_constrained_scalar_and_set_string_values() {
         let resolved = resolve_variables(
             &[declaration("NAME", Some("value"), None)],
             &VariableInputs::default(),
@@ -857,13 +1151,20 @@ mod tests {
             target: SetStringTarget::DocumentationManagedPaths,
             value: "docs/{{jit:var:NAME}}".to_string(),
         };
+        assert!(substitute_contribution(0, &scalar, &resolved).is_err());
+        assert!(substitute_contribution(1, &set, &resolved).is_err());
+
+        let free_form = Contribution::MapEntry {
+            target: crate::repository_state::MapEntryTarget::Namespaces,
+            identity: "component".to_string(),
+            value: serde_json::json!({
+                "description": "owned by {{jit:var:NAME}}",
+            }),
+        };
         assert!(matches!(
-            substitute_contribution(0, &scalar, &resolved).unwrap(),
-            Contribution::Scalar { value, .. } if value == "docs/value"
-        ));
-        assert!(matches!(
-            substitute_contribution(1, &set, &resolved).unwrap(),
-            Contribution::SetString { value, .. } if value == "docs/value"
+            substitute_contribution(2, &free_form, &resolved).unwrap(),
+            Contribution::MapEntry { value, .. }
+                if value["description"] == "owned by value"
         ));
     }
 }
