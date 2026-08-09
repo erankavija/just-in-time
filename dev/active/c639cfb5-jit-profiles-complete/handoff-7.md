@@ -1,6 +1,7 @@
 # Handoff — Complete profile lifecycle, composition, and upgrades (c639cfb5) — session 7
 
 **Date:** 2026-08-10T00:40:30+03:00
+**Amended:** 2026-08-10 after host-wide Cargo cache/lock convergence (`9d66aba9`)
 **Session number:** 7
 **Prior handoffs:** `dev/active/c639cfb5-jit-profiles-complete/handoff.md`, `dev/active/c639cfb5-jit-profiles-complete/handoff-2.md`, `dev/active/c639cfb5-jit-profiles-complete/handoff-3.md`, `dev/active/c639cfb5-jit-profiles-complete/handoff-4.md`, `dev/active/c639cfb5-jit-profiles-complete/handoff-5.md`, `dev/active/c639cfb5-jit-profiles-complete/handoff-6.md`
 
@@ -24,12 +25,13 @@
 - Two fresh Cargo targets filled `/tmp` and prevented even the sandbox mount from starting. The lead removed only `/tmp/jit-wave7-red-target` and the first `/tmp/jit-wave7-target` (about 8 GB of reproducible cache), then resumed with one target path.
 - Observed the focused production-path test red: `test_apply_profile_selection_publishes_multiple_packages_through_one_transaction` reports two `RepositoryBeforeControlCreation` publication boundaries for one two-package selection (`left: 2`, expected `1`). No production implementation has started.
 - Interrupted the worker at the user's handoff request and preserved the test-only checkpoint as `fb58495e` (`wip(jit:9fad8581): preserve session-7 red transaction test`). The worktree and main are clean; no Cargo process remains.
+- After the handoff checkpoint, main adopted the host-wide Cargo convention in `9d66aba9`: guarded `sccache`, the shared `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock`, and `./scripts/cargo-ci.sh --cargo <args...>` for compilation-heavy focused checks. The pre-wrapper 39 GiB main target and 3.5 GiB `/tmp/jit-wave7-target` were deliberately removed before the cached rebuild. The complete main gate then passed (fmt, Clippy, 4,483 tests, provenance, build budget, and no incremental state). No warmed Wave 7 target currently exists.
 
 ## What to do next
 
-- [ ] Resume `/root/wave7_aggregate_publication` with a follow-up task, or dispatch a Terra xhigh successor into the existing worktree. Start from `fb58495e`; do not create a new worktree or drop the red checkpoint.
+- [ ] Resume `/root/wave7_aggregate_publication` with a follow-up task, or dispatch a Terra xhigh successor into the existing worktree. Start from `fb58495e`; do not create a new worktree or drop the red checkpoint. Before implementation, merge current main into the worker branch so it receives `9d66aba9` and this amended handoff without duplicating either change.
 - [ ] Require every `apply_patch` path to begin with the explicit Wave 7 worktree path. Run all shell commands from `.agents/worktrees/agent-9fad8581`.
-- [ ] Use only `CARGO_TARGET_DIR=/tmp/jit-wave7-target` for all Wave 7 Cargo commands. The warmed target is about 3 GB and already compiles the focused red test.
+- [ ] Recreate and reuse only `CARGO_TARGET_DIR=/tmp/jit-wave7-target` for Wave 7; it is currently absent. Run compilation-heavy focused checks as `CARGO_TARGET_DIR=/tmp/jit-wave7-target ./scripts/cargo-ci.sh --cargo <cargo-args...>` so they use the shared host lock and guarded `sccache`. Do not allocate another target or run the complete gate from the worker.
 - [ ] Replace the singular/per-package publication seam with one typed aggregate request over `Vec<ProfileApplicationInput>` or the equivalent single canonical collection. Retain the existing recovered mutation session and `MaterializationPlan`; do not add a transaction framework.
 - [ ] Make direct selector application and profiled initialization derive one complete closure plan and call `session.apply` at most once. Initialization must include the neutral scaffold, every dependency/root target, every v2 or migrated record, and existing audit entries in the one delta.
 - [ ] Combine current per-profile audit entries through existing `finalize_audit_append` in one action. Keep Wave 8's one-lifecycle-event and three-way decision work deferred.
@@ -40,7 +42,7 @@
 ## Traps — do not repeat these
 
 - **Do not trust `apply_patch`'s shell working directory for worktree isolation.** The first Wave 7 test body landed in main while its imports/helper landed in the worker tree. The dispatch snapshot caught `M crates/jit/src/commands/profile.rs`. Use an explicit `.agents/worktrees/agent-9fad8581/...` patch path every time and inspect both statuses after each patch batch.
-- **Do not allocate one Cargo target per validation phase.** `/tmp/jit-wave7-red-target` reached 4.5 GB and `/tmp/jit-wave7-target` reached 3.5 GB, exhausting the 16 GB tmpfs and preventing sandbox startup. Reuse only `/tmp/jit-wave7-target`; serialize Cargo workloads.
+- **Do not allocate one Cargo target per validation phase.** `/tmp/jit-wave7-red-target` reached 4.5 GB and the prior `/tmp/jit-wave7-target` reached 3.5 GB, exhausting the 16 GB tmpfs and preventing sandbox startup. Both were removed; recreate only `/tmp/jit-wave7-target`, reuse it, and route heavy focused commands through `./scripts/cargo-ci.sh --cargo` so Cargo workloads serialize on the shared host lock.
 - **Do not remove or recreate the Wave 7 worktree.** `fb58495e` is a lead-preserve commit containing the test helper and genuine red assertion. Resume that branch; it is intentionally not merge-ready.
 - **Do not mistake the quota failure for the test result.** After quota recovery, the exact focused test ran and failed semantically because one selection published twice. That is the required red evidence.
 - **Do not wrap the old loop.** `apply_one_profile_package` is the publication bypass named by REQ-04. The aggregate path must replace it for direct apply and the post-scaffold init path, not merely call it under a new helper.
@@ -66,4 +68,4 @@ None.
 - Preserved red checkpoint: `fb58495e`
 - Focused red test: `crates/jit/src/commands/profile.rs::tests::test_apply_profile_selection_publishes_multiple_packages_through_one_transaction`
 - Exact base binary: `/tmp/jit-wave7-base-install/bin/jit`
-- One reusable Cargo target: `/tmp/jit-wave7-target`
+- Reusable Cargo target path (currently absent; recreate on demand): `/tmp/jit-wave7-target`
