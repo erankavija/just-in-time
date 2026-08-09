@@ -18,7 +18,7 @@
     {
       "wave_number": 3,
       "issues": [
-        {"id": "474a90a8-7c96-47d7-b652-5b0eba589182", "short_id": "474a90a8", "title": "Resolve the selected package set against its declared graph", "classification": "implementation", "status": "pending"}
+        {"id": "474a90a8-7c96-47d7-b652-5b0eba589182", "short_id": "474a90a8", "title": "Resolve the selected package set against its declared graph", "classification": "implementation", "status": "in_progress"}
       ]
     },
     {

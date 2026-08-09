@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker-474a90a8",
+  "claimed_at": "2026-08-09T09:46:37.924000608Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
@@ -25,7 +26,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Resolve the selected package set against its declared graph",
-  "updated_at": "2026-08-09T09:44:18.374144863Z"
+  "updated_at": "2026-08-09T09:46:37.924000608Z"
 }
