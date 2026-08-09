@@ -8,6 +8,7 @@
   ],
   "description": "Replace the single-profile argument with a repeatable ordered selector that names\neither a recorded profile id or a package directory in the worktree.\n\n## Background\n\nSelection is one id plus an optional separate location flag, so a caller cannot\nname several profiles, cannot interleave id and directory selections, and cannot\nexpress the order it wants them considered in.\n\n## Success Criteria\n\n- [hard] REQ-01: Selecting commands accept a repeatable selector naming either a profile id or a worktree-relative package directory, and the request preserves occurrence order exactly, including interleaved forms.\n- [hard] REQ-02: A directory selection that shadows the id of an embedded package is rejected by name rather than silently preferred.\n- [hard] REQ-03: The previous single-id argument and its separate location flag are gone from the command line, the generated schema, and the bridge tool inventory, with no alias retained.\n- [hard] REQ-04: Selection reads only the worktree; a package outside it, or under the data root, is refused with the existing confinement error.\n",
   "documents": [],
+  "done_at": "2026-08-09T09:44:12.861144136Z",
   "first_ready_at": "2026-08-09T03:46:18.559011530Z",
   "gates_required": [
     "cargo-ci",
@@ -43,7 +44,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Select profiles through repeatable ordered selectors",
-  "updated_at": "2026-08-09T09:28:30.528567772Z"
+  "updated_at": "2026-08-09T09:44:12.861144136Z"
 }

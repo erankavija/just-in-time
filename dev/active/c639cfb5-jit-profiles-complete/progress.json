@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -12,7 +12,7 @@
     {
       "wave_number": 2,
       "issues": [
-        {"id": "eac6ec13-2c8b-4249-9ed4-372416bca255", "short_id": "eac6ec13", "title": "Select profiles through repeatable ordered selectors", "classification": "implementation", "status": "in_progress"}
+        {"id": "eac6ec13-2c8b-4249-9ed4-372416bca255", "short_id": "eac6ec13", "title": "Select profiles through repeatable ordered selectors", "classification": "implementation", "status": "done"}
       ]
     },
     {
@@ -135,13 +135,13 @@
     {
       "category": "session-handoff-on-review-failure",
       "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
-      "status": "handed_off",
-      "summary": "The authorized retry passed cargo-ci and mcp-ci at product commit 46fc9427, but the lead stale-consumer audit found the release smoke workflow still reading the superseded top-level dry-run status; the configured review invocation also failed because its narrowed PATH omitted codex. Per invoker instruction, implementation stopped and session 2 handed off without another repair."
+      "status": "resolved",
+      "summary": "Session 2 handed off after the release smoke workflow exposed one stale dry-run consumer. A final authorized Luna xhigh repair updated that workflow and its acceptance test; all configured gates passed, and the exact merged main tree passed cargo-ci plus the MCP suite."
     }
   ],
   "rework_counts": {
     "f2ef652a": 2,
-    "eac6ec13": 1
+    "eac6ec13": 2
   },
   "started_at": "2026-08-09T04:36:58+03:00"
 }
