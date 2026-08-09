@@ -957,12 +957,99 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::{profile_package_model_schema, ProfileDependencyRequirement, ProfileId};
+    use crate::profile::{
+        profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
+        ProfileDependencyRequirement, ProfileId, RegionDeclaration,
+    };
     use crate::repository_state::{
         Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;
+
+    /// Test-only reference for the released v1 package-identity input.
+    ///
+    /// The shipped v1 contract hashed this wire-shaped value after TOML
+    /// deserialization and canonical JSON serialization. It is deliberately
+    /// confined to this test module: it is not a runtime manifest reader or a
+    /// second package model. Keeping the reference independent from the
+    /// production decoder makes a decoder change fail the continuity check.
+    #[derive(Debug, serde::Deserialize, serde::Serialize)]
+    #[serde(deny_unknown_fields)]
+    struct LegacyV1IdentityManifest {
+        profile: LegacyV1IdentityProfile,
+        #[serde(default)]
+        dependencies: Vec<ProfileId>,
+        #[serde(default, rename = "contribution")]
+        contributions: Vec<Contribution>,
+        #[serde(default, rename = "asset")]
+        assets: Vec<AssetDeclaration>,
+        #[serde(default, rename = "region")]
+        regions: Vec<RegionDeclaration>,
+        #[serde(default, rename = "live-source")]
+        live_sources: Vec<LiveSourceDeclaration>,
+    }
+
+    #[derive(Debug, serde::Deserialize, serde::Serialize)]
+    #[serde(deny_unknown_fields, rename_all = "kebab-case")]
+    struct LegacyV1IdentityProfile {
+        manifest_version: u32,
+        id: ProfileId,
+        version: String,
+        jit: String,
+    }
+
+    /// Independently reproduce the released v1 package hash for `files`.
+    ///
+    /// This consumes exactly the bytes that the package under test owns. The
+    /// typed value exists only as a test oracle for the superseded v1 hash
+    /// contract; no production code can call it.
+    fn legacy_v1_identity_hash(files: &BTreeMap<String, Vec<u8>>) -> String {
+        let manifest_bytes = files
+            .get(MANIFEST_FILE_NAME)
+            .expect("the package under test has a manifest");
+        let manifest_text = std::str::from_utf8(manifest_bytes).expect("manifest is UTF-8");
+        let manifest: LegacyV1IdentityManifest =
+            toml::from_str(manifest_text).expect("current shipped manifest is released v1 wire");
+        let identity_manifest = serde_json::to_vec(&legacy_v1_canonicalize(
+            serde_json::to_value(manifest).expect("v1 identity oracle serializes"),
+        ))
+        .expect("v1 identity oracle serializes canonical JSON");
+
+        let mut hasher = Sha256::new();
+        hasher.update(PACKAGE_HASH_DOMAIN);
+        legacy_v1_hash_frame(&mut hasher, &identity_manifest);
+        files
+            .iter()
+            .filter(|(path, _)| path.as_str() != MANIFEST_FILE_NAME)
+            .for_each(|(path, contents)| {
+                legacy_v1_hash_frame(&mut hasher, path.as_bytes());
+                legacy_v1_hash_frame(&mut hasher, contents);
+            });
+        format!("{:x}", hasher.finalize())
+    }
+
+    fn legacy_v1_canonicalize(value: Value) -> Value {
+        match value {
+            Value::Array(values) => {
+                Value::Array(values.into_iter().map(legacy_v1_canonicalize).collect())
+            }
+            Value::Object(values) => Value::Object(
+                values
+                    .into_iter()
+                    .map(|(key, value)| (key, legacy_v1_canonicalize(value)))
+                    .collect::<BTreeMap<_, _>>()
+                    .into_iter()
+                    .collect::<Map<_, _>>(),
+            ),
+            scalar => scalar,
+        }
+    }
+
+    fn legacy_v1_hash_frame(hasher: &mut Sha256, frame: &[u8]) {
+        hasher.update((frame.len() as u64).to_be_bytes());
+        hasher.update(frame);
+    }
 
     /// The checked-in synthetic fixture tree every case below is read from.
     fn fixture_tree() -> PathBuf {
@@ -1076,11 +1163,17 @@ mod tests {
         let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
 
         assert_eq!(package.model().id.as_str(), "jit-dogfood");
-        // Fixed v1 identity oracle: the pre-cutover implementation produces
-        // this value for the current shipped package bytes.
+        // Fixed oracle for the current shipped v1 package bytes. The
+        // independent comparison below is the continuity proof; this literal
+        // remains a useful stable-contract check rather than its replacement.
         assert_eq!(
             package.hashes().package,
             "5c7c1540706350e6c28452ed6fa7500a679a21b511515f52065da6f60aef62f0"
+        );
+        assert_eq!(
+            package.hashes().package,
+            legacy_v1_identity_hash(&package.files),
+            "the canonical decoder changed the released v1 identity algorithm"
         );
     }
 
