@@ -12,12 +12,12 @@
 # The script reproduces the *default ruleset* the jit-planning-lead skill documents by
 # copying the live config from a source JIT repo ($JIT_SRC): the `plan` template
 # (.jit/templates.toml), the coverage rule (.jit/rules.toml), the type hierarchy and
-# namespaces (.jit/config.toml), the rule schemas (.jit/schemas/), and the portable
-# coverage-preview checker (scripts/coverage-preview.sh). It then defines the four
+# namespaces (.jit/config.toml), and the rule schemas (.jit/schemas/). It then defines the four
 # bracket gates the `plan` template references. The two AI-review gates (plan-review,
 # breakdown-review) are defined `manual` so an eval runner can attest them via
-# `jit gate evaluate --by ...` without the production reviewer; coverage-preview and
-# repo-validate are real `auto` gates (jit validate), so coverage keeps its teeth.
+# `jit gate evaluate --by ...` without the production reviewer; coverage-preview is a
+# native `rule_validation` gate and repo-validate is a real `auto` gate (jit validate),
+# so coverage keeps its teeth without a shell or jq dependency.
 set -euo pipefail
 
 JIT="${JIT:-/home/vkaskivuo/.cargo/bin/jit}"
@@ -44,10 +44,6 @@ cp "$JIT_SRC/.jit/config.toml"    .jit/config.toml
 sed -i '/^\[projection\./,$d' .jit/config.toml
 mkdir -p .jit/schemas
 cp -r "$JIT_SRC"/.jit/schemas/. .jit/schemas/ 2>/dev/null || true
-mkdir -p scripts
-cp "$JIT_SRC/scripts/coverage-preview.sh" scripts/coverage-preview.sh
-chmod +x scripts/coverage-preview.sh
-
 # Project conventions shared by all scenarios: a small Python utility library.
 cat > AGENTS.md << 'AGENTEOF'
 # Test Utility Library
@@ -65,6 +61,24 @@ mkdir -p src tests
 printf '"""Test utility library."""\n' > src/__init__.py
 : > tests/__init__.py
 
+# Seed the portable native coverage gate before defining the remaining gates so
+# the CLI definitions below append to, rather than replace, this registry.
+cat > .jit/gates.toml <<'GATEEOF'
+[[gates]]
+version = 1
+key = "coverage-preview"
+title = "Coverage Preview"
+description = "Evaluate the configured coverage-preview rule with the gated breakdown as its sole firing issue."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "rule_validation"
+rule = "coverage-preview"
+GATEEOF
+
 # --- Bracket gates referenced by the `plan` template ---------------------------
 # repo-validate: whole-repo validation (real, portable).
 $JIT gate define repo-validate --title "Repo Validate" \
@@ -78,11 +92,6 @@ $JIT gate define plan-review --title "Plan Review" \
 $JIT gate define breakdown-review --title "Breakdown Review" \
   --description "Adversarial breakdown review (attested by the planning lead)" \
   --mode manual >/dev/null
-# coverage-preview: real scoped-coverage checker (jit validate --scope <C>).
-$JIT gate define coverage-preview --title "Coverage Preview" \
-  --description "Scoped coverage validation: every [hard] REQ credited by a satisfies: label" \
-  --mode auto --checker-command "./scripts/coverage-preview.sh" >/dev/null
-
 # --- Impl-tier gates the breakdown attaches to leaf work ------------------------
 # Never driven during planning (execution does that); present so jit-breakdown can
 # attach a standard gate tier to the impl children it creates.

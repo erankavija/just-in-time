@@ -861,6 +861,7 @@ mod tests {
                         crate::declarations::GateChecker::RepositoryValidation
                             | crate::declarations::GateChecker::IssueValidation
                             | crate::declarations::GateChecker::LabelTargetValidation { .. }
+                            | crate::declarations::GateChecker::RuleValidation { .. }
                             | crate::declarations::GateChecker::ReviewPlaceholder
                     )
                 ),

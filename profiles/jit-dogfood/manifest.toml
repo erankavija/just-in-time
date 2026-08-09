@@ -93,7 +93,7 @@ identity = "coverage-preview"
 [contribution.value]
 name = "coverage-preview"
 origin = "jit-dogfood"
-description = "While breakdown is reviewed, every hard requirement is credited to a drafted implementation descendant."
+description = "Apply the plan-time coverage preview with the gated breakdown as the sole firing issue; every hard requirement is credited to a drafted implementation descendant."
 when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
 severity = "error"
 enforce = true
@@ -193,7 +193,7 @@ identity = "coverage-preview"
 version = 1
 key = "coverage-preview"
 title = "Coverage Preview"
-description = "Validate the container named by the breakdown issue's brackets label."
+description = "Evaluate the coverage-preview rule with the gated breakdown as its sole firing issue."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -201,8 +201,8 @@ auto = true
 reserved = {}
 
 [contribution.value.checker]
-type = "label_target_validation"
-label_namespace = "brackets"
+type = "rule_validation"
+rule = "coverage-preview"
 
 [[contribution]]
 kind = "keyed-array"

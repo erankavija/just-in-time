@@ -1198,6 +1198,88 @@ pub(crate) fn plan_content_from_image(
     Ok(out)
 }
 
+/// Evaluate one configured graph rule against one issue from a closed image.
+///
+/// The selected issue is the sole firing subject. The complete captured issue
+/// set is retained as graph and resolution context, and all rule/configuration
+/// lookup plus selected plan-document projection comes from the same image.
+/// This is the shared report boundary for the live CLI and native gate checker.
+pub(super) fn rule_validation_report(
+    image: &crate::repository_state::RepositoryImage,
+    requested_issue_id: &str,
+    rule_name: &str,
+) -> Result<crate::validation::report::RuleReport> {
+    use crate::declarations::rules::Severity;
+    use crate::validation::engine::Finding;
+    use crate::validation::report::{ReportedFinding, RuleReport};
+
+    let issues = super::captured_active_issues(image)?;
+    let issue_id = super::resolve_issue_from_capture(&issues, requested_issue_id)?;
+    let issue = issues
+        .iter()
+        .find(|issue| issue.id == issue_id)
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id))?;
+    let declarations = crate::repository_state::declarations_from_image(image)?;
+    let config = crate::repository_state::assemble_config(image)?;
+    let repo_format = config
+        .validation
+        .as_ref()
+        .map(crate::config::ValidationConfig::content_format)
+        .transpose()?
+        .unwrap_or(crate::domain::ContentFormat::Markdown);
+    let rule = match crate::validation::graph::select_graph_rule(
+        &declarations.rules.rules,
+        rule_name,
+        issue,
+    ) {
+        Ok(rule) => rule,
+        Err(message) => {
+            return Ok(RuleReport {
+                findings: vec![ReportedFinding::new(
+                    Some(issue.id.clone()),
+                    &Finding {
+                        rule: rule_name.to_string(),
+                        severity: Severity::Error,
+                        message,
+                    },
+                )],
+            });
+        }
+    };
+
+    let plan_source_ids =
+        crate::validation::graph::graph_rule_plan_source_ids(rule, issue, &issues);
+    let plan_sources = plan_source_ids
+        .iter()
+        .filter_map(|source_id| {
+            issues
+                .iter()
+                .find(|candidate| &candidate.id == source_id)
+                .cloned()
+        })
+        .collect::<Vec<_>>();
+    let plan_content = plan_content_from_image(image, &plan_sources)?;
+    let hierarchy = crate::repository_state::hierarchy_config(
+        &crate::config_manager::namespaces_from_config(&config),
+    );
+    let context = crate::validation::graph::GraphEvaluationContext {
+        graph_context: &issues,
+        resolution_index: &issues,
+        hierarchy: &hierarchy,
+        repo_default_format: repo_format,
+        now: chrono::Utc::now(),
+        plan_content: &plan_content,
+    };
+    let findings =
+        crate::validation::graph::evaluate_graph_rule(rule, std::slice::from_ref(issue), &context);
+    Ok(RuleReport {
+        findings: findings
+            .into_iter()
+            .map(|finding| ReportedFinding::new(finding.issue_id, &finding.finding))
+            .collect(),
+    })
+}
+
 impl<S: IssueStore> CommandExecutor<S> {
     fn detect_and_fix_hierarchy_issues(&mut self, dry_run: bool) -> Result<(usize, Vec<String>)>
     where
@@ -2042,6 +2124,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
 
         Ok(RuleReport { findings })
+    }
+
+    /// Evaluate one configured graph rule with one selected issue as its sole
+    /// firing subject.
+    ///
+    /// The complete issue set is retained as graph and identifier-resolution
+    /// context, but it cannot become an additional rule subject. Missing,
+    /// disabled, non-graph, and non-matching selections return error findings
+    /// rather than an empty passing report.
+    pub fn validate_rule(
+        &self,
+        issue_id: &str,
+        rule_name: &str,
+    ) -> Result<crate::validation::report::RuleReport>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let image = self.capture_validation_image()?;
+        rule_validation_report(&image, issue_id, rule_name)
     }
 
     /// Build the `--explain` report for one issue: EVERY rule in the ruleset,

@@ -3978,6 +3978,12 @@ fn run() -> Result<()> {
                                         label_namespace
                                     );
                                 }
+                                jit::declarations::GateChecker::RuleValidation { rule } => {
+                                    println!(
+                                        "  Checker: rule validation (built-in, rule: {})",
+                                        rule
+                                    );
+                                }
                                 jit::declarations::GateChecker::ReviewPlaceholder => {
                                     println!("  Checker: WARNING — external review placeholder");
                                 }
@@ -4857,6 +4863,11 @@ fn run() -> Result<()> {
                                             } => {
                                                 println!(
                                                     "    Built-in: label-target validation ({label_namespace}:)"
+                                                );
+                                            }
+                                            jit::declarations::GateChecker::RuleValidation { rule } => {
+                                                println!(
+                                                    "    Built-in: rule validation ({rule})"
                                                 );
                                             }
                                             jit::declarations::GateChecker::ReviewPlaceholder => {
@@ -6691,6 +6702,7 @@ fn run() -> Result<()> {
             divergence,
             leases,
             scope,
+            rule,
         } => {
             // `--divergence` is a hidden stub (cli.rs): the word names the
             // membership-vs-DAG report of `jit query divergence`, so the git
@@ -6719,11 +6731,26 @@ fn run() -> Result<()> {
             // error-severity finding) and is mutually exclusive with the other
             // validate modes, so it is dispatched FIRST after the combo checks
             // below reject conflicting flags.
-            if scope.is_some() && (id.is_some() || fix || branch_drift || leases || explain) {
-                return Err(anyhow!(
+            if scope.is_some()
+                && (id.is_some() || fix || branch_drift || leases || explain || rule.is_some())
+            {
+                return Err(jit::errors::InvalidArgumentError::new(
                     "`--scope` cannot be combined with a positional id or with \
-                     `--fix`/`--branch-drift`/`--leases`/`--explain`"
-                ));
+                     `--fix`/`--branch-drift`/`--leases`/`--explain`/`--rule`",
+                )
+                .into());
+            }
+
+            if rule.is_some() && (fix || branch_drift || leases || explain) {
+                return Err(jit::errors::InvalidArgumentError::new(
+                    "`--rule` cannot be combined with `--fix`/`--branch-drift`/`--leases`/`--explain`"
+                ).into());
+            }
+            if rule.is_some() && id.is_none() {
+                return Err(jit::errors::InvalidArgumentError::new(
+                    "`--rule` requires a positional issue id",
+                )
+                .into());
             }
 
             // `--fix`, `--branch-drift`, and `--leases` are repo-wide operations and
@@ -6782,6 +6809,52 @@ fn run() -> Result<()> {
                 }
                 if exit_nonzero {
                     std::process::exit(jit::ExitCode::ValidationFailed.code());
+                }
+                return Ok(());
+            }
+
+            // --rule path: evaluate exactly one configured graph rule with the
+            // positional issue as its sole firing subject. The command keeps the
+            // same report and exit contract as per-issue validation.
+            if let Some(rule_name) = rule.as_deref() {
+                let issue_id = id.as_deref().expect("--rule requires an issue id");
+                let report = executor.validate_rule(issue_id, rule_name)?;
+                let exit_nonzero = report.has_errors();
+                if json {
+                    let value = serde_json::to_value(&report)?;
+                    let message = if exit_nonzero {
+                        format!(
+                            "Rule validation failed with {} error(s)",
+                            report.error_count()
+                        )
+                    } else {
+                        "Rule validation passed".to_string()
+                    };
+                    render_validation_json(
+                        value,
+                        message,
+                        exit_nonzero.then_some(ErrorCode::GenericError),
+                    )?;
+                } else if report.findings.is_empty() {
+                    println!("✓ Rule validation passed");
+                } else {
+                    for finding in &report.findings {
+                        println!(
+                            "{} [{}] {}",
+                            if finding.is_error() { "❌" } else { "⚠" },
+                            finding.rule,
+                            finding.message
+                        );
+                    }
+                    if exit_nonzero {
+                        eprintln!(
+                            "Rule validation failed with {} error(s)",
+                            report.error_count()
+                        );
+                    }
+                }
+                if exit_nonzero {
+                    std::process::exit(1);
                 }
                 return Ok(());
             }

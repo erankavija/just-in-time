@@ -3165,6 +3165,7 @@ Check repository integrity and run the declarative rule set from `.jit/rules.tom
 ```bash
 jit validate [<ID>] [--json]
 jit validate <ID> --explain [--json]
+jit validate <ID> --rule <RULE> [--json]
 jit validate --scope <ID> [--json]
 jit validate --fix [--dry-run] [--json]
 jit validate --branch-drift [--leases] [--json]
@@ -3174,6 +3175,7 @@ jit validate --branch-drift [--leases] [--json]
 |------|--------------|
 | (no arguments) | Whole repository: integrity checks (broken dependencies, unknown gates, label format, acyclicity, transitive reduction, readiness coherence, claims index) plus every local and graph rule. |
 | `<ID>` | The local and graph rules for that issue only. |
+| `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
 | `--fix` | Apply automatic rule/graph/state fixes and provenance-proven derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. |
@@ -3181,7 +3183,9 @@ jit validate --branch-drift [--leases] [--json]
 | `--leases` | Check that active leases are consistent and not stale. |
 
 **Mode exclusivity.** `--scope` may not be combined with a positional id or with
-`--fix`/`--branch-drift`/`--leases`/`--explain`. `--fix`, `--branch-drift`, and
+`--fix`/`--branch-drift`/`--leases`/`--explain`/`--rule`. `--rule` requires a
+positional id and may not be combined with `--fix`/`--branch-drift`/`--leases`/
+`--explain`. `--fix`, `--branch-drift`, and
 `--leases` are repository-wide, so combining any of them with a positional id is
 a usage error rather than a silently ignored argument. `--dry-run` requires
 `--fix`.
@@ -3195,7 +3199,7 @@ mirrored in this command's advisory `divergence_count`.
 Every successful JSON validation mode emits its normal mode-specific report. A
 failing invocation emits the canonical error envelope and retains that same
 report under `error.details`. This applies to whole-repository, per-issue,
-`--explain`, `--scope`, `--branch-drift`, and `--leases` validation. For example,
+`--explain`, `--scope`, `--rule`, `--branch-drift`, and `--leases` validation. For example,
 a whole-repository rule failure reports:
 
 ```json

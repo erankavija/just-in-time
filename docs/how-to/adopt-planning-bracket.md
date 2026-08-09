@@ -135,7 +135,7 @@ Declare the `brackets:` namespace so `B`'s container pointer validates cleanly:
 
 ```toml
 [namespaces.brackets]
-description = "On a breakdown node B: names the container C it brackets (the sole scope pointer for `validate --scope`)."
+description = "On a breakdown node B: names the container C used by the preview rule's container-from-label setting."
 unique = true
 examples = ["brackets:2fbd2a82"]
 ```
@@ -253,28 +253,32 @@ type = "review_placeholder"
 version = 1
 key = "coverage-preview"
 title = "Coverage Preview"
-description = "Validate the container named by the breakdown issue's brackets label."
+description = "Evaluate the configured coverage-preview rule with the gated breakdown as its sole firing issue."
 stage = "postcheck"
 mode = "auto"
 priority = 100
 auto = true
 
 [gates.checker]
-type = "label_target_validation"
-label_namespace = "brackets"
+type = "rule_validation"
+rule = "coverage-preview"
 ```
 
-The titles and descriptions are yours to reword; the keys, the checker types,
-and `coverage-preview`'s `label_namespace` are what the bracket depends on.
+The titles and descriptions are yours to reword; the keys, checker types, and
+the configured rule name are what this example depends on. The `brackets`
+namespace is not a checker hardcode: the preview rule's own
+`container-from-label = "brackets"` assertion setting declares how its selected
+breakdown resolves the criteria-bearing container.
 [Gate Presets](../reference/gate-presets.md#portable-checker-types) specifies
 each checker type and the registry syntax above.
 
 What each gate does:
 
-- **`coverage-preview`** uses the in-process `label_target_validation` checker. It
-  reads `B`'s `brackets:<C-short-id>` label and runs scoped validation for `C`.
-  Your preview rule from Step 3 therefore blocks when a `[hard]` criterion is
-  uncovered.
+- **`coverage-preview`** uses the in-process `rule_validation` checker. It names
+  the configured preview rule and evaluates it with `B` as the sole firing issue.
+  The rule's `container-from-label` setting reads `B`'s `brackets:<C-short-id>`
+  label and checks `C`'s criteria. Unrelated graph issues, historical brackets,
+  and rejected targets remain context and cannot become additional subjects.
 - **`plan-review`** and **`breakdown-review`** use the in-process
   `review_placeholder` checker. Each passes with an advisory structured finding
   and prints `WARNING: EXTERNAL REVIEW PLACEHOLDER`. This is an unmistakable
@@ -380,9 +384,11 @@ reinterpretation path. It then:
 3. re-homes recorded external dependencies through the key→id map, verifies
    issues and edges against the manifest, then runs `B`'s gates.
 
-`coverage-preview` runs `jit validate --scope <C>`, which fires your preview rule.
-If the drafted children leave a `[hard]` criterion with no satisfying child (in any
-state), the gate **blocks** (exit 4) and names the uncovered criteria. The
+`coverage-preview` applies your preview rule with `B` as its sole firing issue.
+For the canonical rule name, reproduce the exact application directly with
+`jit validate <B> --rule coverage-preview`. If the drafted children leave a
+`[hard]` criterion with no satisfying child (in any state), the gate **blocks**
+(exit 4) and names the uncovered criteria. The
 `breakdown-review` placeholder separately reserves the decomposition-quality
 checkpoint but performs no judgment until you replace its checker. Because the
 impl subgraph transitively depends on `B`, all configured gates must pass before
@@ -394,6 +400,10 @@ You can run the scoped check directly at any time:
 ```bash
 jit validate --scope epic-123
 ```
+
+`--scope` remains the broad explicit-subtree validation surface. Use it when you
+intentionally want every applicable rule in that bracket subtree; the gate's
+`rule_validation` checker is narrower by design.
 
 The `jit-breakdown` skill performs the batch and external wiring. Planning
 metadata is accepted for authoring but is neither persisted nor exported.

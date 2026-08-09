@@ -136,6 +136,12 @@ pub enum GateChecker {
         /// Namespace whose label value selects the validation target.
         label_namespace: String,
     },
+    /// Evaluate one configured graph rule with the gated issue as its sole
+    /// firing subject and the captured repository as resolution context.
+    RuleValidation {
+        /// Exact rule name to evaluate.
+        rule: String,
+    },
     /// Advisory placeholder for an external review integration.
     ReviewPlaceholder,
 }

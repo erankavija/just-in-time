@@ -36,10 +36,13 @@ in order — each gate blocks the next step. Section numbers refer to the skill'
 
 5. **Pass `B`'s coverage gate — it BLOCKS the implementation fan-out.** Run the
    coverage gate the template declares on the breakdown node (`coverage-preview`
-   in the default rulesets) via the standard runner; it is deterministic
-   (`jit validate --scope <C>`) and blocks (exit 4) while any `[hard]` criterion
-   is uncovered. Do not dispatch implementation waves until the recorded status
-   is `passed`; on failure add or relabel children to cover the gap and re-run.
+   in the default rulesets) via the standard runner; its native
+   `rule_validation` checker applies the configured preview rule with `B` as its
+   sole firing issue. The rule's `container-from-label` setting resolves `C`;
+   unrelated historical brackets cannot become additional subjects. It blocks
+   (exit 4) while any `[hard]` criterion is uncovered. Do not dispatch
+   implementation waves until the recorded status is `passed`; on failure add
+   or relabel children to cover the gap and re-run.
 
 6. Commit JIT state in batch, then run Section 4 (Wave Planning) over the
    **impl interior only** — `P` and `B` are bracket infrastructure, not

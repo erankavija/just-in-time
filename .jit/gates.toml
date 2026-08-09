@@ -226,19 +226,15 @@ REVIEWER_AGENT = 'codex exec --sandbox read-only -m gpt-5.6-terra -c model_reaso
 version = 1
 key = "coverage-preview"
 title = "Coverage Preview"
-description = "Run scoped validation for the container resolved from the breakdown node's brackets: label; blocks when a [hard] criterion is uncovered at plan time"
+description = "Evaluate the configured coverage-preview rule with the gated breakdown as its sole firing issue; blocks when a [hard] criterion is uncovered at plan time"
 stage = "postcheck"
 mode = "auto"
 priority = 100
 auto = true
 
 [gates.checker]
-type = "exec"
-command = "./scripts/coverage-preview.sh"
-timeout_seconds = 300
-pass_context = true
-
-[gates.checker.env]
+type = "rule_validation"
+rule = "coverage-preview"
 
 [gates.reserved]
 

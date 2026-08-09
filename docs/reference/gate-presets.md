@@ -24,7 +24,7 @@ definitions when it is applied; see [Repository Profiles](profiles.md).
 
 ## Portable checker types
 
-Automated gate definitions can use `exec` or one of four in-process checker types.
+Automated gate definitions can use `exec` or one of five in-process checker types.
 The in-process checkers do not invoke a shell, a second `jit` binary, or `jq`, and the
 configured gate key does not change their behavior:
 
@@ -34,6 +34,10 @@ repository.
 - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label
 from the gated issue and runs scoped validation for that target. Its checker table
 must set `label_namespace`.
+- `rule_validation` names one configured graph rule with `rule` and evaluates it
+with the gated issue as its sole firing subject. The complete repository may be
+used for graph and identifier-resolution context, but unrelated issues cannot
+contribute findings. A missing, disabled, or non-matching rule is an error.
 - `review_placeholder` passes so a workflow can be installed before an external
 reviewer is selected, but records an advisory structured finding and prints
 `WARNING: EXTERNAL REVIEW PLACEHOLDER`. Whole-repository validation also warns
@@ -42,7 +46,7 @@ update <key> --checker-command <command>`) before treating the gate as review
 evidence.
 
 Native checker types are selected in the gate registry; `jit gate define` does not
-have a checker-type option. These four independent definitions show the canonical
+have a checker-type option. These five independent definitions show the canonical
 `.jit/gates.toml` syntax. The keys are examples and can be replaced with any
 configured gate keys:
 
@@ -86,6 +90,20 @@ auto = true
 [gates.checker]
 type = "label_target_validation"
 label_namespace = "covers"
+
+[[gates]]
+version = 1
+key = "selected-rule"
+title = "Selected rule validation"
+description = "Evaluate one configured graph rule for the gated issue"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "rule_validation"
+rule = "coverage-preview"
 
 [[gates]]
 version = 1

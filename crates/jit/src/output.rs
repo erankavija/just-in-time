@@ -2933,10 +2933,18 @@ mod tests {
             inputs: None,
         };
 
-        let encoded = serde_json::to_value(GateDefinition::from(gate)).unwrap();
+        let encoded = serde_json::to_value(GateDefinition::from(gate.clone())).unwrap();
         assert_eq!(encoded["key"], "anything");
         assert_eq!(encoded["checker"]["type"], "label_target_validation");
         assert_eq!(encoded["checker"]["label_namespace"], "owner");
+
+        let mut selected_rule = gate;
+        selected_rule.checker = Some(crate::declarations::GateChecker::RuleValidation {
+            rule: "coverage-preview".to_string(),
+        });
+        let encoded = serde_json::to_value(GateDefinition::from(selected_rule)).unwrap();
+        assert_eq!(encoded["checker"]["type"], "rule_validation");
+        assert_eq!(encoded["checker"]["rule"], "coverage-preview");
     }
 
     #[test]

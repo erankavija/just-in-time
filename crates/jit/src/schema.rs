@@ -1356,6 +1356,7 @@ mod tests {
             "repository_validation",
             "issue_validation",
             "label_target_validation",
+            "rule_validation",
             "review_placeholder",
         ] {
             assert!(
