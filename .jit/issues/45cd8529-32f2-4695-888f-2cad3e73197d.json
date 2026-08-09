@@ -6,12 +6,24 @@
   "dependencies": [],
   "description": "Coverage preview currently validates an entire bracket subtree, allowing unrelated historical breakdowns and non-coverage findings to fail a gate that should answer one question. The gate must evaluate the configured coverage rule once, with its gated breakdown as the sole firing issue.\n\n## Background\n\nThe current checker resolves the container named by a breakdown issue and runs broad scoped validation for that container. Scoped validation intentionally evaluates local rules for every issue in the dependency slice, graph rules matching any issue in that slice, dangling item links, and project-level enforcement drift. Those are useful subtree diagnostics but are wider than coverage preview.\n\nIssue ef0065ad made the broad scope path resolve container pointers against a wider index and skip out-of-scope coverage targets. That workaround still admits unrelated historical breakdowns into evaluation. The failure motivating this issue occurred while checking breakdown 01bace3f for container c639cfb5: historical breakdown 207364b1 entered the slice, and its pointer to rejected container 8b05a612 blocked an unrelated coverage verdict.\n\nVerdict scope is distinct from the read set. A checker may load a captured repository view to resolve identifiers, plan content, and dependency relationships, but only the selected rule application may contribute findings to the coverage-preview verdict.\n\n## Success Criteria\n\n- [hard] REQ-01: A portable rule-validation checker names one configured rule and evaluates it with the gated issue as its sole firing issue, without hardcoding a gate key, issue type, or label namespace.\n- [hard] REQ-02: The pure graph-rule boundary represents firing issues separately from graph and resolution context, so repository context cannot silently become additional rule subjects.\n- [hard] REQ-03: The canonical coverage-preview gate uses rule validation for the coverage-preview rule, while the brackets target remains declared only by the rule container-from-label configuration.\n- [hard] REQ-04: Coverage preview for one breakdown is unaffected by an unrelated historical breakdown in its dependency history, including one whose target is rejected, absent from the active index, or otherwise invalid.\n- [hard] REQ-05: A missing or ambiguous target on the selected breakdown fails precisely, an extant rejected target resolves when directly selected, and an uncovered criterion on the selected container fails with that criterion identified.\n- [hard] REQ-06: Local-rule failures, unrelated graph-rule failures, dangling item links, and enforcement drift outside the selected coverage rule application do not affect the coverage-preview verdict.\n- [hard] REQ-07: The CLI can reproduce the same issue-and-rule-scoped evaluation with machine-readable output and the standard clean, validation-failure, and usage-error exit behavior.\n- [hard] REQ-08: Whole-repository validation and explicit bracket-subtree validation retain their broad behavior; this change neither cleans historical bracket nodes nor weakens those diagnostics.\n- [hard] REQ-09: The shipped dogfood profile, checker schema and reference, adopter-facing planning-bracket documentation, and repository dogfood configuration expose the issue-scoped checker consistently without a shell or jq dependency.\n- [hard] REQ-10: Unit, command-harness, and CLI regression coverage proves selected-source isolation, selected-target failures, non-vacuous rule selection, closed repository-view behavior, and unchanged global validation.\n\n## Notes\n\nThis supersedes the use of broad target-subtree validation for coverage preview, not the broad validation command itself. Issue ef0065ad remains relevant to callers that explicitly request subtree validation. Retiring historical bracket nodes or changing rejected-container lifecycle policy is out of scope. The configured checker form is expected to be equivalent to `type = \"rule_validation\"` with `rule = \"coverage-preview\"`.",
   "documents": [],
+  "done_at": "2026-08-09T03:03:08.200452503Z",
   "first_ready_at": "2026-08-09T00:56:08.173107766Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T02:59:38.047740118Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-09T03:02:45.184539418Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "45cd8529-32f2-4695-888f-2cad3e73197d",
   "labels": [
     "milestone:v1.0",
@@ -21,7 +33,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Scope coverage preview to the gated rule application",
-  "updated_at": "2026-08-09T01:21:28.506137477Z"
+  "updated_at": "2026-08-09T03:03:08.200452503Z"
 }
