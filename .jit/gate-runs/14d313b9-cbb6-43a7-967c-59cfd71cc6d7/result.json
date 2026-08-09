@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-f2ef652a",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0790b8995258a0a1de7c6bf92b1a96a4239218ac",
+  "completed_at": "2026-08-09T03:16:25.550421917Z",
+  "duration_ms": 388987,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/package.rs",
+        "id": "F1",
+        "line": 1083,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f2ef652a/requirement/REQ-03",
+          "@/issue/c639cfb5/requirement/REQ-09"
+        ],
+        "severity": "high",
+        "summary": "The shipped v1 package identity hash changed despite unchanged package bytes; the regression test was updated to accept the new value."
+      }
+    ],
+    "summary": "The v1 manifest decoder changes the shipped package identity hash and the follow-up commit masks the regression by replacing its oracle.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "14d313b9-cbb6-43a7-967c-59cfd71cc6d7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T03:09:56.562565576Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18319 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f2ef652a\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe47f-9ed3-7600-8164-4da5c456b282\n--------\nuser\n--- 18306 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 532189dc, ddc01e62, 3259874d, c3fbf765, b1772b4b, 47e731de (`jit:f2ef652a`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; .jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json\nResolved items: @/issue/f2ef652a/requirement/REQ-03 (.jit/issues/f2ef652a-e192-4d37-ad7e-51be2b077fd6.json); @/issue/c639cfb5/requirement/REQ-09 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json); @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T03:01:26Z); latest code-review failed (exit 1, no structured findings)\nTruncation recovery: Recovered broad-output truncation with bounded reads of decoder, model, package-hash logic, callers, individual commit patches, and gate results.\n\n1. **[blocking][issue-impact]** [crates/jit/src/profile/package.rs:1083](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f2ef652a/crates/jit/src/profile/package.rs:1083) changes the shipped v1 identity oracle from `746104…` to `5c7c15…`, masking a regression. The earlier attributable cargo-ci result shows the new decoder produced `5c7c15…` for unchanged shipped bytes while the pre-cutover expected value was `746104…`; the shipped manifest was not changed. This fails REQ-03 and breaks continuity for the embedded package's recorded identity.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The v1 manifest decoder changes the shipped package identity hash and the follow-up commit masks the regression by replacing its oracle.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The shipped v1 package identity hash changed despite unchanged package bytes; the regression test was updated to accept the new value.\",\"file\":\"crates/jit/src/profile/package.rs\",\"line\":1083,\"references\":[\"@/issue/f2ef652a/requirement/REQ-03\",\"@/issue/c639cfb5/requirement/REQ-09\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

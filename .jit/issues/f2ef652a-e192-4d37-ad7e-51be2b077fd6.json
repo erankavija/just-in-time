@@ -15,13 +15,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-09T02:47:08.762049355Z",
+      "status": "passed",
+      "updated_at": "2026-08-09T03:05:27.184965577Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "passed",
-      "updated_at": "2026-08-09T02:38:57.948174743Z",
+      "status": "failed",
+      "updated_at": "2026-08-09T03:16:25.837624129Z",
       "updated_by": "auto:executor"
     }
   },
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Normalize both package manifest versions into one canonical model",
-  "updated_at": "2026-08-09T02:47:08.762049355Z"
+  "updated_at": "2026-08-09T03:16:25.837624129Z"
 }

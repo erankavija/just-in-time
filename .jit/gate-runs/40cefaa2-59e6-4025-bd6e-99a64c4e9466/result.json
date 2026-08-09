@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-f2ef652a",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "0790b8995258a0a1de7c6bf92b1a96a4239218ac",
+  "completed_at": "2026-08-09T02:59:38.093777641Z",
+  "duration_ms": 282988,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "b37a3a393560620c91c4de7dbe458fc1f94439a9bd4567d75fb3f567a2e6671b",
+  "issue_id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "40cefaa2-59e6-4025-bd6e-99a64c4e9466",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T02:54:55.105724467Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- incremental-preflight output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f2ef652a/target:\n/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-f2ef652a/target/debug/incremental\n  ✗ incremental-preflight: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}
