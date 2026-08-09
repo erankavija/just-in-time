@@ -37,7 +37,7 @@
     {
       "wave_number": 6,
       "issues": [
-        {"id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944", "short_id": "9a9a4cfc", "title": "Carry ownership claims in the applied profile record", "classification": "implementation", "status": "pending"}
+        {"id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944", "short_id": "9a9a4cfc", "title": "Carry ownership claims in the applied profile record", "classification": "implementation", "status": "in_progress"}
       ]
     },
     {
