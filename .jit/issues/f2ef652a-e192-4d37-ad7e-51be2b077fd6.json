@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-08-09T02:34:36.573495523Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-09T02:38:57.948174743Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
@@ -33,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Normalize both package manifest versions into one canonical model",
-  "updated_at": "2026-08-09T02:34:36.573495523Z"
+  "updated_at": "2026-08-09T02:38:57.948174743Z"
 }
