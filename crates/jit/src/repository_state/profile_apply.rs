@@ -67,6 +67,208 @@ impl Contribution {
             Self::KeyedArray { target, .. } => target.registry_path(),
         }
     }
+
+    /// Return the canonical identity of the one semantic declaration this
+    /// contribution supplies.
+    ///
+    /// The identity includes the registry and declaration target, so equal names
+    /// in distinct registry tables remain separate contributions.
+    pub fn semantic_identity(&self) -> ContributionIdentity {
+        let semantic = match self {
+            Self::Scalar { target, .. } => format!("scalar:{target:?}"),
+            Self::MapEntry {
+                target, identity, ..
+            } => format!("map-entry:{target:?}:{identity}"),
+            Self::SetString { target, value } => {
+                format!("set-string:{target:?}:{value}")
+            }
+            Self::KeyedArray {
+                target, identity, ..
+            } => format!("keyed-array:{target:?}:{identity}"),
+            Self::Projection { name, .. } => format!("projection:{name}"),
+        };
+        ContributionIdentity(format!("{}:{semantic}", self.registry_path()))
+    }
+}
+
+/// Canonical semantic identity of one contribution within a registry.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ContributionIdentity(String);
+
+impl ContributionIdentity {
+    /// Borrow the stable identity spelling.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for ContributionIdentity {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+/// One resolved contribution supplied by a profile package.
+///
+/// Callers must construct this only from a resolved package model; comparison is
+/// intentionally over the resolved contribution rather than package source bytes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProfileContributionClaim {
+    /// Package that contributes the definition.
+    pub(crate) package_id: ProfilePackageId,
+    /// Fully resolved semantic definition.
+    pub(crate) contribution: Contribution,
+}
+
+/// A prior semantic definition at the composition boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExistingContributionClaim {
+    /// A repository-authored definition with no package provenance.
+    Repository(Contribution),
+    /// A definition owned by an installed package.
+    Package(ProfileContributionClaim),
+}
+
+/// A definition that survived semantic composition with all package owners.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComposedContribution {
+    /// Canonical semantic identity shared by the contributors.
+    pub identity: ContributionIdentity,
+    /// The shared resolved definition.
+    pub definition: Contribution,
+    /// Every package owning `definition`, sorted by package identity.
+    pub owners: Vec<ProfilePackageId>,
+}
+
+/// Origin of one differing definition in a semantic contribution conflict.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ContributionConflictOwner {
+    /// The repository itself authored one of the conflicting definitions.
+    Repository,
+    /// An installed or selected package authored one of the definitions.
+    Package(ProfilePackageId),
+}
+
+impl std::fmt::Display for ContributionConflictOwner {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Repository => formatter.write_str("the repository"),
+            Self::Package(package_id) => write!(formatter, "package {package_id}"),
+        }
+    }
+}
+
+/// A semantic identity has more than one resolved definition.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("profile contribution '{identity}' conflicts between {owners:?}")]
+pub struct ContributionCompositionConflict {
+    /// Shared semantic identity with incompatible definitions.
+    pub identity: ContributionIdentity,
+    /// Every repository or package owner of a conflicting definition, sorted
+    /// independently of selector occurrence.
+    pub owners: Vec<ContributionConflictOwner>,
+}
+
+enum ContributionClaimSource {
+    Repository,
+    Package(ProfilePackageId),
+}
+
+struct CompositionInput {
+    source: ContributionClaimSource,
+    contribution: Contribution,
+}
+
+/// Compose resolved package claims with existing semantic claims.
+///
+/// Existing claims owned by a selected package are excluded before comparison:
+/// its new resolved definition replaces its own prior identity claim rather
+/// than conflicting with it. Different package definitions for an identity
+/// produce one order-independent error naming all owners. Repository-authored
+/// definitions remain distinct from package-owned definitions in that error.
+pub fn compose_resolved_contributions(
+    existing: impl IntoIterator<Item = ExistingContributionClaim>,
+    candidates: impl IntoIterator<Item = ProfileContributionClaim>,
+) -> Result<Vec<ComposedContribution>, ContributionCompositionConflict> {
+    let candidates = candidates.into_iter().collect::<Vec<_>>();
+    let selected_packages = candidates
+        .iter()
+        .map(|claim| claim.package_id.clone())
+        .collect::<BTreeSet<_>>();
+    let existing = existing.into_iter().filter_map(|claim| match claim {
+        ExistingContributionClaim::Repository(contribution) => Some(CompositionInput {
+            source: ContributionClaimSource::Repository,
+            contribution,
+        }),
+        ExistingContributionClaim::Package(claim)
+            if selected_packages.contains(&claim.package_id) =>
+        {
+            None
+        }
+        ExistingContributionClaim::Package(claim) => Some(CompositionInput {
+            source: ContributionClaimSource::Package(claim.package_id),
+            contribution: claim.contribution,
+        }),
+    });
+    let grouped = existing
+        .chain(candidates.into_iter().map(|claim| CompositionInput {
+            source: ContributionClaimSource::Package(claim.package_id),
+            contribution: claim.contribution,
+        }))
+        .fold(
+            BTreeMap::<ContributionIdentity, Vec<CompositionInput>>::new(),
+            |mut grouped, claim| {
+                grouped
+                    .entry(claim.contribution.semantic_identity())
+                    .or_default()
+                    .push(claim);
+                grouped
+            },
+        );
+
+    grouped
+        .into_iter()
+        .map(|(identity, claims)| compose_contribution_identity(identity, claims))
+        .collect()
+}
+
+fn compose_contribution_identity(
+    identity: ContributionIdentity,
+    claims: Vec<CompositionInput>,
+) -> Result<ComposedContribution, ContributionCompositionConflict> {
+    let definition = claims
+        .first()
+        .expect("every composition group has an originating claim")
+        .contribution
+        .clone();
+    if claims.iter().any(|claim| claim.contribution != definition) {
+        let owners = claims
+            .iter()
+            .map(|claim| match &claim.source {
+                ContributionClaimSource::Repository => ContributionConflictOwner::Repository,
+                ContributionClaimSource::Package(package_id) => {
+                    ContributionConflictOwner::Package(package_id.clone())
+                }
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        return Err(ContributionCompositionConflict { identity, owners });
+    }
+    let owners = claims
+        .into_iter()
+        .filter_map(|claim| match claim.source {
+            ContributionClaimSource::Repository => None,
+            ContributionClaimSource::Package(package_id) => Some(package_id),
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    Ok(ComposedContribution {
+        identity,
+        definition,
+        owners,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -1210,6 +1412,142 @@ mod tests {
             document,
             contribution,
         )
+    }
+
+    fn namespace_contribution(identity: &str, description: &str) -> Contribution {
+        Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: identity.to_string(),
+            value: serde_json::json!({ "description": description }),
+        }
+    }
+
+    fn contribution_claim(package: &str, contribution: Contribution) -> ProfileContributionClaim {
+        ProfileContributionClaim {
+            package_id: ProfilePackageId::new(package),
+            contribution,
+        }
+    }
+
+    #[test]
+    fn test_compose_resolved_contributions_records_sorted_shared_owners() {
+        let contribution = namespace_contribution("shared", "Shared vocabulary.");
+
+        let composed = compose_resolved_contributions(
+            [],
+            [
+                contribution_claim("workflow", contribution.clone()),
+                contribution_claim("base", contribution),
+            ],
+        )
+        .expect("equal resolved definitions compose");
+
+        assert_eq!(composed.len(), 1);
+        assert_eq!(
+            composed[0].owners,
+            vec![
+                ProfilePackageId::new("base"),
+                ProfilePackageId::new("workflow")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_compose_resolved_contributions_conflicts_independent_of_input_order() {
+        let shared_identity = "shared";
+        let first = namespace_contribution(shared_identity, "First definition.");
+        let second = namespace_contribution(shared_identity, "Second definition.");
+        let expected_owners = vec![
+            ContributionConflictOwner::Package(ProfilePackageId::new("base")),
+            ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+        ];
+
+        for claims in [
+            vec![
+                contribution_claim("base", first.clone()),
+                contribution_claim("workflow", second.clone()),
+            ],
+            vec![
+                contribution_claim("workflow", second.clone()),
+                contribution_claim("base", first.clone()),
+            ],
+        ] {
+            let conflict = compose_resolved_contributions([], claims)
+                .expect_err("different definitions must conflict without a winner");
+
+            assert_eq!(conflict.identity, first.semantic_identity());
+            assert_eq!(conflict.owners, expected_owners);
+        }
+    }
+
+    #[test]
+    fn test_compose_resolved_contributions_replaces_a_package_owned_identity() {
+        let existing = namespace_contribution("shared", "Previous definition.");
+        let replacement = namespace_contribution("shared", "Replacement definition.");
+
+        let composed = compose_resolved_contributions(
+            [ExistingContributionClaim::Package(contribution_claim(
+                "workflow", existing,
+            ))],
+            [contribution_claim("workflow", replacement.clone())],
+        )
+        .expect("a package does not conflict with its own former identity claim");
+
+        assert_eq!(composed.len(), 1);
+        assert_eq!(composed[0].definition, replacement);
+        assert_eq!(composed[0].owners, vec![ProfilePackageId::new("workflow")]);
+    }
+
+    #[test]
+    fn test_compose_resolved_contributions_keeps_distinct_identities_in_one_registry() {
+        let composed = compose_resolved_contributions(
+            [],
+            [
+                contribution_claim("workflow", namespace_contribution("one", "First.")),
+                contribution_claim("workflow", namespace_contribution("two", "Second.")),
+            ],
+        )
+        .expect("different semantic identities in one registry compose");
+
+        assert_eq!(composed.len(), 2);
+        assert!(composed
+            .iter()
+            .all(|contribution| contribution.owners == [ProfilePackageId::new("workflow")]));
+    }
+
+    #[test]
+    fn test_compose_resolved_contributions_distinguishes_repository_and_package_conflicts() {
+        let existing = namespace_contribution("shared", "Existing definition.");
+        let replacement = namespace_contribution("shared", "Replacement definition.");
+        let candidate = contribution_claim("workflow", replacement);
+
+        let cases = [
+            (
+                ExistingContributionClaim::Repository(existing.clone()),
+                vec![
+                    ContributionConflictOwner::Repository,
+                    ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+                ],
+            ),
+            (
+                ExistingContributionClaim::Package(contribution_claim("base", existing)),
+                vec![
+                    ContributionConflictOwner::Package(ProfilePackageId::new("base")),
+                    ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+                ],
+            ),
+        ];
+
+        for (existing, expected_owners) in cases {
+            let conflict = compose_resolved_contributions([existing], [candidate.clone()])
+                .expect_err("an existing differently-defined identity conflicts");
+
+            assert_eq!(
+                conflict.identity,
+                candidate.contribution.semantic_identity()
+            );
+            assert_eq!(conflict.owners, expected_owners);
+        }
     }
 
     #[test]

@@ -189,10 +189,12 @@ pub use path::{
 };
 pub(crate) use profile_apply::profile_capture_closure;
 pub use profile_apply::{
-    AppliedProfileRecord, CompleteProjectionConfig, Contribution, KeyedArrayTarget, MapEntryTarget,
+    compose_resolved_contributions, AppliedProfileRecord, CompleteProjectionConfig,
+    ComposedContribution, Contribution, ContributionCompositionConflict, ContributionConflictOwner,
+    ContributionIdentity, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
     ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileConflictOccupant,
-    ProfilePackageId, ProfileRegionClaim, ProfileTargetConflictError, ScalarTarget,
-    SetStringTarget,
+    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflictError,
+    ScalarTarget, SetStringTarget,
 };
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
