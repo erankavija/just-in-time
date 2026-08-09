@@ -14,7 +14,8 @@
       "component:storage"
     ],
     "gates": [
-      "repo-validate"
+      "repo-validate",
+      "holistic-review"
     ],
     "depends_on": [
       "package-graph-resolution"
@@ -44,7 +45,8 @@
       "component:cli"
     ],
     "gates": [
-      "repo-validate"
+      "repo-validate",
+      "holistic-review"
     ],
     "depends_on": [
       "reconfigure-and-upgrade-commands"
@@ -77,7 +79,8 @@
       "component:storage"
     ],
     "gates": [
-      "repo-validate"
+      "repo-validate",
+      "holistic-review"
     ],
     "depends_on": [
       "package-archive-exchange"
@@ -109,7 +112,8 @@
       "component:testing"
     ],
     "gates": [
-      "repo-validate"
+      "repo-validate",
+      "holistic-review"
     ],
     "depends_on": [
       "profile-lifecycle-documentation",
