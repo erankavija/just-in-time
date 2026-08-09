@@ -491,8 +491,9 @@ impl CommandSchema {
                     ],
                     "description": "Normal execution returns ProfileComposedApplyResult, \
                         one ProfileApplyResult per package in dependency-first application \
-                        order for the ordered selectors. With --dry-run, returns the exact \
-                        non-mutating ProfilePlanResult for the selected package."
+                        order for the ordered selectors. With --dry-run, returns the count-wrapped \
+                        ProfilePlanResult with one non-mutating ProfilePlanEntry per selector \
+                        occurrence in selector order."
                 });
                 (Some(union), "ProfileComposedApplyResult")
             }

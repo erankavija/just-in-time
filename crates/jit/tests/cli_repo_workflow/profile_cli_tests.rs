@@ -462,10 +462,11 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
 
     assert!(preview.status.success(), "{preview:?}");
     let preview = json(&preview);
-    assert_eq!(preview["id"], FIXTURE_PROFILE);
-    assert_eq!(preview["status"], "would_apply");
+    assert_eq!(preview["profiles"][0]["id"], FIXTURE_PROFILE);
+    assert_eq!(preview["count"], 1);
+    assert_eq!(preview["profiles"][0]["status"], "would_apply");
     assert!(
-        preview["targets"]
+        preview["profiles"][0]["targets"]
             .as_array()
             .unwrap()
             .iter()
@@ -475,6 +476,101 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
     // A preview writes nothing, the record included.
     assert!(!repo.path().join(".jit/profiles").exists());
     assert!(!repo.path().join("docs/profile.txt").exists());
+}
+
+#[test]
+fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let first = package_with_id(repo.path(), "packages/first", "first");
+    let second = package_with_id(repo.path(), "packages/second", "second");
+
+    let seeded = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            &path_selector(first),
+            "--json",
+        ],
+    );
+    assert!(seeded.status.success(), "{seeded:?}");
+    let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
+
+    let second_selector = path_selector(second);
+    let first_selector = path_selector(first);
+    let output = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            &second_selector,
+            "--profile",
+            "id:first",
+            "--profile",
+            &first_selector,
+            "--profile",
+            &second_selector,
+            "--dry-run",
+            "--json",
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let preview = json(&output);
+    assert_eq!(preview["count"], 4);
+    assert_eq!(
+        preview["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|profile| profile["id"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["second", "first", "first", "second"]
+    );
+    assert_eq!(
+        preview["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|profile| profile["status"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["would_apply", "unchanged", "unchanged", "would_apply"]
+    );
+    assert_eq!(
+        fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
+        events_before,
+        "dry-run must not append events"
+    );
+    assert!(!repo.path().join(".jit/profiles/second.json").exists());
+    assert!(!repo.path().join("docs/second.txt").exists());
+
+    let human = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            &second_selector,
+            "--profile",
+            "id:first",
+            "--profile",
+            &first_selector,
+            "--profile",
+            &second_selector,
+            "--dry-run",
+        ],
+    );
+    assert!(human.status.success(), "{human:?}");
+    let human_stdout = String::from_utf8_lossy(&human.stdout);
+    let human_ids = human_stdout
+        .lines()
+        .filter_map(|line| line.strip_prefix("Profile "))
+        .filter_map(|line| line.split_whitespace().next())
+        .collect::<Vec<_>>();
+    assert_eq!(human_ids, vec!["second", "first", "first", "second"]);
 }
 
 #[test]
@@ -1023,7 +1119,8 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         ],
     );
     assert!(preview.status.success(), "{preview:?}");
-    assert_eq!(json(&preview)["status"], "would_apply");
+    assert_eq!(json(&preview)["count"], 1);
+    assert_eq!(json(&preview)["profiles"][0]["status"], "would_apply");
     assert_eq!(
         fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
         events_before
@@ -1100,7 +1197,8 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
         ],
     );
     assert!(preview.status.success(), "{preview:?}");
-    assert_eq!(json(&preview)["status"], "would_apply");
+    assert_eq!(json(&preview)["count"], 1);
+    assert_eq!(json(&preview)["profiles"][0]["status"], "would_apply");
     assert!(!namespace_schema.exists(), "dry-run must remain read-only");
 
     let repaired_missing = jit(

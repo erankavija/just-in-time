@@ -692,12 +692,14 @@ recoverable multi-target transaction:
 jit profile apply --profile <SELECTOR>... [--dry-run] [--json]
 ```
 
-`--dry-run` builds and validates the exact plan without writing. JSON returns
-`ProfilePlanResult`, including `status` (`would_apply` or `unchanged`),
-`plan_hash`, and the sorted target list with each action (`create`, `update`, or
-`unchanged`) and executable intent.
+`--dry-run` builds and validates the exact plans without writing. JSON returns
+the count-wrapped `ProfilePlanResult` collection
+`{"count": N, "profiles": [...]}` with one `ProfilePlanEntry` per selector
+occurrence in selector order. Each entry includes `status` (`would_apply` or
+`unchanged`), `plan_hash`, and the sorted target list with each action (`create`,
+`update`, or `unchanged`) and executable intent.
 
-`--dry-run` previews one selected package. Applying selectors applies the
+`--dry-run` previews each selected package. Applying selectors applies the
 packages each declares a dependency on as well, so a preview accounts for the
 selected package's own targets.
 

@@ -2,7 +2,7 @@ use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionSte
 use crate::profile::{
     build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
     ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
-    ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
+    ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
     ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
@@ -354,7 +354,20 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Build the exact non-mutating target plan for one resolved profile.
-    pub fn plan_profile(&self, selector: &ProfileSelector) -> Result<ProfilePlanResult> {
+    pub fn plan_profiles(&self, selectors: &[ProfileSelector]) -> Result<ProfilePlanResult> {
+        // Validate the complete request first so dry-run uses the same
+        // selector-level ambiguity and confinement rules as show/apply before
+        // constructing any individual preview.
+        self.resolve_profile_selectors(selectors)?;
+        selectors
+            .iter()
+            .map(|selector| self.plan_profile(selector))
+            .collect::<Result<Vec<_>>>()
+            .map(ProfilePlanResult::new)
+    }
+
+    /// Build the exact non-mutating target plan for one resolved profile.
+    pub fn plan_profile(&self, selector: &ProfileSelector) -> Result<ProfilePlanEntry> {
         let package = self.resolve_profile_package(selector)?;
         let metadata = package.model();
         let layout = self.require_layout()?;
@@ -363,7 +376,7 @@ impl CommandExecutor<JsonFileStorage> {
             let Some((plan, changes)) = self.prepare_profile(session, &package, &context)? else {
                 return Ok(SessionStep::Retry);
             };
-            Ok(SessionStep::Done(ProfilePlanResult {
+            Ok(SessionStep::Done(ProfilePlanEntry {
                 id: metadata.id.to_string(),
                 version: metadata.version.clone(),
                 status: if plan.delta().actions().is_empty() {
@@ -2421,6 +2434,33 @@ mod tests {
 
         assert_eq!(first.0.hash(), second.0.hash());
         assert_eq!(first.1, second.1);
+    }
+
+    #[test]
+    fn test_profile_plan_collection_preserves_selector_occurrences_without_events() {
+        let (temp, storage, executor, _package) = fixture();
+        let before = storage.read_events().unwrap();
+        let selector = ProfileSelector::path(FIXTURE_LOCATION);
+
+        let result = executor
+            .plan_profiles(&[selector.clone(), selector])
+            .unwrap();
+
+        assert_eq!(result.count, 2);
+        assert_eq!(
+            result
+                .profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["planner-asset-only", "planner-asset-only"]
+        );
+        assert_eq!(storage.read_events().unwrap(), before);
+        assert!(!temp
+            .path()
+            .join(".jit/profiles/planner-asset-only.json")
+            .exists());
+        assert!(!temp.path().join("docs/profile.txt").exists());
     }
 
     #[test]

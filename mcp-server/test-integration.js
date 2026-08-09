@@ -604,7 +604,9 @@ async function main() {
           profile: [`path:${baseLocation}`],
           'dry-run': true,
         });
-        assert.strictEqual(basePreview.status, 'would_apply');
+        assert.strictEqual(basePreview.count, 1);
+        assert.strictEqual(basePreview.profiles.length, basePreview.count);
+        assert.strictEqual(basePreview.profiles[0].status, 'would_apply');
 
         // An application reports one result per applied package: the packages
         // the named one depends on, then the named one.
@@ -631,13 +633,15 @@ async function main() {
           profile: ['id:workflow'],
           'dry-run': true,
         });
-        assert.ok(preview.targets.some(target => target.path === 'docs/workflow.txt'));
+        assert.strictEqual(preview.count, 1);
+        assert.ok(preview.profiles[0].targets.some(target => target.path === 'docs/workflow.txt'));
 
         const unchanged = await profileCall('jit_profile_apply', {
           profile: ['id:workflow'],
           'dry-run': true,
         });
-        assert.strictEqual(unchanged.status, 'unchanged');
+        assert.strictEqual(unchanged.count, 1);
+        assert.strictEqual(unchanged.profiles[0].status, 'unchanged');
 
         // The bridge preserves one repeated --profile occurrence stream,
         // including interleaved path and recorded-id selectors.
@@ -648,6 +652,15 @@ async function main() {
         });
         const seededProfileIds = seeded.profiles.map(profile => profile.id);
         assert.deepStrictEqual(seededProfileIds, ['alpha', 'beta']);
+        const orderedPreview = await profileCall('jit_profile_apply', {
+          profile: [`path:${betaLocation}`, 'id:alpha', `path:${betaLocation}`],
+          'dry-run': true,
+        });
+        assert.strictEqual(orderedPreview.count, 3);
+        assert.deepStrictEqual(
+          orderedPreview.profiles.map(profile => profile.id),
+          ['beta', 'alpha', 'beta']
+        );
         const ordered = await profileCall('jit_profile_apply', {
           profile: [`path:${alphaLocation}`, 'id:alpha', `path:${betaLocation}`],
         });

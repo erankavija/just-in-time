@@ -2347,31 +2347,30 @@ fn run() -> Result<()> {
                     ));
                 }
                 if dry_run {
-                    if selectors.len() > 1 {
-                        return Err(invalid_argument(
-                            "profile apply --dry-run accepts exactly one --profile selector"
-                                .to_string(),
-                            json,
-                        ));
-                    }
-                    match executor.plan_profile(&selectors[0]) {
-                        Ok(plan) => {
+                    match executor.plan_profiles(&selectors) {
+                        Ok(plans) => {
                             if json {
-                                let output = JsonOutput::success(&plan);
+                                let output = JsonOutput::success(&plans);
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                let status = match plan.status {
-                                    jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
-                                    jit::profile::ProfilePlanStatus::WouldApply => "would apply",
-                                };
-                                println!("Profile {} {}: {}", plan.id, plan.version, status);
-                                for target in plan.targets {
-                                    let action = match target.action {
-                                        jit::profile::ProfileTargetAction::Unchanged => "unchanged",
-                                        jit::profile::ProfileTargetAction::Create => "create",
-                                        jit::profile::ProfileTargetAction::Update => "update",
+                                for plan in plans.profiles {
+                                    let status = match plan.status {
+                                        jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
+                                        jit::profile::ProfilePlanStatus::WouldApply => {
+                                            "would apply"
+                                        }
                                     };
-                                    println!("  {action}: {}", target.path);
+                                    println!("Profile {} {}: {}", plan.id, plan.version, status);
+                                    for target in plan.targets {
+                                        let action = match target.action {
+                                            jit::profile::ProfileTargetAction::Unchanged => {
+                                                "unchanged"
+                                            }
+                                            jit::profile::ProfileTargetAction::Create => "create",
+                                            jit::profile::ProfileTargetAction::Update => "update",
+                                        };
+                                        println!("  {action}: {}", target.path);
+                                    }
                                 }
                             }
                         }

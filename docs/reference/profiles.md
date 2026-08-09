@@ -107,15 +107,16 @@ Profile enumeration and its handling of applied-profile records are defined in
 All profile commands support `--json`. `profile list`, `profile show`, and
 `profile apply` use the standard count-wrapped collection shape. A show response
 contains one package entry per selector occurrence in selector order, including
-repeated selectors; an application reports one result per applied package,
-dependencies before the package that declares them. Each show entry carries the
-manifest, package identity, target hashes, size, and stored provenance record
-when present. Showing that record does not re-verify current target bytes. Use
-`jit profile apply --profile id:jit-dogfood --dry-run` for exact current-state verification
-of the named package: it returns the deterministic plan hash and every target's
-`create`, `update`, or `unchanged` action without writing. Successful
-reapplication of an exact installation returns `unchanged` for every package of
-the set.
+repeated selectors; a dry-run reports one plan entry per selected occurrence;
+normal application reports one result per applied package, dependencies before
+the package that declares them. Each show entry carries the manifest, package
+identity, target hashes, size, and stored provenance record when present.
+Showing that record does not re-verify current target bytes. Use
+`jit profile apply --profile id:jit-dogfood --dry-run` for exact current-state
+verification of the named package: it returns a one-entry collection with the
+deterministic plan hash and every target's `create`, `update`, or `unchanged`
+action without writing. Successful reapplication of an exact installation
+returns `unchanged` for every package of the set.
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
 into one validated publication; where the profile declares dependencies, the

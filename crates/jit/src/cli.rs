@@ -2968,7 +2968,7 @@ pub enum ProfileCommands {
         )]
         profile: Vec<String>,
 
-        /// Build and validate the exact application plan without writing
+        /// Build and validate the exact application plans without writing
         #[arg(long)]
         dry_run: bool,
 

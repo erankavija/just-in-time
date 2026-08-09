@@ -199,7 +199,7 @@ fn snapshot_tree(root: &Path) -> BTreeMap<String, SnapshotEntry> {
 }
 
 fn target<'a>(plan: &'a Value, path: &str) -> &'a Value {
-    plan["targets"]
+    plan["profiles"][0]["targets"]
         .as_array()
         .expect("profile targets")
         .iter()
@@ -267,7 +267,8 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
             "--json",
         ],
     );
-    assert_eq!(preview["status"], "would_apply");
+    assert_eq!(preview["count"], 1);
+    assert_eq!(preview["profiles"][0]["status"], "would_apply");
     assert!(!existing.path.join(".jit/profiles").exists());
 
     let applied = success_json(
@@ -292,7 +293,8 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
             "--json",
         ],
     );
-    assert_eq!(no_op["status"], "unchanged");
+    assert_eq!(no_op["count"], 1);
+    assert_eq!(no_op["profiles"][0]["status"], "unchanged");
     assert_eq!(
         target(&no_op, "contrib/gates/ai-review.sh")["executable"],
         true
@@ -905,6 +907,10 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
             .keys()
             .cloned()
             .collect::<BTreeSet<_>>(),
+        expected_keys(&["count", "profiles"])
+    );
+    assert_eq!(
+        property_keys(by_title["ProfilePlanResult"], "ProfilePlanEntry"),
         expected_keys(&["id", "plan_hash", "status", "targets", "version"])
     );
     assert_eq!(
