@@ -1076,9 +1076,11 @@ mod tests {
         let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
 
         assert_eq!(package.model().id.as_str(), "jit-dogfood");
+        // Fixed v1 identity oracle: the pre-cutover implementation produces
+        // this value for the current shipped package bytes.
         assert_eq!(
             package.hashes().package,
-            "74610484cf7d64084390803597966ee75f675014013ad251ae21be115ea8bcd7"
+            "5c7c1540706350e6c28452ed6fa7500a679a21b511515f52065da6f60aef62f0"
         );
     }
 
