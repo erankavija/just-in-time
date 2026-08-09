@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "7ba66f571e366755c84655db87c28a2d251712fb",
+  "completed_at": "2026-08-09T02:34:57.563241148Z",
+  "duration_ms": 249,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "5d54399e61eaff9385cb8af439ab5f0fa662ef7850491956d39ce4345470af40",
+  "issue_id": "45cd8529-32f2-4695-888f-2cad3e73197d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "33150c07-d383-4c29-9c24-5550a62d3bc3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T02:34:57.313380126Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- incremental-preflight output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/target:\n/home/vkaskivuo/Projects/just-in-time/target/jit-stale-child-test-cache/debug/incremental\n/home/vkaskivuo/Projects/just-in-time/target/debug/incremental\n  ✗ incremental-preflight: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}

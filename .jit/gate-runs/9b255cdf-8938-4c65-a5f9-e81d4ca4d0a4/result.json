@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7ba66f571e366755c84655db87c28a2d251712fb",
+  "completed_at": "2026-08-09T02:48:49.963579639Z",
+  "duration_ms": 213349,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/adopt-planning-bracket.md",
+        "id": "F1",
+        "line": 264,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/coverage-preview",
+          "@/rule/coverage-preview"
+        ],
+        "severity": "high",
+        "summary": "Adoption-guide rule_validation gate selects coverage-preview while its preview rule is named sdd-coverage-preview."
+      }
+    ],
+    "summary": "The adoption guide configures a rule name different from the preview rule it instructs adopters to create.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "45cd8529-32f2-4695-888f-2cad3e73197d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9b255cdf-8938-4c65-a5f9-e81d4ca4d0a4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T02:45:16.614272760Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12341 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe469-09f9-72b2-80ae-e844b662b014\n--------\nuser\n--- 12328 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7ba66f57, c1b7acd1, 526fbe1a\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-15 (dev/vision/9db27a3a-charter.md); @/gate/coverage-preview (.jit/gates.toml); @/rule/coverage-preview (.jit/rules.toml); @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci: passed, exit 0 (2026-08-09T02:35:44Z)\nTruncation recovery: recovered bounded per-commit, per-file patch reads and focused current-file reads after broad-output truncation\n\n1. **F1 — blocking, issue-impact:** The adopter guide’s Step 3 defines the preview rule as `sdd-coverage-preview` ([docs/how-to/adopt-planning-bracket.md:179](docs/how-to/adopt-planning-bracket.md:179)), but its newly changed gate configuration selects `rule = \"coverage-preview\"` ([docs/how-to/adopt-planning-bracket.md:264](docs/how-to/adopt-planning-bracket.md:264)). Copying the guide as written therefore produces a non-vacuous “rule not found” gate failure rather than a coverage preview; the research example has the same mismatch. This violates the required consistent adopter-facing issue-scoped checker configuration. References: `@/gate/coverage-preview`, `@/rule/coverage-preview`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The adoption guide configures a rule name different from the preview rule it instructs adopters to create.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Adoption-guide rule_validation gate selects coverage-preview while its preview rule is named sdd-coverage-preview.\",\"file\":\"docs/how-to/adopt-planning-bracket.md\",\"line\":264,\"references\":[\"@/gate/coverage-preview\",\"@/rule/coverage-preview\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
