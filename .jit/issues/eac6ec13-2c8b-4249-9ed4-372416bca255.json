@@ -14,7 +14,23 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T04:54:17.530350503Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-09T04:58:13.269428488Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T04:54:41.038240969Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
   "labels": [
     "type:task",
@@ -29,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Select profiles through repeatable ordered selectors",
-  "updated_at": "2026-08-09T03:48:06.592966899Z"
+  "updated_at": "2026-08-09T04:58:13.269428488Z"
 }

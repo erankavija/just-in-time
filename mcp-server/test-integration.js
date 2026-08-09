@@ -114,7 +114,7 @@ const PROFILE_PACKAGE_FIXTURE = new URL(
  * scenario is authored here; renaming the asset target after the id is what
  * keeps two staged packages from publishing the same file.
  *
- * @returns {string} the repository-relative location, as `--from` names it
+ * @returns {string} the repository-relative location used by a `path:` selector
  */
 function stagePackage(repo, location, id, dependencies = []) {
   const root = join(repo, location);
@@ -401,20 +401,20 @@ async function main() {
           .filter(tool => tool.name.startsWith('jit_profile_'))
           .map(tool => [tool.name, Object.keys(tool.inputSchema.properties).sort()])
       );
-      // `from` names the repository directory holding the package; enumeration
-      // takes none, because it follows the repository's own records.
+      // `profile` names an ordered selector; enumeration takes none, because it
+      // follows the repository's own records.
       assert.deepStrictEqual(profileInputKeys, {
-        jit_profile_apply: ['dry-run', 'from', 'id', 'json'],
+        jit_profile_apply: ['dry-run', 'json', 'profile'],
         jit_profile_list: ['json'],
-        jit_profile_show: ['from', 'id', 'json'],
+        jit_profile_show: ['json', 'profile'],
       });
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.required,
-        ['id']
+        ['profile']
       );
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_show').inputSchema.required,
-        ['id']
+        ['profile']
       );
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_list').inputSchema.required,
@@ -578,10 +578,9 @@ async function main() {
         assert.deepStrictEqual(listed.profiles, []);
 
         const shown = await profileCall('jit_profile_show', {
-          id: 'workflow',
-          from: workflowLocation,
+          profile: [`path:${workflowLocation}`],
         });
-        assert.strictEqual(shown.manifest.profile.id, 'workflow');
+        assert.strictEqual(shown.manifest.id, 'workflow');
         assert.deepStrictEqual(shown.origin, {
           source: 'directory',
           location: workflowLocation,
@@ -591,8 +590,7 @@ async function main() {
         // front of it, so the package a repository declaring nothing can be
         // shown is the self-contained one.
         const basePreview = await profileCall('jit_profile_apply', {
-          id: 'base',
-          from: baseLocation,
+          profile: [`path:${baseLocation}`],
           'dry-run': true,
         });
         assert.strictEqual(basePreview.status, 'would_apply');
@@ -600,49 +598,71 @@ async function main() {
         // An application reports one result per applied package: the packages
         // the named one depends on, then the named one.
         const applied = await profileCall('jit_profile_apply', {
-          id: 'workflow',
-          from: workflowLocation,
+          profile: [`path:${workflowLocation}`],
         });
         assert.strictEqual(applied.count, applied.profiles.length);
         const appliedProfileIds = applied.profiles.map(profile => profile.id);
         const expectedProfileIds = [
-          ...shown.manifest.dependencies,
-          shown.manifest.profile.id,
+          ...shown.manifest.dependency.map(dependency => dependency.id),
+          shown.manifest.id,
         ];
-        assert.ok(shown.manifest.dependencies.length > 0,
+        assert.ok(shown.manifest.dependency.length > 0,
           'the named package declares a dependency');
         for (const id of expectedProfileIds) {
           assert.ok(appliedProfileIds.includes(id),
             `application should include declared package ${id}`);
         }
-        assert.strictEqual(appliedProfileIds.at(-1), shown.manifest.profile.id);
+        assert.strictEqual(appliedProfileIds.at(-1), shown.manifest.id);
         assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
         // The applied package's own preview names the target it published.
         const preview = await profileCall('jit_profile_apply', {
-          id: 'workflow',
+          profile: ['id:workflow'],
           'dry-run': true,
         });
         assert.ok(preview.targets.some(target => target.path === 'docs/workflow.txt'));
 
         const unchanged = await profileCall('jit_profile_apply', {
-          id: 'workflow',
+          profile: ['id:workflow'],
           'dry-run': true,
         });
         assert.strictEqual(unchanged.status, 'unchanged');
+
+        // The bridge preserves one repeated --profile occurrence stream,
+        // including interleaved path and recorded-id selectors.
+        const alphaLocation = stagePackage(profileTester.testDir, 'packages/alpha', 'alpha');
+        const betaLocation = stagePackage(profileTester.testDir, 'packages/beta', 'beta');
+        const seeded = await profileCall('jit_profile_apply', {
+          profile: [`path:${alphaLocation}`, `path:${betaLocation}`],
+        });
+        const seededProfileIds = seeded.profiles.map(profile => profile.id);
+        assert.deepStrictEqual(seededProfileIds, ['alpha', 'beta']);
+        const ordered = await profileCall('jit_profile_apply', {
+          profile: [`path:${alphaLocation}`, 'id:alpha', `path:${betaLocation}`],
+        });
+        const orderedProfileIds = ordered.profiles.map(profile => profile.id);
+        assert.deepStrictEqual(orderedProfileIds, ['alpha', 'alpha', 'beta']);
+        const allAppliedProfileIds = [
+          ...appliedProfileIds,
+          ...seededProfileIds,
+          ...orderedProfileIds,
+        ];
 
         // The records the application wrote are what the repository now names:
         // one per applied package, and no other.
         const recorded = await profileCall('jit_profile_list');
         assert.strictEqual(recorded.count, recorded.profiles.length);
+        const expectedRecordedIds = [...new Set(allAppliedProfileIds)].sort();
         assert.deepStrictEqual(
           recorded.profiles.map(profile => profile.id),
-          appliedProfileIds,
-          'recorded profiles should match the dependency-first application order'
+          expectedRecordedIds,
+          'recorded profiles should contain each applied package exactly once'
         );
         const appliedOrigins = new Map(await Promise.all(
-          appliedProfileIds.map(async id => {
-            const resolved = await profileCall('jit_profile_show', { id });
+          allAppliedProfileIds.map(async id => {
+            const resolved = await profileCall('jit_profile_show', {
+              profile: [`id:${id}`],
+            });
             return [id, resolved.origin];
           })
         ));

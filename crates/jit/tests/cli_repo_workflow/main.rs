@@ -36,7 +36,7 @@ mod worktree_identity_tests;
 ///
 /// A package is applied from inside the worktree it is applied to, and a
 /// declared dependency is looked for beside the package declaring it, so the
-/// whole authored set is staged and `--from` names one of them.
+/// whole authored set is staged and a `path:` selector names one of them.
 pub(crate) fn repository_package_at(repo: &std::path::Path, id: &str) -> String {
     let staged = jit::test_utils::stage_repository_packages(repo, id);
     staged

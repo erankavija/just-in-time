@@ -52,10 +52,7 @@ fn profiled_harness(omit_profile_record: bool) -> (tempfile::TempDir, TestHarnes
         .with_layout(source_layout)
         .initialize_fresh_repository(
             source.path(),
-            Some(jit::commands::ProfileSelection {
-                id: "jit-dogfood",
-                location: Some(&location),
-            }),
+            Some(&[jit::commands::ProfileSelector::path(&location)]),
         )
         .unwrap();
 
@@ -210,10 +207,7 @@ fn repair_target_path_strings() -> Vec<String> {
                 .with_layout(layout.clone())
                 .initialize_fresh_repository(
                     source.path(),
-                    Some(jit::commands::ProfileSelection {
-                        id: "jit-dogfood",
-                        location: Some(&location),
-                    }),
+                    Some(&[jit::commands::ProfileSelector::path(&location)]),
                 )
                 .unwrap();
 
@@ -304,10 +298,9 @@ impl DirectoryPackageRepo {
         repo.executor
             .initialize_profiled_repository(
                 repo.root.path(),
-                jit::commands::ProfileSelection {
-                    id: repo.id(),
-                    location: Some(&repo.root.path().join(PACKAGE_DIRECTORY)),
-                },
+                &[jit::commands::ProfileSelector::path(
+                    repo.root.path().join(PACKAGE_DIRECTORY),
+                )],
             )
             .expect("a package inside the worktree applies");
         repo

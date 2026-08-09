@@ -116,14 +116,7 @@ fn test_nested_profile_init_keeps_data_and_assets_in_child() {
     fs::create_dir(&child).unwrap();
     let location = crate::repository_package_at(&child, "jit-dogfood");
     let child_init = jit_cmd(&child)
-        .args([
-            "init",
-            "--profile",
-            "jit-dogfood",
-            "--from",
-            &location,
-            "--json",
-        ])
+        .args(["init", "--profile", &format!("path:{location}"), "--json"])
         .output()
         .expect("nested init failed to spawn");
 
@@ -164,14 +157,7 @@ fn test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd() {
     let output = Command::new(jit_binary())
         .current_dir(&child)
         .env("JIT_DATA_DIR", &data_root)
-        .args([
-            "init",
-            "--profile",
-            "jit-dogfood",
-            "--from",
-            &location,
-            "--json",
-        ])
+        .args(["init", "--profile", &format!("path:{location}"), "--json"])
         .output()
         .expect("explicit-root init failed to spawn");
 
@@ -208,9 +194,8 @@ fn test_relative_data_root_override_keeps_worktree_assets_at_discovered_root() {
         .args([
             "profile",
             "apply",
-            "jit-dogfood",
-            "--from",
-            &location.to_string_lossy(),
+            "--profile",
+            &format!("path:{}", location.to_string_lossy()),
             "--json",
         ])
         .output()

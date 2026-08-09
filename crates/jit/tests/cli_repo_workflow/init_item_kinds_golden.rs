@@ -34,7 +34,7 @@ fn setup_test_repo() -> TempDir {
     jit::test_utils::assemble_repository_package(DEFAULT_PACKAGE, &temp.path().join(&location))
         .expect("this repository's default package assembles");
     let output = Command::new(jit_binary())
-        .args(["init", "--profile", DEFAULT_PACKAGE, "--from", &location])
+        .args(["init", "--profile", &format!("path:{location}")])
         .current_dir(temp.path())
         .output()
         .expect("failed to run jit init");

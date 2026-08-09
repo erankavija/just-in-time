@@ -44,7 +44,7 @@ For a new repository, this is the preferred setup:
 mkdir my-project
 cd my-project
 cp -R <extracted-archive>/packages .
-jit init --profile jit-dogfood --from packages/jit-dogfood
+jit init --profile path:packages/jit-dogfood
 ```
 
 Plain `jit init` remains the methodology-neutral alternative. It creates the
@@ -62,23 +62,23 @@ one those records name, or a package at a location:
 
 ```bash
 jit profile list
-jit profile show jit-dogfood
-jit profile show jit-dogfood --from packages/jit-dogfood
+jit profile show --profile id:jit-dogfood
+jit profile show --profile path:packages/jit-dogfood
 ```
 
 Preview and apply a profile to an existing JIT repository:
 
 ```bash
 # A first application names where the package was placed
-jit profile apply jit-dogfood --from packages/jit-dogfood --dry-run
-jit profile apply jit-dogfood --from packages/jit-dogfood
+jit profile apply --profile path:packages/jit-dogfood --dry-run
+jit profile apply --profile path:packages/jit-dogfood
 
 # Later runs need no location: the applied-profile record names it
-jit profile apply jit-dogfood --dry-run
+jit profile apply --profile id:jit-dogfood --dry-run
 ```
 
-The command syntax, supplied-location form, and package-resolution contract are
-defined in [Profile Commands](cli-commands.md#profile-commands). This page
+The selector syntax and package-resolution contract are defined in [Profile
+Commands](cli-commands.md#profile-commands). This page
 describes the package and its lifecycle; the command reference covers how a
 package obtained from a directory is selected and found again on later runs,
 including where a declared dependency is looked for. A directory of obtained
@@ -129,10 +129,10 @@ tools.
 
 The package is versioned independently from the JIT binary and declares its
 compatible JIT range in a TOML manifest. The manifest is the package inventory:
-run `jit profile show jit-dogfood --from packages/jit-dogfood --json` for the
+run `jit profile show --profile path:packages/jit-dogfood --json` for the
 exact version, dependencies, contributions, assets, managed regions, hashes, and
 executable declarations the resolved package carries. Once the repository has
-applied it, its own record names the location and `--from` can be dropped. It also declares the repository roots from which
+applied it, its own record can be selected with `id:jit-dogfood`. It also declares the repository roots from which
 packaged live assets are drawn, so any repository file under a declared root
 that is neither claimed by a packaged asset nor matched by a declared exclusion
 is caught rather than silently left out of the package.

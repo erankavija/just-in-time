@@ -1937,8 +1937,8 @@ mod tests {
         assert!(redirect.contains("Ordinary `jit init` does not install it"));
         assert!(redirect.contains("profile-installed workflow policy"));
         assert!(redirect.contains("repositories that use plain initialization"));
-        assert!(redirect.contains("`jit init --profile jit-dogfood --from packages/jit-dogfood`"));
-        assert!(redirect.contains("`jit profile apply jit-dogfood --from packages/jit-dogfood`"));
+        assert!(redirect.contains("`jit init --profile path:packages/jit-dogfood`"));
+        assert!(redirect.contains("`jit profile apply --profile path:packages/jit-dogfood`"));
         assert!(redirect.contains("[Repository Profiles](profiles.md)"));
         assert!(!redirect.contains("does not expose a public profile-install command"));
     }

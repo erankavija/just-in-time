@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-eac6ec13",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "6f9da1b13ae79adb3f84bb36619ad13b00e132b1",
+  "completed_at": "2026-08-09T04:28:35.875809222Z",
+  "duration_ms": 166488,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "eb3cfe0f0c33fd7471c857ca27b5dc1468a2cce20976cabca02af93c0907e880",
+  "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e534d5a7-6220-451d-aa79-309d5f3cf03f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T04:25:49.386974129Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest failure_probe_fixture::test_failure_probe_fixture_parser_accepts_every_recorded_invocation ... FAILED\ntest failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope ... FAILED\ntest failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes ... FAILED\ntest payload_stream_purity_tests::test_machine_readable_failures_emit_one_json_document_on_payload_stream ... FAILED\ntest result: FAILED. 330 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.35s\n---- failure_probe_fixture::test_failure_probe_fixture_parser_accepts_every_recorded_invocation stdout ----\n\nthread 'failure_probe_fixture::test_failure_probe_fixture_parser_accepts_every_recorded_invocation' (1413071) panicked at crates/jit/tests/cli_issue/failure_probe_fixture.rs:104:9:\nrecorded invocation for `profile show` is rejected before dispatch: error: unexpected argument 'absent-profile' found\n\n---- failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope stdout ----\n\n---- failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes stdout ----\n\n---- payload_stream_purity_tests::test_machine_readable_failures_emit_one_json_document_on_payload_stream stdout ----\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1519 bytes=28655902)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1445565872/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

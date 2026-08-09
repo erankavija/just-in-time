@@ -1,9 +1,9 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
     build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
-    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError, ProfilePackageSource,
-    ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
+    ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
+    ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -15,16 +15,108 @@ use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+
+/// One ordered profile selection from the command boundary.
+///
+/// The tag is part of the value rather than inferred from filesystem state:
+/// `id:NAME` reads the recorded package named by `NAME`, while `path:DIR`
+/// reads the package directory `DIR` relative to the worktree. This keeps one
+/// occurrence stream lossless and prevents a local directory from silently
+/// replacing an explicitly selected recorded package.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProfileSelector {
+    /// A profile id resolved through this repository's applied records.
+    Id(ProfileId),
+    /// A package directory, resolved relative to the repository worktree.
+    Path(PathBuf),
+}
+
+/// A malformed `--profile` selector.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ProfileSelectorError {
+    /// The selector does not have one of the supported tags.
+    #[error("invalid profile selector '{selector}': expected id:ID or path:DIR")]
+    InvalidShape {
+        /// User-supplied selector.
+        selector: String,
+    },
+    /// The selector has a supported tag but no value.
+    #[error("invalid profile selector '{selector}': the value after '{kind}:' is empty")]
+    EmptyValue {
+        /// User-supplied selector.
+        selector: String,
+        /// Supported selector tag.
+        kind: String,
+    },
+    /// The id portion does not satisfy the package id contract.
+    #[error("invalid profile selector '{selector}': {error}")]
+    InvalidId {
+        /// User-supplied selector.
+        selector: String,
+        /// Canonical profile-id validation failure.
+        error: String,
+    },
+}
+
+impl FromStr for ProfileSelector {
+    type Err = ProfileSelectorError;
+
+    fn from_str(selector: &str) -> Result<Self, Self::Err> {
+        let (kind, value) =
+            selector
+                .split_once(':')
+                .ok_or_else(|| ProfileSelectorError::InvalidShape {
+                    selector: selector.to_string(),
+                })?;
+        if value.is_empty() {
+            return Err(ProfileSelectorError::EmptyValue {
+                selector: selector.to_string(),
+                kind: match kind {
+                    "id" | "path" => kind.to_string(),
+                    _ => {
+                        return Err(ProfileSelectorError::InvalidShape {
+                            selector: selector.to_string(),
+                        })
+                    }
+                },
+            });
+        }
+        match kind {
+            "id" => ProfileId::try_from(value.to_string())
+                .map(ProfileSelector::Id)
+                .map_err(|error| ProfileSelectorError::InvalidId {
+                    selector: selector.to_string(),
+                    error,
+                }),
+            "path" => Ok(ProfileSelector::Path(PathBuf::from(value))),
+            _ => Err(ProfileSelectorError::InvalidShape {
+                selector: selector.to_string(),
+            }),
+        }
+    }
+}
+
+impl ProfileSelector {
+    /// Construct an id selector from a validated profile id.
+    pub fn id(id: impl AsRef<str>) -> Result<Self, ProfileSelectorError> {
+        format!("id:{}", id.as_ref()).parse()
+    }
+
+    /// Construct a path selector from a worktree-relative or absolute spelling.
+    pub fn path(path: impl Into<PathBuf>) -> Self {
+        Self::Path(path.into())
+    }
+}
 
 /// Failure resolving which package bytes a command reads.
 ///
-/// Resolution takes the first route that answers — a location the caller
-/// supplied, then the location this repository's applied-profile record names —
-/// and each variant names the route that failed together with what it
-/// addressed. A recorded location that no longer resolves is one of these
-/// rather than an absent profile: a deleted directory is a repository whose
-/// record outlived its package, not a repository that never applied one.
+/// Resolution names the route a selector addressed together with what failed.
+/// A recorded location that no longer resolves is one of these rather than
+/// an absent profile: a deleted directory is a repository whose record
+/// outlived its package, not a repository that never applied one.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileResolutionError {
     /// A supplied location holds no readable package.
@@ -35,15 +127,15 @@ pub enum ProfileResolutionError {
         /// Package-reader failure.
         source: ProfilePackageError,
     },
-    /// A supplied location holds a package declaring another profile.
-    #[error("profile package location '{location}' declares profile '{found}', not '{requested}'")]
-    UnexpectedProfileAtLocation {
-        /// Location as the caller supplied it.
+    /// A path selector attempts to use the name of an explicitly selected id.
+    #[error(
+        "profile package directory '{location}' declares profile '{id}', which shadows a selected recorded profile with the same id"
+    )]
+    PathShadowsSelectedId {
+        /// Path selector that declared the duplicate id.
         location: String,
-        /// Profile the caller asked for.
-        requested: String,
-        /// Profile the package at that location declares.
-        found: String,
+        /// Profile id that the path would shadow.
+        id: String,
     },
     /// A recorded location no longer holds a readable package.
     #[error(
@@ -135,35 +227,69 @@ pub enum ProfileApplyError {
 impl CommandExecutor<JsonFileStorage> {
     /// Read the package one profile command acts on.
     ///
-    /// The routes are tried in a fixed order and the first that answers wins:
-    /// `location` when the caller supplies one, then the location this
-    /// repository's applied-profile record for `id` names. A supplied location
-    /// answers the first application, when the repository has obtained a
-    /// package and recorded nothing yet; the record answers every run after it,
-    /// so a caller need not remember where the bytes came from. A repository
-    /// that has neither is not carrying that profile, which is a
-    /// [`NotFoundError`](crate::errors::NotFoundError).
-    ///
-    /// A supplied location must hold a package declaring `id`, and a recorded
-    /// location that no longer holds a readable package is a
-    /// [`ProfileResolutionError`] naming the record and the location rather
-    /// than an absent profile.
-    pub fn resolve_profile_package(
-        &self,
-        id: &str,
-        location: Option<&Path>,
-    ) -> Result<ProfilePackage> {
-        match location {
-            Some(location) => supplied_package(location, id),
-            None => match self.read_applied_profile_record(id)? {
+    /// An `id:` selector reads the location named by this repository's applied
+    /// profile record. A `path:` selector reads a package directory in the
+    /// worktree and uses the id declared by that package. A recorded location
+    /// that no longer holds a readable package is a [`ProfileResolutionError`]
+    /// naming the record and location rather than an absent profile.
+    pub fn resolve_profile_package(&self, selector: &ProfileSelector) -> Result<ProfilePackage> {
+        let layout = self.require_layout()?;
+        match selector {
+            ProfileSelector::Path(location) => supplied_package(location, &layout),
+            ProfileSelector::Id(id) => match self.read_applied_profile_record(id.as_str())? {
                 Some(record) => {
-                    recorded_package(&record, &applied_record_path(id)?, &self.require_layout()?)
+                    recorded_package(&record, &applied_record_path(id.as_str())?, &layout)
                 }
                 None => Err(
                     crate::errors::NotFoundError::new(format!("Profile not found: {id}")).into(),
                 ),
             },
         }
+    }
+
+    /// Resolve every selector in occurrence order before any package is applied.
+    ///
+    /// A path that declares the id of an explicitly selected recorded package is
+    /// rejected before application, so selector order cannot make one source
+    /// silently win over the other.
+    pub fn resolve_profile_selectors(
+        &self,
+        selectors: &[ProfileSelector],
+    ) -> Result<Vec<ProfilePackage>> {
+        let resolved = selectors
+            .iter()
+            .map(|selector| self.resolve_profile_package(selector))
+            .collect::<Result<Vec<_>>>()?;
+        let selected_id_sources = resolved
+            .iter()
+            .zip(selectors)
+            .filter_map(|(package, selector)| match selector {
+                ProfileSelector::Id(_) => {
+                    Some((package.model().id.to_string(), package.source().clone()))
+                }
+                ProfileSelector::Path(_) => None,
+            })
+            .collect::<Vec<_>>();
+
+        resolved
+            .into_iter()
+            .zip(selectors)
+            .map(|(package, selector)| {
+                if let ProfileSelector::Path(location) = selector {
+                    let shadows = selected_id_sources.iter().any(|(id, source)| {
+                        id == package.model().id.as_str() && source != package.source()
+                    });
+                    if shadows {
+                        return Err(ProfileResolutionError::PathShadowsSelectedId {
+                            location: location.display().to_string(),
+                            id: package.model().id.to_string(),
+                        }
+                        .into());
+                    }
+                }
+                Ok(package)
+            })
+            .collect()
     }
 
     /// List the profiles this repository's own applied-profile records name.
@@ -198,9 +324,10 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Inspect one resolved profile package.
-    pub fn show_profile(&self, id: &str, location: Option<&Path>) -> Result<ProfileShowResult> {
-        let package = self.resolve_profile_package(id, location)?;
+    pub fn show_profile(&self, selector: &ProfileSelector) -> Result<ProfileShowResult> {
+        let package = self.resolve_profile_package(selector)?;
         let layout = self.require_layout()?;
+        let id = package.model().id.as_str();
         Ok(ProfileShowResult {
             manifest: package.model().clone(),
             origin: package_origin(&package, &layout)?,
@@ -213,8 +340,8 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Build the exact non-mutating target plan for one resolved profile.
-    pub fn plan_profile(&self, id: &str, location: Option<&Path>) -> Result<ProfilePlanResult> {
-        let package = self.resolve_profile_package(id, location)?;
+    pub fn plan_profile(&self, selector: &ProfileSelector) -> Result<ProfilePlanResult> {
+        let package = self.resolve_profile_package(selector)?;
         let metadata = package.model();
         let layout = self.require_layout()?;
         let context = MutationContext::preview();
@@ -240,11 +367,20 @@ impl CommandExecutor<JsonFileStorage> {
     /// on.
     pub fn apply_profile(
         &self,
-        id: &str,
-        location: Option<&Path>,
+        selectors: &[ProfileSelector],
     ) -> Result<ProfileComposedApplyResult> {
-        let package = self.resolve_profile_package(id, location)?;
-        self.apply_profile_package(&package)
+        self.resolve_profile_selectors(selectors)?
+            .into_iter()
+            .map(|package| self.apply_profile_package(&package))
+            .collect::<Result<Vec<_>>>()
+            .map(|results| {
+                ProfileComposedApplyResult::new(
+                    results
+                        .into_iter()
+                        .flat_map(|result| result.profiles)
+                        .collect(),
+                )
+            })
     }
 
     /// Resolve the complete set of packages applying `package` applies, in the
@@ -329,18 +465,15 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<ProfilePackage> {
         let ProfilePackageSource::Directory(directory) = declaring.source();
         let Some(location) = directory.parent().map(|parent| parent.join(dependency)) else {
-            return self.resolve_profile_package(dependency, None);
+            return self.resolve_profile_package(&ProfileSelector::id(dependency)?);
         };
-        match ProfilePackage::from_directory(&location) {
+        match supplied_package(&location, &self.require_layout()?) {
             Ok(package) if package.model().id.as_str() == dependency => Ok(package),
-            Ok(_) | Err(ProfilePackageError::UnreadableDirectory { .. }) => {
-                self.resolve_profile_package(dependency, None)
+            Ok(_) => Ok(self.resolve_profile_package(&ProfileSelector::id(dependency)?)?),
+            Err(error) if is_unreadable_location(&error) => {
+                Ok(self.resolve_profile_package(&ProfileSelector::id(dependency)?)?)
             }
-            Err(source) => Err(ProfileResolutionError::UnreadableLocation {
-                location: location.display().to_string(),
-                source,
-            }
-            .into()),
+            Err(error) => Err(error),
         }
     }
 
@@ -351,9 +484,10 @@ impl CommandExecutor<JsonFileStorage> {
     /// selection resolves to is the whole set applying it applies, so an
     /// unresolvable dependency and a dependency cycle fail here too rather than
     /// at the publication the check exists to precede.
-    pub fn validate_profile_selection(&self, id: &str, location: Option<&Path>) -> Result<()> {
-        let package = self.resolve_profile_package(id, location)?;
-        self.resolve_profile_closure(&package).map(drop)
+    pub fn validate_profile_selection(&self, selectors: &[ProfileSelector]) -> Result<()> {
+        self.resolve_profile_selectors(selectors)?
+            .into_iter()
+            .try_for_each(|package| self.resolve_profile_closure(&package).map(drop))
     }
 
     /// Apply one validated package together with the packages it depends on.
@@ -676,28 +810,27 @@ pub(super) fn recorded_profile_ids(
 
 /// Read the package at a location the caller supplied.
 ///
-/// The package there must declare `id`: the record an application writes is
-/// named by the package's own identity, so admitting a package declaring
-/// something else would apply a profile the caller did not ask for and record
-/// it under the name it did not name.
-fn supplied_package(location: &Path, id: &str) -> Result<ProfilePackage> {
-    let package = ProfilePackage::from_directory(location).map_err(|source| {
-        ProfileResolutionError::UnreadableLocation {
-            location: location.display().to_string(),
-            source,
-        }
-    })?;
-    let found = package.model().id.as_str();
-    if found == id {
-        Ok(package)
+/// The package there supplies the id for a `path:` selector. The caller may
+/// combine that selector with `id:` selectors, but a path package may not
+/// shadow a selected recorded id.
+fn supplied_package(location: &Path, layout: &RepositoryLayout) -> Result<ProfilePackage> {
+    let requested = if location.is_absolute() {
+        location.to_path_buf()
     } else {
-        Err(ProfileResolutionError::UnexpectedProfileAtLocation {
-            location: location.display().to_string(),
-            requested: id.to_string(),
-            found: found.to_string(),
+        layout.worktree_root().join(location)
+    };
+    let package = match fs::canonicalize(&requested) {
+        Ok(resolved) => {
+            ensure_worktree_package_directory(&resolved, layout)?;
+            ProfilePackage::from_directory(&resolved)
         }
-        .into())
+        Err(_) => ProfilePackage::from_directory(&requested),
     }
+    .map_err(|source| ProfileResolutionError::UnreadableLocation {
+        location: location.display().to_string(),
+        source,
+    })?;
+    Ok(package)
 }
 
 /// Read the package one applied-profile record names.
@@ -716,16 +849,56 @@ pub(super) fn recorded_package(
     layout: &RepositoryLayout,
 ) -> Result<ProfilePackage> {
     let ProfileOrigin::Directory(location) = &record.origin;
-    ProfilePackage::from_directory(&layout.worktree_root().join(location.as_path())).map_err(
-        |source| {
-            ProfileResolutionError::UnresolvableRecordedLocation {
-                record: record_path.repository_relative(),
-                location: location.as_path().display().to_string(),
-                source,
-            }
-            .into()
-        },
-    )
+    let requested = layout.worktree_root().join(location.as_path());
+    let package = match fs::canonicalize(&requested) {
+        Ok(resolved) => {
+            ensure_worktree_package_directory(&resolved, layout)?;
+            ProfilePackage::from_directory(&resolved)
+        }
+        Err(_) => ProfilePackage::from_directory(&requested),
+    };
+    package.map_err(|source| {
+        ProfileResolutionError::UnresolvableRecordedLocation {
+            record: record_path.repository_relative(),
+            location: location.as_path().display().to_string(),
+            source,
+        }
+        .into()
+    })
+}
+
+/// Reuse the repository layout's canonical root classification before reading a
+/// package directory. This is deliberately the same worktree/data-root
+/// boundary used for every persisted package origin.
+fn ensure_worktree_package_directory(
+    directory: &Path,
+    layout: &RepositoryLayout,
+) -> Result<(), ProfileApplyError> {
+    let path = layout.classify_and_canonicalize(directory).map_err(|_| {
+        ProfileApplyError::PackageOutsideWorktree {
+            path: directory.display().to_string(),
+        }
+    })?;
+    if path.root_class() != RepositoryRootClass::Worktree {
+        return Err(ProfileApplyError::PackageOutsideWorktree {
+            path: directory.display().to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn is_unreadable_location(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<ProfileResolutionError>()
+        .is_some_and(|error| {
+            matches!(
+                error,
+                ProfileResolutionError::UnreadableLocation {
+                    source: ProfilePackageError::UnreadableDirectory { .. },
+                    ..
+                }
+            )
+        })
 }
 
 /// Summarize one recorded profile from the package its record resolves to.
@@ -1192,9 +1365,8 @@ mod tests {
         let (temp, _storage, executor, _package) = fixture();
         let supplied = package_read_from(&temp, "vendor/supplied");
 
-        let resolved = executor
-            .resolve_profile_package(&fixture_id(), Some(&temp.path().join("vendor/supplied")))
-            .unwrap();
+        let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
+        let resolved = executor.resolve_profile_package(&selector).unwrap();
 
         assert_eq!(resolved.hashes(), supplied.hashes());
         assert_eq!(
@@ -1219,9 +1391,8 @@ mod tests {
         );
         assert_ne!(supplied.hashes(), recorded.hashes());
 
-        let resolved = executor
-            .resolve_profile_package(&fixture_id(), Some(&temp.path().join("vendor/supplied")))
-            .unwrap();
+        let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
+        let resolved = executor.resolve_profile_package(&selector).unwrap();
 
         assert_eq!(resolved.hashes(), supplied.hashes());
     }
@@ -1244,9 +1415,8 @@ mod tests {
         );
         assert_ne!(rewritten.hashes(), applied.hashes());
 
-        let resolved = executor
-            .resolve_profile_package(&fixture_id(), None)
-            .unwrap();
+        let selector = ProfileSelector::id(fixture_id()).unwrap();
+        let resolved = executor.resolve_profile_package(&selector).unwrap();
 
         assert_eq!(resolved.hashes(), rewritten.hashes());
     }
@@ -1280,7 +1450,8 @@ mod tests {
             ),
         );
 
-        let resolved = executor.resolve_profile_package(&id, None).unwrap();
+        let selector = ProfileSelector::id(&id).unwrap();
+        let resolved = executor.resolve_profile_package(&selector).unwrap();
 
         assert_eq!(resolved.hashes(), recorded.hashes());
     }
@@ -1293,7 +1464,8 @@ mod tests {
         // because a resolution with no supplied or recorded package must
         // report profile-not-found for each of them.
         for id in ["jit-default", "jit-dogfood", "no-such-profile"] {
-            let error = executor.resolve_profile_package(id, None).unwrap_err();
+            let selector = ProfileSelector::id(id).unwrap();
+            let error = executor.resolve_profile_package(&selector).unwrap_err();
 
             assert!(
                 error
@@ -1393,9 +1565,8 @@ mod tests {
         executor.apply_profile_package(&applied).unwrap();
         fs::remove_dir_all(temp.path().join("vendor/recorded")).unwrap();
 
-        let error = executor
-            .resolve_profile_package(&fixture_id(), None)
-            .unwrap_err();
+        let selector = ProfileSelector::id(fixture_id()).unwrap();
+        let error = executor.resolve_profile_package(&selector).unwrap_err();
 
         // The record outlived its package: naming the record and the location
         // is what distinguishes that from a profile this repository never
@@ -1419,31 +1590,20 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_profile_package_refuses_a_supplied_location_declaring_another_profile() {
+    fn test_resolve_profile_package_path_selector_uses_the_directory_package_id() {
         let (temp, _storage, executor, _package) = fixture();
-        package_read_from(&temp, "vendor/supplied");
-
-        let error = executor
-            .resolve_profile_package("jit-dogfood", Some(&temp.path().join("vendor/supplied")))
-            .unwrap_err();
-
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileResolutionError>(),
-                Some(ProfileResolutionError::UnexpectedProfileAtLocation { requested, found, .. })
-                    if requested == "jit-dogfood" && *found == fixture_id()
-            ),
-            "{error:#}"
-        );
+        let package = package_read_from(&temp, "vendor/supplied");
+        let selector = ProfileSelector::path(temp.path().join("vendor/supplied"));
+        let resolved = executor.resolve_profile_package(&selector).unwrap();
+        assert_eq!(resolved.model().id, package.model().id);
     }
 
     #[test]
     fn test_resolve_profile_package_reports_a_supplied_location_holding_no_package() {
         let (temp, _storage, executor, _package) = fixture();
 
-        let error = executor
-            .resolve_profile_package(&fixture_id(), Some(&temp.path().join("vendor/absent")))
-            .unwrap_err();
+        let selector = ProfileSelector::path(temp.path().join("vendor/absent"));
+        let error = executor.resolve_profile_package(&selector).unwrap_err();
 
         assert!(
             matches!(

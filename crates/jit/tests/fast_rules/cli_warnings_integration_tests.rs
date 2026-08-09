@@ -40,7 +40,7 @@ fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, TestTaxonomy
     // application records the package's worktree-relative location.
     let location = jit::test_utils::stage_repository_packages(temp_dir.path(), "jit-dogfood");
     executor
-        .apply_profile("jit-dogfood", Some(&location))
+        .apply_profile(&[jit::commands::ProfileSelector::path(&location)])
         .unwrap();
     (temp_dir, executor, taxonomy)
 }

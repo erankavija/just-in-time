@@ -23,7 +23,7 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
     ProfileCommands, ProjectCommands,
 };
-use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelection};
+use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
@@ -897,6 +897,18 @@ fn invalid_argument(message: String, json: bool) -> anyhow::Error {
     jit::errors::InvalidArgumentError::new(message).into()
 }
 
+/// Parse the one ordered selector stream accepted by profile commands.
+fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileSelector>> {
+    values
+        .iter()
+        .map(|value| {
+            value
+                .parse::<ProfileSelector>()
+                .map_err(|error| invalid_argument(format!("{error}"), json))
+        })
+        .collect()
+}
+
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
 fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
@@ -910,7 +922,7 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
         return JsonError::new(ErrorCode::ProfileNotFound, error.to_string()).with_suggestion(
-            "Name the directory holding the package with --from, or run \
+            "Select a package with --profile path:DIR, or run \
              'jit profile list --json' to see the profiles this repository records",
         );
     }
@@ -2143,20 +2155,10 @@ fn run() -> Result<()> {
     let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout.clone());
 
     match &command {
-        Commands::Init {
-            profile,
-            from,
-            json,
-        } => {
+        Commands::Init { profile, json } => {
             let output_ctx = OutputContext::new(quiet, *json);
-
-            let profile_location = from.as_deref();
-            if let Some(id) = profile.as_deref() {
-                profile_result(
-                    executor.validate_profile_selection(id, profile_location),
-                    *json,
-                )?;
-            }
+            let selectors = parse_profile_selectors(profile, *json)?;
+            profile_result(executor.validate_profile_selection(&selectors), *json)?;
 
             // Every init and re-init — plain, profiled, or over an existing root —
             // publishes through the recovered session: `run_initialization` fills
@@ -2167,17 +2169,7 @@ fn run() -> Result<()> {
             // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
             // profiled init, closing the prior re-init gap.
             let init_result = profile_result(
-                if let Some(id) = profile.as_deref() {
-                    executor.initialize_profiled_repository(
-                        &current_dir,
-                        ProfileSelection {
-                            id,
-                            location: profile_location,
-                        },
-                    )
-                } else {
-                    executor.initialize_fresh_repository(&current_dir, None)
-                },
+                executor.initialize_fresh_repository(&current_dir, Some(&selectors)),
                 *json,
             )?;
             // Machine-local worktree identity (gitignored, not part of the
@@ -2295,8 +2287,22 @@ fn run() -> Result<()> {
                 }
                 Err(error) => return Err(error),
             },
-            ProfileCommands::Show { id, from, json } => {
-                match executor.show_profile(&id, from.as_deref()) {
+            ProfileCommands::Show { profile, json } => {
+                let selectors = parse_profile_selectors(&profile, json)?;
+                let selector = selectors.first().ok_or_else(|| {
+                    invalid_argument(
+                        "profile show requires one --profile id:ID or path:DIR selector"
+                            .to_string(),
+                        json,
+                    )
+                })?;
+                if selectors.len() > 1 {
+                    return Err(invalid_argument(
+                        "profile show accepts exactly one --profile selector".to_string(),
+                        json,
+                    ));
+                }
+                match executor.show_profile(selector) {
                     Ok(result) => {
                         if json {
                             let output = JsonOutput::success(&result);
@@ -2329,13 +2335,27 @@ fn run() -> Result<()> {
                 }
             }
             ProfileCommands::Apply {
-                id,
-                from,
+                profile,
                 dry_run,
                 json,
             } => {
+                let selectors = parse_profile_selectors(&profile, json)?;
+                if selectors.is_empty() {
+                    return Err(invalid_argument(
+                        "profile apply requires at least one --profile id:ID or path:DIR selector"
+                            .to_string(),
+                        json,
+                    ));
+                }
                 if dry_run {
-                    match executor.plan_profile(&id, from.as_deref()) {
+                    if selectors.len() > 1 {
+                        return Err(invalid_argument(
+                            "profile apply --dry-run accepts exactly one --profile selector"
+                                .to_string(),
+                            json,
+                        ));
+                    }
+                    match executor.plan_profile(&selectors[0]) {
                         Ok(plan) => {
                             if json {
                                 let output = JsonOutput::success(&plan);
@@ -2364,7 +2384,7 @@ fn run() -> Result<()> {
                         Err(error) => return Err(error),
                     }
                 } else {
-                    match executor.apply_profile(&id, from.as_deref()) {
+                    match executor.apply_profile(&selectors) {
                         Ok(applied) => {
                             if json {
                                 let output = JsonOutput::success(&applied);

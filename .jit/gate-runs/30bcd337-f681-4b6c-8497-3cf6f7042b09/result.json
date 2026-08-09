@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-eac6ec13",
+  "by": "auto:executor",
+  "command": "cd mcp-server && npm test",
+  "commit": "2b550db95971e92c03fae62fc20a729f464c9125",
+  "completed_at": "2026-08-09T04:54:27.492673943Z",
+  "duration_ms": 341,
+  "exit_code": 1,
+  "gate_key": "mcp-ci",
+  "inputs_digest": "d80669ba02624b2ede457a7b64337319a0932b0b7e3f52c7130e48b87b1c772d",
+  "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "30bcd337-f681-4b6c-8497-3cf6f7042b09",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T04:54:27.151051365Z",
+  "status": "failed",
+  "stderr": "npm notice run @erankavija/jit-mcp-server@1.0.0 test\nnpm notice run node test-unit.js && node test-integration.js\nError: Refusing to run gate 'mcp-ci' for issue eac6ec13-2c8b-4249-9ed4-372416bca255: this jit binary predates the tree under review\n\nPossible causes:\n  • This jit binary was built from commit 5aea748054c08bd95ad273b2cf2ccaa6ad1764f6, but the repository's current HEAD is 2b550db95971e92c03fae62fc20a729f464c9125\n  • A gate verdict produced by a stale binary is not evidence about the change under review\n\nTo fix:\n  • Rebuild and reinstall with build provenance: scripts/install-jit.sh (wraps cargo install --path crates/jit)\n  • Verify with: jit --version (should show commit 5aea748054c08bd95ad273b2cf2ccaa6ad1764f6)\n\nnode:internal/errors:999\n  const err = new Error(message);\n              ^\n\nError: Command failed: jit --schema\nError: Refusing to run gate 'mcp-ci' for issue eac6ec13-2c8b-4249-9ed4-372416bca255: this jit binary predates the tree under review\n\nPossible causes:\n  • This jit binary was built from commit 5aea748054c08bd95ad273b2cf2ccaa6ad1764f6, but the repository's current HEAD is 2b550db95971e92c03fae62fc20a729f464c9125\n  • A gate verdict produced by a stale binary is not evidence about the change under review\n\nTo fix:\n  • Rebuild and reinstall with build provenance: scripts/install-jit.sh (wraps cargo install --path crates/jit)\n  • Verify with: jit --version (should show commit 5aea748054c08bd95ad273b2cf2ccaa6ad1764f6)\n\n\n    at genericNodeError (node:internal/errors:999:15)\n    at wrappedFn (node:internal/errors:544:14)\n    at checkExecSyncError (node:child_process:942:11)\n    at execFileSync (node:child_process:978:15)\n    at file:///home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-eac6ec13/mcp-server/test-unit.js:18:31\n    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)\n    at async node:internal/modules/esm/loader:650:26\n    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {\n  status: 10,\n  signal: null,\n  output: [\n    null,\n    Buffer(0) [Uint8Array] [],\n    Buffer(627) [Uint8Array] [\n       69, 114, 114, 111, 114,  58,  32,  82, 101, 102, 117, 115,\n      105, 110, 103,  32, 116, 111,  32, 114, 117, 110,  32, 103,\n       97, 116, 101,  32,  39, 109,  99, 112,  45,  99, 105,  39,\n       32, 102, 111, 114,  32, 105, 115, 115, 117, 101,  32, 101,\n       97,  99,  54, 101,  99,  49,  51,  45,  50,  99,  56,  98,\n       45,  52,  50,  52,  57,  45,  57, 101, 100,  52,  45,  51,\n       55,  50,  52,  49,  54,  98,  99,  97,  50,  53,  53,  58,\n       32, 116, 104, 105, 115,  32, 106, 105, 116,  32,  98, 105,\n      110,  97, 114, 121,\n      ... 527 more items\n    ]\n  ],\n  pid: 1556891,\n  stdout: Buffer(0) [Uint8Array] [],\n  stderr: Buffer(627) [Uint8Array] [\n     69, 114, 114, 111, 114,  58,  32,  82, 101, 102, 117, 115,\n    105, 110, 103,  32, 116, 111,  32, 114, 117, 110,  32, 103,\n     97, 116, 101,  32,  39, 109,  99, 112,  45,  99, 105,  39,\n     32, 102, 111, 114,  32, 105, 115, 115, 117, 101,  32, 101,\n     97,  99,  54, 101,  99,  49,  51,  45,  50,  99,  56,  98,\n     45,  52,  50,  52,  57,  45,  57, 101, 100,  52,  45,  51,\n     55,  50,  52,  49,  54,  98,  99,  97,  50,  53,  53,  58,\n     32, 116, 104, 105, 115,  32, 106, 105, 116,  32,  98, 105,\n    110,  97, 114, 121,\n    ... 527 more items\n  ]\n}\n\nNode.js v26.7.0\n",
+  "stdout": "",
+  "tree_dirty": true
+}

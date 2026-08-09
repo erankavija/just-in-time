@@ -240,17 +240,11 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     // the end differ only in how the profile got there.
     let fresh_location = crate::repository_package_at(&fresh.path, "jit-dogfood");
     let existing_location = crate::repository_package_at(&existing.path, "jit-dogfood");
+    let fresh_selector = format!("path:{fresh_location}");
     assert_eq!(fresh_location, existing_location);
     let fresh_init = success_json(
         &fresh.path,
-        &[
-            "init",
-            "--profile",
-            "jit-dogfood",
-            "--from",
-            &fresh_location,
-            "--json",
-        ],
+        &["init", "--profile", &fresh_selector, "--json"],
     );
     assert_eq!(
         requested_profile(&fresh_init["profile"])["status"],
@@ -260,14 +254,15 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     success_json(&existing.path, &["init", "--json"]);
     // A preview is derived over one package, so the self-contained one is what
     // a repository declaring nothing can be shown. It writes nothing.
+    let existing_default_location = crate::repository_package_at(&existing.path, "jit-default");
+    let existing_default_selector = format!("path:{existing_default_location}");
     let preview = success_json(
         &existing.path,
         &[
             "profile",
             "apply",
-            "jit-default",
-            "--from",
-            &crate::repository_package_at(&existing.path, "jit-default"),
+            "--profile",
+            &existing_default_selector,
             "--dry-run",
             "--json",
         ],
@@ -280,16 +275,22 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
         &[
             "profile",
             "apply",
-            "jit-dogfood",
-            "--from",
-            &existing_location,
+            "--profile",
+            &format!("path:{existing_location}"),
             "--json",
         ],
     );
     assert_eq!(requested_profile(&applied)["status"], "applied");
     let no_op = success_json(
         &existing.path,
-        &["profile", "apply", "jit-dogfood", "--dry-run", "--json"],
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            "id:jit-dogfood",
+            "--dry-run",
+            "--json",
+        ],
     );
     assert_eq!(no_op["status"], "unchanged");
     assert_eq!(
@@ -365,9 +366,8 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
         &[
             "profile",
             "apply",
-            "workflow",
-            "--from",
-            "packages/workflow",
+            "--profile",
+            "path:packages/workflow",
             "--json",
         ],
     );
@@ -394,9 +394,8 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
         &[
             "profile",
             "apply",
-            "workflow",
-            "--from",
-            "packages/workflow",
+            "--profile",
+            "path:packages/workflow",
             "--json",
         ],
     );
@@ -432,17 +431,8 @@ fn test_validate_repairs_a_profile_applied_from_a_directory() {
         .expect("the fixture package declares one asset");
     let asset = fs::read_to_string(directory.join(&declared.source)).expect("read package asset");
 
-    success_json(
-        &repo.path,
-        &[
-            "init",
-            "--profile",
-            package.id.as_str(),
-            "--from",
-            LOCATION,
-            "--json",
-        ],
-    );
+    let selector = format!("path:{LOCATION}");
+    success_json(&repo.path, &["init", "--profile", &selector, "--json"]);
 
     assert_eq!(
         success_json(&repo.path, &["validate", "--json"])["valid"],
@@ -481,14 +471,7 @@ fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
 
     let failure = failed_json_with_path(
         &repo.path,
-        &[
-            "init",
-            "--profile",
-            "workflow",
-            "--from",
-            "packages/workflow",
-            "--json",
-        ],
+        &["init", "--profile", "path:packages/workflow", "--json"],
         1,
         None,
     );
@@ -521,9 +504,8 @@ fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
         &[
             "profile",
             "apply",
-            "workflow",
-            "--from",
-            "packages/workflow",
+            "--profile",
+            "path:packages/workflow",
             "--json",
         ],
         1,
@@ -546,16 +528,11 @@ fn test_profile_application_contributes_workflow_invariants_to_scaffolded_regist
     let repo = TestRepo::new();
 
     success_json(&repo.path, &["init", "--json"]);
+    let dogfood_location = crate::repository_package_at(&repo.path, "jit-dogfood");
+    let dogfood_selector = format!("path:{dogfood_location}");
     let applied = success_json(
         &repo.path,
-        &[
-            "profile",
-            "apply",
-            "jit-dogfood",
-            "--from",
-            &crate::repository_package_at(&repo.path, "jit-dogfood"),
-            "--json",
-        ],
+        &["profile", "apply", "--profile", &dogfood_selector, "--json"],
     );
     assert_eq!(requested_profile(&applied)["status"], "applied");
     assert_eq!(
@@ -585,16 +562,11 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let repo = TestRepo::new();
     let checker_path = checker_path_without_jq();
     let path = Some(checker_path.value.as_path());
+    let dogfood_location = crate::repository_package_at(&repo.path, "jit-dogfood");
+    let dogfood_selector = format!("path:{dogfood_location}");
     success_json_with_path(
         &repo.path,
-        &[
-            "init",
-            "--profile",
-            "jit-dogfood",
-            "--from",
-            &crate::repository_package_at(&repo.path, "jit-dogfood"),
-            "--json",
-        ],
+        &["init", "--profile", &dogfood_selector, "--json"],
         path,
     );
     assert!(!repo.path.join(".git").exists());
@@ -823,7 +795,7 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
             .iter()
             .map(|argument| argument["name"].as_str().unwrap().to_string())
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["id"])
+        expected_keys(&[])
     );
     assert_eq!(
         commands["apply"]["flags"]
@@ -832,7 +804,7 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
             .iter()
             .map(|flag| flag["name"].as_str().unwrap().to_string())
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["dry-run", "from", "json"])
+        expected_keys(&["dry-run", "json", "profile"])
     );
 
     let list_schema = &commands["list"]["output"]["success_schema"];

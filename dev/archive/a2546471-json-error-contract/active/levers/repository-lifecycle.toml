@@ -3,9 +3,9 @@ namespace = "repository-lifecycle"
 
 [[arms]]
 path = "init"
-argv = ["init", "--profile", "no-such-profile", "--json"]
+argv = ["init", "--profile", "id:no-such-profile", "--json"]
 setup = ["init", "no-profile:no-such-profile"]
-expected_failure = "Profile lookup reports that the requested embedded profile is absent."
+expected_failure = "Profile lookup reports that no location and no record supplies the requested profile."
 expected_code = "PROFILE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"

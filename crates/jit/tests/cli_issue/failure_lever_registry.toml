@@ -673,7 +673,7 @@ confirmation = "invoked"
 
 [[arms]]
 path = "profile show"
-argv = ["profile", "show", "absent-profile", "--json"]
+argv = ["profile", "show", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]
 expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
 expected_code = "PROFILE_NOT_FOUND"
@@ -682,7 +682,7 @@ confirmation = "invoked"
 
 [[arms]]
 path = "profile apply"
-argv = ["profile", "apply", "absent-profile", "--json"]
+argv = ["profile", "apply", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]
 expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
 expected_code = "PROFILE_NOT_FOUND"
@@ -810,7 +810,7 @@ confirmation = "invoked"
 
 [[arms]]
 path = "init"
-argv = ["init", "--profile", "no-such-profile", "--json"]
+argv = ["init", "--profile", "id:no-such-profile", "--json"]
 setup = ["init", "no-profile:no-such-profile"]
 expected_failure = "Profile lookup reports that no location and no record supplies the requested profile."
 expected_code = "PROFILE_NOT_FOUND"

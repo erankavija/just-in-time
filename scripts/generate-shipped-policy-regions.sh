@@ -95,7 +95,7 @@ region="shipped-documentation-policy"
 package="jit-default"
 package_source="profiles/$package"
 # Where the package is placed inside the throwaway repository, worktree-relative
-# because that is the form `--from` records.
+# because that is the form a `path:` selector and applied record use.
 package_location="packages/$package"
 
 # --- provenance: establish currency, or refuse -------------------------------
@@ -139,8 +139,8 @@ cp -R "$root/$package_source/." "$tmp/scaffold/$package_location/" ||
 # directory, and `JIT_GATE_RUN` so the throwaway directory — which is no
 # repository — never becomes the subject of a currency verdict.
 (cd "$tmp/scaffold" &&
-  env -u JIT_DATA_DIR -u JIT_GATE_RUN jit init --profile "$package" --from "$package_location" --quiet) >/dev/null 2>&1 ||
-  die "'jit init --profile $package' failed in the throwaway repository"
+  env -u JIT_DATA_DIR -u JIT_GATE_RUN jit init --profile "path:$package_location" --quiet) >/dev/null 2>&1 ||
+  die "'jit init --profile path:$package_location' failed in the throwaway repository"
 
 scaffold_config="$tmp/scaffold/.jit/config.toml"
 [ -f "$scaffold_config" ] || die "'jit init' wrote no $scaffold_config"

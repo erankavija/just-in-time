@@ -43,14 +43,7 @@ fn profiled_repo() -> TempDir {
         .to_string_lossy();
     let output = run(
         repo.path(),
-        &[
-            "init",
-            "--profile",
-            "jit-dogfood",
-            "--from",
-            &location,
-            "--json",
-        ],
+        &["init", "--profile", &format!("path:{location}"), "--json"],
     );
     assert!(
         output.status.success(),

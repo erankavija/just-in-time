@@ -1,6 +1,6 @@
 //! Command-line interface definitions using clap.
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 
 use crate::build_info;
 
@@ -41,13 +41,14 @@ pub enum Commands {
     /// Initialize through one recoverable publication; an absent data root is
     /// staged complete and published without replacing an occupied destination
     Init {
-        /// Apply a profile during initialization
-        #[arg(long)]
-        profile: Option<String>,
-
-        /// Repository directory holding the profile's package
-        #[arg(long, value_name = "PATH", requires = "profile")]
-        from: Option<std::path::PathBuf>,
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append
+        )]
+        profile: Vec<String>,
 
         #[arg(long)]
         json: bool,
@@ -2940,13 +2941,15 @@ pub enum ProfileCommands {
 
     /// Show one profile manifest and package identity from a repository package
     Show {
-        /// Stable profile ID
-        id: String,
-
-        /// Repository directory holding the package, instead of the location
-        /// this repository's record names
-        #[arg(long, value_name = "PATH")]
-        from: Option<std::path::PathBuf>,
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append,
+            required = true
+        )]
+        profile: Vec<String>,
 
         /// Output as JSON
         #[arg(long)]
@@ -2955,13 +2958,15 @@ pub enum ProfileCommands {
 
     /// Apply a profile package read from a repository location through one recoverable multi-target transaction
     Apply {
-        /// Stable profile ID
-        id: String,
-
-        /// Repository directory holding the package, instead of the location
-        /// this repository's record names
-        #[arg(long, value_name = "PATH")]
-        from: Option<std::path::PathBuf>,
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append,
+            required = true
+        )]
+        profile: Vec<String>,
 
         /// Build and validate the exact application plan without writing
         #[arg(long)]
@@ -3651,8 +3656,7 @@ mod recovery_dispatch_tests {
     #[test]
     fn test_representative_writer_and_reader_classification() {
         assert!(Commands::Init {
-            profile: None,
-            from: None,
+            profile: Vec::new(),
             json: false,
         }
         .requires_recovery_dispatch());
