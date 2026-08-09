@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T16:31:04.263538952Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-09T16:34:55.361464359Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Compose contributions by semantic identity with shared ownership",
-  "updated_at": "2026-08-09T14:23:39.671188377Z"
+  "updated_at": "2026-08-09T16:34:55.361464359Z"
 }
