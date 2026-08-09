@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-fc47a7bf",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7e7103f992e3fa24728e8febe42cf0311b6b30c0",
+  "completed_at": "2026-08-09T14:05:49.043547448Z",
+  "duration_ms": 283541,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Issue-scoped review found no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6f555c77-9ac9-4fff-ab80-497986811d9e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T14:01:05.501784596Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a8edf709, 6b51f0be, aae26ba5, 5a8bfaa6, 836db37e, 573e6474, 920a23fa, 7e7103f9\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/c639cfb5/requirement/REQ-04 and REQ-11 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json)\nGate evidence: cargo-ci passed, exit 0, 2026-08-09T13:51:23Z\nTruncation recovery: recovered bounded per-commit/path patches and current source/test reads after truncated aggregate output\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-scoped review found no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T14:00:24.638108245Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-09T14:05:49.334308081Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
   "labels": [
     "type:task",
@@ -29,5 +40,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Resolve declared non-secret variables into package content",
-  "updated_at": "2026-08-09T10:50:55.211882337Z"
+  "updated_at": "2026-08-09T14:05:49.334308081Z"
 }
