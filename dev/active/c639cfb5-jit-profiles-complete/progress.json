@@ -141,8 +141,8 @@
     {
       "category": "rework-exceeded-max-attempts",
       "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
-      "status": "open",
-      "summary": "After two substantive rework rounds produced a fully tested final commit, the lead Tier 2.5 sweep found one remaining stale neighbouring phrase at docs/reference/storage-format.md:67 ('minimal provenance record'). Invoker guidance is required before one further targeted correction."
+      "status": "resolved",
+      "summary": "After two substantive rework rounds produced a fully tested final commit, the lead Tier 2.5 sweep found one remaining stale neighbouring phrase at docs/reference/storage-format.md:67 ('minimal provenance record'). The invoker selected option 1 and authorized one narrowly targeted Luna xhigh retry."
     }
   ],
   "rework_counts": {
