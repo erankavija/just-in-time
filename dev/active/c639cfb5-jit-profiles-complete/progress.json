@@ -131,11 +131,17 @@
       "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
       "status": "resolved",
       "summary": "The invoker authorized a targeted retry and reset the counter with explicit guidance that profile apply dry-run is part of the repeatable ordered-selector contract."
+    },
+    {
+      "category": "session-handoff-on-review-failure",
+      "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+      "status": "handed_off",
+      "summary": "The authorized retry passed cargo-ci and mcp-ci at product commit 46fc9427, but the lead stale-consumer audit found the release smoke workflow still reading the superseded top-level dry-run status; the configured review invocation also failed because its narrowed PATH omitted codex. Per invoker instruction, implementation stopped and session 2 handed off without another repair."
     }
   ],
   "rework_counts": {
     "f2ef652a": 2,
-    "eac6ec13": 0
+    "eac6ec13": 1
   },
   "started_at": "2026-08-09T04:36:58+03:00"
 }
