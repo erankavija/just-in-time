@@ -8,6 +8,7 @@
   ],
   "description": "Decide contribution conflicts by comparing resolved definitions and recording who\nowns each one, so two packages contributing the same definition coexist and a\npackage no longer collides with itself.\n\n## Background\n\nMerging compares a candidate contribution against the live registry value and\nfails whenever they differ, and occupancy is resolved per file from the applied\nrecords without excluding the candidate package. A package that changed one\ncontribution therefore reports a conflict against its own prior record.\n\n## Success Criteria\n\n- [hard] REQ-01: Two packages contributing a structurally equal resolved definition compose successfully and the result records both as owners in a stable order.\n- [hard] REQ-02: Two packages contributing different definitions for one identity conflict, and selector order does not decide a winner.\n- [hard] REQ-03: Ownership is resolved per contribution identity rather than per file, and a package re-contributing an identity it already owns is not reported as conflicting with itself.\n- [hard] REQ-04: A conflict names the contributing packages and the semantic identity, and distinguishes a package-owned identity from one the repository owns with no package behind it.\n",
   "documents": [],
+  "done_at": "2026-08-09T17:57:32.170880124Z",
   "first_ready_at": "2026-08-09T14:20:36.806465269Z",
   "gates_required": [
     "cargo-ci",
@@ -16,7 +17,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-09T17:40:13.328293638Z",
+      "updated_at": "2026-08-09T17:56:01.756104116Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -37,7 +38,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Compose contributions by semantic identity with shared ownership",
-  "updated_at": "2026-08-09T17:43:25.275218675Z"
+  "updated_at": "2026-08-09T17:57:32.170880124Z"
 }

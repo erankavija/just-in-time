@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -31,7 +31,7 @@
     {
       "wave_number": 5,
       "issues": [
-        {"id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226", "short_id": "cbcd9318", "title": "Compose contributions by semantic identity with shared ownership", "classification": "implementation", "status": "in_progress"}
+        {"id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226", "short_id": "cbcd9318", "title": "Compose contributions by semantic identity with shared ownership", "classification": "implementation", "status": "done"}
       ]
     },
     {
@@ -294,6 +294,69 @@
       "deferred_items_audit": "no linked documents",
       "holistic_review": "initialization and the public package-closure application path also remain sequential without whole-selection contribution preflight",
       "reviewed_at": "2026-08-09T16:26:00Z"
+    },
+    {
+      "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
+      "reviewed_commit": "a7746277",
+      "evidence_commit": "5d1ee848",
+      "merged_commit": "c8d8d99b1c69fd4ef448af6bc1979621fe8c7689",
+      "verdict": "pass",
+      "gate_status": {"cargo-ci": "passed", "code-review": "passed"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "F1",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/initialize.rs:837"
+        },
+        {
+          "round": 1,
+          "id": "lead-F2",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:77"
+        },
+        {
+          "round": 2,
+          "id": "lead-selector-order",
+          "status": "closed",
+          "evidence": "crates/jit/src/commands/profile.rs:630"
+        },
+        {
+          "round": 2,
+          "id": "lead-record-convergence",
+          "status": "closed",
+          "evidence": "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs:351"
+        },
+        {
+          "round": 2,
+          "id": "lead-declaration-order",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:326"
+        },
+        {
+          "round": 2,
+          "id": "lead-panic-sites",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:347"
+        },
+        {
+          "round": 3,
+          "id": "F1",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:760"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "met: equal definitions record all sorted owners on the first ordinary, closure, and initialization operation",
+        "REQ-02": "met: differing definitions preflight as an order-independent conflict before publication",
+        "REQ-03": "met: composition and replacement operate per semantic identity without self-conflict",
+        "REQ-04": "met: conflicts identify packages, semantic identity, and repository ownership"
+      },
+      "stale_narrative_sweep": "zero actionable stale product assertions; active research matches are historical option analysis",
+      "deferred_items_audit": "no linked documents",
+      "holistic_review": "ordinary repeatable-selector apply, public dependency-closure apply, and profiled initialization share the same scoped ownership context without pulling forward Wave 7's aggregate transaction",
+      "post_merge_validation": "exact merged-main cargo-ci passed in gate run 2fd99ed6-b428-4428-8e7c-57e43c2367f9; MCP server 64 unit and 13 integration tests passed",
+      "reviewed_at": "2026-08-09T17:58:15Z"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00"

@@ -7,6 +7,7 @@
   ],
   "description": "Extend the applied profile record from package-level hashes to per-target and\nper-identity ownership claims with the base each claim was published from.\n\n## Background\n\nThe record states a package hash and a flat map of target hashes. Nothing records\nwhich contribution identity a package owns, what the content looked like when the\npackage published it, or that a target is repository-owned and must survive. A\nthree-way decision has no base to compare against without that.\n\n## Success Criteria\n\n- [hard] REQ-01: The record states origin, profile version, compatible-jit range, package identity, resolved non-secret inputs, and sorted per-target and per-identity ownership claims, each carrying the base fingerprint it was published from.\n- [hard] REQ-02: A claim can mark content as retained when no package owns it, so repository content that no package contributed survives a later application.\n- [hard] REQ-03: A record in the shipped format is read once, converted into the current format, and written back in the same transaction as the operation that encountered it; ordinary reads accept only the current format.\n- [hard] REQ-04: Records remain provenance: no configured behavior is served from a record, and effective configuration continues to load from the declared registries.\n",
   "documents": [],
+  "first_ready_at": "2026-08-09T17:57:42.619181193Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Carry ownership claims in the applied profile record",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-09T17:57:42.619181193Z"
 }
