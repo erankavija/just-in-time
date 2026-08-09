@@ -6,7 +6,7 @@
     {
       "wave_number": 1,
       "issues": [
-        {"id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6", "short_id": "f2ef652a", "title": "Normalize both package manifest versions into one canonical model", "classification": "implementation", "status": "pending"}
+        {"id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6", "short_id": "f2ef652a", "title": "Normalize both package manifest versions into one canonical model", "classification": "implementation", "status": "in_progress"}
       ]
     },
     {
@@ -123,10 +123,12 @@
     {
       "category": "blocker-outside-epic-and-shared-infrastructure",
       "issue_id": "45cd8529-32f2-4695-888f-2cad3e73197d",
-      "status": "awaiting-invoker",
-      "summary": "Uncommitted work for separate v1.0 validation issue 45cd8529 overlaps the profile implementation footprint and prevents clean direct-main integration."
+      "status": "mitigated",
+      "summary": "The separate v1.0 validation implementation is committed and merged into the isolated Wave 1 candidate; final direct-main integration waits only for its lead-owned JIT gate state to be committed."
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "f2ef652a": 1
+  },
   "started_at": "2026-08-09T04:36:58+03:00"
 }
