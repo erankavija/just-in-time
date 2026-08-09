@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-f2ef652a",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "ddc01e62ee9a135447cde2d1da7d7674d3dc8747",
+  "completed_at": "2026-08-09T02:31:07.392653606Z",
+  "duration_ms": 588843,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "174d24ec2ee23592bd3a1f87ab9b2a1715dfa079b69cf0b7d18b532d319f821f",
+  "issue_id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bbbd7656-21e4-4549-bae4-21274949ef07",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T02:21:18.549386806Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest template_apply_tests::test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_registry_key ... FAILED\ntest result: FAILED. 209 passed; 1 failed; 6 ignored; 0 measured; 0 filtered out; finished in 13.55s\n---- template_apply_tests::test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_registry_key stdout ----\n\nthread 'template_apply_tests::test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_registry_key' (809913) panicked at crates/jit/tests/fast_docs_templates/template_apply_tests.rs:963:10:\ncalled `Result::unwrap()` on an `Err` value: Lock timeout: could not acquire exclusive lock on /home/vkaskivuo/.cache/jit-cargo-ci-tmp/.jit-bootstrap.lock after 5s\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1520 bytes=28598029)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1441714528/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": true
+}
