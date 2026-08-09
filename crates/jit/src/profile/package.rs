@@ -1,4 +1,4 @@
-use super::manifest::{is_lowercase_kebab, ProfilePackageModel, MANIFEST_FILE_NAME};
+use super::manifest::{ProfilePackageModel, MANIFEST_FILE_NAME};
 use super::variables::{validate_body_references, validate_model_references, VariableError};
 use super::wire::ManifestWireError;
 use crate::domain::repository_inputs::is_safe_relative_path;
@@ -688,11 +688,6 @@ fn validate_manifest_declarations(
     for region in &manifest.regions {
         validate_relative_path("region source", &region.source)?;
         validate_relative_path("region target", &region.target)?;
-        if !is_lowercase_kebab(&region.region_id) {
-            return Err(ProfilePackageError::InvalidRegionId(
-                region.region_id.clone(),
-            ));
-        }
     }
     // Collecting the sources is what rejects one declared twice.
     declared_sources(manifest)?;

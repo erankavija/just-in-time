@@ -23,11 +23,30 @@ use super::{
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
 use crate::domain::ProfileOrigin;
-use crate::profile::ResolvedVariables;
+use crate::profile::{RegionId, ResolvedVariables};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use sha2::{Digest, Sha256};
 use toml_edit::{Array, ArrayOfTables, DocumentMut, InlineTable, Item, Table, Value};
+
+#[path = "shipped_v1_record.rs"]
+mod shipped_v1_record;
+
+pub(crate) use shipped_v1_record::{
+    is_shipped_v1_candidate, migrate_shipped_v1_record, shipped_v1_migration_paths,
+    ShippedV1MigrationError,
+};
+
+#[cfg(test)]
+pub(crate) fn reset_shipped_v1_conversion_count() {
+    shipped_v1_record::reset_exact_conversion_count();
+}
+
+#[cfg(test)]
+pub(crate) fn shipped_v1_conversion_count() -> usize {
+    shipped_v1_record::exact_conversion_count()
+}
 
 /// A semantic contribution to one JIT registry.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -229,28 +248,6 @@ pub struct ComposedContribution {
     pub definition: Contribution,
     /// Every package owning `definition`, sorted by package identity.
     pub owners: Vec<ProfilePackageId>,
-}
-
-/// One composed semantic definition retained in installed-profile provenance.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct AppliedProfileContribution {
-    /// Canonical semantic identity of the retained definition.
-    pub identity: ContributionIdentity,
-    /// Fully resolved definition rendered into the registry.
-    pub definition: Contribution,
-    /// Every package sharing ownership, in stable package-id order.
-    pub owners: Vec<ProfilePackageId>,
-}
-
-impl From<ComposedContribution> for AppliedProfileContribution {
-    fn from(contribution: ComposedContribution) -> Self {
-        Self {
-            identity: contribution.identity,
-            definition: contribution.definition,
-            owners: contribution.owners,
-        }
-    }
 }
 
 /// Origin of one differing definition in a semantic contribution conflict.
@@ -569,7 +566,7 @@ pub struct ProfileAssetClaim {
 #[derive(Clone)]
 pub struct ProfileRegionClaim {
     pub claim: TargetClaim,
-    pub region_id: String,
+    pub region_id: RegionId,
     pub content: Vec<u8>,
 }
 
@@ -685,60 +682,333 @@ impl Contribution {
     }
 }
 
+/// The sole installed-profile provenance wire version accepted by ordinary
+/// readers. The five-field shipped v1 image is intentionally *not* accepted by
+/// this type; it is decoded only by the dedicated one-way migration boundary.
+pub const APPLIED_PROFILE_RECORD_VERSION: u8 = 2;
+
+/// A domain-separated SHA-256 fingerprint of one profile-owned base value.
+///
+/// The string representation is deliberately constrained at deserialization so
+/// a record can never claim a digest this implementation could not have
+/// produced. The domain is part of every preimage; semantic declarations,
+/// static files, and managed regions therefore cannot collide merely because
+/// their raw bytes happen to be equal.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
+#[serde(transparent)]
+#[schemars(with = "String")]
+pub struct ProfileBaseFingerprint(String);
+
+impl ProfileBaseFingerprint {
+    /// Borrow the canonical lowercase hexadecimal digest.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    fn from_digest(digest: impl Into<String>) -> Result<Self, String> {
+        let digest = digest.into();
+        if digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            Ok(Self(digest))
+        } else {
+            Err("expected 64 lowercase hexadecimal characters".to_string())
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for ProfileBaseFingerprint {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Self::from_digest(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
+}
+
+/// The typed target component of an asset or managed-region ownership claim.
+///
+/// A virtual repository path cannot deserialize independently of a repository
+/// layout. This representation preserves its root discriminator and canonical
+/// root-relative path so records stay portable while avoiding an unqualified
+/// target string protocol.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct AppliedClaimTarget {
+    /// Selected repository root containing the target.
+    pub root: super::RepositoryRootClass,
+    /// Canonical path below `root`.
+    pub path: super::RootRelativePath,
+    /// Mode that is part of the published content identity.
+    pub mode: FileMode,
+}
+
+/// Typed target location of a managed-region identity. Unlike an asset, a
+/// region's mode belongs to its base fingerprint rather than its identity.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct AppliedManagedRegionTarget {
+    /// Selected repository root containing the managed region.
+    pub root: super::RepositoryRootClass,
+    /// Canonical path below `root`.
+    pub path: super::RootRelativePath,
+}
+
+impl AppliedManagedRegionTarget {
+    fn from_virtual_path(path: &VirtualPath) -> Self {
+        Self {
+            root: path.root_class(),
+            path: path.relative().clone(),
+        }
+    }
+}
+
+impl AppliedClaimTarget {
+    fn from_virtual_path(path: &VirtualPath, mode: FileMode) -> Self {
+        Self {
+            root: path.root_class(),
+            path: path.relative().clone(),
+            mode,
+        }
+    }
+}
+
+/// Canonical ownership identity for exactly one profile contribution.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum AppliedProfileClaimIdentity {
+    /// One semantic registry declaration. Its value is fingerprinted, never
+    /// embedded in provenance.
+    Semantic { identity: ContributionIdentity },
+    /// One exact package asset and its mode.
+    Asset { target: AppliedClaimTarget },
+    /// One managed region, distinguished from a whole-file asset by its region
+    /// identifier and fingerprinted over its source body and mode.
+    ManagedRegion {
+        target: AppliedManagedRegionTarget,
+        region_id: RegionId,
+    },
+}
+
+/// Provenance for one contribution a profile owns at its recorded base.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct AppliedProfileClaim {
+    /// Typed identity of the owned contribution.
+    pub identity: AppliedProfileClaimIdentity,
+    /// Domain-separated fingerprint of the contribution when it was published.
+    pub base_fingerprint: ProfileBaseFingerprint,
+    /// Preserve an adopted repository baseline if this becomes the last owner.
+    pub retain_if_unowned: bool,
+}
+
+impl AppliedProfileClaim {
+    fn semantic(
+        contribution: &Contribution,
+        retain_if_unowned: bool,
+    ) -> Result<Self, serde_json::Error> {
+        Ok(Self {
+            identity: AppliedProfileClaimIdentity::Semantic {
+                identity: contribution.semantic_identity(),
+            },
+            base_fingerprint: fingerprint_semantic_contribution(contribution)?,
+            retain_if_unowned,
+        })
+    }
+
+    fn asset(target: &VirtualPath, bytes: &[u8], mode: FileMode, retain_if_unowned: bool) -> Self {
+        Self {
+            identity: AppliedProfileClaimIdentity::Asset {
+                target: AppliedClaimTarget::from_virtual_path(target, mode),
+            },
+            base_fingerprint: fingerprint_bytes(
+                b"jit-profile-record-v2:asset\0",
+                &[bytes, &file_mode_bytes(mode)],
+            ),
+            retain_if_unowned,
+        }
+    }
+
+    fn managed_region(
+        target: &VirtualPath,
+        region_id: RegionId,
+        content: &[u8],
+        mode: FileMode,
+        retain_if_unowned: bool,
+    ) -> Self {
+        Self {
+            identity: AppliedProfileClaimIdentity::ManagedRegion {
+                target: AppliedManagedRegionTarget::from_virtual_path(target),
+                region_id: region_id.clone(),
+            },
+            base_fingerprint: fingerprint_bytes(
+                b"jit-profile-record-v2:managed-region\0",
+                &[
+                    region_id.as_str().as_bytes(),
+                    content,
+                    &file_mode_bytes(mode),
+                ],
+            ),
+            retain_if_unowned,
+        }
+    }
+}
+
+/// Fingerprint one resolved semantic contribution under the v2 semantic domain.
+pub fn fingerprint_semantic_contribution(
+    contribution: &Contribution,
+) -> Result<ProfileBaseFingerprint, serde_json::Error> {
+    canonical_json_bytes(contribution)
+        .map(|bytes| fingerprint_bytes(b"jit-profile-record-v2:semantic\0", &[bytes.as_slice()]))
+}
+
+fn fingerprint_bytes(domain: &[u8], fields: &[&[u8]]) -> ProfileBaseFingerprint {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    fields.iter().for_each(|field| {
+        hasher.update((field.len() as u64).to_be_bytes());
+        hasher.update(field);
+    });
+    // SHA-256 always produces this exact canonical spelling.
+    ProfileBaseFingerprint(format!("{:x}", hasher.finalize()))
+}
+
+fn file_mode_bytes(mode: FileMode) -> Vec<u8> {
+    match mode {
+        FileMode::Regular => b"regular".to_vec(),
+        FileMode::Executable => b"executable".to_vec(),
+    }
+}
+
+fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, serde_json::Error> {
+    serde_json::to_vec(&canonicalize_json(serde_json::to_value(value)?))
+}
+
+fn canonicalize_json(value: JsonValue) -> JsonValue {
+    match value {
+        JsonValue::Array(values) => {
+            JsonValue::Array(values.into_iter().map(canonicalize_json).collect())
+        }
+        JsonValue::Object(values) => JsonValue::Object(
+            values
+                .into_iter()
+                .map(|(key, value)| (key, canonicalize_json(value)))
+                .collect::<BTreeMap<_, _>>()
+                .into_iter()
+                .collect(),
+        ),
+        scalar => scalar,
+    }
+}
+
 /// Canonical repository-local provenance for one installed profile.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+///
+/// This record deliberately carries no registry definitions or effective
+/// configuration. Registry loaders remain the sole source of behavior; claims
+/// are only identities, historical fingerprints, and retention intent.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AppliedProfileRecord {
-    /// Stable profile identifier.
+    /// Explicit current wire discriminator. Only `2` is accepted here.
+    #[serde(deserialize_with = "deserialize_current_record_version")]
+    pub record_version: u8,
+    /// Stable package identity.
     pub id: String,
     /// Installed package version.
     pub version: String,
+    /// Compatible JIT range authored by the package manifest.
+    pub compatible_jit: String,
     /// Package discovery source.
     pub origin: ProfileOrigin,
     /// Digest of the complete package manifest and content.
     pub package_hash: String,
     /// Canonical public values and source kinds used to resolve this package.
     pub variables: ResolvedVariables,
-    /// Digests of every installed package target, keyed by repository-relative path.
-    pub target_hashes: BTreeMap<String, String>,
-    /// Resolved semantic declarations and every package sharing each definition.
-    pub contributions: Vec<AppliedProfileContribution>,
+    /// One sorted ownership claim for every semantic, asset, or managed-region
+    /// contribution this profile published.
+    #[serde(deserialize_with = "deserialize_applied_profile_claims")]
+    pub claims: BTreeSet<AppliedProfileClaim>,
+}
+
+fn deserialize_applied_profile_claims<'de, D>(
+    deserializer: D,
+) -> Result<BTreeSet<AppliedProfileClaim>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let claims = Vec::<AppliedProfileClaim>::deserialize(deserializer)?;
+    let identities = claims
+        .iter()
+        .map(|claim| claim.identity.clone())
+        .collect::<BTreeSet<_>>();
+    (identities.len() == claims.len())
+        .then(|| claims.into_iter().collect())
+        .ok_or_else(|| {
+            serde::de::Error::custom("applied profile record contains duplicate claim identities")
+        })
+}
+
+fn deserialize_current_record_version<'de, D>(deserializer: D) -> Result<u8, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let record_version = u8::deserialize(deserializer)?;
+    (record_version == APPLIED_PROFILE_RECORD_VERSION)
+        .then_some(record_version)
+        .ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "unsupported applied profile record_version {record_version}; expected {APPLIED_PROFILE_RECORD_VERSION}"
+            ))
+        })
 }
 
 impl AppliedProfileRecord {
-    /// Construct canonical installed-profile provenance from typed package metadata.
+    /// Construct the only current installed-profile provenance representation.
     pub fn new(
         id: impl Into<String>,
         version: impl Into<String>,
+        compatible_jit: impl Into<String>,
         origin: ProfileOrigin,
         package_hash: impl Into<String>,
         variables: ResolvedVariables,
-        target_hashes: BTreeMap<String, String>,
-        contributions: Vec<AppliedProfileContribution>,
+        claims: BTreeSet<AppliedProfileClaim>,
     ) -> Self {
         Self {
+            record_version: APPLIED_PROFILE_RECORD_VERSION,
             id: id.into(),
             version: version.into(),
+            compatible_jit: compatible_jit.into(),
             origin,
             package_hash: package_hash.into(),
             variables,
-            target_hashes,
-            contributions,
+            claims,
         }
     }
 
-    /// Whether the immutable package provenance agrees, excluding repository-wide
-    /// semantic ownership that is resolved at application time.
+    /// Whether immutable package provenance agrees, excluding mutable
+    /// contribution ownership and repository content.
     pub fn matches_package_provenance(&self, expected: &Self) -> bool {
-        self.id == expected.id
+        self.record_version == APPLIED_PROFILE_RECORD_VERSION
+            && self.id == expected.id
             && self.version == expected.version
+            && self.compatible_jit == expected.compatible_jit
             && self.origin == expected.origin
             && self.package_hash == expected.package_hash
             && self.variables == expected.variables
-            && self.target_hashes == expected.target_hashes
     }
 
-    /// Encode the stable installed-record image.
+    /// Encode the stable current record image. Claims remain in identity order
+    /// by construction because the record owns a `BTreeSet`.
     pub fn to_bytes(&self) -> Result<Vec<u8>, serde_json::Error> {
         let mut bytes = serde_json::to_vec_pretty(self)?;
         bytes.push(b'\n');
@@ -746,11 +1016,29 @@ impl AppliedProfileRecord {
     }
 }
 
+/// Verify that a persisted provenance record occupies the only canonical path
+/// for its package identity. Ownership readers call this before trusting claims.
+pub(crate) fn validate_applied_record_path(
+    path: &VirtualPath,
+    record: &AppliedProfileRecord,
+) -> Result<(), ProducerError> {
+    let expected = VirtualPath::data(format!("profiles/{}.json", record.id))?;
+    (path == &expected)
+        .then_some(())
+        .ok_or_else(|| ProducerError::ProfileRecordPathMismatch {
+            path: path.repository_relative(),
+            id: record.id.clone(),
+            expected: expected.repository_relative(),
+        })
+}
+
 /// Neutral profile package input consumed by the one materialization dispatcher.
 #[derive(Clone)]
 pub struct ProfileApplicationInput {
     pub id: String,
     pub version: String,
+    /// Compatible JIT range authored by this package's manifest.
+    pub compatible_jit: String,
     pub package_hash: String,
     /// Exact public values and source kinds that produced `claims`.
     pub variables: ResolvedVariables,
@@ -764,6 +1052,9 @@ pub struct ProfileApplicationInput {
     /// retain the same complete owner set without making unrelated package
     /// declarations part of this package's materialization.
     pub(crate) contribution_context: Vec<ProfileContributionClaim>,
+    /// Exact current-format rewrites produced by the sole shipped-v1 boundary.
+    /// They are provenance-only and are written with this application delta.
+    pub(crate) shipped_v1_migrations: BTreeMap<VirtualPath, AppliedProfileRecord>,
     pub record_path: VirtualPath,
 }
 
@@ -787,6 +1078,15 @@ impl ProfileApplicationInput {
         self
     }
 
+    /// Attach authenticated shipped-v1 rewrites to this mutating operation.
+    pub(crate) fn with_shipped_v1_migrations(
+        mut self,
+        migrations: BTreeMap<VirtualPath, AppliedProfileRecord>,
+    ) -> Self {
+        self.shipped_v1_migrations = migrations;
+        self
+    }
+
     /// Whether this package contributes either authored input of the coupled
     /// default-rule/schema materialization.
     ///
@@ -798,19 +1098,76 @@ impl ProfileApplicationInput {
             || self.target_hashes.contains_key(".jit/rules.toml")
     }
 
-    pub(crate) fn record(
+    pub(super) fn record(
         &self,
-        contributions: Vec<AppliedProfileContribution>,
-    ) -> AppliedProfileRecord {
-        AppliedProfileRecord::new(
+        composition: &ProfileTargetComposition,
+    ) -> Result<AppliedProfileRecord, serde_json::Error> {
+        let semantic = self
+            .claims
+            .contributions
+            .iter()
+            .map(|claim| {
+                let identity = AppliedProfileClaimIdentity::Semantic {
+                    identity: claim.contribution.semantic_identity(),
+                };
+                AppliedProfileClaim::semantic(
+                    &claim.contribution,
+                    composition.retained_claims.contains(&identity),
+                )
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let assets = self
+            .claims
+            .assets
+            .iter()
+            .map(|asset| {
+                let (bytes, mode) =
+                    composition
+                        .targets
+                        .get(asset.claim.target())
+                        .ok_or_else(|| {
+                            serde_json::Error::io(std::io::Error::other(
+                                "profile composition omitted a declared asset target",
+                            ))
+                        })?;
+                let identity = AppliedProfileClaimIdentity::Asset {
+                    target: AppliedClaimTarget::from_virtual_path(asset.claim.target(), *mode),
+                };
+                Ok(AppliedProfileClaim::asset(
+                    asset.claim.target(),
+                    bytes,
+                    *mode,
+                    composition.retained_claims.contains(&identity),
+                ))
+            })
+            .collect::<Result<BTreeSet<_>, serde_json::Error>>()?;
+        let regions = self.claims.regions.iter().map(|region| {
+            let mode = composition
+                .targets
+                .get(region.claim.target())
+                .map(|(_, mode)| *mode)
+                .unwrap_or(FileMode::Regular);
+            let identity = AppliedProfileClaimIdentity::ManagedRegion {
+                target: AppliedManagedRegionTarget::from_virtual_path(region.claim.target()),
+                region_id: region.region_id.clone(),
+            };
+            AppliedProfileClaim::managed_region(
+                region.claim.target(),
+                region.region_id.clone(),
+                &region.content,
+                mode,
+                composition.retained_claims.contains(&identity),
+            )
+        });
+        Ok(AppliedProfileRecord::new(
             self.id.clone(),
             self.version.clone(),
+            self.compatible_jit.clone(),
             self.origin.clone(),
             self.package_hash.clone(),
             self.variables.clone(),
-            self.target_hashes.clone(),
-            contributions,
-        )
+            semantic.into_iter().chain(assets).chain(regions).collect(),
+        ))
     }
 }
 
@@ -826,11 +1183,12 @@ pub(crate) fn profile_capture_closure(
     {
         return Ok(record_paths);
     }
-    let composed = compose_profile_contributions(base, &profile.contribution_context)?;
+    let composition_base = profile_composition_base(base, profile)?;
+    let composed = compose_profile_contributions(&composition_base, &profile.contribution_context)?;
     let composed = owned_composed_contributions(composed, &profile.claims.package_id);
-    let registries = render_composed_contributions(base, &composed)?;
+    let registries = render_composed_contributions(&composition_base, &composed)?;
     let proposed = apply_overlay(
-        base,
+        &composition_base,
         registries
             .into_iter()
             .map(|(path, (bytes, _))| (path, Some(bytes))),
@@ -852,11 +1210,72 @@ pub(crate) fn profile_capture_closure(
     Ok(closure.into_iter().collect())
 }
 
+pub(super) fn profile_composition_base(
+    base: &RepositoryImage,
+    profile: &ProfileApplicationInput,
+) -> Result<RepositoryImage, RepositoryStateError> {
+    profile_composition_base_from_migrations(base, &profile.shipped_v1_migrations)
+}
+
+fn profile_composition_base_from_migrations(
+    base: &RepositoryImage,
+    migrations: &BTreeMap<VirtualPath, AppliedProfileRecord>,
+) -> Result<RepositoryImage, RepositoryStateError> {
+    Ok(apply_overlay(
+        base,
+        migrations
+            .iter()
+            .map(|(path, record)| {
+                record
+                    .to_bytes()
+                    .map(|bytes| (path.clone(), Some(bytes)))
+                    .map_err(|error| ProducerError::ProfileRecordParse {
+                        path: path.repository_relative(),
+                        source: error,
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    )?)
+}
+
+/// Find records that only the named mutating shipped-v1 boundary may convert.
+/// Current records are deliberately decoded first; a malformed current record
+/// reaches the v1 decoder only while a lifecycle operation is already building
+/// one recoverable materialization transaction.
+pub(crate) fn migrate_shipped_v1_records(
+    base: &RepositoryImage,
+) -> Result<BTreeMap<VirtualPath, AppliedProfileRecord>, ShippedV1MigrationError> {
+    applied_profile_record_paths(base)
+        .map_err(|error| ShippedV1MigrationError::InvalidEvidence(error.to_string()))?
+        .into_iter()
+        .filter_map(|path| match base.entry(&path) {
+            Ok(RepositoryEntry::File { bytes, .. }) if is_shipped_v1_candidate(bytes) => {
+                Some(migrate_shipped_v1_record(bytes, base).and_then(|record| {
+                    let expected = VirtualPath::data(format!("profiles/{}.json", record.id))
+                        .map_err(|error| {
+                            ShippedV1MigrationError::InvalidEvidence(error.to_string())
+                        })?;
+                    (path == expected)
+                        .then_some((path.clone(), record.clone()))
+                        .ok_or_else(|| ShippedV1MigrationError::RecordPathMismatch {
+                            path: path.repository_relative(),
+                            id: record.id,
+                            expected: expected.repository_relative(),
+                        })
+                }))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Target bytes and semantic owner evidence derived by profile composition.
 #[derive(Debug)]
 pub(super) struct ProfileTargetComposition {
     pub targets: BTreeMap<VirtualPath, (Vec<u8>, FileMode)>,
-    pub contributions: Vec<AppliedProfileContribution>,
+    /// Claims whose matching captured content was repository-authored rather
+    /// than already claimed by a package.
+    pub retained_claims: BTreeSet<AppliedProfileClaimIdentity>,
 }
 
 /// Derive every profile-owned target's exact final bytes and mode from a captured
@@ -892,10 +1311,20 @@ pub(super) fn compose_profile_targets_with_context(
     claims: ProfileClaims,
     contribution_context: Vec<ProfileContributionClaim>,
 ) -> Result<ProfileTargetComposition, RepositoryStateError> {
+    let mut retained_claims = retained_semantic_claim_identities(base, &claims.contributions)?;
+    retained_claims.extend(retained_claim_identities_for_package(
+        base,
+        &claims.package_id,
+    )?);
     let composed = compose_profile_contributions(base, &contribution_context)?;
     let composed = owned_composed_contributions(composed, &claims.package_id);
     let mut targets = render_composed_contributions(base, &composed)?;
     let package_id = claims.package_id.clone();
+    let asset_paths = claims
+        .assets
+        .iter()
+        .map(|asset| asset.claim.target().clone())
+        .collect::<Vec<_>>();
     let projection_targets = configured_projection_targets(base, &targets)?;
     for asset in claims.assets {
         let path = asset.claim.target().clone();
@@ -919,20 +1348,39 @@ pub(super) fn compose_profile_targets_with_context(
     // Profile-owned regions compose over the captured base; a region target keeps
     // its captured file mode (a fresh target is Regular), matching the profile's
     // region-target mode contract.
-    let regions = claims.regions.into_iter().map(|region| {
+    let regions = claims.regions.iter().map(|region| {
         let path = region.claim.target().clone();
         let claim = ManagedDocumentClaim::Region {
             owner: region.claim.owner().to_string(),
-            region_id: region.region_id.clone(),
+            region_id: region.region_id.to_string(),
             begin: format!("<!-- jit:{}:begin -->", region.region_id).into_bytes(),
             end: format!("<!-- jit:{}:end -->", region.region_id).into_bytes(),
-            content: region.content,
+            content: region.content.clone(),
             placement: RegionPlacement::AppendIfAbsent,
         };
         (path, claim)
     });
     for (path, bytes) in compose_managed_documents(base, regions)? {
         let mode = existing_file_mode(base, &path)?;
+        if matches!(
+            base.entry(&path).map_err(ProducerError::from)?,
+            RepositoryEntry::File { bytes: existing, mode: existing_mode, .. }
+                if existing == &bytes && *existing_mode == mode
+        ) && matches!(
+            profile_conflict_occupant(base, &path)?,
+            ProfileConflictOccupant::Repository
+        ) {
+            claims
+                .regions
+                .iter()
+                .filter(|region| region.claim.target() == &path)
+                .for_each(|region| {
+                    retained_claims.insert(AppliedProfileClaimIdentity::ManagedRegion {
+                        target: AppliedManagedRegionTarget::from_virtual_path(&path),
+                        region_id: region.region_id.clone(),
+                    });
+                });
+        }
         targets.insert(path, (bytes, mode));
     }
 
@@ -975,9 +1423,30 @@ pub(super) fn compose_profile_targets_with_context(
             }
         }
     }
+
+    // An asset claim describes the bytes ultimately published. A projection may
+    // rewrite a declared asset target, so adoption is evaluated only after that
+    // final target image is known.
+    for path in asset_paths {
+        let Some((bytes, mode)) = targets.get(&path) else {
+            continue;
+        };
+        if matches!(
+            base.entry(&path).map_err(ProducerError::from)?,
+            RepositoryEntry::File { bytes: existing, mode: existing_mode, .. }
+                if existing == bytes && *existing_mode == *mode
+        ) && matches!(
+            profile_conflict_occupant(base, &path)?,
+            ProfileConflictOccupant::Repository
+        ) {
+            retained_claims.insert(AppliedProfileClaimIdentity::Asset {
+                target: AppliedClaimTarget::from_virtual_path(&path, *mode),
+            });
+        }
+    }
     Ok(ProfileTargetComposition {
         targets,
-        contributions: composed.into_iter().map(Into::into).collect(),
+        retained_claims,
     })
 }
 
@@ -990,10 +1459,28 @@ pub(crate) fn preflight_profile_contributions(
     base: &RepositoryImage,
     candidates: Vec<ProfileContributionClaim>,
 ) -> Result<(), RepositoryStateError> {
-    let existing = existing_contribution_claims(base, &candidates)?;
-    compose_resolved_contributions(existing, candidates)
-        .map(|_| ())
-        .map_err(Into::into)
+    compose_profile_contributions(base, &candidates).map(|_| ())
+}
+
+/// Preflight a mutating application while deferring the sole historical v1
+/// decoder to that application's held publication session. Candidate legacy
+/// records are excluded here only; their claims are authenticated and restored
+/// before the selected package can derive or publish a delta.
+pub(crate) fn preflight_profile_contributions_for_mutation(
+    base: &RepositoryImage,
+    candidates: Vec<ProfileContributionClaim>,
+) -> Result<(), RepositoryStateError> {
+    let legacy = applied_profile_record_paths(base)?
+        .into_iter()
+        .filter_map(|path| match base.entry(&path) {
+            Ok(RepositoryEntry::File { bytes, .. }) if is_shipped_v1_candidate(bytes) => {
+                Some((path, None))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let base = apply_overlay(base, legacy)?;
+    compose_profile_contributions(&base, &candidates).map(|_| ())
 }
 
 /// Return every registry path whose semantic definition contributes to this
@@ -1015,8 +1502,43 @@ fn compose_profile_contributions(
     base: &RepositoryImage,
     candidates: &[ProfileContributionClaim],
 ) -> Result<Vec<ComposedContribution>, RepositoryStateError> {
-    let existing = existing_contribution_claims(base, candidates)?;
-    compose_resolved_contributions(existing, candidates.iter().cloned()).map_err(Into::into)
+    let (recorded, repository) = existing_contribution_claims(base, candidates)?;
+    let mut composed = compose_resolved_contributions(repository, candidates.iter().cloned())?;
+    for contribution in &mut composed {
+        let expected = fingerprint_semantic_contribution(&contribution.definition)
+            .map_err(ProducerError::ProfileClaimFingerprint)?;
+        let owners = recorded
+            .iter()
+            .filter(|claim| claim.identity == contribution.identity)
+            .map(|claim| {
+                (claim.base_fingerprint == expected)
+                    .then(|| claim.package_id.clone())
+                    .ok_or_else(|| ContributionCompositionConflict {
+                        identity: contribution.identity.clone(),
+                        owners: contribution
+                            .owners
+                            .iter()
+                            .cloned()
+                            .map(ContributionConflictOwner::Package)
+                            .chain(std::iter::once(ContributionConflictOwner::Package(
+                                claim.package_id.clone(),
+                            )))
+                            .collect::<BTreeSet<_>>()
+                            .into_iter()
+                            .collect(),
+                    })
+            })
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        contribution.owners = contribution
+            .owners
+            .iter()
+            .cloned()
+            .chain(owners)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+    }
+    Ok(composed)
 }
 
 fn owned_composed_contributions(
@@ -1078,17 +1600,25 @@ fn applied_profile_record_paths(
         .collect()
 }
 
-/// Resolve recorded package ownership and repository-authored declarations for
-/// exactly the semantic identities a candidate contributes.
+/// One ownership fact read from an existing v2 record. It intentionally has no
+/// definition: the registry remains the authority for every effective value.
+struct RecordedSemanticClaim {
+    package_id: ProfilePackageId,
+    identity: ContributionIdentity,
+    base_fingerprint: ProfileBaseFingerprint,
+}
+
+/// Read only ownership facts from current records and registry definitions from
+/// the captured registries. No behavior is reconstructed from a record.
 fn existing_contribution_claims(
     base: &RepositoryImage,
     candidates: &[ProfileContributionClaim],
-) -> Result<Vec<ExistingContributionClaim>, RepositoryStateError> {
+) -> Result<(Vec<RecordedSemanticClaim>, Vec<ExistingContributionClaim>), RepositoryStateError> {
     let candidate_identities = candidates
         .iter()
         .map(|claim| claim.contribution.semantic_identity())
         .collect::<BTreeSet<_>>();
-    let package_claims = applied_profile_record_paths(base)?
+    let recorded = applied_profile_record_paths(base)?
         .into_iter()
         .map(|path| {
             let RepositoryEntry::File { bytes, .. } =
@@ -1102,19 +1632,21 @@ fn existing_contribution_claims(
                     source,
                 }
             })?;
+            validate_applied_record_path(&path, &record)?;
             Ok(record
-                .contributions
+                .claims
                 .into_iter()
-                .filter(|contribution| {
-                    candidate_identities.contains(&contribution.definition.semantic_identity())
-                })
-                .flat_map(|contribution| {
-                    contribution.owners.into_iter().map(move |package_id| {
-                        ExistingContributionClaim::Package(ProfileContributionClaim {
-                            package_id,
-                            contribution: contribution.definition.clone(),
+                .filter_map(|claim| match claim.identity {
+                    AppliedProfileClaimIdentity::Semantic { identity }
+                        if candidate_identities.contains(&identity) =>
+                    {
+                        Some(RecordedSemanticClaim {
+                            package_id: ProfilePackageId::new(record.id.clone()),
+                            identity,
+                            base_fingerprint: claim.base_fingerprint,
                         })
-                    })
+                    }
+                    _ => None,
                 })
                 .collect::<Vec<_>>())
         })
@@ -1122,27 +1654,82 @@ fn existing_contribution_claims(
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
-    let package_identities = package_claims
+    let owned_identities = recorded
         .iter()
-        .filter_map(|claim| match claim {
-            ExistingContributionClaim::Package(claim) => {
-                Some(claim.contribution.semantic_identity())
-            }
-            ExistingContributionClaim::Repository(_) => None,
-        })
+        .map(|claim| claim.identity.clone())
         .collect::<BTreeSet<_>>();
-    let repository_claims = candidates
+    let repository = candidates
         .iter()
-        .filter(|claim| !package_identities.contains(&claim.contribution.semantic_identity()))
+        .filter(|claim| !owned_identities.contains(&claim.contribution.semantic_identity()))
         .map(|claim| repository_definition(base, &claim.contribution))
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .flatten()
         .map(ExistingContributionClaim::Repository)
-        .collect::<Vec<_>>();
-    Ok(package_claims
+        .collect();
+    Ok((recorded, repository))
+}
+
+/// Preserve adoption intent when the same package record is re-applied or is
+/// replaced after an authenticated v1 conversion. The record remains ownership
+/// provenance only; registry values are still read from the captured image.
+fn retained_claim_identities_for_package(
+    base: &RepositoryImage,
+    package_id: &ProfilePackageId,
+) -> Result<BTreeSet<AppliedProfileClaimIdentity>, RepositoryStateError> {
+    applied_profile_record_paths(base)?
         .into_iter()
-        .chain(repository_claims)
+        .map(|path| {
+            let RepositoryEntry::File { bytes, .. } =
+                base.entry(&path).map_err(ProducerError::from)?
+            else {
+                return Ok(BTreeSet::new());
+            };
+            let record: AppliedProfileRecord = serde_json::from_slice(bytes).map_err(|source| {
+                ProducerError::ProfileRecordParse {
+                    path: path.repository_relative(),
+                    source,
+                }
+            })?;
+            validate_applied_record_path(&path, &record)?;
+            Ok((record.id == package_id.as_str())
+                .then(|| {
+                    record
+                        .claims
+                        .into_iter()
+                        .filter(|claim| claim.retain_if_unowned)
+                        .map(|claim| claim.identity)
+                        .collect()
+                })
+                .unwrap_or_default())
+        })
+        .collect::<Result<Vec<BTreeSet<_>>, RepositoryStateError>>()
+        .map(|sets| sets.into_iter().flatten().collect())
+}
+
+/// Find repository-authored semantic values a new profile adopts unchanged.
+///
+/// The record is only an ownership witness: definitions are always read from
+/// the captured registries, then compared to the resolved package value.
+fn retained_semantic_claim_identities(
+    base: &RepositoryImage,
+    candidates: &[ProfileContributionClaim],
+) -> Result<BTreeSet<AppliedProfileClaimIdentity>, RepositoryStateError> {
+    let (_, repository) = existing_contribution_claims(base, candidates)?;
+    Ok(repository
+        .into_iter()
+        .filter_map(|claim| match claim {
+            ExistingContributionClaim::Repository(contribution) => Some(contribution),
+            ExistingContributionClaim::Package(_) => None,
+        })
+        .filter(|existing| {
+            candidates
+                .iter()
+                .any(|candidate| candidate.contribution == *existing)
+        })
+        .map(|contribution| AppliedProfileClaimIdentity::Semantic {
+            identity: contribution.semantic_identity(),
+        })
         .collect())
 }
 
@@ -1544,7 +2131,6 @@ fn profile_conflict_occupant(
     base: &RepositoryImage,
     target: &VirtualPath,
 ) -> Result<ProfileConflictOccupant, RepositoryStateError> {
-    let target = target.repository_relative();
     let Some(listing) = base.listing_fingerprints().get(&VirtualPath::PROFILES) else {
         return Ok(ProfileConflictOccupant::Repository);
     };
@@ -1560,7 +2146,23 @@ fn profile_conflict_occupant(
                 path: record_path.repository_relative(),
                 source,
             })?;
-        if record.target_hashes.contains_key(&target) {
+        validate_applied_record_path(&record_path, &record)?;
+        if record.claims.iter().any(|claim| match &claim.identity {
+            AppliedProfileClaimIdentity::Semantic { .. } => return false,
+            AppliedProfileClaimIdentity::Asset {
+                target: claimed_target,
+            } => {
+                claimed_target.root == target.root_class()
+                    && claimed_target.path == *target.relative()
+            }
+            AppliedProfileClaimIdentity::ManagedRegion {
+                target: claimed_target,
+                ..
+            } => {
+                claimed_target.root == target.root_class()
+                    && claimed_target.path == *target.relative()
+            }
+        }) {
             return Ok(ProfileConflictOccupant::Package(ProfilePackageId::new(
                 record.id,
             )));
@@ -1762,8 +2364,9 @@ mod tests {
     use super::*;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, EntryIdentity, ListingFingerprint, RepositoryLayout,
+        RepositoryRootEvidence,
     };
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
 
     fn image_with_profile_owner(
         target: &VirtualPath,
@@ -1775,22 +2378,23 @@ mod tests {
             super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap();
-        let target_name = target.repository_relative();
-        let target_hashes = package_owns_target
-            .then(|| (target_name, "target-hash".to_string()))
+        let config_bytes = b"";
+        let config_identity = EntryIdentity::for_bytes("config", config_bytes).unwrap();
+        let claims = package_owns_target
+            .then(|| AppliedProfileClaim::asset(target, target_bytes, FileMode::Regular, false))
             .into_iter()
             .collect();
         let record = AppliedProfileRecord::new(
             "base-package",
             "1.0.0",
+            "*",
             ProfileOrigin::Directory(
                 crate::repository_state::RootRelativePath::parse("packages/base-package")
                     .expect("a canonical package location"),
             ),
             "package-hash",
             ResolvedVariables::default(),
-            target_hashes,
-            Vec::new(),
+            claims,
         );
         let record_bytes = record.to_bytes().unwrap();
         let record_path = VirtualPath::data("profiles/base-package.json").unwrap();
@@ -1798,12 +2402,16 @@ mod tests {
         let mut spec = CaptureSpec::phase_one(
             [
                 VirtualPath::CONFIG,
+                VirtualPath::GATES,
+                VirtualPath::INVARIANTS,
+                VirtualPath::RULES,
+                VirtualPath::TEMPLATES,
                 profiles.clone(),
                 record_path.clone(),
                 target.clone(),
             ],
             CaptureBudget {
-                max_paths: 8,
+                max_paths: 16,
                 max_listings: 1,
                 max_bytes: 4096,
                 max_depth: 8,
@@ -1812,8 +2420,15 @@ mod tests {
         .unwrap();
         spec.discover_listing(profiles.clone()).unwrap();
         let record_identity = EntryIdentity::for_bytes("record", &record_bytes).unwrap();
-        let entries = BTreeMap::from([
-            (VirtualPath::CONFIG, RepositoryEntry::Absent),
+        let mut entries = BTreeMap::from([
+            (
+                VirtualPath::CONFIG,
+                RepositoryEntry::File {
+                    identity: config_identity,
+                    bytes: config_bytes.to_vec(),
+                    mode: FileMode::Regular,
+                },
+            ),
             (
                 profiles.clone(),
                 RepositoryEntry::Directory {
@@ -1838,6 +2453,16 @@ mod tests {
                 },
             ),
         ]);
+        entries.extend(
+            [
+                VirtualPath::GATES,
+                VirtualPath::INVARIANTS,
+                VirtualPath::RULES,
+                VirtualPath::TEMPLATES,
+            ]
+            .into_iter()
+            .map(|path| (path, RepositoryEntry::Absent)),
+        );
         let listings = BTreeMap::from([(
             profiles,
             ListingFingerprint::new(BTreeMap::from([(
@@ -1880,6 +2505,238 @@ mod tests {
         ProfileContributionClaim {
             package_id: ProfilePackageId::new(package),
             contribution,
+        }
+    }
+
+    #[test]
+    fn test_applied_profile_record_v2_wire_is_strict_and_claims_are_sorted() {
+        let alpha = namespace_contribution("alpha", "First namespace.");
+        let beta = namespace_contribution("beta", "Second namespace.");
+        let claims = [
+            AppliedProfileClaim::semantic(&beta, false).unwrap(),
+            AppliedProfileClaim::semantic(&alpha, false).unwrap(),
+        ]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+        let record = AppliedProfileRecord::new(
+            "example",
+            "1.2.3",
+            ">=1.0.0",
+            ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("profiles/example")
+                    .expect("canonical package source"),
+            ),
+            "a".repeat(64),
+            ResolvedVariables::default(),
+            claims,
+        );
+
+        let wire = serde_json::to_value(&record).expect("record serializes");
+        assert_eq!(wire["record_version"], serde_json::json!(2));
+        assert_eq!(wire["id"], serde_json::json!("example"));
+        assert_eq!(wire["version"], serde_json::json!("1.2.3"));
+        assert_eq!(wire["compatible_jit"], serde_json::json!(">=1.0.0"));
+        assert_eq!(wire["package_hash"], serde_json::json!("a".repeat(64)));
+        assert_eq!(
+            wire["claims"]
+                .as_array()
+                .expect("claims are an array")
+                .iter()
+                .map(|claim| claim["identity"]["identity"]["target"]["name"].clone())
+                .collect::<Vec<_>>(),
+            vec![serde_json::json!("alpha"), serde_json::json!("beta")]
+        );
+        assert_eq!(
+            serde_json::from_value::<AppliedProfileRecord>(wire.clone())
+                .expect("exact current record reads"),
+            record
+        );
+
+        let mut obsolete_version = wire.clone();
+        obsolete_version["record_version"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<AppliedProfileRecord>(obsolete_version).is_err());
+
+        let mut missing_claims = wire.clone();
+        missing_claims
+            .as_object_mut()
+            .expect("record is an object")
+            .remove("claims");
+        assert!(serde_json::from_value::<AppliedProfileRecord>(missing_claims).is_err());
+
+        let mut unknown = wire;
+        unknown
+            .as_object_mut()
+            .expect("record is an object")
+            .insert("unexpected".to_string(), serde_json::json!(true));
+        assert!(serde_json::from_value::<AppliedProfileRecord>(unknown).is_err());
+    }
+
+    #[test]
+    fn test_applied_profile_record_rejects_duplicate_claim_identities() {
+        let target = VirtualPath::worktree("docs/example.md").expect("canonical target");
+        let claim = AppliedProfileClaim::asset(&target, b"content", FileMode::Regular, false);
+        let record = AppliedProfileRecord::new(
+            "example",
+            "1.0.0",
+            "*",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            ResolvedVariables::default(),
+            BTreeSet::from([claim]),
+        );
+        let mut wire = serde_json::to_value(record).expect("current record serializes");
+        let duplicate = wire["claims"][0].clone();
+        wire["claims"]
+            .as_array_mut()
+            .expect("claims are an array")
+            .push(duplicate);
+
+        assert!(serde_json::from_value::<AppliedProfileRecord>(wire).is_err());
+    }
+
+    #[test]
+    fn test_validate_applied_record_path_rejects_a_record_under_another_package_id() {
+        let record = AppliedProfileRecord::new(
+            "example",
+            "1.0.0",
+            "*",
+            ProfileOrigin::Embedded,
+            "a".repeat(64),
+            ResolvedVariables::default(),
+            BTreeSet::new(),
+        );
+        let path = VirtualPath::data("profiles/other.json").expect("canonical path");
+
+        assert!(matches!(
+            validate_applied_record_path(&path, &record),
+            Err(ProducerError::ProfileRecordPathMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_profile_application_record_fingerprints_the_final_derived_asset_target() {
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "worktree", true),
+            RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .expect("layout is valid");
+        let target = VirtualPath::worktree("docs/example.md").expect("canonical target");
+        let claims = ProfileClaims {
+            package_id: ProfilePackageId::new("example"),
+            contributions: Vec::new(),
+            assets: vec![ProfileAssetClaim {
+                claim: TargetClaim::new(&layout, target.clone(), "example")
+                    .expect("target claim is valid"),
+                bytes: b"declared bytes".to_vec(),
+                mode: FileMode::Regular,
+                replace_owned: false,
+            }],
+            regions: Vec::new(),
+        };
+        let input = ProfileApplicationInput {
+            id: "example".into(),
+            version: "1.0.0".into(),
+            compatible_jit: "*".into(),
+            package_hash: "a".repeat(64),
+            variables: ResolvedVariables::default(),
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Embedded,
+            claims,
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::new(),
+            record_path: VirtualPath::data("profiles/example.json").expect("record path"),
+        };
+        let composition = ProfileTargetComposition {
+            targets: BTreeMap::from([(
+                target.clone(),
+                (b"derived projection bytes".to_vec(), FileMode::Executable),
+            )]),
+            retained_claims: BTreeSet::new(),
+        };
+
+        let record = input.record(&composition).expect("record is derived");
+        let expected = AppliedProfileClaim::asset(
+            &target,
+            b"derived projection bytes",
+            FileMode::Executable,
+            false,
+        );
+        assert_eq!(record.claims, BTreeSet::from([expected]));
+    }
+
+    #[test]
+    fn test_profile_claim_fingerprints_canonicalize_semantic_values_and_separate_domains() {
+        let first = Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: "example".to_string(),
+            value: serde_json::from_str(r#"{"description":"Example.","rank":1}"#)
+                .expect("valid JSON"),
+        };
+        let reordered = Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: "example".to_string(),
+            value: serde_json::from_str(r#"{"rank":1,"description":"Example."}"#)
+                .expect("valid JSON"),
+        };
+        let different_identity = Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: "other".to_string(),
+            value: first_value(&first),
+        };
+        let target = VirtualPath::worktree("docs/example.md").expect("canonical target");
+        let asset = AppliedProfileClaim::asset(&target, b"same bytes", FileMode::Regular, false);
+        let executable =
+            AppliedProfileClaim::asset(&target, b"same bytes", FileMode::Executable, false);
+        let region = AppliedProfileClaim::managed_region(
+            &target,
+            "example-region"
+                .try_into()
+                .expect("test region id is canonical"),
+            b"same bytes",
+            FileMode::Regular,
+            false,
+        );
+
+        assert_eq!(
+            fingerprint_semantic_contribution(&first).expect("first fingerprint"),
+            fingerprint_semantic_contribution(&reordered).expect("reordered fingerprint")
+        );
+        assert_ne!(
+            fingerprint_semantic_contribution(&first).expect("first fingerprint"),
+            fingerprint_semantic_contribution(&different_identity)
+                .expect("different identity fingerprint")
+        );
+        assert_ne!(asset.base_fingerprint, executable.base_fingerprint);
+        assert_ne!(asset.base_fingerprint, region.base_fingerprint);
+        assert_ne!(asset.identity, region.identity);
+    }
+
+    #[test]
+    fn test_managed_region_identity_ignores_mode_while_its_fingerprint_includes_mode() {
+        let target = VirtualPath::worktree("AGENTS.md").expect("canonical target");
+        let regular = AppliedProfileClaim::managed_region(
+            &target,
+            "guidance".try_into().expect("canonical region id"),
+            b"region body",
+            FileMode::Regular,
+            true,
+        );
+        let executable = AppliedProfileClaim::managed_region(
+            &target,
+            "guidance".try_into().expect("canonical region id"),
+            b"region body",
+            FileMode::Executable,
+            true,
+        );
+
+        assert_eq!(regular.identity, executable.identity);
+        assert_ne!(regular.base_fingerprint, executable.base_fingerprint);
+    }
+
+    fn first_value(contribution: &Contribution) -> JsonValue {
+        match contribution {
+            Contribution::MapEntry { value, .. } => value.clone(),
+            _ => unreachable!("test fixture is a map entry"),
         }
     }
 
@@ -2102,6 +2959,108 @@ mod tests {
                 path,
             }) if candidate.as_str() == "workflow-package" && path == target
         ));
+    }
+
+    #[test]
+    fn test_profile_record_retains_adopted_identical_repository_asset_baseline() {
+        let target = VirtualPath::data("custom.txt").unwrap();
+        let (image, layout) = image_with_profile_owner(&target, b"repository bytes", false);
+        let claims = ProfileClaims {
+            package_id: ProfilePackageId::new("workflow-package"),
+            contributions: Vec::new(),
+            assets: vec![ProfileAssetClaim {
+                claim: TargetClaim::new(&layout, target.clone(), "profile-asset:custom.txt")
+                    .unwrap(),
+                bytes: b"repository bytes".to_vec(),
+                mode: FileMode::Regular,
+                replace_owned: false,
+            }],
+            regions: Vec::new(),
+        };
+        let composition = compose_profile_targets(&image, claims.clone())
+            .expect("identical repository asset is adoptable");
+        let input = ProfileApplicationInput {
+            id: "workflow-package".to_string(),
+            version: "1.0.0".to_string(),
+            compatible_jit: "*".to_string(),
+            package_hash: "a".repeat(64),
+            variables: ResolvedVariables::default(),
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Directory(
+                crate::repository_state::RootRelativePath::parse("profiles/workflow-package")
+                    .expect("canonical package source"),
+            ),
+            claims,
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::new(),
+            record_path: VirtualPath::data("profiles/workflow-package.json")
+                .expect("canonical record path"),
+        };
+        let identity = AppliedProfileClaimIdentity::Asset {
+            target: AppliedClaimTarget::from_virtual_path(&target, FileMode::Regular),
+        };
+
+        assert!(composition.retained_claims.contains(&identity));
+        assert!(input
+            .record(&composition)
+            .expect("record serializes")
+            .claims
+            .iter()
+            .any(|claim| claim.identity == identity && claim.retain_if_unowned));
+    }
+
+    #[test]
+    fn test_retained_semantic_claim_identities_marks_an_adopted_registry_definition() {
+        let layout = super::super::RepositoryLayout::new(
+            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
+            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .unwrap();
+        let config =
+            b"[namespaces.adopted]\ndescription = \"Repository definition.\"\nunique = false\n";
+        let mut spec = CaptureSpec::phase_one(
+            [VirtualPath::CONFIG],
+            CaptureBudget {
+                max_paths: 4,
+                max_listings: 0,
+                max_bytes: 4096,
+                max_depth: 4,
+            },
+        )
+        .unwrap();
+        spec.discover_paths([]).unwrap();
+        let image = RepositoryImage::close(
+            layout,
+            spec,
+            BTreeMap::from([(
+                VirtualPath::CONFIG,
+                RepositoryEntry::File {
+                    identity: EntryIdentity::for_bytes("config", config).unwrap(),
+                    bytes: config.to_vec(),
+                    mode: FileMode::Regular,
+                },
+            )]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+        let contribution = Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: "adopted".to_string(),
+            value: serde_json::json!({
+                "description": "Repository definition.",
+                "unique": false,
+            }),
+        };
+        let candidate = contribution_claim("workflow", contribution.clone());
+
+        assert_eq!(
+            retained_semantic_claim_identities(&image, &[candidate]).unwrap(),
+            BTreeSet::from([AppliedProfileClaimIdentity::Semantic {
+                identity: contribution.semantic_identity(),
+            }])
+        );
     }
 
     #[test]

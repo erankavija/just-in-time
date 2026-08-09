@@ -373,24 +373,28 @@ fn test_profile_apply_records_complete_shared_ownership_on_first_apply() {
     let first = jit(repo.path(), &args);
     assert!(first.status.success(), "{first:?}");
 
-    for id in ["base", "workflow"] {
-        let record: Value = serde_json::from_slice(
-            &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
-        )
-        .unwrap();
-        let owners = record["contributions"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|contribution| contribution["identity"]["target"]["name"] == "shared")
-            .unwrap()["owners"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|owner| owner.as_str().unwrap())
-            .collect::<Vec<_>>();
-        assert_eq!(owners, vec!["base", "workflow"]);
-    }
+    let fingerprints = ["base", "workflow"]
+        .into_iter()
+        .map(|id| {
+            let record: Value = serde_json::from_slice(
+                &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
+            )
+            .unwrap();
+            record["claims"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|claim| {
+                    claim["identity"]["kind"] == "semantic"
+                        && claim["identity"]["identity"]["target"]["name"] == "shared"
+                })
+                .unwrap()["base_fingerprint"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(fingerprints[0], fingerprints[1]);
 }
 
 #[test]
@@ -835,27 +839,28 @@ fn test_profile_variable_record_drives_validation_repair_and_provenance_checks()
         format!("NAME={resolved_value}\n")
     );
 
-    let assert_not_applied = |mutated: Value| {
+    let assert_applied = |mutated: Value, expected_applied: bool| {
         fs::write(&record_path, serde_json::to_vec_pretty(&mutated).unwrap()).unwrap();
         let listed = jit(repo.path(), &["profile", "list", "--json"]);
         assert!(listed.status.success(), "{listed:?}");
-        assert_eq!(json(&listed)["profiles"][0]["applied"], false);
+        assert_eq!(
+            json(&listed)["profiles"][0]["applied"],
+            expected_applied,
+            "{listed:?}"
+        );
     };
     let mut value_tamper = record.clone();
     value_tamper["variables"]["NAME"]["value"] = Value::String("tampered".to_string());
-    assert_not_applied(value_tamper);
+    assert_applied(value_tamper, true);
     let mut source_tamper = record.clone();
     source_tamper["variables"]["NAME"]["source"] = Value::String("values_file".to_string());
-    assert_not_applied(source_tamper);
-    let mut hash_tamper = record.clone();
-    let target_hash = hash_tamper["target_hashes"]
-        .as_object_mut()
-        .unwrap()
-        .values_mut()
-        .next()
-        .unwrap();
-    *target_hash = Value::String("0".repeat(64));
-    assert_not_applied(hash_tamper);
+    assert_applied(source_tamper, true);
+    let mut package_hash_tamper = record.clone();
+    package_hash_tamper["package_hash"] = Value::String("0".repeat(64));
+    assert_applied(package_hash_tamper, false);
+    let mut claim_tamper = record.clone();
+    claim_tamper["claims"][0]["base_fingerprint"] = Value::String("0".repeat(64));
+    assert_applied(claim_tamper, true);
     fs::write(record_path, record_bytes).unwrap();
 }
 

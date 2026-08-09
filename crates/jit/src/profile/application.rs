@@ -239,11 +239,11 @@ mod tests {
         AppliedProfileRecord::new(
             "example",
             "1.0.0",
+            "*",
             origin,
             "package",
             crate::profile::ResolvedVariables::default(),
-            BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
-            Vec::new(),
+            std::collections::BTreeSet::new(),
         )
     }
 
@@ -267,11 +267,12 @@ mod tests {
                 .cloned()
                 .collect::<Vec<_>>(),
             vec![
-                "contributions",
+                "claims",
+                "compatible_jit",
                 "id",
                 "origin",
                 "package_hash",
-                "target_hashes",
+                "record_version",
                 "variables",
                 "version"
             ]
@@ -292,6 +293,18 @@ mod tests {
             stored,
             record_at("vendor/elsewhere").to_bytes().unwrap(),
             "records naming different locations must not store the same image"
+        );
+    }
+
+    #[test]
+    fn test_installed_record_round_trips_shipped_embedded_provenance_without_configuration() {
+        let stored = record(ProfileOrigin::Embedded).to_bytes().unwrap();
+
+        assert_eq!(
+            serde_json::from_slice::<AppliedProfileRecord>(&stored)
+                .expect("embedded provenance remains a valid v2 record")
+                .origin,
+            ProfileOrigin::Embedded
         );
     }
 
@@ -320,13 +333,13 @@ mod tests {
     }
 
     #[test]
-    fn test_installed_record_requires_semantic_contribution_ownership_evidence() {
+    fn test_installed_record_requires_ownership_claim_evidence() {
         let mut stored: serde_json::Value =
             serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
         stored
             .as_object_mut()
             .expect("an installed record serializes as an object")
-            .remove("contributions");
+            .remove("claims");
 
         assert!(
             serde_json::from_value::<AppliedProfileRecord>(stored).is_err(),

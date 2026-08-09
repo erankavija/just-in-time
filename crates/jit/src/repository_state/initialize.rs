@@ -498,7 +498,9 @@ pub(super) fn derive_initialization(
             profile.contribution_context.clone(),
         )
         .map_err(profile_composition_error)?;
-        let record = profile.record(composed.contributions);
+        let record = profile
+            .record(&composed)
+            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
         for (path, (bytes, mode)) in composed.targets {
             let disposition = profile_target_disposition(&neutral_proposed, &path, &bytes, mode)?;
             profile_targets.push(ProfileTargetMaterialization {
@@ -590,6 +592,16 @@ fn profile_record_changed(
     profile: &ProfileApplicationInput,
     record: &AppliedProfileRecord,
 ) -> Result<bool, InitializationError> {
+    // The selected package may replace the same shipped-v1 record that the
+    // operation authenticated. Its raw v1 preimage is still carried by this
+    // final record write, while the current selected record is the one final
+    // persisted provenance image.
+    if profile
+        .shipped_v1_migrations
+        .contains_key(&profile.record_path)
+    {
+        return Ok(true);
+    }
     match base.entry(&profile.record_path)? {
         RepositoryEntry::Absent => Ok(true),
         RepositoryEntry::File { bytes, .. } => {
@@ -834,13 +846,17 @@ pub(super) fn derive_profile_application(
     profile: &ProfileApplicationInput,
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
+    let composition_base = super::profile_apply::profile_composition_base(base, profile)
+        .map_err(profile_composition_error)?;
     let composed = super::profile_apply::compose_profile_targets_with_context(
-        base,
+        &composition_base,
         profile.claims.clone(),
         profile.contribution_context.clone(),
     )
     .map_err(profile_composition_error)?;
-    let record = profile.record(composed.contributions);
+    let record = profile
+        .record(&composed)
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
     let mut targets = Vec::with_capacity(composed.targets.len());
     let files = composed
         .targets
@@ -868,6 +884,21 @@ pub(super) fn derive_profile_application(
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
+    let migrated_records = profile
+        .shipped_v1_migrations
+        .iter()
+        .filter(|(path, _)| *path != &profile.record_path)
+        .map(|(path, record)| {
+            Ok(DesiredFile {
+                path: path.clone(),
+                bytes: serialize_profile_record(record)?,
+                mode: FileMode::Regular,
+                policy: WritePolicy::Always,
+                owner: PROFILE_OWNER,
+            })
+        })
+        .collect::<Result<Vec<_>, InitializationError>>()?;
+    push_file_actions(base, &migrated_records, &mut actions)?;
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
     if profile.target_hashes.contains_key(".jit/config.toml")

@@ -3372,14 +3372,14 @@ depends_on = ["planning"]
         serde_json::to_string_pretty(&crate::repository_state::AppliedProfileRecord::new(
             id,
             "1.0.0",
+            "*",
             crate::profile::ProfileOrigin::Directory(
                 crate::repository_state::RootRelativePath::parse("packages/recorded")
                     .expect("a canonical package location"),
             ),
             "0".repeat(64),
             crate::profile::ResolvedVariables::default(),
-            std::collections::BTreeMap::new(),
-            Vec::new(),
+            std::collections::BTreeSet::new(),
         ))
         .unwrap()
     }

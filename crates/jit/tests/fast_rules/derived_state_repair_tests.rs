@@ -380,14 +380,14 @@ impl DirectoryPackageRepo {
         let record = jit::repository_state::AppliedProfileRecord::new(
             self.id(),
             self.package.model().version.clone(),
+            self.package.model().compatible_jit.clone(),
             jit::profile::ProfileOrigin::Directory(
                 jit::repository_state::RootRelativePath::parse(PACKAGE_DIRECTORY)
                     .expect("a worktree-relative package location"),
             ),
             self.package.hashes().package.clone(),
             resolved.variables().clone(),
-            resolved.target_hashes().expect("hash resolved targets"),
-            Vec::new(),
+            std::collections::BTreeSet::new(),
         );
         std::fs::write(
             self.record_path(self.id()),

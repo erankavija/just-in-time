@@ -1107,6 +1107,12 @@ pub enum GateRunStatus {
     deny_unknown_fields
 )]
 pub enum ProfileOrigin {
+    /// Package bytes were compiled into the historical JIT binary.
+    ///
+    /// This provenance-only variant is retained solely for the authenticated
+    /// shipped-v1 applied-record conversion. Current package discovery never
+    /// resolves it and configured behavior is never read from a record.
+    Embedded,
     /// Package bytes were read from this worktree-relative directory.
     Directory(RootRelativePath),
 }

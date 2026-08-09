@@ -13,7 +13,7 @@ use crate::repository_state::{
 };
 use crate::storage::JsonFileStorage;
 use anyhow::{Context, Result};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
 /// Keep initialization's dependency work set unique while retaining one result
@@ -441,12 +441,14 @@ impl CommandExecutor<JsonFileStorage> {
         Ok(ProfileApplicationInput {
             id: metadata.id.to_string(),
             version: metadata.version.clone(),
+            compatible_jit: metadata.compatible_jit.clone(),
             package_hash: package.hashes().package.clone(),
             variables: resolved.variables().clone(),
             target_hashes: resolved.target_hashes()?,
             origin: super::profile::package_origin(package, &layout)?,
             contribution_context: claims.contributions.clone(),
             claims,
+            shipped_v1_migrations: BTreeMap::new(),
             record_path,
         })
     }
@@ -934,21 +936,28 @@ source-of-truth = \"registry-first\"\n";
             )
             .unwrap();
 
-        for id in ["base", "workflow"] {
-            let record: AppliedProfileRecord = serde_json::from_slice(
-                &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
-            )
-            .unwrap();
-            assert_eq!(record.contributions.len(), 1);
-            assert_eq!(
-                record.contributions[0].owners,
-                vec![
-                    crate::repository_state::ProfilePackageId::new("base"),
-                    crate::repository_state::ProfilePackageId::new("workflow"),
-                ],
-                "{id} retains complete ownership on initialization's first publication"
-            );
-        }
+        let shared_claims = ["base", "workflow"]
+            .into_iter()
+            .map(|id| {
+                let record: AppliedProfileRecord = serde_json::from_slice(
+                    &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
+                )
+                .unwrap();
+                let semantic = record
+                    .claims
+                    .into_iter()
+                    .filter(|claim| {
+                        matches!(
+                            claim.identity,
+                            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(semantic.len(), 1);
+                semantic.into_iter().next().unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(shared_claims[0], shared_claims[1]);
     }
 
     #[test]

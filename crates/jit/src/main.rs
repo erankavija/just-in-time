@@ -940,8 +940,12 @@ fn parse_profile_variable_assignments(
 /// Render a package origin for human output, naming the directory a package
 /// read from the repository came from.
 fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
-    let jit::profile::ProfileOrigin::Directory(location) = origin;
-    format!("directory {}", location.as_path().display())
+    match origin {
+        jit::profile::ProfileOrigin::Embedded => "embedded".to_string(),
+        jit::profile::ProfileOrigin::Directory(location) => {
+            format!("directory {}", location.as_path().display())
+        }
+    }
 }
 
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {

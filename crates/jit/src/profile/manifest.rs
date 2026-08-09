@@ -43,6 +43,52 @@ impl TryFrom<String> for ProfileId {
     }
 }
 
+/// Canonical lowercase-kebab marker identity for one managed profile region.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
+#[serde(transparent)]
+#[schemars(with = "String")]
+pub struct RegionId(String);
+
+impl RegionId {
+    /// Borrow the canonical region-marker identity.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<&str> for RegionId {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        is_lowercase_kebab(value)
+            .then(|| Self(value.to_string()))
+            .ok_or_else(|| format!("invalid region id '{value}'; expected lowercase-kebab"))
+    }
+}
+
+impl TryFrom<String> for RegionId {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl std::fmt::Display for RegionId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl<'de> Deserialize<'de> for RegionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::try_from(String::deserialize(deserializer)?).map_err(de::Error::custom)
+    }
+}
+
 impl fmt::Display for ProfileId {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(formatter)
@@ -276,7 +322,7 @@ pub struct RegionDeclaration {
     /// Repository-relative destination path.
     pub target: String,
     /// Stable marker identity.
-    pub region_id: String,
+    pub region_id: RegionId,
     /// V1 placement policy.
     pub placement: RegionPlacement,
     /// Whether the managed-region body opts into UTF-8 variable substitution.
@@ -431,7 +477,7 @@ mod tests {
         // The keys that were already there still mean what they meant.
         assert_eq!(manifest.assets[0].target, "bin/check.sh");
         assert!(manifest.assets[0].executable);
-        assert_eq!(manifest.regions[0].region_id, "guidance");
+        assert_eq!(manifest.regions[0].region_id.as_str(), "guidance");
         assert_eq!(manifest.regions[0].placement, RegionPlacement::Append);
     }
 

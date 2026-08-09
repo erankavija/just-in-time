@@ -864,11 +864,12 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
     assert_eq!(
         property_keys(show_schema, "AppliedProfileRecord"),
         expected_keys(&[
-            "contributions",
+            "claims",
+            "compatible_jit",
             "id",
             "origin",
             "package_hash",
-            "target_hashes",
+            "record_version",
             "variables",
             "version",
         ])
@@ -883,14 +884,13 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         "#/definitions/ResolvedVariable"
     );
     assert_eq!(
-        show_schema["definitions"]["AppliedProfileRecord"]["properties"]["contributions"]["items"]
-            ["$ref"],
-        "#/definitions/AppliedProfileContribution"
+        show_schema["definitions"]["AppliedProfileRecord"]["properties"]["claims"]["items"]["$ref"],
+        "#/definitions/AppliedProfileClaim"
     );
     for definition in [
         "ProfilePackageModel",
         "AppliedProfileRecord",
-        "AppliedProfileContribution",
+        "AppliedProfileClaim",
         "ResolvedVariable",
     ] {
         assert_eq!(

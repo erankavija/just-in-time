@@ -154,6 +154,15 @@ pub enum ProfileResolutionError {
         /// Package-reader failure.
         source: ProfilePackageError,
     },
+    /// A converted shipped-v1 record preserves an embedded origin, but this
+    /// binary deliberately has no embedded-package discovery surface.
+    #[error(
+        "applied profile record '{record}' has embedded provenance, which is unavailable for package resolution"
+    )]
+    EmbeddedProvenanceUnavailable {
+        /// Repository-relative applied-record path.
+        record: String,
+    },
 }
 
 /// Failure composing the set of packages one application applies.
@@ -538,7 +547,12 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            self.resolve_profile_graph(&selected)?.selected_packages()
+            let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
+            self.resolve_profile_graph_with_applied(
+                &selected,
+                self.resolve_applied_profile_packages_except(&provenance_only)?,
+            )?
+            .selected_packages()
         };
         let inputs = load_profile_variable_inputs(
             &packages,
@@ -585,6 +599,7 @@ impl CommandExecutor<JsonFileStorage> {
                 &resolved,
                 &contribution_context,
                 &context,
+                false,
             )?
             else {
                 return Ok(SessionStep::Retry);
@@ -630,7 +645,11 @@ impl CommandExecutor<JsonFileStorage> {
         let contribution_context = if selected.is_empty() {
             Vec::new()
         } else {
-            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
+            let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
+            let applied = self.resolve_applied_profile_packages_except(&provenance_only)?;
+            let packages = self
+                .resolve_profile_graph_with_applied(&selected, applied)?
+                .selected_packages();
             validate_variable_inputs(&packages, inputs)?;
             let candidates = self.profile_contribution_candidates(&packages, inputs)?;
             self.preflight_profile_contributions(&candidates)?;
@@ -711,7 +730,7 @@ impl CommandExecutor<JsonFileStorage> {
                 if recorded_profile_ids(&image, &VirtualPath::PROFILES)? != recorded {
                     return Ok(SessionStep::Retry);
                 }
-                crate::repository_state::preflight_profile_contributions(
+                crate::repository_state::preflight_profile_contributions_for_mutation(
                     &image,
                     candidates.to_vec(),
                 )?;
@@ -766,6 +785,17 @@ impl CommandExecutor<JsonFileStorage> {
         selected: &[ProfilePackage],
     ) -> Result<ResolvedProfileGraph> {
         let applied = self.resolve_applied_profile_packages()?;
+        self.resolve_profile_graph_with_applied(selected, applied)
+    }
+
+    /// Mutating profile application may retain authenticated embedded
+    /// provenance as ownership evidence without trying to rediscover a package
+    /// that no longer exists. Ordinary graph reads never take this route.
+    fn resolve_profile_graph_with_applied(
+        &self,
+        selected: &[ProfilePackage],
+        applied: BTreeMap<ProfileId, ProfilePackage>,
+    ) -> Result<ResolvedProfileGraph> {
         let mut packages = BTreeMap::new();
         let mut selected_ids = BTreeSet::new();
         let mut pending = VecDeque::new();
@@ -801,6 +831,16 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Load every package the repository's applied records currently name.
     fn resolve_applied_profile_packages(&self) -> Result<BTreeMap<ProfileId, ProfilePackage>> {
+        self.resolve_applied_profile_packages_except(&BTreeSet::new())
+    }
+
+    /// Resolve current records for one mutating application while excluding
+    /// provenance-only Embedded records. The application image still supplies
+    /// their ownership claims; this does not synthesize configuration from them.
+    fn resolve_applied_profile_packages_except(
+        &self,
+        excluded: &BTreeSet<String>,
+    ) -> Result<BTreeMap<ProfileId, ProfilePackage>> {
         let layout = self.require_layout()?;
         with_mutation_session(self.storage(), &layout, "profile graph read", |session| {
             let Some((image, ids)) = capture_applied_records(session, &VirtualPath::PROFILES)?
@@ -809,6 +849,9 @@ impl CommandExecutor<JsonFileStorage> {
             };
             let mut packages = BTreeMap::new();
             for id in ids {
+                if excluded.contains(&id) {
+                    continue;
+                }
                 let record_path = applied_record_path(&id)?;
                 let record = read_applied_record(&image, &record_path, &id)?.ok_or_else(|| {
                     anyhow::anyhow!(
@@ -827,6 +870,55 @@ impl CommandExecutor<JsonFileStorage> {
             }
             Ok(SessionStep::Done(packages))
         })
+    }
+
+    fn provenance_only_profile_ids_for_mutation(&self) -> Result<BTreeSet<String>> {
+        let layout = self.require_layout()?;
+        with_mutation_session(
+            self.storage(),
+            &layout,
+            "profile application provenance",
+            |session| {
+                let Some((image, ids)) = capture_applied_records(session, &VirtualPath::PROFILES)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let provenance_only = ids
+                    .into_iter()
+                    .map(|id| {
+                        let path = applied_record_path(&id)?;
+                        let RepositoryEntry::File { bytes, .. } = image.entry(&path)? else {
+                            return Ok(None);
+                        };
+                        let embedded_current =
+                            match serde_json::from_slice::<AppliedProfileRecord>(bytes) {
+                                Ok(record) => {
+                                    record.id == id
+                                        && matches!(record.origin, ProfileOrigin::Embedded)
+                                }
+                                Err(_) => false,
+                            };
+                        Ok((embedded_current
+                            || crate::repository_state::is_shipped_v1_candidate(bytes))
+                        .then_some(id))
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<BTreeSet<_>>();
+                Ok(SessionStep::Done(provenance_only))
+            },
+        )
+    }
+
+    fn resolve_profile_closure_for_mutation(
+        &self,
+        package: &ProfilePackage,
+        provenance_only: &BTreeSet<String>,
+    ) -> Result<Vec<ProfilePackage>> {
+        let applied = self.resolve_applied_profile_packages_except(provenance_only)?;
+        self.resolve_profile_graph_with_applied(std::slice::from_ref(package), applied)
+            .map(|graph| graph.selected_packages())
     }
 
     /// Extend `packages` with dependencies in canonical id order.
@@ -949,7 +1041,8 @@ impl CommandExecutor<JsonFileStorage> {
         package: &ProfilePackage,
         inputs: &VariableInputs,
     ) -> Result<ProfileComposedApplyResult> {
-        let packages = self.resolve_profile_closure(package)?;
+        let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
+        let packages = self.resolve_profile_closure_for_mutation(package, &provenance_only)?;
         validate_variable_inputs(&packages, inputs)?;
         let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
         self.preflight_profile_contributions(&contribution_context)?;
@@ -964,7 +1057,8 @@ impl CommandExecutor<JsonFileStorage> {
         inputs: &VariableInputs,
         contribution_context: &[ProfileContributionClaim],
     ) -> Result<ProfileComposedApplyResult> {
-        let packages = self.resolve_profile_closure(package)?;
+        let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
+        let packages = self.resolve_profile_closure_for_mutation(package, &provenance_only)?;
         self.apply_profile_packages_with_context(&packages, inputs, contribution_context)
     }
 
@@ -1019,6 +1113,7 @@ impl CommandExecutor<JsonFileStorage> {
                 resolved,
                 contribution_context,
                 &context,
+                true,
             )?
             else {
                 return Ok(SessionStep::Retry);
@@ -1077,7 +1172,14 @@ impl CommandExecutor<JsonFileStorage> {
             std::slice::from_ref(package),
             &VariableInputs::default(),
         )?;
-        self.prepare_profile_resolved(session, package, &resolved, &contribution_context, context)
+        self.prepare_profile_resolved(
+            session,
+            package,
+            &resolved,
+            &contribution_context,
+            context,
+            true,
+        )
     }
 
     fn prepare_profile_resolved(
@@ -1087,6 +1189,7 @@ impl CommandExecutor<JsonFileStorage> {
         resolved: &ResolvedProfileContent,
         contribution_context: &[ProfileContributionClaim],
         context: &MutationContext,
+        allow_shipped_v1_migration: bool,
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
         let metadata = package.model();
         reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
@@ -1124,10 +1227,54 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
 
+        // Candidate detection is intentionally shallow: the exact five-field
+        // decoder runs below only after this same session has captured every
+        // pinned historical unit it must authenticate.
+        let mut migration_paths = Vec::new();
+        if allow_shipped_v1_migration {
+            let mut has_candidate = false;
+            for id in recorded_profile_ids(&base, &profiles_dir)? {
+                let path = applied_record_path(&id)?;
+                if matches!(
+                    base.entry(&path)?,
+                    RepositoryEntry::File { bytes, .. }
+                        if crate::repository_state::is_shipped_v1_candidate(bytes)
+                ) {
+                    has_candidate = true;
+                    break;
+                }
+            }
+            if has_candidate {
+                migration_paths = crate::repository_state::shipped_v1_migration_paths()?
+                    .into_iter()
+                    .map(|path| layout.classify_repository_relative(&path))
+                    .collect::<Result<Vec<_>, _>>()?;
+            }
+        }
+        let mut authenticated_paths = content_paths.clone();
+        authenticated_paths.extend(migration_paths);
+        let base = match self.capture_proposed_base(
+            session,
+            &BTreeMap::new(),
+            &authenticated_paths,
+            None,
+        )? {
+            None => return Ok(None),
+            Some(base) => base,
+        };
+        // This is the sole exact legacy decode/conversion for this operation.
+        // The authenticated rewrite map stays immutable through closure,
+        // preview, and final derivation; final delta preimages revalidate the
+        // raw record bytes before publication.
+        let migrations = allow_shipped_v1_migration
+            .then(|| crate::repository_state::migrate_shipped_v1_records(&base))
+            .transpose()?
+            .unwrap_or_default();
         let input =
             profile_application_input(package, resolved, base.layout(), record_path.clone())?
-                .with_contribution_context(contribution_context);
-        let mut expanded_paths = content_paths.clone();
+                .with_contribution_context(contribution_context)
+                .with_shipped_v1_migrations(migrations.clone());
+        let mut expanded_paths = authenticated_paths;
         expanded_paths.extend(crate::repository_state::profile_capture_closure(
             &base, &input,
         )?);
@@ -1145,7 +1292,8 @@ impl CommandExecutor<JsonFileStorage> {
             };
         let input =
             profile_application_input(package, resolved, base.layout(), record_path.clone())?
-                .with_contribution_context(contribution_context);
+                .with_contribution_context(contribution_context)
+                .with_shipped_v1_migrations(migrations.clone());
         let preview = derive_materialization(
             &base,
             MaterializationRequest::ApplyProfile {
@@ -1167,7 +1315,8 @@ impl CommandExecutor<JsonFileStorage> {
             Some(base) => base,
         };
         let input = profile_application_input(package, resolved, probe.layout(), record_path)?
-            .with_contribution_context(contribution_context);
+            .with_contribution_context(contribution_context)
+            .with_shipped_v1_migrations(migrations);
         let final_closure = crate::repository_state::profile_capture_closure(&probe, &input)?;
         if final_closure
             .iter()
@@ -1452,7 +1601,12 @@ pub(super) fn recorded_package(
     record_path: &VirtualPath,
     layout: &RepositoryLayout,
 ) -> Result<ProfilePackage> {
-    let ProfileOrigin::Directory(location) = &record.origin;
+    let ProfileOrigin::Directory(location) = &record.origin else {
+        return Err(ProfileResolutionError::EmbeddedProvenanceUnavailable {
+            record: record_path.repository_relative(),
+        }
+        .into());
+    };
     let requested = layout.worktree_root().join(location.as_path());
     let package = match fs::canonicalize(&requested) {
         Ok(_) => {
@@ -1568,25 +1722,25 @@ pub(super) fn package_origin(
 
 /// The expected provenance record for a package read through this repository.
 ///
-/// Target hashes are independently recomputed by resolving the current
-/// unresolved package from the record's persisted public values. This path
-/// never reads current environment variables or accepts stored target hashes
-/// as expected input.
+/// Resolved variables are validated against the current package without
+/// consulting ambient input. Ownership claims remain repository-state
+/// provenance rather than immutable package identity, so the package check
+/// deliberately excludes them.
 pub(super) fn expected_record(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
     variables: &ResolvedVariables,
 ) -> Result<AppliedProfileRecord> {
     let metadata = package.model();
-    let resolved = resolve_package_from_record(package, variables)?;
+    let _resolved = resolve_package_from_record(package, variables)?;
     Ok(AppliedProfileRecord::new(
         metadata.id.to_string(),
         metadata.version.clone(),
+        metadata.compatible_jit.clone(),
         package_origin(package, layout)?,
         package.hashes().package.clone(),
         variables.clone(),
-        resolved.target_hashes()?,
-        Vec::new(),
+        BTreeSet::new(),
     ))
 }
 
@@ -1602,12 +1756,14 @@ fn profile_application_input(
     Ok(ProfileApplicationInput {
         id: metadata.id.to_string(),
         version: metadata.version.clone(),
+        compatible_jit: metadata.compatible_jit.clone(),
         package_hash: package.hashes().package.clone(),
         variables: resolved.variables().clone(),
         target_hashes: resolved.target_hashes()?,
         origin: package_origin(package, layout)?,
         contribution_context: claims.contributions.clone(),
         claims,
+        shipped_v1_migrations: BTreeMap::new(),
         record_path,
     })
 }
@@ -1622,6 +1778,13 @@ fn read_applied_record(
         RepositoryEntry::Absent => Ok(None),
         RepositoryEntry::File { bytes, .. } => {
             serde_json::from_slice::<AppliedProfileRecord>(bytes)
+                .and_then(|record| {
+                    (record.id == id).then_some(record).ok_or_else(|| {
+                        serde_json::Error::io(std::io::Error::other(
+                            "record id does not match its canonical path",
+                        ))
+                    })
+                })
                 .map(Some)
                 .map_err(|_| {
                     ProfileApplyError::InstalledRecordConflict {
@@ -2069,6 +2232,36 @@ mod tests {
         .unwrap();
     }
 
+    /// Encode the exact historical five-field wire only to prove ordinary
+    /// readers do not accept it. The migration boundary owns all legacy input.
+    fn shipped_v1_record(record: &AppliedProfileRecord) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({
+            "id": record.id,
+            "version": record.version,
+            "origin": record.origin,
+            "package_hash": record.package_hash,
+            "target_hashes": {},
+        }))
+        .unwrap()
+    }
+
+    fn exact_shipped_dogfood_v1_record() -> Vec<u8> {
+        let evidence: serde_json::Value = serde_json::from_slice(include_bytes!(
+            "../repository_state/shipped_v1_dogfood_evidence.json"
+        ))
+        .expect("pinned evidence is JSON");
+        let mut bytes = serde_json::to_vec_pretty(&serde_json::json!({
+            "id": "jit-dogfood",
+            "version": "1.0.0",
+            "origin": { "source": "embedded" },
+            "package_hash": "43829e7e032e5e9ec40776103b1996f15e7291664c8b11e403c20b7f54af905c",
+            "target_hashes": evidence["target_hashes"],
+        }))
+        .expect("v1 fixture serializes");
+        bytes.push(b'\n');
+        bytes
+    }
+
     #[test]
     fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
         let (temp, _storage, executor, _package) = fixture();
@@ -2131,6 +2324,175 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_profile_package_refuses_embedded_provenance_without_restoring_discovery() {
+        let (temp, _storage, executor, _package) = fixture();
+        let id = fixture_id();
+        store_record(
+            &temp,
+            &AppliedProfileRecord::new(
+                id.clone(),
+                "1.0.0",
+                ">=1.0.0, <2.0.0",
+                ProfileOrigin::Embedded,
+                "a".repeat(64),
+                ResolvedVariables::default(),
+                BTreeSet::new(),
+            ),
+        );
+
+        let error = executor
+            .resolve_profile_package(&ProfileSelector::id(&id).unwrap())
+            .unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<ProfileResolutionError>(),
+            Some(ProfileResolutionError::EmbeddedProvenanceUnavailable { record })
+                if record == &format!(".jit/profiles/{id}.json")
+        ));
+    }
+
+    #[test]
+    fn test_apply_profile_package_keeps_embedded_provenance_as_ownership_only_on_later_mutations() {
+        let (temp, _storage, executor, _package) = fixture();
+        store_record(
+            &temp,
+            &AppliedProfileRecord::new(
+                "jit-dogfood",
+                "1.0.0",
+                ">=1.0.0, <2.0.0",
+                ProfileOrigin::Embedded,
+                "a".repeat(64),
+                ResolvedVariables::default(),
+                BTreeSet::new(),
+            ),
+        );
+        let later =
+            package_publishing(&temp, "vendor/later", "later", "notes/later.txt", "later\n");
+
+        let applied = executor
+            .apply_profile_package(&later)
+            .expect("a later mutation does not resolve Embedded provenance as configuration");
+        assert_eq!(applied.profiles.len(), 1);
+        assert!(temp.path().join("notes/later.txt").is_file());
+    }
+
+    #[test]
+    fn test_apply_profile_from_sources_keeps_embedded_provenance_out_of_mutating_graph_resolution()
+    {
+        let (temp, _storage, executor, _package) = fixture();
+        store_record(
+            &temp,
+            &AppliedProfileRecord::new(
+                "jit-dogfood",
+                "1.0.0",
+                ">=1.0.0, <2.0.0",
+                ProfileOrigin::Embedded,
+                "a".repeat(64),
+                ResolvedVariables::default(),
+                BTreeSet::new(),
+            ),
+        );
+
+        let result = executor
+            .apply_profile_from_sources(
+                &[ProfileSelector::path(FIXTURE_LOCATION)],
+                &ProfileVariableOptions::default(),
+            )
+            .expect("a mutation treats Embedded provenance as ownership only");
+        assert_eq!(result.profiles.len(), 1);
+    }
+
+    #[test]
+    fn test_apply_profile_package_authenticates_a_shipped_v1_record_once_before_publication() {
+        let (temp, storage, executor, _package) = fixture();
+        let raw_v1 = exact_shipped_dogfood_v1_record();
+        fs::create_dir_all(temp.path().join(".jit/profiles")).unwrap();
+        let record_path = temp.path().join(".jit/profiles/jit-dogfood.json");
+        fs::write(&record_path, &raw_v1).unwrap();
+        let later =
+            package_publishing(&temp, "vendor/later", "later", "notes/later.txt", "later\n");
+
+        crate::repository_state::reset_shipped_v1_conversion_count();
+        let error = executor.apply_profile_package(&later).unwrap_err();
+
+        assert!(error.to_string().contains("shipped-v1 migration"));
+        assert_eq!(crate::repository_state::shipped_v1_conversion_count(), 1);
+        assert_eq!(fs::read(&record_path).unwrap(), raw_v1);
+        assert!(!temp.path().join("notes/later.txt").exists());
+        assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_package_retains_an_adopted_managed_region_across_reapplication() {
+        let (temp, _storage, executor, _package) = fixture();
+        let package_root = temp.path().join("vendor/managed-region");
+        fs::create_dir_all(package_root.join("assets")).unwrap();
+        fs::write(
+            package_root.join("manifest.toml"),
+            r#"
+[profile]
+manifest-version = 2
+id = "managed-region"
+version = "1.0.0"
+compatible-jit = "*"
+
+[[region]]
+source = "assets/guidance.md"
+target = "AGENTS.md"
+region-id = "guidance"
+placement = "append"
+"#,
+        )
+        .unwrap();
+        fs::write(
+            package_root.join("assets/guidance.md"),
+            b"Repository guidance.\n",
+        )
+        .unwrap();
+        fs::write(
+            temp.path().join("AGENTS.md"),
+            b"Repository policy.\n\n<!-- jit:guidance:begin -->\nRepository guidance.\n<!-- jit:guidance:end -->\n",
+        )
+        .unwrap();
+        let package = ProfilePackage::from_directory(&package_root).unwrap();
+
+        executor.apply_profile_package(&package).unwrap();
+        let first = record_for(&temp, "managed-region");
+        assert!(first.claims.iter().any(|claim| {
+            matches!(
+                claim.identity,
+                crate::repository_state::AppliedProfileClaimIdentity::ManagedRegion { .. }
+            ) && claim.retain_if_unowned
+        }));
+
+        executor.apply_profile_package(&package).unwrap();
+        let second = record_for(&temp, "managed-region");
+        assert!(second.claims.iter().any(|claim| {
+            matches!(
+                claim.identity,
+                crate::repository_state::AppliedProfileClaimIdentity::ManagedRegion { .. }
+            ) && claim.retain_if_unowned
+        }));
+    }
+
+    #[test]
+    fn test_ordinary_profile_readers_reject_shipped_v1_records() {
+        let (temp, _storage, executor, _package) = fixture();
+        let applied = package_read_from(&temp, "vendor/recorded");
+        executor.apply_profile_package(&applied).unwrap();
+        let id = applied.model().id.to_string();
+        let record_path = temp.path().join(format!(".jit/profiles/{id}.json"));
+        fs::write(&record_path, shipped_v1_record(&stored_record(&temp))).unwrap();
+        let selector = ProfileSelector::id(&id).unwrap();
+
+        assert!(executor.resolve_profile_package(&selector).is_err());
+        assert!(executor.list_recorded_profiles().is_err());
+        assert!(executor
+            .show_profiles(std::slice::from_ref(&selector))
+            .is_err());
+        assert!(executor.plan_profiles(&[selector]).is_err());
+    }
+
+    #[test]
     fn test_resolve_profile_package_reads_the_recorded_package_not_another_declaring_that_id() {
         let (temp, _storage, executor, _package) = fixture();
         let (_workspace, authored) = crate::test_utils::temporary_repository_package("jit-dogfood");
@@ -2153,11 +2515,11 @@ mod tests {
             &AppliedProfileRecord::new(
                 id.clone(),
                 recorded.model().version.clone(),
+                recorded.model().compatible_jit.clone(),
                 ProfileOrigin::Directory(RootRelativePath::parse("vendor/dogfood").unwrap()),
                 recorded.hashes().package.clone(),
                 ResolvedVariables::default(),
-                recorded.hashes().targets.clone(),
-                Vec::new(),
+                BTreeSet::new(),
             ),
         );
 
@@ -2414,7 +2776,10 @@ mod tests {
         // The stored location resolves, from the worktree root alone, back to
         // the directory whose bytes were applied — which is the whole point of
         // recording it.
-        let ProfileOrigin::Directory(location) = stored_record(&temp).origin;
+        let location = match stored_record(&temp).origin {
+            ProfileOrigin::Directory(location) => location,
+            ProfileOrigin::Embedded => panic!("fixture records a directory package"),
+        };
         assert_eq!(
             ProfilePackage::from_directory(&temp.path().join(location.as_path()))
                 .expect("the recorded location names a readable package")
@@ -3134,17 +3499,21 @@ template = true
         let record_bytes =
             fs::read(temp.path().join(".jit/profiles/planner-variable.json")).unwrap();
         let record: AppliedProfileRecord = serde_json::from_slice(&record_bytes).unwrap();
-        assert_ne!(
-            record.target_hashes,
-            package.hashes().targets,
-            "applied target fingerprints must include resolved content"
-        );
-        assert!(
-            record.target_hashes.values().all(|hash| event_bytes
-                .windows(hash.len())
-                .any(|window| window == hash.as_bytes())),
-            "the profile_applied event must carry the same resolved target fingerprints"
-        );
+        assert!(record
+            .claims
+            .iter()
+            .all(|claim| claim.base_fingerprint.as_str().len() == 64));
+        let resolved = resolve_package(
+            &package,
+            &inputs.for_declarations(&package.model().variables),
+        )
+        .expect("the applied variable inputs resolve the package");
+        let events = storage.read_events().unwrap();
+        assert!(matches!(
+            events.as_slice(),
+            [Event::ProfileApplied { target_hashes, .. }]
+                if *target_hashes == resolved.target_hashes().expect("resolved target hashes")
+        ));
         assert!(!event_bytes
             .windows(resolved_value.len())
             .any(|window| window == resolved_value.as_bytes()));
@@ -3159,7 +3528,6 @@ template = true
             record.variables.sources()[&"NAME".try_into().unwrap()],
             crate::profile::VariableSource::Set
         );
-        assert_eq!(storage.read_events().unwrap().len(), 1);
     }
 
     #[test]
@@ -3452,19 +3820,67 @@ template = true
 
         executor.apply_profile_package(&workflow).unwrap();
 
-        for package in [base, workflow] {
-            let record = record_for(&temp, package.model().id.as_str());
-            assert_eq!(record.contributions.len(), 1);
-            assert_eq!(
-                record.contributions[0].owners,
-                vec![
-                    ProfilePackageId::new("base"),
-                    ProfilePackageId::new("workflow")
-                ],
-                "{} retains complete ownership on the closure's first application",
-                package.model().id
-            );
-        }
+        let shared_claims = [base, workflow]
+            .into_iter()
+            .map(|package| {
+                let record = record_for(&temp, package.model().id.as_str());
+                let semantic = record
+                    .claims
+                    .into_iter()
+                    .filter(|claim| {
+                        matches!(
+                            claim.identity,
+                            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(semantic.len(), 1);
+                semantic.into_iter().next().unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert!(shared_claims.iter().all(|claim| matches!(
+            claim.identity,
+            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
+        )));
+        assert_eq!(shared_claims[0], shared_claims[1]);
+    }
+
+    #[test]
+    fn test_effective_configuration_loads_registry_not_record_claims() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let namespace = "registry-derived";
+        let package = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            namespace,
+            "Published definition.",
+        );
+        executor.apply_profile_package(&package).unwrap();
+        let record = record_for(&temp, "workflow");
+        assert!(record.claims.iter().any(|claim| matches!(
+            claim.identity,
+            crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
+        )));
+
+        let config_path = temp.path().join(".jit/config.toml");
+        let registry = fs::read_to_string(&config_path)
+            .unwrap()
+            .replace("Published definition.", "Current registry definition.");
+        fs::write(config_path, registry).unwrap();
+        let reloaded = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+
+        assert_eq!(
+            reloaded
+                .cached_config()
+                .unwrap()
+                .namespaces
+                .as_ref()
+                .unwrap()[namespace]
+                .description,
+            "Current registry definition."
+        );
     }
 
     #[test]
@@ -3682,13 +4098,16 @@ template = true
         assert_eq!(record_for(&temp, "stated").id, "stated");
         let record = record_for(&temp, "restated");
         assert_eq!(record.id, "restated");
-        assert_eq!(record.contributions.len(), 1);
         assert_eq!(
-            record.contributions[0].owners,
-            vec![
-                ProfilePackageId::new("restated"),
-                ProfilePackageId::new("stated")
-            ]
+            record
+                .claims
+                .iter()
+                .filter(|claim| matches!(
+                    claim.identity,
+                    crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
+                ))
+                .count(),
+            1
         );
     }
 
@@ -3711,10 +4130,16 @@ template = true
             ProfileApplicationStatus::Unchanged
         );
         let record = record_for(&temp, "workflow");
-        assert_eq!(record.contributions.len(), 1);
         assert_eq!(
-            record.contributions[0].owners,
-            vec![ProfilePackageId::new("workflow")]
+            record
+                .claims
+                .iter()
+                .filter(|claim| matches!(
+                    claim.identity,
+                    crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
+                ))
+                .count(),
+            1
         );
     }
 
@@ -3742,10 +4167,16 @@ template = true
         assert!(config.contains("First registry definition."));
         assert!(config.contains("Second registry definition."));
         let record = record_for(&temp, "workflow");
-        assert_eq!(record.contributions.len(), 1);
         assert_eq!(
-            record.contributions[0].owners,
-            vec![ProfilePackageId::new("workflow")]
+            record
+                .claims
+                .iter()
+                .filter(|claim| matches!(
+                    claim.identity,
+                    crate::repository_state::AppliedProfileClaimIdentity::Semantic { .. }
+                ))
+                .count(),
+            1
         );
     }
 

@@ -54,7 +54,7 @@ pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{
     profile_package_model_schema, AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration,
     ProfileDependencyRequirement, ProfileId, ProfileIncompatibility, ProfilePackageModel,
-    ProfileVariableDeclaration, ProfileVariableName, RegionDeclaration, RegionPlacement,
+    ProfileVariableDeclaration, ProfileVariableName, RegionDeclaration, RegionId, RegionPlacement,
     MANIFEST_FILE_NAME,
 };
 pub use package::{

@@ -931,7 +931,7 @@ mod tests {
         RegionDeclaration {
             source: source.to_string(),
             target: target.to_string(),
-            region_id: region_id.to_string(),
+            region_id: region_id.try_into().expect("test region id is canonical"),
             placement: RegionPlacement::Append,
             template: false,
         }

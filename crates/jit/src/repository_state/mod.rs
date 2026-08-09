@@ -188,17 +188,22 @@ pub use path::{
     RootRelativePath, VirtualPath,
 };
 pub use profile_apply::{
-    compose_resolved_contributions, AppliedProfileContribution, AppliedProfileRecord,
+    compose_resolved_contributions, AppliedClaimTarget, AppliedManagedRegionTarget,
+    AppliedProfileClaim, AppliedProfileClaimIdentity, AppliedProfileRecord,
     CompleteProjectionConfig, ComposedContribution, Contribution, ContributionCompositionConflict,
     ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
     ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
-    ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileConflictOccupant,
-    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflictError,
-    ScalarTarget, SetStringTarget,
+    ProfileApplicationInput, ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims,
+    ProfileConflictOccupant, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
+    ProfileTargetConflictError, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
-    preflight_profile_contributions, profile_capture_closure, profile_contribution_target_paths,
+    is_shipped_v1_candidate, migrate_shipped_v1_records, preflight_profile_contributions,
+    preflight_profile_contributions_for_mutation, profile_capture_closure,
+    profile_contribution_target_paths, shipped_v1_migration_paths,
 };
+#[cfg(test)]
+pub(crate) use profile_apply::{reset_shipped_v1_conversion_count, shipped_v1_conversion_count};
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
 };
@@ -305,6 +310,20 @@ pub enum ProducerError {
         /// JSON decoding failure.
         source: serde_json::Error,
     },
+    /// A provenance record was stored under a name other than its package id.
+    #[error("applied profile record '{path}' names package '{id}', expected '{expected}'")]
+    ProfileRecordPathMismatch {
+        /// Repository-relative record path.
+        path: String,
+        /// Record package identity.
+        id: String,
+        /// Canonical record path for that package identity.
+        expected: String,
+    },
+    /// A canonical profile-claim fingerprint could not serialize its resolved
+    /// semantic value.
+    #[error("could not fingerprint profile claim: {0}")]
+    ProfileClaimFingerprint(#[source] serde_json::Error),
     /// A supported archive edge target is absent from the proposed plan.
     #[error("supported archive edge target is absent from plan: {target}")]
     ProposedLayoutTargetAbsent { target: String },
