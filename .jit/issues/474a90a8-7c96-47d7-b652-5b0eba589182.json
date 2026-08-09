@@ -8,6 +8,7 @@
   ],
   "description": "Resolve a selection together with the profiles already applied, so declared\ndependencies, incompatibilities, and version ranges are settled before anything\nis written.\n\n## Background\n\nDependency closures resolve today, but nothing expresses that two packages must\nnot coexist, nothing constrains which engine versions a package supports, and the\nresolution does not consider profiles that are already applied but unselected.\n\n## Success Criteria\n\n- [hard] REQ-01: Resolution evaluates the selected packages together with every already-applied profile, so an unselected applied profile participates in dependency, incompatibility, and range decisions.\n- [hard] REQ-02: A missing dependency, a dependency cycle, a declared incompatibility between two participating packages, and a compatible-jit range the running engine falls outside of each fail before publication with a message naming the packages involved.\n- [hard] REQ-03: An unsafe relative path, a symlinked package source, and an executable asset the manifest did not declare executable each fail at read time.\n- [hard] REQ-04: Resolution is deterministic: the same selection and applied set produce the same resolved graph regardless of selector order.\n",
   "documents": [],
+  "done_at": "2026-08-09T10:47:34.036510950Z",
   "first_ready_at": "2026-08-09T09:44:18.374144863Z",
   "gates_required": [
     "cargo-ci",
@@ -37,7 +38,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Resolve the selected package set against its declared graph",
-  "updated_at": "2026-08-09T10:37:22.213289826Z"
+  "updated_at": "2026-08-09T10:47:34.036510950Z"
 }

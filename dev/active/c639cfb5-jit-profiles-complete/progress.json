@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -18,13 +18,13 @@
     {
       "wave_number": 3,
       "issues": [
-        {"id": "474a90a8-7c96-47d7-b652-5b0eba589182", "short_id": "474a90a8", "title": "Resolve the selected package set against its declared graph", "classification": "implementation", "status": "in_progress"}
+        {"id": "474a90a8-7c96-47d7-b652-5b0eba589182", "short_id": "474a90a8", "title": "Resolve the selected package set against its declared graph", "classification": "implementation", "status": "done"}
       ]
     },
     {
       "wave_number": 4,
       "issues": [
-        {"id": "f73d54a2-14bd-4641-bcfe-be5f1431c133", "short_id": "f73d54a2", "title": "Canonical package model, selection, and graph", "classification": "implementation", "status": "pending"},
+        {"id": "f73d54a2-14bd-4641-bcfe-be5f1431c133", "short_id": "f73d54a2", "title": "Canonical package model, selection, and graph", "classification": "implementation", "status": "done"},
         {"id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6", "short_id": "fc47a7bf", "title": "Resolve declared non-secret variables into package content", "classification": "implementation", "status": "pending"}
       ]
     },
@@ -141,7 +141,8 @@
   ],
   "rework_counts": {
     "f2ef652a": 2,
-    "eac6ec13": 2
+    "eac6ec13": 2,
+    "474a90a8": 0
   },
   "started_at": "2026-08-09T04:36:58+03:00"
 }
