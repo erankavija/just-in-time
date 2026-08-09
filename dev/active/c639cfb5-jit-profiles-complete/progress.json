@@ -1,12 +1,12 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
       "issues": [
-        {"id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6", "short_id": "f2ef652a", "title": "Normalize both package manifest versions into one canonical model", "classification": "implementation", "status": "in_progress"}
+        {"id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6", "short_id": "f2ef652a", "title": "Normalize both package manifest versions into one canonical model", "classification": "implementation", "status": "done"}
       ]
     },
     {

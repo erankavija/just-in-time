@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "810a10c730f5cc6426dd46747b2b336c4410522f",
+  "completed_at": "2026-08-09T03:45:45.790297505Z",
+  "duration_ms": 187327,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The strict versioned decoder, canonical-model cutover, v1 hash-continuity oracle, and updated callers satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f2ef652a-e192-4d37-ad7e-51be2b077fd6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7a4c1909-399f-4e1b-ba3f-a39f1b22eb4a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T03:42:38.462381010Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 532189dc, ddc01e62, 3259874d, c3fbf765, b1772b4b, 47e731de, 87827042, c89f6932, 76ecb24e, 810a10c (`jit:f2ef652a`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; .jit/issues/f2ef652a-e192-4d37-ad7e-51be2b077fd6.json; .jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/f2ef652a/requirement/REQ-01–REQ-04 (.jit/issues/f2ef652a-e192-4d37-ad7e-51be2b077fd6.json); @/issue/c639cfb5/requirement/REQ-09 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json); @/inv/canonical-cutover (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T03:39:01.098365412+00:00)\nTruncation recovery: bounded reads of individual commit patches/name-status, decoder halves, current package/hash/caller code, test diffs, and latest structured gate results\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The strict versioned decoder, canonical-model cutover, v1 hash-continuity oracle, and updated callers satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

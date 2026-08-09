@@ -8,6 +8,7 @@
   ],
   "description": "Give the profile engine one strict decoder that turns either package manifest\nversion into the single canonical package model the rest of the lifecycle reads.\n\n## Background\n\nThe manifest type is read directly as the runtime model today, so a new manifest\nfield is also a new runtime field and the shipped package tree constrains every\nlater addition. The lifecycle needs manifest fields the shipped wire does not\ncarry, and the shipped package must keep decoding byte-for-byte unchanged.\n\n## Success Criteria\n\n- [hard] REQ-01: A version-dispatching decoder accepts the shipped manifest wire and a second wire that adds dependency requirements, incompatibilities, a compatible-jit range, and variable declarations, and returns one canonical package model for both.\n- [hard] REQ-02: An unknown field, an unknown manifest version, or a field absent from the wire it appears in is rejected with a message naming the offending field.\n- [hard] REQ-03: The shipped package tree decodes without edits, and its package identity hash is unchanged from the value the current implementation produces for the same bytes.\n- [hard] REQ-04: The manifest type is no longer the runtime model; every reader consumes the canonical model, and no second decoder or parallel package representation remains.\n",
   "documents": [],
+  "done_at": "2026-08-09T03:46:13.135967229Z",
   "first_ready_at": "2026-08-08T23:11:26.421913953Z",
   "gates_required": [
     "cargo-ci",
@@ -16,12 +17,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-09T03:33:31.268963197Z",
+      "updated_at": "2026-08-09T03:42:28.571941750Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-08-09T03:37:29.447787230Z",
+      "updated_at": "2026-08-09T03:45:46.114476608Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,7 +37,7 @@
     "satisfies:REQ-09"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Normalize both package manifest versions into one canonical model",
-  "updated_at": "2026-08-09T03:37:29.447787230Z"
+  "updated_at": "2026-08-09T03:46:13.135967229Z"
 }
