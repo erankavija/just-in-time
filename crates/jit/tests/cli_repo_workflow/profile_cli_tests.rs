@@ -85,6 +85,25 @@ fn package_with_id<'a>(repo: &Path, location: &'a str, id: &str) -> &'a str {
     location
 }
 
+/// Write a package with one semantic contribution and no content targets.
+fn package_with_shared_namespace<'a>(
+    repo: &Path,
+    location: &'a str,
+    id: &str,
+    description: &str,
+) -> &'a str {
+    let root = repo.join(location);
+    fs::create_dir_all(&root).unwrap();
+    fs::write(
+        root.join("manifest.toml"),
+        format!(
+            "[profile]\nmanifest-version = 1\nid = \"{id}\"\nversion = \"1.0.0\"\njit = \">=0.2.0, <2.0.0\"\n\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\nidentity = \"shared\"\nvalue = {{ description = \"{description}\", unique = false }}\n"
+        ),
+    )
+    .unwrap();
+    location
+}
+
 fn path_selector(location: &str) -> String {
     format!("path:{location}")
 }
@@ -284,6 +303,94 @@ fn test_profile_apply_rejects_a_path_that_shadows_a_selected_profile_id() {
     let error_json = json(&output);
     let message = error_json["error"]["message"].as_str().unwrap_or_default();
     assert!(message.contains(FIXTURE_PROFILE), "{message}");
+}
+
+#[test]
+fn test_profile_apply_preflights_conflicting_repeatable_selectors_before_publication() {
+    for (first, second) in [
+        ("packages/base", "packages/workflow"),
+        ("packages/workflow", "packages/base"),
+    ] {
+        let repo = TempDir::new().unwrap();
+        assert!(jit(repo.path(), &["init"]).status.success());
+        package_with_shared_namespace(repo.path(), "packages/base", "base", "Base definition");
+        package_with_shared_namespace(
+            repo.path(),
+            "packages/workflow",
+            "workflow",
+            "Workflow definition",
+        );
+
+        let config_path = repo.path().join(".jit/config.toml");
+        let events_path = repo.path().join(".jit/events.jsonl");
+        let config_before = fs::read(&config_path).unwrap();
+        let events_before = fs::read(&events_path).unwrap();
+        let output = jit(
+            repo.path(),
+            &[
+                "profile",
+                "apply",
+                "--profile",
+                &path_selector(first),
+                "--profile",
+                &path_selector(second),
+                "--json",
+            ],
+        );
+
+        assert_eq!(output.status.code(), Some(4), "{output:?}");
+        assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
+        assert_eq!(fs::read(&config_path).unwrap(), config_before, "{output:?}");
+        assert_eq!(fs::read(&events_path).unwrap(), events_before);
+        assert!(!repo.path().join(".jit/profiles/base.json").exists());
+        assert!(!repo.path().join(".jit/profiles/workflow.json").exists());
+    }
+}
+
+#[test]
+fn test_profile_apply_records_complete_shared_ownership_on_first_apply() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let base =
+        package_with_shared_namespace(repo.path(), "packages/base", "base", "Shared definition");
+    let workflow = package_with_shared_namespace(
+        repo.path(),
+        "packages/workflow",
+        "workflow",
+        "Shared definition",
+    );
+
+    let selectors = [path_selector(base), path_selector(workflow)];
+    let args = [
+        "profile",
+        "apply",
+        "--profile",
+        selectors[0].as_str(),
+        "--profile",
+        selectors[1].as_str(),
+        "--json",
+    ];
+    let first = jit(repo.path(), &args);
+    assert!(first.status.success(), "{first:?}");
+
+    for id in ["base", "workflow"] {
+        let record: Value = serde_json::from_slice(
+            &fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
+        )
+        .unwrap();
+        let owners = record["contributions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|contribution| contribution["identity"]["target"]["name"] == "shared")
+            .unwrap()["owners"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|owner| owner.as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(owners, vec!["base", "workflow"]);
+    }
 }
 
 #[test]

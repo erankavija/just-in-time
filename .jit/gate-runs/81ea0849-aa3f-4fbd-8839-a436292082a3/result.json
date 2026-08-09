@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-cbcd9318",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "406e22b9732b7a1f3de4871b1bd64fba7c76a4e3",
+  "completed_at": "2026-08-09T14:56:54.443336546Z",
+  "duration_ms": 156428,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/profile_apply.rs",
+        "id": "F1",
+        "line": 640,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c639cfb5/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "Production profile application bypasses the new semantic composition and shared-ownership logic."
+      }
+    ],
+    "summary": "The semantic composition implementation is not wired into the profile-application path.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "81ea0849-aa3f-4fbd-8839-a436292082a3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T14:54:18.014608401Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5075 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-cbcd9318\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe704-7aa1-7041-a561-43abb630a09c\n--------\nuser\n--- 5062 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:cbcd9318 commits 74d8962a and 406e22b9\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 — dev/vision/9db27a3a-charter.md; @/issue/c639cfb5/requirement/REQ-03 — .jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json (markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T14:44:38Z); code-review unrun\nTruncation recovery: narrowed profile_apply patch/current-tree reads and call-site searches after truncated broad output\n\n1. **blocking · issue-impact** — The new composition engine is never connected to profile application: `compose_resolved_contributions` is used only by its unit tests, while production still passes raw `ProfileClaims.contributions` to `merge_semantic_contributions` at `crates/jit/src/repository_state/profile_apply.rs:640`. Thus applied records still retain only file-level `target_hashes`, equal definitions do not gain shared owners, and reapplying a package still relies on the old per-file occupant conflict path. This leaves REQ-01 through REQ-04 materially unimplemented. References: `@/issue/c639cfb5/requirement/REQ-03`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The semantic composition implementation is not wired into the profile-application path.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Production profile application bypasses the new semantic composition and shared-ownership logic.\",\"file\":\"crates/jit/src/repository_state/profile_apply.rs\",\"line\":640,\"references\":[\"@/issue/c639cfb5/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

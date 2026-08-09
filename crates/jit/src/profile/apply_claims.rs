@@ -5,7 +5,8 @@ use super::{
     ResolvedVariables, VariableInputs,
 };
 use crate::repository_state::{
-    FileMode, ProfileAssetClaim, ProfileClaims, ProfilePackageId, ProfileRegionClaim, TargetClaim,
+    FileMode, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim, ProfilePackageId,
+    ProfileRegionClaim, TargetClaim,
 };
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -55,6 +56,7 @@ pub fn build_profile_claims_from_resolved(
     replace_owned: bool,
 ) -> Result<ProfileClaims, ProfileClaimError> {
     validate_target_overlaps(package)?;
+    let contribution_claims = build_resolved_contribution_claims(package);
     let assets = package
         .model()
         .assets
@@ -103,11 +105,32 @@ pub fn build_profile_claims_from_resolved(
         contributions: if replace_owned {
             Vec::new()
         } else {
-            package.model().contributions.clone()
+            contribution_claims
         },
         assets,
         regions,
     })
+}
+
+/// Adapt the resolved semantic definitions of one package into composition
+/// claims.
+///
+/// The input is [`ResolvedProfileContent`], never the immutable package, so
+/// variables have already been substituted before definitions are compared.
+pub fn build_resolved_contribution_claims(
+    package: &ResolvedProfileContent,
+) -> Vec<ProfileContributionClaim> {
+    let package_id = ProfilePackageId::new(package.model().id.to_string());
+    package
+        .model()
+        .contributions
+        .iter()
+        .cloned()
+        .map(|contribution| ProfileContributionClaim {
+            package_id: package_id.clone(),
+            contribution,
+        })
+        .collect()
 }
 
 fn validate_target_overlaps(package: &ResolvedProfileContent) -> Result<(), ProfileClaimError> {
@@ -147,4 +170,51 @@ fn validate_target_overlaps(package: &ResolvedProfileContent) -> Result<(), Prof
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_build_resolved_contribution_claims_uses_variable_substituted_definition() {
+        let directory = TempDir::new().expect("a temporary package directory");
+        fs::write(
+            directory.path().join("manifest.toml"),
+            r#"
+[profile]
+manifest-version = 2
+id = "variable-package"
+version = "1.0.0"
+compatible-jit = "*"
+
+[[variable]]
+name = "NAME"
+default = "resolved"
+
+[[contribution]]
+kind = "map-entry"
+target = "namespaces"
+identity = "component"
+value = { description = "docs/{{jit:var:NAME}}" }
+"#,
+        )
+        .expect("a package manifest");
+        let package = ProfilePackage::from_directory(directory.path()).expect("a valid package");
+        let resolved = resolve_package(&package, &VariableInputs::default())
+            .expect("default variables resolve");
+
+        let claims = build_resolved_contribution_claims(&resolved);
+
+        assert!(matches!(
+            claims.as_slice(),
+            [ProfileContributionClaim {
+                package_id,
+                contribution: crate::repository_state::Contribution::MapEntry { value, .. },
+            }] if package_id.as_str() == "variable-package"
+                && value["description"] == "docs/resolved"
+        ));
+    }
 }

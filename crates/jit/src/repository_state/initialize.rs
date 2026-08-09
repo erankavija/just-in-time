@@ -36,7 +36,10 @@ use super::mutation::{
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
-use super::{ProfileApplicationInput, ProfileTargetDisposition, ProfileTargetMaterialization};
+use super::{
+    AppliedProfileRecord, ContributionCompositionConflict, ProfileApplicationInput,
+    ProfileTargetDisposition, ProfileTargetMaterialization,
+};
 use super::{ProfileTargetConflictError, RepositoryStateError};
 
 /// Stable ownership identity for the neutral scaffold materialization.
@@ -144,6 +147,9 @@ pub enum InitializationError {
     /// A profile asset would overwrite an unowned authored occupant.
     #[error(transparent)]
     ProfileTargetConflict(#[from] ProfileTargetConflictError),
+    /// Resolved package definitions disagree for one semantic identity.
+    #[error(transparent)]
+    ContributionComposition(#[from] ContributionCompositionConflict),
     /// A scaffold path is occupied by an unexpected filesystem kind.
     #[error("initialization target '{path:?}' is occupied by an unsupported filesystem kind")]
     UnexpectedOccupant {
@@ -420,9 +426,20 @@ impl InitializationScaffold {
         let Some(profile) = &self.profile else {
             return Ok(Vec::new());
         };
-        let proposed = super::apply_overlay(base, desired_overrides(base, &self.desired_files()?)?)
-            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
-        super::profile_apply::profile_capture_closure(&proposed, &profile.claims)
+        let proposed = self.profile_composition_base(base)?;
+        super::profile_apply::profile_capture_closure(&proposed, profile)
+            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
+    }
+
+    /// Overlay only the neutral scaffold files that initialization will actually
+    /// publish, preserving existing `IfAbsent` authored files. This is the
+    /// repository view against which profile composition is both captured and
+    /// preflighted before the scaffold can publish.
+    pub(crate) fn profile_composition_base(
+        &self,
+        base: &RepositoryImage,
+    ) -> Result<RepositoryImage, InitializationError> {
+        super::apply_overlay(base, desired_overrides(base, &self.desired_files()?)?)
             .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
     }
 
@@ -473,13 +490,16 @@ pub(super) fn derive_initialization(
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
     let mut profile_targets = Vec::new();
     let mut profile_changed = false;
+    let mut profile_record = None;
     if let Some(profile) = &scaffold.profile {
-        let derived = super::profile_apply::compose_profile_targets(
+        let composed = super::profile_apply::compose_profile_targets_with_context(
             &neutral_proposed,
             profile.claims.clone(),
+            profile.contribution_context.clone(),
         )
         .map_err(profile_composition_error)?;
-        for (path, (bytes, mode)) in derived {
+        let record = profile.record(composed.contributions);
+        for (path, (bytes, mode)) in composed.targets {
             let disposition = profile_target_disposition(&neutral_proposed, &path, &bytes, mode)?;
             profile_targets.push(ProfileTargetMaterialization {
                 path: path.clone(),
@@ -497,7 +517,8 @@ pub(super) fn derive_initialization(
                 });
             }
         }
-        profile_changed |= profile_record_changed(base, profile)?;
+        profile_changed |= profile_record_changed(base, profile, &record)?;
+        profile_record = Some(record);
     }
     let desired = dedup_last_wins(desired);
     let final_authority = authored_rule_overrides(base, &desired, &config_path, &rules_path)?;
@@ -510,8 +531,8 @@ pub(super) fn derive_initialization(
     if compose_rules {
         compose_existing_default_rules(base, final_authority, &mut actions)?;
     }
-    if let Some(profile) = &scaffold.profile {
-        push_record_action(base, profile, profile_changed, &mut actions)?;
+    if let (Some(profile), Some(record)) = (&scaffold.profile, &profile_record) {
+        push_record_action(base, profile, record, profile_changed, &mut actions)?;
     }
     if let Some(action) = events_action(base, scaffold.profile.as_ref(), profile_changed, context)?
     {
@@ -567,19 +588,20 @@ fn profile_target_disposition(
 fn profile_record_changed(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
+    record: &AppliedProfileRecord,
 ) -> Result<bool, InitializationError> {
     match base.entry(&profile.record_path)? {
         RepositoryEntry::Absent => Ok(true),
         RepositoryEntry::File { bytes, .. } => {
-            let existing = serde_json::from_slice::<super::AppliedProfileRecord>(bytes);
-            if existing.is_ok_and(|existing| existing == profile.record()) {
-                Ok(false)
-            } else {
-                Err(InitializationError::InstalledRecordConflict {
+            let existing = serde_json::from_slice::<AppliedProfileRecord>(bytes);
+            match existing {
+                Ok(existing) if existing == *record => Ok(false),
+                Ok(existing) if existing.matches_package_provenance(record) => Ok(true),
+                _ => Err(InitializationError::InstalledRecordConflict {
                     path: profile.record_path.clone(),
                     id: profile.id.clone(),
                     version: profile.version.clone(),
-                })
+                }),
             }
         }
         _ => Err(InitializationError::UnsupportedMetadataPath(
@@ -812,10 +834,16 @@ pub(super) fn derive_profile_application(
     profile: &ProfileApplicationInput,
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
-    let derived = super::profile_apply::compose_profile_targets(base, profile.claims.clone())
-        .map_err(profile_composition_error)?;
-    let mut targets = Vec::with_capacity(derived.len());
-    let files = derived
+    let composed = super::profile_apply::compose_profile_targets_with_context(
+        base,
+        profile.claims.clone(),
+        profile.contribution_context.clone(),
+    )
+    .map_err(profile_composition_error)?;
+    let record = profile.record(composed.contributions);
+    let mut targets = Vec::with_capacity(composed.targets.len());
+    let files = composed
+        .targets
         .into_iter()
         .map(|(path, (bytes, mode))| {
             let disposition = profile_target_disposition(base, &path, &bytes, mode)?;
@@ -853,11 +881,23 @@ pub(super) fn derive_profile_application(
             path: profile.record_path.clone(),
             owner: PROFILE_OWNER.to_string(),
             expected: ExpectedPreimage::Absent,
-            bytes: serialize_profile_record(profile)?,
+            bytes: serialize_profile_record(&record)?,
             mode: FileMode::Regular,
         }),
         RepositoryEntry::File { .. } => {
-            profile_record_changed(base, profile)?;
+            if profile_record_changed(base, profile, &record)? {
+                push_file_actions(
+                    base,
+                    &[DesiredFile {
+                        path: profile.record_path.clone(),
+                        bytes: serialize_profile_record(&record)?,
+                        mode: FileMode::Regular,
+                        policy: WritePolicy::Always,
+                        owner: PROFILE_OWNER,
+                    }],
+                    &mut actions,
+                )?;
+            }
         }
         _ => {
             return Err(InitializationError::UnsupportedMetadataPath(
@@ -918,15 +958,16 @@ fn dedup_last_wins(files: Vec<DesiredFile>) -> Vec<DesiredFile> {
 fn push_record_action(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
+    record: &AppliedProfileRecord,
     changed: bool,
     actions: &mut Vec<RepositoryAction>,
 ) -> Result<(), InitializationError> {
-    if changed && profile_record_changed(base, profile)? {
+    if changed && profile_record_changed(base, profile, record)? {
         push_file_actions(
             base,
             &[DesiredFile {
                 path: profile.record_path.clone(),
-                bytes: serialize_profile_record(profile)?,
+                bytes: serialize_profile_record(record)?,
                 mode: FileMode::Regular,
                 policy: WritePolicy::Always,
                 owner: PROFILE_OWNER,
@@ -937,11 +978,8 @@ fn push_record_action(
     Ok(())
 }
 
-fn serialize_profile_record(
-    profile: &ProfileApplicationInput,
-) -> Result<Vec<u8>, InitializationError> {
-    profile
-        .record()
+fn serialize_profile_record(record: &AppliedProfileRecord) -> Result<Vec<u8>, InitializationError> {
+    record
         .to_bytes()
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
 }
@@ -949,6 +987,7 @@ fn serialize_profile_record(
 fn profile_composition_error(error: RepositoryStateError) -> InitializationError {
     match error {
         RepositoryStateError::ProfileTargetConflict(error) => error.into(),
+        RepositoryStateError::ContributionComposition(error) => error.into(),
         error => InitializationError::RuleMaterialization(error.to_string()),
     }
 }

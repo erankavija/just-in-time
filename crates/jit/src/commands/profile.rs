@@ -11,8 +11,8 @@ use crate::profile::{
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
     MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
-    ProfileTargetDisposition, RepositoryEntry, RepositoryImage, RepositoryLayout,
-    RepositoryRootClass, VirtualPath,
+    ProfileContributionClaim, ProfileTargetDisposition, RepositoryEntry, RepositoryImage,
+    RepositoryLayout, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -351,7 +351,10 @@ pub(super) fn load_profile_variable_inputs(
     Ok(inputs)
 }
 
-fn validate_variable_inputs(packages: &[ProfilePackage], inputs: &VariableInputs) -> Result<()> {
+pub(super) fn validate_variable_inputs(
+    packages: &[ProfilePackage],
+    inputs: &VariableInputs,
+) -> Result<()> {
     let names = packages
         .iter()
         .flat_map(|package| package.model().variables.iter())
@@ -573,9 +576,16 @@ impl CommandExecutor<JsonFileStorage> {
         let metadata = package.model();
         let layout = self.require_layout()?;
         let context = MutationContext::preview();
+        let contribution_context =
+            self.profile_contribution_candidates(std::slice::from_ref(package), inputs)?;
         with_mutation_session(self.storage(), &layout, "profile planning", |session| {
-            let Some((plan, changes)) =
-                self.prepare_profile_resolved(session, package, &resolved, &context)?
+            let Some((plan, changes)) = self.prepare_profile_resolved(
+                session,
+                package,
+                &resolved,
+                &contribution_context,
+                &context,
+            )?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -603,6 +613,10 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Resolve and apply profiles with already captured variable inputs.
+    ///
+    /// The complete selected set is semantically preflighted before sequential
+    /// per-package publication begins, so every record for a shared definition
+    /// receives the same complete ownership evidence on its first application.
     pub fn apply_profile_with_inputs(
         &self,
         selectors: &[ProfileSelector],
@@ -613,13 +627,20 @@ impl CommandExecutor<JsonFileStorage> {
         // the first per-package publication. The later calls preserve the
         // repeatable selector result surface; this preflight makes graph
         // failures independent of that occurrence order.
-        if !selected.is_empty() {
+        let contribution_context = if selected.is_empty() {
+            Vec::new()
+        } else {
             let packages = self.resolve_profile_graph(&selected)?.selected_packages();
             validate_variable_inputs(&packages, inputs)?;
-        }
+            let candidates = self.profile_contribution_candidates(&packages, inputs)?;
+            self.preflight_profile_contributions(&candidates)?;
+            candidates
+        };
         selected
             .into_iter()
-            .map(|package| self.apply_profile_package_with_inputs(&package, inputs))
+            .map(|package| {
+                self.apply_profile_package_with_context(&package, inputs, &contribution_context)
+            })
             .collect::<Result<Vec<_>>>()
             .map(|results| {
                 ProfileComposedApplyResult::new(
@@ -629,6 +650,74 @@ impl CommandExecutor<JsonFileStorage> {
                         .collect(),
                 )
             })
+    }
+
+    /// Resolve the semantic candidates that every selected package contributes.
+    ///
+    /// The candidate vector is kept through the sequential publication loop so
+    /// each affected record derives its shared ownership from the same selection.
+    pub(super) fn profile_contribution_candidates(
+        &self,
+        packages: &[ProfilePackage],
+        inputs: &VariableInputs,
+    ) -> Result<Vec<ProfileContributionClaim>> {
+        let layout = self.require_layout()?;
+        packages
+            .iter()
+            .map(|package| {
+                let resolved = resolve_package(
+                    package,
+                    &inputs.for_declarations(&package.model().variables),
+                )?;
+                Ok(build_profile_claims_from_resolved(&resolved, &layout, false)?.contributions)
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(|claims| claims.into_iter().flatten().collect())
+    }
+
+    /// Preflight every selected package's resolved semantic contribution against
+    /// one captured repository image before the per-package publication loop.
+    fn preflight_profile_contributions(
+        &self,
+        candidates: &[ProfileContributionClaim],
+    ) -> Result<()> {
+        let layout = self.require_layout()?;
+        with_mutation_session(
+            self.storage(),
+            &layout,
+            "profile composition preflight",
+            |session| {
+                let Some((listed, recorded)) =
+                    capture_applied_records(session, &VirtualPath::PROFILES)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let mut spec = listed.capture_spec().clone();
+                spec.discover_paths(
+                    candidates
+                        .iter()
+                        .map(|claim| claim.contribution.registry_path())
+                        .map(|path| {
+                            listed
+                                .layout()
+                                .classify_repository_relative(path)
+                                .map_err(anyhow::Error::from)
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                )?;
+                let Some(image) = capture_or_retry(session.capture(spec))? else {
+                    return Ok(SessionStep::Retry);
+                };
+                if recorded_profile_ids(&image, &VirtualPath::PROFILES)? != recorded {
+                    return Ok(SessionStep::Retry);
+                }
+                crate::repository_state::preflight_profile_contributions(
+                    &image,
+                    candidates.to_vec(),
+                )?;
+                Ok(SessionStep::Done(()))
+            },
+        )
     }
 
     /// Resolve and apply profiles after loading command-bound variable inputs.
@@ -851,6 +940,10 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Apply one package closure with already captured variable inputs.
+    ///
+    /// The closure's semantic contributions are preflighted before any member
+    /// publishes, and the resulting scoped context gives each affected record
+    /// complete shared ownership evidence during that first sequential pass.
     pub fn apply_profile_package_with_inputs(
         &self,
         package: &ProfilePackage,
@@ -858,6 +951,29 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<ProfileComposedApplyResult> {
         let packages = self.resolve_profile_closure(package)?;
         validate_variable_inputs(&packages, inputs)?;
+        let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
+        self.preflight_profile_contributions(&contribution_context)?;
+        self.apply_profile_packages_with_context(&packages, inputs, &contribution_context)
+    }
+
+    /// Apply one package closure using a selection-scoped composition context
+    /// that has already passed semantic preflight.
+    fn apply_profile_package_with_context(
+        &self,
+        package: &ProfilePackage,
+        inputs: &VariableInputs,
+        contribution_context: &[ProfileContributionClaim],
+    ) -> Result<ProfileComposedApplyResult> {
+        let packages = self.resolve_profile_closure(package)?;
+        self.apply_profile_packages_with_context(&packages, inputs, contribution_context)
+    }
+
+    fn apply_profile_packages_with_context(
+        &self,
+        packages: &[ProfilePackage],
+        inputs: &VariableInputs,
+        contribution_context: &[ProfileContributionClaim],
+    ) -> Result<ProfileComposedApplyResult> {
         packages
             .iter()
             .map(|package| {
@@ -865,7 +981,7 @@ impl CommandExecutor<JsonFileStorage> {
                     package,
                     &inputs.for_declarations(&package.model().variables),
                 )?;
-                self.apply_one_profile_package(package, &resolved)
+                self.apply_one_profile_package(package, &resolved, contribution_context)
             })
             .collect::<Result<Vec<_>>>()
             .map(ProfileComposedApplyResult::new)
@@ -889,6 +1005,7 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         package: &ProfilePackage,
         resolved: &ResolvedProfileContent,
+        contribution_context: &[ProfileContributionClaim],
     ) -> Result<ProfileApplyResult> {
         let metadata = package.model();
         let layout = self.require_layout()?;
@@ -896,8 +1013,13 @@ impl CommandExecutor<JsonFileStorage> {
         // every retry so the appended ProfileApplied event's id/timestamp stay stable.
         let context = MutationContext::production();
         with_mutation_session(self.storage(), &layout, "profile application", |session| {
-            let Some((plan, _changes)) =
-                self.prepare_profile_resolved(session, package, resolved, &context)?
+            let Some((plan, _changes)) = self.prepare_profile_resolved(
+                session,
+                package,
+                resolved,
+                contribution_context,
+                &context,
+            )?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -951,7 +1073,11 @@ impl CommandExecutor<JsonFileStorage> {
         context: &MutationContext,
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
         let resolved = resolve_package(package, &VariableInputs::default())?;
-        self.prepare_profile_resolved(session, package, &resolved, context)
+        let contribution_context = self.profile_contribution_candidates(
+            std::slice::from_ref(package),
+            &VariableInputs::default(),
+        )?;
+        self.prepare_profile_resolved(session, package, &resolved, &contribution_context, context)
     }
 
     fn prepare_profile_resolved(
@@ -959,6 +1085,7 @@ impl CommandExecutor<JsonFileStorage> {
         session: &mut (dyn RepositoryMutationSession + '_),
         package: &ProfilePackage,
         resolved: &ResolvedProfileContent,
+        contribution_context: &[ProfileContributionClaim],
         context: &MutationContext,
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
         let metadata = package.model();
@@ -998,11 +1125,11 @@ impl CommandExecutor<JsonFileStorage> {
             };
 
         let input =
-            profile_application_input(package, resolved, base.layout(), record_path.clone())?;
+            profile_application_input(package, resolved, base.layout(), record_path.clone())?
+                .with_contribution_context(contribution_context);
         let mut expanded_paths = content_paths.clone();
         expanded_paths.extend(crate::repository_state::profile_capture_closure(
-            &base,
-            &input.claims,
+            &base, &input,
         )?);
         // A package that re-derives the default rules reaches the schemas they
         // reference, and reaching a schema that is absent means proving its
@@ -1017,7 +1144,8 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
         let input =
-            profile_application_input(package, resolved, base.layout(), record_path.clone())?;
+            profile_application_input(package, resolved, base.layout(), record_path.clone())?
+                .with_contribution_context(contribution_context);
         let preview = derive_materialization(
             &base,
             MaterializationRequest::ApplyProfile {
@@ -1038,9 +1166,9 @@ impl CommandExecutor<JsonFileStorage> {
             None => return Ok(None),
             Some(base) => base,
         };
-        let input = profile_application_input(package, resolved, probe.layout(), record_path)?;
-        let final_closure =
-            crate::repository_state::profile_capture_closure(&probe, &input.claims)?;
+        let input = profile_application_input(package, resolved, probe.layout(), record_path)?
+            .with_contribution_context(contribution_context);
+        let final_closure = crate::repository_state::profile_capture_closure(&probe, &input)?;
         if final_closure
             .iter()
             .any(|path| !probe.capture_spec().contains_path(path))
@@ -1402,7 +1530,11 @@ fn recorded_summary(
         version: metadata.version.clone(),
         origin: package_origin(&package, layout)?,
         jit: metadata.compatible_jit.clone(),
-        applied: record == expected_record(&package, layout, &record.variables)?,
+        applied: record.matches_package_provenance(&expected_record(
+            &package,
+            layout,
+            &record.variables,
+        )?),
     }))
 }
 
@@ -1454,6 +1586,7 @@ pub(super) fn expected_record(
         package.hashes().package.clone(),
         variables.clone(),
         resolved.target_hashes()?,
+        Vec::new(),
     ))
 }
 
@@ -1465,6 +1598,7 @@ fn profile_application_input(
     record_path: VirtualPath,
 ) -> Result<ProfileApplicationInput> {
     let metadata = resolved.model();
+    let claims = build_profile_claims_from_resolved(resolved, layout, false)?;
     Ok(ProfileApplicationInput {
         id: metadata.id.to_string(),
         version: metadata.version.clone(),
@@ -1472,7 +1606,8 @@ fn profile_application_input(
         variables: resolved.variables().clone(),
         target_hashes: resolved.target_hashes()?,
         origin: package_origin(package, layout)?,
-        claims: build_profile_claims_from_resolved(resolved, layout, false)?,
+        contribution_context: claims.contributions.clone(),
+        claims,
         record_path,
     })
 }
@@ -1528,9 +1663,10 @@ mod tests {
     use super::*;
     use crate::domain::Event;
     use crate::repository_state::{
-        Contribution, InitializationError, MapEntryTarget, ProducerError, ProfileConflictOccupant,
-        ProfilePackageId, ProfileTargetConflictError, RepositoryStateError, RootRelativePath,
-        ScalarTarget, SetStringTarget,
+        Contribution, ContributionCompositionConflict, ContributionConflictOwner,
+        InitializationError, MapEntryTarget, ProfileConflictOccupant, ProfilePackageId,
+        ProfileTargetConflictError, RepositoryStateError, RootRelativePath, ScalarTarget,
+        SetStringTarget,
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
@@ -1858,6 +1994,29 @@ mod tests {
         )
     }
 
+    fn package_declaring_contribution(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        dependencies: &[&str],
+        namespace: &str,
+        description: &str,
+    ) -> ProfilePackage {
+        package_declaring(temp, relative, id, dependencies);
+        let directory = temp.path().join(relative);
+        let manifest = directory.join(crate::profile::MANIFEST_FILE_NAME);
+        let authored = fs::read_to_string(&manifest).unwrap();
+        fs::write(
+            &manifest,
+            format!(
+                "{authored}{}",
+                namespace_contribution(namespace, description)
+            ),
+        )
+        .unwrap();
+        ProfilePackage::from_directory(&directory).unwrap()
+    }
+
     /// A manifest fragment declaring the label namespace `namespace` as
     /// `description`.
     fn namespace_contribution(namespace: &str, description: &str) -> String {
@@ -1883,6 +2042,19 @@ mod tests {
                 )),
             ) => conflict,
             _ => panic!("a colliding asset target fails as a target conflict: {error:#}"),
+        }
+    }
+
+    /// The semantic-composition conflict carried by real profile application.
+    fn contribution_conflict(error: &anyhow::Error) -> &ContributionCompositionConflict {
+        match error.downcast_ref::<RepositoryStateError>() {
+            Some(
+                RepositoryStateError::ContributionComposition(conflict)
+                | RepositoryStateError::Initialization(InitializationError::ContributionComposition(
+                    conflict,
+                )),
+            ) => conflict,
+            _ => panic!("a colliding contribution fails as a semantic conflict: {error:#}"),
         }
     }
 
@@ -1985,6 +2157,7 @@ mod tests {
                 recorded.hashes().package.clone(),
                 ResolvedVariables::default(),
                 recorded.hashes().targets.clone(),
+                Vec::new(),
             ),
         );
 
@@ -3257,6 +3430,88 @@ template = true
     }
 
     #[test]
+    fn test_apply_profile_package_records_shared_owners_for_its_dependency_closure() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let namespace = "closure-shared";
+        let base = package_declaring_contribution(
+            &temp,
+            "vendor/base",
+            "base",
+            &[],
+            namespace,
+            "Shared closure definition.",
+        );
+        let workflow = package_declaring_contribution(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            &["base"],
+            namespace,
+            "Shared closure definition.",
+        );
+
+        executor.apply_profile_package(&workflow).unwrap();
+
+        for package in [base, workflow] {
+            let record = record_for(&temp, package.model().id.as_str());
+            assert_eq!(record.contributions.len(), 1);
+            assert_eq!(
+                record.contributions[0].owners,
+                vec![
+                    ProfilePackageId::new("base"),
+                    ProfilePackageId::new("workflow")
+                ],
+                "{} retains complete ownership on the closure's first application",
+                package.model().id
+            );
+        }
+    }
+
+    #[test]
+    fn test_apply_profile_package_preflights_a_conflicting_dependency_closure() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let namespace = "closure-conflict";
+        package_declaring_contribution(
+            &temp,
+            "vendor/base",
+            "base",
+            &[],
+            namespace,
+            "Base definition.",
+        );
+        let workflow = package_declaring_contribution(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            &["base"],
+            namespace,
+            "Workflow definition.",
+        );
+
+        let error = executor.apply_profile_package(&workflow).unwrap_err();
+
+        let conflict = contribution_conflict(&error);
+        assert_eq!(
+            conflict.owners,
+            vec![
+                ContributionConflictOwner::Package(ProfilePackageId::new("base")),
+                ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+            ]
+        );
+        for path in [
+            ".jit/profiles/base.json",
+            ".jit/profiles/workflow.json",
+            "docs/base.txt",
+            "docs/workflow.txt",
+        ] {
+            assert!(
+                !temp.path().join(path).exists(),
+                "the conflicting closure published {path}"
+            );
+        }
+    }
+
+    #[test]
     fn test_apply_profile_package_names_both_packages_of_a_conflicting_asset_target() {
         let (temp, _storage, executor, _fixture) = fixture();
         let target = "docs/shared.txt";
@@ -3287,47 +3542,72 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_names_both_packages_of_a_conflicting_contribution() {
-        let (temp, _storage, executor, _fixture) = fixture();
+    fn test_apply_profile_package_reports_semantic_conflicts_without_an_order_winner() {
         let namespace = "shared-namespace";
-        let occupant = package_contributing(
-            &temp,
-            "vendor/base",
-            "base",
-            namespace,
-            "What the occupant means by it.",
-        );
-        let candidate = package_contributing(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            namespace,
-            "Another meaning entirely.",
-        );
-        executor.apply_profile_package(&occupant).unwrap();
+        let expected_owners = vec![
+            ContributionConflictOwner::Package(ProfilePackageId::new("base")),
+            ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+        ];
 
-        let error = executor.apply_profile_package(&candidate).unwrap_err();
+        for (first_id, first_description, second_id, second_description) in [
+            (
+                "base",
+                "The base meaning.",
+                "workflow",
+                "The workflow meaning.",
+            ),
+            (
+                "workflow",
+                "The workflow meaning.",
+                "base",
+                "The base meaning.",
+            ),
+        ] {
+            let (temp, _storage, executor, _fixture) = fixture();
+            let first = package_contributing(
+                &temp,
+                &format!("vendor/{first_id}"),
+                first_id,
+                namespace,
+                first_description,
+            );
+            let second = package_contributing(
+                &temp,
+                &format!("vendor/{second_id}"),
+                second_id,
+                namespace,
+                second_description,
+            );
+            executor.apply_profile_package(&first).unwrap();
 
-        let Some(RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
-            identity,
-            candidate: conflicting,
-            occupant: held_by,
-            ..
-        })) = error.downcast_ref::<RepositoryStateError>()
-        else {
-            panic!("a colliding contribution fails as a contribution conflict: {error:#}");
-        };
-        assert_eq!(identity, namespace);
-        assert_eq!(
-            *held_by,
-            ProfileConflictOccupant::Package(ProfilePackageId::new(
-                occupant.model().id.to_string()
-            ))
-        );
-        assert_eq!(
-            *conflicting,
-            ProfilePackageId::new(candidate.model().id.to_string())
-        );
+            let error = executor.apply_profile_package(&second).unwrap_err();
+
+            let conflict = contribution_conflict(&error);
+            assert_eq!(conflict.owners, expected_owners);
+            assert_eq!(
+                conflict.identity.to_string(),
+                Contribution::MapEntry {
+                    target: MapEntryTarget::Namespaces,
+                    identity: namespace.to_string(),
+                    value: serde_json::json!({ "description": first_description, "unique": false }),
+                }
+                .semantic_identity()
+                .to_string()
+            );
+            assert!(
+                !temp
+                    .path()
+                    .join(format!(".jit/profiles/{second_id}.json"))
+                    .exists(),
+                "the conflicting candidate must not gain a record"
+            );
+            assert!(
+                fs::read_to_string(temp.path().join(".jit/config.toml"))
+                    .unwrap()
+                    .contains(first_description),
+                "the first definition remains the repository state"
+            );
+        }
     }
 
     #[test]
@@ -3400,7 +3680,107 @@ template = true
             "identical\n"
         );
         assert_eq!(record_for(&temp, "stated").id, "stated");
-        assert_eq!(record_for(&temp, "restated").id, "restated");
+        let record = record_for(&temp, "restated");
+        assert_eq!(record.id, "restated");
+        assert_eq!(record.contributions.len(), 1);
+        assert_eq!(
+            record.contributions[0].owners,
+            vec![
+                ProfilePackageId::new("restated"),
+                ProfilePackageId::new("stated")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_recontributes_its_own_semantic_identity() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let package = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            "self-recontribution",
+            "One package owns this definition.",
+        );
+        executor.apply_profile_package(&package).unwrap();
+
+        let reapplied = executor.apply_profile_package(&package).unwrap();
+
+        assert_eq!(
+            reapplied.requested().unwrap().status,
+            ProfileApplicationStatus::Unchanged
+        );
+        let record = record_for(&temp, "workflow");
+        assert_eq!(record.contributions.len(), 1);
+        assert_eq!(
+            record.contributions[0].owners,
+            vec![ProfilePackageId::new("workflow")]
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_keeps_distinct_identities_in_one_registry_independent() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let first = package_contributing(
+            &temp,
+            "vendor/base",
+            "base",
+            "first-identity",
+            "First registry definition.",
+        );
+        let second = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            "second-identity",
+            "Second registry definition.",
+        );
+        executor.apply_profile_package(&first).unwrap();
+        executor.apply_profile_package(&second).unwrap();
+
+        let config = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
+        assert!(config.contains("First registry definition."));
+        assert!(config.contains("Second registry definition."));
+        let record = record_for(&temp, "workflow");
+        assert_eq!(record.contributions.len(), 1);
+        assert_eq!(
+            record.contributions[0].owners,
+            vec![ProfilePackageId::new("workflow")]
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_reports_repository_and_package_semantic_owners() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let namespace = "repository-owned";
+        let config_path = temp.path().join(".jit/config.toml");
+        let mut config = fs::read_to_string(&config_path).unwrap();
+        config.push_str(
+            "\n[namespaces.repository-owned]\ndescription = \"Repository definition.\"\nunique = false\n",
+        );
+        fs::write(config_path, config).unwrap();
+        let candidate = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            namespace,
+            "Package definition.",
+        );
+
+        let error = executor.apply_profile_package(&candidate).unwrap_err();
+
+        let conflict = contribution_conflict(&error);
+        assert_eq!(
+            conflict.owners,
+            vec![
+                ContributionConflictOwner::Repository,
+                ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+            ]
+        );
+        assert!(
+            !temp.path().join(".jit/profiles/workflow.json").exists(),
+            "a rejected repository conflict must not publish provenance"
+        );
     }
 
     #[test]

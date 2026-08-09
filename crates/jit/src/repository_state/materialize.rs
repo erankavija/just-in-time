@@ -571,8 +571,9 @@ mod tests {
         CaptureSpec, Contribution, EntryIdentity, InitializationScaffold, MapEntryTarget,
         MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
         MaterializationRequest, MutationContext, ProfileApplicationInput, ProfileAssetClaim,
-        ProfileClaims, ProfilePackageId, ProfileRegionClaim, RepositoryImage, RepositoryLayout,
-        RepositoryRootEvidence, RepositorySeed, RepositorySeedKind, TargetClaim,
+        ProfileClaims, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
+        RepositoryImage, RepositoryLayout, RepositoryRootEvidence, RepositorySeed,
+        RepositorySeedKind, TargetClaim,
     };
     use std::collections::BTreeMap;
 
@@ -964,6 +965,7 @@ kind = "advisory"
                 assets: Vec::new(),
                 regions: Vec::new(),
             },
+            contribution_context: Vec::new(),
             record_path: VirtualPath::data("profiles/identity-test.json").unwrap(),
         };
         let profile_image = image(&[
@@ -1706,13 +1708,16 @@ kind = "advisory"
         let test_layout = layout();
         let profile_claims = ProfileClaims {
             package_id: ProfilePackageId::new("profile-test"),
-            contributions: vec![Contribution::MapEntry {
-                target: MapEntryTarget::Namespaces,
-                identity: "profile-owned".to_string(),
-                value: serde_json::json!({
-                    "description": "profile-owned namespace",
-                    "unique": false,
-                }),
+            contributions: vec![ProfileContributionClaim {
+                package_id: ProfilePackageId::new("profile-test"),
+                contribution: Contribution::MapEntry {
+                    target: MapEntryTarget::Namespaces,
+                    identity: "profile-owned".to_string(),
+                    value: serde_json::json!({
+                        "description": "profile-owned namespace",
+                        "unique": false,
+                    }),
+                },
             }],
             assets: vec![ProfileAssetClaim {
                 claim: TargetClaim::new(

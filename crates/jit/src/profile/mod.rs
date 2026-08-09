@@ -48,7 +48,7 @@ pub use application::{
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
-    ProfileClaimError,
+    build_resolved_contribution_claims, ProfileClaimError,
 };
 pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{

@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-cbcd9318",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a774627702af42900f6bd8e75f6bdc524eb65d9c",
+  "completed_at": "2026-08-09T17:43:24.966631787Z",
+  "duration_ms": 180982,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed implementation satisfies the semantic composition, ownership, conflict, and first-application coverage criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7a28001f-7f86-44ac-9daa-97e643a8d762",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T17:40:23.984060247Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 74d8962a, 406e22b9, 90eeb8fe, 97a9c19d, d7bb3241, abea9028, 4228d655, c17dcaf5, 88c2f70a, a7746277\nPolicy sources: AGENTS.md\nResolved items: none (the installed CLI’s stale-binary guard blocked `jit item show`; no finding relies on an unresolved item)\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T17:27:58Z)\nTruncation recovery: narrowed 97a9c19d patch reads and current-source/test reads for composition, application, initialization, provenance, and CLI coverage\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed implementation satisfies the semantic composition, ownership, conflict, and first-application coverage criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
