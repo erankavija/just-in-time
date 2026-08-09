@@ -61,6 +61,20 @@ label_namespace = "covers"
 
 [[gates]]
 version = 1
+key = "selected-rule"
+title = "Selected rule validation"
+description = "Evaluate one configured graph rule for the gated issue"
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "rule_validation"
+rule = "coverage-preview"
+
+[[gates]]
+version = 1
 key = "external-review"
 title = "External review"
 description = "Passing placeholder until a reviewer is configured"
@@ -107,7 +121,7 @@ pub fn render_reference_markdown() -> String {
          \n\
          ## Portable checker types\n\
          \n\
-         Automated gate definitions can use `exec` or one of four in-process checker types.\n\
+         Automated gate definitions can use `exec` or one of five in-process checker types.\n\
          The in-process checkers do not invoke a shell, a second `jit` binary, or `jq`, and the\n\
          configured gate key does not change their behavior:\n\
          \n\
@@ -117,6 +131,10 @@ pub fn render_reference_markdown() -> String {
          - `label_target_validation` reads exactly one `<label_namespace>:<target-id>` label\n\
            from the gated issue and runs scoped validation for that target. Its checker table\n\
            must set `label_namespace`.\n\
+         - `rule_validation` names one configured graph rule with `rule` and evaluates it\n\
+           with the gated issue as its sole firing subject. The complete repository may be\n\
+           used for graph and identifier-resolution context, but unrelated issues cannot\n\
+           contribute findings. A missing, disabled, or non-matching rule is an error.\n\
          - `review_placeholder` passes so a workflow can be installed before an external\n\
            reviewer is selected, but records an advisory structured finding and prints\n\
            `WARNING: EXTERNAL REVIEW PLACEHOLDER`. Whole-repository validation also warns\n\
@@ -125,7 +143,7 @@ pub fn render_reference_markdown() -> String {
            evidence.\n\
          \n\
          Native checker types are selected in the gate registry; `jit gate define` does not\n\
-         have a checker-type option. These four independent definitions show the canonical\n\
+         have a checker-type option. These five independent definitions show the canonical\n\
          `.jit/gates.toml` syntax. The keys are examples and can be replaced with any\n\
          configured gate keys:\n\
          \n\
@@ -176,7 +194,7 @@ mod tests {
         .unwrap();
 
         let registry = crate::storage::gate_store::load_gate_registry(dir.path()).unwrap();
-        assert_eq!(registry.gates.len(), 4);
+        assert_eq!(registry.gates.len(), 5);
         assert!(matches!(
             registry.gates["repository-policy"].checker.as_ref(),
             Some(GateChecker::RepositoryValidation)
@@ -190,6 +208,10 @@ mod tests {
             Some(GateChecker::LabelTargetValidation {
                 label_namespace
             }) if label_namespace == "covers"
+        ));
+        assert!(matches!(
+            registry.gates["selected-rule"].checker.as_ref(),
+            Some(GateChecker::RuleValidation { rule }) if rule == "coverage-preview"
         ));
         assert!(matches!(
             registry.gates["external-review"].checker.as_ref(),
@@ -215,6 +237,7 @@ mod tests {
                 GateChecker::RepositoryValidation => "repository_validation",
                 GateChecker::IssueValidation => "issue_validation",
                 GateChecker::LabelTargetValidation { .. } => "label_target_validation",
+                GateChecker::RuleValidation { .. } => "rule_validation",
                 GateChecker::ReviewPlaceholder => "review_placeholder",
                 GateChecker::Exec { .. } => panic!("the examples declare no exec checker"),
             };

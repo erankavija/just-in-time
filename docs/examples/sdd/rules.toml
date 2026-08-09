@@ -32,8 +32,10 @@
 #
 #   read as precedence `P > B > impl > C`: plan first, then breakdown, then the
 #   work, then the container closes. `P` carries the `plan-review` placeholder; `B`
-#   carries the deterministic `coverage-preview` gate (checker: `jit validate
-#   --scope <C>`). `B` carries a `brackets:<C-short-id>` label naming its container.
+#   carries the deterministic `coverage-preview` gate (checker:
+#   `rule_validation`, applying the configured preview rule with B as its sole
+#   firing issue). `B` carries a `brackets:<C-short-id>` label naming its
+#   container through the rule's `container-from-label` setting.
 #
 #   Coverage is checked at BOTH ends of the bracket, by ONE rule kind
 #   (`label-coverage`) instanced twice — see (3) closure and (3b) preview below.
@@ -53,7 +55,7 @@
 #       `type:breakdown`), resolves its container `C` via the `brackets:<C-short-id>`
 #       label, and checks that every `[hard]` criterion has a `satisfies:` child
 #       in ANY state (drafts sit in Backlog at breakdown time). An uncovered
-#       criterion BLOCKS the breakdown gate (exit 4 from `jit validate --scope`).
+#       criterion BLOCKS the breakdown gate (exit 4 from the selected-rule gate).
 #       This rule never fires on the epic, so an in-progress epic is unaffected.
 #
 #   DONE TRANSITION
@@ -231,10 +233,10 @@ assert = { label-coverage = { criteria-section = "success_criteria", marker = "[
 # `P` (beyond the boundary) does not count.
 #
 # The deterministic `coverage-preview` gate on `B` (attached to the breakdown node
-# by the `plan` template when `jit apply plan` scaffolds the bracket) runs
-# `jit validate --scope <C>`, which evaluates this rule; an uncovered `[hard]`
-# criterion BLOCKS the breakdown gate (exit 4). `enforce = true` makes the
-# severity blocking at scoped-validate time.
+# by the `plan` template when `jit apply plan` scaffolds the bracket) uses
+# `rule_validation`, which evaluates this rule with B as its sole firing issue;
+# an uncovered `[hard]` criterion BLOCKS the breakdown gate (exit 4).
+# `enforce = true` makes the severity blocking at selected-rule validation time.
 [[rules]]
 name = "sdd-coverage-preview"
 # State-gated on the breakdown node: while B sits in backlog (freshly scaffolded,

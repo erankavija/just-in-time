@@ -11,9 +11,10 @@
 #     its container C via the brackets: label.
 #   * The impl child does NOT carry satisfies:REQ-01, so REQ-01 is uncovered.
 #
-# `jit validate --scope $C` runs the preview coverage rule (child-state omitted =
-# any state) over C's impl interior. REQ-01 has no satisfying child in ANY state,
-# so the breakdown gate's deterministic checker blocks: exit 4, naming REQ-01.
+# The native breakdown gate applies the configured preview rule to B as its sole
+# firing issue. REQ-01 has no satisfying child in ANY state, so that gate blocks
+# with exit 4, naming REQ-01. The explicit `jit validate --scope $C` step below
+# remains a broad diagnostic reproduction, not the gate implementation.
 ruleset = "sdd"
 
 [[steps]]
@@ -81,8 +82,10 @@ capture = "none"
 argv = ["issue", "update", "$breakdown", "--state", "in_progress"]
 capture = "none"
 
-# The breakdown gate's deterministic checker (`jit validate --scope <C>`).
-# REQ-01 is uncovered -> blocked, exit 4, naming the uncovered criterion.
+# The explicit subtree command below is a broad diagnostic reproduction. In the
+# canonical workflow, the breakdown gate instead uses the native selected-rule
+# checker and fires only the configured preview rule for B. REQ-01 is uncovered
+# -> blocked, exit 4, naming the uncovered criterion.
 [[steps]]
 argv = ["validate", "--scope", "$container"]
 capture = "none"

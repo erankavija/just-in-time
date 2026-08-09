@@ -45,9 +45,11 @@ experiment = "experiment"
 # depends on the impl subgraph, which depends on B, which depends on P. Here the
 # breakable container is the research
 # `goal` — NOT a software container; the engine reads the breakable type from the
-# template and bakes in nothing. coverage-preview's checker runs
-# `jit validate --scope <C>` (resolving C from B's `brackets:<C-short-id>` label, so the
-# preview coverage rule fires and blocks when a [hard] criterion is uncovered);
+# template and bakes in nothing. coverage-preview's native rule-validation
+# checker applies the configured preview rule with B as its sole firing issue;
+# that rule resolves C through its own `container-from-label` setting (the
+# `brackets:<C-short-id>` label), so unrelated historical brackets cannot fire
+# and the preview blocks when a [hard] criterion is uncovered);
 # plan-review and breakdown-review are declared as warning-only review
 # placeholders; replace their checkers before treating either pass as review
 # evidence. The three gate definitions themselves are not in this directory —
@@ -72,6 +74,6 @@ unique = false
 examples = ["tests:H-1"]
 
 [namespaces.brackets]
-description = "On a breakdown node B: names the container C it brackets (the sole scope pointer for `validate --scope`)."
+description = "On a breakdown node B: names the container C used by the preview rule's container-from-label setting."
 unique = true
 examples = ["brackets:5c21327f"]

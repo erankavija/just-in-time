@@ -375,6 +375,11 @@ pub enum Commands {
         #[arg(long, value_name = "ID")]
         scope: Option<String>,
 
+        /// Evaluate one configured graph rule with the positional issue as its
+        /// sole firing subject. Repository issues remain resolution context.
+        #[arg(long, value_name = "RULE")]
+        rule: Option<String>,
+
         /// Repair safe findings; provenance-proven derived-state repairs use one
         /// recoverable transaction
         #[arg(long)]
@@ -3656,6 +3661,7 @@ mod recovery_dispatch_tests {
             json: false,
             explain: false,
             scope: None,
+            rule: None,
             fix: true,
             dry_run: false,
             branch_drift: false,

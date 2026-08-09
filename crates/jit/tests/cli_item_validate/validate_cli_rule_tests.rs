@@ -83,6 +83,35 @@ fn create_epic(temp: &TempDir, with_req: bool) -> String {
         .to_string()
 }
 
+fn create_labeled_issue(temp: &TempDir, title: &str, labels: &[&str]) -> String {
+    let mut args = vec![
+        "issue".to_string(),
+        "create".to_string(),
+        "--title".to_string(),
+        title.to_string(),
+    ];
+    labels.iter().for_each(|label| {
+        args.push("--label".to_string());
+        args.push((*label).to_string());
+    });
+    let output = bin()
+        .current_dir(temp.path())
+        .args(&args)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    String::from_utf8_lossy(&output)
+        .lines()
+        .find(|line| line.contains("Created issue:"))
+        .expect("created issue line")
+        .split_whitespace()
+        .last()
+        .expect("created issue id")
+        .to_string()
+}
+
 const EPIC_NEEDS_REQ: &str = r#"
 [[rules]]
 name = "epic-needs-req"
@@ -441,6 +470,33 @@ scope = "graph"
 assert = { label-reference = { from = "satisfies" } }
 "#;
 
+const DISABLED_GRAPH_RULE: &str = r#"
+[[rules]]
+name = "disabled-graph-rule"
+when = { type = "epic" }
+severity = "off"
+scope = "graph"
+assert = { label-coverage = { marker = "[hard]" } }
+"#;
+
+const SELECTED_COVERAGE_GRAPH_RULE: &str = r#"
+[[rules]]
+name = "selected-epic-criteria-covered"
+when = { type = "epic" }
+severity = "error"
+scope = "graph"
+assert = { label-coverage = { child-link = "dependencies", marker = "[hard]" } }
+"#;
+
+const SELECTED_BREAKDOWN_COVERAGE_RULE: &str = r#"
+[[rules]]
+name = "selected-breakdown-criteria-covered"
+when = { type = "breakdown" }
+severity = "error"
+scope = "graph"
+assert = { label-coverage = { child-link = "dependencies", marker = "[hard]", container-from-label = "brackets" } }
+"#;
+
 /// Create an epic whose body declares a single `[hard]` success criterion.
 fn create_epic_with_criterion(temp: &TempDir) -> String {
     let output = bin()
@@ -691,6 +747,137 @@ fn test_validate_explain_marks_malformed_graph_rule_as_failed() {
 }
 
 #[test]
+fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application() {
+    let temp = setup_repo_with_rules(SELECTED_COVERAGE_GRAPH_RULE);
+    let selected = create_epic_with_criterion(&temp);
+    let _child = create_labeled_issue(
+        &temp,
+        "Selected implementation",
+        &["type:task", "satisfies:REQ-01"],
+    );
+    bin()
+        .current_dir(temp.path())
+        .args(["dep", "add", &selected, &_child])
+        .assert()
+        .success();
+    let _unrelated = create_epic_with_criterion(&temp);
+    let selected_prefix = &selected[..8];
+
+    let clean = bin()
+        .current_dir(temp.path())
+        .args([
+            "validate",
+            selected_prefix,
+            "--rule",
+            "selected-epic-criteria-covered",
+            "--json",
+        ])
+        .assert()
+        .success();
+    let clean_json: Value = serde_json::from_slice(&clean.get_output().stdout).unwrap();
+    assert!(clean_json["findings"].as_array().unwrap().is_empty());
+
+    let failing = create_epic_with_criterion(&temp);
+    let failed = bin()
+        .current_dir(temp.path())
+        .args([
+            "validate",
+            &failing,
+            "--rule",
+            "selected-epic-criteria-covered",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .code(1);
+    let failed_json: Value = serde_json::from_slice(&failed.get_output().stdout).unwrap();
+    let findings = failed_json["error"]["details"]["findings"]
+        .as_array()
+        .unwrap();
+    assert!(findings.iter().any(|finding| {
+        finding["rule"] == "selected-epic-criteria-covered"
+            && finding["issue_id"] == failing
+            && finding["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("REQ-01")
+    }));
+}
+
+#[test]
+fn test_validate_rule_cli_selection_errors_do_not_pass_vacuously() {
+    let temp = setup_repo_with_rules(&format!("{COVERAGE_GRAPH_RULE}\n{DISABLED_GRAPH_RULE}"));
+    let epic = create_epic_with_criterion(&temp);
+    let task = create_labeled_issue(&temp, "A task", &["type:task"]);
+
+    for (id, rule, message) in [
+        (&epic, "missing-graph-rule", "was not found"),
+        (&epic, "disabled-graph-rule", "is off"),
+        (
+            &task,
+            "epic-criteria-covered",
+            "does not match selected issue",
+        ),
+    ] {
+        let assert = bin()
+            .current_dir(temp.path())
+            .args(["validate", id, "--rule", rule, "--json"])
+            .assert()
+            .failure()
+            .code(1);
+        let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+        let findings = json["error"]["details"]["findings"].as_array().unwrap();
+        assert!(
+            findings.iter().any(|finding| finding["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains(message)),
+            "{rule} must identify its selection error: {findings:?}"
+        );
+    }
+
+    bin()
+        .current_dir(temp.path())
+        .args(["validate", "--rule", "epic-criteria-covered"])
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("requires a positional issue id"));
+}
+
+#[test]
+fn test_validate_rule_cli_reports_missing_selected_container() {
+    let temp = setup_repo_with_rules(SELECTED_BREAKDOWN_COVERAGE_RULE);
+    let breakdown = create_labeled_issue(
+        &temp,
+        "Breakdown with missing target",
+        &["type:breakdown", "brackets:missing-target"],
+    );
+
+    let assert = bin()
+        .current_dir(temp.path())
+        .args([
+            "validate",
+            &breakdown,
+            "--rule",
+            "selected-breakdown-criteria-covered",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .code(1);
+    let json: Value = serde_json::from_slice(&assert.get_output().stdout).unwrap();
+    let findings = json["error"]["details"]["findings"].as_array().unwrap();
+    assert!(findings.iter().any(|finding| {
+        finding["rule"] == "selected-breakdown-criteria-covered"
+            && finding["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("names no known issue")
+    }));
+}
+
+#[test]
 fn test_schema_exposes_validate_positional_and_explain_flag() {
     // MCP parity: the new positional `id` arg and `--explain` flag MUST appear in
     // `jit --schema` so the MCP server auto-generates a working tool (DR §9.3).
@@ -713,6 +900,10 @@ fn test_schema_exposes_validate_positional_and_explain_flag() {
     assert!(
         flags.iter().any(|f| f["name"] == "json"),
         "validate must expose --json flag"
+    );
+    assert!(
+        flags.iter().any(|f| f["name"] == "rule"),
+        "validate must expose --rule for selected graph-rule reproduction"
     );
     let fix = flags.iter().find(|flag| flag["name"] == "fix").unwrap();
     assert!(
@@ -756,8 +947,9 @@ process.stdin.on('end', () => {
   const props = tool.inputSchema.properties || {};
   if (!props.id) { console.error('missing id property'); process.exit(3); }
   if (!props.explain) { console.error('missing explain property'); process.exit(4); }
+  if (!props.rule) { console.error('missing rule property'); process.exit(5); }
   if (!props.fix?.description?.includes('provenance-proven derived-state repairs use one recoverable transaction')) {
-    console.error('missing fix repair contract'); process.exit(5);
+    console.error('missing fix repair contract'); process.exit(6);
   }
   console.log('ok');
 });

@@ -5,9 +5,8 @@
 //! it. The gate is run separately by the standard gate runner
 //! (`jit gate evaluate <B> coverage-preview`) as a breakdown-workflow step. This test
 //! proves that the *attached* gate, when run via the real runner against a
-//! manually-built bracket fixture, executes the deterministic
-//! `jit validate --scope <C>` checker (the project's `scripts/coverage-preview.sh`)
-//! and persists a `GateRunResult` reflecting:
+//! manually-built bracket fixture, executes the deterministic native
+//! `rule_validation` checker and persists a `GateRunResult` reflecting:
 //!   - PASS (exit 0) when the drafted children cover every `[hard]` criterion, and
 //!   - FAIL (exit 4) when a `[hard]` criterion is left uncovered.
 //!
@@ -15,12 +14,10 @@
 //! temp `.jit` repo). The bracket spine `C → child → B` is built by hand so that
 //! `B` (which carries the coverage rule's `type:breakdown` selector and the
 //! `brackets:<C-short-id>` pointer) is inside `C`'s dependency closure — exactly the shape
-//! `bracket_breakdown` produces. The checker (`coverage-preview.sh`) resolves `C`
-//! from `B`'s `brackets:` label and shells out to the built `jit` binary, so the
-//! gate's PATH is set to the built-binary directory.
+//! `bracket_breakdown` produces. The configured rule resolves the selected container from
+//! the rule's `container-from-label` setting while keeping `B` as the sole firing issue.
 
 use assert_cmd::prelude::*;
-use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -78,24 +75,6 @@ enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"], container-from-label = "brackets" } }
 "#;
 
-/// Absolute path to the project's real coverage-preview gate checker.
-fn coverage_script() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2) // crates/jit -> crates -> repo root
-        .expect("repo root above crates/jit")
-        .join("scripts")
-        .join("coverage-preview.sh")
-}
-
-/// Directory containing the built `jit` binary under test, so the gate checker's
-/// bare `jit` invocations resolve to *this* build (not a stale installed one).
-fn bin_dir() -> PathBuf {
-    let mut p = PathBuf::from(assert_cmd::cargo::cargo_bin!("jit"));
-    p.pop();
-    p
-}
-
 fn jit(temp: &TempDir) -> Command {
     let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     cmd.current_dir(temp.path());
@@ -139,9 +118,24 @@ fn create_issue(temp: &TempDir, title: &str, description: &str, labels: &[&str])
     json["id"].as_str().expect("created issue id").to_string()
 }
 
+const COVERAGE_GATE_TOML: &str = r#"
+[[gates]]
+version = 1
+key = "coverage-preview"
+title = "Coverage Preview"
+description = "Evaluate the configured coverage-preview rule with the gated breakdown as its sole firing issue."
+stage = "postcheck"
+mode = "auto"
+priority = 100
+auto = true
+
+[gates.checker]
+type = "rule_validation"
+rule = "coverage-preview"
+"#;
+
 /// Initialize a temp repo with the bracket config, the `plan` template, the
-/// coverage rule, and a `coverage-preview` auto gate wired to the real checker
-/// (PATH points at the built binary so the script's bare `jit` resolves to this build).
+/// coverage rule, and a `coverage-preview` auto gate using the portable native checker.
 fn setup_bracket_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     jit(&temp).arg("init").assert().success();
@@ -150,33 +144,7 @@ fn setup_bracket_repo() -> TempDir {
     std::fs::write(jit_dir.join("config.toml"), BRACKET_CONFIG_TOML).unwrap();
     std::fs::write(jit_dir.join("templates.toml"), BRACKET_TEMPLATE_TOML).unwrap();
     std::fs::write(jit_dir.join("rules.toml"), COVERAGE_RULES_TOML).unwrap();
-
-    let script = coverage_script();
-    let path_env = format!(
-        "{}:{}",
-        bin_dir().display(),
-        std::env::var("PATH").unwrap_or_default()
-    );
-    jit(&temp)
-        .args([
-            "gate",
-            "define",
-            "coverage-preview",
-            "--title",
-            "Coverage Preview",
-            "--description",
-            "Scoped [hard]-criterion coverage check",
-            "--mode",
-            "auto",
-            "--checker-command",
-            script.to_str().unwrap(),
-            "--timeout",
-            "60",
-            "--env",
-            &format!("PATH={path_env}"),
-        ])
-        .assert()
-        .success();
+    std::fs::write(jit_dir.join("gates.toml"), COVERAGE_GATE_TOML).unwrap();
     temp
 }
 
@@ -312,4 +280,36 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
         Some("failed"),
         "uncovered run must record B's coverage-preview gate Failed: {issue}"
     );
+}
+
+#[test]
+fn test_selected_rule_ignores_historical_rejected_bracket_target() {
+    let temp = setup_bracket_repo();
+    let (_selected_container, selected_breakdown) =
+        build_bracket(&temp, "Current epic", "REQ-01", &["satisfies:REQ-01"]);
+    let (historical_container, _historical_breakdown) =
+        build_bracket(&temp, "Historical epic", "REQ-99", &[]);
+
+    // The historical target is rejected and its breakdown is unrelated to the
+    // selected gate application. Both issues remain in the repository image so
+    // the checker must prove subject isolation rather than relying on omission.
+    jit(&temp)
+        .args([
+            "issue",
+            "update",
+            &historical_container,
+            "--state",
+            "rejected",
+        ])
+        .assert()
+        .success();
+
+    jit(&temp)
+        .args(["gate", "evaluate", &selected_breakdown, "coverage-preview"])
+        .assert()
+        .success();
+
+    assert_gate_run(&temp, &selected_breakdown, "passed");
+    let historical = jit_json(&temp, &["issue", "show", &historical_container, "--json"]);
+    assert_eq!(historical["state"].as_str(), Some("rejected"));
 }

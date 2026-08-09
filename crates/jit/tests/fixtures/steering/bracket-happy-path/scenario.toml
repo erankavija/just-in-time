@@ -4,12 +4,13 @@
 # Same spine `C -> child -> B` as bracket-coverage-gap, but the impl child DOES
 # carry satisfies:REQ-01, so every [hard] criterion is covered.
 #
-# `jit validate --scope $C` runs the preview coverage rule (child-state omitted =
-# any state) over C's impl interior. REQ-01 is satisfied by the child (in ANY
-# state, drafts sit in Backlog at breakdown time), so the breakdown gate passes:
-# exit 0. We then walk the child to done and show C transitions to done cleanly,
-# demonstrating the full green path (the done-scoped closure coverage rule also
-# passes because the done child satisfies REQ-01).
+# The native breakdown gate applies the configured preview rule to B as its sole
+# firing issue. REQ-01 is satisfied by the child (in ANY state, drafts sit in
+# Backlog at breakdown time), so that gate passes with exit 0. The explicit
+# `jit validate --scope $C` step below is retained as a broad diagnostic, not as
+# the gate implementation. We then walk the child to done and show C transitions
+# to done cleanly, demonstrating the full green path (the done-scoped closure
+# coverage rule also passes because the done child satisfies REQ-01).
 ruleset = "sdd"
 
 [[steps]]
@@ -76,7 +77,8 @@ capture = "none"
 argv = ["issue", "update", "$breakdown", "--state", "in_progress"]
 capture = "none"
 
-# The breakdown gate's deterministic checker passes: REQ-01 is covered, exit 0.
+# The explicit subtree diagnostic also passes: REQ-01 is covered, exit 0. The
+# canonical breakdown gate is the native selected-rule checker described above.
 [[steps]]
 argv = ["validate", "--scope", "$container"]
 capture = "none"

@@ -544,6 +544,7 @@ fn updated_gate_definition(current: GateDefinition, update: GateUpdate) -> Resul
                 Some(GateChecker::RepositoryValidation)
                     | Some(GateChecker::IssueValidation)
                     | Some(GateChecker::LabelTargetValidation { .. })
+                    | Some(GateChecker::RuleValidation { .. })
                     | Some(GateChecker::ReviewPlaceholder)
             )
         {

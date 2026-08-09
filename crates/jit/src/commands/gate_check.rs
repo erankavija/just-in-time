@@ -193,6 +193,7 @@ fn checker_needs_validation_image(checker: &crate::declarations::GateChecker) ->
         crate::declarations::GateChecker::RepositoryValidation
             | crate::declarations::GateChecker::IssueValidation
             | crate::declarations::GateChecker::LabelTargetValidation { .. }
+            | crate::declarations::GateChecker::RuleValidation { .. }
     )
 }
 
@@ -1195,6 +1196,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                     failed,
                 )
             }
+            GateChecker::RuleValidation { rule } => {
+                let report =
+                    super::validate::rule_validation_report(repository_image, issue_id, rule)?;
+                let failed = report.has_errors();
+                (
+                    "builtin:rule_validation",
+                    gate_findings_from_rule_report(&report),
+                    failed,
+                )
+            }
             GateChecker::LabelTargetValidation { label_namespace } => {
                 let captured_issues = super::captured_active_issues(repository_image)?;
                 let issue = captured_issues
@@ -1771,6 +1782,71 @@ enforce_leases = "off"
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
         crate::commands::test_helpers::memory_executor(storage)
+    }
+
+    const RULE_VALIDATION_TEST_RULES: &str = r#"
+[[rules]]
+name = "coverage-preview"
+when = { type = "breakdown" }
+scope = "graph"
+severity = "error"
+assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", child-link = "dependencies", container-from-label = "brackets" } }
+
+[[rules]]
+name = "unrelated-local-failure"
+when = { type = "task" }
+scope = "local"
+severity = "error"
+assert = { require-label = { label = "required:*", min = 1 } }
+
+[[rules]]
+name = "unrelated-graph-failure"
+when = { type = "epic" }
+scope = "graph"
+severity = "error"
+assert = { label-coverage = { marker = "[hard]", child-link = "any" } }
+
+[[rules]]
+name = "unrelated-label-reference"
+when = { type = "task" }
+scope = "graph"
+severity = "error"
+assert = { label-reference = { from = "satisfies", to = "req" } }
+"#;
+
+    fn seed_rule_validation_rules(executor: &CommandExecutor<InMemoryStorage>) {
+        std::fs::write(
+            executor.storage.root().join("rules.toml"),
+            RULE_VALIDATION_TEST_RULES,
+        )
+        .unwrap();
+        seed_repo_file(
+            &executor.storage,
+            ".jit/rules.toml",
+            RULE_VALIDATION_TEST_RULES,
+        );
+    }
+
+    fn seed_unrelated_manual_gate(executor: &CommandExecutor<InMemoryStorage>) {
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "unrelated-pending".to_string(),
+            crate::declarations::GateDefinition {
+                version: 1,
+                key: "unrelated-pending".to_string(),
+                title: "Unrelated pending gate".to_string(),
+                description: "A deliberately unpassed unrelated gate".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Manual,
+                checker: None,
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: false,
+                example_integration: None,
+                inputs: None,
+            },
+        );
+        seed_gate_registry(&executor.storage, &registry);
     }
 
     fn prior_run(
@@ -2919,6 +2995,163 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         assert_eq!(result.status, GateRunStatus::Passed);
         assert_eq!(result.command, "builtin:label_target_validation");
         assert_eq!(result.findings.unwrap().verdict, "pass");
+    }
+
+    #[test]
+    fn test_rule_validation_checker_ignores_unrelated_validation_failures() {
+        let executor = setup();
+        let config = r#"
+[worktree]
+enforce_leases = "off"
+
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "[A-Z][A-Z0-9]*-[0-9]+"
+markers = ["[hard]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"
+"#;
+        std::fs::write(executor.storage.root().join("config.toml"), config).unwrap();
+        seed_repo_file(&executor.storage, ".jit/config.toml", config);
+        seed_rule_validation_rules(&executor);
+
+        let mut child = crate::domain::types::fixture_issue(
+            "Selected implementation".to_string(),
+            String::new(),
+        );
+        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        let child_id = child.id.clone();
+        seed_issue(&executor.storage, child);
+
+        let mut container = crate::domain::types::fixture_issue(
+            "Selected container".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-01: selected work\n".to_string(),
+        );
+        container.labels = vec!["type:epic".to_string()];
+        container.dependencies = vec![child_id];
+        let container_short = container.short_id();
+        seed_issue(&executor.storage, container);
+
+        let selected_id = add_builtin_gate(
+            &executor,
+            "coverage-preview",
+            GateChecker::RuleValidation {
+                rule: "coverage-preview".to_string(),
+            },
+            vec![
+                "type:breakdown".to_string(),
+                format!("brackets:{container_short}"),
+            ],
+        );
+
+        let mut local_failure = crate::domain::types::fixture_issue(
+            "Unrelated local failure".to_string(),
+            "See @/missing/item".to_string(),
+        );
+        local_failure.labels = vec![
+            "type:task".to_string(),
+            "satisfies:@/requirement/missing".to_string(),
+        ];
+        local_failure.dependencies = vec!["missing-dependency".to_string()];
+        local_failure.gates_required = vec!["unrelated-pending".to_string()];
+        seed_issue(&executor.storage, local_failure);
+
+        let mut unrelated_graph = crate::domain::types::fixture_issue(
+            "Unrelated graph failure".to_string(),
+            "## Success Criteria\n\n- [hard] REQ-99: uncovered\n".to_string(),
+        );
+        unrelated_graph.labels = vec!["type:epic".to_string()];
+        seed_issue(&executor.storage, unrelated_graph);
+        seed_unrelated_manual_gate(&executor);
+
+        let broad_report = executor
+            .run_rules(None)
+            .expect("the representative unrelated failures should be observable");
+        for rule in [
+            "unrelated-local-failure",
+            "unrelated-graph-failure",
+            "unrelated-label-reference",
+            crate::commands::DANGLING_LINK_RULE,
+        ] {
+            assert!(
+                broad_report
+                    .findings
+                    .iter()
+                    .any(|finding| finding.rule == rule),
+                "broad validation fixture must contain {rule}: {:?}",
+                broad_report.findings
+            );
+        }
+
+        let result = executor
+            .check_gate(&selected_id, "coverage-preview")
+            .expect("captured native rule validation should run");
+
+        assert_eq!(result.command, "builtin:rule_validation");
+        assert_eq!(result.status, GateRunStatus::Passed);
+        assert_eq!(result.exit_code, Some(0));
+        assert_eq!(result.findings.unwrap().verdict, "pass");
+    }
+
+    #[test]
+    fn test_rule_validation_checker_reports_missing_and_ambiguous_targets() {
+        let missing_executor = setup();
+        seed_rule_validation_rules(&missing_executor);
+        let missing_id = add_builtin_gate(
+            &missing_executor,
+            "coverage-preview",
+            GateChecker::RuleValidation {
+                rule: "coverage-preview".to_string(),
+            },
+            vec![
+                "type:breakdown".to_string(),
+                "brackets:missing-target".to_string(),
+            ],
+        );
+        let missing = missing_executor
+            .check_gate(&missing_id, "coverage-preview")
+            .expect("missing target should be a native validation failure");
+        assert_eq!(missing.status, GateRunStatus::Failed);
+        assert!(missing
+            .findings
+            .unwrap()
+            .findings
+            .iter()
+            .any(|finding| finding.summary.contains("names no known issue")));
+
+        let ambiguous_executor = setup();
+        seed_rule_validation_rules(&ambiguous_executor);
+        for id in ["deadbeef-a", "deadbeef-b"] {
+            let mut target = crate::domain::types::fixture_issue(
+                format!("Ambiguous target {id}"),
+                String::new(),
+            );
+            target.id = id.to_string();
+            target.labels = vec!["type:epic".to_string()];
+            seed_issue(&ambiguous_executor.storage, target);
+        }
+        let ambiguous_id = add_builtin_gate(
+            &ambiguous_executor,
+            "coverage-preview",
+            GateChecker::RuleValidation {
+                rule: "coverage-preview".to_string(),
+            },
+            vec![
+                "type:breakdown".to_string(),
+                "brackets:deadbeef".to_string(),
+            ],
+        );
+        let ambiguous = ambiguous_executor
+            .check_gate(&ambiguous_id, "coverage-preview")
+            .expect("ambiguous target should be a native validation failure");
+        assert_eq!(ambiguous.status, GateRunStatus::Failed);
+        assert!(ambiguous
+            .findings
+            .unwrap()
+            .findings
+            .iter()
+            .any(|finding| finding.summary.contains("ambiguous")));
     }
 
     #[test]

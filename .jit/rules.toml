@@ -68,7 +68,7 @@ assert = { require-label = { label = "brackets:*", min = 0, max = 1 } }
 [[rules]]
 name = "coverage-preview"
 origin = "bracket"
-description = "On a breakdown node, assert every [hard] REQ-id in the bracketed container's Success Criteria is credited by some issue in its dependency closure via a satisfies:<id> label. A plan-time coverage preview; fires once breakdown is underway."
+description = "On a matching breakdown node, apply the bracketed container's plan-time coverage preview with this issue as the sole firing subject; every [hard] REQ-id must be credited by a satisfies:<id> descendant."
 # Fires on the breakdown node B, redirects to its bracketed container C via the
 # brackets: label, and asserts every [hard] REQ-id in C's Success Criteria is
 # credited by some issue in C's dependency closure (stories/tasks) carrying a
@@ -82,4 +82,3 @@ when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
 severity = "error"
 enforce = true
 assert = { label-coverage = { criteria-section = "success_criteria", marker = "[hard]", id-pattern = "REQ-[0-9]+", satisfies-namespace = "satisfies", container-from-label = "brackets", child-link = "dependencies", child-type-exclude = ["breakdown", "planning"] } }
-

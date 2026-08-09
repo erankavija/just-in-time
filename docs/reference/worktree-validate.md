@@ -179,6 +179,11 @@ behavior depends on the arguments.
   membership-vs-DAG divergences are reported but do not fail the run.
 - **Per-issue** (`jit validate <id>`): runs the declarative rules for that one
   issue. The id accepts a full UUID, 8-char short id, or unique prefix.
+- **Selected rule** (`jit validate <id> --rule <rule>`): applies exactly one
+  configured graph rule with that issue as its sole firing subject. The complete
+  repository remains graph and identifier-resolution context only; a missing,
+  disabled, non-graph, or non-matching rule is an error rather than a vacuous
+  pass.
 
 `--fix` additionally repairs the auto-fixable findings (type-hierarchy label
 fixes, transitive-reduction violations, pending state transitions) and owned
@@ -195,7 +200,8 @@ locks, the claims index, expired leases — is repaired by
 |--------|-------------|
 | `[ID]` | Positional. Validate this one issue's rules; omit to validate the whole repository |
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
-| `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, and `--explain` |
+| `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and a rule or selection failure exits `1`. Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
+| `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
 | `--fix` | Auto-fix repairable rule/graph/state findings and provenance-proven derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
 | `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
@@ -216,6 +222,9 @@ jit validate a1b2c3d4
 
 # Explain which rules apply to an issue
 jit validate a1b2c3d4 --explain
+
+# Reproduce one configured graph-rule application
+jit validate a1b2c3d4 --rule coverage-preview
 
 # Validate a container's bracket subtree as a gate check
 jit validate --scope <container-id>
@@ -270,6 +279,11 @@ It fails as a usage error when `--dry-run` is given without `--fix`, and on the
 hidden `--divergence` stub, which errors and redirects to `--branch-drift` or
 `jit query divergence`. It fails as not-found when the positional issue id or the
 `--scope` container does not resolve.
+
+For `--rule`, a missing, disabled, non-graph, or non-matching configured rule is
+a validation finding and exits `1`, just like an uncovered selected application.
+Only invalid flag combinations or a missing required positional issue id are
+usage errors and exit `2`.
 
 The code each outcome exits with — including the codes that signal findings
 rather than errors — is in the [Exit Codes reference](exit-codes.md).

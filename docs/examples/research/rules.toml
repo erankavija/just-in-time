@@ -83,9 +83,10 @@
 #
 #   read as precedence `P > B > experiments > C`: plan first, then breakdown, then
 #   the experiments, then the goal closes. `P` carries the `plan-review` placeholder
-#   gate; `B` carries the deterministic `coverage-preview` gate (checker: `jit
-#   validate --scope <C>`). `B` carries a `brackets:<C-short-id>` label naming its
-#   container goal.
+#   gate; `B` carries the deterministic `coverage-preview` gate (checker:
+#   `rule_validation`, applying the configured preview rule with B as its sole
+#   firing issue). `B` carries a `brackets:<C-short-id>` label naming its
+#   container goal through the rule's `container-from-label` setting.
 #
 #   Hypothesis coverage is checked at BOTH ends of the bracket, by ONE rule kind
 #   (`label-coverage`) instanced twice — see rule (3) closure and rule (5) preview
@@ -96,8 +97,8 @@
 #   transient `B` node (keyed on `type:breakdown`), resolves its container goal `C`
 #   via the `brackets:<C-short-id>` label, and checks that every `[hard]` hypothesis has
 #   a `tests:` child in ANY state (drafted experiments sit in backlog at breakdown
-#   time). An uncovered hypothesis BLOCKS the breakdown gate (exit 4 from `jit
-#   validate --scope`). This rule never fires on the goal, so an in-progress goal
+#   time). An uncovered hypothesis BLOCKS the breakdown gate (exit 4 from the
+#   selected-rule gate). This rule never fires on the goal, so an in-progress goal
 #   is unaffected.
 #
 # ADAPTATION KNOBS:
@@ -263,10 +264,10 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
 # `P` (beyond the boundary) does not count.
 #
 # The deterministic `coverage-preview` gate on `B` (attached to the breakdown node
-# by the `plan` template when `jit apply plan` scaffolds the bracket) runs
-# `jit validate --scope <C>`, which evaluates this rule; an uncovered `[hard]`
-# hypothesis BLOCKS the breakdown gate (exit 4). `enforce = true` makes the
-# severity blocking at scoped-validate time.
+# by the `plan` template when `jit apply plan` scaffolds the bracket) applies this
+# configured rule with B as its sole firing issue; its `container-from-label`
+# setting resolves C. An uncovered `[hard]` hypothesis BLOCKS the breakdown gate
+# (exit 4). `enforce = true` makes the severity blocking at selected-rule time.
 [[rules]]
 name = "research-hypotheses-covered-preview"
 # State-gated on the breakdown node: while B sits in backlog (freshly scaffolded,

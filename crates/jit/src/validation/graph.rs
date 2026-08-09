@@ -427,6 +427,126 @@ pub fn evaluate_graph_scoped(
     )
 }
 
+/// Explain why a selected rule cannot be applied to one issue.
+///
+/// This pure selection boundary is shared by the live CLI and captured gate
+/// checker. Callers turn the returned message into an error-severity finding;
+/// the evaluator itself intentionally treats selection as already validated.
+pub fn graph_rule_selection_error(rule_name: &str, rule: &Rule, issue: &Issue) -> Option<String> {
+    if rule.severity == Severity::Off {
+        Some(format!("configured rule '{rule_name}' is off"))
+    } else if rule.scope != RuleScope::Graph {
+        Some(format!(
+            "configured rule '{rule_name}' is not a graph rule and cannot use rule validation"
+        ))
+    } else if !rule.when.matches(issue) {
+        Some(format!(
+            "configured rule '{rule_name}' does not match selected issue {}",
+            issue.short_id()
+        ))
+    } else {
+        None
+    }
+}
+
+/// Select one configured graph rule for a selected issue.
+///
+/// This keeps rule lookup and the non-vacuous selection contract identical for
+/// live and captured validation. The caller owns how the returned error becomes
+/// a command- or gate-level finding.
+pub fn select_graph_rule<'a>(
+    rules: &'a [Rule],
+    rule_name: &str,
+    issue: &Issue,
+) -> Result<&'a Rule, String> {
+    let rule = rules
+        .iter()
+        .find(|candidate| candidate.name == rule_name)
+        .ok_or_else(|| format!("configured rule '{rule_name}' was not found"))?;
+    if let Some(message) = graph_rule_selection_error(rule_name, rule, issue) {
+        Err(message)
+    } else {
+        Ok(rule)
+    }
+}
+
+/// Return the selected issue and its uniquely resolved coverage container id.
+///
+/// Resolution is deliberately performed against the same pure issue index that
+/// the evaluator receives. Missing or ambiguous pointers intentionally produce
+/// no additional plan source here; the pure evaluator reports those pointer
+/// errors for the selected firing issue.
+pub fn graph_rule_plan_source_ids(
+    rule: &Rule,
+    issue: &Issue,
+    resolution_index: &[Issue],
+) -> Vec<String> {
+    let mut source_ids = vec![issue.id.clone()];
+    if let Assertion::LabelCoverage { config } = &rule.assert {
+        if let Some(toml::Value::String(namespace)) = config.get("container-from-label") {
+            let prefix = format!("{namespace}:");
+            if let Some(value) = issue
+                .labels
+                .iter()
+                .find_map(|label| label.strip_prefix(&prefix))
+            {
+                if let ContainerMatch::Unique(target) = resolve_container(value, resolution_index) {
+                    if !source_ids.iter().any(|source_id| source_id == &target.id) {
+                        source_ids.push(target.id.clone());
+                    }
+                }
+            }
+        }
+    }
+    source_ids
+}
+
+/// Repository context supplied to one pure graph-rule application.
+///
+/// `graph_context` supplies relationship and declaration context, while
+/// `resolution_index` is used only for identifier resolution such as
+/// `container-from-label`. Keeping both separate from the firing slice prevents
+/// a repository-wide read set from silently widening a selected verdict.
+#[derive(Debug, Clone, Copy)]
+pub struct GraphEvaluationContext<'a> {
+    /// Issues available to relationship and declaration-aware assertions.
+    pub graph_context: &'a [Issue],
+    /// Issues available when resolving identifier or label pointers.
+    pub resolution_index: &'a [Issue],
+    /// Repository hierarchy used by type-hierarchy assertions.
+    pub hierarchy: &'a HierarchyConfig,
+    /// Default content format used for criteria parsing.
+    pub repo_default_format: ContentFormat,
+    /// Clock supplied to recency assertions.
+    pub now: DateTime<Utc>,
+    /// Captured external plan content keyed by issue id.
+    pub plan_content: &'a HashMap<String, String>,
+}
+
+/// Evaluate one graph rule with an explicit firing set and separate context.
+///
+/// `firing_issues` is the only set whose matching issues can become rule
+/// subjects. `graph_context` supplies relationship and declaration context for
+/// the rule, while `resolution_index` is used only for identifier resolution
+/// such as `container-from-label`. Keeping these sets separate prevents a
+/// repository-wide read set from silently widening a selected rule's verdict.
+///
+/// This is the pure boundary used by issue-and-rule-scoped checkers. Callers
+/// must validate that the selected rule exists, is enabled, and matches the
+/// selected issue before invoking it; an empty result here means the selected
+/// rule application passed, not that an absent application passed.
+pub fn evaluate_graph_rule(
+    rule: &Rule,
+    firing_issues: &[Issue],
+    context: &GraphEvaluationContext<'_>,
+) -> Vec<GraphFinding> {
+    if rule.scope != RuleScope::Graph || rule.severity == Severity::Off {
+        return Vec::new();
+    }
+
+    evaluate_one(rule, firing_issues, context)
+}
+
 /// Shared driver for [`evaluate_graph`] and [`evaluate_graph_scoped`]: evaluate
 /// each graph rule over the `evaluation` slice, resolving container pointers
 /// against `resolution_index`.
@@ -439,50 +559,49 @@ fn evaluate_graph_indexed(
     now: DateTime<Utc>,
     plan_content: &HashMap<String, String>,
 ) -> Vec<GraphFinding> {
+    let context = GraphEvaluationContext {
+        graph_context: evaluation,
+        resolution_index,
+        hierarchy,
+        repo_default_format,
+        now,
+        plan_content,
+    };
     rules
         .iter()
         .filter(|rule| rule.scope == RuleScope::Graph && rule.severity != Severity::Off)
-        .flat_map(|rule| {
-            evaluate_one(
-                rule,
-                evaluation,
-                resolution_index,
-                hierarchy,
-                repo_default_format,
-                now,
-                plan_content,
-            )
-        })
+        .flat_map(|rule| evaluate_one(rule, evaluation, &context))
         .collect()
 }
 
 /// Evaluate a single graph rule, dispatching on its assertion kind.
 fn evaluate_one(
     rule: &Rule,
-    issues: &[Issue],
-    resolution_index: &[Issue],
-    hierarchy: &HierarchyConfig,
-    repo_default_format: ContentFormat,
-    now: DateTime<Utc>,
-    plan_content: &HashMap<String, String>,
+    firing_issues: &[Issue],
+    context: &GraphEvaluationContext<'_>,
 ) -> Vec<GraphFinding> {
     match &rule.assert {
         Assertion::LabelCoverage { config } => evaluate_label_coverage(
             rule,
             config,
-            issues,
-            resolution_index,
-            repo_default_format,
-            plan_content,
+            firing_issues,
+            context.graph_context,
+            context.resolution_index,
+            context.repo_default_format,
+            context.plan_content,
         ),
-        Assertion::LabelReference { config } => evaluate_label_reference(rule, config, issues),
-        Assertion::DependencyShape { config } => evaluate_dependency_shape(rule, config, issues),
+        Assertion::LabelReference { config } => {
+            evaluate_label_reference(rule, config, firing_issues, context.graph_context)
+        }
+        Assertion::DependencyShape { config } => {
+            evaluate_dependency_shape(rule, config, firing_issues, context.graph_context)
+        }
         Assertion::GateRecency {
             max_age_hours,
             gates,
-        } => evaluate_gate_recency(rule, *max_age_hours, gates, issues, now),
+        } => evaluate_gate_recency(rule, *max_age_hours, gates, firing_issues, context.now),
         Assertion::TypeHierarchy { kind } => {
-            evaluate_type_hierarchy(rule, *kind, hierarchy, issues)
+            evaluate_type_hierarchy(rule, *kind, context.hierarchy, firing_issues)
         }
         Assertion::CriteriaLabelMatch {
             namespace,
@@ -495,9 +614,9 @@ fn evaluate_one(
             criteria_section,
             marker.as_deref(),
             id_pattern,
-            issues,
-            repo_default_format,
-            plan_content,
+            firing_issues,
+            context.repo_default_format,
+            context.plan_content,
         ),
         Assertion::CriteriaToCheck {
             criteria_section,
@@ -512,12 +631,12 @@ fn evaluate_one(
             id_pattern,
             gate_prefix.as_deref(),
             check_namespace.as_deref(),
-            issues,
-            repo_default_format,
-            plan_content,
+            firing_issues,
+            context.repo_default_format,
+            context.plan_content,
         ),
         Assertion::LabelUniqueness { namespace } => {
-            evaluate_label_uniqueness(rule, namespace, issues)
+            evaluate_label_uniqueness(rule, namespace, firing_issues)
         }
         // Non-graph kinds are never dispatched here (filtered by scope), but be
         // exhaustive and total rather than panic.
@@ -702,7 +821,8 @@ fn optional_str<'a>(
 fn evaluate_label_coverage(
     rule: &Rule,
     config: &toml::value::Table,
-    issues: &[Issue],
+    firing_issues: &[Issue],
+    graph_context: &[Issue],
     resolution_index: &[Issue],
     repo_default_format: ContentFormat,
     plan_content: &HashMap<String, String>,
@@ -817,7 +937,7 @@ fn evaluate_label_coverage(
         claims && state_ok
     };
 
-    issues
+    firing_issues
         .iter()
         .filter(|source| rule.when.matches(source))
         .flat_map(|source| {
@@ -835,7 +955,7 @@ fn evaluate_label_coverage(
                             // firing issue's coverage (ef0065ad). Whole-repo
                             // evaluation resolves against the same slice, so the
                             // container is always in-slice and nothing is skipped.
-                            if !issues.iter().any(|i| i.id == c.id) {
+                            if !graph_context.iter().any(|i| i.id == c.id) {
                                 return Vec::new();
                             }
                             c
@@ -889,7 +1009,7 @@ fn evaluate_label_coverage(
                 Err(err) => return vec![config_error(rule, err.to_string())],
             };
             let candidates: Vec<&Issue> =
-                children_of(container, issues, child_link, &exclude_types);
+                children_of(container, graph_context, child_link, &exclude_types);
             // The qualified `satisfies:` form is scoped to the criteria-owning
             // container's short id.
             let container_short = container.short_id();
@@ -1087,7 +1207,8 @@ fn children_of<'a>(
 fn evaluate_label_reference(
     rule: &Rule,
     config: &toml::value::Table,
-    issues: &[Issue],
+    firing_issues: &[Issue],
+    graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
     let from_ns = match require_str(rule, config, "from") {
         Ok(v) => v,
@@ -1113,17 +1234,17 @@ fn evaluate_label_reference(
     };
 
     // Globally declared source ids (the `to` namespace values across all issues).
-    let global_sources: BTreeSet<&str> = issues
+    let global_sources: BTreeSet<&str> = graph_context
         .iter()
         .flat_map(|i| values_in_namespace(i, to_ns))
         .collect();
 
-    issues
+    firing_issues
         .iter()
         .filter(|issue| rule.when.matches(issue))
         .flat_map(|issue| {
             let allowed: BTreeSet<&str> = if linked {
-                linked_issues(issue, issues)
+                linked_issues(issue, graph_context)
                     .into_iter()
                     .flat_map(|i| values_in_namespace(i, to_ns))
                     .collect()
@@ -1232,7 +1353,8 @@ fn linked_issues<'a>(issue: &Issue, issues: &'a [Issue]) -> Vec<&'a Issue> {
 fn evaluate_dependency_shape(
     rule: &Rule,
     config: &toml::value::Table,
-    issues: &[Issue],
+    firing_issues: &[Issue],
+    graph_context: &[Issue],
 ) -> Vec<GraphFinding> {
     // `target` must be a table we can deserialize into a Selector.
     let target = match config.get("target") {
@@ -1265,16 +1387,16 @@ fn evaluate_dependency_shape(
     };
 
     // Set of issue ids matching the target selector.
-    let target_ids: BTreeSet<&str> = issues
+    let target_ids: BTreeSet<&str> = graph_context
         .iter()
         .filter(|i| target.matches(i))
         .map(|i| i.id.as_str())
         .collect();
 
-    let node_refs: Vec<&Issue> = issues.iter().collect();
+    let node_refs: Vec<&Issue> = graph_context.iter().collect();
     let graph = DependencyGraph::new(&node_refs);
 
-    issues
+    firing_issues
         .iter()
         .filter(|source| rule.when.matches(source))
         .filter(|source| !depends_on_target(source, &target_ids, transitive, &graph))
@@ -4302,5 +4424,69 @@ source-of-truth = "markdown-first"
             findings[0].is_config_error(),
             "is_config_error reads the field, not the message"
         );
+    }
+
+    #[test]
+    fn test_rule_scoped_evaluation_isolates_firing_issue_from_repository_context() {
+        let rule = rule_from(
+            r#"
+[[rules]]
+name = "coverage-preview"
+when = { type = "breakdown" }
+severity = "error"
+assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", container-from-label = "brackets", child-link = "dependencies" } }
+"#,
+        );
+
+        let mut selected = issue("selected breakdown", &["type:breakdown"]);
+        let mut selected_container = initiative_with_criteria(&["REQ-01"]);
+        let selected_child = issue("selected child", &["satisfies:REQ-01"]);
+        selected
+            .labels
+            .push(format!("brackets:{}", selected_container.short_id()));
+        selected_container.dependencies = vec![selected_child.id.clone()];
+
+        // This historical breakdown is deliberately in the repository context,
+        // but not in the firing set. Its rejected target has an uncovered
+        // criterion; a subtree-wide evaluator would incorrectly fail selected.
+        let mut historical = issue("historical breakdown", &["type:breakdown"]);
+        let mut rejected_target = initiative_with_criteria(&["REQ-99"]);
+        rejected_target.state = State::Rejected;
+        historical
+            .labels
+            .push(format!("brackets:{}", rejected_target.short_id()));
+
+        let context = vec![
+            selected.clone(),
+            selected_container.clone(),
+            selected_child,
+            historical.clone(),
+            rejected_target.clone(),
+        ];
+        let hierarchy = crate::test_taxonomy::test_taxonomy().hierarchy_config();
+        let plan_content = HashMap::new();
+        let evaluation_context = GraphEvaluationContext {
+            graph_context: &context,
+            resolution_index: &context,
+            hierarchy: &hierarchy,
+            repo_default_format: ContentFormat::Markdown,
+            now: fixed_now(),
+            plan_content: &plan_content,
+        };
+        let findings =
+            evaluate_graph_rule(&rule, std::slice::from_ref(&selected), &evaluation_context);
+        assert!(
+            findings.is_empty(),
+            "unrelated firing issues must not affect the selected verdict: {findings:?}"
+        );
+
+        let direct_findings = evaluate_graph_rule(
+            &rule,
+            std::slice::from_ref(&historical),
+            &evaluation_context,
+        );
+        assert_eq!(direct_findings.len(), 1);
+        assert_eq!(direct_findings[0].issue_id, Some(rejected_target.id));
+        assert!(direct_findings[0].finding.message.contains("REQ-99"));
     }
 }

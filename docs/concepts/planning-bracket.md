@@ -151,7 +151,7 @@ bracket:
 | Gate | Node | Mode | Checks |
 |------|------|------|--------|
 | `plan-review` | `P` | review placeholder | Reserves the plan-quality checkpoint. Replace the checker with a real reviewer before relying on it. |
-| `coverage-preview` | `B` | deterministic, in-process | Does the *decomposition* cover every `[hard]` criterion? Runs scoped repository validation for `C`. |
+| `coverage-preview` | `B` | deterministic, in-process | Does the *decomposition* cover every `[hard]` criterion? Applies the configured preview rule with `B` as its sole firing issue. |
 | `breakdown-review` | `B` | review placeholder | Reserves the decomposition-quality checkpoint. Replace the checker with a real reviewer before relying on it. |
 
 **`plan-review`** is declared with the in-process `review_placeholder` checker. It
@@ -160,12 +160,15 @@ bracket can be installed without a shell, source checkout, or selected agent. It
 does not judge plan quality. Replace it with a repository-owned reviewer before
 treating a pass as approval.
 
-**`coverage-preview`** is deterministic. Its checker resolves the container `C`
-from `B`'s `brackets:<C-short-id>` label and runs `jit validate --scope <C>`. That
-scoped validation evaluates the **preview coverage rule** (below), which exits 4
-— failing the gate — when the drafted children leave a `[hard]` criterion
-uncovered. No human judgment, no agent: pure structural coverage over the drafted
-decomposition.
+**`coverage-preview`** is deterministic. Its native `rule_validation` checker
+names the configured preview rule and applies it with the gated breakdown `B` as
+the sole firing issue. The rule's own `container-from-label` setting resolves
+the criteria-bearing container `C` from `B`'s declared label; the rest of the
+repository is graph and identifier-resolution context only. A missing, disabled,
+or non-matching configured rule is an error, never a vacuous pass. The selected
+rule exits 4 — failing the gate — when drafted children leave a `[hard]`
+criterion uncovered. No human judgment, no agent: pure structural coverage over
+the drafted decomposition.
 
 **`breakdown-review`** is declared with the same warning-only placeholder on `B`.
 Its intended role is the *quality* half of `B`'s split: a repository-supplied
