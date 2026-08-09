@@ -168,12 +168,13 @@ fn test_profile_list_and_show_work_without_repository() {
     );
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
-    assert_eq!(show["manifest"]["id"], "jit-dogfood");
+    assert_eq!(show["count"], 1);
+    assert_eq!(show["profiles"][0]["manifest"]["id"], "jit-dogfood");
     assert_eq!(
-        show["origin"],
+        show["profiles"][0]["origin"],
         serde_json::json!({ "source": "directory", "location": location })
     );
-    assert!(show["package_hash"].as_str().unwrap().len() >= 64);
+    assert!(show["profiles"][0]["package_hash"].as_str().unwrap().len() >= 64);
     assert!(!repo.path().join(".jit").exists());
 }
 
@@ -310,12 +311,75 @@ fn test_profile_show_reads_the_package_a_supplied_location_holds() {
 
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
+    assert_eq!(show["count"], 1);
     // Nothing but the supplied location holds a package declaring this
     // profile, so reporting it at all is that location having been read.
-    assert_eq!(show["manifest"]["id"], FIXTURE_PROFILE);
+    assert_eq!(show["profiles"][0]["manifest"]["id"], FIXTURE_PROFILE);
     assert_eq!(
-        show["origin"],
+        show["profiles"][0]["origin"],
         serde_json::json!({ "source": "directory", "location": location })
+    );
+}
+
+#[test]
+fn test_profile_show_json_preserves_repeated_selectors_in_order() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+    let selector = path_selector(location);
+
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            "--profile",
+            &selector,
+            "--profile",
+            &selector,
+            "--json",
+        ],
+    );
+
+    assert!(show.status.success(), "{show:?}");
+    let show = json(&show);
+    assert_eq!(show["count"], 2);
+    assert_eq!(
+        show["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|profile| profile["manifest"]["id"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec![FIXTURE_PROFILE, FIXTURE_PROFILE]
+    );
+}
+
+#[test]
+fn test_profile_show_human_renders_each_selected_occurrence() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+    let selector = path_selector(location);
+
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            "--profile",
+            &selector,
+            "--profile",
+            &selector,
+        ],
+    );
+
+    assert!(show.status.success(), "{show:?}");
+    let stdout = String::from_utf8_lossy(&show.stdout);
+    assert_eq!(
+        stdout.matches("Profile: planner-asset-only").count(),
+        2,
+        "human rendering must include every selected occurrence"
     );
 }
 
@@ -499,9 +563,10 @@ fn test_profile_show_prefers_a_supplied_location_over_the_recorded_one() {
     );
     assert!(shown.status.success(), "{shown:?}");
     let shown = json(&shown);
-    assert_eq!(shown["manifest"]["version"], "2.0.0");
+    assert_eq!(shown["count"], 1);
+    assert_eq!(shown["profiles"][0]["manifest"]["version"], "2.0.0");
     assert_eq!(
-        shown["origin"],
+        shown["profiles"][0]["origin"],
         serde_json::json!({ "source": "directory", "location": supplied })
     );
 
@@ -519,9 +584,10 @@ fn test_profile_show_prefers_a_supplied_location_over_the_recorded_one() {
     );
     assert!(recorded_show.status.success(), "{recorded_show:?}");
     let recorded_show = json(&recorded_show);
-    assert_eq!(recorded_show["manifest"]["version"], "1.0.0");
+    assert_eq!(recorded_show["count"], 1);
+    assert_eq!(recorded_show["profiles"][0]["manifest"]["version"], "1.0.0");
     assert_eq!(
-        recorded_show["origin"],
+        recorded_show["profiles"][0]["origin"],
         serde_json::json!({ "source": "directory", "location": recorded })
     );
 }
@@ -613,6 +679,43 @@ fn test_init_profile_applies_the_package_a_supplied_location_holds() {
     );
     assert!(reapplied.status.success(), "{reapplied:?}");
     assert_eq!(requested_profile(&json(&reapplied))["status"], "unchanged");
+}
+
+#[test]
+fn test_init_profile_json_preserves_repeated_root_occurrences_in_order() {
+    let repo = TempDir::new().unwrap();
+    let location = package_at(repo.path(), "vendor/planner");
+    let selector = path_selector(location);
+
+    let init = jit(
+        repo.path(),
+        &[
+            "init",
+            "--profile",
+            &selector,
+            "--profile",
+            &selector,
+            "--json",
+        ],
+    );
+
+    assert!(init.status.success(), "{init:?}");
+    let init_json = json(&init);
+    let profiles = init_json["profile"]["profiles"]
+        .as_array()
+        .expect("init reports one result per root occurrence");
+    assert_eq!(
+        profiles
+            .iter()
+            .map(|profile| {
+                (
+                    profile["id"].as_str().unwrap(),
+                    profile["status"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        vec![(FIXTURE_PROFILE, "applied"), (FIXTURE_PROFILE, "unchanged"),]
+    );
 }
 
 #[test]
@@ -717,7 +820,9 @@ fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
     assert!(show.status.success(), "{show:?}");
     let show = json(&show);
 
-    let roots: Vec<&str> = show["manifest"]["live-source"]
+    assert_eq!(show["count"], 1);
+    let profile = &show["profiles"][0];
+    let roots: Vec<&str> = profile["manifest"]["live-source"]
         .as_array()
         .expect("the reported manifest declares its live-source roots")
         .iter()
@@ -733,7 +838,7 @@ fn test_profile_show_json_reports_the_roots_its_live_assets_are_drawn_from() {
         .collect();
     assert!(!roots.is_empty(), "the package declares at least one root");
 
-    let live_targets: Vec<&str> = show["manifest"]["asset"]
+    let live_targets: Vec<&str> = profile["manifest"]["asset"]
         .as_array()
         .expect("the reported manifest declares assets")
         .iter()

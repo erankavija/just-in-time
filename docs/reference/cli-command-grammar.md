@@ -78,12 +78,14 @@ verb acts.
 Canonical rules:
 
 - **The subject is positional.** The issue id, gate key, document path, assignee,
-  dependency endpoints, template name, preset name, profile id, and qualified
-  item id are positional because the verb cannot run without them. Examples:
+  dependency endpoints, template name, preset name, and qualified item id are
+  positional because the verb cannot run without them. Examples:
   `jit issue show <id>`, `jit gate evaluate <id> <gate-key>`,
   `jit dep add <from> <to>...`, `jit doc add <id> <path>`,
-  `jit archive document <path>`, `jit archive container <id>`,
-  `jit profile show <profile-id>`.
+  `jit archive document <path>`, and `jit archive container <id>`.
+- **Profile selection is a repeatable flag.** Profile inspection and application
+  name one or more recorded IDs or worktree package directories with
+  `--profile <SELECTOR>`; repeated occurrences remain in request order.
 - **Modifiers are flags.** Anything that tunes, filters, scopes, or formats is a
   flag: `--priority`, `--state`, `--label`, `--force`, `--depth`, `--json`,
   `--quiet`.

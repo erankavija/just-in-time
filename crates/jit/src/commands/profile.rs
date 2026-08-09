@@ -2,8 +2,8 @@ use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionSte
 use crate::profile::{
     build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
     ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
-    ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus, ProfileShowResult, ProfileSummary,
-    ProfileTargetAction, ProfileTargetChange,
+    ProfilePackageSource, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
+    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -323,14 +323,28 @@ impl CommandExecutor<JsonFileStorage> {
         })
     }
 
-    /// Inspect one resolved profile package.
-    pub fn show_profile(&self, selector: &ProfileSelector) -> Result<ProfileShowResult> {
-        let package = self.resolve_profile_package(selector)?;
+    /// Inspect every selected profile package in selector occurrence order.
+    pub fn show_profiles(&self, selectors: &[ProfileSelector]) -> Result<ProfileShowResult> {
         let layout = self.require_layout()?;
+        let profiles = self
+            .resolve_profile_selectors(selectors)?
+            .iter()
+            .map(|package| self.show_profile_entry(package, &layout))
+            .collect::<Result<Vec<_>>>()?;
+        Ok(ProfileShowResult::new(profiles))
+    }
+
+    /// Build one package inspection entry after selector-level ambiguity checks
+    /// have already run for the complete request.
+    fn show_profile_entry(
+        &self,
+        package: &ProfilePackage,
+        layout: &RepositoryLayout,
+    ) -> Result<ProfileShowEntry> {
         let id = package.model().id.as_str();
-        Ok(ProfileShowResult {
+        Ok(ProfileShowEntry {
             manifest: package.model().clone(),
-            origin: package_origin(&package, &layout)?,
+            origin: package_origin(package, layout)?,
             package_hash: package.hashes().package.clone(),
             target_hashes: package.hashes().targets.clone(),
             file_count: package.file_count(),

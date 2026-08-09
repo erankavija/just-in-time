@@ -41,7 +41,7 @@ pub use crate::domain::ProfileOrigin;
 pub use application::{
     ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
     ProfileComposedApplyResult, ProfileListResult, ProfilePlanResult, ProfilePlanStatus,
-    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
 pub use manifest::{

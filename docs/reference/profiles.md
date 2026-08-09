@@ -57,8 +57,8 @@ this project's workflow on top of it.
 
 ## Commands
 
-List the profiles this repository's own records name, and inspect one — either
-one those records name, or a package at a location:
+List the profiles this repository's own records name, and inspect one or more —
+either profiles those records name, or packages at locations:
 
 ```bash
 jit profile list
@@ -104,13 +104,14 @@ so a package and its dependency may declare the same thing.
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).
 
-All profile commands support `--json`. `profile list` and `profile apply` use
-the standard count-wrapped list shape; an application reports one result per
-applied package, dependencies before the package that declares them.
-`profile show` returns the manifest, package identity, target hashes, size, and
-the stored provenance record when present. Showing that record does not
-re-verify current target bytes. Use
-`jit profile apply jit-dogfood --dry-run` for exact current-state verification
+All profile commands support `--json`. `profile list`, `profile show`, and
+`profile apply` use the standard count-wrapped collection shape. A show response
+contains one package entry per selector occurrence in selector order, including
+repeated selectors; an application reports one result per applied package,
+dependencies before the package that declares them. Each show entry carries the
+manifest, package identity, target hashes, size, and stored provenance record
+when present. Showing that record does not re-verify current target bytes. Use
+`jit profile apply --profile id:jit-dogfood --dry-run` for exact current-state verification
 of the named package: it returns the deterministic plan hash and every target's
 `create`, `update`, or `unchanged` action without writing. Successful
 reapplication of an exact installation returns `unchanged` for every package of

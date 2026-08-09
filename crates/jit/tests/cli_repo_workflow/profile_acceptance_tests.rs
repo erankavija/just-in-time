@@ -830,6 +830,10 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
             .keys()
             .cloned()
             .collect::<BTreeSet<_>>(),
+        expected_keys(&["count", "profiles"])
+    );
+    assert_eq!(
+        property_keys(show_schema, "ProfileShowEntry"),
         expected_keys(&[
             "applied",
             "byte_size",

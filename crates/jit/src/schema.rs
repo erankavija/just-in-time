@@ -1856,4 +1856,33 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_profile_show_schema_is_a_count_wrapped_collection() {
+        let schema = CommandSchema::generate();
+        let command = schema
+            .commands
+            .get("profile")
+            .and_then(|command| command.subcommands.as_ref())
+            .and_then(|commands| commands.get("show"))
+            .expect("profile show command");
+        let output = command.output.as_ref().expect("profile show output");
+        assert_eq!(output.success, "ProfileShowResult");
+
+        let success_schema = output
+            .success_schema
+            .as_ref()
+            .expect("profile show success schema");
+        let properties = success_schema
+            .pointer("/properties")
+            .or_else(|| success_schema.pointer("/definitions/ProfileShowResult/properties"))
+            .and_then(Value::as_object)
+            .expect("ProfileShowResult properties");
+        assert!(properties.contains_key("count"));
+        assert_eq!(properties["profiles"]["type"], "array");
+        assert!(
+            !properties.contains_key("manifest"),
+            "the public result must not retain the former single-profile shape"
+        );
+    }
 }
