@@ -13,18 +13,18 @@ confirmation = "invoked"
 
 [[arms]]
 path = "profile show"
-argv = ["profile", "show", "absent-profile", "--json"]
+argv = ["profile", "show", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]
-expected_failure = "PROFILE_NOT_FOUND for an unknown embedded profile ID"
+expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
 expected_code = "PROFILE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
 path = "profile apply"
-argv = ["profile", "apply", "absent-profile", "--json"]
+argv = ["profile", "apply", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]
-expected_failure = "PROFILE_NOT_FOUND for an unknown embedded profile ID"
+expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
 expected_code = "PROFILE_NOT_FOUND"
 expected_exit = 3
 confirmation = "invoked"
