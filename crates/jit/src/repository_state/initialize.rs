@@ -547,55 +547,26 @@ fn derive_initialization_with_profiles(
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let neutral = derive_initialization(base, &scaffold.without_profiles(), context)?;
-    let neutral_image = super::apply_overlay(
-        base,
-        neutral
-            .delta
-            .actions()
-            .iter()
-            .filter_map(|action| match action {
-                RepositoryAction::WriteFile { path, bytes, .. } => {
-                    Some((path.clone(), Some(bytes.clone())))
-                }
-                _ => None,
-            }),
-    )
-    .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+    let neutral_image = apply_action_overlay(base, neutral.delta.actions())?;
     let profiles = scaffold.profiles();
     let applications = derive_profile_applications(&neutral_image, &profiles, context)?;
-    let mut writes = BTreeMap::<VirtualPath, (String, Vec<u8>, FileMode)>::new();
+    let mut actions = BTreeMap::new();
     for action in neutral
         .delta
         .actions()
         .iter()
         .chain(applications.delta.actions())
     {
-        if let RepositoryAction::WriteFile {
-            path,
-            owner,
-            bytes,
-            mode,
-            ..
-        } = action
-        {
-            writes.insert(path.clone(), (owner.clone(), bytes.clone(), *mode));
-        }
+        fold_rebased_action(base, &mut actions, action)?;
     }
-    let actions = writes
-        .into_iter()
-        .map(|(path, (owner, bytes, mode))| {
-            Ok(RepositoryAction::WriteFile {
-                expected: ExpectedPreimage::of(base.entry(&path)?),
-                path,
-                owner,
-                bytes,
-                mode,
-            })
-        })
-        .collect::<Result<Vec<_>, InitializationError>>()?;
-    let mut all = directory_actions(base, &actions, &scaffold.explicit_dirs()?)?;
-    all.extend(actions);
-    let delta = RepositoryDelta::new(base.layout(), all)?;
+    for action in directory_actions(
+        base,
+        &actions.values().cloned().collect::<Vec<_>>(),
+        &scaffold.explicit_dirs()?,
+    )? {
+        fold_rebased_action(base, &mut actions, &action)?;
+    }
+    let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
     let facts = BTreeMap::from([
         (
             "project".to_string(),
@@ -622,7 +593,8 @@ fn derive_initialization_with_profiles(
     let seed = RepositorySeed::new(RepositorySeedKind::Initialization, facts, payloads)?;
     Ok(
         MaterializationDerivation::new(delta, seed, MaterializationIntent::InitializeRepository)
-            .with_profile_targets(applications.profile_targets),
+            .with_profile_targets(applications.profile_targets)
+            .with_applied_profiles(applications.applied_profiles),
     )
 }
 
@@ -905,6 +877,68 @@ fn rebase_action(
     })
 }
 
+/// Project the byte-bearing effects of exact actions into the existing proposed
+/// image. Directory creation and mode-only changes remain in the delta; they do
+/// not change bytes that a later profile derivation can observe.
+fn apply_action_overlay(
+    base: &RepositoryImage,
+    actions: &[RepositoryAction],
+) -> Result<RepositoryImage, InitializationError> {
+    super::apply_overlay(
+        base,
+        actions.iter().filter_map(|action| match action {
+            RepositoryAction::WriteFile { path, bytes, .. } => {
+                Some((path.clone(), Some(bytes.clone())))
+            }
+            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
+            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
+        }),
+    )
+    .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
+}
+
+/// Keep the final effect for one canonical target and derive its preimage from
+/// the original captured image. A deletion of a file created earlier in this
+/// aggregate has no final effect, while a later mode-only action preserves the
+/// earlier aggregate write's bytes.
+fn fold_rebased_action(
+    base: &RepositoryImage,
+    actions: &mut BTreeMap<VirtualPath, RepositoryAction>,
+    action: &RepositoryAction,
+) -> Result<(), InitializationError> {
+    let path = action.path().clone();
+    if matches!(action, RepositoryAction::DeleteFile { .. })
+        && matches!(base.entry(&path)?, RepositoryEntry::Absent)
+    {
+        actions.remove(&path);
+        return Ok(());
+    }
+    if let (
+        RepositoryAction::SetMode { owner, mode, .. },
+        Some(RepositoryAction::WriteFile {
+            path,
+            bytes,
+            expected,
+            ..
+        }),
+    ) = (action, actions.get(&path))
+    {
+        actions.insert(
+            path.clone(),
+            RepositoryAction::WriteFile {
+                path: path.clone(),
+                owner: owner.clone(),
+                expected: expected.clone(),
+                bytes: bytes.clone(),
+                mode: *mode,
+            },
+        );
+        return Ok(());
+    }
+    actions.insert(path, rebase_action(base, action.clone())?);
+    Ok(())
+}
+
 /// Compose the `events.jsonl` action for an init/profile delta.
 ///
 /// A profile whose application emits an event appends one `ProfileApplied` record
@@ -1182,50 +1216,28 @@ pub(super) fn derive_profile_applications(
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let mut proposed = base.clone();
-    let mut files = BTreeMap::<VirtualPath, DesiredFile>::new();
+    let mut actions = BTreeMap::new();
     let mut targets = Vec::new();
     let mut events = Vec::new();
+    let mut applied_profiles = std::collections::BTreeSet::new();
 
     for profile in profiles {
         let candidate = derive_profile_application_candidate(&proposed, profile, context)?;
-        let writes = candidate
+        let candidate_actions = candidate
             .delta
             .actions()
             .iter()
-            .filter_map(|action| match action {
-                RepositoryAction::WriteFile {
-                    path,
-                    owner,
-                    bytes,
-                    mode,
-                    ..
-                } if path != &VirtualPath::EVENTS => Some(DesiredFile {
-                    path: path.clone(),
-                    bytes: bytes.clone(),
-                    mode: *mode,
-                    policy: WritePolicy::Always,
-                    owner: if owner == PROFILE_OWNER {
-                        PROFILE_OWNER
-                    } else {
-                        SCAFFOLD_OWNER
-                    },
-                }),
-                _ => None,
-            })
+            .filter(|action| action.path() != &VirtualPath::EVENTS)
+            .cloned()
             .collect::<Vec<_>>();
-        let changed = !writes.is_empty();
-        for file in &writes {
-            files.insert(file.path.clone(), file.clone());
+        let changed = !candidate_actions.is_empty();
+        for action in &candidate_actions {
+            fold_rebased_action(base, &mut actions, action)?;
         }
-        proposed = super::apply_overlay(
-            &proposed,
-            writes
-                .iter()
-                .map(|file| (file.path.clone(), Some(file.bytes.clone()))),
-        )
-        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+        proposed = apply_action_overlay(&proposed, &candidate_actions)?;
         targets.extend(candidate.profile_targets);
         if changed {
+            applied_profiles.insert(profile.id.clone());
             events.push((
                 2,
                 profile_applied_event(
@@ -1239,11 +1251,8 @@ pub(super) fn derive_profile_applications(
         }
     }
 
-    let mut actions = Vec::new();
-    let files = files.into_values().collect::<Vec<_>>();
-    push_file_actions(base, &files, &mut actions)?;
     if let Some(action) = finalize_audit_append(base, context, events)? {
-        actions.push(action);
+        fold_rebased_action(base, &mut actions, &action)?;
     }
     let profiles_path = VirtualPath::PROFILES;
     let explicit = match base.entry(&profiles_path)? {
@@ -1251,9 +1260,14 @@ pub(super) fn derive_profile_applications(
         RepositoryEntry::Directory { .. } => Vec::new(),
         _ => return Err(InitializationError::UnsupportedMetadataPath(profiles_path)),
     };
-    let mut all = directory_actions(base, &actions, &explicit)?;
-    all.extend(actions);
-    let delta = RepositoryDelta::new(base.layout(), all)?;
+    for action in directory_actions(
+        base,
+        &actions.values().cloned().collect::<Vec<_>>(),
+        &explicit,
+    )? {
+        fold_rebased_action(base, &mut actions, &action)?;
+    }
+    let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
     let facts = BTreeMap::from([(
         "profiles".to_string(),
         profiles
@@ -1280,7 +1294,8 @@ pub(super) fn derive_profile_applications(
     )?;
     Ok(
         MaterializationDerivation::new(delta, seed, MaterializationIntent::ApplyProfile)
-            .with_profile_targets(targets),
+            .with_profile_targets(targets)
+            .with_applied_profiles(applied_profiles),
     )
 }
 

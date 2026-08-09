@@ -1049,7 +1049,7 @@ pub struct ProfileApplicationInput {
     /// Resolved candidates sharing one of this package's semantic identities.
     ///
     /// The command supplies this scoped selection or dependency-closure context
-    /// before sequential publication begins. It lets every affected record
+    /// before aggregate selection publication begins. It lets every affected record
     /// retain the same complete owner set without making unrelated package
     /// declarations part of this package's materialization.
     pub(crate) contribution_context: Vec<ProfileContributionClaim>,
@@ -1305,7 +1305,7 @@ pub(super) fn compose_profile_targets(
 
 /// Derive profile-owned targets with a preflighted, identity-scoped candidate
 /// context. Definitions outside the package's own identities remain outside its
-/// per-package publication, while equal definitions retain their full owner set
+/// scoped contribution materialization, while equal definitions retain their full owner set
 /// in every affected provenance record.
 pub(super) fn compose_profile_targets_with_context(
     base: &RepositoryImage,
@@ -1453,9 +1453,9 @@ pub(super) fn compose_profile_targets_with_context(
 
 /// Check all selected package contributions against one captured repository image.
 ///
-/// This is deliberately a read-only semantic preflight. Publication remains the
-/// existing per-package path, while a conflict anywhere in the selected set is
-/// reported before that path can publish an earlier package.
+/// This is deliberately a read-only semantic preflight. The aggregate
+/// publication path reports a conflict anywhere in the selected set before its
+/// one transaction can publish any member.
 pub(crate) fn preflight_profile_contributions(
     base: &RepositoryImage,
     candidates: Vec<ProfileContributionClaim>,

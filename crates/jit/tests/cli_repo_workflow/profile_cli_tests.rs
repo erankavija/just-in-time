@@ -1599,6 +1599,16 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
     );
     assert!(repaired_missing.status.success(), "{repaired_missing:?}");
     assert!(published_anything(&json(&repaired_missing)));
+    assert_eq!(
+        json(&repaired_missing)["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|profile| profile["status"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["applied", "unchanged"],
+        "the default-profile candidate owns the coupled schema repair"
+    );
     assert_eq!(fs::read(&namespace_schema).unwrap(), expected_namespace);
 
     fs::write(&type_schema, b"stale\n").unwrap();
@@ -1614,6 +1624,16 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
     );
     assert!(repaired_stale.status.success(), "{repaired_stale:?}");
     assert!(published_anything(&json(&repaired_stale)));
+    assert_eq!(
+        json(&repaired_stale)["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|profile| profile["status"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec!["applied", "unchanged"],
+        "the default-profile candidate owns the coupled schema repair"
+    );
     assert_eq!(fs::read(&type_schema).unwrap(), expected_types);
 
     let events_after_repairs = fs::read(&events_path).unwrap();

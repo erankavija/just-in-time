@@ -358,16 +358,7 @@ impl CommandExecutor<JsonFileStorage> {
                         packages
                             .iter()
                             .map(|package| {
-                                let record_path = VirtualPath::data(format!(
-                                    "profiles/{}.json",
-                                    package.model().id
-                                ));
-                                let changed = record_path.is_ok_and(|path| {
-                                    plan.delta()
-                                        .actions()
-                                        .iter()
-                                        .any(|action| action.path() == &path)
-                                });
+                                let changed = plan.applied_profiles().contains(&package.model().id);
                                 ProfileApplyResult {
                                     id: package.model().id.to_string(),
                                     version: package.model().version.clone(),

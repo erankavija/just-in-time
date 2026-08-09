@@ -1108,17 +1108,10 @@ impl CommandExecutor<JsonFileStorage> {
                 .into());
             }
 
-            let changed_records = plan
-                .delta()
-                .actions()
-                .iter()
-                .map(|action| action.path())
-                .collect::<BTreeSet<_>>();
             let results = packages
                 .iter()
                 .map(|package| {
-                    let record_path = applied_record_path(package.model().id.as_str())?;
-                    let changed = changed_records.contains(&record_path);
+                    let changed = plan.applied_profiles().contains(&package.model().id);
                     Ok(ProfileApplyResult {
                         id: package.model().id.to_string(),
                         version: package.model().version.clone(),
@@ -2765,6 +2758,63 @@ placement = "append"
                 "workflow profile did not contribute {expected}: {rules:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically() {
+        let (temp, executor, _default, dogfood) = bare_repository_beside_shipped_packages();
+        executor.apply_profile_package(&dogfood).unwrap();
+
+        let stale_schema = temp
+            .path()
+            .join(".jit/schemas/default-obsolete-profile-selection.json");
+        fs::write(&stale_schema, "{}").unwrap();
+        let rules_path = temp.path().join(".jit/rules.toml");
+        let rules = fs::read_to_string(&rules_path).unwrap();
+        fs::write(
+            &rules_path,
+            format!(
+                "{rules}\n[[rules]]\nname = \"obsolete-profile-selection\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-obsolete-profile-selection.json\" }}\n"
+            ),
+        )
+        .unwrap();
+        let events_before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            temp.path().join(".jit"),
+            FailOnce::at(
+                crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            ),
+        );
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+
+        assert!(executor.apply_profile_package(&dogfood).is_err());
+
+        let recovered = JsonFileStorage::new(temp.path().join(".jit"));
+        let layout = discover_repository_layout(temp.path(), recovered.root()).unwrap();
+        drop(recovered.open_mutation_session(layout).unwrap());
+        assert!(stale_schema.exists());
+        assert_eq!(
+            fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
+            events_before
+        );
+
+        let repaired = CommandExecutor::new(recovered.clone())
+            .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap())
+            .apply_profile_package(&dogfood)
+            .unwrap();
+        assert!(!stale_schema.exists());
+        assert_eq!(
+            repaired
+                .profiles
+                .iter()
+                .map(|profile| (profile.id.as_str(), profile.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("jit-default", ProfileApplicationStatus::Applied),
+                ("jit-dogfood", ProfileApplicationStatus::Unchanged),
+            ]
+        );
     }
 
     #[test]

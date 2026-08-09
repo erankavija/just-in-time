@@ -578,6 +578,7 @@ pub struct MaterializationPlan {
     /// Per-projection row counts produced by a configured-projection render.
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
+    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -600,6 +601,7 @@ struct MaterializationDerivation {
     seed: RepositorySeed,
     intent: MaterializationIntent,
     profile_targets: Vec<ProfileTargetMaterialization>,
+    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
 impl MaterializationDerivation {
@@ -609,11 +611,21 @@ impl MaterializationDerivation {
             seed,
             intent,
             profile_targets: Vec::new(),
+            applied_profiles: std::collections::BTreeSet::new(),
         }
     }
 
     fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
         self.profile_targets = targets;
+        self
+    }
+
+    /// Record packages whose candidate derivations have a non-event effect.
+    fn with_applied_profiles(
+        mut self,
+        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    ) -> Self {
+        self.applied_profiles = profiles;
         self
     }
 }
@@ -643,6 +655,13 @@ impl MaterializationPlan {
         &self.profile_targets
     }
 
+    /// Package identities responsible for a non-event effect in this plan.
+    pub(crate) fn applied_profiles(
+        &self,
+    ) -> &std::collections::BTreeSet<crate::profile::ProfileId> {
+        &self.applied_profiles
+    }
+
     /// Close a delta into a plan whose identity is computed from all plan inputs.
     pub(crate) fn new(
         image: &RepositoryImage,
@@ -657,6 +676,7 @@ impl MaterializationPlan {
             hash,
             projection_counts: std::collections::BTreeMap::new(),
             profile_targets: Vec::new(),
+            applied_profiles: std::collections::BTreeSet::new(),
         })
     }
 
@@ -667,6 +687,14 @@ impl MaterializationPlan {
 
     fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
         self.profile_targets = targets;
+        self
+    }
+
+    fn with_applied_profiles(
+        mut self,
+        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    ) -> Self {
+        self.applied_profiles = profiles;
         self
     }
 }
@@ -788,11 +816,13 @@ pub fn derive_materialization(
         seed,
         intent,
         profile_targets,
+        applied_profiles,
     } = derivation;
     MaterializationPlan::new(image, &seed, &intent, delta)
         .map(|plan| {
             plan.with_projection_counts(projection_counts)
                 .with_profile_targets(profile_targets)
+                .with_applied_profiles(applied_profiles)
         })
         .map_err(Into::into)
 }
