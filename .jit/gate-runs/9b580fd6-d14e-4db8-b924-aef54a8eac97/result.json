@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-eac6ec13",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2b550db95971e92c03fae62fc20a729f464c9125",
+  "completed_at": "2026-08-09T04:58:12.980359146Z",
+  "duration_ms": 203066,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Tagged implementation satisfies the ordered selector, shadow rejection, cutover, confinement, schema, bridge, and test coverage criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9b580fd6-d14e-4db8-b924-aef54a8eac97",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T04:54:49.913996948Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 31cd9894, 6f9da1b1, 8256590b, 2b550db9 (`jit:eac6ec13`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 — dev/vision/9db27a3a-charter.md; @/inv/canonical-cutover and @/inv/architecture-dependency-direction — .jit/invariants.toml\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T04:51:49Z); mcp-ci passed (exit 0, 2026-08-09T04:54:38Z)\nTruncation recovery: recovered through bounded per-commit, path, and line-range reads; direct configured sources used after the stale CLI guard blocked item queries.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Tagged implementation satisfies the ordered selector, shadow rejection, cutover, confinement, schema, bridge, and test coverage criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

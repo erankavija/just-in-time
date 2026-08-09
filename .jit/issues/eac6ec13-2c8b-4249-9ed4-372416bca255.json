@@ -16,8 +16,18 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-09T04:28:35.886026745Z",
+      "status": "passed",
+      "updated_at": "2026-08-09T04:54:17.530350503Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-09T04:58:13.269428488Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T04:54:41.038240969Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +45,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Select profiles through repeatable ordered selectors",
-  "updated_at": "2026-08-09T04:28:35.886026745Z"
+  "updated_at": "2026-08-09T04:58:13.269428488Z"
 }

@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-eac6ec13",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "2b550db95971e92c03fae62fc20a729f464c9125",
+  "completed_at": "2026-08-09T04:51:33.861723867Z",
+  "duration_ms": 158913,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "5bb7c4b552782dde692e39a2983733fc4738d03d3614b2d8cbb6ce24fbccf0d1",
+  "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ffc47990-6314-4052-82eb-d85187d9bb77",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T04:48:54.948670542Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest commands::serve::tests::test_start_server_records_the_pid_of_a_server_that_answers ... FAILED\ntest result: FAILED. 2440 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.71s\n---- commands::serve::tests::test_start_server_records_the_pid_of_a_server_that_answers stdout ----\n\nthread 'commands::serve::tests::test_start_server_records_the_pid_of_a_server_that_answers' (1472276) panicked at crates/jit/src/commands/serve.rs:1420:31:\na started server leaves a record\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1519 bytes=28656041)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1445565872/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
