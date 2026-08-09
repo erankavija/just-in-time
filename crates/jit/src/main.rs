@@ -148,7 +148,11 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
             RepositoryStateError::Projection(_)
             | RepositoryStateError::ManagedDocument(_)
             | RepositoryStateError::ProfileTargetConflict(_)
+            | RepositoryStateError::ContributionComposition(_)
             | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
+            | RepositoryStateError::Initialization(InitializationError::ContributionComposition(
+                _,
+            ))
             | RepositoryStateError::AmbiguousOwnership(_)
             | RepositoryStateError::GateRegistryEdit(_)
             | RepositoryStateError::ArchiveExecution(_) => ErrorCode::ValidationFailed,
@@ -942,7 +946,7 @@ fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
 
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
-    use jit::repository_state::{InitializationError, ProducerError, RepositoryStateError};
+    use jit::repository_state::{InitializationError, RepositoryStateError};
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
         return JsonError::new(ErrorCode::ProfileNotFound, error.to_string()).with_suggestion(
@@ -986,10 +990,13 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
         let is_conflict = matches!(
             state_error,
             RepositoryStateError::ProfileTargetConflict(_)
+                | RepositoryStateError::ContributionComposition(_)
                 | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
                     _
                 ))
-                | RepositoryStateError::Producer(ProducerError::ProfileContributionConflict { .. })
+                | RepositoryStateError::Initialization(
+                    InitializationError::ContributionComposition(_),
+                )
         );
         if is_conflict {
             return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
@@ -8589,14 +8596,26 @@ mod repository_state_classifier_tests {
 
     use super::{error_to_exit_code, profile_json_error};
     use jit::repository_state::{
-        AmbiguousOwnershipError, ArchiveExecutionError, GateRegistryEditError, InitializationError,
+        AmbiguousOwnershipError, ArchiveExecutionError, Contribution,
+        ContributionCompositionConflict, GateRegistryEditError, InitializationError,
         ManagedDocumentError, ProducerError, ProfileConflictOccupant, ProfilePackageId,
         ProfileTargetConflictError, ProjectionError, RepositoryLayoutError, RepositoryStateError,
-        VirtualPath,
+        ScalarTarget, VirtualPath,
     };
 
     fn path() -> VirtualPath {
         VirtualPath::data("issues/abc123.json").unwrap()
+    }
+
+    fn contribution_conflict() -> ContributionCompositionConflict {
+        ContributionCompositionConflict {
+            identity: Contribution::Scalar {
+                target: ScalarTarget::ValidationDefaultType,
+                value: "task".to_string(),
+            }
+            .semantic_identity(),
+            owners: Vec::new(),
+        }
     }
 
     /// Each repository-state variant paired with the exit code the exhaustive match
@@ -8626,6 +8645,13 @@ mod repository_state_classifier_tests {
                         candidate: ProfilePackageId::new("candidate"),
                         occupant: ProfileConflictOccupant::Repository,
                     },
+                )),
+                4,
+            ),
+            (contribution_conflict().into(), 4),
+            (
+                RepositoryStateError::Initialization(InitializationError::ContributionComposition(
+                    contribution_conflict(),
                 )),
                 4,
             ),
@@ -8680,13 +8706,10 @@ mod repository_state_classifier_tests {
                     occupant: ProfileConflictOccupant::Repository,
                 },
             )),
-            ProducerError::ProfileContributionConflict {
-                identity: "i".into(),
-                registry: "r".into(),
-                candidate: ProfilePackageId::new("candidate"),
-                occupant: ProfileConflictOccupant::Repository,
-            }
-            .into(),
+            contribution_conflict().into(),
+            RepositoryStateError::Initialization(InitializationError::ContributionComposition(
+                contribution_conflict(),
+            )),
         ];
         for state_error in conflict_cases {
             let error = anyhow::Error::new(state_error);

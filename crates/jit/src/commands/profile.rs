@@ -1402,7 +1402,11 @@ fn recorded_summary(
         version: metadata.version.clone(),
         origin: package_origin(&package, layout)?,
         jit: metadata.compatible_jit.clone(),
-        applied: record == expected_record(&package, layout, &record.variables)?,
+        applied: record.matches_package_provenance(&expected_record(
+            &package,
+            layout,
+            &record.variables,
+        )?),
     }))
 }
 
@@ -1454,6 +1458,7 @@ pub(super) fn expected_record(
         package.hashes().package.clone(),
         variables.clone(),
         resolved.target_hashes()?,
+        Vec::new(),
     ))
 }
 
@@ -1528,9 +1533,10 @@ mod tests {
     use super::*;
     use crate::domain::Event;
     use crate::repository_state::{
-        Contribution, InitializationError, MapEntryTarget, ProducerError, ProfileConflictOccupant,
-        ProfilePackageId, ProfileTargetConflictError, RepositoryStateError, RootRelativePath,
-        ScalarTarget, SetStringTarget,
+        Contribution, ContributionCompositionConflict, ContributionConflictOwner,
+        InitializationError, MapEntryTarget, ProfileConflictOccupant, ProfilePackageId,
+        ProfileTargetConflictError, RepositoryStateError, RootRelativePath, ScalarTarget,
+        SetStringTarget,
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
@@ -1886,6 +1892,19 @@ mod tests {
         }
     }
 
+    /// The semantic-composition conflict carried by real profile application.
+    fn contribution_conflict(error: &anyhow::Error) -> &ContributionCompositionConflict {
+        match error.downcast_ref::<RepositoryStateError>() {
+            Some(
+                RepositoryStateError::ContributionComposition(conflict)
+                | RepositoryStateError::Initialization(InitializationError::ContributionComposition(
+                    conflict,
+                )),
+            ) => conflict,
+            _ => panic!("a colliding contribution fails as a semantic conflict: {error:#}"),
+        }
+    }
+
     /// Store `record` as this repository's applied-profile record for its id.
     fn store_record(temp: &TempDir, record: &AppliedProfileRecord) {
         fs::create_dir_all(temp.path().join(".jit/profiles")).unwrap();
@@ -1985,6 +2004,7 @@ mod tests {
                 recorded.hashes().package.clone(),
                 ResolvedVariables::default(),
                 recorded.hashes().targets.clone(),
+                Vec::new(),
             ),
         );
 
@@ -3287,47 +3307,72 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_package_names_both_packages_of_a_conflicting_contribution() {
-        let (temp, _storage, executor, _fixture) = fixture();
+    fn test_apply_profile_package_reports_semantic_conflicts_without_an_order_winner() {
         let namespace = "shared-namespace";
-        let occupant = package_contributing(
-            &temp,
-            "vendor/base",
-            "base",
-            namespace,
-            "What the occupant means by it.",
-        );
-        let candidate = package_contributing(
-            &temp,
-            "vendor/workflow",
-            "workflow",
-            namespace,
-            "Another meaning entirely.",
-        );
-        executor.apply_profile_package(&occupant).unwrap();
+        let expected_owners = vec![
+            ContributionConflictOwner::Package(ProfilePackageId::new("base")),
+            ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+        ];
 
-        let error = executor.apply_profile_package(&candidate).unwrap_err();
+        for (first_id, first_description, second_id, second_description) in [
+            (
+                "base",
+                "The base meaning.",
+                "workflow",
+                "The workflow meaning.",
+            ),
+            (
+                "workflow",
+                "The workflow meaning.",
+                "base",
+                "The base meaning.",
+            ),
+        ] {
+            let (temp, _storage, executor, _fixture) = fixture();
+            let first = package_contributing(
+                &temp,
+                &format!("vendor/{first_id}"),
+                first_id,
+                namespace,
+                first_description,
+            );
+            let second = package_contributing(
+                &temp,
+                &format!("vendor/{second_id}"),
+                second_id,
+                namespace,
+                second_description,
+            );
+            executor.apply_profile_package(&first).unwrap();
 
-        let Some(RepositoryStateError::Producer(ProducerError::ProfileContributionConflict {
-            identity,
-            candidate: conflicting,
-            occupant: held_by,
-            ..
-        })) = error.downcast_ref::<RepositoryStateError>()
-        else {
-            panic!("a colliding contribution fails as a contribution conflict: {error:#}");
-        };
-        assert_eq!(identity, namespace);
-        assert_eq!(
-            *held_by,
-            ProfileConflictOccupant::Package(ProfilePackageId::new(
-                occupant.model().id.to_string()
-            ))
-        );
-        assert_eq!(
-            *conflicting,
-            ProfilePackageId::new(candidate.model().id.to_string())
-        );
+            let error = executor.apply_profile_package(&second).unwrap_err();
+
+            let conflict = contribution_conflict(&error);
+            assert_eq!(conflict.owners, expected_owners);
+            assert_eq!(
+                conflict.identity.to_string(),
+                Contribution::MapEntry {
+                    target: MapEntryTarget::Namespaces,
+                    identity: namespace.to_string(),
+                    value: serde_json::json!({ "description": first_description, "unique": false }),
+                }
+                .semantic_identity()
+                .to_string()
+            );
+            assert!(
+                !temp
+                    .path()
+                    .join(format!(".jit/profiles/{second_id}.json"))
+                    .exists(),
+                "the conflicting candidate must not gain a record"
+            );
+            assert!(
+                fs::read_to_string(temp.path().join(".jit/config.toml"))
+                    .unwrap()
+                    .contains(first_description),
+                "the first definition remains the repository state"
+            );
+        }
     }
 
     #[test]
@@ -3400,7 +3445,107 @@ template = true
             "identical\n"
         );
         assert_eq!(record_for(&temp, "stated").id, "stated");
-        assert_eq!(record_for(&temp, "restated").id, "restated");
+        let record = record_for(&temp, "restated");
+        assert_eq!(record.id, "restated");
+        assert_eq!(record.contributions.len(), 1);
+        assert_eq!(
+            record.contributions[0].owners,
+            vec![
+                ProfilePackageId::new("restated"),
+                ProfilePackageId::new("stated")
+            ]
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_recontributes_its_own_semantic_identity() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let package = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            "self-recontribution",
+            "One package owns this definition.",
+        );
+        executor.apply_profile_package(&package).unwrap();
+
+        let reapplied = executor.apply_profile_package(&package).unwrap();
+
+        assert_eq!(
+            reapplied.requested().unwrap().status,
+            ProfileApplicationStatus::Unchanged
+        );
+        let record = record_for(&temp, "workflow");
+        assert_eq!(record.contributions.len(), 1);
+        assert_eq!(
+            record.contributions[0].owners,
+            vec![ProfilePackageId::new("workflow")]
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_keeps_distinct_identities_in_one_registry_independent() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let first = package_contributing(
+            &temp,
+            "vendor/base",
+            "base",
+            "first-identity",
+            "First registry definition.",
+        );
+        let second = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            "second-identity",
+            "Second registry definition.",
+        );
+        executor.apply_profile_package(&first).unwrap();
+        executor.apply_profile_package(&second).unwrap();
+
+        let config = fs::read_to_string(temp.path().join(".jit/config.toml")).unwrap();
+        assert!(config.contains("First registry definition."));
+        assert!(config.contains("Second registry definition."));
+        let record = record_for(&temp, "workflow");
+        assert_eq!(record.contributions.len(), 1);
+        assert_eq!(
+            record.contributions[0].owners,
+            vec![ProfilePackageId::new("workflow")]
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_reports_repository_and_package_semantic_owners() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let namespace = "repository-owned";
+        let config_path = temp.path().join(".jit/config.toml");
+        let mut config = fs::read_to_string(&config_path).unwrap();
+        config.push_str(
+            "\n[namespaces.repository-owned]\ndescription = \"Repository definition.\"\nunique = false\n",
+        );
+        fs::write(config_path, config).unwrap();
+        let candidate = package_contributing(
+            &temp,
+            "vendor/workflow",
+            "workflow",
+            namespace,
+            "Package definition.",
+        );
+
+        let error = executor.apply_profile_package(&candidate).unwrap_err();
+
+        let conflict = contribution_conflict(&error);
+        assert_eq!(
+            conflict.owners,
+            vec![
+                ContributionConflictOwner::Repository,
+                ContributionConflictOwner::Package(ProfilePackageId::new("workflow")),
+            ]
+        );
+        assert!(
+            !temp.path().join(".jit/profiles/workflow.json").exists(),
+            "a rejected repository conflict must not publish provenance"
+        );
     }
 
     #[test]

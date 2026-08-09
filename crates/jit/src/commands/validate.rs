@@ -912,7 +912,11 @@ fn captured_profile_repair_claims(
                     ))))
                 }
             };
-        if actual != super::profile::expected_record(package, image.layout(), &actual.variables)? {
+        if !actual.matches_package_provenance(&super::profile::expected_record(
+            package,
+            image.layout(),
+            &actual.variables,
+        )?) {
             return Ok(Some(Err(RepositoryValidationFailure::materialization(
                 anyhow!(
                     "applied profile provenance for '{}@{}' does not match the package its record resolves to",
@@ -3375,6 +3379,7 @@ depends_on = ["planning"]
             "0".repeat(64),
             crate::profile::ResolvedVariables::default(),
             std::collections::BTreeMap::new(),
+            Vec::new(),
         ))
         .unwrap()
     }

@@ -106,9 +106,6 @@ pub fn build_profile_claims_from_resolved(
             Vec::new()
         } else {
             contribution_claims
-                .into_iter()
-                .map(|claim| claim.contribution)
-                .collect()
         },
         assets,
         regions,

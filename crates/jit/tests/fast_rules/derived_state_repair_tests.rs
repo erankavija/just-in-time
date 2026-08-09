@@ -387,6 +387,7 @@ impl DirectoryPackageRepo {
             self.package.hashes().package.clone(),
             resolved.variables().clone(),
             resolved.target_hashes().expect("hash resolved targets"),
+            Vec::new(),
         );
         std::fs::write(
             self.record_path(self.id()),

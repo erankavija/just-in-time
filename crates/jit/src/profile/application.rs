@@ -243,6 +243,7 @@ mod tests {
             "package",
             crate::profile::ResolvedVariables::default(),
             BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
+            Vec::new(),
         )
     }
 
@@ -266,6 +267,7 @@ mod tests {
                 .cloned()
                 .collect::<Vec<_>>(),
             vec![
+                "contributions",
                 "id",
                 "origin",
                 "package_hash",
@@ -315,5 +317,20 @@ mod tests {
                 "{origin} must not read as a valid record"
             );
         }
+    }
+
+    #[test]
+    fn test_installed_record_requires_semantic_contribution_ownership_evidence() {
+        let mut stored: serde_json::Value =
+            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
+        stored
+            .as_object_mut()
+            .expect("an installed record serializes as an object")
+            .remove("contributions");
+
+        assert!(
+            serde_json::from_value::<AppliedProfileRecord>(stored).is_err(),
+            "greenfield records must not silently drop semantic ownership evidence"
+        );
     }
 }

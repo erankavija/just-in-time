@@ -189,9 +189,10 @@ pub use path::{
 };
 pub(crate) use profile_apply::profile_capture_closure;
 pub use profile_apply::{
-    compose_resolved_contributions, AppliedProfileRecord, CompleteProjectionConfig,
-    ComposedContribution, Contribution, ContributionCompositionConflict, ContributionConflictOwner,
-    ContributionIdentity, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
+    compose_resolved_contributions, AppliedProfileContribution, AppliedProfileRecord,
+    CompleteProjectionConfig, ComposedContribution, Contribution, ContributionCompositionConflict,
+    ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
+    ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
     ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileConflictOccupant,
     ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflictError,
     ScalarTarget, SetStringTarget,
@@ -293,20 +294,6 @@ pub enum ProducerError {
         #[source]
         source: Box<ProfileRegistryParseError>,
     },
-    /// A profile contribution conflicts with an existing registry identity.
-    #[error(
-        "profile package {candidate} contribution '{identity}' in '{registry}' conflicts with {occupant}"
-    )]
-    ProfileContributionConflict {
-        /// Conflicting declaration identity.
-        identity: String,
-        /// Registry containing the declaration.
-        registry: String,
-        /// Package whose declaration is being applied.
-        candidate: profile_apply::ProfilePackageId,
-        /// Existing owner of the declaration.
-        occupant: profile_apply::ProfileConflictOccupant,
-    },
     /// An applied-profile provenance record could not be decoded while resolving
     /// the owner of a conflicting target.
     #[error("invalid applied profile record '{path}': {source}")]
@@ -345,6 +332,8 @@ pub enum ProfileRegistryParseError {
     SetTargetNotArray,
     #[error("set target contains a non-string member")]
     SetTargetNonStringMember,
+    #[error("scalar target is not a string")]
+    ScalarTargetNotString,
     #[error("entry lacks '{field}' identity")]
     MissingIdentity { field: String },
     #[error("duplicate '{field}' identity")]
@@ -357,6 +346,8 @@ pub enum ProfileRegistryParseError {
     NotArray { key: String },
     #[error("'{key}' is not an array of tables")]
     NotArrayOfTables { key: String },
+    #[error("invalid projection definition: {0}")]
+    ProjectionDefinition(String),
     #[error("contribution value is not a table")]
     ContributionNotTable,
     #[error("null is not a TOML value")]
@@ -858,6 +849,9 @@ pub enum RepositoryStateError {
     /// A profile asset would overwrite an unowned authored occupant.
     #[error(transparent)]
     ProfileTargetConflict(#[from] ProfileTargetConflictError),
+    /// Resolved package definitions disagree for one semantic identity.
+    #[error(transparent)]
+    ContributionComposition(#[from] ContributionCompositionConflict),
     /// Layout classification rejected a producer path.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
@@ -961,7 +955,8 @@ fn derive_repair(
     let mut actions = compose_complete(image, declarations)?;
     let mut claimed = std::collections::BTreeSet::new();
     for claims in profiles {
-        for (path, (bytes, mode)) in profile_apply::compose_profile_targets(image, claims)? {
+        for (path, (bytes, mode)) in profile_apply::compose_profile_targets(image, claims)?.targets
+        {
             if !claimed.insert(path.clone()) {
                 return Err(AmbiguousOwnershipError::MultipleProfileClaims(path.clone()).into());
             }
@@ -1062,7 +1057,11 @@ pub fn repair_target_paths(
     // Profile targets: the exact keys of each installed profile's composed target
     // set.
     for claims in profiles {
-        targets.extend(profile_apply::compose_profile_targets(image, claims)?.into_keys());
+        targets.extend(
+            profile_apply::compose_profile_targets(image, claims)?
+                .targets
+                .into_keys(),
+        );
     }
 
     Ok(targets)
