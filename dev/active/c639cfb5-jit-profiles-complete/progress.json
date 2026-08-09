@@ -441,6 +441,85 @@
       "deferred_items_audit": "no linked documents",
       "holistic_review": "the unconditional second base capture when no legacy candidate exists also regresses the final-closure race test; reuse the first capture on the ordinary path rather than weakening the concurrency assertion. The final rework must also type AppliedProfileRecord.id as ProfileId and prove both strict record wires reject duplicate JSON members.",
       "reviewed_at": "2026-08-09T23:19:00+03:00"
+    },
+    {
+      "issue_id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944",
+      "reviewed_commit": "78752b83ca0d4feec35618d205db0da9ac6c61f0",
+      "verdict": "pass",
+      "gate_status": {"cargo-ci": "passed", "code-review": "passed"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "lead-mutation-routing",
+          "status": "closed across direct apply, source apply, CLI init prevalidation, and profiled init",
+          "evidence": "crates/jit/src/commands/profile.rs:745; crates/jit/src/commands/init.rs:139"
+        },
+        {
+          "round": 1,
+          "id": "lead-held-session-evidence",
+          "status": "closed across direct apply and profiled init",
+          "evidence": "crates/jit/src/commands/profile.rs:1244; crates/jit/src/commands/init.rs:218"
+        },
+        {
+          "round": 1,
+          "id": "lead-single-conversion",
+          "status": "closed: each mutation authenticates once into one immutable conversion map",
+          "evidence": "crates/jit/src/commands/profile.rs:1289; crates/jit/src/commands/init.rs:268"
+        },
+        {
+          "round": 1,
+          "id": "lead-final-asset-base",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:1120"
+        },
+        {
+          "round": 1,
+          "id": "lead-managed-retention",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:1315"
+        },
+        {
+          "round": 1,
+          "id": "lead-record-canonicality",
+          "status": "closed: record identity is typed and claim identities are unique",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:926; crates/jit/src/repository_state/profile_apply.rs:943"
+        },
+        {
+          "round": 1,
+          "id": "lead-region-evidence",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/shipped_v1_record.rs:472"
+        },
+        {
+          "round": 1,
+          "id": "lead-public-wire-and-stale-tests",
+          "status": "closed, including explicit duplicate-member rejection on both current and migration wires",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:2601; crates/jit/src/repository_state/shipped_v1_record.rs:645"
+        },
+        {
+          "round": 2,
+          "id": "lead-init-co-publication",
+          "status": "closed: migrated records join initialization's one recoverable delta",
+          "evidence": "crates/jit/src/repository_state/initialize.rs:540"
+        },
+        {
+          "round": 2,
+          "id": "lead-no-candidate-recapture",
+          "status": "closed: the ordinary path reuses its first captured base",
+          "evidence": "crates/jit/src/commands/profile.rs:1275"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "met: the strict v2 provenance record carries typed package identity, origin, version and compatibility, public resolved inputs, and sorted unique domain-separated ownership claims over final published bases",
+        "REQ-02": "met: semantic, asset, and managed-region claims preserve retain-if-unowned for adopted or migrated repository baselines",
+        "REQ-03": "met: only the named shipped-v1 mutation boundary authenticates and converts the pinned historical image once, while ordinary readers remain v2-only and conversion writes co-publish in the held mutation transaction",
+        "REQ-04": "met: records remain provenance-only and effective configuration continues to come from registries"
+      },
+      "stale_narrative_sweep": "zero actionable stale assertions; remaining v1 and target_hashes mentions are confined to the named historical migration boundary and historical workflow evidence",
+      "deferred_items_audit": "no linked documents",
+      "holistic_review": "all direct-apply, source-apply, and profiled-init routes preserve strict ordinary reads while giving the single shipped-record migrator an authenticated mutation-only path; no Wave 7 aggregate transaction design was pulled forward",
+      "gate_evidence": "cargo-ci run 628e2db5-17da-4c0a-9043-5814df3286ef passed 4482 tests with zero failures plus fmt, clippy, provenance, build-budget, and incremental checks; code-review run db603bcd-6035-401d-a1df-07ed2a0dfa66 passed with zero findings",
+      "reviewed_at": "2026-08-10T00:06:38+03:00"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00"
