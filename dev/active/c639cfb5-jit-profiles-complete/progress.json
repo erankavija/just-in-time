@@ -125,11 +125,17 @@
       "issue_id": "45cd8529-32f2-4695-888f-2cad3e73197d",
       "status": "mitigated",
       "summary": "The separate v1.0 validation implementation is committed and merged into the isolated Wave 1 candidate; final direct-main integration waits only for its lead-owned JIT gate state to be committed."
+    },
+    {
+      "category": "rework-exceeded-max-attempts",
+      "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+      "status": "resolved",
+      "summary": "The invoker authorized a targeted retry and reset the counter with explicit guidance that profile apply dry-run is part of the repeatable ordered-selector contract."
     }
   ],
   "rework_counts": {
     "f2ef652a": 2,
-    "eac6ec13": 2
+    "eac6ec13": 0
   },
   "started_at": "2026-08-09T04:36:58+03:00"
 }
