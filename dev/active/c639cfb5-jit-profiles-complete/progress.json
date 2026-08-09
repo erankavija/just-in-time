@@ -12,7 +12,7 @@
     {
       "wave_number": 2,
       "issues": [
-        {"id": "eac6ec13-2c8b-4249-9ed4-372416bca255", "short_id": "eac6ec13", "title": "Select profiles through repeatable ordered selectors", "classification": "implementation", "status": "pending"}
+        {"id": "eac6ec13-2c8b-4249-9ed4-372416bca255", "short_id": "eac6ec13", "title": "Select profiles through repeatable ordered selectors", "classification": "implementation", "status": "in_progress"}
       ]
     },
     {
