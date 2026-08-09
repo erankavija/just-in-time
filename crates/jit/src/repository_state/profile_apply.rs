@@ -98,7 +98,18 @@ impl Contribution {
             }
         };
         ContributionIdentity {
-            registry: ContributionRegistry::for_path(self.registry_path()),
+            registry: match self {
+                Self::Scalar { .. }
+                | Self::MapEntry { .. }
+                | Self::SetString { .. }
+                | Self::Projection { .. } => ContributionRegistry::Config,
+                Self::KeyedArray { target, .. } => match target {
+                    KeyedArrayTarget::Gates => ContributionRegistry::Gates,
+                    KeyedArrayTarget::Invariants => ContributionRegistry::Invariants,
+                    KeyedArrayTarget::Rules => ContributionRegistry::Rules,
+                    KeyedArrayTarget::Templates => ContributionRegistry::Templates,
+                },
+            },
             target,
         }
     }
@@ -130,17 +141,6 @@ pub enum ContributionRegistry {
 }
 
 impl ContributionRegistry {
-    fn for_path(path: &str) -> Self {
-        match path {
-            ".jit/config.toml" => Self::Config,
-            ".jit/gates.toml" => Self::Gates,
-            ".jit/invariants.toml" => Self::Invariants,
-            ".jit/rules.toml" => Self::Rules,
-            ".jit/templates.toml" => Self::Templates,
-            _ => unreachable!("contributions only target declared profile registries"),
-        }
-    }
-
     fn path(self) -> &'static str {
         match self {
             Self::Config => ".jit/config.toml",
@@ -323,37 +323,33 @@ pub fn compose_resolved_contributions(
             contribution: claim.contribution,
         }),
     });
-    let grouped = existing
-        .chain(candidates.into_iter().map(|claim| CompositionInput {
-            source: ContributionClaimSource::Package(claim.package_id),
-            contribution: claim.contribution,
-        }))
-        .fold(
-            BTreeMap::<ContributionIdentity, Vec<CompositionInput>>::new(),
-            |mut grouped, claim| {
-                grouped
-                    .entry(claim.contribution.semantic_identity())
-                    .or_default()
-                    .push(claim);
-                grouped
-            },
-        );
+    let mut positions = BTreeMap::<ContributionIdentity, usize>::new();
+    let mut grouped = Vec::<(ContributionIdentity, Vec<CompositionInput>)>::new();
+    for claim in existing.chain(candidates.into_iter().map(|claim| CompositionInput {
+        source: ContributionClaimSource::Package(claim.package_id),
+        contribution: claim.contribution,
+    })) {
+        let identity = claim.contribution.semantic_identity();
+        if let Some(index) = positions.get(&identity) {
+            grouped[*index].1.push(claim);
+        } else {
+            positions.insert(identity.clone(), grouped.len());
+            grouped.push((identity, vec![claim]));
+        }
+    }
 
     grouped
         .into_iter()
-        .map(|(identity, claims)| compose_contribution_identity(identity, claims))
+        .filter_map(|(identity, claims)| compose_contribution_identity(identity, claims))
         .collect()
 }
 
 fn compose_contribution_identity(
     identity: ContributionIdentity,
     claims: Vec<CompositionInput>,
-) -> Result<ComposedContribution, ContributionCompositionConflict> {
-    let definition = claims
-        .first()
-        .expect("every composition group has an originating claim")
-        .contribution
-        .clone();
+) -> Option<Result<ComposedContribution, ContributionCompositionConflict>> {
+    let first = claims.first()?;
+    let definition = first.contribution.clone();
     if claims.iter().any(|claim| claim.contribution != definition) {
         let owners = claims
             .iter()
@@ -366,7 +362,7 @@ fn compose_contribution_identity(
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        return Err(ContributionCompositionConflict { identity, owners });
+        return Some(Err(ContributionCompositionConflict { identity, owners }));
     }
     let owners = claims
         .into_iter()
@@ -377,11 +373,11 @@ fn compose_contribution_identity(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
-    Ok(ComposedContribution {
+    Some(Ok(ComposedContribution {
         identity,
         definition,
         owners,
-    })
+    }))
 }
 
 #[derive(
@@ -944,6 +940,21 @@ pub(super) fn compose_profile_targets(
     })
 }
 
+/// Check all selected package contributions against one captured repository image.
+///
+/// This is deliberately a read-only semantic preflight. Publication remains the
+/// existing per-package path, while a conflict anywhere in the selected set is
+/// reported before that path can publish an earlier package.
+pub(crate) fn preflight_profile_contributions(
+    base: &RepositoryImage,
+    candidates: Vec<ProfileContributionClaim>,
+) -> Result<(), RepositoryStateError> {
+    let existing = existing_contribution_claims(base, &candidates)?;
+    compose_resolved_contributions(existing, candidates)
+        .map(|_| ())
+        .map_err(Into::into)
+}
+
 /// Compose a candidate package's claims with the repository's per-identity
 /// ownership evidence before any registry renderer receives a definition.
 fn compose_profile_contributions(
@@ -1049,11 +1060,11 @@ fn existing_contribution_claims(
         .collect::<Vec<_>>();
     let package_identities = package_claims
         .iter()
-        .map(|claim| match claim {
-            ExistingContributionClaim::Package(claim) => claim.contribution.semantic_identity(),
-            ExistingContributionClaim::Repository(_) => {
-                unreachable!("only package claims are collected")
+        .filter_map(|claim| match claim {
+            ExistingContributionClaim::Package(claim) => {
+                Some(claim.contribution.semantic_identity())
             }
+            ExistingContributionClaim::Repository(_) => None,
         })
         .collect::<BTreeSet<_>>();
     let repository_claims = candidates

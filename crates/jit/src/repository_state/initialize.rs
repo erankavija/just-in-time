@@ -582,14 +582,14 @@ fn profile_record_changed(
         RepositoryEntry::Absent => Ok(true),
         RepositoryEntry::File { bytes, .. } => {
             let existing = serde_json::from_slice::<AppliedProfileRecord>(bytes);
-            if existing.is_ok_and(|existing| existing == *record) {
-                Ok(false)
-            } else {
-                Err(InitializationError::InstalledRecordConflict {
+            match existing {
+                Ok(existing) if existing == *record => Ok(false),
+                Ok(existing) if existing.matches_package_provenance(record) => Ok(true),
+                _ => Err(InitializationError::InstalledRecordConflict {
                     path: profile.record_path.clone(),
                     id: profile.id.clone(),
                     version: profile.version.clone(),
-                })
+                }),
             }
         }
         _ => Err(InitializationError::UnsupportedMetadataPath(
@@ -869,7 +869,19 @@ pub(super) fn derive_profile_application(
             mode: FileMode::Regular,
         }),
         RepositoryEntry::File { .. } => {
-            profile_record_changed(base, profile, &record)?;
+            if profile_record_changed(base, profile, &record)? {
+                push_file_actions(
+                    base,
+                    &[DesiredFile {
+                        path: profile.record_path.clone(),
+                        bytes: serialize_profile_record(&record)?,
+                        mode: FileMode::Regular,
+                        policy: WritePolicy::Always,
+                        owner: PROFILE_OWNER,
+                    }],
+                    &mut actions,
+                )?;
+            }
         }
         _ => {
             return Err(InitializationError::UnsupportedMetadataPath(

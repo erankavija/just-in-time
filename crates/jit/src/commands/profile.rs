@@ -616,6 +616,7 @@ impl CommandExecutor<JsonFileStorage> {
         if !selected.is_empty() {
             let packages = self.resolve_profile_graph(&selected)?.selected_packages();
             validate_variable_inputs(&packages, inputs)?;
+            self.preflight_profile_contributions(&packages, inputs)?;
         }
         selected
             .into_iter()
@@ -629,6 +630,65 @@ impl CommandExecutor<JsonFileStorage> {
                         .collect(),
                 )
             })
+    }
+
+    /// Preflight every selected package's resolved semantic contribution against
+    /// one captured repository image before the per-package publication loop.
+    fn preflight_profile_contributions(
+        &self,
+        packages: &[ProfilePackage],
+        inputs: &VariableInputs,
+    ) -> Result<()> {
+        let layout = self.require_layout()?;
+        with_mutation_session(
+            self.storage(),
+            &layout,
+            "profile composition preflight",
+            |session| {
+                let Some((listed, recorded)) =
+                    capture_applied_records(session, &VirtualPath::PROFILES)?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                let candidates = packages
+                    .iter()
+                    .map(|package| {
+                        let resolved = resolve_package(
+                            package,
+                            &inputs.for_declarations(&package.model().variables),
+                        )?;
+                        Ok(
+                            build_profile_claims_from_resolved(&resolved, listed.layout(), false)?
+                                .contributions,
+                        )
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
+                let mut spec = listed.capture_spec().clone();
+                spec.discover_paths(
+                    candidates
+                        .iter()
+                        .map(|claim| claim.contribution.registry_path())
+                        .map(|path| {
+                            listed
+                                .layout()
+                                .classify_repository_relative(path)
+                                .map_err(anyhow::Error::from)
+                        })
+                        .collect::<Result<Vec<_>>>()?,
+                )?;
+                let Some(image) = capture_or_retry(session.capture(spec))? else {
+                    return Ok(SessionStep::Retry);
+                };
+                if recorded_profile_ids(&image, &VirtualPath::PROFILES)? != recorded {
+                    return Ok(SessionStep::Retry);
+                }
+                crate::repository_state::preflight_profile_contributions(&image, candidates)?;
+                Ok(SessionStep::Done(()))
+            },
+        )
     }
 
     /// Resolve and apply profiles after loading command-bound variable inputs.
