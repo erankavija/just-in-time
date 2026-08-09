@@ -613,8 +613,9 @@ repository-format-too-new startup failure (see **Scripting and Automation
 (`REPOSITORY_FORMAT_TOO_NEW` / exit `10`).
 
 When `--profile` is present, `profile` contains the same
-`ProfileComposedApplyResult` returned by `jit profile apply`, one entry per
-applied package; otherwise it is `null`.
+`ProfileComposedApplyResult` returned by `jit profile apply`; dependency-only
+packages appear once and every selected root occurrence appears in selector
+order, with repeated roots reported as `unchanged`. Otherwise it is `null`.
 
 ## Profile Commands
 
@@ -666,19 +667,21 @@ from prose.
 
 ### `jit profile show`
 
-Show one profile manifest and package identity from a repository package:
+Show one or more profile manifests and package identities from repository packages:
 
 ```bash
-jit profile show --profile <SELECTOR> [--json]
+jit profile show --profile <SELECTOR>... [--json]
 ```
 
-Human output summarizes package identity, compatibility, hashes, contribution
-and asset counts, and installed state. JSON returns `ProfileShowResult`: the
-complete parsed manifest, `origin`, `package_hash`, `target_hashes`,
-`file_count`, `byte_size`, and the parseable stored `applied` provenance record
-when one is present. `show` does not compare that record with current target
-bytes; use `jit profile apply --profile <SELECTOR> --dry-run` for exact current-state
-verification.
+Human output summarizes each package's identity, compatibility, hashes,
+contribution and asset counts, and installed state. JSON returns the
+count-wrapped `ProfileShowResult` collection `{"count": N, "profiles": [...]}`;
+each entry carries the complete parsed manifest, `origin`, `package_hash`,
+`target_hashes`, `file_count`, `byte_size`, and the parseable stored `applied`
+provenance record when one is present. Entries preserve every `--profile`
+occurrence in order, including repeated selectors. `show` does not compare that
+record with current target bytes; use `jit profile apply --profile <SELECTOR>
+--dry-run` for exact current-state verification.
 
 ### `jit profile apply`
 
@@ -689,12 +692,14 @@ recoverable multi-target transaction:
 jit profile apply --profile <SELECTOR>... [--dry-run] [--json]
 ```
 
-`--dry-run` builds and validates the exact plan without writing. JSON returns
-`ProfilePlanResult`, including `status` (`would_apply` or `unchanged`),
-`plan_hash`, and the sorted target list with each action (`create`, `update`, or
-`unchanged`) and executable intent.
+`--dry-run` builds and validates the exact plans without writing. JSON returns
+the count-wrapped `ProfilePlanResult` collection
+`{"count": N, "profiles": [...]}` with one `ProfilePlanEntry` per selector
+occurrence in selector order. Each entry includes `status` (`would_apply` or
+`unchanged`), `plan_hash`, and the sorted target list with each action (`create`,
+`update`, or `unchanged`) and executable intent.
 
-`--dry-run` previews one selected package. Applying selectors applies the
+`--dry-run` previews each selected package. Applying selectors applies the
 packages each declares a dependency on as well, so a preview accounts for the
 selected package's own targets.
 

@@ -105,9 +105,9 @@ pub struct ProfileListResult {
     pub profiles: Vec<ProfileSummary>,
 }
 
-/// Complete package inspection response.
+/// One complete package inspection entry.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
-pub struct ProfileShowResult {
+pub struct ProfileShowEntry {
     /// Canonical package model produced from the immutable manifest bytes.
     pub manifest: ProfilePackageModel,
     /// Package discovery origin.
@@ -123,6 +123,25 @@ pub struct ProfileShowResult {
     /// Stored provenance record when the selected repository has one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applied: Option<AppliedProfileRecord>,
+}
+
+/// Count-wrapped, occurrence-ordered package inspection response.
+#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
+pub struct ProfileShowResult {
+    /// Number of entries in [`Self::profiles`].
+    pub count: usize,
+    /// One package entry per selector occurrence, in selector order.
+    pub profiles: Vec<ProfileShowEntry>,
+}
+
+impl ProfileShowResult {
+    /// Collect package inspection entries without changing their selector order.
+    pub(crate) fn new(profiles: Vec<ProfileShowEntry>) -> Self {
+        Self {
+            count: profiles.len(),
+            profiles,
+        }
+    }
 }
 
 /// Planned target operation exposed by profile dry-run output.
@@ -170,9 +189,9 @@ pub enum ProfilePlanStatus {
     WouldApply,
 }
 
-/// Deterministic, non-mutating profile application preview.
+/// One deterministic, non-mutating profile application preview.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfilePlanResult {
+pub struct ProfilePlanEntry {
     /// Stable profile identifier.
     pub id: String,
     /// Semantic package version.
@@ -183,6 +202,25 @@ pub struct ProfilePlanResult {
     pub plan_hash: String,
     /// Every package target, sorted by path.
     pub targets: Vec<ProfileTargetChange>,
+}
+
+/// Count-wrapped, occurrence-ordered profile application previews.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfilePlanResult {
+    /// Number of previews in [`Self::profiles`].
+    pub count: usize,
+    /// One preview per selector occurrence, in selector order.
+    pub profiles: Vec<ProfilePlanEntry>,
+}
+
+impl ProfilePlanResult {
+    /// Collect previews without changing their selector order.
+    pub(crate) fn new(profiles: Vec<ProfilePlanEntry>) -> Self {
+        Self {
+            count: profiles.len(),
+            profiles,
+        }
+    }
 }
 
 #[cfg(test)]

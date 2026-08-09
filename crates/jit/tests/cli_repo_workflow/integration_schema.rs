@@ -106,6 +106,15 @@ fn test_schema_exposes_only_repeatable_profile_selectors() {
         assert!(profile[command]["args"].as_array().unwrap().is_empty());
     }
 
+    let show_schema = &profile["show"]["output"]["success_schema"];
+    let show_properties = show_schema
+        .get("properties")
+        .or_else(|| show_schema.pointer("/definitions/ProfileShowResult/properties"))
+        .expect("profile show collection properties");
+    assert!(show_properties["count"].is_object());
+    assert_eq!(show_properties["profiles"]["type"], "array");
+    assert!(show_properties.get("manifest").is_none());
+
     let init_flags = parsed["commands"]["init"]["flags"].as_array().unwrap();
     let selector = init_flags
         .iter()

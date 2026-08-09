@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-eac6ec13",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0f964f23fbf412032ae6f55536018607cd9a6cdd",
+  "completed_at": "2026-08-09T05:41:34.725396721Z",
+  "duration_ms": 255210,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 2350,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/eac6ec13/requirement/REQ-01",
+          "@/issue/c639cfb5/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "Profile apply --dry-run rejects more than one repeatable --profile selector, so it cannot preserve an ordered interleaved request."
+      }
+    ],
+    "summary": "Profile apply dry-run rejects repeatable ordered selectors, leaving REQ-01 unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "baa7baab-296e-4ac3-8247-a0a8d427b1d0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T05:37:19.514977764Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17679 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-eac6ec13\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe506-8e0a-7b72-9794-caeac49b674a\n--------\nuser\n--- 17666 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:eac6ec13` commits 31cd9894, 6f9da1b1, 8256590b, 2b550db9, 6ec1ca90, 9a4a5f00, 48ff8f7a, 0f964f23\nPolicy sources: AGENTS.md\nResolved items: @/issue/eac6ec13/requirement/REQ-01–REQ-04 (.jit/issues/eac6ec13-2c8b-4249-9ed4-372416bca255.json); @/issue/c639cfb5/requirement/REQ-01, REQ-11 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json); @/charter/D-8 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T05:33:01Z); mcp-ci passed (exit 0, 2026-08-09T05:37:07Z); prior code-review failed (exit 1, run a18bd1a0), with both findings fixed by 0f964f23\nTruncation recovery: Re-read the tagged patches by commit and affected path, then inspected current command, resolver, schema, bridge, test, and documentation line ranges; excluded uncommitted JIT run metadata\n\n1. [blocking, issue-impact] `profile apply --dry-run` rejects more than one `--profile` selector at `crates/jit/src/main.rs:2349-2357`. Although the CLI and generated schema advertise a repeatable ordered selector, this selecting-command mode cannot accept or preserve an interleaved request, leaving REQ-01 unmet.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Profile apply dry-run rejects repeatable ordered selectors, leaving REQ-01 unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Profile apply --dry-run rejects more than one repeatable --profile selector, so it cannot preserve an ordered interleaved request.\",\"file\":\"crates/jit/src/main.rs\",\"line\":2350,\"references\":[\"@/issue/eac6ec13/requirement/REQ-01\",\"@/issue/c639cfb5/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

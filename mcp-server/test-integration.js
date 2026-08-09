@@ -580,11 +580,22 @@ async function main() {
         const shown = await profileCall('jit_profile_show', {
           profile: [`path:${workflowLocation}`],
         });
-        assert.strictEqual(shown.manifest.id, 'workflow');
-        assert.deepStrictEqual(shown.origin, {
+        assert.strictEqual(shown.count, 1);
+        assert.strictEqual(shown.profiles.length, shown.count);
+        assert.strictEqual(shown.profiles[0].manifest.id, 'workflow');
+        assert.deepStrictEqual(shown.profiles[0].origin, {
           source: 'directory',
           location: workflowLocation,
         });
+
+        const repeatedShown = await profileCall('jit_profile_show', {
+          profile: [`path:${workflowLocation}`, `path:${workflowLocation}`],
+        });
+        assert.strictEqual(repeatedShown.count, 2);
+        assert.deepStrictEqual(
+          repeatedShown.profiles.map(profile => profile.manifest.id),
+          ['workflow', 'workflow']
+        );
 
         // A preview is derived over one package against the repository in
         // front of it, so the package a repository declaring nothing can be
@@ -593,7 +604,9 @@ async function main() {
           profile: [`path:${baseLocation}`],
           'dry-run': true,
         });
-        assert.strictEqual(basePreview.status, 'would_apply');
+        assert.strictEqual(basePreview.count, 1);
+        assert.strictEqual(basePreview.profiles.length, basePreview.count);
+        assert.strictEqual(basePreview.profiles[0].status, 'would_apply');
 
         // An application reports one result per applied package: the packages
         // the named one depends on, then the named one.
@@ -603,16 +616,16 @@ async function main() {
         assert.strictEqual(applied.count, applied.profiles.length);
         const appliedProfileIds = applied.profiles.map(profile => profile.id);
         const expectedProfileIds = [
-          ...shown.manifest.dependency.map(dependency => dependency.id),
-          shown.manifest.id,
+          ...shown.profiles[0].manifest.dependency.map(dependency => dependency.id),
+          shown.profiles[0].manifest.id,
         ];
-        assert.ok(shown.manifest.dependency.length > 0,
+        assert.ok(shown.profiles[0].manifest.dependency.length > 0,
           'the named package declares a dependency');
         for (const id of expectedProfileIds) {
           assert.ok(appliedProfileIds.includes(id),
             `application should include declared package ${id}`);
         }
-        assert.strictEqual(appliedProfileIds.at(-1), shown.manifest.id);
+        assert.strictEqual(appliedProfileIds.at(-1), shown.profiles[0].manifest.id);
         assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
         // The applied package's own preview names the target it published.
@@ -620,13 +633,15 @@ async function main() {
           profile: ['id:workflow'],
           'dry-run': true,
         });
-        assert.ok(preview.targets.some(target => target.path === 'docs/workflow.txt'));
+        assert.strictEqual(preview.count, 1);
+        assert.ok(preview.profiles[0].targets.some(target => target.path === 'docs/workflow.txt'));
 
         const unchanged = await profileCall('jit_profile_apply', {
           profile: ['id:workflow'],
           'dry-run': true,
         });
-        assert.strictEqual(unchanged.status, 'unchanged');
+        assert.strictEqual(unchanged.count, 1);
+        assert.strictEqual(unchanged.profiles[0].status, 'unchanged');
 
         // The bridge preserves one repeated --profile occurrence stream,
         // including interleaved path and recorded-id selectors.
@@ -637,6 +652,15 @@ async function main() {
         });
         const seededProfileIds = seeded.profiles.map(profile => profile.id);
         assert.deepStrictEqual(seededProfileIds, ['alpha', 'beta']);
+        const orderedPreview = await profileCall('jit_profile_apply', {
+          profile: [`path:${betaLocation}`, 'id:alpha', `path:${betaLocation}`],
+          'dry-run': true,
+        });
+        assert.strictEqual(orderedPreview.count, 3);
+        assert.deepStrictEqual(
+          orderedPreview.profiles.map(profile => profile.id),
+          ['beta', 'alpha', 'beta']
+        );
         const ordered = await profileCall('jit_profile_apply', {
           profile: [`path:${alphaLocation}`, 'id:alpha', `path:${betaLocation}`],
         });
@@ -663,7 +687,7 @@ async function main() {
             const resolved = await profileCall('jit_profile_show', {
               profile: [`id:${id}`],
             });
-            return [id, resolved.origin];
+            return [id, resolved.profiles[0].origin];
           })
         ));
         for (const profile of recorded.profiles) {

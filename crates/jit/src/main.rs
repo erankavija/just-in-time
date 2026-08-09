@@ -2289,41 +2289,40 @@ fn run() -> Result<()> {
             },
             ProfileCommands::Show { profile, json } => {
                 let selectors = parse_profile_selectors(&profile, json)?;
-                let selector = selectors.first().ok_or_else(|| {
-                    invalid_argument(
-                        "profile show requires one --profile id:ID or path:DIR selector"
-                            .to_string(),
-                        json,
-                    )
-                })?;
-                if selectors.len() > 1 {
+                if selectors.is_empty() {
                     return Err(invalid_argument(
-                        "profile show accepts exactly one --profile selector".to_string(),
+                        "profile show requires at least one --profile id:ID or path:DIR selector"
+                            .to_string(),
                         json,
                     ));
                 }
-                match executor.show_profile(selector) {
+                match executor.show_profiles(&selectors) {
                     Ok(result) => {
                         if json {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            let profile = &result.manifest;
-                            println!("Profile: {}", profile.id);
-                            println!("Version: {}", profile.version);
-                            println!("Origin: {}", profile_origin_label(&result.origin));
-                            println!("Compatible JIT: {}", profile.compatible_jit);
-                            println!("Package hash: {}", result.package_hash);
-                            println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
-                            println!("Targets: {}", result.target_hashes.len());
-                            println!(
-                                "Applied: {}",
-                                if result.applied.is_some() {
-                                    "yes"
-                                } else {
-                                    "no"
-                                }
-                            );
+                            for result in result.profiles {
+                                let profile = &result.manifest;
+                                println!("Profile: {}", profile.id);
+                                println!("Version: {}", profile.version);
+                                println!("Origin: {}", profile_origin_label(&result.origin));
+                                println!("Compatible JIT: {}", profile.compatible_jit);
+                                println!("Package hash: {}", result.package_hash);
+                                println!(
+                                    "Files: {} ({} bytes)",
+                                    result.file_count, result.byte_size
+                                );
+                                println!("Targets: {}", result.target_hashes.len());
+                                println!(
+                                    "Applied: {}",
+                                    if result.applied.is_some() {
+                                        "yes"
+                                    } else {
+                                        "no"
+                                    }
+                                );
+                            }
                         }
                     }
                     Err(error) if json => {
@@ -2348,31 +2347,30 @@ fn run() -> Result<()> {
                     ));
                 }
                 if dry_run {
-                    if selectors.len() > 1 {
-                        return Err(invalid_argument(
-                            "profile apply --dry-run accepts exactly one --profile selector"
-                                .to_string(),
-                            json,
-                        ));
-                    }
-                    match executor.plan_profile(&selectors[0]) {
-                        Ok(plan) => {
+                    match executor.plan_profiles(&selectors) {
+                        Ok(plans) => {
                             if json {
-                                let output = JsonOutput::success(&plan);
+                                let output = JsonOutput::success(&plans);
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                let status = match plan.status {
-                                    jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
-                                    jit::profile::ProfilePlanStatus::WouldApply => "would apply",
-                                };
-                                println!("Profile {} {}: {}", plan.id, plan.version, status);
-                                for target in plan.targets {
-                                    let action = match target.action {
-                                        jit::profile::ProfileTargetAction::Unchanged => "unchanged",
-                                        jit::profile::ProfileTargetAction::Create => "create",
-                                        jit::profile::ProfileTargetAction::Update => "update",
+                                for plan in plans.profiles {
+                                    let status = match plan.status {
+                                        jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
+                                        jit::profile::ProfilePlanStatus::WouldApply => {
+                                            "would apply"
+                                        }
                                     };
-                                    println!("  {action}: {}", target.path);
+                                    println!("Profile {} {}: {}", plan.id, plan.version, status);
+                                    for target in plan.targets {
+                                        let action = match target.action {
+                                            jit::profile::ProfileTargetAction::Unchanged => {
+                                                "unchanged"
+                                            }
+                                            jit::profile::ProfileTargetAction::Create => "create",
+                                            jit::profile::ProfileTargetAction::Update => "update",
+                                        };
+                                        println!("  {action}: {}", target.path);
+                                    }
                                 }
                             }
                         }

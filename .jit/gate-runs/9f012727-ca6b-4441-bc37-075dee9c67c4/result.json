@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-eac6ec13",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "46fc9427253af7b5d0d9c735851a7da19d296f63",
+  "completed_at": "2026-08-09T08:40:09.604095201Z",
+  "duration_ms": 142,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "3876caf0a825aede5ae1e513fbd5f4a6e60d4ff86097c8f738b0e214e28d7f68",
+  "issue_id": "eac6ec13-2c8b-4249-9ed4-372416bca255",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9f012727-ca6b-4441-bc37-075dee9c67c4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T08:40:09.462012891Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- incremental-preflight output ---\nnon-empty incremental directories under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-eac6ec13/target:\n/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-eac6ec13/target/jit-stale-child-test-cache/debug/incremental\n/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-eac6ec13/target/debug/incremental\n  ✗ incremental-preflight: FAILED (exit 1)\n\n",
+  "tree_dirty": false
+}

@@ -11,7 +11,48 @@ use crate::repository_state::{
 };
 use crate::storage::JsonFileStorage;
 use anyhow::{Context, Result};
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
+
+/// Keep initialization's dependency work set unique while retaining one result
+/// for every selected root occurrence. A repeated root is an idempotent second
+/// observation of the same durable application, not a second publication.
+fn init_profile_results(
+    applied: &[ProfileApplyResult],
+    roots: &[ProfilePackage],
+) -> Result<ProfileComposedApplyResult> {
+    let root_ids = roots
+        .iter()
+        .map(|root| root.model().id.as_str())
+        .collect::<HashSet<_>>();
+    let applied_by_id = applied
+        .iter()
+        .map(|result| (result.id.as_str(), result))
+        .collect::<HashMap<_, _>>();
+    let mut results = applied
+        .iter()
+        .filter(|result| !root_ids.contains(result.id.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut occurrences = HashMap::<&str, usize>::new();
+    for root in roots {
+        let id = root.model().id.as_str();
+        let Some(source) = applied_by_id.get(id) else {
+            anyhow::bail!("initialized root '{id}' has no applied result");
+        };
+        let occurrence = occurrences.entry(id).or_default();
+        let first = *occurrence == 0;
+        *occurrence += 1;
+        let mut result = (*source).clone();
+        if !first {
+            result.status = ProfileApplicationStatus::Unchanged;
+            result.transaction_id = None;
+            result.warnings.clear();
+        }
+        results.push(result);
+    }
+    Ok(ProfileComposedApplyResult::new(results))
+}
 
 /// Result of publishing a fresh repository scaffold.
 #[derive(Debug)]
@@ -71,22 +112,22 @@ impl CommandExecutor<JsonFileStorage> {
         repo_dir: &Path,
         selectors: &[super::profile::ProfileSelector],
     ) -> Result<FreshInitResult> {
-        let packages = if selectors.is_empty() {
-            Vec::new()
+        let (roots, packages) = if selectors.is_empty() {
+            (Vec::new(), Vec::new())
         } else {
             let selected = self.resolve_profile_selectors(selectors)?;
-            selected
-                .into_iter()
-                .try_fold(Vec::new(), |mut packages, root| {
-                    for package in self.resolve_profile_closure(&root)? {
-                        if packages.iter().all(|existing: &ProfilePackage| {
-                            existing.model().id != package.model().id
-                        }) {
-                            packages.push(package);
-                        }
+            let packages = selected.iter().try_fold(Vec::new(), |mut packages, root| {
+                for package in self.resolve_profile_closure(root)? {
+                    if packages
+                        .iter()
+                        .all(|existing: &ProfilePackage| existing.model().id != package.model().id)
+                    {
+                        packages.push(package);
                     }
-                    Ok::<_, anyhow::Error>(packages)
-                })?
+                }
+                Ok::<_, anyhow::Error>(packages)
+            })?;
+            (selected, packages)
         };
         let (package, dependants) = match packages.as_slice() {
             [scaffolded, dependants @ ..] => (Some(scaffolded.clone()), dependants),
@@ -250,11 +291,17 @@ impl CommandExecutor<JsonFileStorage> {
             .iter()
             .map(|package| self.apply_one_profile_package(package))
             .collect::<Result<Vec<_>>>()?;
-        result.profile = result.profile.map(|scaffolded| {
-            ProfileComposedApplyResult::new(
-                scaffolded.profiles.into_iter().chain(applied).collect(),
-            )
-        });
+        let mut applied_results = result
+            .profile
+            .take()
+            .map(|scaffolded| scaffolded.profiles)
+            .unwrap_or_default();
+        applied_results.extend(applied);
+        result.profile = if applied_results.is_empty() {
+            None
+        } else {
+            Some(init_profile_results(&applied_results, &roots)?)
+        };
         Ok(result)
     }
 
@@ -757,6 +804,53 @@ source-of-truth = \"registry-first\"\n";
         assert!(repo.path().join("docs/workflow.txt").is_file());
         assert!(repo.path().join(".jit/profiles/base.json").is_file());
         assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+    }
+
+    #[test]
+    fn test_fresh_profile_init_preserves_repeated_root_occurrences_in_order() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let location = repo.path().join("packages/workflow");
+        crate::test_utils::write_package_declaring(
+            &composition_package(),
+            &location,
+            "workflow",
+            &[],
+        );
+
+        let result = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[
+                    ProfileSelector::path(&location),
+                    ProfileSelector::path(&location),
+                ],
+            )
+            .unwrap();
+
+        let profiles = result
+            .profile
+            .expect("profiled init reports its roots")
+            .profiles;
+        assert_eq!(
+            profiles
+                .iter()
+                .map(|profile| (profile.id.as_str(), profile.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("workflow", ProfileApplicationStatus::Applied),
+                ("workflow", ProfileApplicationStatus::Unchanged),
+            ],
+            "each selector occurrence remains an ordered root result"
+        );
+        assert_eq!(
+            fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+                .unwrap()
+                .lines()
+                .count(),
+            1,
+            "repeated roots do not duplicate the durable application"
+        );
     }
 
     #[test]
