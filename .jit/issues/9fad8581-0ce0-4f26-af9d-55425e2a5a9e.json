@@ -7,6 +7,7 @@
   ],
   "description": "Plan a whole selection once and publish it through a single recoverable\ntransaction, replacing the per-package application calls.\n\n## Background\n\nApplication already derives a shared plan and submits it through the shared\nmutation session, but a selection naming several packages runs that path once per\npackage. A failure part-way therefore leaves some packages applied and others not.\n\n## Success Criteria\n\n- [hard] REQ-01: A selection naming several packages produces one plan over the whole applied closure and publishes it through one recoverable transaction.\n- [hard] REQ-02: A failure at any point leaves either the complete prior repository state or the complete new state, including repository bytes, records, and audit state.\n- [hard] REQ-03: Repeating an operation whose result is already present changes nothing and reports the selection as unchanged.\n- [hard] REQ-04: The per-package application entry point is gone, and no caller reaches publication except through the aggregate path.\n- [hard] REQ-05: Every operation works in a repository with no Git directory.\n",
   "documents": [],
+  "first_ready_at": "2026-08-09T21:21:43.920057706Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "satisfies:REQ-08"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Publish one selection through one recoverable transaction",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-09T21:21:43.920057706Z"
 }
