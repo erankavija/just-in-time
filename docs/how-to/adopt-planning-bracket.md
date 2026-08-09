@@ -261,12 +261,15 @@ auto = true
 
 [gates.checker]
 type = "rule_validation"
-rule = "coverage-preview"
+rule = "sdd-coverage-preview"
 ```
 
 The titles and descriptions are yours to reword; the keys, checker types, and
-the configured rule name are what this example depends on. The `brackets`
-namespace is not a checker hardcode: the preview rule's own
+the configured rule name are what this example depends on. This checker names
+the `sdd-coverage-preview` rule declared in Step 3. If you adapt the research
+example instead, set it to `research-hypotheses-covered-preview`; the gate key
+can remain `coverage-preview`. The `brackets` namespace is not a checker
+hardcode: the preview rule's own
 `container-from-label = "brackets"` assertion setting declares how its selected
 breakdown resolves the criteria-bearing container.
 [Gate Presets](../reference/gate-presets.md#portable-checker-types) specifies
@@ -385,10 +388,10 @@ reinterpretation path. It then:
    issues and edges against the manifest, then runs `B`'s gates.
 
 `coverage-preview` applies your preview rule with `B` as its sole firing issue.
-For the canonical rule name, reproduce the exact application directly with
-`jit validate <B> --rule coverage-preview`. If the drafted children leave a
-`[hard]` criterion with no satisfying child (in any state), the gate **blocks**
-(exit 4) and names the uncovered criteria. The
+For the SDD rule declared in Step 3, reproduce the exact application directly
+with `jit validate <B> --rule sdd-coverage-preview`. If the drafted children
+leave a `[hard]` criterion with no satisfying child (in any state), the gate
+**blocks** (exit 4) and names the uncovered criteria. The
 `breakdown-review` placeholder separately reserves the decomposition-quality
 checkpoint but performs no judgment until you replace its checker. Because the
 impl subgraph transitively depends on `B`, all configured gates must pass before
