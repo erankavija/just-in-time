@@ -87,7 +87,7 @@ pub use item::{ItemListResult, ItemShowResult};
 pub use migrate::LifecycleBackfillResult;
 pub use profile::{
     ProfileApplyError, ProfileDependencyError, ProfileResolutionError, ProfileSelector,
-    ProfileSelectorError,
+    ProfileSelectorError, ProfileVariableOptions,
 };
 pub use project::{ProjectRenderResult, ProjectionRenderReport};
 pub use template::TemplateApplyResult;

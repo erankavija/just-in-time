@@ -1,4 +1,5 @@
 use super::manifest::{is_lowercase_kebab, ProfilePackageModel, MANIFEST_FILE_NAME};
+use super::variables::{validate_body_references, validate_model_references, VariableError};
 use super::wire::ManifestWireError;
 use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
@@ -162,6 +163,7 @@ impl ProfilePackage {
         let model = decoded.model;
 
         validate_declared_content(&model, &files, &executable_sources)?;
+        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
         let hashes = compute_hashes(&model, &files, &decoded.identity_manifest)?;
 
         Ok(Self {
@@ -360,6 +362,10 @@ pub enum ProfilePackageError {
     /// Canonical serialization unexpectedly failed.
     #[error("failed to serialize canonical profile data: {0}")]
     CanonicalSerialization(#[source] serde_json::Error),
+    /// A variable declaration or bounded reference violates the package
+    /// contract.
+    #[error(transparent)]
+    Variable(#[from] VariableError),
     /// File count or byte size exceeds the package budget.
     #[error(
         "profile package exceeds bounds: {file_count} files/{byte_size} bytes; \
@@ -626,6 +632,7 @@ fn package_bounds_failure(file_count: usize, byte_size: usize) -> Option<Profile
 fn validate_manifest_declarations(
     manifest: &ProfilePackageModel,
 ) -> Result<(), ProfilePackageError> {
+    validate_model_references(manifest)?;
     if let Some(dependency) = manifest
         .dependencies
         .iter()
@@ -1026,6 +1033,7 @@ fn hash_frame(hasher: &mut Sha256, frame: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::profile::variables::{resolve_package, VariableError, VariableInputs};
     use crate::profile::{
         profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
         ProfileDependencyRequirement, ProfileId, RegionDeclaration,
@@ -1508,6 +1516,109 @@ value = "workspace/active"
             first.hashes().targets[".jit/config.toml"],
             reordered.hashes().targets[".jit/config.toml"]
         );
+    }
+
+    #[test]
+    fn test_variable_resolution_changes_content_without_changing_package_identity() {
+        let manifest = br#"
+[profile]
+manifest-version = 2
+id = "variable-package"
+version = "1.0.0"
+compatible-jit = "*"
+
+[[variable]]
+name = "NAME"
+default = "default"
+
+[[contribution]]
+kind = "scalar"
+target = "documentation-development-root"
+value = "docs/{{jit:var:NAME}}"
+
+[[asset]]
+source = "assets/profile.txt"
+target = "docs/profile.txt"
+template = true
+"#;
+        let package = ProfilePackage::from_files(
+            BTreeMap::from([
+                (MANIFEST_FILE_NAME.to_string(), manifest.to_vec()),
+                (
+                    "assets/profile.txt".to_string(),
+                    b"profile={{jit:var:NAME}}\n".to_vec(),
+                ),
+            ]),
+            ProfilePackageSource::Directory(fixture_tree()),
+        )
+        .expect("the variable package is valid");
+        let package_hash = package.hashes().package.clone();
+        let first = resolve_package(
+            &package,
+            &VariableInputs {
+                command_line: vec![("NAME".to_string(), "first".to_string())],
+                ..VariableInputs::default()
+            },
+        )
+        .expect("the first value resolves");
+        let first_again = resolve_package(
+            &package,
+            &VariableInputs {
+                command_line: vec![("NAME".to_string(), "first".to_string())],
+                ..VariableInputs::default()
+            },
+        )
+        .expect("the same value resolves deterministically");
+        let second = resolve_package(
+            &package,
+            &VariableInputs {
+                command_line: vec![("NAME".to_string(), "second".to_string())],
+                ..VariableInputs::default()
+            },
+        )
+        .expect("the second value resolves");
+
+        assert_eq!(package.hashes().package, package_hash);
+        assert_eq!(first, first_again);
+        assert_eq!(first.variables().values()["NAME"], "first");
+        assert_eq!(second.variables().values()["NAME"], "second");
+        assert_eq!(
+            first.source_bytes("assets/profile.txt"),
+            Some(b"profile=first\n".as_slice())
+        );
+        assert_eq!(
+            second.source_bytes("assets/profile.txt"),
+            Some(b"profile=second\n".as_slice())
+        );
+        assert_ne!(first.model(), second.model());
+    }
+
+    #[test]
+    fn test_package_reader_rejects_duplicate_variable_declarations() {
+        let manifest = br#"
+[profile]
+manifest-version = 2
+id = "duplicate-variable"
+version = "1.0.0"
+compatible-jit = "*"
+
+[[variable]]
+name = "NAME"
+
+[[variable]]
+name = "NAME"
+"#;
+        let error = ProfilePackage::from_files(
+            BTreeMap::from([(MANIFEST_FILE_NAME.to_string(), manifest.to_vec())]),
+            ProfilePackageSource::Directory(fixture_tree()),
+        )
+        .expect_err("duplicate declarations must fail at package read");
+
+        assert!(matches!(
+            error,
+            ProfilePackageError::Variable(VariableError::DuplicateDeclaration(name))
+                if name == "NAME"
+        ));
     }
 
     #[test]

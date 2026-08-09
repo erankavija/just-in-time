@@ -23,7 +23,7 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
     ProfileCommands, ProjectCommands,
 };
-use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector};
+use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext};
 use jit::storage::{IssueStore, JsonFileStorage};
@@ -2155,7 +2155,12 @@ fn run() -> Result<()> {
     let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout.clone());
 
     match &command {
-        Commands::Init { profile, json } => {
+        Commands::Init {
+            profile,
+            values_file,
+            set,
+            json,
+        } => {
             let output_ctx = OutputContext::new(quiet, *json);
             let selectors = parse_profile_selectors(profile, *json)?;
             profile_result(executor.validate_profile_selection(&selectors), *json)?;
@@ -2169,7 +2174,14 @@ fn run() -> Result<()> {
             // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
             // profiled init, closing the prior re-init gap.
             let init_result = profile_result(
-                executor.initialize_fresh_repository(&current_dir, Some(&selectors)),
+                executor.initialize_fresh_repository_from_sources(
+                    &current_dir,
+                    Some(&selectors),
+                    &ProfileVariableOptions {
+                        values_file: values_file.clone(),
+                        assignments: set.clone(),
+                    },
+                ),
                 *json,
             )?;
             // Machine-local worktree identity (gitignored, not part of the
@@ -2335,6 +2347,8 @@ fn run() -> Result<()> {
             }
             ProfileCommands::Apply {
                 profile,
+                values_file,
+                set,
                 dry_run,
                 json,
             } => {
@@ -2347,7 +2361,13 @@ fn run() -> Result<()> {
                     ));
                 }
                 if dry_run {
-                    match executor.plan_profiles(&selectors) {
+                    match executor.plan_profiles_from_sources(
+                        &selectors,
+                        &ProfileVariableOptions {
+                            values_file: values_file.clone(),
+                            assignments: set.clone(),
+                        },
+                    ) {
                         Ok(plans) => {
                             if json {
                                 let output = JsonOutput::success(&plans);
@@ -2382,7 +2402,13 @@ fn run() -> Result<()> {
                         Err(error) => return Err(error),
                     }
                 } else {
-                    match executor.apply_profile(&selectors) {
+                    match executor.apply_profile_from_sources(
+                        &selectors,
+                        &ProfileVariableOptions {
+                            values_file: values_file.clone(),
+                            assignments: set.clone(),
+                        },
+                    ) {
                         Ok(applied) => {
                             if json {
                                 let output = JsonOutput::success(&applied);

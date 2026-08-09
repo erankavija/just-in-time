@@ -50,6 +50,14 @@ pub enum Commands {
         )]
         profile: Vec<String>,
 
+        /// Optional TOML file containing the `[variables]` value map.
+        #[arg(long, value_name = "PATH")]
+        values_file: Option<std::path::PathBuf>,
+
+        /// Set one declared profile variable; repeatable and last-wins.
+        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+        set: Vec<String>,
+
         #[arg(long)]
         json: bool,
     },
@@ -2968,6 +2976,14 @@ pub enum ProfileCommands {
         )]
         profile: Vec<String>,
 
+        /// Optional TOML file containing the `[variables]` value map.
+        #[arg(long, value_name = "PATH")]
+        values_file: Option<std::path::PathBuf>,
+
+        /// Set one declared profile variable; repeatable and last-wins.
+        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+        set: Vec<String>,
+
         /// Build and validate the exact application plans without writing
         #[arg(long)]
         dry_run: bool,
@@ -3657,6 +3673,8 @@ mod recovery_dispatch_tests {
     fn test_representative_writer_and_reader_classification() {
         assert!(Commands::Init {
             profile: Vec::new(),
+            values_file: None,
+            set: Vec::new(),
             json: false,
         }
         .requires_recovery_dispatch());

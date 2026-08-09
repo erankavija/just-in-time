@@ -933,6 +933,7 @@ mod tests {
             target: target.to_string(),
             region_id: region_id.to_string(),
             placement: RegionPlacement::Append,
+            template: false,
         }
     }
 

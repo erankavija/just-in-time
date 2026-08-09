@@ -1,8 +1,8 @@
 use super::{with_mutation_session, CommandExecutor, SessionStep};
 use crate::config::{slugify_project_name, ProjectName};
 use crate::profile::{
-    build_profile_claims, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
-    ProfilePackage,
+    build_profile_claims_from_resolved, resolve_package, ProfileApplicationStatus,
+    ProfileApplyResult, ProfileComposedApplyResult, ProfilePackage, VariableInputs,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
@@ -79,7 +79,18 @@ impl CommandExecutor<JsonFileStorage> {
         repo_dir: &Path,
         selectors: &[super::profile::ProfileSelector],
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, selectors)
+        self.run_initialization(repo_dir, selectors, &VariableInputs::default())
+    }
+
+    /// Initialize and apply profiles after loading command-bound variable
+    /// inputs.
+    pub fn initialize_profiled_repository_from_sources(
+        &self,
+        repo_dir: &Path,
+        selectors: &[super::profile::ProfileSelector],
+        options: &super::profile::ProfileVariableOptions,
+    ) -> Result<FreshInitResult> {
+        self.initialize_from_sources(repo_dir, selectors, options)
     }
 
     /// Publish a fresh neutral or profiled repository through the recovered
@@ -94,7 +105,41 @@ impl CommandExecutor<JsonFileStorage> {
         repo_dir: &Path,
         selectors: Option<&[super::profile::ProfileSelector]>,
     ) -> Result<FreshInitResult> {
-        self.run_initialization(repo_dir, selectors.unwrap_or_default())
+        self.run_initialization(
+            repo_dir,
+            selectors.unwrap_or_default(),
+            &VariableInputs::default(),
+        )
+    }
+
+    /// Initialize a repository after loading command-bound variable inputs.
+    pub fn initialize_fresh_repository_from_sources(
+        &self,
+        repo_dir: &Path,
+        selectors: Option<&[super::profile::ProfileSelector]>,
+        options: &super::profile::ProfileVariableOptions,
+    ) -> Result<FreshInitResult> {
+        self.initialize_from_sources(repo_dir, selectors.unwrap_or_default(), options)
+    }
+
+    fn initialize_from_sources(
+        &self,
+        repo_dir: &Path,
+        selectors: &[super::profile::ProfileSelector],
+        options: &super::profile::ProfileVariableOptions,
+    ) -> Result<FreshInitResult> {
+        let selected = self.resolve_profile_selectors(selectors)?;
+        let packages = if selected.is_empty() {
+            Vec::new()
+        } else {
+            self.resolve_profile_graph(&selected)?.selected_packages()
+        };
+        let inputs = super::profile::load_profile_variable_inputs(
+            &packages,
+            options.values_file.as_deref(),
+            &options.assignments,
+        )?;
+        self.run_initialization(repo_dir, selectors, &inputs)
     }
 
     /// Capture the base under one recovered session, validate the proposed
@@ -111,6 +156,7 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         repo_dir: &Path,
         selectors: &[super::profile::ProfileSelector],
+        variable_inputs: &VariableInputs,
     ) -> Result<FreshInitResult> {
         let (roots, packages) = if selectors.is_empty() {
             (Vec::new(), Vec::new())
@@ -136,7 +182,9 @@ impl CommandExecutor<JsonFileStorage> {
             |session| {
                 let (config, project_name) = self.resolve_init_config(&mut *session, repo_dir)?;
                 let profile = match package.as_ref() {
-                    Some(package) => Some(self.profile_input(package)?),
+                    Some(package) => {
+                        Some(self.profile_input_with_inputs(package, variable_inputs)?)
+                    }
                     None => None,
                 };
                 let scaffold = InitializationScaffold::from_config(config, project_name, profile)?
@@ -279,7 +327,13 @@ impl CommandExecutor<JsonFileStorage> {
         // over the absent data root the scaffold was captured against.
         let applied = dependants
             .iter()
-            .map(|package| self.apply_one_profile_package(package))
+            .map(|package| {
+                let resolved = resolve_package(
+                    package,
+                    &variable_inputs.for_declarations(&package.model().variables),
+                )?;
+                self.apply_one_profile_package(package, &resolved)
+            })
             .collect::<Result<Vec<_>>>()?;
         let mut applied_results = result
             .profile
@@ -347,20 +401,33 @@ impl CommandExecutor<JsonFileStorage> {
     /// config/gates/rules preserved), so the profile merges over the proposed neutral
     /// repository. Returns `Ok(None)` on a retryable capture conflict so the caller
     /// re-attempts the whole initialization.
+    #[cfg(test)]
     fn profile_input(&self, package: &ProfilePackage) -> Result<ProfileApplicationInput> {
+        self.profile_input_with_inputs(package, &VariableInputs::default())
+    }
+
+    fn profile_input_with_inputs(
+        &self,
+        package: &ProfilePackage,
+        variable_inputs: &VariableInputs,
+    ) -> Result<ProfileApplicationInput> {
         super::profile::reject_reserved_application_targets(
             package.hashes().targets.keys().map(String::as_str),
         )?;
         let metadata = package.model();
         let record_path = VirtualPath::data(format!("profiles/{}.json", metadata.id))?;
         let layout = self.require_layout()?;
+        let resolved = resolve_package(
+            package,
+            &variable_inputs.for_declarations(&package.model().variables),
+        )?;
         Ok(ProfileApplicationInput {
             id: metadata.id.to_string(),
             version: metadata.version.clone(),
             package_hash: package.hashes().package.clone(),
             target_hashes: package.hashes().targets.clone(),
             origin: super::profile::package_origin(package, &layout)?,
-            claims: build_profile_claims(package, &layout)?,
+            claims: build_profile_claims_from_resolved(&resolved, &layout, false)?,
             record_path,
         })
     }

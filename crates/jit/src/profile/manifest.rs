@@ -145,6 +145,9 @@ pub struct AssetDeclaration {
     /// Whether Unix application should publish the executable bit.
     #[serde(default)]
     pub executable: bool,
+    /// Whether the asset body opts into UTF-8 variable substitution.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub template: bool,
 }
 
 /// A managed region sourced from one file.
@@ -159,6 +162,9 @@ pub struct RegionDeclaration {
     pub region_id: String,
     /// V1 placement policy.
     pub placement: RegionPlacement,
+    /// Whether the managed-region body opts into UTF-8 variable substitution.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub template: bool,
 }
 
 /// One repository root the package's live assets are drawn from.
@@ -208,6 +214,10 @@ pub enum RegionPlacement {
 /// Generate the JSON Schema for the canonical package model.
 pub fn profile_package_model_schema() -> RootSchema {
     schema_for!(ProfilePackageModel)
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 pub(crate) fn is_lowercase_kebab(value: &str) -> bool {
