@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "973f716d861b4f61c0694bc0cf301f44e4829c10",
+  "completed_at": "2026-08-09T14:09:08.564747512Z",
+  "duration_ms": 50502,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "116b9f218b3f30e8f0589d0962cac4d94575c998a76105293da7f609028cbdf6",
+  "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e998b17b-0372-498a-a690-734a5b46dccd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T14:08:18.061778243Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\n--- provenance failures ---\n--- budget output ---\nrust-build-budget: 'cargo test --workspace --no-run' failed under /home/vkaskivuo/Projects/just-in-time\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✗ provenance: FAILED (exit 101)\n  ✗ budget: FAILED (exit 2)\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

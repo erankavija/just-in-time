@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -25,7 +25,7 @@
       "wave_number": 4,
       "issues": [
         {"id": "f73d54a2-14bd-4641-bcfe-be5f1431c133", "short_id": "f73d54a2", "title": "Canonical package model, selection, and graph", "classification": "implementation", "status": "done"},
-        {"id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6", "short_id": "fc47a7bf", "title": "Resolve declared non-secret variables into package content", "classification": "implementation", "status": "in_progress"}
+        {"id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6", "short_id": "fc47a7bf", "title": "Resolve declared non-secret variables into package content", "classification": "implementation", "status": "done"}
       ]
     },
     {
@@ -151,5 +151,34 @@
     "474a90a8": 0,
     "fc47a7bf": 2
   },
+  "review_verdicts": [
+    {
+      "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
+      "reviewed_commit": "7e7103f992e3fa24728e8febe42cf0311b6b30c0",
+      "merged_commit": "973f716d861b4f61c0694bc0cf301f44e4829c10",
+      "verdict": "pass",
+      "gate_status": {"cargo-ci": "passed", "code-review": "passed"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "F1",
+          "status": "closed",
+          "evidence": "crates/jit/src/commands/validate.rs:915"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "met",
+        "REQ-02": "met",
+        "REQ-03": "met",
+        "REQ-04": "met",
+        "REQ-05": "met",
+        "REQ-06": "met"
+      },
+      "stale_narrative_sweep": "zero matches",
+      "deferred_items_audit": "no linked documents",
+      "holistic_review": "no issues found",
+      "reviewed_at": "2026-08-09T14:21:01Z"
+    }
+  ],
   "started_at": "2026-08-09T04:36:58+03:00"
 }
