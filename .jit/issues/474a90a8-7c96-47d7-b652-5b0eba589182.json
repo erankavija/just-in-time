@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-09T10:33:13.078954608Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-09T10:37:22.213289826Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "474a90a8-7c96-47d7-b652-5b0eba589182",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Resolve the selected package set against its declared graph",
-  "updated_at": "2026-08-09T09:46:37.924000608Z"
+  "updated_at": "2026-08-09T10:37:22.213289826Z"
 }

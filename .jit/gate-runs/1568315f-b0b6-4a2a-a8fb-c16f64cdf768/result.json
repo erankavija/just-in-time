@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-474a90a8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "757a86259dcdd04fc6c1adc097b8d405ea5d8d23",
+  "completed_at": "2026-08-09T10:37:21.923819054Z",
+  "duration_ms": 238596,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable graph resolver, command integration, package-reader hardening, and focused tests satisfy the issue-scoped criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "474a90a8-7c96-47d7-b652-5b0eba589182",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1568315f-b0b6-4a2a-a8fb-c16f64cdf768",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T10:33:23.327314211Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `87b12325`, `757a8625` (`jit:474a90a8`)\nPolicy sources: `AGENTS.md`\nResolved items: @/charter/D-8 (`dev/vision/9db27a3a-charter.md`); @/issue/c639cfb5/requirement/REQ-02 and REQ-11 (`.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json`); @/gate/cargo-ci (`.jit/gates.toml`); @/invariant/architecture-dependency-direction, convention-convergence, semantic-test-assertions, shared-test-contracts (`.jit/invariants.toml`)\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T10:26:03Z); code-review pending\nTruncation recovery: narrowed reads by commit, affected path/line range, test blocks, and policy source after broad profile/config searches truncated\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable graph resolver, command integration, package-reader hardening, and focused tests satisfy the issue-scoped criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
