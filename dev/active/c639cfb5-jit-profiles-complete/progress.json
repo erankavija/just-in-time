@@ -31,7 +31,7 @@
     {
       "wave_number": 5,
       "issues": [
-        {"id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226", "short_id": "cbcd9318", "title": "Compose contributions by semantic identity with shared ownership", "classification": "implementation", "status": "pending"}
+        {"id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226", "short_id": "cbcd9318", "title": "Compose contributions by semantic identity with shared ownership", "classification": "implementation", "status": "in_progress"}
       ]
     },
     {
@@ -143,6 +143,12 @@
       "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
       "status": "resolved",
       "summary": "After two substantive rework rounds produced a fully tested final commit, the lead Tier 2.5 sweep found one remaining stale neighbouring phrase at docs/reference/storage-format.md:67 ('minimal provenance record'). The invoker selected option 1 and authorized one narrowly targeted Luna xhigh retry."
+    },
+    {
+      "category": "rework-exceeded-max-attempts",
+      "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
+      "status": "awaiting-invoker",
+      "summary": "After two rework rounds, exact cargo-ci passed at abea9028 but code-review found that the first successful apply of two equal contributors records shared ownership only in the later package record; the first record converges only on a second apply. The isolated branch and all gate evidence are preserved at 4228d655."
     }
   ],
   "rework_counts": {
@@ -233,6 +239,61 @@
       "deferred_items_audit": "no linked documents",
       "holistic_review": "cargo-ci exposed declaration-order regression; three new production unreachable/expect panic sites violate repository guidance",
       "reviewed_at": "2026-08-09T15:47:00Z"
+    },
+    {
+      "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
+      "reviewed_commit": "abea9028f337f7679eb12e672439a8266c83e117",
+      "evidence_commit": "4228d655",
+      "verdict": "fail",
+      "gate_status": {"cargo-ci": "passed", "code-review": "failed"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "F1",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:960"
+        },
+        {
+          "round": 1,
+          "id": "lead-F2",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:77"
+        },
+        {
+          "round": 2,
+          "id": "lead-selector-order",
+          "status": "closed for conflict preflight",
+          "evidence": "crates/jit/src/commands/profile.rs:606"
+        },
+        {
+          "round": 2,
+          "id": "lead-record-convergence",
+          "status": "partially closed; reapplication no longer conflicts, but first-apply ownership remains incomplete",
+          "evidence": "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs:351"
+        },
+        {
+          "round": 2,
+          "id": "lead-declaration-order",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:326"
+        },
+        {
+          "round": 2,
+          "id": "lead-panic-sites",
+          "status": "closed",
+          "evidence": "crates/jit/src/repository_state/profile_apply.rs:347"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "unmet: first apply leaves the earlier package record without the stable shared owner set",
+        "REQ-02": "met for profile apply conflict preflight",
+        "REQ-03": "met for per-identity composition and self-replacement",
+        "REQ-04": "met"
+      },
+      "stale_narrative_sweep": "no actionable stale product narrative; option-analysis prose remains historical context",
+      "deferred_items_audit": "no linked documents",
+      "holistic_review": "initialization and the public package-closure application path also remain sequential without whole-selection contribution preflight",
+      "reviewed_at": "2026-08-09T16:26:00Z"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00"
