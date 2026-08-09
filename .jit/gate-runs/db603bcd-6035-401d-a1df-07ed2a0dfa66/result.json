@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-9a9a4cfc",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "78752b83ca0d4feec35618d205db0da9ac6c61f0",
+  "completed_at": "2026-08-09T21:05:44.873784891Z",
+  "duration_ms": 224848,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met by the attributed current implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9a9a4cfc-38a1-42e4-94bd-6dd15cd46944",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "db603bcd-6035-401d-a1df-07ed2a0dfa66",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T21:02:00.024804881Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2eb0dcbd, 78677238, d2b4448f, 4a4a26f3, bb4df98f, 78752b83\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/inv/canonical-cutover, @/inv/derived-state-coherence, @/inv/semantic-types (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-09T20:48:13Z)\nTruncation recovery: inspected commits individually; recovered bounded current-code, migration, materialization, command, test, documentation, and workflow-record reads\n1. No blocking or advisory findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met by the attributed current implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
