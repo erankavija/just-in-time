@@ -21,6 +21,11 @@ set -euo pipefail
 #   0 — all steps passed
 #   1 — one or more steps failed
 #   2 — environment problem: no real cargo available on PATH
+#
+# `./scripts/cargo-ci.sh --cargo <args...>` applies the same host lock, real
+# Cargo selection, and guarded sccache setup, then runs only that focused Cargo
+# command. Use this mode for compilation-heavy targeted checks; invoke the
+# script without arguments only when the complete gate is intended.
 
 # Host-wide build serialization. Only one cargo-ci run executes the heavy
 # build/test steps at a time across the whole host. Concurrent gate runs (e.g.
@@ -33,7 +38,7 @@ set -euo pipefail
 # infinite re-exec; CARGO_CI_NO_LOCK=1 disables (e.g. an isolated CI container
 # that already owns the machine); CARGO_CI_BUILD_LOCK overrides the lock path.
 if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
-  BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/jit-cargo-ci.lock}"
+  BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
   if command -v flock >/dev/null 2>&1; then
     exec env CARGO_CI_LOCKED=1 flock "$BUILD_LOCK" "$0" "$@"
   fi
@@ -67,6 +72,20 @@ ensure_real_cargo() {
 }
 
 ensure_real_cargo
+
+# Reuse the host-wide compiler cache when it is installed. Keep explicit
+# wrappers authoritative (for instrumentation or debugging), and provide a
+# deterministic opt-out for cache-sensitive diagnosis. Enabling a wrapper
+# changes Cargo fingerprints, so operators should clean a large pre-existing
+# target directory before opting an established checkout into this default.
+if [ -z "${CARGO_CI_NO_SCCACHE:-}" ] && [ -z "${RUSTC_WRAPPER:-}" ] && command -v sccache >/dev/null 2>&1; then
+  export RUSTC_WRAPPER=sccache
+fi
+
+if [ "${1:-}" = "--cargo" ]; then
+  shift
+  exec cargo "$@"
+fi
 
 # Disk-backed TMPDIR: a few tests (provenance_contract suite) compile the whole crate
 # into a fresh temp target dir; on a small tmpfs /tmp that hits "Disk quota
