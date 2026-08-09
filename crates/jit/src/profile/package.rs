@@ -77,11 +77,22 @@ impl ProfilePackage {
     ///
     /// The recorded [`source`](Self::source) is the resolved root the walk
     /// anchored its handle chain at, not the argument: `directory` may be
-    /// relative and may traverse symbolic links, and the bytes admitted are the
-    /// bytes below the root those resolve to.
+    /// relative and may use ordinary path normalization, but the package root
+    /// itself and every entry beneath it must not be a symbolic link.
     pub fn from_directory(directory: &Path) -> Result<Self, ProfilePackageError> {
-        let (root, files) = read_package_directory(directory)?;
-        Self::from_files(files, ProfilePackageSource::Directory(root))
+        let metadata =
+            fs::symlink_metadata(directory).map_err(|source| unreadable(directory, source))?;
+        if metadata.file_type().is_symlink() {
+            return Err(ProfilePackageError::SymlinkedSource {
+                path: directory.display().to_string(),
+            });
+        }
+        let contents = read_package_directory(directory)?;
+        Self::from_files_with_modes(
+            contents.files,
+            contents.executable_sources,
+            ProfilePackageSource::Directory(contents.root),
+        )
     }
 
     /// Parse manifest bytes and validate everything they declare about
@@ -130,8 +141,17 @@ impl ProfilePackage {
         Ok(decoded)
     }
 
+    #[cfg(test)]
     fn from_files(
         files: BTreeMap<String, Vec<u8>>,
+        source: ProfilePackageSource,
+    ) -> Result<Self, ProfilePackageError> {
+        Self::from_files_with_modes(files, BTreeSet::new(), source)
+    }
+
+    fn from_files_with_modes(
+        files: BTreeMap<String, Vec<u8>>,
+        executable_sources: BTreeSet<String>,
         source: ProfilePackageSource,
     ) -> Result<Self, ProfilePackageError> {
         validate_package_bounds(&files)?;
@@ -141,7 +161,7 @@ impl ProfilePackage {
         let decoded = Self::read_manifest(manifest_bytes)?;
         let model = decoded.model;
 
-        validate_declared_content(&model, &files)?;
+        validate_declared_content(&model, &files, &executable_sources)?;
         let hashes = compute_hashes(&model, &files, &decoded.identity_manifest)?;
 
         Ok(Self {
@@ -204,6 +224,12 @@ pub enum ProfilePackageError {
     #[error("profile package entry '{path}' escapes the package root")]
     EscapingEntry {
         /// Package-relative entry path.
+        path: String,
+    },
+    /// The package root itself is a symbolic link.
+    #[error("profile package source '{path}' is a symlink")]
+    SymlinkedSource {
+        /// Supplied package source path.
         path: String,
     },
     /// The root manifest is absent.
@@ -299,6 +325,12 @@ pub enum ProfilePackageError {
     /// Package bytes have no declaration.
     #[error("package source '{0}' is not declared by the manifest")]
     ExtraContent(String),
+    /// A package asset carries executable bits without declaring them.
+    #[error("profile package asset '{path}' is executable but the manifest does not declare it executable")]
+    UndeclaredExecutable {
+        /// Package-relative executable asset path.
+        path: String,
+    },
     /// Invalid semantic contribution.
     #[error("invalid contribution at index {index}: {message}")]
     InvalidContribution {
@@ -345,8 +377,8 @@ pub enum ProfilePackageError {
     },
 }
 
-/// Walk the package tree rooted at `root` into its resolved root and a
-/// package-relative byte map.
+/// Walk the package tree rooted at `root` into its resolved root, a
+/// package-relative byte map, and the sources carrying executable mode bits.
 ///
 /// The returned root is the resolved path the handle chain is anchored at, so
 /// it names the directory the returned bytes actually came from.
@@ -366,14 +398,19 @@ pub enum ProfilePackageError {
 /// at most one byte past what remains, so a file that grows after its size is
 /// taken cannot be read past the budget either. [`validate_package_bounds`]
 /// stays the authority over what was actually read.
-fn read_package_directory(
-    root: &Path,
-) -> Result<(PathBuf, BTreeMap<String, Vec<u8>>), ProfilePackageError> {
+struct PackageDirectoryContents {
+    root: PathBuf,
+    files: BTreeMap<String, Vec<u8>>,
+    executable_sources: BTreeSet<String>,
+}
+
+fn read_package_directory(root: &Path) -> Result<PackageDirectoryContents, ProfilePackageError> {
     let root = fs::canonicalize(root).map_err(|source| unreadable(root, source))?;
     let handle = CapDir::open_ambient_dir(&root, ambient_authority())
         .map_err(|source| unreadable(&root, source))?;
     let mut pending = vec![(handle, String::new())];
     let mut files = BTreeMap::new();
+    let mut executable_sources = BTreeSet::new();
     let mut byte_size = 0usize;
     while let Some((directory, prefix)) = pending.pop() {
         let listing = directory
@@ -388,15 +425,23 @@ fn read_package_directory(
             if kind.is_dir() {
                 pending.push((open_child_directory(&entry, &root, &relative)?, relative));
             } else if kind.is_file() {
-                let bytes = read_regular_entry(&entry, &root, &relative, files.len(), byte_size)?;
+                let (bytes, executable) =
+                    read_regular_entry(&entry, &root, &relative, files.len(), byte_size)?;
                 byte_size = byte_size.saturating_add(bytes.len());
+                if executable {
+                    executable_sources.insert(relative.clone());
+                }
                 files.insert(relative, bytes);
             } else {
                 return Err(rejected_entry(&root, relative));
             }
         }
     }
-    Ok((root, files))
+    Ok(PackageDirectoryContents {
+        root,
+        files,
+        executable_sources,
+    })
 }
 
 /// Open one listed entry through a no-follow `openat` on the handle that listed
@@ -446,7 +491,7 @@ fn read_regular_entry(
     relative: &str,
     file_count: usize,
     byte_size: usize,
-) -> Result<Vec<u8>, ProfilePackageError> {
+) -> Result<(Vec<u8>, bool), ProfilePackageError> {
     let opened = open_entry_nofollow(entry, false)
         .map_err(|source| entry_open_failure(root, relative, source))?;
     let metadata = opened
@@ -468,8 +513,22 @@ fn read_regular_entry(
         .map_err(|source| unreadable(&root.join(relative), source))?;
     match package_bounds_failure(admitted, byte_size.saturating_add(bytes.len())) {
         Some(error) => Err(error),
-        None => Ok(bytes),
+        None => Ok((bytes, is_executable(&metadata))),
     }
+}
+
+/// Whether the opened regular file carries an executable Unix mode.
+#[cfg(unix)]
+fn is_executable(metadata: &cap_std::fs::Metadata) -> bool {
+    use cap_std::fs::PermissionsExt as _;
+
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+/// Windows has no executable mode bit for package-reader purposes.
+#[cfg(not(unix))]
+fn is_executable(_metadata: &cap_std::fs::Metadata) -> bool {
+    false
 }
 
 /// Why an entry that is not a usable regular file or directory is refused.
@@ -675,6 +734,7 @@ fn validate_content_targets(manifest: &ProfilePackageModel) -> Result<(), Profil
 fn validate_declared_content(
     manifest: &ProfilePackageModel,
     files: &BTreeMap<String, Vec<u8>>,
+    executable_sources: &BTreeSet<String>,
 ) -> Result<(), ProfilePackageError> {
     let declared = declared_sources(manifest)?;
     for source in &declared {
@@ -689,6 +749,15 @@ fn validate_declared_content(
         if !declared.contains(path) {
             return Err(ProfilePackageError::ExtraContent(path.clone()));
         }
+    }
+    if let Some(asset) = manifest
+        .assets
+        .iter()
+        .find(|asset| executable_sources.contains(&asset.source) && !asset.executable)
+    {
+        return Err(ProfilePackageError::UndeclaredExecutable {
+            path: asset.source.clone(),
+        });
     }
     Ok(())
 }
@@ -1871,6 +1940,46 @@ value = "workspace/active"
 
     #[cfg(unix)]
     #[test]
+    fn test_from_directory_rejects_a_symlinked_package_source_root() {
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        let source = temp.path().join("package-link");
+        std::os::unix::fs::symlink(&root, &source).unwrap();
+
+        let error = ProfilePackage::from_directory(&source).unwrap_err();
+
+        assert!(
+            matches!(
+                &error,
+                ProfilePackageError::SymlinkedSource { path } if *path == source.display().to_string()
+            ),
+            "a package source symlink must fail at the reader boundary: {error}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_from_directory_rejects_an_executable_asset_without_a_manifest_declaration() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = TempDir::new().unwrap();
+        let root = writable_package_tree(&temp);
+        let asset = root.join("assets/workflow.txt");
+        std::fs::set_permissions(&asset, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let error = ProfilePackage::from_directory(&root).unwrap_err();
+
+        assert!(
+            matches!(
+                &error,
+                ProfilePackageError::UndeclaredExecutable { path } if path == "assets/workflow.txt"
+            ),
+            "an executable asset without an executable declaration must fail at read time: {error}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn test_read_regular_entry_refuses_a_name_relinked_outward_after_it_was_listed() {
         let temp = TempDir::new().unwrap();
         let root = std::fs::canonicalize(writable_package_tree(&temp)).unwrap();
@@ -1918,8 +2027,8 @@ value = "workspace/active"
     #[cfg(unix)]
     fn read_within(
         budget: std::time::Duration,
-        read: impl FnOnce() -> Result<Vec<u8>, ProfilePackageError> + Send + 'static,
-    ) -> Option<Result<Vec<u8>, String>> {
+        read: impl FnOnce() -> Result<(Vec<u8>, bool), ProfilePackageError> + Send + 'static,
+    ) -> Option<Result<(Vec<u8>, bool), String>> {
         let (sender, receiver) = std::sync::mpsc::channel();
         std::thread::spawn(move || sender.send(read().map_err(|error| error.to_string())));
         receiver.recv_timeout(budget).ok()
@@ -1985,9 +2094,11 @@ value = "workspace/active"
             .find(|entry| entry.file_name() == "large.bin")
             .expect("the written file is listed");
 
-        let bytes = read_regular_entry(&entry, &root, "assets/large.bin", 0, 0).unwrap();
+        let (bytes, executable) =
+            read_regular_entry(&entry, &root, "assets/large.bin", 0, 0).unwrap();
         assert_eq!(bytes, content);
         assert_eq!(bytes, std::fs::read(root.join("assets/large.bin")).unwrap());
+        assert!(!executable);
     }
 
     #[cfg(unix)]

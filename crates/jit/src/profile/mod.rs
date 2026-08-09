@@ -6,6 +6,7 @@
 
 mod application;
 mod apply_claims;
+mod graph;
 mod manifest;
 mod package;
 mod repository_package;
@@ -45,6 +46,7 @@ pub use application::{
     ProfileTargetChange,
 };
 pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
+pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{
     profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
     ProfileDependencyRequirement, ProfileId, ProfileIncompatibility, ProfilePackageModel,

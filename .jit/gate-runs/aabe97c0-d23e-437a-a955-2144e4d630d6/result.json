@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-474a90a8",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "757a86259dcdd04fc6c1adc097b8d405ea5d8d23",
+  "completed_at": "2026-08-09T10:24:15.466431206Z",
+  "duration_ms": 86517,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "30e48c5597d314086e0617ee9b5bf0d96cb2bce6ba468b980c2d340425cfba64",
+  "issue_id": "474a90a8-7c96-47d7-b652-5b0eba589182",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aabe97c0-d23e-437a-a955-2144e4d630d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T10:22:48.948937703Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\n--- provenance failures ---\n--- budget output ---\nrust-build-budget: 'cargo test --workspace --no-run' failed under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-474a90a8\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✗ provenance: FAILED (exit 101)\n  ✗ budget: FAILED (exit 2)\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
