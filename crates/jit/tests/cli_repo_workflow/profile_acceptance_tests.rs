@@ -806,7 +806,7 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
             .iter()
             .map(|flag| flag["name"].as_str().unwrap().to_string())
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["dry-run", "json", "profile"])
+        expected_keys(&["dry-run", "json", "profile", "set", "values-file"])
     );
 
     let list_schema = &commands["list"]["output"]["success_schema"];
@@ -863,9 +863,29 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
     );
     assert_eq!(
         property_keys(show_schema, "AppliedProfileRecord"),
-        expected_keys(&["id", "origin", "package_hash", "target_hashes", "version"])
+        expected_keys(&[
+            "id",
+            "origin",
+            "package_hash",
+            "target_hashes",
+            "variables",
+            "version",
+        ])
     );
-    for definition in ["ProfilePackageModel", "AppliedProfileRecord"] {
+    assert_eq!(
+        property_keys(show_schema, "ResolvedVariable"),
+        expected_keys(&["source", "value"])
+    );
+    assert_eq!(
+        show_schema["definitions"]["AppliedProfileRecord"]["properties"]["variables"]
+            ["additionalProperties"]["$ref"],
+        "#/definitions/ResolvedVariable"
+    );
+    for definition in [
+        "ProfilePackageModel",
+        "AppliedProfileRecord",
+        "ResolvedVariable",
+    ] {
         assert_eq!(
             show_schema["definitions"][definition]["additionalProperties"], false,
             "{definition} must reject undeclared lifecycle fields"

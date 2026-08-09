@@ -374,6 +374,9 @@ impl DirectoryPackageRepo {
     /// Store the record the package now at the recorded location would write,
     /// so record and location agree on a package this repository never applied.
     fn record_the_current_package(&self) {
+        let resolved =
+            jit::profile::resolve_package(&self.package, &jit::profile::VariableInputs::default())
+                .expect("the package resolves without variable inputs");
         let record = jit::repository_state::AppliedProfileRecord::new(
             self.id(),
             self.package.model().version.clone(),
@@ -382,7 +385,8 @@ impl DirectoryPackageRepo {
                     .expect("a worktree-relative package location"),
             ),
             self.package.hashes().package.clone(),
-            self.package.hashes().targets.clone(),
+            resolved.variables().clone(),
+            resolved.target_hashes().expect("hash resolved targets"),
         );
         std::fs::write(
             self.record_path(self.id()),

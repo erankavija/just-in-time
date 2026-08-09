@@ -5,8 +5,9 @@
 //! never carry a versioned manifest representation.
 
 use super::manifest::{
-    AssetDeclaration, LiveSourceDeclaration, ProfileDependencyRequirement, ProfileId,
-    ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration, RegionDeclaration,
+    AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration, ProfileDependencyRequirement,
+    ProfileId, ProfileIncompatibility, ProfilePackageModel, ProfileVariableDeclaration,
+    ProfileVariableName, RegionDeclaration,
 };
 use crate::repository_state::Contribution;
 use serde::{Deserialize, Serialize};
@@ -69,6 +70,12 @@ pub(crate) fn decode_manifest(bytes: &[u8]) -> Result<DecodedManifest, ManifestW
 
 fn decode_v1(text: &str) -> Result<DecodedManifest, ManifestWireError> {
     let wire: ManifestV1 = toml::from_str(text)?;
+    if v1_declares_template_field(text, "asset")? {
+        return Err(ManifestWireError::InvalidVersionField("asset.template"));
+    }
+    if v1_declares_template_field(text, "region")? {
+        return Err(ManifestWireError::InvalidVersionField("region.template"));
+    }
     let identity_manifest = serde_json::to_vec(&canonicalize(serde_json::to_value(&wire)?))?;
     let model = ProfilePackageModel {
         id: wire.profile.id,
@@ -93,6 +100,20 @@ fn decode_v1(text: &str) -> Result<DecodedManifest, ManifestWireError> {
         identity_manifest,
         model,
     })
+}
+
+fn v1_declares_template_field(text: &str, collection: &str) -> Result<bool, ManifestWireError> {
+    let document: toml::Value = toml::from_str(text)?;
+    Ok(document
+        .get(collection)
+        .and_then(toml::Value::as_array)
+        .is_some_and(|entries| {
+            entries.iter().any(|entry| {
+                entry
+                    .as_table()
+                    .is_some_and(|table| table.contains_key("template"))
+            })
+        }))
 }
 
 fn decode_v2(text: &str) -> Result<DecodedManifest, ManifestWireError> {
@@ -208,11 +229,11 @@ struct ManifestIncompatibility {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ManifestVariable {
-    name: String,
+    name: ProfileVariableName,
     #[serde(default)]
     default: Option<String>,
     #[serde(default)]
-    env: Option<String>,
+    env: Option<EnvironmentVariableName>,
 }
 
 /// Canonicalize a JSON object recursively without changing array order.
@@ -296,13 +317,16 @@ env = "PROJECT_NAME"
             "legacy-package"
         );
         assert_eq!(decoded.model.incompatibilities[0].version, ">=4.0.0");
-        assert_eq!(decoded.model.variables[0].name, "PROJECT_NAME");
+        assert_eq!(decoded.model.variables[0].name.as_str(), "PROJECT_NAME");
         assert_eq!(
             decoded.model.variables[0].default.as_deref(),
             Some("example")
         );
         assert_eq!(
-            decoded.model.variables[0].env.as_deref(),
+            decoded.model.variables[0]
+                .env
+                .as_ref()
+                .map(|name| name.as_str()),
             Some("PROJECT_NAME")
         );
     }
@@ -369,6 +393,23 @@ compatible-jit = ">=2.0.0"
         )
         .expect_err("v1 compatibility spelling is not part of the v2 wire");
         assert!(v2_error.to_string().contains("jit"));
+
+        let v1_template_error = decode_manifest(
+            br#"
+[profile]
+manifest-version = 1
+id = "example-package"
+version = "1.0.0"
+jit = ">=1.0.0"
+
+[[asset]]
+source = "asset.txt"
+target = "docs/asset.txt"
+template = true
+"#,
+        )
+        .expect_err("body substitution opt-in is a v2 wire field");
+        assert!(v1_template_error.to_string().contains("asset.template"));
     }
 
     #[test]

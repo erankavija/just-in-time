@@ -1,10 +1,12 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
-    build_profile_claims, EngineVersion, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
+    build_profile_claims_from_resolved, resolve_package, resolve_package_from_record,
+    EngineVersion, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
+    ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
     ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange, ResolvedProfileGraph,
+    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent,
+    ResolvedProfileGraph, ResolvedVariables, VariableInputs,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -15,6 +17,7 @@ use crate::repository_state::{
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
+use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -281,6 +284,88 @@ pub enum ProfileApplyError {
     },
 }
 
+/// Read-only command options for the package's non-secret input channels.
+///
+/// The command boundary turns these filesystem and process inputs into the
+/// pure [`VariableInputs`] value consumed by profile resolution.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ProfileVariableOptions {
+    /// Optional TOML file containing exactly one `[variables]` string table.
+    pub values_file: Option<PathBuf>,
+    /// Repeated typed assignments in command-line occurrence order.
+    pub assignments: Vec<ProfileVariableAssignment>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProfileValuesFile {
+    variables: BTreeMap<ProfileVariableName, String>,
+}
+
+/// Capture profile variable inputs from the command boundary.
+pub(super) fn load_profile_variable_inputs(
+    packages: &[ProfilePackage],
+    values_file: Option<&Path>,
+    assignments: &[ProfileVariableAssignment],
+) -> Result<VariableInputs> {
+    let values_file = values_file
+        .map(fs::read_to_string)
+        .transpose()?
+        .map(|text| toml::from_str::<ProfileValuesFile>(&text))
+        .transpose()?
+        .map(|file| file.variables)
+        .unwrap_or_default();
+    let declarations = packages
+        .iter()
+        .flat_map(|package| package.model().variables.iter())
+        .collect::<Vec<_>>();
+    let names = declarations
+        .iter()
+        .map(|declaration| declaration.name.clone())
+        .collect::<BTreeSet<_>>();
+    let environment_names = declarations
+        .iter()
+        .filter_map(|declaration| declaration.env.clone())
+        .collect::<BTreeSet<_>>();
+    let mut inputs = VariableInputs {
+        values_file,
+        environment: BTreeMap::new(),
+        command_line: assignments.to_vec(),
+    };
+    inputs.validate_against_names(&names, &environment_names)?;
+
+    for declaration in declarations {
+        let Some(env_name) = declaration.env.as_ref() else {
+            continue;
+        };
+        if let Some(value) = std::env::var_os(env_name.as_str()) {
+            let value = value.into_string().map_err(|_| {
+                anyhow::anyhow!(
+                    "environment variable '{env_name}' for profile variable '{}' is not valid UTF-8",
+                    declaration.name
+                )
+            })?;
+            inputs.environment.insert(env_name.clone(), value);
+        }
+    }
+    Ok(inputs)
+}
+
+fn validate_variable_inputs(packages: &[ProfilePackage], inputs: &VariableInputs) -> Result<()> {
+    let names = packages
+        .iter()
+        .flat_map(|package| package.model().variables.iter())
+        .map(|declaration| declaration.name.clone())
+        .collect::<BTreeSet<_>>();
+    let environment_names = packages
+        .iter()
+        .flat_map(|package| package.model().variables.iter())
+        .filter_map(|declaration| declaration.env.clone())
+        .collect::<BTreeSet<_>>();
+    inputs.validate_against_names(&names, &environment_names)?;
+    Ok(())
+}
+
 impl CommandExecutor<JsonFileStorage> {
     /// Read the package one profile command acts on.
     ///
@@ -412,28 +497,86 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Build the exact non-mutating target plan for one resolved profile.
     pub fn plan_profiles(&self, selectors: &[ProfileSelector]) -> Result<ProfilePlanResult> {
+        self.plan_profiles_with_inputs(selectors, &VariableInputs::default())
+    }
+
+    /// Build plans from already captured, command-bound variable inputs.
+    pub fn plan_profiles_with_inputs(
+        &self,
+        selectors: &[ProfileSelector],
+        inputs: &VariableInputs,
+    ) -> Result<ProfilePlanResult> {
         // Validate the complete request first so dry-run uses the same
         // selector-level ambiguity and confinement rules as show/apply before
         // constructing any individual preview.
         let selected = self.resolve_profile_selectors(selectors)?;
         if !selected.is_empty() {
-            self.resolve_profile_graph(&selected)?;
+            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
+            validate_variable_inputs(&packages, inputs)?;
         }
         selectors
             .iter()
-            .map(|selector| self.plan_profile(selector))
+            .map(|selector| {
+                let package = self.resolve_profile_package(selector)?;
+                self.plan_profile_package_with_inputs(&package, inputs)
+            })
             .collect::<Result<Vec<_>>>()
             .map(ProfilePlanResult::new)
     }
 
+    /// Build plans after loading the values file and declared environment
+    /// variables at the command boundary.
+    pub fn plan_profiles_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<ProfilePlanResult> {
+        let selected = self.resolve_profile_selectors(selectors)?;
+        let packages = if selected.is_empty() {
+            Vec::new()
+        } else {
+            self.resolve_profile_graph(&selected)?.selected_packages()
+        };
+        let inputs = load_profile_variable_inputs(
+            &packages,
+            options.values_file.as_deref(),
+            &options.assignments,
+        )?;
+        self.plan_profiles_with_inputs(selectors, &inputs)
+    }
+
     /// Build the exact non-mutating target plan for one resolved profile.
     pub fn plan_profile(&self, selector: &ProfileSelector) -> Result<ProfilePlanEntry> {
+        self.plan_profile_with_inputs(selector, &VariableInputs::default())
+    }
+
+    /// Build one exact plan with resolved variables.
+    pub fn plan_profile_with_inputs(
+        &self,
+        selector: &ProfileSelector,
+        inputs: &VariableInputs,
+    ) -> Result<ProfilePlanEntry> {
         let package = self.resolve_profile_package(selector)?;
+        validate_variable_inputs(std::slice::from_ref(&package), inputs)?;
+        self.plan_profile_package_with_inputs(&package, inputs)
+    }
+
+    fn plan_profile_package_with_inputs(
+        &self,
+        package: &ProfilePackage,
+        inputs: &VariableInputs,
+    ) -> Result<ProfilePlanEntry> {
+        let resolved = resolve_package(
+            package,
+            &inputs.for_declarations(&package.model().variables),
+        )?;
         let metadata = package.model();
         let layout = self.require_layout()?;
         let context = MutationContext::preview();
         with_mutation_session(self.storage(), &layout, "profile planning", |session| {
-            let Some((plan, changes)) = self.prepare_profile(session, &package, &context)? else {
+            let Some((plan, changes)) =
+                self.prepare_profile_resolved(session, package, &resolved, &context)?
+            else {
                 return Ok(SessionStep::Retry);
             };
             Ok(SessionStep::Done(ProfilePlanEntry {
@@ -456,17 +599,27 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         selectors: &[ProfileSelector],
     ) -> Result<ProfileComposedApplyResult> {
+        self.apply_profile_with_inputs(selectors, &VariableInputs::default())
+    }
+
+    /// Resolve and apply profiles with already captured variable inputs.
+    pub fn apply_profile_with_inputs(
+        &self,
+        selectors: &[ProfileSelector],
+        inputs: &VariableInputs,
+    ) -> Result<ProfileComposedApplyResult> {
         let selected = self.resolve_profile_selectors(selectors)?;
         // Resolve every selected root and every already-applied package before
         // the first per-package publication. The later calls preserve the
         // repeatable selector result surface; this preflight makes graph
         // failures independent of that occurrence order.
         if !selected.is_empty() {
-            self.resolve_profile_graph(&selected)?;
+            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
+            validate_variable_inputs(&packages, inputs)?;
         }
         selected
             .into_iter()
-            .map(|package| self.apply_profile_package(&package))
+            .map(|package| self.apply_profile_package_with_inputs(&package, inputs))
             .collect::<Result<Vec<_>>>()
             .map(|results| {
                 ProfileComposedApplyResult::new(
@@ -476,6 +629,26 @@ impl CommandExecutor<JsonFileStorage> {
                         .collect(),
                 )
             })
+    }
+
+    /// Resolve and apply profiles after loading command-bound variable inputs.
+    pub fn apply_profile_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<ProfileComposedApplyResult> {
+        let selected = self.resolve_profile_selectors(selectors)?;
+        let packages = if selected.is_empty() {
+            Vec::new()
+        } else {
+            self.resolve_profile_graph(&selected)?.selected_packages()
+        };
+        let inputs = load_profile_variable_inputs(
+            &packages,
+            options.values_file.as_deref(),
+            &options.assignments,
+        )?;
+        self.apply_profile_with_inputs(selectors, &inputs)
     }
 
     /// Resolve the complete set of packages applying `package` applies, in the
@@ -674,9 +847,26 @@ impl CommandExecutor<JsonFileStorage> {
         &self,
         package: &ProfilePackage,
     ) -> Result<ProfileComposedApplyResult> {
-        self.resolve_profile_closure(package)?
+        self.apply_profile_package_with_inputs(package, &VariableInputs::default())
+    }
+
+    /// Apply one package closure with already captured variable inputs.
+    pub fn apply_profile_package_with_inputs(
+        &self,
+        package: &ProfilePackage,
+        inputs: &VariableInputs,
+    ) -> Result<ProfileComposedApplyResult> {
+        let packages = self.resolve_profile_closure(package)?;
+        validate_variable_inputs(&packages, inputs)?;
+        packages
             .iter()
-            .map(|package| self.apply_one_profile_package(package))
+            .map(|package| {
+                let resolved = resolve_package(
+                    package,
+                    &inputs.for_declarations(&package.model().variables),
+                )?;
+                self.apply_one_profile_package(package, &resolved)
+            })
             .collect::<Result<Vec<_>>>()
             .map(ProfileComposedApplyResult::new)
     }
@@ -698,6 +888,7 @@ impl CommandExecutor<JsonFileStorage> {
     pub(super) fn apply_one_profile_package(
         &self,
         package: &ProfilePackage,
+        resolved: &ResolvedProfileContent,
     ) -> Result<ProfileApplyResult> {
         let metadata = package.model();
         let layout = self.require_layout()?;
@@ -705,7 +896,9 @@ impl CommandExecutor<JsonFileStorage> {
         // every retry so the appended ProfileApplied event's id/timestamp stay stable.
         let context = MutationContext::production();
         with_mutation_session(self.storage(), &layout, "profile application", |session| {
-            let Some((plan, _changes)) = self.prepare_profile(session, package, &context)? else {
+            let Some((plan, _changes)) =
+                self.prepare_profile_resolved(session, package, resolved, &context)?
+            else {
                 return Ok(SessionStep::Retry);
             };
             if plan.delta().actions().is_empty() {
@@ -745,15 +938,27 @@ impl CommandExecutor<JsonFileStorage> {
     /// Capture the base and derive one complete canonical profile plan.
     ///
     /// Returns `Ok(None)` on a retryable capture conflict so the caller re-attempts.
-    /// The profile package is parsed into canonical claims
-    /// ([`build_profile_claims`](crate::profile::build_profile_claims)) and composed
+    /// The resolved profile package is parsed into canonical claims
+    /// ([`build_profile_claims_from_resolved`](crate::profile::build_profile_claims_from_resolved)) and composed
     /// into exact target bytes by `repository_state`; finalizing the complete probe
     /// delta decides whether the operation is a no-op and supplies the validation
     /// overlay reused by application.
+    #[cfg(test)]
     fn prepare_profile(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
         package: &ProfilePackage,
+        context: &MutationContext,
+    ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
+        let resolved = resolve_package(package, &VariableInputs::default())?;
+        self.prepare_profile_resolved(session, package, &resolved, context)
+    }
+
+    fn prepare_profile_resolved(
+        &self,
+        session: &mut (dyn RepositoryMutationSession + '_),
+        package: &ProfilePackage,
+        resolved: &ResolvedProfileContent,
         context: &MutationContext,
     ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
         let metadata = package.model();
@@ -792,7 +997,8 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
 
-        let input = profile_application_input(package, base.layout(), record_path.clone())?;
+        let input =
+            profile_application_input(package, resolved, base.layout(), record_path.clone())?;
         let mut expanded_paths = content_paths.clone();
         expanded_paths.extend(crate::repository_state::profile_capture_closure(
             &base,
@@ -810,11 +1016,12 @@ impl CommandExecutor<JsonFileStorage> {
                 None => return Ok(None),
                 Some(base) => base,
             };
-        let input = profile_application_input(package, base.layout(), record_path.clone())?;
+        let input =
+            profile_application_input(package, resolved, base.layout(), record_path.clone())?;
         let preview = derive_materialization(
             &base,
             MaterializationRequest::ApplyProfile {
-                profile: input,
+                profile: Box::new(input),
                 context,
             },
         )?;
@@ -831,7 +1038,7 @@ impl CommandExecutor<JsonFileStorage> {
             None => return Ok(None),
             Some(base) => base,
         };
-        let input = profile_application_input(package, probe.layout(), record_path)?;
+        let input = profile_application_input(package, resolved, probe.layout(), record_path)?;
         let final_closure =
             crate::repository_state::profile_capture_closure(&probe, &input.claims)?;
         if final_closure
@@ -843,7 +1050,7 @@ impl CommandExecutor<JsonFileStorage> {
         let plan = derive_materialization(
             &probe,
             MaterializationRequest::ApplyProfile {
-                profile: input,
+                profile: Box::new(input),
                 context,
             },
         )?;
@@ -1195,7 +1402,7 @@ fn recorded_summary(
         version: metadata.version.clone(),
         origin: package_origin(&package, layout)?,
         jit: metadata.compatible_jit.clone(),
-        applied: record == expected_record(&package, layout)?,
+        applied: record == expected_record(&package, layout, &record.variables)?,
     }))
 }
 
@@ -1228,34 +1435,44 @@ pub(super) fn package_origin(
 }
 
 /// The expected provenance record for a package read through this repository.
+///
+/// Target hashes are independently recomputed by resolving the current
+/// unresolved package from the record's persisted public values. This path
+/// never reads current environment variables or accepts stored target hashes
+/// as expected input.
 pub(super) fn expected_record(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
+    variables: &ResolvedVariables,
 ) -> Result<AppliedProfileRecord> {
     let metadata = package.model();
+    let resolved = resolve_package_from_record(package, variables)?;
     Ok(AppliedProfileRecord::new(
         metadata.id.to_string(),
         metadata.version.clone(),
         package_origin(package, layout)?,
         package.hashes().package.clone(),
-        package.hashes().targets.clone(),
+        variables.clone(),
+        resolved.target_hashes()?,
     ))
 }
 
 /// Convert an immutable package into neutral claims plus provenance metadata.
 fn profile_application_input(
     package: &ProfilePackage,
+    resolved: &ResolvedProfileContent,
     layout: &RepositoryLayout,
     record_path: VirtualPath,
 ) -> Result<ProfileApplicationInput> {
-    let metadata = package.model();
+    let metadata = resolved.model();
     Ok(ProfileApplicationInput {
         id: metadata.id.to_string(),
         version: metadata.version.clone(),
         package_hash: package.hashes().package.clone(),
-        target_hashes: package.hashes().targets.clone(),
+        variables: resolved.variables().clone(),
+        target_hashes: resolved.target_hashes()?,
         origin: package_origin(package, layout)?,
-        claims: build_profile_claims(package, layout)?,
+        claims: build_profile_claims_from_resolved(resolved, layout, false)?,
         record_path,
     })
 }
@@ -1766,6 +1983,7 @@ mod tests {
                 recorded.model().version.clone(),
                 ProfileOrigin::Directory(RootRelativePath::parse("vendor/dogfood").unwrap()),
                 recorded.hashes().package.clone(),
+                ResolvedVariables::default(),
                 recorded.hashes().targets.clone(),
             ),
         );
@@ -2675,6 +2893,100 @@ mod tests {
             fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
             compact_record
         );
+    }
+
+    #[test]
+    fn test_profile_application_substitutes_values_without_auditing_resolved_content() {
+        let (temp, storage, executor, _package) = fixture();
+        let package_root = temp.path().join(FIXTURE_LOCATION);
+        fs::write(
+            package_root.join(crate::profile::MANIFEST_FILE_NAME),
+            br#"
+[profile]
+manifest-version = 2
+id = "planner-variable"
+version = "1.0.0"
+compatible-jit = "*"
+
+[[variable]]
+name = "NAME"
+default = "default"
+
+[[asset]]
+source = "assets/profile.txt"
+target = "docs/profile.txt"
+template = true
+"#,
+        )
+        .unwrap();
+        let resolved_value = "resolved-value";
+        let values_file = temp.path().join("profile-values.toml");
+        fs::write(&values_file, "[variables]\nNAME = \"values-file-value\"\n").unwrap();
+        fs::write(
+            package_root.join("assets/profile.txt"),
+            b"profile={{jit:var:NAME}}\n",
+        )
+        .unwrap();
+        let package = ProfilePackage::from_directory(&package_root).unwrap();
+        let inputs = load_profile_variable_inputs(
+            std::slice::from_ref(&package),
+            Some(&values_file),
+            &[
+                ProfileVariableAssignment::new("NAME".try_into().unwrap(), resolved_value),
+                ProfileVariableAssignment::new(
+                    "NAME".try_into().unwrap(),
+                    format!("{resolved_value}-last"),
+                ),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            inputs.values_file[&"NAME".try_into().unwrap()],
+            "values-file-value"
+        );
+        assert_eq!(
+            inputs.command_line.last().unwrap().value,
+            "resolved-value-last"
+        );
+
+        executor
+            .apply_profile_package_with_inputs(&package, &inputs)
+            .unwrap();
+
+        assert_eq!(
+            fs::read(temp.path().join("docs/profile.txt")).unwrap(),
+            b"profile=resolved-value-last\n"
+        );
+        let event_bytes = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+        let record_bytes =
+            fs::read(temp.path().join(".jit/profiles/planner-variable.json")).unwrap();
+        let record: AppliedProfileRecord = serde_json::from_slice(&record_bytes).unwrap();
+        assert_ne!(
+            record.target_hashes,
+            package.hashes().targets,
+            "applied target fingerprints must include resolved content"
+        );
+        assert!(
+            record.target_hashes.values().all(|hash| event_bytes
+                .windows(hash.len())
+                .any(|window| window == hash.as_bytes())),
+            "the profile_applied event must carry the same resolved target fingerprints"
+        );
+        assert!(!event_bytes
+            .windows(resolved_value.len())
+            .any(|window| window == resolved_value.as_bytes()));
+        assert!(record_bytes
+            .windows(resolved_value.len())
+            .any(|window| window == resolved_value.as_bytes()));
+        assert_eq!(
+            record.variables.values()[&"NAME".try_into().unwrap()],
+            "resolved-value-last"
+        );
+        assert_eq!(
+            record.variables.sources()[&"NAME".try_into().unwrap()],
+            crate::profile::VariableSource::Set
+        );
+        assert_eq!(storage.read_events().unwrap().len(), 1);
     }
 
     #[test]

@@ -1,21 +1,21 @@
 //! Convert an immutable profile package into image-independent repository-state claims.
 
-use super::ProfilePackage;
+use super::{
+    resolve_package, resolve_package_from_record, ProfilePackage, ResolvedProfileContent,
+    ResolvedVariables, VariableInputs,
+};
 use crate::repository_state::{
     FileMode, ProfileAssetClaim, ProfileClaims, ProfilePackageId, ProfileRegionClaim, TargetClaim,
 };
-use serde_json::Value as JsonValue;
 use std::collections::BTreeSet;
 use std::path::Path;
-
-const RESERVED_INTERPOLATION_PREFIX: &[u8] = b"{{jit:";
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileClaimError {
     #[error("profile targets '{first}' and '{second}' overlap")]
     OverlappingTargets { first: String, second: String },
-    #[error("profile source '{location}' contains unsupported interpolation token")]
-    InvalidInterpolation { location: String },
+    #[error(transparent)]
+    Variable(#[from] super::VariableError),
     #[error("declared package source '{0}' is unavailable")]
     MissingSource(String),
     #[error("profile target path is not canonical: {0}")]
@@ -28,22 +28,32 @@ pub fn build_profile_claims(
     package: &ProfilePackage,
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
-    build_claims(package, layout, false)
+    let resolved = resolve_package(package, &VariableInputs::default())?;
+    build_profile_claims_from_resolved(&resolved, layout, false)
 }
 
+/// Build replacement claims from the exact public values stored in an applied
+/// profile record.
+///
+/// # Errors
+///
+/// Returns [`ProfileClaimError`] when the persisted provenance cannot resolve
+/// the current package or the resulting repository claims are invalid.
 pub fn build_profile_repair_claims(
     package: &ProfilePackage,
+    variables: &ResolvedVariables,
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
-    build_claims(package, layout, true)
+    let resolved = resolve_package_from_record(package, variables)?;
+    build_profile_claims_from_resolved(&resolved, layout, true)
 }
 
-fn build_claims(
-    package: &ProfilePackage,
+/// Convert already-resolved package content into repository-state claims.
+pub fn build_profile_claims_from_resolved(
+    package: &ResolvedProfileContent,
     layout: &crate::repository_state::RepositoryLayout,
     replace_owned: bool,
 ) -> Result<ProfileClaims, ProfileClaimError> {
-    validate_interpolation(package)?;
     validate_target_overlaps(package)?;
     let assets = package
         .model()
@@ -100,40 +110,7 @@ fn build_claims(
     })
 }
 
-fn validate_interpolation(package: &ProfilePackage) -> Result<(), ProfileClaimError> {
-    for source in package
-        .model()
-        .assets
-        .iter()
-        .map(|asset| asset.source.as_str())
-        .chain(
-            package
-                .model()
-                .regions
-                .iter()
-                .map(|region| region.source.as_str()),
-        )
-    {
-        if package
-            .source_bytes(source)
-            .is_some_and(|bytes| contains_bytes(bytes, RESERVED_INTERPOLATION_PREFIX))
-        {
-            return Err(ProfileClaimError::InvalidInterpolation {
-                location: source.into(),
-            });
-        }
-    }
-    for (index, contribution) in package.model().contributions.iter().enumerate() {
-        if json_contains_interpolation(&serde_json::to_value(contribution).expect("serializes")) {
-            return Err(ProfileClaimError::InvalidInterpolation {
-                location: format!("contribution[{index}]"),
-            });
-        }
-    }
-    Ok(())
-}
-
-fn validate_target_overlaps(package: &ProfilePackage) -> Result<(), ProfileClaimError> {
+fn validate_target_overlaps(package: &ResolvedProfileContent) -> Result<(), ProfileClaimError> {
     let semantic = package
         .model()
         .contributions
@@ -170,19 +147,4 @@ fn validate_target_overlaps(package: &ProfilePackage) -> Result<(), ProfileClaim
         }
     }
     Ok(())
-}
-
-fn json_contains_interpolation(value: &JsonValue) -> bool {
-    match value {
-        JsonValue::String(value) => contains_bytes(value.as_bytes(), RESERVED_INTERPOLATION_PREFIX),
-        JsonValue::Array(values) => values.iter().any(json_contains_interpolation),
-        JsonValue::Object(values) => values.values().any(json_contains_interpolation),
-        _ => false,
-    }
-}
-
-fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
-    haystack
-        .windows(needle.len())
-        .any(|window| window == needle)
 }

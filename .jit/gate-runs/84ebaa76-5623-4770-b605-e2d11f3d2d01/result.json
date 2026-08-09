@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-fc47a7bf",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5a8bfaa68e19e29d7563ebe8b237ae2d8cd45c65",
+  "completed_at": "2026-08-09T12:48:18.549448231Z",
+  "duration_ms": 309751,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 926,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/derived-state-coherence",
+          "@/charter/D-8"
+        ],
+        "severity": "high",
+        "summary": "Validation rebuilds profile claims with default inputs, so profiles applied with non-default variable values fail validation or repair to incorrect content."
+      }
+    ],
+    "summary": "Variable-backed profiles cannot be validated or repaired using their applied resolved values.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "84ebaa76-5623-4770-b605-e2d11f3d2d01",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T12:43:08.798082001Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 20772 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-fc47a7bf\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fe68c-6a57-7411-930b-c5e6044e10d8\n--------\nuser\n--- 20759 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:fc47a7bf commits a8edf709, 6b51f0be, aae26ba5, 5a8bfaa6\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/inv/derived-state-coherence (.jit/invariants.toml); @/issue/fc47a7bf/requirement/REQ-04 (issue description, markdown-first)\nGate evidence: cargo-ci passed (exit 0; 2026-08-09T12:30:12Z)\nTruncation recovery: narrowed reads of individual patches and current variables, profile, init, validation, package, manifest, test, and documentation paths\n\n1. **F1 — high, blocking, issue-impact:** [`crates/jit/src/commands/validate.rs:926`](crates/jit/src/commands/validate.rs:926) rebuilds every installed profile’s repair claims through `build_profile_repair_claims`, which always resolves with `VariableInputs::default()` ([`apply_claims.rs:36`](crates/jit/src/profile/apply_claims.rs:36)). A profile applied with `--set` therefore validates/repairs against its default value instead of its published content; one without a default errors during validation. This makes a successful non-default variable application immediately appear invalid and allows repair to restore the wrong bytes. The new CLI test verifies emitted content but not subsequent validation. References: @/inv/derived-state-coherence, @/charter/D-8.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Variable-backed profiles cannot be validated or repaired using their applied resolved values.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Validation rebuilds profile claims with default inputs, so profiles applied with non-default variable values fail validation or repair to incorrect content.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":926,\"references\":[\"@/inv/derived-state-coherence\",\"@/charter/D-8\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

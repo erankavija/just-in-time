@@ -64,7 +64,7 @@ that skips it and leaves any remaining sidecars in place. Pending recoverable
 multi-file transactions use `.jit/tmp/transactions/`. All of these are runtime
 state, not part of the versioned data format.
 
-When a repository profile is applied, its minimal provenance record
+When a repository profile is applied, its canonical provenance record
 lives under `.jit/profiles/`. Fresh profiled initialization may temporarily use
 the repository-sibling `.jit-bootstrap/` control directory before `.jit/`
 exists. The [Repository Profiles reference](profiles.md) defines the record,

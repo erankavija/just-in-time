@@ -23,9 +23,10 @@ use jit::cli::{
     GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
     ProfileCommands, ProjectCommands,
 };
-use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector};
+use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
 use jit::domain::{GateRunResult, Priority, State};
 use jit::output::{ErrorCode, ExitCode, InitResponse, JsonError, JsonOutput, OutputContext};
+use jit::profile::{ProfileVariableAssignment, ProfileVariableName};
 use jit::storage::{IssueStore, JsonFileStorage};
 use std::env;
 use std::path::{Component, Path, PathBuf};
@@ -905,6 +906,29 @@ fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileS
             value
                 .parse::<ProfileSelector>()
                 .map_err(|error| invalid_argument(format!("{error}"), json))
+        })
+        .collect()
+}
+
+/// Parse command-line profile assignments before entering command orchestration.
+fn parse_profile_variable_assignments(
+    values: &[String],
+    json: bool,
+) -> Result<Vec<ProfileVariableAssignment>> {
+    values
+        .iter()
+        .map(|assignment| {
+            let (name, value) = assignment.split_once('=').ok_or_else(|| {
+                invalid_argument(
+                    format!(
+                        "invalid profile variable assignment '{assignment}'; expected NAME=VALUE"
+                    ),
+                    json,
+                )
+            })?;
+            let name = ProfileVariableName::try_from(name.to_string())
+                .map_err(|error| invalid_argument(error, json))?;
+            Ok(ProfileVariableAssignment::new(name, value))
         })
         .collect()
 }
@@ -2155,9 +2179,15 @@ fn run() -> Result<()> {
     let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout.clone());
 
     match &command {
-        Commands::Init { profile, json } => {
+        Commands::Init {
+            profile,
+            values_file,
+            set,
+            json,
+        } => {
             let output_ctx = OutputContext::new(quiet, *json);
             let selectors = parse_profile_selectors(profile, *json)?;
+            let assignments = parse_profile_variable_assignments(set, *json)?;
             profile_result(executor.validate_profile_selection(&selectors), *json)?;
 
             // Every init and re-init — plain, profiled, or over an existing root —
@@ -2169,7 +2199,14 @@ fn run() -> Result<()> {
             // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
             // profiled init, closing the prior re-init gap.
             let init_result = profile_result(
-                executor.initialize_fresh_repository(&current_dir, Some(&selectors)),
+                executor.initialize_fresh_repository_from_sources(
+                    &current_dir,
+                    Some(&selectors),
+                    &ProfileVariableOptions {
+                        values_file: values_file.clone(),
+                        assignments,
+                    },
+                ),
                 *json,
             )?;
             // Machine-local worktree identity (gitignored, not part of the
@@ -2335,10 +2372,13 @@ fn run() -> Result<()> {
             }
             ProfileCommands::Apply {
                 profile,
+                values_file,
+                set,
                 dry_run,
                 json,
             } => {
                 let selectors = parse_profile_selectors(&profile, json)?;
+                let assignments = parse_profile_variable_assignments(&set, json)?;
                 if selectors.is_empty() {
                     return Err(invalid_argument(
                         "profile apply requires at least one --profile id:ID or path:DIR selector"
@@ -2347,7 +2387,13 @@ fn run() -> Result<()> {
                     ));
                 }
                 if dry_run {
-                    match executor.plan_profiles(&selectors) {
+                    match executor.plan_profiles_from_sources(
+                        &selectors,
+                        &ProfileVariableOptions {
+                            values_file: values_file.clone(),
+                            assignments: assignments.clone(),
+                        },
+                    ) {
                         Ok(plans) => {
                             if json {
                                 let output = JsonOutput::success(&plans);
@@ -2382,7 +2428,13 @@ fn run() -> Result<()> {
                         Err(error) => return Err(error),
                     }
                 } else {
-                    match executor.apply_profile(&selectors) {
+                    match executor.apply_profile_from_sources(
+                        &selectors,
+                        &ProfileVariableOptions {
+                            values_file: values_file.clone(),
+                            assignments,
+                        },
+                    ) {
                         Ok(applied) => {
                             if json {
                                 let output = JsonOutput::success(&applied);

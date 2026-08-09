@@ -404,7 +404,7 @@ async function main() {
       // `profile` names an ordered selector; enumeration takes none, because it
       // follows the repository's own records.
       assert.deepStrictEqual(profileInputKeys, {
-        jit_profile_apply: ['dry-run', 'json', 'profile'],
+        jit_profile_apply: ['dry-run', 'json', 'profile', 'set', 'values-file'],
         jit_profile_list: ['json'],
         jit_profile_show: ['json', 'profile'],
       });
@@ -420,6 +420,10 @@ async function main() {
         tools.find(tool => tool.name === 'jit_profile_list').inputSchema.required,
         []
       );
+      const applyProperties = tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.properties;
+      assert.strictEqual(applyProperties['values-file'].type, 'string');
+      assert.strictEqual(applyProperties.set.type, 'array');
+      assert.strictEqual(applyProperties.set.items.type, 'string');
     });
 
     await runTest('profile descriptions source the package from the repository, never from the connected binary', async () => {

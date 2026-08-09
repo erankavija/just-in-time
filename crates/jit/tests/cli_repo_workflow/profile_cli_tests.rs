@@ -118,6 +118,38 @@ fn set_package_version(repo: &Path, location: &str, version: &str) -> PathBuf {
     manifest
 }
 
+/// Write a small v2 package whose templated asset makes the resolved value
+/// observable without putting that value in package identity or provenance.
+struct VariablePackageSpec<'a> {
+    id: &'a str,
+    variable: &'a str,
+    default: Option<&'a str>,
+    environment: Option<&'a str>,
+    target: &'a str,
+    body: &'a str,
+    dependency: Option<&'a str>,
+}
+
+fn write_variable_package(repo: &Path, location: &str, spec: VariablePackageSpec<'_>) {
+    let root = repo.join(location);
+    fs::create_dir_all(root.join("assets")).unwrap();
+    let dependency = spec.dependency.map_or(String::new(), |dependency| {
+        format!("\n[[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n")
+    });
+    let default = spec
+        .default
+        .map_or(String::new(), |value| format!("default = \"{value}\"\n"));
+    let environment = spec
+        .environment
+        .map_or(String::new(), |name| format!("env = \"{name}\"\n"));
+    let manifest = format!(
+        "[profile]\nmanifest-version = 2\nid = \"{}\"\nversion = \"1.0.0\"\ncompatible-jit = \"*\"\n{dependency}\n[[variable]]\nname = \"{}\"\n{default}{environment}\n[[asset]]\nsource = \"assets/content.txt\"\ntarget = \"{}\"\ntemplate = true\n",
+        spec.id, spec.variable, spec.target
+    );
+    fs::write(root.join("manifest.toml"), manifest).unwrap();
+    fs::write(root.join("assets/content.txt"), spec.body).unwrap();
+}
+
 /// Rewrite the package tree at `location` to declare a dependency on `id`.
 ///
 /// No package this repository ships declares a dependency, so a composition
@@ -476,6 +508,248 @@ fn test_profile_apply_dry_run_reads_the_package_a_supplied_location_holds() {
     // A preview writes nothing, the record included.
     assert!(!repo.path().join(".jit/profiles").exists());
     assert!(!repo.path().join("docs/profile.txt").exists());
+}
+
+#[test]
+fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_precedence() {
+    let init_repo = TempDir::new().unwrap();
+    write_variable_package(
+        init_repo.path(),
+        "packages/init-vars",
+        VariablePackageSpec {
+            id: "init-vars",
+            variable: "NAME",
+            default: Some("default"),
+            environment: None,
+            target: "docs/init-vars.txt",
+            body: "NAME={{jit:var:NAME}}\n",
+            dependency: None,
+        },
+    );
+    let init_values = init_repo.path().join("values.toml");
+    fs::write(&init_values, "[variables]\nNAME = \"from-file\"\n").unwrap();
+    let init_values = init_values.to_str().unwrap();
+    let init = jit(
+        init_repo.path(),
+        &[
+            "init",
+            "--profile",
+            "path:packages/init-vars",
+            "--values-file",
+            init_values,
+            "--set",
+            "NAME=first",
+            "--set",
+            "NAME=last",
+            "--json",
+        ],
+    );
+    assert!(init.status.success(), "{init:?}");
+    assert_eq!(
+        fs::read_to_string(init_repo.path().join("docs/init-vars.txt")).unwrap(),
+        "NAME=last\n"
+    );
+
+    let apply_repo = TempDir::new().unwrap();
+    write_variable_package(
+        apply_repo.path(),
+        "packages/dependency-vars",
+        VariablePackageSpec {
+            id: "dependency-vars",
+            variable: "TOKEN",
+            default: Some("dependency-default"),
+            environment: None,
+            target: "docs/dependency-vars.txt",
+            body: "TOKEN={{jit:var:TOKEN}}\n",
+            dependency: None,
+        },
+    );
+    write_variable_package(
+        apply_repo.path(),
+        "packages/root-vars",
+        VariablePackageSpec {
+            id: "root-vars",
+            variable: "NAME",
+            default: Some("root-default"),
+            environment: None,
+            target: "docs/root-vars.txt",
+            body: "NAME={{jit:var:NAME}}\n",
+            dependency: Some("dependency-vars"),
+        },
+    );
+    assert!(jit(apply_repo.path(), &["init"]).status.success());
+    let values = apply_repo.path().join("values.toml");
+    fs::write(&values, "[variables]\nNAME = \"from-file\"\n").unwrap();
+    let values = values.to_str().unwrap();
+    let selector = "path:packages/root-vars";
+    let preview = jit(
+        apply_repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            selector,
+            "--values-file",
+            values,
+            "--set",
+            "NAME=first",
+            "--set",
+            "NAME=last",
+            "--set",
+            "TOKEN=dependency-value",
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(preview.status.success(), "{preview:?}");
+    let preview = json(&preview);
+    assert_eq!(preview["profiles"][0]["status"], "would_apply");
+    assert!(!apply_repo.path().join("docs/root-vars.txt").exists());
+    assert!(!apply_repo.path().join("docs/dependency-vars.txt").exists());
+
+    let alternate = jit(
+        apply_repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            selector,
+            "--set",
+            "NAME=alternate",
+            "--set",
+            "TOKEN=dependency-value",
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(alternate.status.success(), "{alternate:?}");
+    assert_ne!(
+        preview["profiles"][0]["plan_hash"],
+        json(&alternate)["profiles"][0]["plan_hash"],
+        "resolved plan identity must cover resolved values"
+    );
+
+    let applied = jit(
+        apply_repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            selector,
+            "--values-file",
+            values,
+            "--set",
+            "NAME=first",
+            "--set",
+            "NAME=last",
+            "--set",
+            "TOKEN=dependency-value",
+            "--json",
+        ],
+    );
+    assert!(applied.status.success(), "{applied:?}");
+    assert_eq!(
+        fs::read_to_string(apply_repo.path().join("docs/root-vars.txt")).unwrap(),
+        "NAME=last\n"
+    );
+    assert_eq!(
+        fs::read_to_string(apply_repo.path().join("docs/dependency-vars.txt")).unwrap(),
+        "TOKEN=dependency-value\n"
+    );
+}
+
+#[test]
+fn test_profile_variable_record_drives_validation_repair_and_provenance_checks() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    write_variable_package(
+        repo.path(),
+        "packages/recorded-vars",
+        VariablePackageSpec {
+            id: "recorded-vars",
+            variable: "NAME",
+            default: None,
+            environment: Some("JIT_PROFILE_RECORDED_NAME"),
+            target: "docs/recorded-vars.txt",
+            body: "NAME={{jit:var:NAME}}\n",
+            dependency: None,
+        },
+    );
+    let resolved_value = "persisted-public-value";
+    let applied = Command::new(env!("CARGO_BIN_EXE_jit"))
+        .args([
+            "profile",
+            "apply",
+            "--profile",
+            "path:packages/recorded-vars",
+            "--set",
+            &format!("NAME={resolved_value}"),
+            "--json",
+        ])
+        .env("JIT_PROFILE_RECORDED_NAME", "environment-at-apply")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(applied.status.success(), "{applied:?}");
+    assert_eq!(
+        fs::read_to_string(repo.path().join("docs/recorded-vars.txt")).unwrap(),
+        format!("NAME={resolved_value}\n")
+    );
+
+    let record_path = repo.path().join(".jit/profiles/recorded-vars.json");
+    let record_bytes = fs::read(&record_path).unwrap();
+    let record: Value = serde_json::from_slice(&record_bytes).unwrap();
+    assert_eq!(record["variables"]["NAME"]["value"], resolved_value);
+    assert_eq!(record["variables"]["NAME"]["source"], "set");
+    let events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
+    assert!(!events
+        .windows(resolved_value.len())
+        .any(|window| window == resolved_value.as_bytes()));
+
+    let validate = Command::new(env!("CARGO_BIN_EXE_jit"))
+        .args(["validate", "--json"])
+        .env("JIT_PROFILE_RECORDED_NAME", "different-current-environment")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(validate.status.success(), "{validate:?}");
+    assert_eq!(json(&validate)["valid"], true);
+
+    fs::write(repo.path().join("docs/recorded-vars.txt"), "DRIFTED\n").unwrap();
+    let repaired = Command::new(env!("CARGO_BIN_EXE_jit"))
+        .args(["validate", "--fix", "--json"])
+        .env_remove("JIT_PROFILE_RECORDED_NAME")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(repaired.status.success(), "{repaired:?}");
+    assert_eq!(
+        fs::read_to_string(repo.path().join("docs/recorded-vars.txt")).unwrap(),
+        format!("NAME={resolved_value}\n")
+    );
+
+    let assert_not_applied = |mutated: Value| {
+        fs::write(&record_path, serde_json::to_vec_pretty(&mutated).unwrap()).unwrap();
+        let listed = jit(repo.path(), &["profile", "list", "--json"]);
+        assert!(listed.status.success(), "{listed:?}");
+        assert_eq!(json(&listed)["profiles"][0]["applied"], false);
+    };
+    let mut value_tamper = record.clone();
+    value_tamper["variables"]["NAME"]["value"] = Value::String("tampered".to_string());
+    assert_not_applied(value_tamper);
+    let mut source_tamper = record.clone();
+    source_tamper["variables"]["NAME"]["source"] = Value::String("values_file".to_string());
+    assert_not_applied(source_tamper);
+    let mut hash_tamper = record.clone();
+    let target_hash = hash_tamper["target_hashes"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+        .next()
+        .unwrap();
+    *target_hash = Value::String("0".repeat(64));
+    assert_not_applied(hash_tamper);
+    fs::write(record_path, record_bytes).unwrap();
 }
 
 #[test]

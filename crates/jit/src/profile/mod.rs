@@ -10,6 +10,7 @@ mod graph;
 mod manifest;
 mod package;
 mod repository_package;
+mod variables;
 mod wire;
 // Repository-local generator seam: the package tree this repository assembles
 // is produced by one entry point and read back by nothing, so the render has no
@@ -45,15 +46,24 @@ pub use application::{
     ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
     ProfileTargetChange,
 };
-pub use apply_claims::{build_profile_claims, build_profile_repair_claims, ProfileClaimError};
+pub use apply_claims::{
+    build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
+    ProfileClaimError,
+};
 pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{
-    profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
+    profile_package_model_schema, AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration,
     ProfileDependencyRequirement, ProfileId, ProfileIncompatibility, ProfilePackageModel,
-    ProfileVariableDeclaration, RegionDeclaration, RegionPlacement, MANIFEST_FILE_NAME,
+    ProfileVariableDeclaration, ProfileVariableName, RegionDeclaration, RegionPlacement,
+    MANIFEST_FILE_NAME,
 };
 pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
 pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;
+pub use variables::{
+    resolve_package, resolve_package_from_record, resolve_variables, ProfileVariableAssignment,
+    ResolvedProfileContent, ResolvedVariable, ResolvedVariables, VariableError, VariableInputs,
+    VariableSource,
+};

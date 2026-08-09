@@ -952,6 +952,7 @@ kind = "advisory"
             id: "identity-test".into(),
             version: "1.0.0".into(),
             package_hash: "package-hash".into(),
+            variables: crate::profile::ResolvedVariables::default(),
             target_hashes: BTreeMap::new(),
             origin: ProfileOrigin::Directory(
                 crate::repository_state::RootRelativePath::parse("packages/identity-test")
@@ -979,7 +980,7 @@ kind = "advisory"
         let apply_profile = derive_materialization(
             &profile_image,
             MaterializationRequest::ApplyProfile {
-                profile,
+                profile: Box::new(profile),
                 context: &context,
             },
         )

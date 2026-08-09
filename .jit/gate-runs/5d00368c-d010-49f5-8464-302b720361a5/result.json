@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-fc47a7bf",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "6b51f0be0f3519a0d550870ec0e67fbe5aa64a2e",
+  "completed_at": "2026-08-09T11:35:09.978670992Z",
+  "duration_ms": 408604,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "1c881710c9d8099a62e40db57efa4455cf6f54889069a01fdf060add67b0f9a1",
+  "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5d00368c-d010-49f5-8464-302b720361a5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-09T11:28:21.374504559Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest profile_acceptance_tests::test_public_profile_schema_excludes_deferred_lifecycle_surface ... FAILED\ntest result: FAILED. 345 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 51.05s\n---- profile_acceptance_tests::test_public_profile_schema_excludes_deferred_lifecycle_surface stdout ----\n\nthread 'profile_acceptance_tests::test_public_profile_schema_excludes_deferred_lifecycle_surface' (2564867) panicked at crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:802:5:\nassertion `left == right` failed\n  left: {\"dry-run\", \"json\", \"profile\", \"set\", \"values-file\"}\n right: {\"dry-run\", \"json\", \"profile\"}\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1522 bytes=28770406)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1467802344/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

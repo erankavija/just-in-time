@@ -1398,7 +1398,7 @@ pub enum Event {
     },
     /// A profile package was transactionally applied.
     ///
-    /// Repository-scoped: package targets, the minimal installed record, and
+    /// Repository-scoped: package targets, the canonical provenance record, and
     /// this event become durable in one recoverable transaction.
     ProfileApplied {
         /// Event ID.
