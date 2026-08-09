@@ -63,6 +63,7 @@ pub use package::{
 };
 pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;
 pub use variables::{
-    resolve_package, resolve_variables, ProfileVariableAssignment, ResolvedProfileContent,
-    ResolvedVariable, ResolvedVariables, VariableError, VariableInputs, VariableSource,
+    resolve_package, resolve_package_from_record, resolve_variables, ProfileVariableAssignment,
+    ResolvedProfileContent, ResolvedVariable, ResolvedVariables, VariableError, VariableInputs,
+    VariableSource,
 };

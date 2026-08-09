@@ -5,9 +5,10 @@
 //!
 //! `repository_state` owns this composition; the profile package produces the
 //! neutral [`ProfileClaims`] and the command captures the base image and applies the
-//! resulting delta. This module imports no profile, storage, or command code — the
-//! profile-package parsing (`profile::package`) and the typed `ApplyProfile`
-//! materialization request sit on either side of it.
+//! resulting delta. The applied record carries the profile layer's canonical
+//! resolved-variable provenance, but package parsing, storage, and command code
+//! remain outside this module; the typed `ApplyProfile` materialization request
+//! sits between them.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -22,6 +23,7 @@ use super::{
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
 use crate::domain::ProfileOrigin;
+use crate::profile::ResolvedVariables;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -313,6 +315,8 @@ pub struct AppliedProfileRecord {
     pub origin: ProfileOrigin,
     /// Digest of the complete package manifest and content.
     pub package_hash: String,
+    /// Canonical public values and source kinds used to resolve this package.
+    pub variables: ResolvedVariables,
     /// Digests of every installed package target, keyed by repository-relative path.
     pub target_hashes: BTreeMap<String, String>,
 }
@@ -324,6 +328,7 @@ impl AppliedProfileRecord {
         version: impl Into<String>,
         origin: ProfileOrigin,
         package_hash: impl Into<String>,
+        variables: ResolvedVariables,
         target_hashes: BTreeMap<String, String>,
     ) -> Self {
         Self {
@@ -331,6 +336,7 @@ impl AppliedProfileRecord {
             version: version.into(),
             origin,
             package_hash: package_hash.into(),
+            variables,
             target_hashes,
         }
     }
@@ -349,6 +355,8 @@ pub struct ProfileApplicationInput {
     pub id: String,
     pub version: String,
     pub package_hash: String,
+    /// Exact public values and source kinds that produced `claims`.
+    pub variables: ResolvedVariables,
     pub target_hashes: BTreeMap<String, String>,
     pub origin: ProfileOrigin,
     pub claims: ProfileClaims,
@@ -373,6 +381,7 @@ impl ProfileApplicationInput {
             self.version.clone(),
             self.origin.clone(),
             self.package_hash.clone(),
+            self.variables.clone(),
             self.target_hashes.clone(),
         )
     }
@@ -1115,6 +1124,7 @@ mod tests {
                     .expect("a canonical package location"),
             ),
             "package-hash",
+            ResolvedVariables::default(),
             target_hashes,
         );
         let record_bytes = record.to_bytes().unwrap();

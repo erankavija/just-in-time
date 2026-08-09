@@ -9,7 +9,8 @@ use super::manifest::{
 };
 use super::package::ProfilePackage;
 use crate::repository_state::{Contribution, KeyedArrayTarget, MapEntryTarget};
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -102,7 +103,10 @@ impl VariableInputs {
 }
 
 /// The source that supplied one resolved variable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
 pub enum VariableSource {
     /// The declaration supplied the value.
     Default,
@@ -115,7 +119,8 @@ pub enum VariableSource {
 }
 
 /// One resolved value and its non-sensitive source classification.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ResolvedVariable {
     /// The resolved UTF-8 value.
     pub value: String,
@@ -124,7 +129,8 @@ pub struct ResolvedVariable {
 }
 
 /// Deterministic resolved variables, ordered by variable name.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
 pub struct ResolvedVariables(BTreeMap<ProfileVariableName, ResolvedVariable>);
 
 impl ResolvedVariables {
@@ -239,6 +245,36 @@ pub fn resolve_package(
     let model = package.model();
     validate_model_references(model)?;
     let variables = resolve_variables(&model.variables, inputs)?;
+    resolve_package_content(package, variables)
+}
+
+/// Resolve a package exclusively from the public variable provenance stored
+/// in its applied-profile record.
+///
+/// The current process environment and declaration defaults are never input
+/// channels here. Recorded names and source kinds are checked against the
+/// current unresolved package before its exact stored values are rendered.
+///
+/// # Errors
+///
+/// Returns [`VariableError`] when the record names an undeclared variable, a
+/// recorded source kind is impossible for its declaration, or the package's
+/// bounded references cannot be rendered from the recorded values.
+pub fn resolve_package_from_record(
+    package: &ProfilePackage,
+    variables: &ResolvedVariables,
+) -> Result<ResolvedProfileContent, VariableError> {
+    let model = package.model();
+    validate_model_references(model)?;
+    validate_recorded_variables(&model.variables, variables)?;
+    resolve_package_content(package, variables.clone())
+}
+
+fn resolve_package_content(
+    package: &ProfilePackage,
+    variables: ResolvedVariables,
+) -> Result<ResolvedProfileContent, VariableError> {
+    let model = package.model();
     let contributions = model
         .contributions
         .iter()
@@ -285,10 +321,43 @@ pub fn resolve_package(
     })
 }
 
+fn validate_recorded_variables(
+    declarations: &[ProfileVariableDeclaration],
+    variables: &ResolvedVariables,
+) -> Result<(), VariableError> {
+    validate_declarations(declarations)?;
+    let declarations = declarations
+        .iter()
+        .map(|declaration| (&declaration.name, declaration))
+        .collect::<BTreeMap<_, _>>();
+    variables.0.iter().try_for_each(|(name, resolved)| {
+        let declaration = declarations
+            .get(name)
+            .ok_or_else(|| VariableError::UndeclaredInput {
+                name: name.to_string(),
+                tier: "applied profile record",
+            })?;
+        let valid_source = match resolved.source {
+            VariableSource::Default => declaration.default.as_ref() == Some(&resolved.value),
+            VariableSource::Environment => declaration.env.is_some(),
+            VariableSource::ValuesFile | VariableSource::Set => true,
+        };
+        if valid_source {
+            Ok(())
+        } else {
+            Err(VariableError::InvalidRecordedSource {
+                name: name.to_string(),
+                source_kind: resolved.source,
+            })
+        }
+    })
+}
+
 impl ResolvedProfileContent {
     /// Hash resolved semantic contributions and resolved file bytes by their
     /// repository target without exposing the resolved values themselves.
-    pub(crate) fn target_hashes(&self) -> Result<BTreeMap<String, String>, VariableError> {
+    pub fn target_hashes(&self) -> Result<BTreeMap<String, String>, VariableError> {
+        let variable_frame = canonical_json_bytes(&self.variables)?;
         let mut frames = BTreeMap::<String, Vec<Vec<u8>>>::new();
         for contribution in &self.model.contributions {
             frames
@@ -319,6 +388,8 @@ impl ResolvedProfileContent {
             .map(|(target, target_frames)| {
                 let mut hasher = Sha256::new();
                 hasher.update(RESOLVED_TARGET_HASH_DOMAIN);
+                hash_frame(&mut hasher, b"variables");
+                hash_frame(&mut hasher, &variable_frame);
                 hash_frame(&mut hasher, target.as_bytes());
                 target_frames
                     .iter()
@@ -874,6 +945,17 @@ pub enum VariableError {
     /// A resolved semantic definition could not be serialized for hashing.
     #[error("failed to serialize resolved profile content for hashing: {0}")]
     Serialization(String),
+    /// Stored provenance assigns a source kind the current declaration cannot
+    /// have produced.
+    #[error(
+        "applied profile record gives variable '{name}' an invalid source kind {source_kind:?}"
+    )]
+    InvalidRecordedSource {
+        /// Declared variable whose stored provenance is invalid.
+        name: String,
+        /// Stored source kind rejected by the declaration.
+        source_kind: VariableSource,
+    },
 }
 
 #[cfg(test)]

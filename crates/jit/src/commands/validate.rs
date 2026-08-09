@@ -912,9 +912,7 @@ fn captured_profile_repair_claims(
                     ))))
                 }
             };
-        if actual
-            != super::profile::expected_record(package, image.layout(), &actual.target_hashes)?
-        {
+        if actual != super::profile::expected_record(package, image.layout(), &actual.variables)? {
             return Ok(Some(Err(RepositoryValidationFailure::materialization(
                 anyhow!(
                     "applied profile provenance for '{}@{}' does not match the package its record resolves to",
@@ -923,7 +921,11 @@ fn captured_profile_repair_claims(
                 ),
             ))));
         }
-        match crate::profile::build_profile_repair_claims(package, image.layout()) {
+        match crate::profile::build_profile_repair_claims(
+            package,
+            &actual.variables,
+            image.layout(),
+        ) {
             Ok(built) => claims.push(built),
             Err(error) => {
                 return Ok(Some(Err(RepositoryValidationFailure::materialization(
@@ -3371,6 +3373,7 @@ depends_on = ["planning"]
                     .expect("a canonical package location"),
             ),
             "0".repeat(64),
+            crate::profile::ResolvedVariables::default(),
             std::collections::BTreeMap::new(),
         ))
         .unwrap()

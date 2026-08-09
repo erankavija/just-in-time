@@ -700,7 +700,7 @@ pub enum MaterializationRequest<'a> {
     /// Derive one profile application over an existing repository.
     ApplyProfile {
         /// Parsed package metadata and neutral canonical claims.
-        profile: ProfileApplicationInput,
+        profile: Box<ProfileApplicationInput>,
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
     },

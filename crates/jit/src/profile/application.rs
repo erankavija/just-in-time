@@ -92,7 +92,7 @@ pub struct ProfileSummary {
     pub origin: ProfileOrigin,
     /// Compatible JIT version requirement authored by the manifest.
     pub jit: String,
-    /// Whether the stored record exactly names the resolved package's version and hashes.
+    /// Whether the stored values independently reproduce the package's exact provenance.
     pub applied: bool,
 }
 
@@ -241,6 +241,7 @@ mod tests {
             "1.0.0",
             origin,
             "package",
+            crate::profile::ResolvedVariables::default(),
             BTreeMap::from([("docs/example.md".to_string(), "target".to_string())]),
         )
     }
@@ -254,7 +255,7 @@ mod tests {
     }
 
     #[test]
-    fn test_installed_record_is_minimal_stable_json() {
+    fn test_installed_record_is_canonical_stable_json() {
         let value: serde_json::Value =
             serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -264,7 +265,14 @@ mod tests {
                 .keys()
                 .cloned()
                 .collect::<Vec<_>>(),
-            vec!["id", "origin", "package_hash", "target_hashes", "version"]
+            vec![
+                "id",
+                "origin",
+                "package_hash",
+                "target_hashes",
+                "variables",
+                "version"
+            ]
         );
     }
 

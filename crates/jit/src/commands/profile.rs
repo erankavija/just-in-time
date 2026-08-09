@@ -1,11 +1,12 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::profile::{
-    build_profile_claims_from_resolved, resolve_package, EngineVersion, ProfileApplicationStatus,
-    ProfileApplyResult, ProfileComposedApplyResult, ProfileGraphError, ProfileId,
-    ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError, ProfilePackageSource,
-    ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult,
-    ProfileSummary, ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment,
-    ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph, VariableInputs,
+    build_profile_claims_from_resolved, resolve_package, resolve_package_from_record,
+    EngineVersion, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
+    ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
+    ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent,
+    ResolvedProfileGraph, ResolvedVariables, VariableInputs,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -1020,7 +1021,7 @@ impl CommandExecutor<JsonFileStorage> {
         let preview = derive_materialization(
             &base,
             MaterializationRequest::ApplyProfile {
-                profile: input,
+                profile: Box::new(input),
                 context,
             },
         )?;
@@ -1049,7 +1050,7 @@ impl CommandExecutor<JsonFileStorage> {
         let plan = derive_materialization(
             &probe,
             MaterializationRequest::ApplyProfile {
-                profile: input,
+                profile: Box::new(input),
                 context,
             },
         )?;
@@ -1401,7 +1402,7 @@ fn recorded_summary(
         version: metadata.version.clone(),
         origin: package_origin(&package, layout)?,
         jit: metadata.compatible_jit.clone(),
-        applied: record == expected_record(&package, layout, &record.target_hashes)?,
+        applied: record == expected_record(&package, layout, &record.variables)?,
     }))
 }
 
@@ -1434,18 +1435,25 @@ pub(super) fn package_origin(
 }
 
 /// The expected provenance record for a package read through this repository.
+///
+/// Target hashes are independently recomputed by resolving the current
+/// unresolved package from the record's persisted public values. This path
+/// never reads current environment variables or accepts stored target hashes
+/// as expected input.
 pub(super) fn expected_record(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
-    target_hashes: &BTreeMap<String, String>,
+    variables: &ResolvedVariables,
 ) -> Result<AppliedProfileRecord> {
     let metadata = package.model();
+    let resolved = resolve_package_from_record(package, variables)?;
     Ok(AppliedProfileRecord::new(
         metadata.id.to_string(),
         metadata.version.clone(),
         package_origin(package, layout)?,
         package.hashes().package.clone(),
-        target_hashes.clone(),
+        variables.clone(),
+        resolved.target_hashes()?,
     ))
 }
 
@@ -1461,6 +1469,7 @@ fn profile_application_input(
         id: metadata.id.to_string(),
         version: metadata.version.clone(),
         package_hash: package.hashes().package.clone(),
+        variables: resolved.variables().clone(),
         target_hashes: resolved.target_hashes()?,
         origin: package_origin(package, layout)?,
         claims: build_profile_claims_from_resolved(resolved, layout, false)?,
@@ -1974,6 +1983,7 @@ mod tests {
                 recorded.model().version.clone(),
                 ProfileOrigin::Directory(RootRelativePath::parse("vendor/dogfood").unwrap()),
                 recorded.hashes().package.clone(),
+                ResolvedVariables::default(),
                 recorded.hashes().targets.clone(),
             ),
         );
@@ -2965,9 +2975,17 @@ template = true
         assert!(!event_bytes
             .windows(resolved_value.len())
             .any(|window| window == resolved_value.as_bytes()));
-        assert!(!record_bytes
+        assert!(record_bytes
             .windows(resolved_value.len())
             .any(|window| window == resolved_value.as_bytes()));
+        assert_eq!(
+            record.variables.values()[&"NAME".try_into().unwrap()],
+            "resolved-value-last"
+        );
+        assert_eq!(
+            record.variables.sources()[&"NAME".try_into().unwrap()],
+            crate::profile::VariableSource::Set
+        );
         assert_eq!(storage.read_events().unwrap().len(), 1);
     }
 

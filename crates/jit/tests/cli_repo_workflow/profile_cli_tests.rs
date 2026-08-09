@@ -123,7 +123,8 @@ fn set_package_version(repo: &Path, location: &str, version: &str) -> PathBuf {
 struct VariablePackageSpec<'a> {
     id: &'a str,
     variable: &'a str,
-    default: &'a str,
+    default: Option<&'a str>,
+    environment: Option<&'a str>,
     target: &'a str,
     body: &'a str,
     dependency: Option<&'a str>,
@@ -135,9 +136,15 @@ fn write_variable_package(repo: &Path, location: &str, spec: VariablePackageSpec
     let dependency = spec.dependency.map_or(String::new(), |dependency| {
         format!("\n[[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n")
     });
+    let default = spec
+        .default
+        .map_or(String::new(), |value| format!("default = \"{value}\"\n"));
+    let environment = spec
+        .environment
+        .map_or(String::new(), |name| format!("env = \"{name}\"\n"));
     let manifest = format!(
-        "[profile]\nmanifest-version = 2\nid = \"{}\"\nversion = \"1.0.0\"\ncompatible-jit = \"*\"\n{dependency}\n[[variable]]\nname = \"{}\"\ndefault = \"{}\"\n\n[[asset]]\nsource = \"assets/content.txt\"\ntarget = \"{}\"\ntemplate = true\n",
-        spec.id, spec.variable, spec.default, spec.target
+        "[profile]\nmanifest-version = 2\nid = \"{}\"\nversion = \"1.0.0\"\ncompatible-jit = \"*\"\n{dependency}\n[[variable]]\nname = \"{}\"\n{default}{environment}\n[[asset]]\nsource = \"assets/content.txt\"\ntarget = \"{}\"\ntemplate = true\n",
+        spec.id, spec.variable, spec.target
     );
     fs::write(root.join("manifest.toml"), manifest).unwrap();
     fs::write(root.join("assets/content.txt"), spec.body).unwrap();
@@ -512,7 +519,8 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
         VariablePackageSpec {
             id: "init-vars",
             variable: "NAME",
-            default: "default",
+            default: Some("default"),
+            environment: None,
             target: "docs/init-vars.txt",
             body: "NAME={{jit:var:NAME}}\n",
             dependency: None,
@@ -549,7 +557,8 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
         VariablePackageSpec {
             id: "dependency-vars",
             variable: "TOKEN",
-            default: "dependency-default",
+            default: Some("dependency-default"),
+            environment: None,
             target: "docs/dependency-vars.txt",
             body: "TOKEN={{jit:var:TOKEN}}\n",
             dependency: None,
@@ -561,7 +570,8 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
         VariablePackageSpec {
             id: "root-vars",
             variable: "NAME",
-            default: "root-default",
+            default: Some("root-default"),
+            environment: None,
             target: "docs/root-vars.txt",
             body: "NAME={{jit:var:NAME}}\n",
             dependency: Some("dependency-vars"),
@@ -592,9 +602,32 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
         ],
     );
     assert!(preview.status.success(), "{preview:?}");
-    assert_eq!(json(&preview)["profiles"][0]["status"], "would_apply");
+    let preview = json(&preview);
+    assert_eq!(preview["profiles"][0]["status"], "would_apply");
     assert!(!apply_repo.path().join("docs/root-vars.txt").exists());
     assert!(!apply_repo.path().join("docs/dependency-vars.txt").exists());
+
+    let alternate = jit(
+        apply_repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            selector,
+            "--set",
+            "NAME=alternate",
+            "--set",
+            "TOKEN=dependency-value",
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(alternate.status.success(), "{alternate:?}");
+    assert_ne!(
+        preview["profiles"][0]["plan_hash"],
+        json(&alternate)["profiles"][0]["plan_hash"],
+        "resolved plan identity must cover resolved values"
+    );
 
     let applied = jit(
         apply_repo.path(),
@@ -623,6 +656,100 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
         fs::read_to_string(apply_repo.path().join("docs/dependency-vars.txt")).unwrap(),
         "TOKEN=dependency-value\n"
     );
+}
+
+#[test]
+fn test_profile_variable_record_drives_validation_repair_and_provenance_checks() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    write_variable_package(
+        repo.path(),
+        "packages/recorded-vars",
+        VariablePackageSpec {
+            id: "recorded-vars",
+            variable: "NAME",
+            default: None,
+            environment: Some("JIT_PROFILE_RECORDED_NAME"),
+            target: "docs/recorded-vars.txt",
+            body: "NAME={{jit:var:NAME}}\n",
+            dependency: None,
+        },
+    );
+    let resolved_value = "persisted-public-value";
+    let applied = Command::new(env!("CARGO_BIN_EXE_jit"))
+        .args([
+            "profile",
+            "apply",
+            "--profile",
+            "path:packages/recorded-vars",
+            "--set",
+            &format!("NAME={resolved_value}"),
+            "--json",
+        ])
+        .env("JIT_PROFILE_RECORDED_NAME", "environment-at-apply")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(applied.status.success(), "{applied:?}");
+    assert_eq!(
+        fs::read_to_string(repo.path().join("docs/recorded-vars.txt")).unwrap(),
+        format!("NAME={resolved_value}\n")
+    );
+
+    let record_path = repo.path().join(".jit/profiles/recorded-vars.json");
+    let record_bytes = fs::read(&record_path).unwrap();
+    let record: Value = serde_json::from_slice(&record_bytes).unwrap();
+    assert_eq!(record["variables"]["NAME"]["value"], resolved_value);
+    assert_eq!(record["variables"]["NAME"]["source"], "set");
+    let events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
+    assert!(!events
+        .windows(resolved_value.len())
+        .any(|window| window == resolved_value.as_bytes()));
+
+    let validate = Command::new(env!("CARGO_BIN_EXE_jit"))
+        .args(["validate", "--json"])
+        .env("JIT_PROFILE_RECORDED_NAME", "different-current-environment")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(validate.status.success(), "{validate:?}");
+    assert_eq!(json(&validate)["valid"], true);
+
+    fs::write(repo.path().join("docs/recorded-vars.txt"), "DRIFTED\n").unwrap();
+    let repaired = Command::new(env!("CARGO_BIN_EXE_jit"))
+        .args(["validate", "--fix", "--json"])
+        .env_remove("JIT_PROFILE_RECORDED_NAME")
+        .current_dir(repo.path())
+        .output()
+        .unwrap();
+    assert!(repaired.status.success(), "{repaired:?}");
+    assert_eq!(
+        fs::read_to_string(repo.path().join("docs/recorded-vars.txt")).unwrap(),
+        format!("NAME={resolved_value}\n")
+    );
+
+    let assert_not_applied = |mutated: Value| {
+        fs::write(&record_path, serde_json::to_vec_pretty(&mutated).unwrap()).unwrap();
+        let listed = jit(repo.path(), &["profile", "list", "--json"]);
+        assert!(listed.status.success(), "{listed:?}");
+        assert_eq!(json(&listed)["profiles"][0]["applied"], false);
+    };
+    let mut value_tamper = record.clone();
+    value_tamper["variables"]["NAME"]["value"] = Value::String("tampered".to_string());
+    assert_not_applied(value_tamper);
+    let mut source_tamper = record.clone();
+    source_tamper["variables"]["NAME"]["source"] = Value::String("values_file".to_string());
+    assert_not_applied(source_tamper);
+    let mut hash_tamper = record.clone();
+    let target_hash = hash_tamper["target_hashes"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+        .next()
+        .unwrap();
+    *target_hash = Value::String("0".repeat(64));
+    assert_not_applied(hash_tamper);
+    fs::write(record_path, record_bytes).unwrap();
 }
 
 #[test]

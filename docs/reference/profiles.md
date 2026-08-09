@@ -234,15 +234,18 @@ commit point. In that case the new repository state is authoritative and the
 retained committed journal is cleanup work for mandatory recovery, not a failed
 application.
 
-Successful application writes a minimal provenance record at
+Successful application writes a canonical provenance record at
 `.jit/profiles/<profile-id>.json` (therefore the `jit-dogfood` ID selects the
 matching filename) and appends the repository-scoped `profile_applied` audit
 event. Every applied package writes its own record and appends its own event,
 so applying a package that declares a dependency leaves one record and one
 event per package of the set. The record stores the profile ID, version, origin,
-package hash, and per-target hashes used to recognize an exact reapplication.
-It does not state why a package was applied, so a record reads the same whether
-the adopter named that package or received it as another's dependency.
+package hash, resolved public variable values with their source kinds, and
+per-target hashes used to recognize the exact resolved application. Validation
+and repair reuse those stored values; they do not read the current process
+environment. The audit event carries the hashes but never the resolved values.
+The record does not state why a package was applied, so it reads the same
+whether the adopter named that package or received it as another's dependency.
 
 The origin says where the applied bytes were read from: the repository
 directory holding the package, carried as a worktree-relative location, so
@@ -260,8 +263,6 @@ a Git repository. Profiles do not add or alter that lease surface.
 The v1.0 surface is intentionally apply-only. The following capabilities are
 deferred to the post-1.0 profile epic and do not exist in this release:
 
-- applying several profiles the adopter names in one operation;
-- profile incompatibilities;
 - sensitive-value handling;
 - semantic shared ownership;
 - reconfiguration;

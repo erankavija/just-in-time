@@ -44,7 +44,7 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `gate_definition_created` | registry | no | `jit gate define` registered a gate. |
 | `gate_definition_removed` | registry | no | `jit gate remove` unregistered a gate. |
 | `lifecycle_timestamps_backfilled` | repository | no | The one-time `jit migrate lifecycle-timestamps` backfill wrote derived lifecycle timestamps; the record carries the number of issues it updated. |
-| `profile_applied` | repository | no | A profile package, its minimal installed record, and this audit event reached one durable transaction commit point. |
+| `profile_applied` | repository | no | A profile package, its canonical provenance record, and this audit event reached one durable transaction commit point. |
 
 For the commands that read the log, see
 [Event Log Commands](cli-commands.md#event-log-commands); for the file's place in
