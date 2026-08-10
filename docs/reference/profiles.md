@@ -263,18 +263,19 @@ without Git. Claim leases remain the documented exception: their shared
 coordination state lives under `.git/jit/`, so claim acquire/renew/release require
 a Git repository. Profiles do not add or alter that lease surface.
 
-## V1.0 lifecycle boundary
+## Profile surface boundary
 
-The following capabilities are deferred to the post-1.0 profile epic and do not
-exist in this release:
+Profile variables are non-secret by declaration, and the profile surface carries
+no secret-value channel: no input, storage, interpolation, or audit path accepts
+one. A secret goes to the tool that consumes it, never to a package.
 
-- sensitive-value handling;
-- semantic shared ownership;
-- detailed diff;
-- safe removal.
+Profile-owned content leaves the repository through
+[`jit profile upgrade`](cli-commands.md#jit-profile-upgrade): replacing an
+installed version removes the unchanged content that version solely owned and
+the replacement stopped contributing. Removing an applied profile as a whole is
+not part of this release.
 
-There is no profile-removal command hidden behind the v1.0 interface. Package
-lookup follows the command contract in
+Package lookup follows the command contract in
 [Profile Commands](cli-commands.md#profile-commands);
 no configured search path discovers a package. Edit repository configuration
 directly for advanced customization, or start from the manual guides below.

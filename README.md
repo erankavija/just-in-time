@@ -83,7 +83,7 @@ Applying a profile reads its package from a directory inside the repository and
 needs no Git repository or network access. Plain `jit init` remains the
 methodology-neutral setup. See the
 [Repository Profiles reference](docs/reference/profiles.md) for obtaining a
-package, the commands, the safety guarantees, and the v1.0 lifecycle boundary.
+package, the commands, the safety guarantees, and the profile surface boundary.
 
 **See the [Quickstart Tutorial](docs/tutorials/quickstart.md) and [Complete Workflow Example](docs/tutorials/first-workflow.md) for full walkthroughs.**
 
