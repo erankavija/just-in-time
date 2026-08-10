@@ -745,6 +745,7 @@ impl CommandExecutor<JsonFileStorage> {
                     package,
                     &inputs.for_declarations(&package.model().variables),
                 )
+                .map_err(anyhow::Error::from)
             })
             .collect::<Result<Vec<_>>>()?;
         self.profile_contribution_candidates_from_resolved(&resolved)
@@ -762,6 +763,7 @@ impl CommandExecutor<JsonFileStorage> {
             .map(|resolved| {
                 build_profile_claims_from_resolved(resolved, &layout, false)
                     .map(|claims| claims.contributions)
+                    .map_err(anyhow::Error::from)
             })
             .collect::<Result<Vec<_>>>()
             .map(|claims| claims.into_iter().flatten().collect())

@@ -814,8 +814,12 @@ pub fn derive_materialization(
             context,
             operation,
         } => (
-            initialize::derive_profile_applications_with_operation(
-                image, &profiles, context, operation,
+            initialize::derive_profile_applications(
+                image,
+                &profiles,
+                context,
+                operation,
+                std::collections::BTreeSet::new(),
             )?,
             Default::default(),
         ),

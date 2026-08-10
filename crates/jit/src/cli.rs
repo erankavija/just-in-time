@@ -481,64 +481,6 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
-
-    /// Re-render an installed profile from recorded values and supplied overrides
-    Reconfigure {
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append,
-            required = true
-        )]
-        profile: Vec<String>,
-
-        /// Optional TOML file containing the `[variables]` value map.
-        #[arg(long, value_name = "PATH")]
-        values_file: Option<std::path::PathBuf>,
-
-        /// Set one declared profile variable; repeatable and last-wins.
-        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
-        set: Vec<String>,
-
-        /// Build and validate the exact reconfiguration plan without writing
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Replace an installed profile with a newer package version
-    Upgrade {
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append,
-            required = true
-        )]
-        profile: Vec<String>,
-
-        /// Optional TOML file containing the `[variables]` value map.
-        #[arg(long, value_name = "PATH")]
-        values_file: Option<std::path::PathBuf>,
-
-        /// Set one declared profile variable; repeatable and last-wins.
-        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
-        set: Vec<String>,
-
-        /// Build and validate the exact upgrade plan without writing
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
 }
 
 /// Addressable structured item subcommands.
@@ -3043,6 +2985,64 @@ pub enum ProfileCommands {
         set: Vec<String>,
 
         /// Build and validate the exact application plans without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Re-render an installed profile from recorded values and supplied overrides
+    Reconfigure {
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append,
+            required = true
+        )]
+        profile: Vec<String>,
+
+        /// Optional TOML file containing the `[variables]` value map.
+        #[arg(long, value_name = "PATH")]
+        values_file: Option<std::path::PathBuf>,
+
+        /// Set one declared profile variable; repeatable and last-wins.
+        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+        set: Vec<String>,
+
+        /// Build and validate the exact reconfiguration plan without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Replace an installed profile with a newer package version
+    Upgrade {
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append,
+            required = true
+        )]
+        profile: Vec<String>,
+
+        /// Optional TOML file containing the `[variables]` value map.
+        #[arg(long, value_name = "PATH")]
+        values_file: Option<std::path::PathBuf>,
+
+        /// Set one declared profile variable; repeatable and last-wins.
+        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+        set: Vec<String>,
+
+        /// Build and validate the exact upgrade plan without writing
         #[arg(long)]
         dry_run: bool,
 
