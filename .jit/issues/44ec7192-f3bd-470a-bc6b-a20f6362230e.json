@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker-44ec7192",
+  "claimed_at": "2026-08-10T07:24:58.706769035Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
@@ -24,7 +25,7 @@
     "satisfies:REQ-07"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Decide each target from base, current, and candidate",
-  "updated_at": "2026-08-10T00:35:27.762437173Z"
+  "updated_at": "2026-08-10T07:24:58.706769035Z"
 }
