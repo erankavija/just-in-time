@@ -2661,39 +2661,182 @@ mod tests {
         )
     }
 
-    /// A versioned package with one stored-variable input and explicit assets,
-    /// assembled by reusing the common profile fixture tree.
-    fn variable_asset_package(
+    /// A package tree at `relative` holding `manifest` and exactly the named
+    /// `sources`, read back from there.
+    ///
+    /// A lifecycle scenario turns on exactly what a manifest declares — its
+    /// version, its variables, which assets a variable reaches — and a package
+    /// admits no file its manifest does not declare, so these cases author the
+    /// whole tree they mean instead of staging a fixture whose own asset the
+    /// authored manifest would have to keep declaring. The one builder is
+    /// shared by every case below (`@/invariant/shared-test-contracts`).
+    fn authored_manifest_package(
         temp: &TempDir,
         relative: &str,
-        id: &str,
-        version: &str,
-        assets: &[(&str, &str, &str)],
+        manifest: &str,
+        sources: &[(&str, &str)],
     ) -> ProfilePackage {
-        let tree = crate::test_utils::copy_package_tree(
-            &fixture_package_tree(),
-            &temp.path().join(relative),
-        );
-        let assets_manifest = assets
-            .iter()
-            .map(|(source, target, _)| {
-                format!(
-                    "\n[[asset]]\nsource = \"{source}\"\ntarget = \"{target}\"\ntemplate = true\n"
-                )
-            })
-            .collect::<String>();
-        fs::write(
-            tree.join(crate::profile::MANIFEST_FILE_NAME),
-            format!(
-                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"{version}\"\ncompatible-jit = \"*\"\n\n[[variable]]\nname = \"VALUE\"\ndefault = \"default\"\n{assets_manifest}"
-            ),
-        )
-        .unwrap();
-        fs::create_dir_all(tree.join("assets")).unwrap();
-        for (source, _, content) in assets {
-            fs::write(tree.join(source), content).unwrap();
+        let tree = temp.path().join(relative);
+        if tree.exists() {
+            fs::remove_dir_all(&tree).expect("clear a re-authored package tree");
         }
-        ProfilePackage::from_directory(&tree).expect("a valid variable fixture package")
+        fs::create_dir_all(&tree).expect("create the package root");
+        fs::write(tree.join(crate::profile::MANIFEST_FILE_NAME), manifest)
+            .expect("write the authored manifest");
+        for (source, content) in sources {
+            let path = tree.join(source);
+            fs::create_dir_all(path.parent().expect("a package source has a directory"))
+                .expect("create the package source directory");
+            fs::write(path, content).expect("write the package source");
+        }
+        ProfilePackage::from_directory(&tree).expect("a valid authored package tree")
+    }
+
+    /// Profile id every lifecycle case below reconfigures or upgrades.
+    const LIFECYCLE_ID: &str = "lifecycle-package";
+
+    /// Worktree location the lifecycle package is staged and re-read at.
+    const LIFECYCLE_LOCATION: &str = "packages/lifecycle";
+
+    /// The lifecycle package at `version`, declaring one variable that reaches
+    /// one asset and leaves the other alone.
+    ///
+    /// Separating a target the variable feeds from a target it does not is what
+    /// makes "republish what the value affects" observable as distinct from
+    /// "republish everything this package owns".
+    fn lifecycle_package(temp: &TempDir, version: &str) -> ProfilePackage {
+        authored_manifest_package(
+            temp,
+            LIFECYCLE_LOCATION,
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
+                 version = \"{version}\"\ncompatible-jit = \"*\"\n\n\
+                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
+                 [[asset]]\nsource = \"assets/templated.txt\"\n\
+                 target = \"docs/templated.txt\"\ntemplate = true\n\n\
+                 [[asset]]\nsource = \"assets/fixed.txt\"\ntarget = \"docs/fixed.txt\"\n"
+            ),
+            &[
+                ("assets/templated.txt", "greeting={{jit:var:GREETING}}\n"),
+                ("assets/fixed.txt", "no variable reaches this\n"),
+            ],
+        )
+    }
+
+    /// Command options carrying repeated `--set NAME=VALUE` assignments.
+    fn supplied_values(assignments: &[(&str, &str)]) -> ProfileVariableOptions {
+        ProfileVariableOptions {
+            values_file: None,
+            assignments: assignments
+                .iter()
+                .map(|(name, value)| {
+                    ProfileVariableAssignment::new(
+                        (*name).try_into().expect("a canonical variable name"),
+                        *value,
+                    )
+                })
+                .collect(),
+        }
+    }
+
+    /// Apply `package` through the ordinary command entry point.
+    fn apply_package(
+        executor: &CommandExecutor<JsonFileStorage>,
+        package: &ProfilePackage,
+        options: &ProfileVariableOptions,
+    ) -> ProfileComposedApplyResult {
+        executor
+            .apply_profile_from_sources(&[package_selector(package)], options)
+            .expect("the package applies")
+    }
+
+    /// Select an installed profile the way a lifecycle command addresses it:
+    /// through the record that names where its package is read from.
+    fn installed_selector(id: &str) -> Vec<ProfileSelector> {
+        vec![ProfileSelector::id(id).expect("a canonical profile id")]
+    }
+
+    /// The fingerprint a record carries for the asset it published at `target`.
+    ///
+    /// This is the base of the next three-way decision, so a target that was
+    /// left alone must carry the same one it carried before.
+    fn recorded_asset_fingerprint(record: &AppliedProfileRecord, target: &str) -> String {
+        record
+            .claims
+            .iter()
+            .find_map(|claim| match &claim.identity {
+                crate::repository_state::AppliedProfileClaimIdentity::Asset { target: claimed } => {
+                    (claimed.path.as_path() == Path::new(target))
+                        .then(|| claim.base_fingerprint.as_str().to_string())
+                }
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("the record claims an asset at {target}"))
+    }
+
+    /// Every file this repository holds, keyed by its path below the worktree.
+    ///
+    /// A rehearsal writes nothing, which is a statement about the whole
+    /// repository rather than about the targets a plan happens to name.
+    fn repository_files(temp: &TempDir) -> BTreeMap<PathBuf, Vec<u8>> {
+        fn collect(directory: &Path, root: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
+            for entry in fs::read_dir(directory).expect("read a repository directory") {
+                let path = entry.expect("a readable directory entry").path();
+                if path.is_dir() {
+                    collect(&path, root, files);
+                } else {
+                    files.insert(
+                        path.strip_prefix(root)
+                            .expect("every file sits below the worktree")
+                            .to_path_buf(),
+                        fs::read(&path).expect("read a repository file"),
+                    );
+                }
+            }
+        }
+        let mut files = BTreeMap::new();
+        collect(temp.path(), temp.path(), &mut files);
+        files
+    }
+
+    /// The lifecycle operation and per-profile statuses of the last audited
+    /// profile event.
+    fn last_lifecycle_event(
+        storage: &JsonFileStorage,
+    ) -> (
+        ProfileLifecycleOperation,
+        Vec<(String, ProfileLifecycleStatus)>,
+    ) {
+        storage
+            .read_events()
+            .expect("the audit log is readable")
+            .into_iter()
+            .filter_map(|event| match event {
+                Event::ProfileLifecycle {
+                    operation,
+                    profiles,
+                    ..
+                } => Some((
+                    operation,
+                    profiles
+                        .into_iter()
+                        .map(|profile| (profile.id.to_string(), profile.status))
+                        .collect(),
+                )),
+                _ => None,
+            })
+            .next_back()
+            .expect("a lifecycle mutation audits one profile event")
+    }
+
+    /// Number of profile lifecycle events this repository has audited.
+    fn lifecycle_event_count(storage: &JsonFileStorage) -> usize {
+        storage
+            .read_events()
+            .expect("the audit log is readable")
+            .into_iter()
+            .filter(|event| matches!(event, Event::ProfileLifecycle { .. }))
+            .count()
     }
 
     /// A package declaring `id`, publishing an asset target of its own, and
@@ -5648,5 +5791,508 @@ template = true
                 ..
             }
         ));
+    }
+
+    /// Assert a rehearsal's per-target decisions against what the real run did.
+    ///
+    /// A rehearsal is only worth running if its decisions are the ones the
+    /// publication makes, so every target it would create or update must have
+    /// changed and every target it called unchanged must not have.
+    fn assert_planned_targets_match_published(
+        before: &BTreeMap<PathBuf, Vec<u8>>,
+        after: &BTreeMap<PathBuf, Vec<u8>>,
+        planned: &ProfilePlanResult,
+    ) {
+        assert!(
+            planned
+                .profiles
+                .iter()
+                .flat_map(|plan| &plan.targets)
+                .any(|target| target.action != ProfileTargetAction::Unchanged),
+            "a rehearsal that decides nothing proves nothing about the run it precedes"
+        );
+        for target in planned.profiles.iter().flat_map(|plan| &plan.targets) {
+            let path = PathBuf::from(&target.path);
+            match target.action {
+                ProfileTargetAction::Unchanged => assert_eq!(
+                    before.get(&path),
+                    after.get(&path),
+                    "the rehearsal called {} unchanged",
+                    target.path
+                ),
+                ProfileTargetAction::Create | ProfileTargetAction::Update => assert_ne!(
+                    before.get(&path),
+                    after.get(&path),
+                    "the rehearsal said it would publish {}",
+                    target.path
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn test_reconfigure_profiles_from_sources_republishes_only_the_targets_the_changed_value_feeds()
+    {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        let untouched = temp.path().join("docs/fixed.txt");
+        let untouched_before = fs::read(&untouched).unwrap();
+        let record_before = record_for(&temp, LIFECYCLE_ID);
+        let events_before = lifecycle_event_count(&storage);
+
+        let reconfigured = executor
+            .reconfigure_profiles_from_sources(
+                &installed_selector(LIFECYCLE_ID),
+                &supplied_values(&[("GREETING", "supplied")]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            reconfigured.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
+        assert!(
+            fs::read_to_string(temp.path().join("docs/templated.txt"))
+                .unwrap()
+                .contains("supplied"),
+            "the target the supplied value feeds carries that value"
+        );
+        assert_eq!(
+            fs::read(&untouched).unwrap(),
+            untouched_before,
+            "a target no supplied value reaches keeps its exact bytes"
+        );
+        let record_after = record_for(&temp, LIFECYCLE_ID);
+        assert_eq!(
+            recorded_asset_fingerprint(&record_after, "docs/fixed.txt"),
+            recorded_asset_fingerprint(&record_before, "docs/fixed.txt"),
+            "a target no supplied value reaches keeps the base its next decision reads"
+        );
+        assert_ne!(
+            recorded_asset_fingerprint(&record_after, "docs/templated.txt"),
+            recorded_asset_fingerprint(&record_before, "docs/templated.txt"),
+            "the republished target records the base it was published at"
+        );
+        assert_eq!(
+            record_after.package_hash, record_before.package_hash,
+            "reconfiguration replays the installed package rather than replacing it"
+        );
+        assert_eq!(lifecycle_event_count(&storage), events_before + 1);
+    }
+
+    #[test]
+    fn test_reconfigure_profiles_from_sources_publishes_nothing_when_no_value_is_supplied() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+
+        let reconfigured = executor
+            .reconfigure_profiles_from_sources(
+                &installed_selector(LIFECYCLE_ID),
+                &supplied_values(&[]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            reconfigured.requested().unwrap().status,
+            ProfileApplicationStatus::Unchanged,
+            "replaying the record with nothing supplied changes nothing"
+        );
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "a complete no-op writes no file"
+        );
+        assert_eq!(
+            lifecycle_event_count(&storage),
+            events_before,
+            "a complete no-op audits no lifecycle event"
+        );
+    }
+
+    #[test]
+    fn test_reconfigure_profiles_from_sources_reports_an_edited_target_as_a_conflict_without_publishing(
+    ) {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        fs::write(
+            temp.path().join("docs/templated.txt"),
+            "greeting=edited in place\n",
+        )
+        .unwrap();
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+
+        let error = executor
+            .reconfigure_profiles_from_sources(
+                &installed_selector(LIFECYCLE_ID),
+                &supplied_values(&[("GREETING", "supplied")]),
+            )
+            .unwrap_err();
+
+        let conflict = three_way_conflict(&error);
+        assert_eq!(conflict.target.repository_relative(), "docs/templated.txt");
+        assert_eq!(conflict.owner.as_str(), LIFECYCLE_ID);
+        assert_ne!(
+            conflict.current, conflict.base,
+            "the conflict reports current diverging from the recorded base"
+        );
+        assert_ne!(
+            conflict.current, conflict.candidate,
+            "the conflict reports current diverging from the resolved candidate"
+        );
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "a conflicting decision publishes nothing"
+        );
+        assert_eq!(lifecycle_event_count(&storage), events_before);
+    }
+
+    #[test]
+    fn test_upgrade_profiles_from_sources_updates_owned_targets_and_retains_shared_content() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let shared_body = "one body, two owners\n";
+        let alpha = authored_manifest_package(
+            &temp,
+            "packages/alpha",
+            "[profile]\nmanifest-version = 2\nid = \"alpha\"\nversion = \"1.0.0\"\n\
+             compatible-jit = \"*\"\n\n\
+             [[asset]]\nsource = \"assets/own.txt\"\ntarget = \"docs/alpha-own.txt\"\n\n\
+             [[asset]]\nsource = \"assets/shared.txt\"\ntarget = \"docs/shared.txt\"\n",
+            &[
+                ("assets/own.txt", "alpha own v1\n"),
+                ("assets/shared.txt", shared_body),
+            ],
+        );
+        let beta = authored_manifest_package(
+            &temp,
+            "packages/beta",
+            "[profile]\nmanifest-version = 2\nid = \"beta\"\nversion = \"1.0.0\"\n\
+             compatible-jit = \"*\"\n\n\
+             [[asset]]\nsource = \"assets/shared.txt\"\ntarget = \"docs/shared.txt\"\n",
+            &[("assets/shared.txt", shared_body)],
+        );
+        apply_package(&executor, &alpha, &supplied_values(&[]));
+        apply_package(&executor, &beta, &supplied_values(&[]));
+        authored_manifest_package(
+            &temp,
+            "packages/alpha",
+            "[profile]\nmanifest-version = 2\nid = \"alpha\"\nversion = \"2.0.0\"\n\
+             compatible-jit = \"*\"\n\n\
+             [[asset]]\nsource = \"assets/own.txt\"\ntarget = \"docs/alpha-own.txt\"\n",
+            &[("assets/own.txt", "alpha own v2\n")],
+        );
+
+        let upgraded = executor
+            .upgrade_profiles_from_sources(&installed_selector("alpha"), &supplied_values(&[]))
+            .unwrap();
+
+        assert_eq!(
+            upgraded.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
+        assert_eq!(
+            fs::read_to_string(temp.path().join("docs/alpha-own.txt")).unwrap(),
+            "alpha own v2\n",
+            "an unchanged target this package solely owns takes the new version's content"
+        );
+        assert_eq!(
+            fs::read_to_string(temp.path().join("docs/shared.txt")).unwrap(),
+            shared_body,
+            "content a surviving owner still claims outlives the owner that stopped claiming it"
+        );
+        assert_eq!(record_for(&temp, "alpha").version, "2.0.0");
+        assert_eq!(
+            record_for(&temp, "beta").version,
+            "1.0.0",
+            "upgrading one profile leaves every other applied record where it was"
+        );
+    }
+
+    #[test]
+    fn test_upgrade_profiles_from_sources_refuses_a_version_a_surviving_profile_depends_on() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let alpha = package_v2(&temp, "packages/alpha", "alpha", "1.0.0", "*", &[], &[]);
+        let beta = package_v2(
+            &temp,
+            "packages/beta",
+            "beta",
+            "1.0.0",
+            "*",
+            &[("alpha", "^1.0.0")],
+            &[],
+        );
+        apply_package(&executor, &alpha, &supplied_values(&[]));
+        apply_package(&executor, &beta, &supplied_values(&[]));
+        package_v2(&temp, "packages/alpha", "alpha", "2.0.0", "*", &[], &[]);
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+
+        let error = executor
+            .upgrade_profiles_from_sources(&installed_selector("alpha"), &supplied_values(&[]))
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::DependencyVersionMismatch {
+                    package,
+                    dependency,
+                    found,
+                    ..
+                }) if package == "beta" && dependency == "alpha" && found == "2.0.0"
+            ),
+            "the range a surviving profile depends on refuses the replacement: {error:#}"
+        );
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "a refused upgrade publishes nothing"
+        );
+        assert_eq!(lifecycle_event_count(&storage), events_before);
+    }
+
+    #[test]
+    fn test_upgrade_profiles_from_sources_reports_a_divergent_target_as_a_conflict_without_publishing(
+    ) {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        fs::write(
+            temp.path().join("docs/fixed.txt"),
+            "edited by the adopter\n",
+        )
+        .unwrap();
+        authored_manifest_package(
+            &temp,
+            LIFECYCLE_LOCATION,
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
+                 version = \"2.0.0\"\ncompatible-jit = \"*\"\n\n\
+                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
+                 [[asset]]\nsource = \"assets/templated.txt\"\n\
+                 target = \"docs/templated.txt\"\ntemplate = true\n\n\
+                 [[asset]]\nsource = \"assets/fixed.txt\"\ntarget = \"docs/fixed.txt\"\n"
+            ),
+            &[
+                ("assets/templated.txt", "greeting={{jit:var:GREETING}}\n"),
+                ("assets/fixed.txt", "the new version's fixed content\n"),
+            ],
+        );
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+
+        let error = executor
+            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
+            .unwrap_err();
+
+        let conflict = three_way_conflict(&error);
+        assert_eq!(conflict.target.repository_relative(), "docs/fixed.txt");
+        assert_eq!(conflict.owner.as_str(), LIFECYCLE_ID);
+        assert_ne!(conflict.current, conflict.base);
+        assert_ne!(conflict.current, conflict.candidate);
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "a conflicting upgrade publishes nothing"
+        );
+        assert_eq!(lifecycle_event_count(&storage), events_before);
+    }
+
+    #[test]
+    fn test_upgrade_profiles_from_sources_carries_supplied_values_and_defaults_new_declarations() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(
+            &executor,
+            &package,
+            &supplied_values(&[("GREETING", "carried")]),
+        );
+        authored_manifest_package(
+            &temp,
+            LIFECYCLE_LOCATION,
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
+                 version = \"2.0.0\"\ncompatible-jit = \"*\"\n\n\
+                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
+                 [[variable]]\nname = \"FAREWELL\"\ndefault = \"new default\"\n\n\
+                 [[asset]]\nsource = \"assets/templated.txt\"\n\
+                 target = \"docs/templated.txt\"\ntemplate = true\n"
+            ),
+            &[(
+                "assets/templated.txt",
+                "greeting={{jit:var:GREETING}} farewell={{jit:var:FAREWELL}}\n",
+            )],
+        );
+
+        executor
+            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
+            .unwrap();
+
+        assert_eq!(
+            fs::read_to_string(temp.path().join("docs/templated.txt")).unwrap(),
+            "greeting=carried farewell=new default\n",
+            "a stored supplied value survives the replacement while a newly declared \
+             variable takes the new package's default"
+        );
+    }
+
+    #[test]
+    fn test_plan_reconfigure_profiles_from_sources_reports_the_decisions_the_run_publishes() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+        let options = supplied_values(&[("GREETING", "supplied")]);
+
+        let planned = executor
+            .plan_reconfigure_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &options)
+            .unwrap();
+
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "a rehearsal writes no file and leaves every applied record byte-identical"
+        );
+        assert_eq!(
+            lifecycle_event_count(&storage),
+            events_before,
+            "a rehearsal audits nothing"
+        );
+        assert_eq!(planned.count, planned.profiles.len());
+        assert_eq!(
+            planned.profiles[0].status,
+            ProfilePlanStatus::WouldApply,
+            "a rehearsal over changed values reports work to publish"
+        );
+
+        executor
+            .reconfigure_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &options)
+            .unwrap();
+
+        assert_planned_targets_match_published(&before, &repository_files(&temp), &planned);
+    }
+
+    #[test]
+    fn test_plan_upgrade_profiles_from_sources_reports_the_decisions_the_run_publishes() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        authored_manifest_package(
+            &temp,
+            LIFECYCLE_LOCATION,
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
+                 version = \"2.0.0\"\ncompatible-jit = \"*\"\n\n\
+                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
+                 [[asset]]\nsource = \"assets/templated.txt\"\n\
+                 target = \"docs/templated.txt\"\ntemplate = true\n\n\
+                 [[asset]]\nsource = \"assets/fixed.txt\"\ntarget = \"docs/fixed.txt\"\n"
+            ),
+            &[
+                ("assets/templated.txt", "greeting={{jit:var:GREETING}}\n"),
+                ("assets/fixed.txt", "the new version's fixed content\n"),
+            ],
+        );
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+
+        let planned = executor
+            .plan_upgrade_profiles_from_sources(
+                &installed_selector(LIFECYCLE_ID),
+                &supplied_values(&[]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "a rehearsal writes no file and leaves every applied record byte-identical"
+        );
+        assert_eq!(lifecycle_event_count(&storage), events_before);
+        assert_eq!(planned.count, planned.profiles.len());
+        assert_eq!(planned.profiles[0].status, ProfilePlanStatus::WouldApply);
+
+        executor
+            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
+            .unwrap();
+
+        assert_planned_targets_match_published(&before, &repository_files(&temp), &planned);
+    }
+
+    #[test]
+    fn test_profile_lifecycle_run_audits_one_event_naming_its_operation_and_profile_status() {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        let after_apply = lifecycle_event_count(&storage);
+
+        executor
+            .reconfigure_profiles_from_sources(
+                &installed_selector(LIFECYCLE_ID),
+                &supplied_values(&[("GREETING", "supplied")]),
+            )
+            .unwrap();
+
+        assert_eq!(lifecycle_event_count(&storage), after_apply + 1);
+        assert_eq!(
+            last_lifecycle_event(&storage),
+            (
+                ProfileLifecycleOperation::Reconfigure,
+                vec![(
+                    LIFECYCLE_ID.to_string(),
+                    ProfileLifecycleStatus::Reconfigured
+                )]
+            )
+        );
+
+        lifecycle_package(&temp, "2.0.0");
+        executor
+            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
+            .unwrap();
+
+        assert_eq!(lifecycle_event_count(&storage), after_apply + 2);
+        assert_eq!(
+            last_lifecycle_event(&storage),
+            (
+                ProfileLifecycleOperation::Upgrade,
+                vec![(LIFECYCLE_ID.to_string(), ProfileLifecycleStatus::Upgraded)]
+            )
+        );
+    }
+
+    #[test]
+    fn test_reconfigure_profiles_from_sources_refuses_a_package_that_replaced_its_installed_identity(
+    ) {
+        let (temp, storage, executor, _fixture) = fixture();
+        let package = lifecycle_package(&temp, "1.0.0");
+        apply_package(&executor, &package, &supplied_values(&[]));
+        lifecycle_package(&temp, "2.0.0");
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+
+        let error = executor
+            .reconfigure_profiles_from_sources(
+                &installed_selector(LIFECYCLE_ID),
+                &supplied_values(&[("GREETING", "supplied")]),
+            )
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileApplyError>(),
+                Some(ProfileApplyError::ReconfigurationPackageChanged { id, .. })
+                    if id == LIFECYCLE_ID
+            ),
+            "reconfiguration never switches package identity: {error:#}"
+        );
+        assert_eq!(repository_files(&temp), before);
+        assert_eq!(lifecycle_event_count(&storage), events_before);
     }
 }
