@@ -301,10 +301,17 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     );
 
     assert_eq!(snapshot_tree(&fresh.path), snapshot_tree(&existing.path));
-    assert_eq!(
-        normalized_events(&fresh.path),
-        normalized_events(&existing.path)
-    );
+    let fresh_events = normalized_events(&fresh.path);
+    let existing_events = normalized_events(&existing.path);
+    assert_eq!(fresh_events.len(), 1);
+    assert_eq!(existing_events.len(), 1);
+    assert_eq!(fresh_events[0]["operation"], "initialize");
+    assert_eq!(existing_events[0]["operation"], "apply");
+    let mut fresh_event = fresh_events[0].clone();
+    let mut existing_event = existing_events[0].clone();
+    fresh_event.as_object_mut().unwrap().remove("operation");
+    existing_event.as_object_mut().unwrap().remove("operation");
+    assert_eq!(fresh_event, existing_event);
     assert!(!fresh.path.join(".git").exists());
     assert!(!existing.path.join(".git").exists());
 
@@ -379,13 +386,19 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
     assert_eq!(applied_ids(&applied), vec!["base", "workflow"]);
     assert_eq!(applied["count"], 2);
     assert_eq!(requested_profile(&applied)["status"], "applied");
-    // Each package's own provenance record and its own audit event.
+    // Each package has its own provenance record; the selection has one aggregate event.
     assert!(repo.path.join(".jit/profiles/base.json").is_file());
     assert!(repo.path.join(".jit/profiles/workflow.json").is_file());
+    let events = normalized_events(&repo.path);
+    assert_eq!(events.len(), 1, "one aggregate lifecycle event is appended");
+    assert_eq!(events[0]["type"], "profile_lifecycle");
+    assert_eq!(events[0]["operation"], "apply");
     assert_eq!(
-        normalized_events(&repo.path)
+        events[0]["profiles"]
+            .as_array()
+            .expect("lifecycle event lists its profile outcomes")
             .iter()
-            .filter_map(|event| event["profile_id"].as_str().map(str::to_string))
+            .map(|profile| profile["id"].as_str().unwrap().to_string())
             .collect::<Vec<_>>(),
         vec!["base".to_string(), "workflow".to_string()]
     );

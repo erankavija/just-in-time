@@ -1405,14 +1405,18 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
     let applied = init["profile"]["profiles"]
         .as_array()
         .expect("one result per applied package");
+    let events = fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
     assert_eq!(
-        fs::read_to_string(repo.path().join(".jit/events.jsonl"))
-            .unwrap()
-            .lines()
-            .count(),
-        applied.len(),
-        "initialization appends one event per package it applied and nothing else"
+        events.len(),
+        1,
+        "initialization appends one aggregate event"
     );
+    assert_eq!(events[0]["type"], "profile_lifecycle");
+    assert_eq!(events[0]["operation"], "initialize");
 
     let validate = jit(repo.path(), &["validate", "--json"]);
     assert!(validate.status.success(), "{validate:?}");
@@ -1760,16 +1764,13 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
         index,
         "existing neutral bytes must be preserved"
     );
-    assert_eq!(
-        fs::read_to_string(repo.path().join(".jit/events.jsonl"))
-            .unwrap()
-            .lines()
-            .count(),
-        json(&output)["profile"]["profiles"]
-            .as_array()
-            .expect("one result per applied package")
-            .len(),
-        "completion appends one event per package it applied and nothing else"
-    );
+    let events = fs::read_to_string(repo.path().join(".jit/events.jsonl"))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(events.len(), 1, "completion appends one aggregate event");
+    assert_eq!(events[0]["type"], "profile_lifecycle");
+    assert_eq!(events[0]["operation"], "initialize");
     assert!(jit(repo.path(), &["validate", "--json"]).status.success());
 }
