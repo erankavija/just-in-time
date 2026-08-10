@@ -730,69 +730,76 @@ application may change.
 
 ### `jit profile reconfigure`
 
-Republish an installed profile from its recorded values together with newly
-supplied ones, without changing which package is installed:
+Republish an installed profile from newly supplied values, keeping the package
+it carries:
 
 ```bash
 jit profile reconfigure --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run] [--json]
 ```
 
-Selectors take the repeatable form described above, and occurrence order is
-preserved. The command refuses when the package at the recorded location no
-longer carries the installed identity, naming both the recorded and the found
-version and package hash; changing which package is installed is
-`jit profile upgrade`.
+Selectors follow the [profile selector rules](#profile-commands) above, so an
+`id:` selector reads the location the applied-profile record names and every
+occurrence is preserved in order. Each selected profile and the packages it
+declares a dependency on must already be installed, and each must still be the
+package its record describes; a selection whose package identity changed is
+refused, which is what [`jit profile upgrade`](#jit-profile-upgrade) is for.
 
-The applied record's stored values are the baseline. Each declared variable
-takes its recorded value, overridden in the ordinary precedence order by
-`--values-file`, then the manifest-declared environment variable, then `--set`.
-Reconfiguring without supplying a value therefore publishes nothing and reports
-the profile unchanged. Every owned target the changed values do not feed keeps
-its current content.
+The record's stored values are the baseline for every variable the package
+declares, so a value an earlier run resolved is never re-derived from the
+manifest or from ambient process state. Supplied values override that baseline
+in values-file, declared-environment, then `--set` order, with the last `--set`
+occurrence winning. Reconfiguring without supplying a value therefore changes
+nothing and reports the profile `unchanged`. The content a changed value feeds
+is republished; every other owned target keeps its exact bytes.
+
+`--dry-run` reports the decisions publication would make and writes nothing: no
+target, no provenance record, and no audit event. JSON returns the count-wrapped
+`ProfilePlanResult` collection `{"count": N, "profiles": [...]}` in the entry
+shape [`jit profile apply`](#jit-profile-apply) documents. Without `--dry-run`,
+JSON returns `ProfileComposedApplyResult` in the standard count-wrapped envelope
+`{"count": N, "profiles": [...]}`, one `ProfileApplyResult` per package the
+selection publishes. A published run uses the same recoverable multi-target
+transaction as `jit profile apply` and appends one profile-lifecycle audit event
+naming the operation and each profile's outcome.
+
+An owned target whose content diverged from what this profile recorded is
+reported as a conflict naming that target, its owning package, and its recorded,
+current, and resolved values. A conflict publishes nothing and exits `4` with
+the shared typed error envelope under `PROFILE_CONFLICT`.
 
 ### `jit profile upgrade`
 
-Replace an installed profile with a newer package version:
+Replace an installed profile's package with a newer version of that package:
 
 ```bash
 jit profile upgrade --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run] [--json]
 ```
 
-The selector resolves the replacement package rather than the installed one.
-A value the adopter supplied through a values file or `--set` carries forward; a
-value that was only the previous package's default follows the new package's
-default; a variable the new package does not declare is dropped.
+Selectors follow the [profile selector rules](#profile-commands) above. Each
+selected profile must already be installed, and every package in the resolved
+selection that has a record must declare a newer semantic version than that
+record carries; re-running against an installed package itself is an exact
+no-op.
 
-Before anything is published, the replacement is settled against every applied
-profile that survives the upgrade, not only the one being replaced: a
-compatible-JIT range or a declared incompatibility that a surviving profile
-depends on refuses the upgrade and writes nothing.
+Stored values carry forward for every variable the replacement still declares,
+and supplied values override them in the same values-file,
+declared-environment, then `--set` order. A variable the replacement declares
+for the first time takes that package's default. A stored value that came from
+the installed package's own default follows the replacement's default rather
+than carrying forward, so a package that revises a default it owns delivers that
+revision while a value an adopter supplied survives the upgrade. A variable the
+replacement does not declare is dropped.
 
-### Deciding owned targets
+Each owned target is decided against the content this profile recorded: a target
+that still holds that content takes the replacement's content, and content
+another applied profile also owns survives when this package stops contributing
+it. The replacement is settled against every applied profile that survives the
+upgrade before anything is written, so a version outside a range another
+profile's manifest requires, or one another profile declares an incompatibility
+with, fails the upgrade with nothing published.
 
-Both commands decide each owned target from the base its record holds, the
-content the repository currently carries, and the content the replacement
-resolves. Content that still matches its recorded base is updated, content that
-already equals the replacement is left alone, and content shared with a
-surviving owner is retained when a package stops contributing it. The
-[Repository Profiles reference](profiles.md) defines the ownership model these
-decisions read.
-
-Content that diverges from both its recorded base and the replacement is a
-conflict: the command names the target, its owning package, and the three
-values, publishes nothing, and exits `4` with the shared typed error envelope
-under `PROFILE_CONFLICT`.
-
-`--dry-run` reports the decisions the run would publish and writes nothing — no
-target, no applied record, and no audit event. Both commands publish through the
-same recoverable multi-target transaction as `jit profile apply`, and both
-append one profile-lifecycle audit event per changed mutation naming the
-operation and each profile's outcome.
-
-JSON follows the same envelopes as `jit profile apply`: `--dry-run` returns the
-count-wrapped `ProfilePlanResult` collection `{"count": N, "profiles": [...]}`
-with the same target actions, and a published run returns
-`ProfileComposedApplyResult` as `{"count": N, "profiles": [...]}`.
+`--dry-run`, the JSON envelopes, and conflict reporting match
+[`jit profile reconfigure`](#jit-profile-reconfigure).
 
 ## Version and Provenance
 
