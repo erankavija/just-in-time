@@ -1441,7 +1441,11 @@ fn push_file_actions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::EntryIdentity;
+    use crate::profile::ProfileOrigin;
+    use crate::repository_state::{
+        CaptureBudget, CaptureSpec, EntryIdentity, RepositoryLayout, RepositoryRootEvidence,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
 
     const LINE: &str = ".jit/events.jsonl merge=union";
 
@@ -1451,6 +1455,142 @@ mod tests {
             bytes: bytes.to_vec(),
             mode: FileMode::Regular,
         }
+    }
+
+    fn profile_input(
+        id: &str,
+        version: &str,
+        package_hash: &str,
+        variables: crate::profile::ResolvedVariables,
+    ) -> ProfileApplicationInput {
+        let profile_id = crate::profile::ProfileId::try_from(id).unwrap();
+        ProfileApplicationInput {
+            id: profile_id.clone(),
+            version: version.to_string(),
+            compatible_jit: "*".to_string(),
+            package_hash: package_hash.to_string(),
+            variables,
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Directory(
+                RootRelativePath::parse(format!("packages/{id}")).unwrap(),
+            ),
+            claims: crate::repository_state::ProfileClaims {
+                package_id: crate::repository_state::ProfilePackageId::new(id),
+                contributions: Vec::new(),
+                assets: Vec::new(),
+                regions: Vec::new(),
+            },
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::new(),
+            record_path: VirtualPath::data(format!("profiles/{id}.json")).unwrap(),
+        }
+    }
+
+    fn variables(value: &str) -> crate::profile::ResolvedVariables {
+        serde_json::from_value(serde_json::json!({
+            "NAME": {"value": value, "source": "set"}
+        }))
+        .unwrap()
+    }
+
+    fn image_with_records(records: Vec<(VirtualPath, AppliedProfileRecord)>) -> RepositoryImage {
+        let paths = records
+            .iter()
+            .map(|(path, _)| path.clone())
+            .collect::<Vec<_>>();
+        let spec = CaptureSpec::phase_one(
+            paths,
+            CaptureBudget {
+                max_paths: 8,
+                max_listings: 0,
+                max_bytes: 4096,
+                max_depth: 4,
+            },
+        )
+        .unwrap();
+        let entries = records
+            .into_iter()
+            .map(|(path, record)| (path, file(&record.to_bytes().unwrap())))
+            .collect::<BTreeMap<_, _>>();
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "worktree", true),
+            RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .unwrap();
+        RepositoryImage::close(
+            layout,
+            spec,
+            entries,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_profile_lifecycle_profile_classifies_changed_existing_profiles() {
+        let unchanged = profile_input("unchanged", "1.0.0", "same", variables("value"));
+        let reconfigured = profile_input("reconfigured", "1.0.0", "same", variables("new"));
+        let upgraded = profile_input("upgraded", "2.0.0", "new", variables("value"));
+        let records = vec![
+            (
+                unchanged.record_path.clone(),
+                AppliedProfileRecord::new(
+                    unchanged.id.clone(),
+                    "1.0.0",
+                    "*",
+                    unchanged.origin.clone(),
+                    "same",
+                    variables("value"),
+                    BTreeSet::new(),
+                ),
+            ),
+            (
+                reconfigured.record_path.clone(),
+                AppliedProfileRecord::new(
+                    reconfigured.id.clone(),
+                    "1.0.0",
+                    "*",
+                    reconfigured.origin.clone(),
+                    "same",
+                    variables("old"),
+                    BTreeSet::new(),
+                ),
+            ),
+            (
+                upgraded.record_path.clone(),
+                AppliedProfileRecord::new(
+                    upgraded.id.clone(),
+                    "1.0.0",
+                    "*",
+                    upgraded.origin.clone(),
+                    "old",
+                    variables("value"),
+                    BTreeSet::new(),
+                ),
+            ),
+        ];
+        let base = image_with_records(records);
+
+        assert_eq!(
+            profile_lifecycle_profile(&base, &unchanged, true)
+                .unwrap()
+                .status,
+            ProfileLifecycleStatus::Unchanged
+        );
+        assert_eq!(
+            profile_lifecycle_profile(&base, &reconfigured, true)
+                .unwrap()
+                .status,
+            ProfileLifecycleStatus::Reconfigured
+        );
+        assert_eq!(
+            profile_lifecycle_profile(&base, &upgraded, true)
+                .unwrap()
+                .status,
+            ProfileLifecycleStatus::Upgraded
+        );
     }
 
     #[test]
