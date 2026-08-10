@@ -119,6 +119,8 @@ pub enum EventTag {
     LifecycleTimestampsBackfilled,
     /// `profile_applied`
     ProfileApplied,
+    /// `profile_lifecycle`
+    ProfileLifecycle,
 }
 
 impl EventTag {
@@ -126,7 +128,7 @@ impl EventTag {
     ///
     /// A conformance test compares this list against the variants schemars
     /// derives from the enum, so a tag left out of it fails the suite.
-    pub const ALL: [EventTag; 21] = [
+    pub const ALL: [EventTag; 22] = [
         EventTag::IssueCreated,
         EventTag::IssueClaimed,
         EventTag::IssueStateChanged,
@@ -148,6 +150,7 @@ impl EventTag {
         EventTag::GateDefinitionRemoved,
         EventTag::LifecycleTimestampsBackfilled,
         EventTag::ProfileApplied,
+        EventTag::ProfileLifecycle,
     ];
 
     /// The tag as serde writes it into a record's `type` field.
@@ -174,6 +177,7 @@ impl EventTag {
             EventTag::GateDefinitionRemoved => "gate_definition_removed",
             EventTag::LifecycleTimestampsBackfilled => "lifecycle_timestamps_backfilled",
             EventTag::ProfileApplied => "profile_applied",
+            EventTag::ProfileLifecycle => "profile_lifecycle",
         }
     }
 
@@ -200,7 +204,8 @@ impl EventTag {
             | EventTag::GateDefinitionRemoved => EventScope::Registry,
             EventTag::ArtifactArchiveExecuted
             | EventTag::LifecycleTimestampsBackfilled
-            | EventTag::ProfileApplied => EventScope::Repository,
+            | EventTag::ProfileApplied
+            | EventTag::ProfileLifecycle => EventScope::Repository,
         }
     }
 
@@ -256,6 +261,11 @@ impl EventTag {
             EventTag::ProfileApplied => {
                 "A profile package, its canonical provenance record, and this audit \
                  event reached one durable transaction commit point."
+            }
+            EventTag::ProfileLifecycle => {
+                "A profile lifecycle operation reached one durable transaction commit point; \
+                 the record summarizes per-profile actions and variable source kinds without \
+                 resolved values or rendered content."
             }
         }
     }
@@ -423,6 +433,25 @@ impl EventTag {
                 )]),
                 isolated_torn_tail: false,
             },
+            EventTag::ProfileLifecycle => Event::ProfileLifecycle {
+                id,
+                timestamp,
+                operation: crate::domain::ProfileLifecycleOperation::Apply,
+                profiles: vec![crate::domain::ProfileLifecycleProfile {
+                    id: "example"
+                        .try_into()
+                        .expect("sample profile id is canonical"),
+                    status: crate::domain::ProfileLifecycleStatus::Installed,
+                    variables: vec![crate::domain::ProfileLifecycleVariable {
+                        name: "NAME"
+                            .try_into()
+                            .expect("sample variable name is canonical"),
+                        source: crate::profile::VariableSource::Set,
+                    }],
+                }],
+                converted_records: Vec::new(),
+                isolated_torn_tail: false,
+            },
         }
     }
 }
@@ -457,6 +486,7 @@ impl Event {
             Event::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
             Event::LifecycleTimestampsBackfilled { .. } => EventTag::LifecycleTimestampsBackfilled,
             Event::ProfileApplied { .. } => EventTag::ProfileApplied,
+            Event::ProfileLifecycle { .. } => EventTag::ProfileLifecycle,
         }
     }
 }
@@ -750,7 +780,7 @@ mod tests {
 
     /// REQ-02: the records without an `issue_id` are exactly the archive execution record,
     /// the three gate-definition registry edits, and
-    /// `lifecycle_timestamps_backfilled`. Asserted as a set equality, so a tag
+    /// `lifecycle_timestamps_backfilled`, and profile lifecycle events. Asserted as a set equality, so a tag
     /// that joins or leaves the no-issue set fails here.
     #[test]
     fn test_no_issue_set_is_exactly_the_shared_state_events() {
@@ -769,6 +799,7 @@ mod tests {
                 "gate_definition_updated",
                 "lifecycle_timestamps_backfilled",
                 "profile_applied",
+                "profile_lifecycle",
             ]),
         );
     }
