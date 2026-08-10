@@ -1,0 +1,38 @@
+{
+  "branch": "worktree-agent-9f493686",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7e1dbbbd9a6a45ae71cb640c5ea1e11df519de4f",
+  "completed_at": "2026-08-10T08:38:47.821181184Z",
+  "duration_ms": 232646,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/initialize.rs",
+        "id": "F1",
+        "line": 1274,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "No test covers upgraded, reconfigured, or unchanged-in-changed-aggregate lifecycle event statuses."
+      }
+    ],
+    "summary": "Lifecycle-event status branches required by the issue lack coverage.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9f493686-82b8-40cd-889c-3821c1066c59",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d422cf7b-fdc9-4da3-bf33-2f5fb5f7be20",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-10T08:34:55.174183253Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 16593 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9f493686\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019feacf-816c-76c1-b7b6-64554b4f22df\n--------\nuser\n--- 16580 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 28e8ca64, 450cead5, 7e1dbbbd (`jit:9f493686`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 — dev/vision/9db27a3a-charter.md; @/issue/c639cfb5/requirement/REQ-06 — .jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json\nGate evidence: cargo-ci passed (exit 0, 2026-08-10T08:27:25Z); code-review is this current review\nTruncation recovery: Re-read affected patches and current implementation/tests by individual path after combined-output truncation\n\n1. **[blocking, issue-impact]** The new lifecycle-status classifier has no tests for `upgraded`, `reconfigured`, or an unchanged profile included in a changed aggregate. The attributable tests only assert `installed`, event count/order, conversion, and value redaction. These untested branches implement REQ-01’s required per-profile outcomes and could regress without detection. [crates/jit/src/repository_state/initialize.rs:1274](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-9f493686/crates/jit/src/repository_state/initialize.rs:1274)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Lifecycle-event status branches required by the issue lack coverage.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No test covers upgraded, reconfigured, or unchanged-in-changed-aggregate lifecycle event statuses.\",\"file\":\"crates/jit/src/repository_state/initialize.rs\",\"line\":1274,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

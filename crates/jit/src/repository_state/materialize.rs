@@ -565,7 +565,7 @@ mod tests {
     use crate::config::ProjectName;
     use crate::declarations::rules::RuleSet;
     use crate::declarations::GateRegistry;
-    use crate::domain::ProfileOrigin;
+    use crate::domain::{Event, ProfileLifecycleOperation, ProfileOrigin};
     use crate::repository_state::{
         compare_materializations, derive_materialization, repair_target_paths, CaptureBudget,
         CaptureSpec, Contribution, EntryIdentity, InitializationScaffold, MapEntryTarget,
@@ -1095,6 +1095,29 @@ kind = "advisory"
             serde_json::from_slice::<crate::repository_state::AppliedProfileRecord>(converted.1)
                 .is_ok()
         );
+        let events = plan
+            .delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile { path, bytes, .. }
+                    if path.repository_relative() == ".jit/events.jsonl" =>
+                {
+                    Some(bytes)
+                }
+                _ => None,
+            })
+            .expect("the encountered conversion shares the lifecycle event");
+        assert!(matches!(
+            crate::domain::parse_known_events(std::str::from_utf8(events).unwrap()).unwrap()
+                .as_slice(),
+            [Event::ProfileLifecycle {
+                operation: ProfileLifecycleOperation::Apply,
+                converted_records,
+                ..
+            }] if converted_records.iter().map(ToString::to_string).collect::<Vec<_>>()
+                == vec!["jit-dogfood"]
+        ));
     }
 
     #[test]

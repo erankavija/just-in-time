@@ -431,11 +431,11 @@ pub enum MutationError {
     #[error("issue {0} is absent from the captured image")]
     MissingIssue(String),
     /// The captured `events.jsonl` ends in an uncertified torn tail and this
-    /// mutation carries no `ProfileApplied` marker to certify it, so appending
+    /// mutation carries no profile lifecycle marker to certify it, so appending
     /// would produce a log the reader rejects.
     #[error(
         "captured events.jsonl has an uncertified torn tail and the mutation has no \
-         ProfileApplied marker to certify it; refusing to append (@/inv/event-log)"
+         profile lifecycle marker to certify it; refusing to append (@/inv/event-log)"
     )]
     UncertifiedTornTail,
     /// A custom preset failed structural validation; carries the underlying
@@ -1086,7 +1086,7 @@ pub(super) fn finalize_delta(
 /// Compose the audit-log append action for a set of pending events over the
 /// captured `events.jsonl` prefix: order them canonically, assign identifiers (via
 /// the context, in the caller's frozen allocation order), stamp the single mutation
-/// timestamp, certify a torn tail (a `ProfileApplied` marker is required, and the
+/// timestamp, certify a torn tail (a profile lifecycle marker is required, and the
 /// certifier is composed immediately after the torn partial), and produce the exact
 /// bytes. Returns `None` when there are no events. This is the event pass of
 /// [`finalize`], factored out so [`finalize_audit_append`] can reuse the one
@@ -1103,12 +1103,15 @@ fn compose_event_action(
     let prefix = captured_file_bytes(image, &path)?.unwrap_or(&[]).to_vec();
     // The finalizer owns torn-tail evidence. The reader (parse_known_events) accepts
     // a malformed, unterminated partial line only when the line IMMEDIATELY following
-    // it is a `ProfileApplied { isolated_torn_tail: true }` certifier. Detect this
+    // it is a profile lifecycle `{ isolated_torn_tail: true }` certifier. Detect this
     // before sampling time or allocating identifiers.
     let torn_tail = prefix_has_torn_tail(&prefix);
-    let has_marker = pending_events
-        .iter()
-        .any(|pending| matches!(pending.event, Event::ProfileApplied { .. }));
+    let has_marker = pending_events.iter().any(|pending| {
+        matches!(
+            pending.event,
+            Event::ProfileApplied { .. } | Event::ProfileLifecycle { .. }
+        )
+    });
     if torn_tail && !has_marker {
         // Appending non-certifying events after an uncertified torn tail would
         // produce a log the reader rejects; refuse instead of corrupting it.
@@ -1122,11 +1125,14 @@ fn compose_event_action(
     for pending in &mut pending_events {
         let id = context.allocate();
         pending.event.assign_identity(id, now);
-        if let Event::ProfileApplied {
-            isolated_torn_tail, ..
-        } = &mut pending.event
-        {
-            *isolated_torn_tail = torn_tail;
+        match &mut pending.event {
+            Event::ProfileApplied {
+                isolated_torn_tail, ..
+            }
+            | Event::ProfileLifecycle {
+                isolated_torn_tail, ..
+            } => *isolated_torn_tail = torn_tail,
+            _ => {}
         }
     }
     // Over a torn tail, the certifying marker must be composed as the line
@@ -1135,7 +1141,12 @@ fn compose_event_action(
     if torn_tail {
         let marker = pending_events
             .iter()
-            .position(|pending| matches!(pending.event, Event::ProfileApplied { .. }))
+            .position(|pending| {
+                matches!(
+                    pending.event,
+                    Event::ProfileApplied { .. } | Event::ProfileLifecycle { .. }
+                )
+            })
             .expect("a markerless torn tail was already rejected");
         let certifier = pending_events.remove(marker);
         pending_events.insert(0, certifier);
@@ -1160,38 +1171,12 @@ fn compose_event_action(
 /// actions. Each `(phase, event)` pair is an inline event variant carrying a
 /// sentinel id/timestamp; this resets the context's frozen allocation order, then
 /// assigns identifiers and the single mutation timestamp and certifies a torn tail
-/// exactly as [`finalize`] does — so a `ProfileApplied` line is the authoritative
-/// audit record, never a command-computed image. Returns `None` when `events` is
-/// empty (no append, no identity or time sampling).
+/// exactly as [`finalize`] does. Returns `None` when `events` is empty (no append,
+/// no identity or time sampling).
 ///
 /// The context must be the operation's single reused [`MutationContext`] and must
 /// not also drive a full [`finalize`] in the same operation (both reset the frozen
 /// order); the init/profile paths use only this entry.
-/// Build the inline `ProfileApplied` audit event for the finalizer path: a bare
-/// variant with an empty id and the sentinel timestamp that [`finalize_audit_append`]
-/// overwrites via [`Event::assign_identity`], and a `false` torn-tail flag the
-/// finalizer sets from the captured prefix. Unlike `Event::draft_profile_applied` it
-/// samples neither a UUID nor the wall clock, so the finalizer — not command code —
-/// owns the event's identity, time, and torn-tail evidence.
-pub(crate) fn profile_applied_event(
-    profile_id: String,
-    version: String,
-    origin: crate::domain::ProfileOrigin,
-    package_hash: String,
-    target_hashes: BTreeMap<String, String>,
-) -> Event {
-    Event::ProfileApplied {
-        id: String::new(),
-        timestamp: sentinel_time(),
-        profile_id,
-        version,
-        origin,
-        package_hash,
-        target_hashes,
-        isolated_torn_tail: false,
-    }
-}
-
 pub(crate) fn finalize_audit_append(
     image: &RepositoryImage,
     context: &MutationContext,
@@ -2102,7 +2087,7 @@ mod tests {
 
     #[test]
     fn test_finalize_rejects_markerless_append_over_torn_tail() {
-        // A batch with no ProfileApplied certifier appended after an uncertified
+        // A batch with no profile lifecycle certifier appended after an uncertified
         // torn tail would produce a log the reader rejects, so finalize refuses and
         // composes nothing.
         let image = torn_tail_image();
@@ -2125,7 +2110,7 @@ mod tests {
 
     #[test]
     fn test_finalize_certifier_over_torn_tail_round_trips_through_reader() {
-        // A batch containing a ProfileApplied marker composes it immediately after
+        // A batch containing the historical ProfileApplied marker composes it immediately after
         // the torn partial line, so the reader accepts the whole log.
         let image = torn_tail_image();
         let delta = finalize(

@@ -13,8 +13,8 @@
 //! [`ProfileApplicationInput`]; this module alone derives and compares their final
 //! bytes.
 //! Finalization derives the coupled default-rule/schema closure and composes the
-//! `ProfileApplied` line from the captured `events.jsonl` prefix (id, timestamp,
-//! and torn-tail handling are never command-owned). Every byte flows through
+//! aggregate profile lifecycle line from the captured `events.jsonl` prefix (id,
+//! timestamp, and torn-tail handling are never command-owned). Every byte flows through
 //! `session.apply` here.
 
 use std::collections::BTreeMap;
@@ -23,6 +23,10 @@ use crate::config::ProjectName;
 use crate::config_manager::namespaces_from_config;
 use crate::declarations::invariants::{serialize_invariant_registry, InvariantRegistry};
 use crate::declarations::{serialize_gate_registry, GateRegistry};
+use crate::domain::{
+    Event, ProfileLifecycleOperation, ProfileLifecycleProfile, ProfileLifecycleStatus,
+    ProfileLifecycleVariable,
+};
 
 use super::default_rules::default_ruleset;
 use super::image::{
@@ -30,9 +34,7 @@ use super::image::{
     RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositorySeed,
     RepositorySeedKind, SeedError,
 };
-use super::mutation::{
-    finalize_audit_append, fresh_index_bytes, profile_applied_event, MutationContext, MutationError,
-};
+use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext, MutationError};
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
@@ -405,7 +407,7 @@ impl InitializationScaffold {
             });
         }
         // The audit log is not a neutral scaffold file: the finalizer composes it
-        // (an empty log for a plain init, a `ProfileApplied` append for a profiled
+        // (an empty log for a plain init, an aggregate lifecycle append for a profiled
         // one) from the captured prefix. See `derive_initialization`.
         Ok(files)
     }
@@ -549,48 +551,25 @@ fn derive_initialization_with_profiles(
     let neutral = derive_initialization(base, &scaffold.without_profiles(), context)?;
     let neutral_image = apply_action_overlay(base, neutral.delta.actions())?;
     let profiles = scaffold.profiles();
-    let applications = derive_profile_applications(&neutral_image, &profiles, context)?;
-    let mut applied_profiles = applications.applied_profiles;
-    if let Some(profile) = coupled_default_repair_profile(neutral.delta.actions(), &profiles) {
-        applied_profiles.insert(profile.id.clone());
-    }
-    let events = profiles
-        .iter()
-        .filter(|profile| applied_profiles.contains(&profile.id))
-        .map(|profile| {
-            (
-                2,
-                profile_applied_event(
-                    profile.id.to_string(),
-                    profile.version.clone(),
-                    profile.origin.clone(),
-                    profile.package_hash.clone(),
-                    profile.target_hashes.clone(),
-                ),
-            )
-        })
-        .collect::<Vec<_>>();
+    let forced_changed = coupled_default_repair_profile(neutral.delta.actions(), &profiles)
+        .map(|profile| std::collections::BTreeSet::from([profile.id.clone()]))
+        .unwrap_or_default();
+    let applications = derive_profile_applications_with_operation(
+        &neutral_image,
+        &profiles,
+        context,
+        ProfileLifecycleOperation::Initialize,
+        forced_changed,
+    )?;
+    let applied_profiles = applications.applied_profiles;
     let mut actions = BTreeMap::new();
     for action in neutral
         .delta
         .actions()
         .iter()
         .chain(applications.delta.actions())
-        .filter(|action| action.path() != &VirtualPath::EVENTS)
     {
         fold_rebased_action(base, &mut actions, action)?;
-    }
-    if events.is_empty() {
-        for action in neutral
-            .delta
-            .actions()
-            .iter()
-            .filter(|action| action.path() == &VirtualPath::EVENTS)
-        {
-            fold_rebased_action(base, &mut actions, action)?;
-        }
-    } else if let Some(action) = finalize_audit_append(base, context, events)? {
-        fold_rebased_action(base, &mut actions, &action)?;
     }
     for action in directory_actions(
         base,
@@ -659,7 +638,7 @@ fn coupled_default_repair_profile<'a>(
 /// rewritten, profile provenance writes when it changes, and profile assets write
 /// unconditionally (the derivation proved them changed). The audit log is composed
 /// by the finalizer (`context`): a plain init creates it empty, a profiled init
-/// appends one `ProfileApplied` record. An empty delta (nothing to publish) is a
+/// appends one aggregate lifecycle record. An empty delta (nothing to publish) is a
 /// complete no-op.
 pub(super) fn derive_initialization(
     base: &RepositoryImage,
@@ -1032,7 +1011,6 @@ fn resolve_gitattributes(
 fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
-    context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
     let composition_base = super::profile_apply::profile_composition_base(base, profile)
         .map_err(profile_composition_error)?;
@@ -1124,18 +1102,6 @@ fn derive_profile_application_candidate(
             ))
         }
     }
-    if !actions.is_empty() {
-        let event = profile_applied_event(
-            profile.id.to_string(),
-            profile.version.clone(),
-            profile.origin.clone(),
-            profile.package_hash.clone(),
-            profile.target_hashes.clone(),
-        );
-        if let Some(action) = finalize_audit_append(base, context, vec![(2, event)])? {
-            actions.push(action);
-        }
-    }
     let profiles = VirtualPath::PROFILES;
     let explicit = match base.entry(&profiles)? {
         RepositoryEntry::Absent => vec![profiles],
@@ -1175,14 +1141,38 @@ pub(super) fn derive_profile_applications(
     profiles: &[ProfileApplicationInput],
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
+    derive_profile_applications_with_operation(
+        base,
+        profiles,
+        context,
+        ProfileLifecycleOperation::Apply,
+        std::collections::BTreeSet::new(),
+    )
+}
+
+/// Compose one profile selection and record its aggregate lifecycle outcome.
+///
+/// `forced_changed` carries coupled initialization materializations that are
+/// derived before the profile candidates themselves. Keeping that fact in this
+/// planner means initialization and ordinary application share one event shape.
+fn derive_profile_applications_with_operation(
+    base: &RepositoryImage,
+    profiles: &[ProfileApplicationInput],
+    context: &MutationContext,
+    operation: ProfileLifecycleOperation,
+    forced_changed: std::collections::BTreeSet<crate::profile::ProfileId>,
+) -> Result<MaterializationDerivation, InitializationError> {
     let mut proposed = base.clone();
     let mut actions = BTreeMap::new();
     let mut targets = Vec::new();
-    let mut events = Vec::new();
-    let mut applied_profiles = std::collections::BTreeSet::new();
+    let mut lifecycle_profiles = Vec::with_capacity(profiles.len());
+    let mut applied_profiles = forced_changed.clone();
+    let mut aggregate_changed = !forced_changed.is_empty();
 
     for profile in profiles {
-        let candidate = derive_profile_application_candidate(&proposed, profile, context)?;
+        let status_base = super::profile_apply::profile_composition_base(&proposed, profile)
+            .map_err(profile_composition_error)?;
+        let candidate = derive_profile_application_candidate(&proposed, profile)?;
         let candidate_actions = candidate
             .delta
             .actions()
@@ -1190,7 +1180,15 @@ pub(super) fn derive_profile_applications(
             .filter(|action| action.path() != &VirtualPath::EVENTS)
             .cloned()
             .collect::<Vec<_>>();
-        let changed = !candidate_actions.is_empty();
+        let migration_paths = profile
+            .shipped_v1_migrations
+            .keys()
+            .collect::<std::collections::BTreeSet<_>>();
+        let changed = forced_changed.contains(&profile.id)
+            || candidate_actions
+                .iter()
+                .any(|action| !migration_paths.contains(action.path()));
+        aggregate_changed |= !candidate_actions.is_empty();
         for action in &candidate_actions {
             fold_rebased_action(base, &mut actions, action)?;
         }
@@ -1198,21 +1196,27 @@ pub(super) fn derive_profile_applications(
         targets.extend(candidate.profile_targets);
         if changed {
             applied_profiles.insert(profile.id.clone());
-            events.push((
-                2,
-                profile_applied_event(
-                    profile.id.to_string(),
-                    profile.version.clone(),
-                    profile.origin.clone(),
-                    profile.package_hash.clone(),
-                    profile.target_hashes.clone(),
-                ),
-            ));
         }
+        lifecycle_profiles.push(profile_lifecycle_profile(&status_base, profile, changed)?);
     }
 
-    if let Some(action) = finalize_audit_append(base, context, events)? {
-        fold_rebased_action(base, &mut actions, &action)?;
+    let converted_records = profiles
+        .iter()
+        .flat_map(|profile| {
+            profile
+                .shipped_v1_migrations
+                .values()
+                .map(|record| record.id.clone())
+        })
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if aggregate_changed || !converted_records.is_empty() {
+        let event =
+            Event::draft_profile_lifecycle(operation, lifecycle_profiles, converted_records);
+        if let Some(action) = finalize_audit_append(base, context, vec![(2, event)])? {
+            fold_rebased_action(base, &mut actions, &action)?;
+        }
     }
     let profiles_path = VirtualPath::PROFILES;
     let explicit = match base.entry(&profiles_path)? {
@@ -1257,6 +1261,57 @@ pub(super) fn derive_profile_applications(
             .with_profile_targets(targets)
             .with_applied_profiles(applied_profiles),
     )
+}
+
+/// Classify one profile's aggregate outcome from its prior provenance and the
+/// candidate's materialization effect. The package operation itself determines
+/// no status; the recorded package identity and resolved inputs do.
+fn profile_lifecycle_profile(
+    base: &RepositoryImage,
+    profile: &ProfileApplicationInput,
+    changed: bool,
+) -> Result<ProfileLifecycleProfile, InitializationError> {
+    let status = match base.entry(&profile.record_path)? {
+        RepositoryEntry::Absent => {
+            if changed {
+                ProfileLifecycleStatus::Installed
+            } else {
+                ProfileLifecycleStatus::Unchanged
+            }
+        }
+        RepositoryEntry::File { bytes, .. } => {
+            let prior = serde_json::from_slice::<AppliedProfileRecord>(bytes).map_err(|_| {
+                InitializationError::InstalledRecordConflict {
+                    path: profile.record_path.clone(),
+                    id: profile.id.to_string(),
+                    version: profile.version.clone(),
+                }
+            })?;
+            if prior.version != profile.version || prior.package_hash != profile.package_hash {
+                ProfileLifecycleStatus::Upgraded
+            } else if prior.variables != profile.variables {
+                ProfileLifecycleStatus::Reconfigured
+            } else {
+                ProfileLifecycleStatus::Unchanged
+            }
+        }
+        _ => {
+            return Err(InitializationError::UnsupportedMetadataPath(
+                profile.record_path.clone(),
+            ))
+        }
+    };
+    let variables = profile
+        .variables
+        .sources()
+        .into_iter()
+        .map(|(name, source)| ProfileLifecycleVariable { name, source })
+        .collect();
+    Ok(ProfileLifecycleProfile {
+        id: profile.id.clone(),
+        status,
+        variables,
+    })
 }
 
 /// Deduplicate desired files by canonical path, keeping the LAST occurrence so a
@@ -1386,7 +1441,11 @@ fn push_file_actions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::EntryIdentity;
+    use crate::profile::ProfileOrigin;
+    use crate::repository_state::{
+        CaptureBudget, CaptureSpec, EntryIdentity, RepositoryLayout, RepositoryRootEvidence,
+    };
+    use std::collections::{BTreeMap, BTreeSet};
 
     const LINE: &str = ".jit/events.jsonl merge=union";
 
@@ -1396,6 +1455,142 @@ mod tests {
             bytes: bytes.to_vec(),
             mode: FileMode::Regular,
         }
+    }
+
+    fn profile_input(
+        id: &str,
+        version: &str,
+        package_hash: &str,
+        variables: crate::profile::ResolvedVariables,
+    ) -> ProfileApplicationInput {
+        let profile_id = crate::profile::ProfileId::try_from(id).unwrap();
+        ProfileApplicationInput {
+            id: profile_id.clone(),
+            version: version.to_string(),
+            compatible_jit: "*".to_string(),
+            package_hash: package_hash.to_string(),
+            variables,
+            target_hashes: BTreeMap::new(),
+            origin: ProfileOrigin::Directory(
+                RootRelativePath::parse(format!("packages/{id}")).unwrap(),
+            ),
+            claims: crate::repository_state::ProfileClaims {
+                package_id: crate::repository_state::ProfilePackageId::new(id),
+                contributions: Vec::new(),
+                assets: Vec::new(),
+                regions: Vec::new(),
+            },
+            contribution_context: Vec::new(),
+            shipped_v1_migrations: BTreeMap::new(),
+            record_path: VirtualPath::data(format!("profiles/{id}.json")).unwrap(),
+        }
+    }
+
+    fn variables(value: &str) -> crate::profile::ResolvedVariables {
+        serde_json::from_value(serde_json::json!({
+            "NAME": {"value": value, "source": "set"}
+        }))
+        .unwrap()
+    }
+
+    fn image_with_records(records: Vec<(VirtualPath, AppliedProfileRecord)>) -> RepositoryImage {
+        let paths = records
+            .iter()
+            .map(|(path, _)| path.clone())
+            .collect::<Vec<_>>();
+        let spec = CaptureSpec::phase_one(
+            paths,
+            CaptureBudget {
+                max_paths: 8,
+                max_listings: 0,
+                max_bytes: 4096,
+                max_depth: 4,
+            },
+        )
+        .unwrap();
+        let entries = records
+            .into_iter()
+            .map(|(path, record)| (path, file(&record.to_bytes().unwrap())))
+            .collect::<BTreeMap<_, _>>();
+        let layout = RepositoryLayout::new(
+            RepositoryRootEvidence::new("/repo", "worktree", true),
+            RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .unwrap();
+        RepositoryImage::close(
+            layout,
+            spec,
+            entries,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_profile_lifecycle_profile_classifies_changed_existing_profiles() {
+        let unchanged = profile_input("unchanged", "1.0.0", "same", variables("value"));
+        let reconfigured = profile_input("reconfigured", "1.0.0", "same", variables("new"));
+        let upgraded = profile_input("upgraded", "2.0.0", "new", variables("value"));
+        let records = vec![
+            (
+                unchanged.record_path.clone(),
+                AppliedProfileRecord::new(
+                    unchanged.id.clone(),
+                    "1.0.0",
+                    "*",
+                    unchanged.origin.clone(),
+                    "same",
+                    variables("value"),
+                    BTreeSet::new(),
+                ),
+            ),
+            (
+                reconfigured.record_path.clone(),
+                AppliedProfileRecord::new(
+                    reconfigured.id.clone(),
+                    "1.0.0",
+                    "*",
+                    reconfigured.origin.clone(),
+                    "same",
+                    variables("old"),
+                    BTreeSet::new(),
+                ),
+            ),
+            (
+                upgraded.record_path.clone(),
+                AppliedProfileRecord::new(
+                    upgraded.id.clone(),
+                    "1.0.0",
+                    "*",
+                    upgraded.origin.clone(),
+                    "old",
+                    variables("value"),
+                    BTreeSet::new(),
+                ),
+            ),
+        ];
+        let base = image_with_records(records);
+
+        assert_eq!(
+            profile_lifecycle_profile(&base, &unchanged, true)
+                .unwrap()
+                .status,
+            ProfileLifecycleStatus::Unchanged
+        );
+        assert_eq!(
+            profile_lifecycle_profile(&base, &reconfigured, true)
+                .unwrap()
+                .status,
+            ProfileLifecycleStatus::Reconfigured
+        );
+        assert_eq!(
+            profile_lifecycle_profile(&base, &upgraded, true)
+                .unwrap()
+                .status,
+            ProfileLifecycleStatus::Upgraded
+        );
     }
 
     #[test]
