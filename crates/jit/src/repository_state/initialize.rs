@@ -38,7 +38,7 @@ use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
 use super::{
     AppliedProfileRecord, ContributionCompositionConflict, ProfileApplicationInput,
-    ProfileTargetDisposition, ProfileTargetMaterialization,
+    ProfileTargetDisposition, ProfileTargetMaterialization, ProfileThreeWayConflictError,
 };
 use super::{ProfileTargetConflictError, RepositoryStateError};
 
@@ -147,6 +147,9 @@ pub enum InitializationError {
     /// A profile asset would overwrite an unowned authored occupant.
     #[error(transparent)]
     ProfileTargetConflict(#[from] ProfileTargetConflictError),
+    /// A package replacement would overwrite a target changed after its base.
+    #[error(transparent)]
+    ProfileThreeWayConflict(#[from] Box<ProfileThreeWayConflictError>),
     /// Resolved package definitions disagree for one semantic identity.
     #[error(transparent)]
     ContributionComposition(#[from] ContributionCompositionConflict),
@@ -760,7 +763,7 @@ fn profile_record_changed(
             let existing = serde_json::from_slice::<AppliedProfileRecord>(bytes);
             match existing {
                 Ok(existing) if existing == *record => Ok(false),
-                Ok(existing) if existing.matches_package_provenance(record) => Ok(true),
+                Ok(existing) if existing.id == profile.id => Ok(true),
                 _ => Err(InitializationError::InstalledRecordConflict {
                     path: profile.record_path.clone(),
                     id: profile.id.to_string(),
@@ -1045,6 +1048,7 @@ fn derive_profile_application_candidate(
     let record = profile
         .record(&composed)
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+    let removals = composed.removals.clone();
     let mut targets = Vec::with_capacity(composed.targets.len());
     let files = composed
         .targets
@@ -1072,6 +1076,15 @@ fn derive_profile_application_candidate(
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
+    for path in removals {
+        if matches!(base.entry(&path)?, RepositoryEntry::File { .. }) {
+            actions.push(RepositoryAction::DeleteFile {
+                path: path.clone(),
+                owner: PROFILE_OWNER.to_string(),
+                expected: ExpectedPreimage::of(base.entry(&path)?),
+            });
+        }
+    }
     let migrated_records = profile
         .shipped_v1_migrations
         .iter()
@@ -1280,6 +1293,7 @@ fn serialize_profile_record(record: &AppliedProfileRecord) -> Result<Vec<u8>, In
 fn profile_composition_error(error: RepositoryStateError) -> InitializationError {
     match error {
         RepositoryStateError::ProfileTargetConflict(error) => error.into(),
+        RepositoryStateError::ProfileThreeWayConflict(error) => error.into(),
         RepositoryStateError::ContributionComposition(error) => error.into(),
         error => InitializationError::RuleMaterialization(error.to_string()),
     }

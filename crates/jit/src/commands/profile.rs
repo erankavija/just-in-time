@@ -1899,8 +1899,8 @@ mod tests {
     use crate::repository_state::{
         Contribution, ContributionCompositionConflict, ContributionConflictOwner,
         InitializationError, MapEntryTarget, ProfileConflictOccupant, ProfilePackageId,
-        ProfileTargetConflictError, RepositoryStateError, RootRelativePath, ScalarTarget,
-        SetStringTarget,
+        ProfileTargetConflictError, ProfileThreeWayConflictError, RepositoryStateError,
+        RootRelativePath, ScalarTarget, SetStringTarget,
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
@@ -2259,6 +2259,20 @@ mod tests {
         authored_package(temp, relative, id, target, content, "")
     }
 
+    /// Rewrite an installed test package to stop contributing every asset.
+    fn package_without_assets(temp: &TempDir, relative: &str, id: &str) -> ProfilePackage {
+        fs::remove_file(temp.path().join(relative).join("assets/profile.txt"))
+            .expect("remove the former asset source");
+        repackage(
+            temp,
+            relative,
+            crate::profile::MANIFEST_FILE_NAME,
+            &format!(
+                "[profile]\nmanifest-version = 1\nid = \"{id}\"\nversion = \"2.0.0\"\njit = \">=0.2.0, <2.0.0\"\n"
+            ),
+        )
+    }
+
     /// A package declaring `id`, publishing an asset target of its own, and
     /// contributing the label namespace `namespace` described as `description`.
     fn package_contributing(
@@ -2326,6 +2340,16 @@ mod tests {
                 )),
             ) => conflict,
             _ => panic!("a colliding asset target fails as a target conflict: {error:#}"),
+        }
+    }
+
+    /// The safe-change conflict carried by real profile application.
+    fn three_way_conflict(error: &anyhow::Error) -> &ProfileThreeWayConflictError {
+        match error.downcast_ref::<RepositoryStateError>() {
+            Some(RepositoryStateError::Initialization(
+                InitializationError::ProfileThreeWayConflict(conflict),
+            )) => conflict,
+            _ => panic!("a concurrent profile edit fails as a three-way conflict: {error:#}"),
         }
     }
 
@@ -3616,6 +3640,167 @@ placement = "append"
         assert_eq!(
             fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
             compact_record
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_reapplies_changed_content_and_rewrites_its_record() {
+        let (temp, _storage, executor, package) = fixture();
+        executor.apply_profile_package(&package).unwrap();
+        let previous = stored_record(&temp);
+        let unowned = temp.path().join("docs/repository-note.txt");
+        fs::write(&unowned, "repository-authored\n").unwrap();
+        let replacement = repackage(
+            &temp,
+            FIXTURE_LOCATION,
+            "assets/profile.txt",
+            "replacement profile content\n",
+        );
+
+        let applied = executor.apply_profile_package(&replacement).unwrap();
+
+        assert_eq!(
+            applied.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
+        assert_eq!(
+            fs::read_to_string(temp.path().join("docs/profile.txt")).unwrap(),
+            "replacement profile content\n"
+        );
+        let rewritten = stored_record(&temp);
+        assert_ne!(rewritten.package_hash, previous.package_hash);
+        assert_eq!(rewritten.package_hash, replacement.hashes().package);
+        assert_eq!(
+            fs::read_to_string(unowned).unwrap(),
+            "repository-authored\n",
+            "a package reapply does not delete unowned repository content"
+        );
+    }
+
+    #[test]
+    fn test_apply_profile_package_removes_only_unchanged_sole_asset_claims() {
+        let (temp, _storage, executor, package) = fixture();
+        executor.apply_profile_package(&package).unwrap();
+        let replacement = package_without_assets(&temp, FIXTURE_LOCATION, "planner-asset-only");
+
+        let applied = executor.apply_profile_package(&replacement).unwrap();
+
+        assert_eq!(
+            applied.requested().unwrap().status,
+            ProfileApplicationStatus::Applied
+        );
+        assert!(
+            !temp.path().join("docs/profile.txt").exists(),
+            "an unchanged, solely-owned, unretained former asset is removable"
+        );
+        assert!(stored_record(&temp).claims.is_empty());
+    }
+
+    #[test]
+    fn test_apply_profile_package_retains_stopped_assets_that_are_changed_shared_or_adopted() {
+        let retained_cases = [
+            ("changed", "repository edit\n", false),
+            ("adopted", "Portable profile fixture.\n", true),
+        ];
+        for (name, current, adopt_before_apply) in retained_cases {
+            let (temp, _storage, executor, package) = fixture();
+            let target = temp.path().join("docs/profile.txt");
+            fs::create_dir_all(target.parent().unwrap()).unwrap();
+            if adopt_before_apply {
+                fs::write(&target, current).unwrap();
+            }
+            executor.apply_profile_package(&package).unwrap();
+            if !adopt_before_apply {
+                fs::write(&target, current).unwrap();
+            }
+            let replacement = package_without_assets(&temp, FIXTURE_LOCATION, "planner-asset-only");
+
+            executor.apply_profile_package(&replacement).unwrap();
+
+            assert_eq!(
+                fs::read_to_string(&target).unwrap(),
+                current,
+                "{name} former content must survive"
+            );
+            assert!(
+                stored_record(&temp).claims.is_empty(),
+                "{name} content is no longer owned by the replacement package"
+            );
+        }
+
+        let (temp, _storage, executor, _fixture) = fixture();
+        let target = "docs/shared.txt";
+        let base = package_publishing(&temp, "vendor/base", "base", target, "shared\n");
+        let survivor = package_publishing(&temp, "vendor/survivor", "survivor", target, "shared\n");
+        executor.apply_profile_package(&base).unwrap();
+        executor.apply_profile_package(&survivor).unwrap();
+        let replacement = package_without_assets(&temp, "vendor/base", "base");
+
+        executor.apply_profile_package(&replacement).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(temp.path().join(target)).unwrap(),
+            "shared\n"
+        );
+        assert!(record_for(&temp, "base").claims.is_empty());
+        assert!(record_for(&temp, "survivor")
+            .claims
+            .iter()
+            .any(|claim| matches!(
+                claim.identity,
+                crate::repository_state::AppliedProfileClaimIdentity::Asset { .. }
+            )));
+    }
+
+    #[test]
+    fn test_apply_profile_package_rejects_concurrent_target_edits_without_publishing() {
+        let (temp, _storage, executor, package) = fixture();
+        executor.apply_profile_package(&package).unwrap();
+        let record_before =
+            fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap();
+        let target = temp.path().join("docs/profile.txt");
+        fs::write(&target, "repository edit\n").unwrap();
+        let replacement = repackage(
+            &temp,
+            FIXTURE_LOCATION,
+            "assets/profile.txt",
+            "replacement profile content\n",
+        );
+
+        let error = executor.apply_profile_package(&replacement).unwrap_err();
+
+        let conflict = three_way_conflict(&error);
+        assert_eq!(conflict.target.repository_relative(), "docs/profile.txt");
+        assert_eq!(conflict.owner.as_str(), "planner-asset-only");
+        assert!(matches!(
+            conflict.base,
+            crate::profile::ThreeWayValue::Present(_)
+        ));
+        assert!(matches!(
+            conflict.current,
+            crate::profile::ThreeWayValue::Present(_)
+        ));
+        assert!(matches!(
+            conflict.candidate,
+            crate::profile::ThreeWayValue::Present(_)
+        ));
+        let message = error.to_string();
+        for expected in [
+            "docs/profile.txt",
+            "planner-asset-only",
+            "base",
+            "current",
+            "candidate",
+        ] {
+            assert!(
+                message.contains(expected),
+                "conflict omits '{expected}': {message}"
+            );
+        }
+        assert_eq!(fs::read_to_string(&target).unwrap(), "repository edit\n");
+        assert_eq!(
+            fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
+            record_before
         );
     }
 

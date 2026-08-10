@@ -23,7 +23,10 @@ use super::{
 };
 use crate::config::{ProjectionKinds, ProjectionMode, ProjectionStyle};
 use crate::domain::ProfileOrigin;
-use crate::profile::{ProfileId, RegionId, ResolvedVariables};
+use crate::profile::{
+    decide_three_way, ProfileId, RegionId, ResolvedVariables, ThreeWayDecision, ThreeWayInput,
+    ThreeWayValue,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -634,6 +637,28 @@ pub struct ProfileTargetConflictError {
     pub occupant: ProfileConflictOccupant,
 }
 
+/// A profile-owned target changed independently after its recorded base.
+///
+/// The values are domain-separated fingerprints: the durable provenance this
+/// layer records, without turning provenance into configuration authority.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "profile package {owner} target '{}' diverged (base: {base:?}, current: {current:?}, candidate: {candidate:?})",
+    .target.repository_relative()
+)]
+pub struct ProfileThreeWayConflictError {
+    /// Canonical repository target whose replacement was refused.
+    pub target: VirtualPath,
+    /// Package whose recorded claim is being replaced.
+    pub owner: ProfilePackageId,
+    /// Fingerprint recorded when this package last published the target.
+    pub base: ThreeWayValue<ProfileBaseFingerprint>,
+    /// Fingerprint observed in the captured repository image.
+    pub current: ThreeWayValue<ProfileBaseFingerprint>,
+    /// Fingerprint resolved from the candidate package.
+    pub candidate: ThreeWayValue<ProfileBaseFingerprint>,
+}
+
 /// A profile package's contribution to a repository, in canonical repository-state
 /// vocabulary. Produced by `profile::package` from the immutable manifest and
 /// consumed only by [`compose_profile_targets`].
@@ -716,6 +741,12 @@ impl ProfileBaseFingerprint {
         } else {
             Err("expected 64 lowercase hexadecimal characters".to_string())
         }
+    }
+}
+
+impl std::fmt::Display for ProfileBaseFingerprint {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
@@ -831,10 +862,7 @@ impl AppliedProfileClaim {
             identity: AppliedProfileClaimIdentity::Asset {
                 target: AppliedClaimTarget::from_virtual_path(target, mode),
             },
-            base_fingerprint: fingerprint_bytes(
-                b"jit-profile-record-v2:asset\0",
-                &[bytes, &file_mode_bytes(mode)],
-            ),
+            base_fingerprint: fingerprint_profile_asset(bytes, mode),
             retain_if_unowned,
         }
     }
@@ -881,6 +909,14 @@ fn fingerprint_bytes(domain: &[u8], fields: &[&[u8]]) -> ProfileBaseFingerprint 
     });
     // SHA-256 always produces this exact canonical spelling.
     ProfileBaseFingerprint(format!("{:x}", hasher.finalize()))
+}
+
+/// Fingerprint exact profile asset bytes and mode under the sole asset domain.
+fn fingerprint_profile_asset(bytes: &[u8], mode: FileMode) -> ProfileBaseFingerprint {
+    fingerprint_bytes(
+        b"jit-profile-record-v2:asset\0",
+        &[bytes, &file_mode_bytes(mode)],
+    )
 }
 
 fn file_mode_bytes(mode: FileMode) -> Vec<u8> {
@@ -1178,11 +1214,14 @@ pub(crate) fn profile_capture_closure(
     profile: &ProfileApplicationInput,
 ) -> Result<Vec<VirtualPath>, RepositoryStateError> {
     let record_paths = applied_profile_record_paths(base)?;
-    if record_paths
+    let replacement_paths = replacement_asset_paths(base, &profile.claims.package_id)?;
+    let mut required_paths = record_paths.clone();
+    required_paths.extend(replacement_paths);
+    if required_paths
         .iter()
         .any(|path| !base.capture_spec().contains_path(path))
     {
-        return Ok(record_paths);
+        return Ok(required_paths);
     }
     let composition_base = profile_composition_base(base, profile)?;
     let composed = compose_profile_contributions(&composition_base, &profile.contribution_context)?;
@@ -1277,6 +1316,8 @@ pub(super) struct ProfileTargetComposition {
     /// Claims whose matching captured content was repository-authored rather
     /// than already claimed by a package.
     pub retained_claims: BTreeSet<AppliedProfileClaimIdentity>,
+    /// Former, safely removable exact asset targets.
+    pub removals: Vec<VirtualPath>,
 }
 
 /// Derive every profile-owned target's exact final bytes and mode from a captured
@@ -1321,29 +1362,10 @@ pub(super) fn compose_profile_targets_with_context(
     let composed = owned_composed_contributions(composed, &claims.package_id);
     let mut targets = render_composed_contributions(base, &composed)?;
     let package_id = claims.package_id.clone();
-    let asset_paths = claims
-        .assets
-        .iter()
-        .map(|asset| asset.claim.target().clone())
-        .collect::<Vec<_>>();
+    let asset_claims = claims.assets.to_vec();
     let projection_targets = configured_projection_targets(base, &targets)?;
     for asset in claims.assets {
         let path = asset.claim.target().clone();
-        if !asset.replace_owned && !projection_targets.contains(&path) {
-            if let RepositoryEntry::File { bytes, .. } =
-                base.entry(&path).map_err(ProducerError::from)?
-            {
-                if bytes != &asset.bytes {
-                    return Err(RepositoryStateError::ProfileTargetConflict(
-                        ProfileTargetConflictError {
-                            occupant: profile_conflict_occupant(base, &path)?,
-                            candidate: package_id.clone(),
-                            path,
-                        },
-                    ));
-                }
-            }
-        }
         targets.insert(path, (asset.bytes, asset.mode));
     }
     // Profile-owned regions compose over the captured base; a region target keeps
@@ -1428,27 +1450,258 @@ pub(super) fn compose_profile_targets_with_context(
     // An asset claim describes the bytes ultimately published. A projection may
     // rewrite a declared asset target, so adoption is evaluated only after that
     // final target image is known.
-    for path in asset_paths {
-        let Some((bytes, mode)) = targets.get(&path) else {
+    for asset in &asset_claims {
+        let path = asset.claim.target();
+        let Some((bytes, mode)) = targets.get(path) else {
             continue;
         };
+        if !asset.replace_owned && !projection_targets.contains(path) {
+            decide_asset_replacement(base, &package_id, path, bytes, *mode)?;
+        }
         if matches!(
-            base.entry(&path).map_err(ProducerError::from)?,
+            base.entry(path).map_err(ProducerError::from)?,
             RepositoryEntry::File { bytes: existing, mode: existing_mode, .. }
                 if existing == bytes && *existing_mode == *mode
         ) && matches!(
-            profile_conflict_occupant(base, &path)?,
+            profile_conflict_occupant(base, path)?,
             ProfileConflictOccupant::Repository
         ) {
             retained_claims.insert(AppliedProfileClaimIdentity::Asset {
-                target: AppliedClaimTarget::from_virtual_path(&path, *mode),
+                target: AppliedClaimTarget::from_virtual_path(path, *mode),
             });
         }
     }
+    // Any composed target, not just a directly declared asset or region, keeps
+    // a former asset path alive. A declaration-derived target can legitimately
+    // reuse that path during the same aggregate application.
+    let candidate_paths = targets.keys().cloned().collect::<BTreeSet<_>>();
+    let removals = obsolete_asset_removals(base, &package_id, &candidate_paths)?;
     Ok(ProfileTargetComposition {
         targets,
         retained_claims,
+        removals,
     })
+}
+
+/// Decide whether an asset target can replace its package's recorded base.
+///
+/// A target with no matching prior claim remains the ordinary first-application
+/// collision case. A matching claim takes the shared pure three-way path, so a
+/// changed package updates its own unchanged content while a concurrent edit is
+/// rejected before the aggregate transaction publishes anything.
+fn decide_asset_replacement(
+    base: &RepositoryImage,
+    package_id: &ProfilePackageId,
+    path: &VirtualPath,
+    candidate_bytes: &[u8],
+    candidate_mode: FileMode,
+) -> Result<(), RepositoryStateError> {
+    let RepositoryEntry::File {
+        bytes: current_bytes,
+        mode: current_mode,
+        ..
+    } = base.entry(path).map_err(ProducerError::from)?
+    else {
+        return Ok(());
+    };
+    if current_bytes == candidate_bytes && *current_mode == candidate_mode {
+        return Ok(());
+    }
+    let Some(recorded) = recorded_asset_claim(base, package_id, path)? else {
+        return Err(RepositoryStateError::ProfileTargetConflict(
+            ProfileTargetConflictError {
+                occupant: profile_conflict_occupant(base, path)?,
+                candidate: package_id.clone(),
+                path: path.clone(),
+            },
+        ));
+    };
+    let decision = decide_three_way(ThreeWayInput {
+        target: path.clone(),
+        owner: package_id.clone(),
+        base: ThreeWayValue::Present(recorded.base_fingerprint),
+        current: ThreeWayValue::Present(fingerprint_profile_asset(current_bytes, *current_mode)),
+        candidate: ThreeWayValue::Present(fingerprint_profile_asset(
+            candidate_bytes,
+            candidate_mode,
+        )),
+        surviving_owners: 0,
+        retain_if_unowned: recorded.retain_if_unowned,
+    });
+    match decision {
+        ThreeWayDecision::Update | ThreeWayDecision::Unchanged => Ok(()),
+        ThreeWayDecision::Conflict(conflict) => Err(RepositoryStateError::ProfileThreeWayConflict(
+            Box::new(ProfileThreeWayConflictError {
+                target: conflict.target,
+                owner: conflict.owner,
+                base: conflict.base,
+                current: conflict.current,
+                candidate: conflict.candidate,
+            }),
+        )),
+        ThreeWayDecision::Retain | ThreeWayDecision::Remove => {
+            unreachable!("a present candidate is always update, unchanged, or conflict")
+        }
+    }
+}
+
+fn recorded_asset_claim(
+    base: &RepositoryImage,
+    package_id: &ProfilePackageId,
+    path: &VirtualPath,
+) -> Result<Option<AppliedProfileClaim>, RepositoryStateError> {
+    let record_path = VirtualPath::data(format!("profiles/{}.json", package_id.as_str()))?;
+    if !base.capture_spec().contains_path(&record_path) {
+        return Ok(None);
+    }
+    let RepositoryEntry::File { bytes, .. } =
+        base.entry(&record_path).map_err(ProducerError::from)?
+    else {
+        return Ok(None);
+    };
+    let record: AppliedProfileRecord =
+        serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
+            path: record_path.repository_relative(),
+            source,
+        })?;
+    validate_applied_record_path(&record_path, &record)?;
+    Ok(record
+        .claims
+        .into_iter()
+        .find(|claim| match &claim.identity {
+            AppliedProfileClaimIdentity::Asset { target } => {
+                target.root == path.root_class() && target.path == *path.relative()
+            }
+            AppliedProfileClaimIdentity::Semantic { .. }
+            | AppliedProfileClaimIdentity::ManagedRegion { .. } => false,
+        }))
+}
+
+/// Target paths named by the package's former asset claims.
+///
+/// Capture planning asks for these before deciding removal so its final plan has
+/// both the recorded base and the current repository value under one session.
+fn replacement_asset_paths(
+    base: &RepositoryImage,
+    package_id: &ProfilePackageId,
+) -> Result<Vec<VirtualPath>, RepositoryStateError> {
+    let record_path = VirtualPath::data(format!("profiles/{}.json", package_id.as_str()))?;
+    if !base.capture_spec().contains_path(&record_path) {
+        return Ok(Vec::new());
+    }
+    let RepositoryEntry::File { bytes, .. } =
+        base.entry(&record_path).map_err(ProducerError::from)?
+    else {
+        return Ok(Vec::new());
+    };
+    let record: AppliedProfileRecord =
+        serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
+            path: record_path.repository_relative(),
+            source,
+        })?;
+    validate_applied_record_path(&record_path, &record)?;
+    record
+        .claims
+        .into_iter()
+        .filter_map(|claim| match claim.identity {
+            AppliedProfileClaimIdentity::Asset { target } => Some(target),
+            AppliedProfileClaimIdentity::Semantic { .. }
+            | AppliedProfileClaimIdentity::ManagedRegion { .. } => None,
+        })
+        .map(|target| VirtualPath::from_root(target.root, target.path).map_err(Into::into))
+        .collect()
+}
+
+/// Decide which former sole asset claims an updated package may remove.
+fn obsolete_asset_removals(
+    base: &RepositoryImage,
+    package_id: &ProfilePackageId,
+    candidate_paths: &BTreeSet<VirtualPath>,
+) -> Result<Vec<VirtualPath>, RepositoryStateError> {
+    let record_path = VirtualPath::data(format!("profiles/{}.json", package_id.as_str()))?;
+    if !base.capture_spec().contains_path(&record_path) {
+        return Ok(Vec::new());
+    }
+    let RepositoryEntry::File { bytes, .. } =
+        base.entry(&record_path).map_err(ProducerError::from)?
+    else {
+        return Ok(Vec::new());
+    };
+    let record: AppliedProfileRecord =
+        serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
+            path: record_path.repository_relative(),
+            source,
+        })?;
+    validate_applied_record_path(&record_path, &record)?;
+    record
+        .claims
+        .into_iter()
+        .filter_map(|claim| {
+            let target = match &claim.identity {
+                AppliedProfileClaimIdentity::Asset { target } => Some(target.clone()),
+                AppliedProfileClaimIdentity::Semantic { .. }
+                | AppliedProfileClaimIdentity::ManagedRegion { .. } => None,
+            }?;
+            Some((claim, target))
+        })
+        .map(|(claim, target)| {
+            let path = VirtualPath::from_root(target.root, target.path)?;
+            if candidate_paths.contains(&path) {
+                return Ok(None);
+            }
+            let current = match base.entry(&path).map_err(ProducerError::from)? {
+                RepositoryEntry::Absent => ThreeWayValue::Absent,
+                RepositoryEntry::File { bytes, mode, .. } => {
+                    ThreeWayValue::Present(fingerprint_profile_asset(bytes, *mode))
+                }
+                _ => return Ok(None),
+            };
+            let decision = decide_three_way(ThreeWayInput {
+                target: path.clone(),
+                owner: package_id.clone(),
+                base: ThreeWayValue::Present(claim.base_fingerprint),
+                current,
+                candidate: ThreeWayValue::Absent,
+                surviving_owners: surviving_asset_owners(base, package_id, &path)?,
+                retain_if_unowned: claim.retain_if_unowned,
+            });
+            Ok(matches!(decision, ThreeWayDecision::Remove).then_some(path))
+        })
+        .collect::<Result<Vec<_>, RepositoryStateError>>()
+        .map(|paths| paths.into_iter().flatten().collect())
+}
+
+fn surviving_asset_owners(
+    base: &RepositoryImage,
+    package_id: &ProfilePackageId,
+    path: &VirtualPath,
+) -> Result<usize, RepositoryStateError> {
+    applied_profile_record_paths(base)?
+        .into_iter()
+        .map(|record_path| {
+            let RepositoryEntry::File { bytes, .. } =
+                base.entry(&record_path).map_err(ProducerError::from)?
+            else {
+                return Ok(false);
+            };
+            let record: AppliedProfileRecord = serde_json::from_slice(bytes).map_err(|source| {
+                ProducerError::ProfileRecordParse {
+                    path: record_path.repository_relative(),
+                    source,
+                }
+            })?;
+            validate_applied_record_path(&record_path, &record)?;
+            Ok(record.id.as_str() != package_id.as_str()
+                && record.claims.iter().any(|claim| match &claim.identity {
+                    AppliedProfileClaimIdentity::Asset { target } => {
+                        target.root == path.root_class() && target.path == *path.relative()
+                    }
+                    AppliedProfileClaimIdentity::Semantic { .. }
+                    | AppliedProfileClaimIdentity::ManagedRegion { .. } => false,
+                }))
+        })
+        .collect::<Result<Vec<_>, RepositoryStateError>>()
+        .map(|owners| owners.into_iter().filter(|owner| *owner).count())
 }
 
 /// Check all selected package contributions against one captured repository image.
@@ -2676,6 +2929,7 @@ mod tests {
                 (b"derived projection bytes".to_vec(), FileMode::Executable),
             )]),
             retained_claims: BTreeSet::new(),
+            removals: Vec::new(),
         };
 
         let record = input.record(&composition).expect("record is derived");
