@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 8,
+  "current_wave": 9,
   "waves": [
     {
       "wave_number": 1,
@@ -49,14 +49,14 @@
     {
       "wave_number": 8,
       "issues": [
-        {"id": "44ec7192-f3bd-470a-bc6b-a20f6362230e", "short_id": "44ec7192", "title": "Decide each target from base, current, and candidate", "classification": "implementation", "status": "in_progress"},
-        {"id": "9f493686-82b8-40cd-889c-3821c1066c59", "short_id": "9f493686", "title": "Record one lifecycle event per changed mutation", "classification": "implementation", "status": "in_progress"}
+        {"id": "44ec7192-f3bd-470a-bc6b-a20f6362230e", "short_id": "44ec7192", "title": "Decide each target from base, current, and candidate", "classification": "implementation", "status": "done"},
+        {"id": "9f493686-82b8-40cd-889c-3821c1066c59", "short_id": "9f493686", "title": "Record one lifecycle event per changed mutation", "classification": "implementation", "status": "done"}
       ]
     },
     {
       "wave_number": 9,
       "issues": [
-        {"id": "7156f64b-8480-40d1-8af9-c0e48db2ba59", "short_id": "7156f64b", "title": "Expose reconfiguration and upgrade as commands", "classification": "implementation", "status": "pending"}
+        {"id": "7156f64b-8480-40d1-8af9-c0e48db2ba59", "short_id": "7156f64b", "title": "Expose reconfiguration and upgrade as commands", "classification": "implementation", "status": "ready"}
       ]
     },
     {
@@ -158,7 +158,9 @@
     "fc47a7bf": 2,
     "cbcd9318": 2,
     "9a9a4cfc": 2,
-    "9fad8581": 2
+    "9fad8581": 2,
+    "44ec7192": 0,
+    "9f493686": 2
   },
   "review_verdicts": [
     {
@@ -624,6 +626,110 @@
       "holistic_review": "application and initialization now share the same action-complete aggregate plan, per-profile change attribution, recovered session, migration closure, and no-op semantics without pulling Wave 8 event redesign forward",
       "gate_evidence": "cargo-ci run 24df6448-e87b-4176-891d-2b9457f970ba passed 4490 tests with zero failures plus fmt, clippy, provenance, build-budget, and incremental checks; code-review run 9ce97fbf-0842-47ff-9d95-2048e0c2d502 passed with zero findings",
       "reviewed_at": "2026-08-10T03:35:47+03:00"
+    },
+    {
+      "issue_id": "9f493686-82b8-40cd-889c-3821c1066c59",
+      "reviewed_commit": "28e8ca646208dd00a659951a04d646a5e5e06e66",
+      "verdict": "fail",
+      "gate_status": {"cargo-ci": "failed", "code-review": "not run after cargo failure"},
+      "prior_findings": [],
+      "criteria": {
+        "REQ-01": "production behavior met, but four integration assertions still expected one legacy event per package or erased operation identity",
+        "REQ-02": "met by focused no-op and rehearsal coverage",
+        "REQ-03": "met: canonical variable names and source kinds are recorded without resolved values or rendered content",
+        "REQ-04": "met: shipped-record conversions are carried by the encountering lifecycle event",
+        "REQ-05": "met in production; historical decode fixtures remain"
+      },
+      "stale_narrative_sweep": "production constructor search was clean; four stale integration assertions remained",
+      "deferred_items_audit": "no linked documents; adopter lifecycle prose is explicitly owned by Wave 15 issue b3d92595",
+      "holistic_review": "update the stale integration contract to preserve aggregate event count, stable profile order, and initialize-versus-apply operation identity",
+      "gate_evidence": "cargo-ci run ed4e32c4-2ce4-4c71-9422-8dd9cf314ccd failed four profile CLI/acceptance assertions; fmt, clippy, provenance, build-budget, and incremental checks passed",
+      "reviewed_at": "2026-08-10T08:11:28Z"
+    },
+    {
+      "issue_id": "9f493686-82b8-40cd-889c-3821c1066c59",
+      "reviewed_commit": "7e1dbbbd9a6a45ae71cb640c5ea1e11df519de4f",
+      "verdict": "fail",
+      "gate_status": {"cargo-ci": "passed", "code-review": "failed"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "lead-integration-contract",
+          "status": "closed: integration tests assert one aggregate lifecycle event, stable profile order, and requested operation identity",
+          "evidence": "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs; crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs"
+        },
+        {
+          "round": 2,
+          "id": "F1",
+          "status": "open: upgraded, reconfigured, and unchanged-in-changed-aggregate classifier branches lack direct coverage",
+          "evidence": "crates/jit/src/repository_state/initialize.rs"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "behavior met, but three required per-profile status branches lack direct regression coverage",
+        "REQ-02": "met",
+        "REQ-03": "met",
+        "REQ-04": "met",
+        "REQ-05": "met"
+      },
+      "stale_narrative_sweep": "zero live legacy constructors; remaining ProfileApplied uses are historical decoder/catalog fixtures",
+      "deferred_items_audit": "no linked documents; adopter lifecycle prose is explicitly owned by Wave 15 issue b3d92595",
+      "holistic_review": "add the smallest direct semantic regression for every required existing-profile lifecycle status",
+      "gate_evidence": "cargo-ci run 595f3e7b-8011-4f34-9145-457375e9fc1b passed; code-review run d422cf7b-fdc9-4da3-bf33-2f5fb5f7be20 failed one coverage finding",
+      "reviewed_at": "2026-08-10T08:38:47Z"
+    },
+    {
+      "issue_id": "9f493686-82b8-40cd-889c-3821c1066c59",
+      "reviewed_commit": "765bafce0a425a8afa2e68813aca186fb0b4a488",
+      "merged_commit": "9a10b933",
+      "verdict": "pass",
+      "gate_status": {"cargo-ci": "passed", "code-review": "passed"},
+      "prior_findings": [
+        {
+          "round": 1,
+          "id": "lead-integration-contract",
+          "status": "closed",
+          "evidence": "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs; crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs"
+        },
+        {
+          "round": 2,
+          "id": "F1",
+          "status": "closed: one direct classifier regression covers upgraded, reconfigured, and unchanged profiles inside a changed aggregate",
+          "evidence": "crates/jit/src/repository_state/initialize.rs::tests::test_profile_lifecycle_profile_classifies_changed_existing_profiles"
+        }
+      ],
+      "criteria": {
+        "REQ-01": "met: one changed aggregate emits one operation-named event with stable per-profile installed, unchanged, reconfigured, or upgraded outcomes",
+        "REQ-02": "met: rehearsals and complete no-ops append no event",
+        "REQ-03": "met: canonical variable names and source kinds are recorded without values or rendered content",
+        "REQ-04": "met: shipped-format conversions are listed inside the encountering operation",
+        "REQ-05": "met: no production legacy event constructor or append remains, while historical logs still decode"
+      },
+      "stale_narrative_sweep": "zero live legacy constructors; the canonical adopter profile reference remains intentionally deferred to its Wave 15 documentation issue",
+      "deferred_items_audit": "no linked documents; b3d92595 owns the canonical adopter lifecycle rewrite after the command surface stabilizes",
+      "holistic_review": "aggregate event construction, torn-tail certification, materialization, initialization/application parity, variable redaction, stable ordering, migration reporting, historical decode, and integration contracts are coherent",
+      "gate_evidence": "cargo-ci run c988f514-a975-44eb-aa43-6d885e8522b7 passed the full workspace plus fmt, clippy, provenance, build-budget, and incremental checks; code-review run c2f4b2a4-7d8f-49b9-91d8-7eaba3c4b411 passed with zero findings",
+      "reviewed_at": "2026-08-10T08:58:00Z"
+    },
+    {
+      "issue_id": "44ec7192-f3bd-470a-bc6b-a20f6362230e",
+      "reviewed_commit": "1a6f8416d57bf43abdcb735967d5e2b5d1380dfa",
+      "merged_commit": "47083065",
+      "verdict": "pass",
+      "gate_status": {"cargo-ci": "passed", "code-review": "passed"},
+      "prior_findings": [],
+      "criteria": {
+        "REQ-01": "met: a target still matching its recorded base updates to the candidate",
+        "REQ-02": "met: divergence reports target, typed owner, base/current/candidate fingerprints and publishes nothing",
+        "REQ-03": "met: stopped shared claims retain content and surviving owners",
+        "REQ-04": "met: only unchanged, solely-owned, unretained stopped assets delete; changed, shared, and adopted content remains",
+        "REQ-05": "met: changed packages reapply, rewrite records, and preserve unowned repository content"
+      },
+      "stale_narrative_sweep": "current implementation has no write-once rejection path; motivating write-once prose remains historical planning context, while adopter lifecycle prose is owned by Wave 15",
+      "deferred_items_audit": "no linked documents; b3d92595 owns final adopter-facing lifecycle prose",
+      "holistic_review": "the pure exhaustive decision table reuses the canonical claim fingerprint, production aggregate planning applies safe updates/deletions atomically, conflict mapping remains typed and actionable, and lifecycle-event integration is clean",
+      "gate_evidence": "cargo-ci run 6b7af235-68b1-444d-b224-1d3095dedf5a passed the combined Wave 8 workspace plus fmt, clippy, provenance, build-budget, and incremental checks; code-review run 7c5630d1-6af1-4a09-8ad2-24132e4f5d52 passed with zero findings. Run 561e0edb-7efa-4687-8435-eda4a597b987 is retained but excluded because it reused another worktree's Cargo target.",
+      "reviewed_at": "2026-08-10T09:17:00Z"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00"
