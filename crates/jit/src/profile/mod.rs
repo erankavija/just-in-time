@@ -10,6 +10,7 @@ mod graph;
 mod manifest;
 mod package;
 mod repository_package;
+mod three_way;
 mod variables;
 mod wire;
 // Repository-local generator seam: the package tree this repository assembles
@@ -62,6 +63,9 @@ pub use package::{
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
 pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;
+pub use three_way::{
+    decide_three_way, ThreeWayConflict, ThreeWayDecision, ThreeWayInput, ThreeWayValue,
+};
 pub use variables::{
     resolve_package, resolve_package_from_record, resolve_variables, ProfileVariableAssignment,
     ResolvedProfileContent, ResolvedVariable, ResolvedVariables, VariableError, VariableInputs,

@@ -148,8 +148,12 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
             RepositoryStateError::Projection(_)
             | RepositoryStateError::ManagedDocument(_)
             | RepositoryStateError::ProfileTargetConflict(_)
+            | RepositoryStateError::ProfileThreeWayConflict(_)
             | RepositoryStateError::ContributionComposition(_)
             | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
+            | RepositoryStateError::Initialization(InitializationError::ProfileThreeWayConflict(
+                _,
+            ))
             | RepositoryStateError::Initialization(InitializationError::ContributionComposition(
                 _,
             ))
@@ -994,10 +998,14 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
         let is_conflict = matches!(
             state_error,
             RepositoryStateError::ProfileTargetConflict(_)
+                | RepositoryStateError::ProfileThreeWayConflict(_)
                 | RepositoryStateError::ContributionComposition(_)
                 | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
                     _
                 ))
+                | RepositoryStateError::Initialization(
+                    InitializationError::ProfileThreeWayConflict(_),
+                )
                 | RepositoryStateError::Initialization(
                     InitializationError::ContributionComposition(_),
                 )
@@ -8602,12 +8610,13 @@ mod repository_state_classifier_tests {
     //! variant) fails here rather than silently changing a command's exit status.
 
     use super::{error_to_exit_code, profile_json_error};
+    use jit::profile::ThreeWayValue;
     use jit::repository_state::{
         AmbiguousOwnershipError, ArchiveExecutionError, Contribution,
         ContributionCompositionConflict, GateRegistryEditError, InitializationError,
-        ManagedDocumentError, ProducerError, ProfileConflictOccupant, ProfilePackageId,
-        ProfileTargetConflictError, ProjectionError, RepositoryLayoutError, RepositoryStateError,
-        ScalarTarget, VirtualPath,
+        ManagedDocumentError, ProducerError, ProfileBaseFingerprint, ProfileConflictOccupant,
+        ProfilePackageId, ProfileTargetConflictError, ProfileThreeWayConflictError,
+        ProjectionError, RepositoryLayoutError, RepositoryStateError, ScalarTarget, VirtualPath,
     };
 
     fn path() -> VirtualPath {
@@ -8622,6 +8631,22 @@ mod repository_state_classifier_tests {
             }
             .semantic_identity(),
             owners: Vec::new(),
+        }
+    }
+
+    fn three_way_conflict() -> ProfileThreeWayConflictError {
+        let fingerprint = || {
+            serde_json::from_str::<ProfileBaseFingerprint>(
+                "\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"",
+            )
+            .unwrap()
+        };
+        ProfileThreeWayConflictError {
+            target: path(),
+            owner: ProfilePackageId::new("candidate"),
+            base: ThreeWayValue::Present(fingerprint()),
+            current: ThreeWayValue::Present(fingerprint()),
+            candidate: ThreeWayValue::Present(fingerprint()),
         }
     }
 
@@ -8652,6 +8677,13 @@ mod repository_state_classifier_tests {
                         candidate: ProfilePackageId::new("candidate"),
                         occupant: ProfileConflictOccupant::Repository,
                     },
+                )),
+                4,
+            ),
+            (Box::new(three_way_conflict()).into(), 4),
+            (
+                RepositoryStateError::Initialization(InitializationError::ProfileThreeWayConflict(
+                    Box::new(three_way_conflict()),
                 )),
                 4,
             ),
@@ -8712,6 +8744,10 @@ mod repository_state_classifier_tests {
                     candidate: ProfilePackageId::new("candidate"),
                     occupant: ProfileConflictOccupant::Repository,
                 },
+            )),
+            Box::new(three_way_conflict()).into(),
+            RepositoryStateError::Initialization(InitializationError::ProfileThreeWayConflict(
+                Box::new(three_way_conflict()),
             )),
             contribution_conflict().into(),
             RepositoryStateError::Initialization(InitializationError::ContributionComposition(

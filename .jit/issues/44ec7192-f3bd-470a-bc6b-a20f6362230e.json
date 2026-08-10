@@ -8,12 +8,24 @@
   ],
   "description": "Compare the base a claim was published from, the current repository value, and the\nresolved candidate, so an applied profile can be changed, reconfigured, or\nupgraded instead of being frozen at its first application.\n\n## Background\n\nAn applied profile is effectively write-once: a record whose content differs is\nrejected outright, so a package edited after application cannot be applied again,\nand the repository is left reporting drift with no sanctioned way back. This is\nthe defect the container exists to remove.\n\n## Success Criteria\n\n- [hard] REQ-01: A target whose current value still matches its recorded base updates to the candidate value.\n- [hard] REQ-02: A target whose current value diverges from both its base and the candidate reports an actionable conflict naming the target, the owning package, and the three values, and publishes nothing.\n- [hard] REQ-03: Content owned by several profiles retains its surviving owners when one of them stops contributing it.\n- [hard] REQ-04: Content that is unchanged, solely owned, and not marked retained may be removed as part of replacing an installed version; content that is changed, shared, or retained is never removed.\n- [hard] REQ-05: Re-applying a package whose content changed succeeds and rewrites its record, and repository content no package owns survives that operation.\n",
   "documents": [],
+  "done_at": "2026-08-10T09:22:06.583891626Z",
   "first_ready_at": "2026-08-10T00:35:27.762437173Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-10T09:18:41.214096759Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-10T09:21:46.681055852Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "44ec7192-f3bd-470a-bc6b-a20f6362230e",
   "labels": [
     "type:task",
@@ -25,7 +37,7 @@
     "satisfies:REQ-07"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Decide each target from base, current, and candidate",
-  "updated_at": "2026-08-10T07:24:58.706769035Z"
+  "updated_at": "2026-08-10T09:22:06.583891626Z"
 }

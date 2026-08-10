@@ -195,7 +195,7 @@ pub use profile_apply::{
     ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
     ProfileApplicationInput, ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims,
     ProfileConflictOccupant, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
-    ProfileTargetConflictError, ScalarTarget, SetStringTarget,
+    ProfileTargetConflictError, ProfileThreeWayConflictError, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
     is_shipped_v1_candidate, migrate_shipped_v1_records, preflight_profile_contributions,
@@ -903,6 +903,9 @@ pub enum RepositoryStateError {
     /// A profile asset would overwrite an unowned authored occupant.
     #[error(transparent)]
     ProfileTargetConflict(#[from] ProfileTargetConflictError),
+    /// A package replacement would overwrite a target changed after its base.
+    #[error(transparent)]
+    ProfileThreeWayConflict(#[from] Box<ProfileThreeWayConflictError>),
     /// Resolved package definitions disagree for one semantic identity.
     #[error(transparent)]
     ContributionComposition(#[from] ContributionCompositionConflict),

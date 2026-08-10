@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-44ec7192",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "70d474ec7cb6f0920346eddf13cbede083c0aa4c",
+  "completed_at": "2026-08-10T08:18:35.944226934Z",
+  "duration_ms": 346022,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "1162bafdbbe29656008d8c71dd7539e218f2c37b0d0f058dd2271eb123ba3dc6",
+  "issue_id": "44ec7192-f3bd-470a-bc6b-a20f6362230e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "561e0edb-7efa-4687-8435-eda4a597b987",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-10T08:12:49.921640376Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest profile_acceptance_tests::test_profile_apply_applies_the_packages_the_named_one_depends_on ... FAILED\ntest profile_cli_tests::test_existing_partial_profiled_init_atomically_completes_neutral_scaffold ... FAILED\ntest profile_cli_tests::test_profiled_init_publishes_valid_repo_and_applied_inventory ... FAILED\ntest profile_acceptance_tests::test_profile_fresh_init_and_existing_apply_are_equivalent_without_git ... FAILED\ntest result: FAILED. 346 passed; 4 failed; 1 ignored; 0 measured; 0 filtered out; finished in 51.87s\n---- profile_acceptance_tests::test_profile_apply_applies_the_packages_the_named_one_depends_on stdout ----\n\nthread 'profile_acceptance_tests::test_profile_apply_applies_the_packages_the_named_one_depends_on' (3490079) panicked at crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:385:5:\nassertion `left == right` failed\n  left: []\n right: [\"base\", \"workflow\"]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n---- profile_cli_tests::test_existing_partial_profiled_init_atomically_completes_neutral_scaffold stdout ----\n\n---- profile_cli_tests::test_profiled_init_publishes_valid_repo_and_applied_inventory stdout ----\n\n---- profile_acceptance_tests::test_profile_fresh_init_and_existing_apply_are_equivalent_without_git stdout ----\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1529 bytes=29116511)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1570194448/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
