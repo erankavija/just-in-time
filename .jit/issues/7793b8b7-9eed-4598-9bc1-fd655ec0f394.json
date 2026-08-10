@@ -1,0 +1,20 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-10T15:07:08.779047590Z",
+  "dependencies": [],
+  "description": "`commands::init::tests::test_profiled_init_authenticates_shipped_v1_once_before_any_publication` asserts on the process-global `shipped_v1_conversion_count`. The counter is shared across concurrently scheduled tests, so the assertion observes bumps caused by tests other than the one under test.\n\nObserved during epic c639cfb5 wave 9: the test passes unfiltered and in isolation, and passes under `--test-threads=1` (284/284 for that filter), but fails under `cargo test -p jit --lib profile` because another test in that filtered set increments the counter concurrently. No profile-lifecycle change touches the counter, so the defect is in the test's use of process-global state rather than in the code under test.\n\nA test whose verdict depends on which other tests are scheduled alongside it is not evidence. It also makes a focused `--lib profile` run unusable as a check during profile work, which is when it is most wanted.\n\n## Success Criteria\n\n- [hard] REQ-01: The test observes only the conversions its own scenario causes, so its verdict does not depend on which other tests run concurrently.\n- [hard] REQ-02: The test passes under a filtered run that includes it alongside other profile tests, without requiring a single-threaded harness.\n- [hard] REQ-03: The authentication-once property it exists to prove is still asserted, not weakened or removed.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-10T15:07:08.779047590Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "7793b8b7-9eed-4598-9bc1-fd655ec0f394",
+  "labels": [
+    "milestone:v1.1",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Shipped-v1 conversion counter makes a profiled-init test order-dependent",
+  "updated_at": "2026-08-10T15:07:08.779047590Z"
+}

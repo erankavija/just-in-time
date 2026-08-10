@@ -13456,3 +13456,5 @@
 {"from":"backlog","id":"0a3fdef5-f733-4056-9c8d-a2b0cc6cfd6b","issue_id":"6a479c58-77ed-4592-8140-9afde0118664","timestamp":"2026-08-10T14:47:19.925204006Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"code-review","id":"24d46ca2-2c18-476f-bec2-41e2f5209909","issue_id":"7156f64b-8480-40d1-8af9-c0e48db2ba59","timestamp":"2026-08-10T14:54:56.606561614Z","type":"gate_failed","updated_by":"auto:executor"}
 {"from":"done","id":"c47f1e5b-c324-4184-acca-995e8bc8bb65","issue_id":"7156f64b-8480-40d1-8af9-c0e48db2ba59","timestamp":"2026-08-10T14:55:44.419678093Z","to":"in_progress","type":"issue_state_changed"}
+{"id":"f252846d-3872-4ca0-bb03-f34f5ecdd3e0","issue_id":"7793b8b7-9eed-4598-9bc1-fd655ec0f394","priority":"normal","timestamp":"2026-08-10T15:07:08.779047590Z","title":"Shipped-v1 conversion counter makes a profiled-init test order-dependent","type":"issue_created"}
+{"fields":["dependencies"],"id":"30e542e2-bd10-43b8-88b3-5b1f3d4f13e4","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-08-10T15:07:24.602849947Z","type":"issue_updated","updated_by":"dependency-add"}
