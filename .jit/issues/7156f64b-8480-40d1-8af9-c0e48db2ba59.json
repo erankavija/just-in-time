@@ -26,7 +26,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Expose reconfiguration and upgrade as commands",
-  "updated_at": "2026-08-08T23:22:28.674041745Z"
+  "updated_at": "2026-08-10T09:22:12.490252486Z"
 }
