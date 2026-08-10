@@ -30,7 +30,7 @@
     "component:cli"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Ownership, records, and safe change",
-  "updated_at": "2026-08-10T14:47:14.772441462Z"
+  "updated_at": "2026-08-10T15:07:53.333446447Z"
 }

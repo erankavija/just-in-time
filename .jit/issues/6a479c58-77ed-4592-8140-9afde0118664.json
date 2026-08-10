@@ -27,7 +27,7 @@
     "satisfies:REQ-11"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Capture a package tree from declared repository targets",
-  "updated_at": "2026-08-10T14:47:19.925204006Z"
+  "updated_at": "2026-08-10T15:07:58.407366289Z"
 }
