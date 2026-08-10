@@ -32,15 +32,54 @@ set -euo pipefail
 # several agent sessions each calling `jit gate evaluate ... cargo-ci`) otherwise
 # oversubscribe the CPU — every `cargo build` fans out to all cores, so K runs
 # demand K×nproc — and multiply peak RAM into swap, making the host and any
-# interactive shell laggy. We re-exec the script under a blocking
+# interactive shell laggy. We re-run the script under a blocking
 # flock so concurrent runs queue rather than fail; the lock is held for the
 # whole run and released when the process exits. CARGO_CI_LOCKED guards against
 # infinite re-exec; CARGO_CI_NO_LOCK=1 disables (e.g. an isolated CI container
-# that already owns the machine); CARGO_CI_BUILD_LOCK overrides the lock path.
+# that already owns the machine); CARGO_CI_BUILD_LOCK overrides the lock path;
+# CARGO_CI_LOCK_TIMEOUT bounds the wait.
+#
+# `flock -o` is load-bearing: it closes the lock descriptor in the child before
+# exec. Without it every descendant inherits the descriptor, and a descendant
+# that daemonises keeps holding the lock after this run exits — `sccache`
+# double-forks to PPID 1 and does exactly that — so the next caller blocks
+# forever against a run that finished long ago. The lock releases when the
+# waiting `flock` parent exits, which is the intended "held for the whole run"
+# lifetime.
+#
+# The wait is bounded and announced. An unbounded silent block is
+# indistinguishable from a hung or dead process, which is how a wedged lock
+# stayed undiagnosed for minutes at a time; `-E 75` separates "could not acquire
+# the lock" from the wrapped command's own exit status so the timeout can name
+# what it was waiting for.
+report_build_lock_holders() {
+  local lock="$1"
+  if command -v lslocks >/dev/null 2>&1; then
+    lslocks -o COMMAND,PID,MODE,PATH 2>/dev/null | awk -v lock="$lock" 'NR==1 || $NF==lock'
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser -v "$lock" 2>&1
+  fi
+}
+
 if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
   BUILD_LOCK="${CARGO_CI_BUILD_LOCK:-${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock}"
+  LOCK_TIMEOUT="${CARGO_CI_LOCK_TIMEOUT:-1800}"
   if command -v flock >/dev/null 2>&1; then
-    exec env CARGO_CI_LOCKED=1 flock "$BUILD_LOCK" "$0" "$@"
+    if ! flock -n -o "$BUILD_LOCK" true 2>/dev/null; then
+      echo "cargo-ci: another build holds $BUILD_LOCK; waiting up to ${LOCK_TIMEOUT}s" >&2
+      report_build_lock_holders "$BUILD_LOCK" >&2
+    fi
+    lock_status=0
+    env CARGO_CI_LOCKED=1 flock -o -w "$LOCK_TIMEOUT" -E 75 "$BUILD_LOCK" "$0" "$@" ||
+      lock_status=$?
+    if [ "$lock_status" -eq 75 ]; then
+      echo "ERROR: cargo-ci: timed out after ${LOCK_TIMEOUT}s waiting for $BUILD_LOCK" >&2
+      report_build_lock_holders "$BUILD_LOCK" >&2
+      echo "       A holder with PPID 1 and no live cargo/rustc is a leaked daemon," >&2
+      echo "       not a running build; stop it (e.g. sccache --stop-server) and retry." >&2
+      exit 2
+    fi
+    exit "$lock_status"
   fi
   echo "cargo-ci: flock not found; running without host-wide build lock" >&2
 fi

@@ -13444,3 +13444,5 @@
 {"from":"backlog","id":"f5fe0bfb-5447-4a72-9293-eb15f3e50842","issue_id":"7156f64b-8480-40d1-8af9-c0e48db2ba59","timestamp":"2026-08-10T09:22:12.490252486Z","to":"ready","type":"issue_state_changed"}
 {"from":"ready","id":"faa45505-ddce-4f04-9c7f-5f2eae8aaf43","issue_id":"7156f64b-8480-40d1-8af9-c0e48db2ba59","timestamp":"2026-08-10T11:47:24.963080324Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker-7156f64b","id":"d4b17ee4-c302-4b01-aa8d-d262c438a783","issue_id":"7156f64b-8480-40d1-8af9-c0e48db2ba59","timestamp":"2026-08-10T11:47:24.963080324Z","type":"issue_claimed"}
+{"id":"ddb30a01-8c0d-4a7d-9ec0-1ac9e6ee33b0","issue_id":"c3a09e0d-93c0-4c76-8a9a-dbed38bf1718","priority":"high","timestamp":"2026-08-10T13:24:58.139687030Z","title":"cargo-ci build lock survives its run through a daemonising child","type":"issue_created"}
+{"fields":["dependencies"],"id":"23c97dc0-dacd-444a-9e6a-a306d77ff80c","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-08-10T13:25:10.443974321Z","type":"issue_updated","updated_by":"dependency-add"}
