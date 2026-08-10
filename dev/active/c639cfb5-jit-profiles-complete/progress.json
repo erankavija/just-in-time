@@ -49,8 +49,8 @@
     {
       "wave_number": 8,
       "issues": [
-        {"id": "44ec7192-f3bd-470a-bc6b-a20f6362230e", "short_id": "44ec7192", "title": "Decide each target from base, current, and candidate", "classification": "implementation", "status": "pending"},
-        {"id": "9f493686-82b8-40cd-889c-3821c1066c59", "short_id": "9f493686", "title": "Record one lifecycle event per changed mutation", "classification": "implementation", "status": "pending"}
+        {"id": "44ec7192-f3bd-470a-bc6b-a20f6362230e", "short_id": "44ec7192", "title": "Decide each target from base, current, and candidate", "classification": "implementation", "status": "in_progress"},
+        {"id": "9f493686-82b8-40cd-889c-3821c1066c59", "short_id": "9f493686", "title": "Record one lifecycle event per changed mutation", "classification": "implementation", "status": "in_progress"}
       ]
     },
     {
