@@ -671,18 +671,7 @@ impl CommandExecutor<JsonFileStorage> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let changes = plan
-                .profile_targets()
-                .iter()
-                .map(|target| {
-                    let action = match target.disposition {
-                        ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
-                        ProfileTargetDisposition::Create => ProfileTargetAction::Create,
-                        ProfileTargetDisposition::Update => ProfileTargetAction::Update,
-                    };
-                    ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
-                })
-                .collect();
+            let changes = profile_target_changes(&plan);
             Ok(SessionStep::Done(ProfilePlanEntry {
                 id: metadata.id.to_string(),
                 version: metadata.version.clone(),
@@ -796,8 +785,11 @@ impl CommandExecutor<JsonFileStorage> {
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
-        let (selected, packages, resolved) =
-            self.reconfiguration_selection_from_sources(selectors, options)?;
+        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
+            selectors,
+            options,
+            RecordedValueAuthority::Exact,
+        )?;
         if selected.is_empty() {
             return Ok(ProfileComposedApplyResult::new(Vec::new()));
         }
@@ -818,8 +810,11 @@ impl CommandExecutor<JsonFileStorage> {
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
     ) -> Result<ProfilePlanResult> {
-        let (selected, packages, resolved) =
-            self.reconfiguration_selection_from_sources(selectors, options)?;
+        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
+            selectors,
+            options,
+            RecordedValueAuthority::Exact,
+        )?;
         if selected.is_empty() {
             return Ok(ProfilePlanResult::new(Vec::new()));
         }
@@ -840,8 +835,11 @@ impl CommandExecutor<JsonFileStorage> {
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
     ) -> Result<ProfileComposedApplyResult> {
-        let (selected, packages, resolved) =
-            self.upgrade_selection_from_sources(selectors, options)?;
+        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
+            selectors,
+            options,
+            RecordedValueAuthority::Superseded,
+        )?;
         if selected.is_empty() {
             return Ok(ProfileComposedApplyResult::new(Vec::new()));
         }
@@ -862,8 +860,11 @@ impl CommandExecutor<JsonFileStorage> {
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
     ) -> Result<ProfilePlanResult> {
-        let (selected, packages, resolved) =
-            self.upgrade_selection_from_sources(selectors, options)?;
+        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
+            selectors,
+            options,
+            RecordedValueAuthority::Superseded,
+        )?;
         if selected.is_empty() {
             return Ok(ProfilePlanResult::new(Vec::new()));
         }
@@ -877,60 +878,26 @@ impl CommandExecutor<JsonFileStorage> {
         )
     }
 
-    /// Resolve and render reconfiguration candidates from the installed
-    /// records. The recorded package identity is verified before defaults or
-    /// ambient process state could affect a replay.
-    fn reconfiguration_selection_from_sources(
+    /// Resolve and render one lifecycle selection from the records the
+    /// repository already holds.
+    ///
+    /// `authority` is the whole difference between the two commands. Under
+    /// [`RecordedValueAuthority::Exact`] every closure member must still be the
+    /// package its record describes, so a replay cannot switch identity. Under
+    /// [`RecordedValueAuthority::Superseded`] a selected member must be
+    /// installed and its replacement must advance the version, while a
+    /// dependency the closure reaches for the first time is resolved as an
+    /// ordinary first application.
+    ///
+    /// The graph is settled over every applied package that survives the
+    /// selection before any member is rendered, so a range or incompatibility
+    /// another profile depends on refuses the selection here rather than at the
+    /// publication this precedes.
+    fn lifecycle_selection_from_sources(
         &self,
         selectors: &[ProfileSelector],
         options: &ProfileVariableOptions,
-    ) -> Result<(
-        Vec<ProfilePackage>,
-        Vec<ProfilePackage>,
-        Vec<ResolvedProfileContent>,
-    )> {
-        let selected = self.resolve_profile_selectors(selectors)?;
-        if selected.is_empty() {
-            return Ok((selected, Vec::new(), Vec::new()));
-        }
-        let packages = self
-            .resolve_profile_graph_for_mutation(&selected)?
-            .selected_packages();
-        let inputs = load_profile_variable_inputs(
-            &packages,
-            options.values_file.as_deref(),
-            &options.assignments,
-        )?;
-        let resolved = packages
-            .iter()
-            .map(|package| {
-                let id = package.model().id.as_str();
-                let record_path = applied_record_path(id)?;
-                let record = self.read_applied_profile_record(id)?.ok_or_else(|| {
-                    ProfileApplyError::InstalledRecordConflict {
-                        path: record_path.repository_relative(),
-                        id: id.to_string(),
-                    }
-                })?;
-                ensure_reconfiguration_package_identity(package, &record)?;
-                resolve_package_from_record(
-                    package,
-                    &record.variables,
-                    &inputs.for_declarations(&package.model().variables),
-                    RecordedValueAuthority::Exact,
-                )
-                .map_err(Into::into)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        Ok((selected, packages, resolved))
-    }
-
-    /// Resolve upgrade candidates and settle their graph against every applied
-    /// package that survives the selection before any profile is rendered.
-    fn upgrade_selection_from_sources(
-        &self,
-        selectors: &[ProfileSelector],
-        options: &ProfileVariableOptions,
+        authority: RecordedValueAuthority,
     ) -> Result<(
         Vec<ProfilePackage>,
         Vec<ProfilePackage>,
@@ -956,31 +923,41 @@ impl CommandExecutor<JsonFileStorage> {
             .iter()
             .map(|package| {
                 let id = package.model().id.as_str();
-                let record_path = applied_record_path(id)?;
-                let record = self.read_applied_profile_record(id)?;
-                if selected_ids.contains(&package.model().id) && record.is_none() {
-                    return Err(ProfileApplyError::InstalledRecordConflict {
-                        path: record_path.repository_relative(),
-                        id: id.to_string(),
+                let package_inputs = inputs.for_declarations(&package.model().variables);
+                let missing_record = || ProfileApplyError::InstalledRecordConflict {
+                    path: applied_record_path(id)
+                        .map(|path| path.repository_relative())
+                        .unwrap_or_else(|_| id.to_string()),
+                    id: id.to_string(),
+                };
+                match (self.read_applied_profile_record(id)?, authority) {
+                    (Some(record), RecordedValueAuthority::Exact) => {
+                        ensure_reconfiguration_package_identity(package, &record)?;
+                        resolve_package_from_record(
+                            package,
+                            &record.variables,
+                            &package_inputs,
+                            authority,
+                        )
+                        .map_err(Into::into)
                     }
-                    .into());
-                }
-                if let Some(record) = &record {
-                    ensure_upgrade_version_is_newer_when_replaced(package, record)?;
-                }
-                match record {
-                    Some(record) => resolve_package_from_record(
-                        package,
-                        &record.variables,
-                        &inputs.for_declarations(&package.model().variables),
-                        RecordedValueAuthority::Superseded,
-                    )
-                    .map_err(Into::into),
-                    None => resolve_package(
-                        package,
-                        &inputs.for_declarations(&package.model().variables),
-                    )
-                    .map_err(Into::into),
+                    (Some(record), RecordedValueAuthority::Superseded) => {
+                        ensure_upgrade_version_is_newer_when_replaced(package, &record)?;
+                        resolve_package_from_record(
+                            package,
+                            &record.variables,
+                            &package_inputs,
+                            authority,
+                        )
+                        .map_err(Into::into)
+                    }
+                    (None, RecordedValueAuthority::Exact) => Err(missing_record().into()),
+                    (None, RecordedValueAuthority::Superseded) => {
+                        if selected_ids.contains(&package.model().id) {
+                            return Err(missing_record().into());
+                        }
+                        resolve_package(package, &package_inputs).map_err(Into::into)
+                    }
                 }
             })
             .collect::<Result<Vec<_>>>()?;
@@ -1422,18 +1399,7 @@ impl CommandExecutor<JsonFileStorage> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let targets = plan
-                .profile_targets()
-                .iter()
-                .map(|target| {
-                    let action = match target.disposition {
-                        ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
-                        ProfileTargetDisposition::Create => ProfileTargetAction::Create,
-                        ProfileTargetDisposition::Update => ProfileTargetAction::Update,
-                    };
-                    ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
-                })
-                .collect::<Vec<_>>();
+            let targets = profile_target_changes(&plan);
             let plans = selected
                 .iter()
                 .map(|package| ProfilePlanEntry {
@@ -1474,18 +1440,7 @@ impl CommandExecutor<JsonFileStorage> {
             ProfileLifecycleOperation::Apply,
         )?;
         Ok(plan.map(|plan| {
-            let changes = plan
-                .profile_targets()
-                .iter()
-                .map(|target| {
-                    let action = match target.disposition {
-                        ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
-                        ProfileTargetDisposition::Create => ProfileTargetAction::Create,
-                        ProfileTargetDisposition::Update => ProfileTargetAction::Update,
-                    };
-                    ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
-                })
-                .collect();
+            let changes = profile_target_changes(&plan);
             (plan, changes)
         }))
     }
@@ -1724,6 +1679,25 @@ impl CommandExecutor<JsonFileStorage> {
             )?))
         })
     }
+}
+
+/// Project a prepared plan's owned targets into the public dry-run vocabulary.
+///
+/// Every profile command that reports targets reads them from the plan it
+/// prepared, so what an adopter is shown and what the transaction would publish
+/// come from one derivation.
+fn profile_target_changes(plan: &MaterializationPlan) -> Vec<ProfileTargetChange> {
+    plan.profile_targets()
+        .iter()
+        .map(|target| {
+            let action = match target.disposition {
+                ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
+                ProfileTargetDisposition::Create => ProfileTargetAction::Create,
+                ProfileTargetDisposition::Update => ProfileTargetAction::Update,
+            };
+            ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
+        })
+        .collect()
 }
 
 /// Insert one package image without allowing selector or dependency traversal
