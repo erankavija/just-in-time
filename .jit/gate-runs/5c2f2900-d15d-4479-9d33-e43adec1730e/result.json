@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d4794ebc9d7bbd90db63fa866e3439fd647f490b",
+  "completed_at": "2026-08-10T16:11:44.140478529Z",
+  "duration_ms": 296047,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are implemented, tested, and the prior schema finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7156f64b-8480-40d1-8af9-c0e48db2ba59",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5c2f2900-d15d-4479-9d33-e43adec1730e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-10T16:06:48.092806379Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 24 commits tagged `jit:7156f64b` (13819826 through d4794ebc)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8, D-13 (dev/vision/9db27a3a-charter.md); issue REQ-01–04 and c639cfb5 REQ-06/11 (issue descriptions); relevant invariants and @/gate/jit-validate (.jit registries)\nGate evidence: cargo-ci passed (exit 0, 2026-08-10T15:50:12Z); mcp-ci passed (exit 0, 2026-08-10T16:06:40Z); prior code-review failed (exit 1) on F1, now addressed by d4794ebc\nTruncation recovery: narrowed reads by tagged commit/path, merge-parent diff, and current command, planner, variable, test, schema, and documentation ranges\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are implemented, tested, and the prior schema finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

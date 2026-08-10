@@ -313,7 +313,7 @@
     "9fad8581": 2,
     "44ec7192": 0,
     "9f493686": 2,
-    "7156f64b": 4
+    "7156f64b": 5
   },
   "review_verdicts": [
     {
@@ -939,6 +939,17 @@
         "code-review": "passed"
       },
       "notes": "Round 1 code-review FAIL was a lead-caused scope error: the dispatch forbade documenting the commands in cli-commands.md, leaving them with no canonical home (@/charter/D-13). Lead wrote the reference entries; gate re-run passed."
+    },
+    {
+      "issue": "7156f64b",
+      "verdict": "PASS",
+      "round": 5,
+      "gates": {
+        "cargo-ci": "passed",
+        "mcp-ci": "passed",
+        "code-review": "passed"
+      },
+      "notes": "Five code-review rounds. R1 docs home (lead scope error). R2 aggregate target list cloned per entry. R3 repeat occurrence listed targets it does not publish. R4 schema prose stated apply's entry-set rule for all three commands. Root cause across R2-R4: changing the rehearsal entry-set shape invalidates every statement describing it, and findings were supplied one at a time. Closed by a worker-authored field-by-occurrence-shape matrix and a SelectionObservation trait that states 'publishes nothing' once per answer type."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",

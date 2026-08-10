@@ -18,17 +18,17 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-10T15:29:03.433724595Z",
+      "updated_at": "2026-08-10T16:20:04.310060109Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-10T15:32:22.102550985Z",
+      "status": "passed",
+      "updated_at": "2026-08-10T16:11:44.487058028Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-08-10T15:29:11.048841934Z",
+      "updated_at": "2026-08-10T16:06:43.033495812Z",
       "updated_by": "auto:executor"
     }
   },
@@ -44,7 +44,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Expose reconfiguration and upgrade as commands",
-  "updated_at": "2026-08-10T15:42:48.356376868Z"
+  "updated_at": "2026-08-10T16:20:16.068572673Z"
 }

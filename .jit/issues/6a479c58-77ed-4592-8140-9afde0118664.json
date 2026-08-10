@@ -27,7 +27,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Capture a package tree from declared repository targets",
-  "updated_at": "2026-08-10T15:42:43.034288435Z"
+  "updated_at": "2026-08-10T16:20:21.393009296Z"
 }
