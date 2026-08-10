@@ -305,7 +305,7 @@
     "9fad8581": 2,
     "44ec7192": 0,
     "9f493686": 2,
-    "7156f64b": 1
+    "7156f64b": 4
   },
   "review_verdicts": [
     {
@@ -958,8 +958,18 @@
     },
     {
       "subject": "ProfileTargetMaterialization carries no owner",
-      "detail": "A rehearsal repeats the same aggregate target list once per selector. Fix at source belongs to cb26de35.",
+      "detail": "A rehearsal repeats the same aggregate target list once per selector. Fix at source belongs to cb26de35. Closed: owner field added and rehearsal entries scoped per profile (47813ac7, ac1a5cf8). Recorded here as a lead triage error \u2014 it was filed as future work and the reviewer correctly bound it to REQ-04 of this issue.",
+      "status": "closed-in-7156f64b"
+    },
+    {
+      "subject": "apply --dry-run rehearsal/run asymmetry",
+      "detail": "jit profile apply --dry-run plans each selector's package alone, so its rehearsal reports one entry per selector while its run reports closure members plus root occurrences. Same class as the REQ-04 findings on reconfigure/upgrade but on a command this issue does not own. Closing it means switching apply onto plan_resolved_profile_selection (one aggregate preview instead of N per-package previews) plus re-merging the two doc statements at cli-commands.md:703 and profiles.md:117.",
       "status": "assigned-cb26de35"
+    },
+    {
+      "subject": "lead triage: findings supplied one at a time",
+      "detail": "Rounds 2 and 3 of code-review were the same defect class (rehearsal entry fidelity). The lead passed on each finding individually instead of the whole entry contract; the reviewer has no cross-round memory, so completeness must come from the lead. Round 4 requires a full field-by-occurrence-shape matrix as the deliverable.",
+      "status": "process-note"
     }
   ]
 }
