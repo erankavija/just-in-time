@@ -1497,6 +1497,59 @@ source-of-truth = \"registry-first\"\n";
     }
 
     #[test]
+    fn test_single_profile_reinit_attributes_coupled_schema_repair() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let location = crate::test_utils::stage_repository_packages(repo.path(), "jit-default");
+        let selector = ProfileSelector::path(&location);
+
+        executor_with_layout(&storage, repo.path())
+            .initialize_fresh_repository(repo.path(), Some(std::slice::from_ref(&selector)))
+            .unwrap();
+        let schema = repo
+            .path()
+            .join(".jit/schemas/default-namespace-registry.json");
+        let expected_schema = fs::read(&schema).unwrap();
+        fs::remove_file(&schema).unwrap();
+        let events_path = repo.path().join(".jit/events.jsonl");
+        let events_before = fs::read_to_string(&events_path).unwrap();
+
+        let repaired = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[ProfileSelector::id("jit-default").unwrap()],
+            )
+            .unwrap();
+
+        assert_eq!(
+            repaired.profile.unwrap().requested().unwrap().status,
+            ProfileApplicationStatus::Applied,
+            "the profile whose default-rule authority repaired the schema is applied"
+        );
+        assert_eq!(fs::read(&schema).unwrap(), expected_schema);
+        assert_eq!(
+            fs::read_to_string(&events_path).unwrap().lines().count(),
+            events_before.lines().count() + 1,
+            "a coupled-only repair keeps the current per-profile audit event"
+        );
+
+        let again = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[ProfileSelector::id("jit-default").unwrap()],
+            )
+            .unwrap();
+        assert_eq!(
+            again.profile.unwrap().requested().unwrap().status,
+            ProfileApplicationStatus::Unchanged
+        );
+        assert_eq!(
+            fs::read_to_string(events_path).unwrap().lines().count(),
+            events_before.lines().count() + 1
+        );
+    }
+
+    #[test]
     fn test_profiled_init_detects_projection_source_outside_final_capture() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
