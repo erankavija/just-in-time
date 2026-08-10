@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "05ef81916c614221281f87fa8b949b08f9457973",
+  "completed_at": "2026-08-10T14:54:56.275671059Z",
+  "duration_ms": 269177,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 1414,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7156f64b/requirement/REQ-04",
+          "@/issue/c639cfb5/requirement/REQ-06"
+        ],
+        "severity": "medium",
+        "summary": "Each selected profile preview clones the full aggregate target list, misreporting target decisions for multi-selector reconfigure and upgrade rehearsals."
+      }
+    ],
+    "summary": "Multi-selector lifecycle rehearsals duplicate aggregate target decisions under every selected profile.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7156f64b-8480-40d1-8af9-c0e48db2ba59",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "723deb17-bba1-4a9d-83a5-ab27e34acc36",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-10T14:50:27.098208697Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14846 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fec27-5151-7290-95e2-462f78b93413\n--------\nuser\n--- 14833 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 13819826, 9a3f71cf, ad396e79, 5f0966da, ff214813, 5f2bf60f, 4ad1ffd8, 8e7d209b, 8dd274e2, 2cdcf44f, f6c422de, d8056a35, 28ece55b, 1daa0aee, 05ef8191\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 and D-13 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose, atomic-writes, derived-state-coherence, architecture-dependency-direction (.jit/invariants.toml); @/issue/7156f64b/requirement/REQ-01 through REQ-04 and @/issue/c639cfb5/requirement/REQ-06, REQ-11 (issue descriptions); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0 (2026-08-10T14:26:10Z); mcp-ci passed, exit 0 (2026-08-10T14:34:39Z); latest prior code-review passed\nTruncation recovery: narrowed truncated searches and patches by path/current-file range; inspected merge-parent patch separately\n\n1. [blocking][issue-impact] [crates/jit/src/commands/profile.rs:1414](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/profile.rs:1414) clones the complete aggregate target list into every selector’s `ProfilePlanEntry`. A multi-profile reconfigure or upgrade rehearsal therefore reports each profile as owning every planned target, rather than its own decisions; the tests only exercise one selected profile. This fails the hard rehearsal-reporting criterion and the documented one-preview-per-selector contract. References: `@/issue/7156f64b/requirement/REQ-04`, `@/issue/c639cfb5/requirement/REQ-06`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Multi-selector lifecycle rehearsals duplicate aggregate target decisions under every selected profile.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Each selected profile preview clones the full aggregate target list, misreporting target decisions for multi-selector reconfigure and upgrade rehearsals.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":1414,\"references\":[\"@/issue/7156f64b/requirement/REQ-04\",\"@/issue/c639cfb5/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

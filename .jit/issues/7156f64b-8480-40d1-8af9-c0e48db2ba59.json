@@ -22,8 +22,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "passed",
-      "updated_at": "2026-08-10T14:46:02.573808616Z",
+      "status": "failed",
+      "updated_at": "2026-08-10T14:54:56.606561614Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -44,7 +44,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "done",
+  "state": "in_progress",
   "title": "Expose reconfiguration and upgrade as commands",
-  "updated_at": "2026-08-10T14:47:09.619559498Z"
+  "updated_at": "2026-08-10T14:55:44.419678093Z"
 }
