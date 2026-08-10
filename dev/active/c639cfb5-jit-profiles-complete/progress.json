@@ -153,6 +153,14 @@
           "title": "Pack a package into a verifiable archive",
           "classification": "implementation",
           "status": "pending"
+        },
+        {
+          "id": "9a81ab12",
+          "short_id": "9a81ab12",
+          "title": "Remove the shipped-v1 record migration boundary",
+          "classification": "implementation",
+          "status": "pending",
+          "note": "No DAG edge onto 6a479c58: the cross-story edge would force jit to drop 42c8c9c1->7156f64b and route that issue's containment through another story, diverging its membership label. Sequenced here instead - capture must exist before the migration path is deleted (protect before destroy)."
         }
       ]
     },
@@ -970,6 +978,16 @@
       "subject": "lead triage: findings supplied one at a time",
       "detail": "Rounds 2 and 3 of code-review were the same defect class (rehearsal entry fidelity). The lead passed on each finding individually instead of the whole entry contract; the reviewer has no cross-round memory, so completeness must come from the lead. Round 4 requires a full field-by-occurrence-shape matrix as the deliverable.",
       "status": "process-note"
+    }
+  ],
+  "scope_changes": [
+    {
+      "date": "2026-08-10",
+      "decision": "Whole epic pulled from milestone v1.1 to v1.0",
+      "authority": "invoker",
+      "detail": "Charter D-8 reversed and D-14 amended in dev/vision/9db27a3a-charter.md, re-projected. All 27 epic issues relabelled milestone:v1.0. Release boundary rewired: bb03df0a (cut the v1.0.0 tag) now depends on c639cfb5 and moved ready->backlog; 0735879a->c639cfb5 removed.",
+      "criteria_amended": "REQ-05, REQ-09, REQ-11, REQ-12, D-01, D-05, RISK-02, RISK-04 and the background framing - the v1.0-record migration promises are gone, replaced by a clean cut.",
+      "new_work": "9a81ab12 removes the shipped-v1 boundary (126 refs across 7 files); dissolves 7793b8b7."
     }
   ]
 }

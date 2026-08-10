@@ -18,16 +18,16 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:authoring-and-exchange",
     "component:cli",
     "component:storage",
     "satisfies:REQ-13",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Capture a package tree from declared repository targets",
-  "updated_at": "2026-08-10T15:07:58.407366289Z"
+  "updated_at": "2026-08-10T15:42:43.034288435Z"
 }

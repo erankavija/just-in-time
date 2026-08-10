@@ -17,14 +17,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:surface-and-evidence",
     "component:cli",
-    "satisfies:REQ-06"
+    "satisfies:REQ-06",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Give the profile subcommands one presentation contract",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-10T15:43:32.529267646Z"
 }

@@ -18,33 +18,33 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-10T14:34:36.189351060Z",
+      "updated_at": "2026-08-10T15:29:03.433724595Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-10T14:54:56.606561614Z",
+      "updated_at": "2026-08-10T15:32:22.102550985Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
       "status": "passed",
-      "updated_at": "2026-08-10T14:34:42.426570234Z",
+      "updated_at": "2026-08-10T15:29:11.048841934Z",
       "updated_by": "auto:executor"
     }
   },
   "id": "7156f64b-8480-40d1-8af9-c0e48db2ba59",
   "labels": [
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:ownership-and-safe-change",
     "component:cli",
     "satisfies:REQ-06",
     "satisfies:REQ-11",
-    "type:task"
+    "type:task",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "in_progress",
   "title": "Expose reconfiguration and upgrade as commands",
-  "updated_at": "2026-08-10T14:55:44.419678093Z"
+  "updated_at": "2026-08-10T15:42:48.356376868Z"
 }

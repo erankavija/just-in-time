@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-10T15:47:30.036394377Z",
+  "dependencies": [],
+  "description": "Delete the compatibility path that converts the pinned shipped-v1 applied-profile record, and every mechanism that exists only to serve it.\n\n## Background\n\nThe boundary was built to carry a released v1.0 record shape into the lifecycle's canonical record. Pulling this epic into v1.0 (`@/charter/D-8`) removes the thing it bridged: v1.0 has not shipped, so no released record format exists to stay compatible with, and the boundary is compatibility code for a format no adopter holds.\n\nThe project's cutover invariant permits compatibility only inside a named, versioned migration boundary with a tracked removal condition (`@/invariant/canonical-cutover`). That removal condition is now met, so the boundary is removed rather than generalized. A repository holding a pre-release record re-derives its package through capture (`6a479c58`).\n\nThe surface is 126 references across seven files: `repository_state/shipped_v1_record.rs` and its pinned evidence fixture, plus call sites in `repository_state/{mod,initialize,materialize,profile_apply}.rs` and `commands/{init,profile}.rs`.\n\nRemoving the conversion counter this boundary maintains also dissolves `7793b8b7`, whose order-dependent test asserts on that process-global.\n\n## Success Criteria\n\n- [hard] REQ-01: The shipped-v1 record decoder, its conversion, its pinned evidence fixture, and its authentication path are gone, and no call site retains a branch for a pre-canonical record shape.\n- [hard] REQ-02: The applied-record reader accepts the canonical record only; a record it cannot decode is a typed error naming the record and its profile, not a silent migration or a fallback.\n- [hard] REQ-03: The multi-phase capture that exists solely to authenticate the pinned historical image before planning is removed with it, so a lifecycle mutation captures what its own operation needs and nothing more.\n- [hard] REQ-04: No process-global conversion counter survives, and no test depends on one.\n- [hard] REQ-05: Every documentation statement describing a migration of a prior record format is removed or corrected in the same change.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-10T15:47:30.036394377Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-10T15:47:36.955991217Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-10T15:47:37.211565310Z",
+      "updated_by": null
+    }
+  },
+  "id": "9a81ab12-1fc5-45b3-bc7d-8d391e13c4a5",
+  "labels": [
+    "milestone:v1.0",
+    "epic:jit-profiles-complete",
+    "story:ownership-and-safe-change",
+    "component:storage",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Remove the shipped-v1 record migration boundary",
+  "updated_at": "2026-08-10T15:47:37.211565310Z"
+}

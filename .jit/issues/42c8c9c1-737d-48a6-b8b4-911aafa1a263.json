@@ -3,7 +3,8 @@
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
-    "7156f64b-8480-40d1-8af9-c0e48db2ba59"
+    "7156f64b-8480-40d1-8af9-c0e48db2ba59",
+    "9a81ab12-1fc5-45b3-bc7d-8d391e13c4a5"
   ],
   "description": "Ownership claims, variable resolution, and three-way decisions together make a\nchange to an already-applied profile safe instead of impossible.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands per-target ownership claims, one aggregate publication, resolved variables, and three-way reconfiguration and upgrade, so an applied profile can change without stranding the repository.\n",
   "documents": [],
@@ -23,14 +24,14 @@
   "labels": [
     "type:story",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:ownership-and-safe-change",
     "component:storage",
-    "component:cli"
+    "component:cli",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Ownership, records, and safe change",
-  "updated_at": "2026-08-10T15:07:53.333446447Z"
+  "updated_at": "2026-08-10T15:47:40.824320593Z"
 }

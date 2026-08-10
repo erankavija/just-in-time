@@ -16,14 +16,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:surface-and-evidence",
     "component:testing",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Prove concurrent lifecycle callers serialize",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-10T15:43:43.254163154Z"
 }

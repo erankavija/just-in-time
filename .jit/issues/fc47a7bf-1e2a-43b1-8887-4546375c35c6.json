@@ -30,16 +30,16 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:ownership-and-safe-change",
     "component:cli",
     "component:storage",
     "satisfies:REQ-04",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Resolve declared non-secret variables into package content",
-  "updated_at": "2026-08-09T14:20:31.178406419Z"
+  "updated_at": "2026-08-10T15:44:45.232168326Z"
 }

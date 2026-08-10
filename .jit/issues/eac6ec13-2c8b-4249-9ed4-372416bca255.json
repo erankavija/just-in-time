@@ -36,15 +36,15 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:canonical-package-graph",
     "component:cli",
     "satisfies:REQ-01",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Select profiles through repeatable ordered selectors",
-  "updated_at": "2026-08-09T09:44:12.861144136Z"
+  "updated_at": "2026-08-10T15:43:54.000529849Z"
 }

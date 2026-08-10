@@ -17,14 +17,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:surface-and-evidence",
     "component:testing",
-    "satisfies:REQ-12"
+    "satisfies:REQ-12",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Prove no superseded lifecycle path survives",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-10T15:42:16.679303105Z"
 }

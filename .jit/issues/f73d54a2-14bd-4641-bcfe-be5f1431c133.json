@@ -30,14 +30,14 @@
   "labels": [
     "type:story",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:canonical-package-graph",
     "component:cli",
-    "component:storage"
+    "component:storage",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Canonical package model, selection, and graph",
-  "updated_at": "2026-08-09T12:07:33.119651079Z"
+  "updated_at": "2026-08-10T15:44:39.889057377Z"
 }

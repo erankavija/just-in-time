@@ -17,14 +17,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:surface-and-evidence",
     "component:docs",
-    "satisfies:REQ-10"
+    "satisfies:REQ-10",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Document the completed profile lifecycle for adopters",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-10T15:43:21.835629776Z"
 }

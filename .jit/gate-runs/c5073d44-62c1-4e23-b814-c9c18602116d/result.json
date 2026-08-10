@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d5f25800b788b9a72e0c12c098abc766c9cd401d",
+  "completed_at": "2026-08-10T15:32:21.769415540Z",
+  "duration_ms": 186299,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 1449,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7156f64b/requirement/REQ-04"
+        ],
+        "severity": "medium",
+        "summary": "A repeated selector's unchanged rehearsal entry still lists target updates that only its first occurrence publishes."
+      }
+    ],
+    "summary": "Repeated lifecycle selectors misreport duplicate rehearsal target actions.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7156f64b-8480-40d1-8af9-c0e48db2ba59",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c5073d44-62c1-4e23-b814-c9c18602116d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-10T15:29:15.470294889Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13740 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fec4a-d8d1-7893-b576-b0205b982710\n--------\nuser\n--- 13727 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 20 `jit:7156f64b` commits (13819826, 9a3f71cf, ad396e79, 5f0966da, ff214813, 5f2bf60f, 4ad1ffd8, 8e7d209b, 8dd274e2, 2cdcf44f, f6c422de, d8056a35, 28ece55b, 1daa0aee, 05ef8191, 51fe864b, 47813ac7, fb610db2, ac1a5cf8, d5f25800); uncommitted `.jit` changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/c639cfb5/requirement/REQ-06 and REQ-11 (epic description); @/issue/7156f64b/requirement/REQ-04 (issue description); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-10T15:19:59Z); mcp-ci passed (exit 0, 2026-08-10T15:29:08Z)\nTruncation recovery: reread bounded current implementation, lifecycle tests, CLI dispatch, documentation, variable resolution, and individual follow-up patches\n\n1. **F1 — blocking, issue-impact, medium:** Repeated `--profile` selectors produce a second rehearsal entry marked `unchanged` but retain the first occurrence’s `create`/`update` targets. `selection_observations` clones the entry and the planner changes only its status, so human output can state “unchanged” then print updates the second occurrence will not publish. This violates the requirement that rehearsal reports the decisions it would publish. [crates/jit/src/commands/profile.rs:1449](@/issue/7156f64b/requirement/REQ-04)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Repeated lifecycle selectors misreport duplicate rehearsal target actions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A repeated selector's unchanged rehearsal entry still lists target updates that only its first occurrence publishes.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":1449,\"references\":[\"@/issue/7156f64b/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

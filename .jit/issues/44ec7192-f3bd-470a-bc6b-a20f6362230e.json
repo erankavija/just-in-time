@@ -30,14 +30,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:ownership-and-safe-change",
     "component:storage",
-    "satisfies:REQ-07"
+    "satisfies:REQ-07",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Decide each target from base, current, and candidate",
-  "updated_at": "2026-08-10T09:22:06.583891626Z"
+  "updated_at": "2026-08-10T15:42:27.177044888Z"
 }

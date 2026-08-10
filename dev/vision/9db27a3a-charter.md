@@ -26,13 +26,13 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-5: A milestone-tier steward skill sits above the epic-level execution lead
 - D-6: Each item kind declares its own source of truth (markdown-first or registry-first)
 - D-7: Charter decisions are project-addressable items over the vision charter
-- D-8: Ship composable offline profile packages discovered from declared locations in v1.0 and defer the rest of the profile lifecycle
+- D-8: Ship the complete profile lifecycle in v1.0, because an apply-only profile surface leaves an applied profile unrecoverable
 - D-9: Remove redundant release surfaces without removing product capabilities
 - D-10: Support one Docker topology that serves the API and web UI from a repository mount
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
 - D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - D-13: Give each adopter-facing fact one canonical documentation home
-- D-14: Gate the v1.0 tag on completed profiles MVP and core maintenance
+- D-14: Gate the v1.0 tag on the completed profile lifecycle and core maintenance
 - D-15: Fix scoped validation in core rather than weakening bracket evidence
 - D-16: Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
 
@@ -136,30 +136,37 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   rationale stays readable below them.
 - **Date:** 2026-07-07
 
-### D-8: Composable offline profile packages before the complete lifecycle
+### D-8: The complete profile lifecycle ships in v1.0
 
-- **Chosen:** v1.0 ships offline profile packages discovered from declared
-  locations, composed by declared package-to-package dependency, and applied
-  safely to fresh and existing repositories. Two packages ship: `jit-default`
-  carrying the domain vocabulary a repository needs to be usable, and
-  `jit-dogfood` carrying this project's workflow on top of it. Variables and
-  sensitive-value handling, reconfiguration, detailed diff, three-way upgrade,
-  safe removal, declared incompatibilities, search-path precedence, and
-  shared-ownership semantics move intact to a post-1.0 epic.
-- **Rejected:** Shipping the full profile package manager before v1.0, which
-  makes a large new lifecycle subsystem the release critical path; dropping
-  profiles from v1.0 entirely, which leaves the strongest dogfooded workflow
-  difficult for adopters to install; and each package carrying a complete copy
-  of the shared vocabulary, which is a hand-maintained duplicate held correct by
-  an assertion.
-- **Reasoning:** The binary carries mechanism and no instance of it
-  (`@/inv/domain-agnostic`), so every type name, namespace, item kind, area
-  classification, and workflow rule reaches a repository as package content.
-  That makes a second package unavoidable — a usable default and this project's
-  workflow are different opinions — and two packages sharing vocabulary need
-  composition rather than duplication. The bounded surface is one dependency
-  edge resolved at application time; the deferred list stays deferred.
-- **Date:** 2026-07-14, amended 2026-07-31
+- **Chosen:** v1.0 ships the whole profile lifecycle: offline packages
+  discovered from declared locations, composed by declared package-to-package
+  dependency and by semantic identity with shared ownership, resolved through
+  declared non-secret variables, published through one recoverable transaction
+  carrying durable ownership records, and then reconfigured, upgraded,
+  captured, packed, exchanged, checked, and previewed. Two packages ship:
+  `jit-default` carrying the domain vocabulary a repository needs to be usable,
+  and `jit-dogfood` carrying this project's workflow on top of it. Safe removal
+  and remote package registries remain deferred.
+- **Rejected:** Shipping the apply-only surface and deferring the rest of the
+  lifecycle to a post-1.0 epic, which is what this decision previously chose;
+  and dropping profiles from v1.0 entirely, which leaves the strongest
+  dogfooded workflow difficult for adopters to install.
+- **Reasoning:** The bounded apply-only surface is not a smaller version of the
+  lifecycle; it is a broken one. An adopter who edits a profile-owned file in
+  place — an ordinary act on their own repository — is reported as drifted, and
+  the owning package cannot be re-applied once its record exists. No sanctioned
+  sequence returns that repository to a valid state, so the deferred list was
+  not a set of conveniences but the recovery path itself. Shipping that as v1.0
+  would hand adopters a system where routine editing is unrecoverable. The
+  deferred capabilities therefore become release scope, and the release waits
+  for them.
+- **Consequences:** The v1.0 tag depends on the complete profile lifecycle
+  epic rather than on the profiles MVP alone (D-14). Because v1.0 has not
+  shipped, no released record format exists to stay compatible with, so the
+  lifecycle carries no migration boundary for a pre-release record shape
+  (`@/inv/canonical-cutover`); a repository holding one re-derives its package
+  through capture.
+- **Date:** 2026-07-14, amended 2026-07-31, reversed 2026-08-10
 
 ### D-9: Cut redundant release surfaces, not product capabilities
 
@@ -230,22 +237,24 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   enforces `@/inv/single-source-prose` across the public documentation surface.
 - **Date:** 2026-07-14
 
-### D-14: The v1.0 tag consumes the two completed upstream delivery streams
+### D-14: The v1.0 tag consumes the completed upstream delivery streams
 
 - **Chosen:** Keep the release boundary directly dependent on profiles MVP
-  `9b7b5f9c` and core maintenance `6eb585bc`. Both reach a terminal state before
-  the `v1.0.0` tag is created; the release work consumes their delivered
-  contracts without changing or duplicating them.
+  `9b7b5f9c`, the complete profile lifecycle `c639cfb5`, and core maintenance
+  `6eb585bc`. All reach a terminal state before the `v1.0.0` tag is created; the
+  release work consumes their delivered contracts without changing or
+  duplicating them. The lifecycle epic joined this set when D-8 was reversed:
+  the profile surface it completes is the one v1.0 ships.
 - **Rejected:** Creating an intermediate v1.0 core-maintenance checkpoint only
   to make the dependency terminal; keeping core maintenance intentionally open
   as a living epic; and copying either upstream stream's work into the release
   container, which creates competing ownership.
 - **Reasoning:** The existing DAG expresses the intended ordering. Planning and
   independent release hardening can proceed while core maintenance finishes, but
-  tagging requires the completed core fixes and the profile quickstart. A
-  synthetic checkpoint would add lifecycle ceremony without changing that
-  contract.
-- **Date:** 2026-07-15
+  tagging requires the completed core fixes, the profile quickstart, and a
+  profile lifecycle an adopter can recover from. A synthetic checkpoint would
+  add lifecycle ceremony without changing that contract.
+- **Date:** 2026-07-15, amended 2026-08-10
 
 ### D-15: Scoped bracket validation is a core-maintenance prerequisite
 

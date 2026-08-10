@@ -77,14 +77,14 @@
   "id": "33f76b11-0c12-4150-bebb-2f0fdb5dbc83",
   "labels": [
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "component:cli",
     "component:storage",
-    "type:planning"
+    "type:planning",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "planning: Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-08T23:10:45.777078245Z"
+  "updated_at": "2026-08-10T15:42:11.446303608Z"
 }

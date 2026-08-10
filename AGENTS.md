@@ -107,13 +107,13 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **D-5** — A milestone-tier steward skill sits above the epic-level execution lead
 - **D-6** — Each item kind declares its own source of truth (markdown-first or registry-first)
 - **D-7** — Charter decisions are project-addressable items over the vision charter
-- **D-8** — Ship composable offline profile packages discovered from declared locations in v1.0 and defer the rest of the profile lifecycle
+- **D-8** — Ship the complete profile lifecycle in v1.0, because an apply-only profile surface leaves an applied profile unrecoverable
 - **D-9** — Remove redundant release surfaces without removing product capabilities
 - **D-10** — Support one Docker topology that serves the API and web UI from a repository mount
 - **D-11** — Release v1.0 with no known dependency advisories and blocking security audits
 - **D-12** — Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - **D-13** — Give each adopter-facing fact one canonical documentation home
-- **D-14** — Gate the v1.0 tag on completed profiles MVP and core maintenance
+- **D-14** — Gate the v1.0 tag on the completed profile lifecycle and core maintenance
 - **D-15** — Fix scoped validation in core rather than weakening bracket evidence
 - **D-16** — Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
 <!-- jit:charter:end -->

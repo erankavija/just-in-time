@@ -18,16 +18,16 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:authoring-and-exchange",
     "component:cli",
     "component:storage",
     "satisfies:REQ-14",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Pack a package into a verifiable archive",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-10T15:42:06.128978326Z"
 }

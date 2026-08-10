@@ -28,15 +28,15 @@
   "id": "01bace3f-8197-42fa-b3e4-fe989491766d",
   "labels": [
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "component:cli",
     "component:storage",
     "type:breakdown",
-    "brackets:c639cfb5"
+    "brackets:c639cfb5",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "breakdown: Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-08T23:32:47.321124251Z"
+  "updated_at": "2026-08-10T15:42:00.801106112Z"
 }

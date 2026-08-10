@@ -30,14 +30,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:canonical-package-graph",
     "component:storage",
-    "satisfies:REQ-09"
+    "satisfies:REQ-09",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Normalize both package manifest versions into one canonical model",
-  "updated_at": "2026-08-09T03:46:13.135967229Z"
+  "updated_at": "2026-08-10T15:44:21.593919033Z"
 }

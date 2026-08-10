@@ -22,14 +22,14 @@
   "labels": [
     "type:story",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:authoring-and-exchange",
     "component:cli",
-    "component:storage"
+    "component:storage",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Package authoring and offline exchange",
-  "updated_at": "2026-08-09T12:07:32.700526869Z"
+  "updated_at": "2026-08-10T15:44:26.972736092Z"
 }

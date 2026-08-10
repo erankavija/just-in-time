@@ -30,16 +30,16 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:ownership-and-safe-change",
     "component:storage",
     "satisfies:REQ-05",
     "satisfies:REQ-09",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Carry ownership claims in the applied profile record",
-  "updated_at": "2026-08-09T21:21:37.753475152Z"
+  "updated_at": "2026-08-10T15:43:05.803744869Z"
 }

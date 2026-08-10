@@ -30,14 +30,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:surface-and-evidence",
     "component:storage",
-    "satisfies:REQ-06"
+    "satisfies:REQ-06",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Record one lifecycle event per changed mutation",
-  "updated_at": "2026-08-10T09:00:53.384263401Z"
+  "updated_at": "2026-08-10T15:43:11.138059976Z"
 }

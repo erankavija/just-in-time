@@ -30,14 +30,14 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:ownership-and-safe-change",
     "component:storage",
-    "satisfies:REQ-08"
+    "satisfies:REQ-08",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Publish one selection through one recoverable transaction",
-  "updated_at": "2026-08-10T00:35:21.797295787Z"
+  "updated_at": "2026-08-10T15:43:16.489464387Z"
 }

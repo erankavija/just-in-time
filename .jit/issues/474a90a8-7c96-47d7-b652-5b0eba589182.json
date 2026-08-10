@@ -30,15 +30,15 @@
   "labels": [
     "type:task",
     "epic:jit-profiles-complete",
-    "milestone:v1.1",
     "per:@/charter/D-8",
     "story:canonical-package-graph",
     "component:storage",
     "satisfies:REQ-02",
-    "satisfies:REQ-11"
+    "satisfies:REQ-11",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "done",
   "title": "Resolve the selected package set against its declared graph",
-  "updated_at": "2026-08-09T10:47:34.036510950Z"
+  "updated_at": "2026-08-10T15:42:32.445431365Z"
 }
