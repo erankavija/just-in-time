@@ -1895,7 +1895,7 @@ pub(super) fn reject_reserved_application_targets<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Event;
+    use crate::domain::{Event, ProfileLifecycleOperation, ProfileLifecycleStatus};
     use crate::repository_state::{
         Contribution, ContributionCompositionConflict, ContributionConflictOwner,
         InitializationError, MapEntryTarget, ProfileConflictOccupant, ProfilePackageId,
@@ -2189,9 +2189,12 @@ mod tests {
             .read_events()
             .unwrap()
             .into_iter()
-            .filter_map(|event| match event {
-                Event::ProfileApplied { profile_id, .. } => Some(profile_id),
-                _ => None,
+            .flat_map(|event| match event {
+                Event::ProfileLifecycle { profiles, .. } => profiles
+                    .into_iter()
+                    .map(|profile| profile.id.to_string())
+                    .collect(),
+                _ => Vec::new(),
             })
             .collect()
     }
@@ -3874,16 +3877,13 @@ template = true
             .claims
             .iter()
             .all(|claim| claim.base_fingerprint.as_str().len() == 64));
-        let resolved = resolve_package(
-            &package,
-            &inputs.for_declarations(&package.model().variables),
-        )
-        .expect("the applied variable inputs resolve the package");
         let events = storage.read_events().unwrap();
         assert!(matches!(
             events.as_slice(),
-            [Event::ProfileApplied { target_hashes, .. }]
-                if *target_hashes == resolved.target_hashes().expect("resolved target hashes")
+            [Event::ProfileLifecycle { profiles, .. }]
+                if profiles.len() == 1
+                    && profiles[0].variables[0].name.as_ref() == "NAME"
+                    && profiles[0].variables[0].source == crate::profile::VariableSource::Set
         ));
         assert!(!event_bytes
             .windows(resolved_value.len())
@@ -4058,7 +4058,7 @@ template = true
         let events = storage.read_events().unwrap();
         assert!(matches!(
             events.as_slice(),
-            [Event::ProfileApplied {
+            [Event::ProfileLifecycle {
                 isolated_torn_tail: true,
                 ..
             }]
@@ -4094,6 +4094,19 @@ template = true
         assert!(temp.path().join("docs/base.txt").is_file());
         assert!(temp.path().join("docs/workflow.txt").is_file());
         assert_eq!(applied_event_ids(&storage), vec!["base", "workflow"]);
+        assert!(matches!(
+            storage.read_events().unwrap().as_slice(),
+            [Event::ProfileLifecycle {
+                operation: ProfileLifecycleOperation::Apply,
+                profiles,
+                converted_records,
+                ..
+            }]
+                if converted_records.is_empty()
+                    && profiles.len() == 2
+                    && profiles.iter().all(|profile| profile.status
+                        == ProfileLifecycleStatus::Installed)
+        ));
         // One record per package, each addressing its own package's bytes.
         assert_eq!(
             record_for(&temp, "base").package_hash,
@@ -5188,14 +5201,16 @@ template = true
     #[test]
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
         let (temp, storage, executor, package) = fixture();
-        let prior_event = Event::draft_profile_applied(
-            "prior".to_string(),
-            "1.0.0".to_string(),
-            ProfileOrigin::Directory(RootRelativePath::parse("vendor/prior").unwrap()),
-            "prior-package".to_string(),
-            BTreeMap::new(),
-            false,
-        );
+        let prior_event = Event::ProfileApplied {
+            id: String::new(),
+            timestamp: chrono::DateTime::UNIX_EPOCH,
+            profile_id: "prior".to_string(),
+            version: "1.0.0".to_string(),
+            origin: ProfileOrigin::Directory(RootRelativePath::parse("vendor/prior").unwrap()),
+            package_hash: "prior-package".to_string(),
+            target_hashes: BTreeMap::new(),
+            isolated_torn_tail: false,
+        };
         fs::write(
             temp.path().join(".jit/events.jsonl"),
             serde_json::to_vec(&prior_event).unwrap(),
@@ -5208,7 +5223,7 @@ template = true
         assert_eq!(events.len(), 2);
         assert!(matches!(
             events.last().unwrap(),
-            Event::ProfileApplied {
+            Event::ProfileLifecycle {
                 isolated_torn_tail: false,
                 ..
             }

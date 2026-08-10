@@ -35,7 +35,7 @@ pub enum EventLogError {
 /// Parse current-vocabulary events while retaining retired/unknown records.
 ///
 /// Invalid JSON is rejected except for exactly one physical line immediately
-/// followed by a valid [`Event::ProfileApplied`] whose
+/// followed by a valid [`Event::ProfileApplied`] or [`Event::ProfileLifecycle`] whose
 /// `isolated_torn_tail` flag is true. That marker is written in the same
 /// transaction as the preserved prefix, making the exception explicit and
 /// auditable rather than broadly accepting malformed history.
@@ -84,6 +84,9 @@ fn certifies_preceding_torn_tail(next_line: Option<&&str>) -> bool {
                 Event::ProfileApplied {
                     isolated_torn_tail: true,
                     ..
+                } | Event::ProfileLifecycle {
+                    isolated_torn_tail: true,
+                    ..
                 }
             )
         })
@@ -96,17 +99,19 @@ mod tests {
     use std::collections::BTreeMap;
 
     fn marker(isolated_torn_tail: bool) -> Event {
-        Event::draft_profile_applied(
-            "example".to_string(),
-            "1.0.0".to_string(),
-            ProfileOrigin::Directory(
+        Event::ProfileApplied {
+            id: String::new(),
+            timestamp: chrono::DateTime::UNIX_EPOCH,
+            profile_id: "example".to_string(),
+            version: "1.0.0".to_string(),
+            origin: ProfileOrigin::Directory(
                 crate::repository_state::RootRelativePath::parse("packages/example")
                     .expect("a canonical package location"),
             ),
-            "package".to_string(),
-            BTreeMap::new(),
+            package_hash: "package".to_string(),
+            target_hashes: BTreeMap::new(),
             isolated_torn_tail,
-        )
+        }
     }
 
     #[test]

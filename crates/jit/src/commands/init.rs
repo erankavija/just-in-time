@@ -155,7 +155,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// The first package of that closure — the one nothing else in it depends
     /// on — is published together with the scaffold, because a package needs a
     /// repository to be applied to; the rest follow in closure order through
-    /// the ordinary application, each with its own record and event.
+    /// the ordinary application and one aggregate lifecycle event.
     fn run_initialization(
         &self,
         repo_dir: &Path,
@@ -178,7 +178,7 @@ impl CommandExecutor<JsonFileStorage> {
         // Typed Git evidence is acquired once at the boundary (loop-invariant).
         let gitattributes = gitattributes_claim(&layout);
         // One MutationContext per operation, reused across probe/final finalize and
-        // every retry so a composed ProfileApplied event's id/timestamp stay stable.
+        // every retry so a composed lifecycle event's id/timestamp stay stable.
         let context = crate::repository_state::MutationContext::production();
         let mut result = with_mutation_session(
             self.storage(),
@@ -1428,8 +1428,8 @@ source-of-truth = \"registry-first\"\n";
                 .unwrap()
                 .lines()
                 .count(),
-            applied.profiles.len(),
-            "initialization appends one event per package it applied and nothing else"
+            1,
+            "initialization appends one aggregate lifecycle event"
         );
         assert!(fs::read_to_string(repo.path().join(".jit/rules.toml"))
             .unwrap()
@@ -1726,13 +1726,8 @@ assert = { require-section = { heading = \"Goals\" } }\n";
         let events = fs::read_to_string(repo.path().join(".jit/events.jsonl")).unwrap();
         assert_eq!(
             events.lines().count(),
-            winner[0]
-                .profile
-                .as_ref()
-                .expect("a profiled initialization reports it")
-                .profiles
-                .len(),
-            "only the winning initialization's packages reached the event log"
+            1,
+            "only one aggregate lifecycle event reached the event log"
         );
     }
 }

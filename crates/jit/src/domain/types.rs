@@ -1117,6 +1117,61 @@ pub enum ProfileOrigin {
     Directory(RootRelativePath),
 }
 
+/// The lifecycle operation requested by a profile mutation.
+///
+/// The enum includes the post-apply operations so the event contract is stable
+/// before those command surfaces consume it. An audit record still names the
+/// operation that actually encountered the repository; record conversion is
+/// never represented as a standalone operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileLifecycleOperation {
+    /// Create a repository and install its selected profiles.
+    Initialize,
+    /// Apply a selected package closure.
+    Apply,
+    /// Reconfigure an already installed package from new inputs.
+    Reconfigure,
+    /// Upgrade an already installed package to a newer package.
+    Upgrade,
+}
+
+/// The action observed for one profile in a lifecycle mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileLifecycleStatus {
+    /// No prior record existed and the operation installed the profile.
+    Installed,
+    /// The profile and all of its materializations were already current.
+    Unchanged,
+    /// Existing provenance was retained while its resolved inputs changed.
+    Reconfigured,
+    /// Existing package provenance was replaced by another package version or identity.
+    Upgraded,
+}
+
+/// One variable's non-sensitive provenance in a lifecycle event.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileLifecycleVariable {
+    /// The declared variable name. Its value is intentionally absent.
+    pub name: crate::profile::ProfileVariableName,
+    /// The source tier that supplied the value.
+    pub source: crate::profile::VariableSource,
+}
+
+/// One profile's lifecycle result within an aggregate mutation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileLifecycleProfile {
+    /// Stable profile identifier.
+    pub id: crate::profile::ProfileId,
+    /// The action observed for this profile.
+    pub status: ProfileLifecycleStatus,
+    /// Variable names and source kinds, in stable name order.
+    pub variables: Vec<ProfileLifecycleVariable>,
+}
+
 /// System event types for audit log
 ///
 /// `JsonSchema` is derived so the event catalog's freshness guard can read the
@@ -1425,6 +1480,28 @@ pub enum Event {
         /// malformed event tail immediately before this record.
         isolated_torn_tail: bool,
     },
+    /// A complete profile lifecycle mutation reached its durable commit point.
+    ///
+    /// One record summarizes the requested operation and every profile in the
+    /// dependency-first aggregate. It carries variable provenance only, never
+    /// resolved values or rendered bytes. Shipped-format record conversion is
+    /// represented by `converted_records` on this operation's event.
+    ProfileLifecycle {
+        /// Event ID.
+        id: String,
+        /// When the transaction was constructed.
+        timestamp: DateTime<Utc>,
+        /// Requested lifecycle operation.
+        operation: ProfileLifecycleOperation,
+        /// Per-profile outcomes in stable aggregate order.
+        profiles: Vec<ProfileLifecycleProfile>,
+        /// Canonical profile ids whose shipped-format records were converted
+        /// while this operation was being planned.
+        converted_records: Vec<crate::profile::ProfileId>,
+        /// Whether the transaction isolated a pre-existing non-newline,
+        /// malformed event tail immediately before this record.
+        isolated_torn_tail: bool,
+    },
 }
 
 impl Event {
@@ -1455,7 +1532,8 @@ impl Event {
             | Event::GateDefinitionCreated { id, timestamp, .. }
             | Event::GateDefinitionRemoved { id, timestamp, .. }
             | Event::LifecycleTimestampsBackfilled { id, timestamp, .. }
-            | Event::ProfileApplied { id, timestamp, .. } => {
+            | Event::ProfileApplied { id, timestamp, .. }
+            | Event::ProfileLifecycle { id, timestamp, .. } => {
                 *id = new_id;
                 *timestamp = new_timestamp;
             }
@@ -1732,24 +1810,19 @@ impl Event {
         }
     }
 
-    /// Create a repository-scoped profile application event.
-    pub fn draft_profile_applied(
-        profile_id: String,
-        version: String,
-        origin: ProfileOrigin,
-        package_hash: String,
-        target_hashes: std::collections::BTreeMap<String, String>,
-        isolated_torn_tail: bool,
+    /// Create the aggregate profile lifecycle audit event.
+    pub fn draft_profile_lifecycle(
+        operation: ProfileLifecycleOperation,
+        profiles: Vec<ProfileLifecycleProfile>,
+        converted_records: Vec<crate::profile::ProfileId>,
     ) -> Self {
-        Event::ProfileApplied {
+        Event::ProfileLifecycle {
             id: String::new(),
             timestamp: DateTime::UNIX_EPOCH,
-            profile_id,
-            version,
-            origin,
-            package_hash,
-            target_hashes,
-            isolated_torn_tail,
+            operation,
+            profiles,
+            converted_records,
+            isolated_torn_tail: false,
         }
     }
 
@@ -1777,6 +1850,7 @@ impl Event {
             Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
             Event::LifecycleTimestampsBackfilled { .. } => "", // No associated issue (repo-scoped)
             Event::ProfileApplied { .. } => "",        // No associated issue (repo-scoped)
+            Event::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
         }
     }
 
