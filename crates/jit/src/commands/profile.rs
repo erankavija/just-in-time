@@ -6032,6 +6032,50 @@ template = true
     }
 
     #[test]
+    fn test_upgrade_profiles_from_sources_refuses_a_version_a_surviving_profile_declares_incompatible(
+    ) {
+        let (temp, storage, executor, _fixture) = fixture();
+        let alpha = package_v2(&temp, "packages/alpha", "alpha", "1.0.0", "*", &[], &[]);
+        let beta = package_v2(
+            &temp,
+            "packages/beta",
+            "beta",
+            "1.0.0",
+            "*",
+            &[],
+            &[("alpha", ">=2.0.0")],
+        );
+        apply_package(&executor, &alpha, &supplied_values(&[]));
+        apply_package(&executor, &beta, &supplied_values(&[]));
+        package_v2(&temp, "packages/alpha", "alpha", "2.0.0", "*", &[], &[]);
+        let before = repository_files(&temp);
+        let events_before = lifecycle_event_count(&storage);
+
+        let error = executor
+            .upgrade_profiles_from_sources(&installed_selector("alpha"), &supplied_values(&[]))
+            .unwrap_err();
+
+        assert!(
+            matches!(
+                error.downcast_ref::<ProfileDependencyError>(),
+                Some(ProfileDependencyError::IncompatiblePackages {
+                    package,
+                    other,
+                    other_version,
+                    ..
+                }) if package == "beta" && other == "alpha" && other_version == "2.0.0"
+            ),
+            "an incompatibility a surviving profile declares refuses the replacement: {error:#}"
+        );
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "a refused upgrade publishes nothing"
+        );
+        assert_eq!(lifecycle_event_count(&storage), events_before);
+    }
+
+    #[test]
     fn test_upgrade_profiles_from_sources_reports_a_divergent_target_as_a_conflict_without_publishing(
     ) {
         let (temp, storage, executor, _fixture) = fixture();
