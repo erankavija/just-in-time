@@ -789,7 +789,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
 }
 
 #[test]
-fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
+fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     let repo = TestRepo::new();
     let schema = success_json(&repo.path, &["--schema"]);
     let commands = schema["commands"]["profile"]["subcommands"]
@@ -801,26 +801,33 @@ fn test_public_profile_schema_excludes_deferred_lifecycle_surface() {
         .contains("recoverable multi-target transaction"));
     assert_eq!(
         commands.keys().cloned().collect::<BTreeSet<_>>(),
-        expected_keys(&["apply", "list", "show"])
+        expected_keys(&["apply", "list", "reconfigure", "show", "upgrade"])
     );
-    assert_eq!(
-        commands["apply"]["args"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|argument| argument["name"].as_str().unwrap().to_string())
-            .collect::<BTreeSet<_>>(),
-        expected_keys(&[])
-    );
-    assert_eq!(
-        commands["apply"]["flags"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|flag| flag["name"].as_str().unwrap().to_string())
-            .collect::<BTreeSet<_>>(),
-        expected_keys(&["dry-run", "json", "profile", "set", "values-file"])
-    );
+    // The three commands that change what a profile publishes take one input
+    // surface: an ordered selector stream, the same value channels, and the
+    // rehearsal that precedes publication.
+    for lifecycle in ["apply", "reconfigure", "upgrade"] {
+        assert_eq!(
+            commands[lifecycle]["args"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|argument| argument["name"].as_str().unwrap().to_string())
+                .collect::<BTreeSet<_>>(),
+            expected_keys(&[]),
+            "{lifecycle} takes its selection through flags"
+        );
+        assert_eq!(
+            commands[lifecycle]["flags"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|flag| flag["name"].as_str().unwrap().to_string())
+                .collect::<BTreeSet<_>>(),
+            expected_keys(&["dry-run", "json", "profile", "set", "values-file"]),
+            "{lifecycle} exposes one lifecycle input surface"
+        );
+    }
 
     let list_schema = &commands["list"]["output"]["success_schema"];
     assert_eq!(

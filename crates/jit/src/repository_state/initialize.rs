@@ -557,7 +557,7 @@ fn derive_initialization_with_profiles(
     let forced_changed = coupled_default_repair_profile(neutral.delta.actions(), &profiles)
         .map(|profile| std::collections::BTreeSet::from([profile.id.clone()]))
         .unwrap_or_default();
-    let applications = derive_profile_applications_with_operation(
+    let applications = derive_profile_applications(
         &neutral_image,
         &profiles,
         context,
@@ -1140,35 +1140,15 @@ fn derive_profile_application_candidate(
     )
 }
 
-/// Compose one complete profile selection into one delta over the captured
-/// repository image.
-///
-/// Each member is derived over the proposed state of the preceding
-/// dependency-first member, while the final writes are rebuilt with preimages
-/// from `base`. That preserves composition (including records and derived
-/// configuration) without exposing an intermediate repository state to the
-/// mutation session. The audit finalizer receives all changed members at once,
-/// so records, repository bytes, and audit state share one recoverable plan.
-pub(super) fn derive_profile_applications(
-    base: &RepositoryImage,
-    profiles: &[ProfileApplicationInput],
-    context: &MutationContext,
-) -> Result<MaterializationDerivation, InitializationError> {
-    derive_profile_applications_with_operation(
-        base,
-        profiles,
-        context,
-        ProfileLifecycleOperation::Apply,
-        std::collections::BTreeSet::new(),
-    )
-}
-
 /// Compose one profile selection and record its aggregate lifecycle outcome.
 ///
-/// `forced_changed` carries coupled initialization materializations that are
-/// derived before the profile candidates themselves. Keeping that fact in this
-/// planner means initialization and ordinary application share one event shape.
-fn derive_profile_applications_with_operation(
+/// `operation` names the lifecycle command that requested the selection; each
+/// member's own status is still derived from its prior record rather than from
+/// that name. `forced_changed` carries coupled initialization materializations
+/// that are derived before the profile candidates themselves. Keeping both
+/// facts in this planner means initialization and every lifecycle command share
+/// one composition, one event shape, and one three-way decision.
+pub(super) fn derive_profile_applications(
     base: &RepositoryImage,
     profiles: &[ProfileApplicationInput],
     context: &MutationContext,

@@ -748,6 +748,9 @@ pub enum MaterializationRequest<'a> {
         profiles: Vec<ProfileApplicationInput>,
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
+        /// Requested lifecycle operation recorded when this selection changes
+        /// repository-owned state.
+        operation: crate::domain::ProfileLifecycleOperation,
     },
 }
 
@@ -806,8 +809,18 @@ pub fn derive_materialization(
             initialize::derive_initialization(image, scaffold, context)?,
             Default::default(),
         ),
-        MaterializationRequest::ApplyProfileSelection { profiles, context } => (
-            initialize::derive_profile_applications(image, &profiles, context)?,
+        MaterializationRequest::ApplyProfileSelection {
+            profiles,
+            context,
+            operation,
+        } => (
+            initialize::derive_profile_applications(
+                image,
+                &profiles,
+                context,
+                operation,
+                std::collections::BTreeSet::new(),
+            )?,
             Default::default(),
         ),
     };

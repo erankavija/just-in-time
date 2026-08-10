@@ -628,7 +628,7 @@ Profile inspection works without an initialized repository. Application targets
 the current JIT repository and runs mandatory transaction recovery before
 planning or writing.
 
-`show` and `apply` take one or more repeatable `--profile <SELECTOR>` flags.
+Profile commands that select packages take one or more repeatable `--profile <SELECTOR>` flags.
 `id:<PROFILE_ID>` reads the location named by the repository's applied-profile
 record; `path:<DIR>` reads a package directory relative to the worktree.
 `jit init` accepts the same ordered selector stream. A path selector is confined

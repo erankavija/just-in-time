@@ -67,7 +67,7 @@ pub use three_way::{
     decide_three_way, ThreeWayConflict, ThreeWayDecision, ThreeWayInput, ThreeWayValue,
 };
 pub use variables::{
-    resolve_package, resolve_package_from_record, resolve_variables, ProfileVariableAssignment,
-    ResolvedProfileContent, ResolvedVariable, ResolvedVariables, VariableError, VariableInputs,
-    VariableSource,
+    resolve_package, resolve_package_from_record, resolve_variables, resolve_variables_from_record,
+    ProfileVariableAssignment, RecordedValueAuthority, ResolvedProfileContent, ResolvedVariable,
+    ResolvedVariables, VariableError, VariableInputs, VariableSource,
 };

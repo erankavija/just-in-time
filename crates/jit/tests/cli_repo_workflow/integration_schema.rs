@@ -72,29 +72,33 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
         std::collections::BTreeSet::from([
             "apply".to_string(),
             "list".to_string(),
+            "reconfigure".to_string(),
             "show".to_string(),
+            "upgrade".to_string(),
         ])
     );
-    for command in ["list", "show", "apply"] {
+    for command in ["list", "show", "apply", "reconfigure", "upgrade"] {
         assert!(
             profile[command]["output"]["success_schema"].is_object(),
             "profile {command} must expose a success schema"
         );
     }
-    assert!(profile["apply"]["flags"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|flag| flag["name"] == "dry-run"));
-    for name in ["set", "values-file"] {
-        assert!(
-            profile["apply"]["flags"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|flag| flag["name"] == name),
-            "profile apply must expose --{name}"
-        );
+    for command in ["apply", "reconfigure", "upgrade"] {
+        assert!(profile[command]["flags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|flag| flag["name"] == "dry-run"));
+        for name in ["set", "values-file"] {
+            assert!(
+                profile[command]["flags"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|flag| flag["name"] == name),
+                "profile {command} must expose --{name}"
+            );
+        }
     }
 }
 
@@ -104,7 +108,7 @@ fn test_schema_exposes_only_repeatable_profile_selectors() {
     let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
     let profile = &parsed["commands"]["profile"]["subcommands"];
 
-    for command in ["show", "apply"] {
+    for command in ["show", "apply", "reconfigure", "upgrade"] {
         let flags = profile[command]["flags"].as_array().unwrap();
         let selector = flags
             .iter()

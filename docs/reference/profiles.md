@@ -111,8 +111,8 @@ so a package and its dependency may declare the same thing.
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).
 
-All profile commands support `--json`. `profile list`, `profile show`, and
-`profile apply` use the standard count-wrapped collection shape. A show response
+All profile commands support `--json`. Profile commands that emit collections
+use the standard count-wrapped collection shape. A show response
 contains one package entry per selector occurrence in selector order, including
 repeated selectors; a dry-run reports one plan entry per selected occurrence;
 normal application reports one result per applied package, dependencies before
@@ -263,19 +263,17 @@ a Git repository. Profiles do not add or alter that lease surface.
 
 ## V1.0 lifecycle boundary
 
-The v1.0 surface is intentionally apply-only. The following capabilities are
-deferred to the post-1.0 profile epic and do not exist in this release:
+The following capabilities are deferred to the post-1.0 profile epic and do not
+exist in this release:
 
 - sensitive-value handling;
 - semantic shared ownership;
-- reconfiguration;
 - detailed diff;
-- three-way upgrade;
 - safe removal.
 
-There is no profile-upgrade command or profile-removal command hidden behind the
-v1.0 interface. Package lookup follows
-the command contract in [Profile Commands](cli-commands.md#profile-commands);
+There is no profile-removal command hidden behind the v1.0 interface. Package
+lookup follows the command contract in
+[Profile Commands](cli-commands.md#profile-commands);
 no configured search path discovers a package. Edit repository configuration
 directly for advanced customization, or start from the manual guides below.
 

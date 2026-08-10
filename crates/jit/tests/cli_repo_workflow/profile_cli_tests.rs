@@ -1774,3 +1774,218 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
     assert_eq!(events[0]["operation"], "initialize");
     assert!(jit(repo.path(), &["validate", "--json"]).status.success());
 }
+
+/// Write a versioned package whose one templated asset and one fixed asset
+/// separate what a supplied value reaches from what it does not.
+fn write_lifecycle_package(repo: &Path, location: &str, id: &str, version: &str) {
+    let root = repo.join(location);
+    fs::create_dir_all(root.join("assets")).unwrap();
+    fs::write(
+        root.join("manifest.toml"),
+        format!(
+            "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"{version}\"\n\
+             compatible-jit = \"*\"\n\n\
+             [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
+             [[asset]]\nsource = \"assets/templated.txt\"\n\
+             target = \"docs/{id}-templated.txt\"\ntemplate = true\n\n\
+             [[asset]]\nsource = \"assets/fixed.txt\"\ntarget = \"docs/{id}-fixed.txt\"\n"
+        ),
+    )
+    .unwrap();
+    fs::write(
+        root.join("assets/templated.txt"),
+        "greeting={{jit:var:GREETING}}\n",
+    )
+    .unwrap();
+    fs::write(root.join("assets/fixed.txt"), "no variable reaches this\n").unwrap();
+}
+
+/// Initialize a repository holding the lifecycle package, and apply it.
+fn installed_lifecycle_repository(id: &str) -> TempDir {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    write_lifecycle_package(repo.path(), "packages/lifecycle", id, "1.0.0");
+    let applied = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            &path_selector("packages/lifecycle"),
+            "--json",
+        ],
+    );
+    assert!(applied.status.success(), "{applied:?}");
+    repo
+}
+
+/// Every collection a response carries reads through the project's count
+/// envelope, so a machine consumer never has to know which key holds it.
+fn assert_count_envelope(response: &Value, collection: &str) {
+    let entries = response[collection]
+        .as_array()
+        .unwrap_or_else(|| panic!("a {collection} response wraps its collection in an array"));
+    assert_eq!(
+        response["count"].as_u64(),
+        Some(entries.len() as u64),
+        "the envelope count states the collection length"
+    );
+}
+
+#[test]
+fn test_profile_reconfigure_and_upgrade_json_carry_the_count_wrapped_collection_envelope() {
+    let id = "lifecycle-envelope";
+    let repo = installed_lifecycle_repository(id);
+
+    let rehearsal = jit(
+        repo.path(),
+        &[
+            "profile",
+            "reconfigure",
+            "--profile",
+            &id_selector(id),
+            "--set",
+            "GREETING=supplied",
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(rehearsal.status.success(), "{rehearsal:?}");
+    assert_count_envelope(&json(&rehearsal), "profiles");
+
+    let reconfigured = jit(
+        repo.path(),
+        &[
+            "profile",
+            "reconfigure",
+            "--profile",
+            &id_selector(id),
+            "--set",
+            "GREETING=supplied",
+            "--json",
+        ],
+    );
+    assert!(reconfigured.status.success(), "{reconfigured:?}");
+    assert_count_envelope(&json(&reconfigured), "profiles");
+    assert_eq!(requested_profile(&json(&reconfigured))["status"], "applied");
+
+    write_lifecycle_package(repo.path(), "packages/lifecycle", id, "2.0.0");
+    let upgraded = jit(
+        repo.path(),
+        &[
+            "profile",
+            "upgrade",
+            "--profile",
+            &id_selector(id),
+            "--json",
+        ],
+    );
+    assert!(upgraded.status.success(), "{upgraded:?}");
+    assert_count_envelope(&json(&upgraded), "profiles");
+    assert_eq!(requested_profile(&json(&upgraded))["version"], "2.0.0");
+}
+
+#[test]
+fn test_profile_reconfigure_and_upgrade_run_without_a_git_directory() {
+    let id = "lifecycle-gitless";
+    let repo = installed_lifecycle_repository(id);
+    assert!(
+        !repo.path().join(".git").exists(),
+        "the scenario is a repository git never touched"
+    );
+
+    let reconfigured = jit(
+        repo.path(),
+        &[
+            "profile",
+            "reconfigure",
+            "--profile",
+            &id_selector(id),
+            "--set",
+            "GREETING=supplied",
+        ],
+    );
+    assert!(reconfigured.status.success(), "{reconfigured:?}");
+    assert_eq!(
+        fs::read_to_string(repo.path().join(format!("docs/{id}-templated.txt"))).unwrap(),
+        "greeting=supplied\n"
+    );
+
+    write_lifecycle_package(repo.path(), "packages/lifecycle", id, "2.0.0");
+    let upgraded = jit(
+        repo.path(),
+        &["profile", "upgrade", "--profile", &id_selector(id)],
+    );
+
+    assert!(upgraded.status.success(), "{upgraded:?}");
+    assert!(!repo.path().join(".git").exists());
+    assert_eq!(
+        stored_lifecycle_record(repo.path(), id)["version"],
+        "2.0.0",
+        "the upgrade published its new provenance without git"
+    );
+}
+
+/// The record this repository stores for the lifecycle package.
+fn stored_lifecycle_record(repo: &Path, id: &str) -> Value {
+    serde_json::from_slice(&fs::read(repo.join(format!(".jit/profiles/{id}.json"))).unwrap())
+        .expect("a stored record is JSON")
+}
+
+#[test]
+fn test_profile_reconfigure_exits_non_zero_and_publishes_nothing_on_a_conflict() {
+    let id = "lifecycle-conflict";
+    let repo = installed_lifecycle_repository(id);
+    let target = repo.path().join(format!("docs/{id}-templated.txt"));
+    fs::write(&target, "greeting=edited in place\n").unwrap();
+    let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
+    let record_before = fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap();
+
+    let output = jit(
+        repo.path(),
+        &[
+            "profile",
+            "reconfigure",
+            "--profile",
+            &id_selector(id),
+            "--set",
+            "GREETING=supplied",
+            "--json",
+        ],
+    );
+
+    assert_ne!(
+        output.status.code(),
+        Some(0),
+        "publishing nothing because of a conflict is a failure: {output:?}"
+    );
+    assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
+    let message = json(&output)["error"]["message"]
+        .as_str()
+        .expect("a conflict states what diverged")
+        .to_string();
+    for expected in [
+        format!("docs/{id}-templated.txt"),
+        id.to_string(),
+        "base".to_string(),
+        "current".to_string(),
+        "candidate".to_string(),
+    ] {
+        assert!(
+            message.contains(&expected),
+            "the conflict omits '{expected}': {message}"
+        );
+    }
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "greeting=edited in place\n"
+    );
+    assert_eq!(
+        fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
+        events_before
+    );
+    assert_eq!(
+        fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
+        record_before
+    );
+}
