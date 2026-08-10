@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-10T08:18:35.955944827Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "44ec7192-f3bd-470a-bc6b-a20f6362230e",
   "labels": [
     "type:task",
@@ -27,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Decide each target from base, current, and candidate",
-  "updated_at": "2026-08-10T07:24:58.706769035Z"
+  "updated_at": "2026-08-10T08:18:35.955944827Z"
 }
