@@ -1,14 +1,13 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
-    build_profile_claims_from_resolved, resolve_package, resolve_package_for_upgrade,
-    resolve_package_from_record, resolve_package_from_record_with_inputs, EngineVersion,
-    ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult, ProfileGraphError,
-    ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
-    ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
-    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
-    ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph,
-    ResolvedVariables, VariableInputs,
+    build_profile_claims_from_resolved, resolve_package, resolve_package_from_record,
+    EngineVersion, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
+    ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
+    ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
+    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, RecordedValueAuthority,
+    ResolvedProfileContent, ResolvedProfileGraph, ResolvedVariables, VariableInputs,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -914,10 +913,11 @@ impl CommandExecutor<JsonFileStorage> {
                     }
                 })?;
                 ensure_reconfiguration_package_identity(package, &record)?;
-                resolve_package_from_record_with_inputs(
+                resolve_package_from_record(
                     package,
                     &record.variables,
                     &inputs.for_declarations(&package.model().variables),
+                    RecordedValueAuthority::Exact,
                 )
                 .map_err(Into::into)
             })
@@ -969,10 +969,11 @@ impl CommandExecutor<JsonFileStorage> {
                     ensure_upgrade_version_is_newer_when_replaced(package, record)?;
                 }
                 match record {
-                    Some(record) => resolve_package_for_upgrade(
+                    Some(record) => resolve_package_from_record(
                         package,
                         &record.variables,
                         &inputs.for_declarations(&package.model().variables),
+                        RecordedValueAuthority::Superseded,
                     )
                     .map_err(Into::into),
                     None => resolve_package(
@@ -2138,7 +2139,12 @@ pub(super) fn expected_record(
     variables: &ResolvedVariables,
 ) -> Result<AppliedProfileRecord> {
     let metadata = package.model();
-    let _resolved = resolve_package_from_record(package, variables)?;
+    let _resolved = resolve_package_from_record(
+        package,
+        variables,
+        &VariableInputs::default(),
+        RecordedValueAuthority::Exact,
+    )?;
     Ok(AppliedProfileRecord::new(
         metadata.id.clone(),
         metadata.version.clone(),

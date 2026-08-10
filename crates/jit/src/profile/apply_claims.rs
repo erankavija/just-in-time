@@ -1,8 +1,8 @@
 //! Convert an immutable profile package into image-independent repository-state claims.
 
 use super::{
-    resolve_package, resolve_package_from_record, ProfilePackage, ResolvedProfileContent,
-    ResolvedVariables, VariableInputs,
+    resolve_package, resolve_package_from_record, ProfilePackage, RecordedValueAuthority,
+    ResolvedProfileContent, ResolvedVariables, VariableInputs,
 };
 use crate::repository_state::{
     FileMode, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim, ProfilePackageId,
@@ -45,7 +45,12 @@ pub fn build_profile_repair_claims(
     variables: &ResolvedVariables,
     layout: &crate::repository_state::RepositoryLayout,
 ) -> Result<ProfileClaims, ProfileClaimError> {
-    let resolved = resolve_package_from_record(package, variables)?;
+    let resolved = resolve_package_from_record(
+        package,
+        variables,
+        &VariableInputs::default(),
+        RecordedValueAuthority::Exact,
+    )?;
     build_profile_claims_from_resolved(&resolved, layout, true)
 }
 

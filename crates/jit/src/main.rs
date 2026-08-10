@@ -941,7 +941,89 @@ fn parse_profile_variable_assignments(
         .collect()
 }
 
-/// Render profile rehearsal decisions for the two lifecycle commands.
+/// One invocation of a profile lifecycle command, as the CLI parsed it.
+struct ProfileLifecycleInvocation<'a> {
+    /// Command path named in an argument diagnostic.
+    command: &'a str,
+    /// Verb this command answers a changed profile with.
+    changed_status: &'a str,
+    /// Repeatable raw `--profile` selectors in occurrence order.
+    profile: &'a [String],
+    /// Optional `--values-file` path.
+    values_file: Option<std::path::PathBuf>,
+    /// Repeatable raw `--set NAME=VALUE` assignments in occurrence order.
+    set: &'a [String],
+    /// Whether this run is a rehearsal.
+    dry_run: bool,
+    /// Whether output is machine-readable.
+    json: bool,
+}
+
+/// Dispatch one profile lifecycle command through its rehearsal or its
+/// publication.
+///
+/// The three lifecycle commands differ only in which executor entry points they
+/// call and in the verb they name a changed profile with; selector parsing,
+/// rehearsal branching, error classification, and rendering are one contract
+/// over all of them.
+fn run_profile_lifecycle<Plan, Apply>(
+    executor: &CommandExecutor<JsonFileStorage>,
+    invocation: ProfileLifecycleInvocation<'_>,
+    plan: Plan,
+    apply: Apply,
+) -> Result<()>
+where
+    Plan: FnOnce(
+        &CommandExecutor<JsonFileStorage>,
+        &[ProfileSelector],
+        &ProfileVariableOptions,
+    ) -> Result<jit::profile::ProfilePlanResult>,
+    Apply: FnOnce(
+        &CommandExecutor<JsonFileStorage>,
+        &[ProfileSelector],
+        &ProfileVariableOptions,
+    ) -> Result<jit::profile::ProfileComposedApplyResult>,
+{
+    let ProfileLifecycleInvocation {
+        command,
+        changed_status,
+        profile,
+        values_file,
+        set,
+        dry_run,
+        json,
+    } = invocation;
+    let selectors = parse_profile_selectors(profile, json)?;
+    let assignments = parse_profile_variable_assignments(set, json)?;
+    if selectors.is_empty() {
+        return Err(invalid_argument(
+            format!("{command} requires at least one --profile id:ID or path:DIR selector"),
+            json,
+        ));
+    }
+    let options = ProfileVariableOptions {
+        values_file,
+        assignments,
+    };
+    if dry_run {
+        let plans = profile_result(plan(executor, &selectors, &options), json)?;
+        if json {
+            println!("{}", JsonOutput::success(&plans).to_json_string()?);
+        } else {
+            print_profile_plans(plans);
+        }
+    } else {
+        let applied = profile_result(apply(executor, &selectors, &options), json)?;
+        if json {
+            println!("{}", JsonOutput::success(&applied).to_json_string()?);
+        } else {
+            print_profile_applications(applied, changed_status);
+        }
+    }
+    Ok(())
+}
+
+/// Render the rehearsal decisions every profile lifecycle command previews.
 fn print_profile_plans(plans: jit::profile::ProfilePlanResult) {
     for plan in plans.profiles {
         let status = match plan.status {
@@ -960,8 +1042,8 @@ fn print_profile_plans(plans: jit::profile::ProfilePlanResult) {
     }
 }
 
-/// Render lifecycle application results without coupling the command layer to
-/// presentation details.
+/// Render what a profile lifecycle command published, naming a changed profile
+/// with the verb `changed_status` its own command answers in.
 fn print_profile_applications(
     applied: jit::profile::ProfileComposedApplyResult,
     changed_status: &str,
@@ -2435,206 +2517,60 @@ fn run() -> Result<()> {
                 set,
                 dry_run,
                 json,
-            } => {
-                let selectors = parse_profile_selectors(&profile, json)?;
-                let assignments = parse_profile_variable_assignments(&set, json)?;
-                if selectors.is_empty() {
-                    return Err(invalid_argument(
-                        "profile apply requires at least one --profile id:ID or path:DIR selector"
-                            .to_string(),
-                        json,
-                    ));
-                }
-                if dry_run {
-                    match executor.plan_profiles_from_sources(
-                        &selectors,
-                        &ProfileVariableOptions {
-                            values_file: values_file.clone(),
-                            assignments: assignments.clone(),
-                        },
-                    ) {
-                        Ok(plans) => {
-                            if json {
-                                let output = JsonOutput::success(&plans);
-                                println!("{}", output.to_json_string()?);
-                            } else {
-                                for plan in plans.profiles {
-                                    let status = match plan.status {
-                                        jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
-                                        jit::profile::ProfilePlanStatus::WouldApply => {
-                                            "would apply"
-                                        }
-                                    };
-                                    println!("Profile {} {}: {}", plan.id, plan.version, status);
-                                    for target in plan.targets {
-                                        let action = match target.action {
-                                            jit::profile::ProfileTargetAction::Unchanged => {
-                                                "unchanged"
-                                            }
-                                            jit::profile::ProfileTargetAction::Create => "create",
-                                            jit::profile::ProfileTargetAction::Update => "update",
-                                        };
-                                        println!("  {action}: {}", target.path);
-                                    }
-                                }
-                            }
-                        }
-                        Err(error) if json => {
-                            let json_error = profile_json_error(&error);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        }
-                        Err(error) => return Err(error),
-                    }
-                } else {
-                    match executor.apply_profile_from_sources(
-                        &selectors,
-                        &ProfileVariableOptions {
-                            values_file: values_file.clone(),
-                            assignments,
-                        },
-                    ) {
-                        Ok(applied) => {
-                            if json {
-                                let output = JsonOutput::success(&applied);
-                                println!("{}", output.to_json_string()?);
-                            } else {
-                                for profile in applied.profiles {
-                                    let status = match profile.status {
-                                        jit::profile::ProfileApplicationStatus::Unchanged => {
-                                            "unchanged"
-                                        }
-                                        jit::profile::ProfileApplicationStatus::Applied => {
-                                            "applied"
-                                        }
-                                    };
-                                    println!(
-                                        "Profile {} {}: {}",
-                                        profile.id, profile.version, status
-                                    );
-                                    for warning in profile.warnings {
-                                        eprintln!("Warning: {:?}", warning);
-                                    }
-                                }
-                            }
-                        }
-                        Err(error) if json => {
-                            let json_error = profile_json_error(&error);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        }
-                        Err(error) => return Err(error),
-                    }
-                }
-            }
+            } => run_profile_lifecycle(
+                &executor,
+                ProfileLifecycleInvocation {
+                    command: "profile apply",
+                    changed_status: "applied",
+                    profile: &profile,
+                    values_file,
+                    set: &set,
+                    dry_run,
+                    json,
+                },
+                CommandExecutor::plan_profiles_from_sources,
+                CommandExecutor::apply_profile_from_sources,
+            )?,
             ProfileCommands::Reconfigure {
                 profile,
                 values_file,
                 set,
                 dry_run,
                 json,
-            } => {
-                let selectors = parse_profile_selectors(&profile, json)?;
-                let assignments = parse_profile_variable_assignments(&set, json)?;
-                if selectors.is_empty() {
-                    return Err(invalid_argument(
-                        "profile reconfigure requires at least one --profile id:ID or path:DIR selector"
-                            .to_string(),
-                        json,
-                    ));
-                }
-                let options = ProfileVariableOptions {
-                    values_file: values_file.clone(),
-                    assignments,
-                };
-                if dry_run {
-                    match executor.plan_reconfigure_profiles_from_sources(&selectors, &options) {
-                        Ok(plans) => {
-                            if json {
-                                println!("{}", JsonOutput::success(&plans).to_json_string()?);
-                            } else {
-                                print_profile_plans(plans);
-                            }
-                        }
-                        Err(error) if json => {
-                            let json_error = profile_json_error(&error);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        }
-                        Err(error) => return Err(error),
-                    }
-                } else {
-                    match executor.reconfigure_profiles_from_sources(&selectors, &options) {
-                        Ok(applied) => {
-                            if json {
-                                println!("{}", JsonOutput::success(&applied).to_json_string()?);
-                            } else {
-                                print_profile_applications(applied, "reconfigured");
-                            }
-                        }
-                        Err(error) if json => {
-                            let json_error = profile_json_error(&error);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        }
-                        Err(error) => return Err(error),
-                    }
-                }
-            }
+            } => run_profile_lifecycle(
+                &executor,
+                ProfileLifecycleInvocation {
+                    command: "profile reconfigure",
+                    changed_status: "reconfigured",
+                    profile: &profile,
+                    values_file,
+                    set: &set,
+                    dry_run,
+                    json,
+                },
+                CommandExecutor::plan_reconfigure_profiles_from_sources,
+                CommandExecutor::reconfigure_profiles_from_sources,
+            )?,
             ProfileCommands::Upgrade {
                 profile,
                 values_file,
                 set,
                 dry_run,
                 json,
-            } => {
-                let selectors = parse_profile_selectors(&profile, json)?;
-                let assignments = parse_profile_variable_assignments(&set, json)?;
-                if selectors.is_empty() {
-                    return Err(invalid_argument(
-                        "profile upgrade requires at least one --profile id:ID or path:DIR selector"
-                            .to_string(),
-                        json,
-                    ));
-                }
-                let options = ProfileVariableOptions {
-                    values_file: values_file.clone(),
-                    assignments,
-                };
-                if dry_run {
-                    match executor.plan_upgrade_profiles_from_sources(&selectors, &options) {
-                        Ok(plans) => {
-                            if json {
-                                println!("{}", JsonOutput::success(&plans).to_json_string()?);
-                            } else {
-                                print_profile_plans(plans);
-                            }
-                        }
-                        Err(error) if json => {
-                            let json_error = profile_json_error(&error);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        }
-                        Err(error) => return Err(error),
-                    }
-                } else {
-                    match executor.upgrade_profiles_from_sources(&selectors, &options) {
-                        Ok(applied) => {
-                            if json {
-                                println!("{}", JsonOutput::success(&applied).to_json_string()?);
-                            } else {
-                                print_profile_applications(applied, "upgraded");
-                            }
-                        }
-                        Err(error) if json => {
-                            let json_error = profile_json_error(&error);
-                            println!("{}", json_error.to_json_string()?);
-                            std::process::exit(json_error.exit_code().code());
-                        }
-                        Err(error) => return Err(error),
-                    }
-                }
-            }
+            } => run_profile_lifecycle(
+                &executor,
+                ProfileLifecycleInvocation {
+                    command: "profile upgrade",
+                    changed_status: "upgraded",
+                    profile: &profile,
+                    values_file,
+                    set: &set,
+                    dry_run,
+                    json,
+                },
+                CommandExecutor::plan_upgrade_profiles_from_sources,
+                CommandExecutor::upgrade_profiles_from_sources,
+            )?,
         },
         Commands::Rdeps { .. } | Commands::List { .. } => {
             unreachable!("top-level rdeps/list are normalized to canonical commands above")

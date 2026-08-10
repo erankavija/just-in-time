@@ -181,11 +181,67 @@ impl ResolvedProfileContent {
 }
 
 /// Resolve every declared value by the fixed package-variable precedence.
+///
+/// A first application has no prior record to replay, which is the empty case
+/// of the same precedence ladder every lifecycle operation resolves through.
 pub fn resolve_variables(
     declarations: &[ProfileVariableDeclaration],
     inputs: &VariableInputs,
 ) -> Result<ResolvedVariables, VariableError> {
+    resolve_variables_from_record(
+        declarations,
+        &ResolvedVariables::default(),
+        inputs,
+        RecordedValueAuthority::Superseded,
+    )
+}
+
+/// How an applied record relates to the package being resolved from it.
+///
+/// The two lifecycle operations that replay a record differ in exactly one
+/// thing: what a recorded entry these declarations cannot justify means. Under
+/// [`Self::Exact`] it is corruption of the record; under [`Self::Superseded`]
+/// it is the ordinary fact that a replacement package changed what it declares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecordedValueAuthority {
+    /// The record is exact provenance for these declarations. A recorded entry
+    /// they cannot justify is an error, and a declaration the record does not
+    /// carry stays unresolved rather than acquiring a default the recorded run
+    /// did not use.
+    Exact,
+    /// The record describes the package these declarations replace. A recorded
+    /// entry they cannot justify is dropped, and a declaration left without any
+    /// value falls back to this package's own default.
+    Superseded,
+}
+
+/// Resolve declared variables from applied-record values, with newly supplied
+/// values taking their ordinary precedence over the record.
+///
+/// The record is the deterministic baseline: neither declaration defaults nor
+/// ambient process state can displace a value a prior run recorded. `authority`
+/// settles the one question the record cannot answer for itself — whether these
+/// declarations are the ones it was written from.
+///
+/// # Errors
+///
+/// Returns [`VariableError`] when an input names a variable no declaration
+/// carries, or when [`RecordedValueAuthority::Exact`] is claimed for a record
+/// these declarations cannot justify.
+pub fn resolve_variables_from_record(
+    declarations: &[ProfileVariableDeclaration],
+    recorded: &ResolvedVariables,
+    inputs: &VariableInputs,
+    authority: RecordedValueAuthority,
+) -> Result<ResolvedVariables, VariableError> {
     validate_declarations(declarations)?;
+    let recorded = &match authority {
+        RecordedValueAuthority::Exact => {
+            validate_recorded_variables(declarations, recorded)?;
+            recorded.clone()
+        }
+        RecordedValueAuthority::Superseded => retain_justified_values(declarations, recorded),
+    };
     let declared = declarations
         .iter()
         .map(|declaration| declaration.name.clone())
@@ -223,113 +279,19 @@ pub fn resolve_variables(
                         .map(|value| (value.clone(), VariableSource::ValuesFile))
                 })
                 .or_else(|| {
-                    declaration
-                        .default
-                        .clone()
-                        .map(|value| (value, VariableSource::Default))
-                });
-            selected.map(|(value, source)| {
-                (declaration.name.clone(), ResolvedVariable { value, source })
-            })
-        })
-        .collect();
-    Ok(ResolvedVariables(resolved))
-}
-
-/// Resolve declared variables from applied-record values, with newly supplied
-/// values taking their ordinary precedence over the record.
-///
-/// Reconfiguration deliberately never falls back to declaration defaults:
-/// once a value was recorded, that record is the deterministic baseline for
-/// replaying the installed package.
-pub fn resolve_variables_from_record(
-    declarations: &[ProfileVariableDeclaration],
-    recorded: &ResolvedVariables,
-    inputs: &VariableInputs,
-) -> Result<ResolvedVariables, VariableError> {
-    resolve_variables_from_record_with_defaults(declarations, recorded, inputs, false)
-}
-
-/// Resolve variables for a replacement package from an installed record.
-///
-/// Values whose declarations survive are carried forward from `recorded`.
-/// Values first declared by the replacement package fall back to that package's
-/// defaults. Values no longer declared by the replacement package are dropped.
-pub fn resolve_variables_for_upgrade(
-    declarations: &[ProfileVariableDeclaration],
-    recorded: &ResolvedVariables,
-    inputs: &VariableInputs,
-) -> Result<ResolvedVariables, VariableError> {
-    let declared = declarations
-        .iter()
-        .map(|declaration| declaration.name.clone())
-        .collect::<BTreeSet<_>>();
-    let retained = ResolvedVariables(
-        recorded
-            .0
-            .iter()
-            .filter(|(name, _)| declared.contains(*name))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect(),
-    );
-    resolve_variables_from_record_with_defaults(declarations, &retained, inputs, true)
-}
-
-fn resolve_variables_from_record_with_defaults(
-    declarations: &[ProfileVariableDeclaration],
-    recorded: &ResolvedVariables,
-    inputs: &VariableInputs,
-    include_defaults_for_missing_values: bool,
-) -> Result<ResolvedVariables, VariableError> {
-    validate_declarations(declarations)?;
-    validate_recorded_variables(declarations, recorded)?;
-    let declared = declarations
-        .iter()
-        .map(|declaration| declaration.name.clone())
-        .collect::<BTreeSet<_>>();
-    let environment_names = declarations
-        .iter()
-        .filter_map(|declaration| declaration.env.clone())
-        .collect::<BTreeSet<_>>();
-    inputs.validate_against_names(&declared, &environment_names)?;
-
-    let command_line = inputs
-        .command_line
-        .iter()
-        .map(|assignment| (assignment.name.clone(), assignment.value.clone()))
-        .collect::<BTreeMap<_, _>>();
-    let resolved = declarations
-        .iter()
-        .filter_map(|declaration| {
-            let selected = command_line
-                .get(&declaration.name)
-                .map(|value| (value.clone(), VariableSource::Set))
-                .or_else(|| {
-                    declaration.env.as_ref().and_then(|environment| {
-                        inputs
-                            .environment
-                            .get(environment)
-                            .map(|value| (value.clone(), VariableSource::Environment))
-                    })
-                })
-                .or_else(|| {
-                    inputs
-                        .values_file
-                        .get(&declaration.name)
-                        .map(|value| (value.clone(), VariableSource::ValuesFile))
-                })
-                .or_else(|| {
                     recorded
                         .get(&declaration.name)
                         .map(|value| (value.value.clone(), value.source))
                 })
                 .or_else(|| {
-                    include_defaults_for_missing_values.then(|| {
-                        declaration
-                            .default
-                            .clone()
-                            .map(|value| (value, VariableSource::Default))
-                    })?
+                    (authority == RecordedValueAuthority::Superseded)
+                        .then(|| {
+                            declaration
+                                .default
+                                .clone()
+                                .map(|value| (value, VariableSource::Default))
+                        })
+                        .flatten()
                 });
             selected.map(|(value, source)| {
                 (declaration.name.clone(), ResolvedVariable { value, source })
@@ -351,52 +313,31 @@ pub fn resolve_package(
     resolve_package_content(package, variables)
 }
 
-/// Resolve a package exclusively from the public variable provenance stored
-/// in its applied-profile record.
+/// Resolve a package from the public variable provenance stored in its
+/// applied-profile record, together with any newly supplied inputs.
 ///
-/// The current process environment and declaration defaults are never input
-/// channels here. Recorded names and source kinds are checked against the
-/// current unresolved package before its exact stored values are rendered.
+/// Declaration defaults and ambient process state never displace a recorded
+/// value; only the caller's own inputs do, in the ordinary precedence order.
+/// `authority` states whether `variables` was recorded from this package's own
+/// declarations ([`RecordedValueAuthority::Exact`]) or from the declarations of
+/// the package it replaces ([`RecordedValueAuthority::Superseded`]).
 ///
 /// # Errors
 ///
-/// Returns [`VariableError`] when the record names an undeclared variable, a
-/// recorded source kind is impossible for its declaration, or the package's
-/// bounded references cannot be rendered from the recorded values.
+/// Returns [`VariableError`] when an input names an undeclared variable, when
+/// an exact record names a variable these declarations cannot justify, or when
+/// the package's bounded references cannot be rendered from the resolved values.
 pub fn resolve_package_from_record(
     package: &ProfilePackage,
     variables: &ResolvedVariables,
-) -> Result<ResolvedProfileContent, VariableError> {
-    resolve_package_from_record_with_inputs(package, variables, &VariableInputs::default())
-}
-
-/// Resolve an installed package from its recorded values and newly supplied
-/// command inputs, without consulting declaration defaults for a stored value.
-pub fn resolve_package_from_record_with_inputs(
-    package: &ProfilePackage,
-    variables: &ResolvedVariables,
     inputs: &VariableInputs,
+    authority: RecordedValueAuthority,
 ) -> Result<ResolvedProfileContent, VariableError> {
     let model = package.model();
     validate_model_references(model)?;
     resolve_package_content(
         package,
-        resolve_variables_from_record(&model.variables, variables, inputs)?,
-    )
-}
-
-/// Resolve a replacement package from the surviving values of its installed
-/// predecessor, defaulting only variables newly declared by that replacement.
-pub fn resolve_package_for_upgrade(
-    package: &ProfilePackage,
-    variables: &ResolvedVariables,
-    inputs: &VariableInputs,
-) -> Result<ResolvedProfileContent, VariableError> {
-    let model = package.model();
-    validate_model_references(model)?;
-    resolve_package_content(
-        package,
-        resolve_variables_for_upgrade(&model.variables, variables, inputs)?,
+        resolve_variables_from_record(&model.variables, variables, inputs, authority)?,
     )
 }
 
@@ -451,6 +392,49 @@ fn resolve_package_content(
     })
 }
 
+/// Whether `declaration` could itself have produced the recorded entry.
+///
+/// A supplied value is justified by the declaration existing at all. A recorded
+/// default is justified only while it still is the default, and a recorded
+/// environment value only while the declaration still names an environment
+/// variable. Both lifecycle authorities read this one predicate: an exact record
+/// must satisfy it, a superseded record is filtered by it.
+fn justifies_recorded_value(
+    declaration: &ProfileVariableDeclaration,
+    recorded: &ResolvedVariable,
+) -> bool {
+    match recorded.source {
+        VariableSource::Default => declaration.default.as_ref() == Some(&recorded.value),
+        VariableSource::Environment => declaration.env.is_some(),
+        VariableSource::ValuesFile | VariableSource::Set => true,
+    }
+}
+
+/// Keep only the recorded entries `declarations` still justify, so a
+/// replacement package carries forward what the adopter supplied and re-derives
+/// what only its predecessor's manifest had said.
+fn retain_justified_values(
+    declarations: &[ProfileVariableDeclaration],
+    recorded: &ResolvedVariables,
+) -> ResolvedVariables {
+    let declarations = declarations
+        .iter()
+        .map(|declaration| (&declaration.name, declaration))
+        .collect::<BTreeMap<_, _>>();
+    ResolvedVariables(
+        recorded
+            .0
+            .iter()
+            .filter(|(name, value)| {
+                declarations
+                    .get(name)
+                    .is_some_and(|declaration| justifies_recorded_value(declaration, value))
+            })
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect(),
+    )
+}
+
 fn validate_recorded_variables(
     declarations: &[ProfileVariableDeclaration],
     variables: &ResolvedVariables,
@@ -467,12 +451,7 @@ fn validate_recorded_variables(
                 name: name.to_string(),
                 tier: "applied profile record",
             })?;
-        let valid_source = match resolved.source {
-            VariableSource::Default => declaration.default.as_ref() == Some(&resolved.value),
-            VariableSource::Environment => declaration.env.is_some(),
-            VariableSource::ValuesFile | VariableSource::Set => true,
-        };
-        if valid_source {
+        if justifies_recorded_value(declaration, resolved) {
             Ok(())
         } else {
             Err(VariableError::InvalidRecordedSource {
@@ -1205,7 +1184,13 @@ mod tests {
             )],
         };
 
-        let resolved = resolve_variables_from_record(&declarations, &stored, &inputs).unwrap();
+        let resolved = resolve_variables_from_record(
+            &declarations,
+            &stored,
+            &inputs,
+            RecordedValueAuthority::Exact,
+        )
+        .unwrap();
 
         assert_eq!(
             resolved.values()[&"UNCHANGED".try_into().unwrap()],
@@ -1226,7 +1211,8 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_variables_for_upgrade_carries_stored_values_and_defaults_new_declarations() {
+    fn test_resolve_variables_from_record_carries_superseded_values_and_defaults_new_declarations()
+    {
         let declarations = [
             declaration("CARRIED", Some("new-default"), None),
             declaration("NEW", Some("new-default"), None),
@@ -1252,9 +1238,13 @@ mod tests {
             .collect(),
         );
 
-        let resolved =
-            resolve_variables_for_upgrade(&declarations, &stored, &VariableInputs::default())
-                .unwrap();
+        let resolved = resolve_variables_from_record(
+            &declarations,
+            &stored,
+            &VariableInputs::default(),
+            RecordedValueAuthority::Superseded,
+        )
+        .unwrap();
 
         assert_eq!(
             resolved.values(),
