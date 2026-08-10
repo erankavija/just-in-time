@@ -263,10 +263,8 @@ a Git repository. Profiles do not add or alter that lease surface.
 
 ## V1.0 lifecycle boundary
 
-The v1.0 surface applies a package, reconfigures an installed one from new
-supplied values, and upgrades one to a newer package version. The following
-capabilities are deferred to the post-1.0 profile epic and do not exist in this
-release:
+The following capabilities are deferred to the post-1.0 profile epic and do not
+exist in this release:
 
 - sensitive-value handling;
 - semantic shared ownership;
@@ -274,8 +272,8 @@ release:
 - safe removal.
 
 There is no profile-removal command hidden behind the v1.0 interface. Package
-lookup follows
-the command contract in [Profile Commands](cli-commands.md#profile-commands);
+lookup follows the command contract in
+[Profile Commands](cli-commands.md#profile-commands);
 no configured search path discovers a package. Edit repository configuration
 directly for advanced customization, or start from the manual guides below.
 
