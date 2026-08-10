@@ -10,8 +10,7 @@ use crate::profile::{
 use crate::repository_state::{
     apply_overlay, derive_materialization, ExpectedPreimage, GitattributesClaim,
     GitattributesStatus, InitializationScaffold, MaterializationPlan, MaterializationRequest,
-    ProfileApplicationInput, ProfileTargetDisposition, RepositoryAction, RepositoryEntry,
-    VirtualPath,
+    ProfileApplicationInput, RepositoryAction, RepositoryEntry, VirtualPath,
 };
 use crate::storage::JsonFileStorage;
 use anyhow::{Context, Result};
@@ -172,10 +171,6 @@ impl CommandExecutor<JsonFileStorage> {
                 .selected_packages();
             (selected, packages)
         };
-        let (package, dependants) = match packages.as_slice() {
-            [scaffolded, dependants @ ..] => (Some(scaffolded.clone()), dependants),
-            [] => (None, &[][..]),
-        };
         validate_variable_inputs(&packages, variable_inputs)?;
         let contribution_context =
             self.profile_contribution_candidates(&packages, variable_inputs)?;
@@ -191,19 +186,20 @@ impl CommandExecutor<JsonFileStorage> {
             "repository initialization",
             |session| {
                 let (config, project_name) = self.resolve_init_config(&mut *session, repo_dir)?;
-                let profile = match package.as_ref() {
-                    Some(package) => Some(
-                        self.profile_input_with_inputs(package, variable_inputs)?
-                            .with_contribution_context(&contribution_context),
-                    ),
-                    None => None,
-                };
+                let profiles = packages
+                    .iter()
+                    .map(|package| {
+                        self.profile_input_with_inputs(package, variable_inputs)
+                            .map(|input| input.with_contribution_context(&contribution_context))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
                 let scaffold = InitializationScaffold::from_config(
                     config.clone(),
                     project_name.clone(),
-                    profile,
+                    None,
                 )?
-                .with_gitattributes(gitattributes.clone());
+                .with_gitattributes(gitattributes.clone())
+                .with_profiles(profiles);
 
                 let mut extra_paths = scaffold.delta_paths()?;
                 extra_paths.extend(crate::repository_state::profile_contribution_target_paths(
@@ -229,7 +225,7 @@ impl CommandExecutor<JsonFileStorage> {
                 // the exact shipped-v1 decoder and carry its immutable v2 overlay
                 // through the remainder of initialization.
                 let mut migration_paths = Vec::new();
-                if scaffold.profile().is_some() {
+                if scaffold.has_profiles() {
                     let mut has_candidate = false;
                     for id in recorded_profile_ids(&probe, &VirtualPath::PROFILES)? {
                         let path = VirtualPath::data(format!("profiles/{id}.json"))?;
@@ -265,7 +261,7 @@ impl CommandExecutor<JsonFileStorage> {
                     }
                     probe = expanded;
                 }
-                let migrations = if scaffold.profile().is_some() {
+                let migrations = if scaffold.has_profiles() {
                     crate::repository_state::migrate_shipped_v1_records(&probe)?
                 } else {
                     BTreeMap::new()
@@ -273,17 +269,15 @@ impl CommandExecutor<JsonFileStorage> {
                 let scaffold = if migrations.is_empty() {
                     scaffold
                 } else {
-                    InitializationScaffold::from_config(
-                        config,
-                        project_name,
-                        scaffold
-                            .profile()
-                            .cloned()
-                            .map(|profile| profile.with_shipped_v1_migrations(migrations)),
-                    )?
-                    .with_gitattributes(gitattributes.clone())
+                    let mut profiles = scaffold.profiles();
+                    if let Some(first) = profiles.first_mut() {
+                        *first = first.clone().with_shipped_v1_migrations(migrations);
+                    }
+                    InitializationScaffold::from_config(config, project_name, None)?
+                        .with_gitattributes(gitattributes.clone())
+                        .with_profiles(profiles)
                 };
-                if scaffold.profile().is_some() {
+                if scaffold.has_profiles() {
                     extra_paths.extend(scaffold.profile_capture_closure(&probe)?);
                     let Some(expanded) = self.capture_proposed_base(
                         &mut *session,
@@ -347,25 +341,6 @@ impl CommandExecutor<JsonFileStorage> {
                 }) {
                     return Ok(SessionStep::Retry);
                 }
-                let profile_status = package.as_ref().map(|package| {
-                    let record_path =
-                        VirtualPath::data(format!("profiles/{}.json", package.model().id));
-                    let changed_target = plan
-                        .profile_targets()
-                        .iter()
-                        .any(|target| target.disposition != ProfileTargetDisposition::Unchanged);
-                    let changed_record = record_path.is_ok_and(|path| {
-                        plan.delta()
-                            .actions()
-                            .iter()
-                            .any(|action| action.path() == &path)
-                    });
-                    if changed_target || changed_record {
-                        ProfileApplicationStatus::Applied
-                    } else {
-                        ProfileApplicationStatus::Unchanged
-                    }
-                });
                 let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
                 let validation = crate::validation::repository::validate_repository(&proposed)
                     .map_err(init_validation_error)?;
@@ -378,20 +353,28 @@ impl CommandExecutor<JsonFileStorage> {
                 let gitattributes = scaffold.gitattributes_status(&base)?;
                 let (created_paths, modified_paths) = init_response_paths(&plan, gitattributes)?;
 
-                let profile = profile_status
-                    .zip(package.as_ref())
-                    .map(|(status, package)| {
-                        ProfileComposedApplyResult::new(vec![ProfileApplyResult {
-                            id: package.model().id.to_string(),
-                            version: package.model().version.clone(),
-                            status,
-                            plan_hash: plan.hash().to_string(),
-                            // The applied transaction hash is the plan hash by construction.
-                            transaction_id: (status == ProfileApplicationStatus::Applied)
-                                .then(|| plan.hash().to_string()),
-                            warnings: Vec::new(),
-                        }])
-                    });
+                let profile = (!packages.is_empty()).then(|| {
+                    ProfileComposedApplyResult::new(
+                        packages
+                            .iter()
+                            .map(|package| {
+                                let changed = plan.applied_profiles().contains(&package.model().id);
+                                ProfileApplyResult {
+                                    id: package.model().id.to_string(),
+                                    version: package.model().version.clone(),
+                                    status: if changed {
+                                        ProfileApplicationStatus::Applied
+                                    } else {
+                                        ProfileApplicationStatus::Unchanged
+                                    },
+                                    plan_hash: plan.hash().to_string(),
+                                    transaction_id: changed.then(|| plan.hash().to_string()),
+                                    warnings: Vec::new(),
+                                }
+                            })
+                            .collect(),
+                    )
+                });
                 Ok(SessionStep::Apply(
                     plan,
                     FreshInitResult {
@@ -404,32 +387,11 @@ impl CommandExecutor<JsonFileStorage> {
             },
         )?;
 
-        // The published repository is what the remaining packages of the
-        // closure are applied to, in the order the closure fixed. Publication
-        // binds the selected roots to the repository it created, so each of
-        // these applications opens its session over that repository rather than
-        // over the absent data root the scaffold was captured against.
-        let applied = dependants
-            .iter()
-            .map(|package| {
-                let resolved = resolve_package(
-                    package,
-                    &variable_inputs.for_declarations(&package.model().variables),
-                )?;
-                self.apply_one_profile_package(package, &resolved, &contribution_context)
-            })
-            .collect::<Result<Vec<_>>>()?;
-        let mut applied_results = result
+        result.profile = result
             .profile
             .take()
-            .map(|scaffolded| scaffolded.profiles)
-            .unwrap_or_default();
-        applied_results.extend(applied);
-        result.profile = if applied_results.is_empty() {
-            None
-        } else {
-            Some(init_profile_results(&applied_results, &roots)?)
-        };
+            .map(|applied| init_profile_results(&applied.profiles, &roots))
+            .transpose()?;
         Ok(result)
     }
 
@@ -692,7 +654,30 @@ mod tests {
     use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
+
+    /// Count only the recoverable publication boundary, not read-only captures.
+    struct PublicationCounter(AtomicUsize);
+
+    impl PublicationCounter {
+        fn new() -> Arc<Self> {
+            Arc::new(Self(AtomicUsize::new(0)))
+        }
+
+        fn count(&self) -> usize {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    impl crate::storage::TransactionFailureInjector for PublicationCounter {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            if point == &crate::storage::TransactionFailurePoint::RepositoryBeforeControlCreation {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_git_events_pattern_preserves_default_and_quotes_lexical_specials() {
@@ -1011,6 +996,47 @@ source-of-truth = \"registry-first\"\n";
         assert!(repo.path().join("docs/workflow.txt").is_file());
         assert!(repo.path().join(".jit/profiles/base.json").is_file());
         assert!(repo.path().join(".jit/profiles/workflow.json").is_file());
+    }
+
+    #[test]
+    fn test_profiled_init_publishes_its_complete_closure_through_one_transaction() {
+        let repo = TempDir::new().unwrap();
+        crate::test_utils::write_package_declaring(
+            &composition_package(),
+            &repo.path().join("packages/base"),
+            "base",
+            &[],
+        );
+        crate::test_utils::write_package_declaring(
+            &composition_package(),
+            &repo.path().join("packages/workflow"),
+            "workflow",
+            &["base"],
+        );
+        let publications = PublicationCounter::new();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            repo.path().join(".jit"),
+            publications.clone(),
+        );
+
+        let result = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[ProfileSelector::path(repo.path().join("packages/workflow"))],
+            )
+            .unwrap();
+
+        assert_eq!(publications.count(), 1);
+        assert_eq!(
+            result
+                .profile
+                .expect("profiled init reports its closure")
+                .profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["base", "workflow"]
+        );
     }
 
     #[test]
@@ -1467,6 +1493,59 @@ source-of-truth = \"registry-first\"\n";
         assert_eq!(
             fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
             compact_record
+        );
+    }
+
+    #[test]
+    fn test_single_profile_reinit_attributes_coupled_schema_repair() {
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        let location = crate::test_utils::stage_repository_packages(repo.path(), "jit-default");
+        let selector = ProfileSelector::path(&location);
+
+        executor_with_layout(&storage, repo.path())
+            .initialize_fresh_repository(repo.path(), Some(std::slice::from_ref(&selector)))
+            .unwrap();
+        let schema = repo
+            .path()
+            .join(".jit/schemas/default-namespace-registry.json");
+        let expected_schema = fs::read(&schema).unwrap();
+        fs::remove_file(&schema).unwrap();
+        let events_path = repo.path().join(".jit/events.jsonl");
+        let events_before = fs::read_to_string(&events_path).unwrap();
+
+        let repaired = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[ProfileSelector::id("jit-default").unwrap()],
+            )
+            .unwrap();
+
+        assert_eq!(
+            repaired.profile.unwrap().requested().unwrap().status,
+            ProfileApplicationStatus::Applied,
+            "the profile whose default-rule authority repaired the schema is applied"
+        );
+        assert_eq!(fs::read(&schema).unwrap(), expected_schema);
+        assert_eq!(
+            fs::read_to_string(&events_path).unwrap().lines().count(),
+            events_before.lines().count() + 1,
+            "a coupled-only repair keeps the current per-profile audit event"
+        );
+
+        let again = executor_with_layout(&storage, repo.path())
+            .initialize_profiled_repository(
+                repo.path(),
+                &[ProfileSelector::id("jit-default").unwrap()],
+            )
+            .unwrap();
+        assert_eq!(
+            again.profile.unwrap().requested().unwrap().status,
+            ProfileApplicationStatus::Unchanged
+        );
+        assert_eq!(
+            fs::read_to_string(events_path).unwrap().lines().count(),
+            events_before.lines().count() + 1
         );
     }
 

@@ -23,6 +23,47 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+/// Project dependency-first unique durable results back onto ordered root
+/// observations. A repeated selector observes the transaction's first result,
+/// then reports an unchanged second observation without attempting another
+/// publication.
+fn selection_profile_results(
+    applied: Vec<ProfileApplyResult>,
+    roots: &[ProfilePackage],
+) -> Result<ProfileComposedApplyResult> {
+    let root_ids = roots
+        .iter()
+        .map(|root| root.model().id.as_str())
+        .collect::<BTreeSet<_>>();
+    let applied_by_id = applied
+        .iter()
+        .map(|result| (result.id.as_str(), result))
+        .collect::<BTreeMap<_, _>>();
+    let mut results = applied
+        .iter()
+        .filter(|result| !root_ids.contains(result.id.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut occurrences = BTreeMap::<&str, usize>::new();
+    for root in roots {
+        let id = root.model().id.as_str();
+        let Some(source) = applied_by_id.get(id) else {
+            anyhow::bail!("selected root '{id}' has no aggregate application result");
+        };
+        let occurrence = occurrences.entry(id).or_default();
+        let first = *occurrence == 0;
+        *occurrence += 1;
+        let mut result = (*source).clone();
+        if !first {
+            result.status = ProfileApplicationStatus::Unchanged;
+            result.transaction_id = None;
+            result.warnings.clear();
+        }
+        results.push(result);
+    }
+    Ok(ProfileComposedApplyResult::new(results))
+}
+
 /// One ordered profile selection from the command boundary.
 ///
 /// The tag is part of the value rather than inferred from filesystem state:
@@ -588,17 +629,28 @@ impl CommandExecutor<JsonFileStorage> {
         let contribution_context =
             self.profile_contribution_candidates(std::slice::from_ref(package), inputs)?;
         with_mutation_session(self.storage(), &layout, "profile planning", |session| {
-            let Some((plan, changes)) = self.prepare_profile_resolved(
+            let Some(plan) = self.prepare_profile_selection(
                 session,
-                package,
-                &resolved,
+                std::slice::from_ref(package),
+                std::slice::from_ref(&resolved),
                 &contribution_context,
                 &context,
-                false,
             )?
             else {
                 return Ok(SessionStep::Retry);
             };
+            let changes = plan
+                .profile_targets()
+                .iter()
+                .map(|target| {
+                    let action = match target.disposition {
+                        ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
+                        ProfileTargetDisposition::Create => ProfileTargetAction::Create,
+                        ProfileTargetDisposition::Update => ProfileTargetAction::Update,
+                    };
+                    ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
+                })
+                .collect();
             Ok(SessionStep::Done(ProfilePlanEntry {
                 id: metadata.id.to_string(),
                 version: metadata.version.clone(),
@@ -624,49 +676,29 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Resolve and apply profiles with already captured variable inputs.
     ///
-    /// The complete selected set is semantically preflighted before sequential
-    /// per-package publication begins, so every record for a shared definition
-    /// receives the same complete ownership evidence on its first application.
+    /// One complete selected closure is planned and published through the held
+    /// session. Selector occurrence order remains a result concern only.
     pub fn apply_profile_with_inputs(
         &self,
         selectors: &[ProfileSelector],
         inputs: &VariableInputs,
     ) -> Result<ProfileComposedApplyResult> {
         let selected = self.resolve_profile_selectors(selectors)?;
-        // Resolve every selected root and every already-applied package before
-        // the first per-package publication. The later calls preserve the
-        // repeatable selector result surface; this preflight makes graph
-        // failures independent of that occurrence order.
-        let contribution_context = if selected.is_empty() {
-            Vec::new()
-        } else {
-            let packages = self
-                .resolve_profile_graph_for_mutation(&selected)?
-                .selected_packages();
-            validate_variable_inputs(&packages, inputs)?;
-            let candidates = self.profile_contribution_candidates(&packages, inputs)?;
-            self.preflight_profile_contributions(&candidates)?;
-            candidates
-        };
-        selected
-            .into_iter()
-            .map(|package| {
-                self.apply_profile_package_with_context(&package, inputs, &contribution_context)
-            })
-            .collect::<Result<Vec<_>>>()
-            .map(|results| {
-                ProfileComposedApplyResult::new(
-                    results
-                        .into_iter()
-                        .flat_map(|result| result.profiles)
-                        .collect(),
-                )
-            })
+        if selected.is_empty() {
+            return Ok(ProfileComposedApplyResult::new(Vec::new()));
+        }
+        let packages = self
+            .resolve_profile_graph_for_mutation(&selected)?
+            .selected_packages();
+        validate_variable_inputs(&packages, inputs)?;
+        let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
+        let applied = self.apply_profile_selection(&packages, inputs, &contribution_context)?;
+        selection_profile_results(applied.profiles, &selected)
     }
 
     /// Resolve the semantic candidates that every selected package contributes.
     ///
-    /// The candidate vector is kept through the sequential publication loop so
+    /// The candidate vector is carried into the one aggregate materialization so
     /// each affected record derives its shared ownership from the same selection.
     pub(super) fn profile_contribution_candidates(
         &self,
@@ -685,51 +717,6 @@ impl CommandExecutor<JsonFileStorage> {
             })
             .collect::<Result<Vec<_>>>()
             .map(|claims| claims.into_iter().flatten().collect())
-    }
-
-    /// Preflight every selected package's resolved semantic contribution against
-    /// one captured repository image before the per-package publication loop.
-    fn preflight_profile_contributions(
-        &self,
-        candidates: &[ProfileContributionClaim],
-    ) -> Result<()> {
-        let layout = self.require_layout()?;
-        with_mutation_session(
-            self.storage(),
-            &layout,
-            "profile composition preflight",
-            |session| {
-                let Some((listed, recorded)) =
-                    capture_applied_records(session, &VirtualPath::PROFILES)?
-                else {
-                    return Ok(SessionStep::Retry);
-                };
-                let mut spec = listed.capture_spec().clone();
-                spec.discover_paths(
-                    candidates
-                        .iter()
-                        .map(|claim| claim.contribution.registry_path())
-                        .map(|path| {
-                            listed
-                                .layout()
-                                .classify_repository_relative(path)
-                                .map_err(anyhow::Error::from)
-                        })
-                        .collect::<Result<Vec<_>>>()?,
-                )?;
-                let Some(image) = capture_or_retry(session.capture(spec))? else {
-                    return Ok(SessionStep::Retry);
-                };
-                if recorded_profile_ids(&image, &VirtualPath::PROFILES)? != recorded {
-                    return Ok(SessionStep::Retry);
-                }
-                crate::repository_state::preflight_profile_contributions_for_mutation(
-                    &image,
-                    candidates.to_vec(),
-                )?;
-                Ok(SessionStep::Done(()))
-            },
-        )
     }
 
     /// Resolve and apply profiles after loading command-bound variable inputs.
@@ -1040,12 +1027,8 @@ impl CommandExecutor<JsonFileStorage> {
     ///
     /// The whole closure is resolved and ordered first
     /// ([`resolve_profile_closure`](Self::resolve_profile_closure)), so a cycle
-    /// or an unresolvable dependency fails before any package is applied. Each
-    /// package is then applied in that order through one application of its
-    /// own, which is what gives every applied package its own provenance record
-    /// and its own audit event. A package whose targets and provenance are
-    /// already exact reports no work, so re-applying a set that is already
-    /// applied publishes nothing.
+    /// or an unresolvable dependency fails before a plan is published. The
+    /// dependency-first closure enters the aggregate application seam once.
     pub fn apply_profile_package(
         &self,
         package: &ProfilePackage,
@@ -1055,9 +1038,8 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Apply one package closure with already captured variable inputs.
     ///
-    /// The closure's semantic contributions are preflighted before any member
-    /// publishes, and the resulting scoped context gives each affected record
-    /// complete shared ownership evidence during that first sequential pass.
+    /// The closure is one aggregate application. Its scoped context gives every
+    /// affected record complete shared ownership evidence on the first run.
     pub fn apply_profile_package_with_inputs(
         &self,
         package: &ProfilePackage,
@@ -1066,87 +1048,54 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = self.resolve_profile_closure_for_mutation(package)?;
         validate_variable_inputs(&packages, inputs)?;
         let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
-        self.preflight_profile_contributions(&contribution_context)?;
-        self.apply_profile_packages_with_context(&packages, inputs, &contribution_context)
+        self.apply_profile_selection(&packages, inputs, &contribution_context)
     }
 
-    /// Apply one package closure using a selection-scoped composition context
-    /// that has already passed semantic preflight.
-    fn apply_profile_package_with_context(
-        &self,
-        package: &ProfilePackage,
-        inputs: &VariableInputs,
-        contribution_context: &[ProfileContributionClaim],
-    ) -> Result<ProfileComposedApplyResult> {
-        let packages = self.resolve_profile_closure_for_mutation(package)?;
-        self.apply_profile_packages_with_context(&packages, inputs, contribution_context)
-    }
-
-    fn apply_profile_packages_with_context(
+    /// Publish the complete dependency-first unique closure through one
+    /// recovered session and one `session.apply` call at most.
+    pub(super) fn apply_profile_selection(
         &self,
         packages: &[ProfilePackage],
         inputs: &VariableInputs,
         contribution_context: &[ProfileContributionClaim],
     ) -> Result<ProfileComposedApplyResult> {
-        packages
+        let resolved = packages
             .iter()
             .map(|package| {
-                let resolved = resolve_package(
+                resolve_package(
                     package,
                     &inputs.for_declarations(&package.model().variables),
-                )?;
-                self.apply_one_profile_package(package, &resolved, contribution_context)
+                )
+                .map_err(anyhow::Error::from)
             })
-            .collect::<Result<Vec<_>>>()
-            .map(ProfileComposedApplyResult::new)
-    }
-
-    /// Apply one validated profile package through the recovered session.
-    ///
-    /// Each attempt captures the whole-repository base under the held session guard,
-    /// derives the exact profile-owned targets through the repository-state
-    /// materialization dispatcher,
-    /// finalizes one exact profile-application delta, validates that delta's proposed
-    /// overlay, and publishes through `session.apply` with pre-journal revalidation.
-    /// A no-op profile has an empty complete finalized delta: package targets and
-    /// provenance are unchanged, and coupled default-rule/schema state is current.
-    ///
-    /// This applies exactly the package it is handed; the packages that package
-    /// depends on are applied by
-    /// [`apply_profile_package`](Self::apply_profile_package), which orders them
-    /// against it.
-    pub(super) fn apply_one_profile_package(
-        &self,
-        package: &ProfilePackage,
-        resolved: &ResolvedProfileContent,
-        contribution_context: &[ProfileContributionClaim],
-    ) -> Result<ProfileApplyResult> {
-        let metadata = package.model();
+            .collect::<Result<Vec<_>>>()?;
         let layout = self.require_layout()?;
-        // One MutationContext per operation, reused across probe/final finalize and
-        // every retry so the appended ProfileApplied event's id/timestamp stay stable.
         let context = MutationContext::production();
         with_mutation_session(self.storage(), &layout, "profile application", |session| {
-            let Some((plan, _changes)) = self.prepare_profile_resolved(
+            let Some(plan) = self.prepare_profile_selection(
                 session,
-                package,
-                resolved,
+                packages,
+                &resolved,
                 contribution_context,
                 &context,
-                true,
             )?
             else {
                 return Ok(SessionStep::Retry);
             };
             if plan.delta().actions().is_empty() {
-                return Ok(SessionStep::Done(ProfileApplyResult {
-                    id: metadata.id.to_string(),
-                    version: metadata.version.clone(),
-                    status: ProfileApplicationStatus::Unchanged,
-                    plan_hash: plan.hash().to_string(),
-                    transaction_id: None,
-                    warnings: Vec::new(),
-                }));
+                return Ok(SessionStep::Done(ProfileComposedApplyResult::new(
+                    packages
+                        .iter()
+                        .map(|package| ProfileApplyResult {
+                            id: package.model().id.to_string(),
+                            version: package.model().version.clone(),
+                            status: ProfileApplicationStatus::Unchanged,
+                            plan_hash: plan.hash().to_string(),
+                            transaction_id: None,
+                            warnings: Vec::new(),
+                        })
+                        .collect(),
+                )));
             }
             let proposed = apply_overlay(plan.image(), super::validation_overlay(plan.delta()))
                 .map_err(anyhow::Error::from)?;
@@ -1159,27 +1108,32 @@ impl CommandExecutor<JsonFileStorage> {
                 .into());
             }
 
-            let result = ProfileApplyResult {
-                id: metadata.id.to_string(),
-                version: metadata.version.clone(),
-                status: ProfileApplicationStatus::Applied,
-                plan_hash: plan.hash().to_string(),
-                // The applied transaction hash is the plan hash by construction.
-                transaction_id: Some(plan.hash().to_string()),
-                warnings: Vec::new(),
-            };
-            Ok(SessionStep::Apply(plan, result))
+            let results = packages
+                .iter()
+                .map(|package| {
+                    let changed = plan.applied_profiles().contains(&package.model().id);
+                    Ok(ProfileApplyResult {
+                        id: package.model().id.to_string(),
+                        version: package.model().version.clone(),
+                        status: if changed {
+                            ProfileApplicationStatus::Applied
+                        } else {
+                            ProfileApplicationStatus::Unchanged
+                        },
+                        plan_hash: plan.hash().to_string(),
+                        transaction_id: changed.then(|| plan.hash().to_string()),
+                        warnings: Vec::new(),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok(SessionStep::Apply(
+                plan,
+                ProfileComposedApplyResult::new(results),
+            ))
         })
     }
 
-    /// Capture the base and derive one complete canonical profile plan.
-    ///
-    /// Returns `Ok(None)` on a retryable capture conflict so the caller re-attempts.
-    /// The resolved profile package is parsed into canonical claims
-    /// ([`build_profile_claims_from_resolved`](crate::profile::build_profile_claims_from_resolved)) and composed
-    /// into exact target bytes by `repository_state`; finalizing the complete probe
-    /// delta decides whether the operation is a no-op and supplies the validation
-    /// overlay reused by application.
+    /// Test-only single-member view of the aggregate preparation path.
     #[cfg(test)]
     fn prepare_profile(
         &self,
@@ -1192,36 +1146,56 @@ impl CommandExecutor<JsonFileStorage> {
             std::slice::from_ref(package),
             &VariableInputs::default(),
         )?;
-        self.prepare_profile_resolved(
+        let plan = self.prepare_profile_selection(
             session,
-            package,
-            &resolved,
+            std::slice::from_ref(package),
+            std::slice::from_ref(&resolved),
             &contribution_context,
             context,
-            true,
-        )
+        )?;
+        Ok(plan.map(|plan| {
+            let changes = plan
+                .profile_targets()
+                .iter()
+                .map(|target| {
+                    let action = match target.disposition {
+                        ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
+                        ProfileTargetDisposition::Create => ProfileTargetAction::Create,
+                        ProfileTargetDisposition::Update => ProfileTargetAction::Update,
+                    };
+                    ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
+                })
+                .collect();
+            (plan, changes)
+        }))
     }
 
-    fn prepare_profile_resolved(
+    /// Capture and close the complete selection once. A retry restarts from a
+    /// fresh held session image; no member of the selection is published until
+    /// the final aggregate plan reaches `session.apply`.
+    fn prepare_profile_selection(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
-        package: &ProfilePackage,
-        resolved: &ResolvedProfileContent,
+        packages: &[ProfilePackage],
+        resolved: &[ResolvedProfileContent],
         contribution_context: &[ProfileContributionClaim],
         context: &MutationContext,
-        allow_shipped_v1_migration: bool,
-    ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
-        let metadata = package.model();
-        reject_reserved_application_targets(package.hashes().targets.keys().map(String::as_str))?;
-        let record_path = applied_record_path(metadata.id.as_str())?;
+    ) -> Result<Option<MaterializationPlan>> {
+        if packages.len() != resolved.len() {
+            anyhow::bail!("profile selection packages and resolved content differ in length");
+        }
+        for package in packages {
+            reject_reserved_application_targets(
+                package.hashes().targets.keys().map(String::as_str),
+            )?;
+        }
         let profiles_dir = VirtualPath::PROFILES;
         let events_path = VirtualPath::EVENTS;
         let layout = self.require_layout()?;
 
-        let mut content_paths = package
-            .hashes()
-            .targets
-            .keys()
+        let mut content_paths = packages
+            .iter()
+            .flat_map(|package| package.hashes().targets.keys())
             .map(|target| {
                 layout
                     .classify_repository_relative(target)
@@ -1237,7 +1211,15 @@ impl CommandExecutor<JsonFileStorage> {
                 .into_iter()
                 .flatten(),
         );
-        content_paths.push(record_path.clone());
+        content_paths.extend(
+            packages
+                .iter()
+                .map(|package| applied_record_path(package.model().id.as_str()))
+                .collect::<Result<Vec<_>>>()?,
+        );
+        content_paths.extend(crate::repository_state::profile_contribution_target_paths(
+            contribution_context,
+        )?);
         content_paths.push(profiles_dir.clone());
         content_paths.push(events_path.clone());
 
@@ -1251,25 +1233,26 @@ impl CommandExecutor<JsonFileStorage> {
         // decoder runs below only after this same session has captured every
         // pinned historical unit it must authenticate.
         let mut migration_paths = Vec::new();
-        if allow_shipped_v1_migration {
-            let mut has_candidate = false;
-            for id in recorded_profile_ids(&base, &profiles_dir)? {
-                let path = applied_record_path(&id)?;
-                if matches!(
+        let has_candidate = recorded_profile_ids(&base, &profiles_dir)?
+            .into_iter()
+            .map(|id| applied_record_path(&id))
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .map(|path| {
+                Ok(matches!(
                     base.entry(&path)?,
                     RepositoryEntry::File { bytes, .. }
                         if crate::repository_state::is_shipped_v1_candidate(bytes)
-                ) {
-                    has_candidate = true;
-                    break;
-                }
-            }
-            if has_candidate {
-                migration_paths = crate::repository_state::shipped_v1_migration_paths()?
-                    .into_iter()
-                    .map(|path| layout.classify_repository_relative(&path))
-                    .collect::<Result<Vec<_>, _>>()?;
-            }
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .any(|candidate| candidate);
+        if has_candidate {
+            migration_paths = crate::repository_state::shipped_v1_migration_paths()?
+                .into_iter()
+                .map(|path| layout.classify_repository_relative(&path))
+                .collect::<Result<Vec<_>, _>>()?;
         }
         let mut authenticated_paths = content_paths.clone();
         let base = if migration_paths.is_empty() {
@@ -1290,23 +1273,37 @@ impl CommandExecutor<JsonFileStorage> {
         // The authenticated rewrite map stays immutable through closure,
         // preview, and final derivation; final delta preimages revalidate the
         // raw record bytes before publication.
-        let migrations = allow_shipped_v1_migration
-            .then(|| crate::repository_state::migrate_shipped_v1_records(&base))
-            .transpose()?
-            .unwrap_or_default();
-        let input =
-            profile_application_input(package, resolved, base.layout(), record_path.clone())?
-                .with_contribution_context(contribution_context)
-                .with_shipped_v1_migrations(migrations.clone());
+        let migrations = crate::repository_state::migrate_shipped_v1_records(&base)?;
+        let inputs = profile_selection_inputs(
+            packages,
+            resolved,
+            base.layout(),
+            contribution_context,
+            &migrations,
+        )?;
+        let migration_base = migration_overlay(&base, &migrations)?;
+        let contribution_base = apply_overlay(
+            &migration_base,
+            crate::repository_state::profile_contribution_overrides(
+                &migration_base,
+                contribution_context,
+            )?,
+        )?;
         let mut expanded_paths = authenticated_paths;
-        expanded_paths.extend(crate::repository_state::profile_capture_closure(
-            &base, &input,
-        )?);
+        for input in &inputs {
+            expanded_paths.extend(crate::repository_state::profile_capture_closure(
+                &contribution_base,
+                input,
+            )?);
+        }
         // A package that re-derives the default rules reaches the schemas they
         // reference, and reaching a schema that is absent means proving its
         // absence against the directory listing, so the directory is discovered
         // whether or not the package names a target under it.
-        if input.owns_default_rule_authority() {
+        if inputs
+            .iter()
+            .any(ProfileApplicationInput::owns_default_rule_authority)
+        {
             expanded_paths.push(VirtualPath::SCHEMAS);
         }
         let base =
@@ -1314,14 +1311,17 @@ impl CommandExecutor<JsonFileStorage> {
                 None => return Ok(None),
                 Some(base) => base,
             };
-        let input =
-            profile_application_input(package, resolved, base.layout(), record_path.clone())?
-                .with_contribution_context(contribution_context)
-                .with_shipped_v1_migrations(migrations.clone());
+        let inputs = profile_selection_inputs(
+            packages,
+            resolved,
+            base.layout(),
+            contribution_context,
+            &migrations,
+        )?;
         let preview = derive_materialization(
             &base,
-            MaterializationRequest::ApplyProfile {
-                profile: Box::new(input),
+            MaterializationRequest::ApplyProfileSelection {
+                profiles: inputs,
                 context,
             },
         )?;
@@ -1338,20 +1338,35 @@ impl CommandExecutor<JsonFileStorage> {
             None => return Ok(None),
             Some(base) => base,
         };
-        let input = profile_application_input(package, resolved, probe.layout(), record_path)?
-            .with_contribution_context(contribution_context)
-            .with_shipped_v1_migrations(migrations);
-        let final_closure = crate::repository_state::profile_capture_closure(&probe, &input)?;
-        if final_closure
-            .iter()
-            .any(|path| !probe.capture_spec().contains_path(path))
-        {
-            return Ok(None);
+        let inputs = profile_selection_inputs(
+            packages,
+            resolved,
+            probe.layout(),
+            contribution_context,
+            &migrations,
+        )?;
+        let migration_probe = migration_overlay(&probe, &migrations)?;
+        let contribution_probe = apply_overlay(
+            &migration_probe,
+            crate::repository_state::profile_contribution_overrides(
+                &migration_probe,
+                contribution_context,
+            )?,
+        )?;
+        for input in &inputs {
+            let final_closure =
+                crate::repository_state::profile_capture_closure(&contribution_probe, input)?;
+            if final_closure
+                .iter()
+                .any(|path| !probe.capture_spec().contains_path(path))
+            {
+                return Ok(None);
+            }
         }
         let plan = derive_materialization(
             &probe,
-            MaterializationRequest::ApplyProfile {
-                profile: Box::new(input),
+            MaterializationRequest::ApplyProfileSelection {
+                profiles: inputs,
                 context,
             },
         )?;
@@ -1363,19 +1378,7 @@ impl CommandExecutor<JsonFileStorage> {
         }) {
             return Ok(None);
         }
-        let changes = plan
-            .profile_targets()
-            .iter()
-            .map(|target| {
-                let action = match target.disposition {
-                    ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
-                    ProfileTargetDisposition::Create => ProfileTargetAction::Create,
-                    ProfileTargetDisposition::Update => ProfileTargetAction::Update,
-                };
-                ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
-            })
-            .collect();
-        Ok(Some((plan, changes)))
+        Ok(Some(plan))
     }
 
     /// Read the applied-profile record this repository holds for `id`, through
@@ -1768,6 +1771,50 @@ pub(super) fn expected_record(
     ))
 }
 
+/// Build one canonical aggregate input collection. The authenticated migration
+/// map belongs to its first dependency-first member only, so one selection
+/// converts each shipped-v1 record once while every later member plans against
+/// the same proposed current-format image.
+fn profile_selection_inputs(
+    packages: &[ProfilePackage],
+    resolved: &[ResolvedProfileContent],
+    layout: &RepositoryLayout,
+    contribution_context: &[ProfileContributionClaim],
+    migrations: &BTreeMap<VirtualPath, AppliedProfileRecord>,
+) -> Result<Vec<ProfileApplicationInput>> {
+    packages
+        .iter()
+        .zip(resolved)
+        .enumerate()
+        .map(|(index, (package, resolved))| {
+            let record_path = applied_record_path(package.model().id.as_str())?;
+            let input = profile_application_input(package, resolved, layout, record_path)?
+                .with_contribution_context(contribution_context);
+            Ok(if index == 0 {
+                input.with_shipped_v1_migrations(migrations.clone())
+            } else {
+                input
+            })
+        })
+        .collect()
+}
+
+/// Apply authenticated migration bytes to an in-memory image for later
+/// aggregate members. The durable migration actions remain in the final plan.
+fn migration_overlay(
+    base: &RepositoryImage,
+    migrations: &BTreeMap<VirtualPath, AppliedProfileRecord>,
+) -> Result<RepositoryImage> {
+    apply_overlay(
+        base,
+        migrations
+            .iter()
+            .map(|(path, record)| Ok((path.clone(), Some(record.to_bytes()?))))
+            .collect::<Result<Vec<_>, serde_json::Error>>()?,
+    )
+    .map_err(Into::into)
+}
+
 /// Convert an immutable package into neutral claims plus provenance metadata.
 fn profile_application_input(
     package: &ProfilePackage,
@@ -1861,6 +1908,8 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::path::Path;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::Arc;
     use tempfile::TempDir;
 
     struct RecaptureRaceSession {
@@ -1874,6 +1923,54 @@ mod tests {
         captures: usize,
         config_path: std::path::PathBuf,
         source_path: std::path::PathBuf,
+    }
+
+    /// Observe actual recoverable publications without coupling the test to
+    /// preparatory graph or capture sessions. This transaction-kernel edge runs
+    /// once for each delta that reaches `session.apply`.
+    struct PublicationCounter(AtomicUsize);
+
+    impl PublicationCounter {
+        fn new() -> Arc<Self> {
+            Arc::new(Self(AtomicUsize::new(0)))
+        }
+
+        fn count(&self) -> usize {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    impl crate::storage::TransactionFailureInjector for PublicationCounter {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            if point == &crate::storage::TransactionFailurePoint::RepositoryBeforeControlCreation {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(())
+        }
+    }
+
+    /// Fail one named kernel boundary, then let the next recovered session run.
+    struct FailOnce {
+        point: crate::storage::TransactionFailurePoint,
+        fired: AtomicBool,
+    }
+
+    impl FailOnce {
+        fn at(point: crate::storage::TransactionFailurePoint) -> Arc<Self> {
+            Arc::new(Self {
+                point,
+                fired: AtomicBool::new(false),
+            })
+        }
+    }
+
+    impl crate::storage::TransactionFailureInjector for FailOnce {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            if point == &self.point && !self.fired.swap(true, Ordering::SeqCst) {
+                return Err(std::io::Error::other(format!("injected {point:?}")));
+            }
+            Ok(())
+        }
     }
 
     impl RepositoryMutationSession for RecaptureRaceSession {
@@ -2661,6 +2758,63 @@ placement = "append"
                 "workflow profile did not contribute {expected}: {rules:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically() {
+        let (temp, executor, _default, dogfood) = bare_repository_beside_shipped_packages();
+        executor.apply_profile_package(&dogfood).unwrap();
+
+        let stale_schema = temp
+            .path()
+            .join(".jit/schemas/default-obsolete-profile-selection.json");
+        fs::write(&stale_schema, "{}").unwrap();
+        let rules_path = temp.path().join(".jit/rules.toml");
+        let rules = fs::read_to_string(&rules_path).unwrap();
+        fs::write(
+            &rules_path,
+            format!(
+                "{rules}\n[[rules]]\nname = \"obsolete-profile-selection\"\norigin = \"default\"\nassert = {{ json-schema = \"schemas/default-obsolete-profile-selection.json\" }}\n"
+            ),
+        )
+        .unwrap();
+        let events_before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            temp.path().join(".jit"),
+            FailOnce::at(
+                crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            ),
+        );
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+
+        assert!(executor.apply_profile_package(&dogfood).is_err());
+
+        let recovered = JsonFileStorage::new(temp.path().join(".jit"));
+        let layout = discover_repository_layout(temp.path(), recovered.root()).unwrap();
+        drop(recovered.open_mutation_session(layout).unwrap());
+        assert!(stale_schema.exists());
+        assert_eq!(
+            fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
+            events_before
+        );
+
+        let repaired = CommandExecutor::new(recovered.clone())
+            .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap())
+            .apply_profile_package(&dogfood)
+            .unwrap();
+        assert!(!stale_schema.exists());
+        assert_eq!(
+            repaired
+                .profiles
+                .iter()
+                .map(|profile| (profile.id.as_str(), profile.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("jit-default", ProfileApplicationStatus::Applied),
+                ("jit-dogfood", ProfileApplicationStatus::Unchanged),
+            ]
+        );
     }
 
     #[test]
@@ -3765,6 +3919,169 @@ template = true
             dependant.hashes().package
         );
         assert_ne!(dependency.hashes().package, dependant.hashes().package);
+    }
+
+    #[test]
+    fn test_apply_profile_selection_publishes_multiple_packages_through_one_transaction() {
+        let temp = TempDir::new().unwrap();
+        let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
+        CommandExecutor::new(bootstrap.clone())
+            .with_layout(discover_repository_layout(temp.path(), bootstrap.root()).unwrap())
+            .initialize_fresh_repository(temp.path(), None)
+            .unwrap();
+        let left = package_declaring(&temp, "vendor/left", "left", &[]);
+        let right = package_declaring(&temp, "vendor/right", "right", &[]);
+        let publications = PublicationCounter::new();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            temp.path().join(".jit"),
+            publications.clone(),
+        );
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+
+        let applied = executor
+            .apply_profile(&[package_selector(&left), package_selector(&right)])
+            .unwrap();
+
+        assert_eq!(
+            publications.count(),
+            1,
+            "one selection must reach the recoverable publication boundary once"
+        );
+        assert_eq!(
+            applied
+                .profiles
+                .iter()
+                .map(|profile| (profile.id.as_str(), profile.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("left", ProfileApplicationStatus::Applied),
+                ("right", ProfileApplicationStatus::Applied),
+            ]
+        );
+        for id in ["left", "right"] {
+            assert!(temp
+                .path()
+                .join(format!(".jit/profiles/{id}.json"))
+                .is_file());
+            assert!(temp.path().join(format!("docs/{id}.txt")).is_file());
+        }
+        assert_eq!(applied_event_ids(&storage), vec!["left", "right"]);
+    }
+
+    #[test]
+    fn test_apply_profile_selection_is_a_complete_noop_when_every_member_is_present() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let left = package_declaring(&temp, "vendor/left", "left", &[]);
+        let right = package_declaring(&temp, "vendor/right", "right", &[]);
+        executor
+            .apply_profile(&[package_selector(&left), package_selector(&right)])
+            .unwrap();
+        let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+        let records = ["left", "right"].map(|id| record_for(&temp, id));
+        let publications = PublicationCounter::new();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            temp.path().join(".jit"),
+            publications.clone(),
+        );
+        let executor = CommandExecutor::new(storage).with_layout(
+            discover_repository_layout(temp.path(), temp.path().join(".jit")).unwrap(),
+        );
+
+        let reapplied = executor
+            .apply_profile(&[package_selector(&left), package_selector(&right)])
+            .unwrap();
+
+        assert_eq!(publications.count(), 0);
+        assert!(reapplied
+            .profiles
+            .iter()
+            .all(|profile| profile.status == ProfileApplicationStatus::Unchanged));
+        assert!(reapplied
+            .profiles
+            .iter()
+            .all(|profile| profile.transaction_id.is_none()));
+        assert_eq!(
+            fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
+            events
+        );
+        assert_eq!(["left", "right"].map(|id| record_for(&temp, id)), records);
+    }
+
+    #[test]
+    fn test_apply_profile_selection_recovers_target_record_and_audit_together_after_failure() {
+        let temp = TempDir::new().unwrap();
+        let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
+        CommandExecutor::new(bootstrap.clone())
+            .with_layout(discover_repository_layout(temp.path(), bootstrap.root()).unwrap())
+            .initialize_fresh_repository(temp.path(), None)
+            .unwrap();
+        let left = package_declaring(&temp, "vendor/left", "left", &[]);
+        let right = package_declaring(&temp, "vendor/right", "right", &[]);
+        let original_events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
+        let storage = JsonFileStorage::with_repository_state_failures(
+            temp.path().join(".jit"),
+            FailOnce::at(
+                crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            ),
+        );
+        let selectors = [package_selector(&left), package_selector(&right)];
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+
+        assert!(executor.apply_profile(&selectors).is_err());
+
+        let recovered = JsonFileStorage::new(temp.path().join(".jit"));
+        let layout = discover_repository_layout(temp.path(), recovered.root()).unwrap();
+        drop(recovered.open_mutation_session(layout).unwrap());
+        for id in ["left", "right"] {
+            assert!(!temp.path().join(format!("docs/{id}.txt")).exists());
+            assert!(!temp
+                .path()
+                .join(format!(".jit/profiles/{id}.json"))
+                .exists());
+        }
+        assert_eq!(
+            fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
+            original_events
+        );
+
+        let retried = CommandExecutor::new(recovered.clone())
+            .with_layout(discover_repository_layout(temp.path(), recovered.root()).unwrap())
+            .apply_profile(&selectors)
+            .unwrap();
+        assert!(retried
+            .profiles
+            .iter()
+            .all(|profile| profile.status == ProfileApplicationStatus::Applied));
+        assert_eq!(applied_event_ids(&recovered), vec!["left", "right"]);
+    }
+
+    #[test]
+    fn test_apply_profile_selection_keeps_duplicate_root_observation_without_duplicate_publication()
+    {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let package = package_declaring(&temp, "vendor/duplicate", "duplicate", &[]);
+
+        let applied = executor
+            .apply_profile(&[package_selector(&package), package_selector(&package)])
+            .unwrap();
+
+        assert_eq!(
+            applied
+                .profiles
+                .iter()
+                .map(|profile| (profile.id.as_str(), profile.status))
+                .collect::<Vec<_>>(),
+            vec![
+                ("duplicate", ProfileApplicationStatus::Applied),
+                ("duplicate", ProfileApplicationStatus::Unchanged),
+            ]
+        );
+        assert_eq!(
+            applied_event_ids(&JsonFileStorage::new(temp.path().join(".jit"))),
+            vec!["duplicate"]
+        );
     }
 
     #[test]

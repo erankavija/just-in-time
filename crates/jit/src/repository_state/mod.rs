@@ -199,8 +199,8 @@ pub use profile_apply::{
 };
 pub(crate) use profile_apply::{
     is_shipped_v1_candidate, migrate_shipped_v1_records, preflight_profile_contributions,
-    preflight_profile_contributions_for_mutation, profile_capture_closure,
-    profile_contribution_target_paths, shipped_v1_migration_paths,
+    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
+    shipped_v1_migration_paths,
 };
 #[cfg(test)]
 pub(crate) use profile_apply::{reset_shipped_v1_conversion_count, shipped_v1_conversion_count};
@@ -578,6 +578,7 @@ pub struct MaterializationPlan {
     /// Per-projection row counts produced by a configured-projection render.
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
+    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -600,6 +601,7 @@ struct MaterializationDerivation {
     seed: RepositorySeed,
     intent: MaterializationIntent,
     profile_targets: Vec<ProfileTargetMaterialization>,
+    applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
 impl MaterializationDerivation {
@@ -609,11 +611,21 @@ impl MaterializationDerivation {
             seed,
             intent,
             profile_targets: Vec::new(),
+            applied_profiles: std::collections::BTreeSet::new(),
         }
     }
 
     fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
         self.profile_targets = targets;
+        self
+    }
+
+    /// Record packages whose candidate derivations have a non-event effect.
+    fn with_applied_profiles(
+        mut self,
+        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    ) -> Self {
+        self.applied_profiles = profiles;
         self
     }
 }
@@ -643,6 +655,13 @@ impl MaterializationPlan {
         &self.profile_targets
     }
 
+    /// Package identities responsible for a non-event effect in this plan.
+    pub(crate) fn applied_profiles(
+        &self,
+    ) -> &std::collections::BTreeSet<crate::profile::ProfileId> {
+        &self.applied_profiles
+    }
+
     /// Close a delta into a plan whose identity is computed from all plan inputs.
     pub(crate) fn new(
         image: &RepositoryImage,
@@ -657,6 +676,7 @@ impl MaterializationPlan {
             hash,
             projection_counts: std::collections::BTreeMap::new(),
             profile_targets: Vec::new(),
+            applied_profiles: std::collections::BTreeSet::new(),
         })
     }
 
@@ -667,6 +687,14 @@ impl MaterializationPlan {
 
     fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
         self.profile_targets = targets;
+        self
+    }
+
+    fn with_applied_profiles(
+        mut self,
+        profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
+    ) -> Self {
+        self.applied_profiles = profiles;
         self
     }
 }
@@ -711,10 +739,13 @@ pub enum MaterializationRequest<'a> {
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
     },
-    /// Derive one profile application over an existing repository.
-    ApplyProfile {
-        /// Parsed package metadata and neutral canonical claims.
-        profile: Box<ProfileApplicationInput>,
+    /// Derive one complete profile-selection application over an existing
+    /// repository. The collection is dependency-first and unique; selector
+    /// occurrence handling remains at the command boundary.
+    ApplyProfileSelection {
+        /// Parsed package metadata and neutral canonical claims for the whole
+        /// selected closure.
+        profiles: Vec<ProfileApplicationInput>,
         /// Stable mutation identity and time authority.
         context: &'a MutationContext,
     },
@@ -775,8 +806,8 @@ pub fn derive_materialization(
             initialize::derive_initialization(image, scaffold, context)?,
             Default::default(),
         ),
-        MaterializationRequest::ApplyProfile { profile, context } => (
-            initialize::derive_profile_application(image, &profile, context)?,
+        MaterializationRequest::ApplyProfileSelection { profiles, context } => (
+            initialize::derive_profile_applications(image, &profiles, context)?,
             Default::default(),
         ),
     };
@@ -785,11 +816,13 @@ pub fn derive_materialization(
         seed,
         intent,
         profile_targets,
+        applied_profiles,
     } = derivation;
     MaterializationPlan::new(image, &seed, &intent, delta)
         .map(|plan| {
             plan.with_projection_counts(projection_counts)
                 .with_profile_targets(profile_targets)
+                .with_applied_profiles(applied_profiles)
         })
         .map_err(Into::into)
 }

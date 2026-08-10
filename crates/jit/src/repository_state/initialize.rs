@@ -202,6 +202,7 @@ pub struct InitializationScaffold {
     rules: Vec<u8>,
     schemas: Vec<(String, Vec<u8>)>,
     profile: Option<ProfileApplicationInput>,
+    additional_profiles: Vec<ProfileApplicationInput>,
     project_name: ProjectName,
     gitattributes: GitattributesClaim,
 }
@@ -253,6 +254,7 @@ impl InitializationScaffold {
             rules: serialized.rules_toml.into_bytes(),
             schemas,
             profile,
+            additional_profiles: Vec::new(),
             project_name,
             gitattributes: GitattributesClaim::NotApplicable,
         })
@@ -262,6 +264,48 @@ impl InitializationScaffold {
     pub fn with_gitattributes(mut self, claim: GitattributesClaim) -> Self {
         self.gitattributes = claim;
         self
+    }
+
+    /// Attach the dependency-first unique closure selected for initialization.
+    /// The existing single-profile construction API remains useful to pure unit
+    /// tests; live profiled initialization supplies its entire closure here.
+    pub fn with_profiles(mut self, mut profiles: Vec<ProfileApplicationInput>) -> Self {
+        self.profile = profiles.first().cloned();
+        self.additional_profiles = if profiles.is_empty() {
+            Vec::new()
+        } else {
+            profiles.split_off(1)
+        };
+        self
+    }
+
+    /// Whether initialization carries any profile application input.
+    pub fn has_profiles(&self) -> bool {
+        self.profile.is_some()
+    }
+
+    /// The complete dependency-first unique profile selection.
+    pub fn profiles(&self) -> Vec<ProfileApplicationInput> {
+        self.profile
+            .iter()
+            .cloned()
+            .chain(self.additional_profiles.iter().cloned())
+            .collect()
+    }
+
+    fn without_profiles(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            index: self.index.clone(),
+            gates: self.gates.clone(),
+            invariants: self.invariants.clone(),
+            rules: self.rules.clone(),
+            schemas: self.schemas.clone(),
+            profile: None,
+            additional_profiles: Vec::new(),
+            project_name: self.project_name.clone(),
+            gitattributes: self.gitattributes.clone(),
+        }
     }
 
     /// The eligible Git-attributes events line, if any.
@@ -386,7 +430,7 @@ impl InitializationScaffold {
         // The finalizer composes `events.jsonl` from the captured prefix, so its
         // path must be captured for the prior bytes and the action preimage.
         paths.push(VirtualPath::EVENTS);
-        if let Some(profile) = &self.profile {
+        for profile in self.profiles() {
             paths.push(profile.record_path.clone());
             paths.push(VirtualPath::PROFILES);
             paths.extend(profile.claims.target_paths()?);
@@ -423,11 +467,48 @@ impl InitializationScaffold {
         &self,
         base: &RepositoryImage,
     ) -> Result<Vec<VirtualPath>, InitializationError> {
-        let Some(profile) = &self.profile else {
+        if !self.has_profiles() {
             return Ok(Vec::new());
-        };
-        let proposed = self.profile_composition_base(base)?;
-        super::profile_apply::profile_capture_closure(&proposed, profile)
+        }
+        let profiles = self.profiles();
+        let migrations = profiles
+            .first()
+            .map(|profile| &profile.shipped_v1_migrations)
+            .cloned()
+            .unwrap_or_default();
+        let neutral = self.profile_composition_base(base)?;
+        let migrated = super::apply_overlay(
+            &neutral,
+            migrations
+                .iter()
+                .map(|(path, record)| {
+                    record
+                        .to_bytes()
+                        .map(|bytes| (path.clone(), Some(bytes)))
+                        .map_err(|error| {
+                            InitializationError::RuleMaterialization(error.to_string())
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+        let contribution_context = profiles
+            .iter()
+            .flat_map(|profile| profile.contribution_context.iter().cloned())
+            .collect::<Vec<_>>();
+        let contribution_base = super::apply_overlay(
+            &migrated,
+            super::profile_contribution_overrides(&migrated, &contribution_context)
+                .map_err(profile_composition_error)?,
+        )
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
+        profiles
+            .iter()
+            .map(|profile| {
+                super::profile_apply::profile_capture_closure(&contribution_base, profile)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|closures| closures.into_iter().flatten().collect())
             .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
     }
 
@@ -456,6 +537,120 @@ impl InitializationScaffold {
     }
 }
 
+/// Combine neutral initialization and an aggregate profile closure into one
+/// final delta. Both partial derivations remain pure proposed-state planning;
+/// this function rebuilds every write with the original captured preimage so
+/// one recovered session can publish the entire repository image atomically.
+fn derive_initialization_with_profiles(
+    base: &RepositoryImage,
+    scaffold: &InitializationScaffold,
+    context: &MutationContext,
+) -> Result<MaterializationDerivation, InitializationError> {
+    let neutral = derive_initialization(base, &scaffold.without_profiles(), context)?;
+    let neutral_image = apply_action_overlay(base, neutral.delta.actions())?;
+    let profiles = scaffold.profiles();
+    let applications = derive_profile_applications(&neutral_image, &profiles, context)?;
+    let mut applied_profiles = applications.applied_profiles;
+    if let Some(profile) = coupled_default_repair_profile(neutral.delta.actions(), &profiles) {
+        applied_profiles.insert(profile.id.clone());
+    }
+    let events = profiles
+        .iter()
+        .filter(|profile| applied_profiles.contains(&profile.id))
+        .map(|profile| {
+            (
+                2,
+                profile_applied_event(
+                    profile.id.to_string(),
+                    profile.version.clone(),
+                    profile.origin.clone(),
+                    profile.package_hash.clone(),
+                    profile.target_hashes.clone(),
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut actions = BTreeMap::new();
+    for action in neutral
+        .delta
+        .actions()
+        .iter()
+        .chain(applications.delta.actions())
+        .filter(|action| action.path() != &VirtualPath::EVENTS)
+    {
+        fold_rebased_action(base, &mut actions, action)?;
+    }
+    if events.is_empty() {
+        for action in neutral
+            .delta
+            .actions()
+            .iter()
+            .filter(|action| action.path() == &VirtualPath::EVENTS)
+        {
+            fold_rebased_action(base, &mut actions, action)?;
+        }
+    } else if let Some(action) = finalize_audit_append(base, context, events)? {
+        fold_rebased_action(base, &mut actions, &action)?;
+    }
+    for action in directory_actions(
+        base,
+        &actions.values().cloned().collect::<Vec<_>>(),
+        &scaffold.explicit_dirs()?,
+    )? {
+        fold_rebased_action(base, &mut actions, &action)?;
+    }
+    let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
+    let facts = BTreeMap::from([
+        (
+            "project".to_string(),
+            scaffold.project_name.as_str().to_string(),
+        ),
+        (
+            "profiles".to_string(),
+            profiles
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>()
+                .join(","),
+        ),
+    ]);
+    let payloads = profiles
+        .iter()
+        .map(|profile| {
+            (
+                format!("profile:{}", profile.id),
+                format!("{}:{}", profile.version, profile.package_hash).into_bytes(),
+            )
+        })
+        .collect();
+    let seed = RepositorySeed::new(RepositorySeedKind::Initialization, facts, payloads)?;
+    Ok(
+        MaterializationDerivation::new(delta, seed, MaterializationIntent::InitializeRepository)
+            .with_profile_targets(applications.profile_targets)
+            .with_applied_profiles(applied_profiles),
+    )
+}
+
+/// Attribute neutral default-rule/schema repair to the first dependency-first
+/// profile that owns the authored rule authority. The neutral scaffold derives
+/// this coupled state before aggregate candidates see it, so without this handoff
+/// a real repair would publish with neither that profile's result nor its current
+/// historical audit entry.
+fn coupled_default_repair_profile<'a>(
+    actions: &[RepositoryAction],
+    profiles: &'a [ProfileApplicationInput],
+) -> Option<&'a ProfileApplicationInput> {
+    actions
+        .iter()
+        .any(|action| matches!(action.owner(), "default-rule-membership" | "default-schema"))
+        .then(|| {
+            profiles
+                .iter()
+                .find(|profile| profile.owns_default_rule_authority())
+        })
+        .flatten()
+}
+
 /// Compose the complete initialization delta over the captured base image.
 ///
 /// Every action's expected preimage is derived from the captured base, so
@@ -471,62 +666,20 @@ pub(super) fn derive_initialization(
     scaffold: &InitializationScaffold,
     context: &MutationContext,
 ) -> Result<MaterializationDerivation, InitializationError> {
+    if scaffold.has_profiles() {
+        return derive_initialization_with_profiles(base, scaffold, context);
+    }
     let mut actions = Vec::new();
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
     let existing_rules = matches!(base.entry(&rules_path)?, RepositoryEntry::File { .. });
-    let profile_changes_rules_authority = scaffold
-        .profile
-        .as_ref()
-        .is_some_and(ProfileApplicationInput::owns_default_rule_authority);
-    let compose_rules = existing_rules || profile_changes_rules_authority;
+    let compose_rules = existing_rules;
     let generated_paths: std::collections::BTreeSet<VirtualPath> = scaffold
         .schemas
         .iter()
         .map(|(name, _)| VirtualPath::data(format!("schemas/{name}")))
         .collect::<Result<_, _>>()?;
-    let mut desired = scaffold.desired_files()?;
-    let neutral_proposed = super::apply_overlay(base, desired_overrides(base, &desired)?)
-        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
-    let mut profile_targets = Vec::new();
-    let mut profile_changed = false;
-    let mut profile_record = None;
-    if let Some(profile) = &scaffold.profile {
-        let composition_base =
-            super::profile_apply::profile_composition_base(&neutral_proposed, profile)
-                .map_err(profile_composition_error)?;
-        let composed = super::profile_apply::compose_profile_targets_with_context(
-            &composition_base,
-            profile.claims.clone(),
-            profile.contribution_context.clone(),
-        )
-        .map_err(profile_composition_error)?;
-        let record = profile
-            .record(&composed)
-            .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
-        for (path, (bytes, mode)) in composed.targets {
-            let disposition = profile_target_disposition(&neutral_proposed, &path, &bytes, mode)?;
-            profile_targets.push(ProfileTargetMaterialization {
-                path: path.clone(),
-                disposition,
-                mode,
-            });
-            if disposition != ProfileTargetDisposition::Unchanged {
-                profile_changed = true;
-                desired.push(DesiredFile {
-                    path,
-                    bytes,
-                    mode,
-                    policy: WritePolicy::Always,
-                    owner: PROFILE_OWNER,
-                });
-            }
-        }
-        profile_changed |= profile_record_changed(base, profile, &record)?;
-        profile_changed |= !profile.shipped_v1_migrations.is_empty();
-        profile_record = Some(record);
-    }
-    let desired = dedup_last_wins(desired);
+    let desired = dedup_last_wins(scaffold.desired_files()?);
     let final_authority = authored_rule_overrides(base, &desired, &config_path, &rules_path)?;
     let publishable = desired
         .clone()
@@ -537,26 +690,7 @@ pub(super) fn derive_initialization(
     if compose_rules {
         compose_existing_default_rules(base, final_authority, &mut actions)?;
     }
-    if let (Some(profile), Some(record)) = (&scaffold.profile, &profile_record) {
-        let migrated_records = profile
-            .shipped_v1_migrations
-            .iter()
-            .filter(|(path, _)| *path != &profile.record_path)
-            .map(|(path, record)| {
-                Ok(DesiredFile {
-                    path: path.clone(),
-                    bytes: serialize_profile_record(record)?,
-                    mode: FileMode::Regular,
-                    policy: WritePolicy::Always,
-                    owner: PROFILE_OWNER,
-                })
-            })
-            .collect::<Result<Vec<_>, InitializationError>>()?;
-        push_file_actions(base, &migrated_records, &mut actions)?;
-        push_record_action(base, profile, record, profile_changed, &mut actions)?;
-    }
-    if let Some(action) = events_action(base, scaffold.profile.as_ref(), profile_changed, context)?
-    {
+    if let Some(action) = events_action(base)? {
         actions.push(action);
     }
     push_gitattributes_action(base, scaffold, &mut actions)?;
@@ -567,8 +701,7 @@ pub(super) fn derive_initialization(
         delta,
         scaffold.seed()?,
         MaterializationIntent::InitializeRepository,
-    )
-    .with_profile_targets(profile_targets))
+    ))
 }
 
 fn desired_overrides(
@@ -732,24 +865,74 @@ fn rebase_action(
     })
 }
 
-/// Compose the `events.jsonl` action for an init/profile delta.
-///
-/// A profile whose application emits an event appends one `ProfileApplied` record
-/// through the finalizer — [`finalize_audit_append`] assigns its id/timestamp and
-/// torn-tail evidence over the captured prefix, so command code never computes
-/// audit-log bytes. Otherwise the log is created empty when absent (fresh init) and
-/// left untouched when already present.
-fn events_action(
+/// Project the byte-bearing effects of exact actions into the existing proposed
+/// image. Directory creation and mode-only changes remain in the delta; they do
+/// not change bytes that a later profile derivation can observe.
+fn apply_action_overlay(
     base: &RepositoryImage,
-    profile: Option<&ProfileApplicationInput>,
-    profile_changed: bool,
-    context: &MutationContext,
-) -> Result<Option<RepositoryAction>, InitializationError> {
-    if let Some(profile) = profile {
-        if profile_changed {
-            return profile_event_action(base, profile, context);
-        }
+    actions: &[RepositoryAction],
+) -> Result<RepositoryImage, InitializationError> {
+    super::apply_overlay(
+        base,
+        actions.iter().filter_map(|action| match action {
+            RepositoryAction::WriteFile { path, bytes, .. } => {
+                Some((path.clone(), Some(bytes.clone())))
+            }
+            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
+            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
+        }),
+    )
+    .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
+}
+
+/// Keep the final effect for one canonical target and derive its preimage from
+/// the original captured image. A deletion of a file created earlier in this
+/// aggregate has no final effect, while a later mode-only action preserves the
+/// earlier aggregate write's bytes.
+fn fold_rebased_action(
+    base: &RepositoryImage,
+    actions: &mut BTreeMap<VirtualPath, RepositoryAction>,
+    action: &RepositoryAction,
+) -> Result<(), InitializationError> {
+    let path = action.path().clone();
+    if matches!(action, RepositoryAction::DeleteFile { .. })
+        && matches!(base.entry(&path)?, RepositoryEntry::Absent)
+    {
+        actions.remove(&path);
+        return Ok(());
     }
+    if let (
+        RepositoryAction::SetMode { owner, mode, .. },
+        Some(RepositoryAction::WriteFile {
+            path,
+            bytes,
+            expected,
+            ..
+        }),
+    ) = (action, actions.get(&path))
+    {
+        actions.insert(
+            path.clone(),
+            RepositoryAction::WriteFile {
+                path: path.clone(),
+                owner: owner.clone(),
+                expected: expected.clone(),
+                bytes: bytes.clone(),
+                mode: *mode,
+            },
+        );
+        return Ok(());
+    }
+    actions.insert(path, rebase_action(base, action.clone())?);
+    Ok(())
+}
+
+/// Compose the neutral initialization `events.jsonl` action.
+///
+/// A plain initialization creates the log empty when absent and leaves it untouched
+/// when already present. Profiled initialization takes the aggregate derivation,
+/// which appends its current per-profile historical events through the finalizer.
+fn events_action(base: &RepositoryImage) -> Result<Option<RepositoryAction>, InitializationError> {
     let path = VirtualPath::EVENTS;
     match base.entry(&path)? {
         RepositoryEntry::Absent => Ok(Some(RepositoryAction::WriteFile {
@@ -762,22 +945,6 @@ fn events_action(
         RepositoryEntry::File { .. } => Ok(None),
         _ => Err(InitializationError::UnexpectedOccupant { path }),
     }
-}
-
-/// Compose one profile-applied audit append over the captured event prefix.
-fn profile_event_action(
-    base: &RepositoryImage,
-    profile: &ProfileApplicationInput,
-    context: &MutationContext,
-) -> Result<Option<RepositoryAction>, InitializationError> {
-    let event = profile_applied_event(
-        profile.id.to_string(),
-        profile.version.clone(),
-        profile.origin.clone(),
-        profile.package_hash.clone(),
-        profile.target_hashes.clone(),
-    );
-    Ok(finalize_audit_append(base, context, vec![(2, event)])?)
 }
 
 /// Emit the worktree `.gitattributes` write when the claim is eligible and the
@@ -858,9 +1025,11 @@ fn resolve_gitattributes(
     }
 }
 
-/// Compose the complete profile-application delta over an existing repository's
-/// captured base image (no neutral scaffold).
-pub(super) fn derive_profile_application(
+/// Derive the uncommitted candidate for one member of an aggregate profile
+/// selection. The caller folds candidates over a proposed image and rebuilds
+/// their final writes against the original captured base, so this helper never
+/// becomes a per-package publication seam.
+fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
     context: &MutationContext,
@@ -992,6 +1161,104 @@ pub(super) fn derive_profile_application(
     )
 }
 
+/// Compose one complete profile selection into one delta over the captured
+/// repository image.
+///
+/// Each member is derived over the proposed state of the preceding
+/// dependency-first member, while the final writes are rebuilt with preimages
+/// from `base`. That preserves composition (including records and derived
+/// configuration) without exposing an intermediate repository state to the
+/// mutation session. The audit finalizer receives all changed members at once,
+/// so records, repository bytes, and audit state share one recoverable plan.
+pub(super) fn derive_profile_applications(
+    base: &RepositoryImage,
+    profiles: &[ProfileApplicationInput],
+    context: &MutationContext,
+) -> Result<MaterializationDerivation, InitializationError> {
+    let mut proposed = base.clone();
+    let mut actions = BTreeMap::new();
+    let mut targets = Vec::new();
+    let mut events = Vec::new();
+    let mut applied_profiles = std::collections::BTreeSet::new();
+
+    for profile in profiles {
+        let candidate = derive_profile_application_candidate(&proposed, profile, context)?;
+        let candidate_actions = candidate
+            .delta
+            .actions()
+            .iter()
+            .filter(|action| action.path() != &VirtualPath::EVENTS)
+            .cloned()
+            .collect::<Vec<_>>();
+        let changed = !candidate_actions.is_empty();
+        for action in &candidate_actions {
+            fold_rebased_action(base, &mut actions, action)?;
+        }
+        proposed = apply_action_overlay(&proposed, &candidate_actions)?;
+        targets.extend(candidate.profile_targets);
+        if changed {
+            applied_profiles.insert(profile.id.clone());
+            events.push((
+                2,
+                profile_applied_event(
+                    profile.id.to_string(),
+                    profile.version.clone(),
+                    profile.origin.clone(),
+                    profile.package_hash.clone(),
+                    profile.target_hashes.clone(),
+                ),
+            ));
+        }
+    }
+
+    if let Some(action) = finalize_audit_append(base, context, events)? {
+        fold_rebased_action(base, &mut actions, &action)?;
+    }
+    let profiles_path = VirtualPath::PROFILES;
+    let explicit = match base.entry(&profiles_path)? {
+        RepositoryEntry::Absent => vec![profiles_path],
+        RepositoryEntry::Directory { .. } => Vec::new(),
+        _ => return Err(InitializationError::UnsupportedMetadataPath(profiles_path)),
+    };
+    for action in directory_actions(
+        base,
+        &actions.values().cloned().collect::<Vec<_>>(),
+        &explicit,
+    )? {
+        fold_rebased_action(base, &mut actions, &action)?;
+    }
+    let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
+    let facts = BTreeMap::from([(
+        "profiles".to_string(),
+        profiles
+            .iter()
+            .map(|profile| profile.id.as_str())
+            .collect::<Vec<_>>()
+            .join(","),
+    )]);
+    let payloads = profiles
+        .iter()
+        .map(|profile| {
+            (
+                format!("profile:{}", profile.id),
+                format!("{}:{}", profile.version, profile.package_hash).into_bytes(),
+            )
+        })
+        .collect();
+    let seed = RepositorySeed::new(
+        RepositorySeedKind::Command {
+            name: "profile-application-selection".to_string(),
+        },
+        facts,
+        payloads,
+    )?;
+    Ok(
+        MaterializationDerivation::new(delta, seed, MaterializationIntent::ApplyProfile)
+            .with_profile_targets(targets)
+            .with_applied_profiles(applied_profiles),
+    )
+}
+
 /// Deduplicate desired files by canonical path, keeping the LAST occurrence so a
 /// profile asset target (appended after the neutral scaffold) overrides a
 /// colliding neutral file — the fresh dogfood profile, for instance, supplies the
@@ -1002,30 +1269,6 @@ fn dedup_last_wins(files: Vec<DesiredFile>) -> Vec<DesiredFile> {
         ordered.insert(file.path.clone(), file);
     }
     ordered.into_values().collect()
-}
-
-/// Emit the provenance-record write only when the command proved it changed.
-fn push_record_action(
-    base: &RepositoryImage,
-    profile: &ProfileApplicationInput,
-    record: &AppliedProfileRecord,
-    changed: bool,
-    actions: &mut Vec<RepositoryAction>,
-) -> Result<(), InitializationError> {
-    if changed && profile_record_changed(base, profile, record)? {
-        push_file_actions(
-            base,
-            &[DesiredFile {
-                path: profile.record_path.clone(),
-                bytes: serialize_profile_record(record)?,
-                mode: FileMode::Regular,
-                policy: WritePolicy::Always,
-                owner: PROFILE_OWNER,
-            }],
-            actions,
-        )?;
-    }
-    Ok(())
 }
 
 fn serialize_profile_record(record: &AppliedProfileRecord) -> Result<Vec<u8>, InitializationError> {

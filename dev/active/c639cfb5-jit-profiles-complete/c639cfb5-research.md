@@ -280,12 +280,12 @@ deterministically without giving selection order semantic conflict precedence?
 
 ### Options considered
 
-#### A. Sequentially apply selected profiles
+#### A. Sequentially apply selected profiles (historical planning baseline)
 
-- **VERIFIED:** Current application publishes and audits one package immediately, so a
-  loop would expose intermediate states and make the first package occupy keys before the
-  next is considered (`crates/jit/src/commands/profile.rs:137-245`).
-- **ASSUMED:** Under sequential application, order becomes an accidental conflict policy
+- **HISTORICAL VERIFIED:** At planning time, application published and audited one package
+  immediately, so a loop exposed intermediate states and made the first package occupy keys
+  before the next was considered (`crates/jit/src/commands/profile.rs:137-245`).
+- **HISTORICAL ASSUMPTION:** Under sequential application, order becomes an accidental conflict policy
   and shared ownership cannot be recorded as one aggregate decision.
 
 #### B. Add a version solver over discovered packages
@@ -347,8 +347,9 @@ deterministically without giving selection order semantic conflict precedence?
 
 ### Rejected alternatives and trade-offs
 
-- **REJECTED — VERIFIED + ASSUMED:** Reject sequential apply because the current command is a
-  publication boundary and cannot represent aggregate ownership (`crates/jit/src/commands/profile.rs:137-245`).
+- **HISTORICAL REJECTION — VERIFIED + ASSUMED:** Reject sequential apply because the planning-time
+  command was a publication boundary and could not represent aggregate ownership
+  (`crates/jit/src/commands/profile.rs:137-245`).
 - **REJECTED — ASSUMED:** Reject dependency-order conflict precedence. Topological order may
   schedule computation but cannot select among different definitions.
 - **REJECTED — ASSUMED:** Reject selected-only validation because it can overwrite a shared

@@ -985,8 +985,8 @@ kind = "advisory"
         ]);
         let apply_profile = derive_materialization(
             &profile_image,
-            MaterializationRequest::ApplyProfile {
-                profile: Box::new(profile),
+            MaterializationRequest::ApplyProfileSelection {
+                profiles: vec![profile],
                 context: &context,
             },
         )
@@ -997,7 +997,7 @@ kind = "advisory"
             ("RenderConfiguredProjections", render),
             ("RepairDerivedState", repair),
             ("Initialize", initialize),
-            ("ApplyProfile", apply_profile),
+            ("ApplyProfileSelection", apply_profile),
         ] {
             assert_eq!(
                 plan.hash().len(),
@@ -1062,8 +1062,8 @@ kind = "advisory"
         ]);
         let plan = derive_materialization(
             &image,
-            MaterializationRequest::ApplyProfile {
-                profile: Box::new(profile),
+            MaterializationRequest::ApplyProfileSelection {
+                profiles: vec![profile],
                 context: &context,
             },
         )
@@ -1148,8 +1148,8 @@ kind = "advisory"
 
         let plan = derive_materialization(
             &image,
-            MaterializationRequest::ApplyProfile {
-                profile: Box::new(profile),
+            MaterializationRequest::ApplyProfileSelection {
+                profiles: vec![profile],
                 context: &context,
             },
         )
