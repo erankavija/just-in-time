@@ -7,6 +7,7 @@
   ],
   "description": "Ownership claims, variable resolution, and three-way decisions together make a\nchange to an already-applied profile safe instead of impossible.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands per-target ownership claims, one aggregate publication, resolved variables, and three-way reconfiguration and upgrade, so an applied profile can change without stranding the repository.\n",
   "documents": [],
+  "first_ready_at": "2026-08-10T14:47:14.772441462Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
@@ -29,7 +30,7 @@
     "component:cli"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Ownership, records, and safe change",
-  "updated_at": "2026-08-09T12:07:31.807918203Z"
+  "updated_at": "2026-08-10T14:47:14.772441462Z"
 }

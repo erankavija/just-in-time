@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 9,
+  "current_wave": 10,
   "waves": [
     {
       "wave_number": 1,
@@ -121,8 +121,7 @@
           "short_id": "7156f64b",
           "title": "Expose reconfiguration and upgrade as commands",
           "classification": "implementation",
-          "status": "ready",
-          "worker": "native subagent (Opus) after tooling switch; codex WIP preserved at 9a3f71cf"
+          "status": "done"
         }
       ]
     },
@@ -305,7 +304,8 @@
     "9a9a4cfc": 2,
     "9fad8581": 2,
     "44ec7192": 0,
-    "9f493686": 2
+    "9f493686": 2,
+    "7156f64b": 1
   },
   "review_verdicts": [
     {
@@ -920,7 +920,46 @@
       "holistic_review": "the pure exhaustive decision table reuses the canonical claim fingerprint, production aggregate planning applies safe updates/deletions atomically, conflict mapping remains typed and actionable, and lifecycle-event integration is clean",
       "gate_evidence": "cargo-ci run 6b7af235-68b1-444d-b224-1d3095dedf5a passed the combined Wave 8 workspace plus fmt, clippy, provenance, build-budget, and incremental checks; code-review run 7c5630d1-6af1-4a09-8ad2-24132e4f5d52 passed with zero findings. Run 561e0edb-7efa-4687-8435-eda4a597b987 is retained but excluded because it reused another worktree's Cargo target.",
       "reviewed_at": "2026-08-10T09:17:00Z"
+    },
+    {
+      "issue": "7156f64b",
+      "verdict": "PASS",
+      "round": 2,
+      "gates": {
+        "cargo-ci": "passed",
+        "mcp-ci": "passed",
+        "code-review": "passed"
+      },
+      "notes": "Round 1 code-review FAIL was a lead-caused scope error: the dispatch forbade documenting the commands in cli-commands.md, leaving them with no canonical home (@/charter/D-13). Lead wrote the reference entries; gate re-run passed."
     }
   ],
-  "started_at": "2026-08-09T04:36:58+03:00"
+  "started_at": "2026-08-09T04:36:58+03:00",
+  "surfaced_pitfalls": [
+    {
+      "subject": "v1.0 applied-record migration boundary",
+      "detail": "is_shipped_v1_candidate authenticates only the pinned embedded jit-dogfood record; a real v1.0 repository (gf2, two directory-package records) is rejected outright by jit validate. Bears on epic REQ-09 and REQ-12.",
+      "status": "open-escalation",
+      "owner": "invoker"
+    },
+    {
+      "subject": "shipped_v1_conversion_count test race",
+      "detail": "commands::init::tests::test_profiled_init_authenticates_shipped_v1_once_before_any_publication asserts on a process-global counter; fails under `cargo test -p jit --lib profile`, passes unfiltered and with --test-threads=1. Pre-existing, needs its own issue.",
+      "status": "open"
+    },
+    {
+      "subject": "fail-fast conflict reporting",
+      "detail": "The three-way seam reports the first conflicting target only. REQ-03 says 'reports a conflict' so 7156f64b passes literally; reporting all would change apply's error type (shared seam).",
+      "status": "open"
+    },
+    {
+      "subject": "profiles.md stale deferral",
+      "detail": "'semantic shared ownership' still listed as deferred though wave 6 landed it. Covered by b3d92595 REQ-01.",
+      "status": "assigned-b3d92595"
+    },
+    {
+      "subject": "ProfileTargetMaterialization carries no owner",
+      "detail": "A rehearsal repeats the same aggregate target list once per selector. Fix at source belongs to cb26de35.",
+      "status": "assigned-cb26de35"
+    }
+  ]
 }

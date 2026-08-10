@@ -8,13 +8,30 @@
   ],
   "description": "Put the three-way decision behind the two commands an adopter runs when an\napplied profile has to change: reconfigure it with new inputs, or move it to a\nnew package version.\n\n## Background\n\nThe decision that compares recorded base, current value, and resolved candidate\nis domain logic with no way to invoke it. Reconfiguration replays an applied\nprofile with different supplied values; upgrade replaces the installed version\nwith a newer package. Both publish through the aggregate transaction, and both\nneed a rehearsal that shows the decision without writing.\n\n## Success Criteria\n\n- [hard] REQ-01: Reconfiguring an applied profile with changed supplied values republishes the content those values affect and leaves every other owned target untouched.\n- [hard] REQ-02: Upgrading a profile to a newer package version applies the three-way decision to each owned target, and refuses when the new version would break a range or an incompatibility that a surviving applied profile depends on.\n- [hard] REQ-03: Each command reports a conflict rather than overwriting divergent content, and exits non-zero when it publishes nothing because of one.\n- [hard] REQ-04: Each command supports a rehearsal that reports the decisions it would publish and writes nothing.\n",
   "documents": [],
+  "done_at": "2026-08-10T14:47:09.619559498Z",
   "first_ready_at": "2026-08-08T23:22:18.925680706Z",
   "gates_required": [
     "cargo-ci",
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-10T14:34:36.189351060Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-10T14:46:02.573808616Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-10T14:34:42.426570234Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7156f64b-8480-40d1-8af9-c0e48db2ba59",
   "labels": [
     "epic:jit-profiles-complete",
@@ -27,7 +44,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Expose reconfiguration and upgrade as commands",
-  "updated_at": "2026-08-10T11:47:24.963080324Z"
+  "updated_at": "2026-08-10T14:47:09.619559498Z"
 }

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f6c422debcddd75eaec7db634079b612330800d5",
+  "completed_at": "2026-08-10T14:39:18.123730172Z",
+  "duration_ms": 271818,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 731,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-13",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The new reconfigure and upgrade workflows have no canonical adopter documentation home."
+      }
+    ],
+    "summary": "Reconfigure and upgrade are implemented and tested, but their adopter-facing command documentation is absent.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7156f64b-8480-40d1-8af9-c0e48db2ba59",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e728c61f-af77-4a3d-985d-956c81b2ab38",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-10T14:34:46.305586824Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11104 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fec18-f91b-7921-85d0-6c0572a3ce45\n--------\nuser\n--- 11091 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 13819826, 9a3f71cf, ad396e79, 5f0966da, ff214813, 5f2bf60f, 4ad1ffd8, 8e7d209b, 8dd274e2, 2cdcf44f, f6c422de\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 and @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/issue/c639cfb5/requirement/REQ-06 and REQ-11 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-10T14:26:10Z); mcp-ci passed (exit 0, 2026-08-10T14:34:39Z); code-review pending\nTruncation recovery: narrowed the initially truncated issue-metadata, patch, source, test, and documentation reads by path and line range\n\n1. [blocking][issue-impact] The new adopter workflows have no canonical documentation home. [`cli-commands.md`](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:731) documents only `list`, `show`, and `apply` before moving to the next command family; it contains no `profile reconfigure` or `profile upgrade` usage, behavior, conflict, or rehearsal contract. This violates the canonical-home policy for the newly shipped commands. References: `@/charter/D-13`, `@/invariant/single-source-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Reconfigure and upgrade are implemented and tested, but their adopter-facing command documentation is absent.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new reconfigure and upgrade workflows have no canonical adopter documentation home.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":731,\"references\":[\"@/charter/D-13\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
