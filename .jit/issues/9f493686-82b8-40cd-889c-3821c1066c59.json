@@ -15,8 +15,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-10T08:34:41.294653652Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-10T08:11:28.991136451Z",
+      "updated_at": "2026-08-10T08:38:48.113620988Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record one lifecycle event per changed mutation",
-  "updated_at": "2026-08-10T08:11:28.991136451Z"
+  "updated_at": "2026-08-10T08:38:48.113620988Z"
 }
