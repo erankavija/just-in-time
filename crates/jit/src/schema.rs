@@ -495,8 +495,13 @@ impl CommandSchema {
                     "description": "Normal execution returns ProfileComposedApplyResult, \
                         one ProfileApplyResult per package in dependency-first application \
                         order for the ordered selectors. With --dry-run, returns the count-wrapped \
-                        ProfilePlanResult with one non-mutating ProfilePlanEntry per selector \
-                        occurrence in selector order."
+                        ProfilePlanResult of non-mutating ProfilePlanEntry values. profile apply \
+                        plans each selector's package on its own, so its dry run carries one entry \
+                        per selector occurrence in selector order. profile reconfigure and profile \
+                        upgrade rehearse one aggregate selection, so their dry run carries the \
+                        entries their own run reports: dependency closure members before the roots \
+                        that declare them, then one entry per root occurrence. An entry that \
+                        publishes nothing reports status unchanged and carries no target decisions."
                 });
                 (Some(union), "ProfileComposedApplyResult")
             }
