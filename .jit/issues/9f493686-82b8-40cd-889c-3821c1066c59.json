@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-10T08:11:28.991136451Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9f493686-82b8-40cd-889c-3821c1066c59",
   "labels": [
     "type:task",
@@ -27,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record one lifecycle event per changed mutation",
-  "updated_at": "2026-08-10T07:25:06.613160487Z"
+  "updated_at": "2026-08-10T08:11:28.991136451Z"
 }
