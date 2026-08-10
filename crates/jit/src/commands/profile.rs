@@ -7,7 +7,8 @@ use crate::profile::{
     ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
     ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
     ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, RecordedValueAuthority,
-    ResolvedProfileContent, ResolvedProfileGraph, ResolvedVariables, VariableInputs,
+    ResolvedProfileContent, ResolvedProfileGraph, ResolvedVariables, SelectionObservation,
+    VariableInputs,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -33,17 +34,7 @@ fn selection_profile_results(
     applied: Vec<ProfileApplyResult>,
     roots: &[ProfilePackage],
 ) -> Result<ProfileComposedApplyResult> {
-    selection_observations(
-        applied,
-        |result| result.id.as_str(),
-        roots,
-        |result| {
-            result.status = ProfileApplicationStatus::Unchanged;
-            result.transaction_id = None;
-            result.warnings.clear();
-        },
-    )
-    .map(ProfileComposedApplyResult::new)
+    selection_observations(applied, roots).map(ProfileComposedApplyResult::new)
 }
 
 /// Project one aggregate selection's per-package answers onto the ordered root
@@ -51,18 +42,17 @@ fn selection_profile_results(
 ///
 /// A closure member the caller did not name is still part of what the selection
 /// settles, so it is reported once, before the roots. A repeated root selector
-/// observes the transaction's first answer, then reports a repeat observation
-/// that `downgrade_repeat` strips of everything a second publication would have
-/// carried.
+/// observes the transaction its first occurrence accounts for, so its later
+/// observations report what [`SelectionObservation::observe_without_publishing`]
+/// leaves — one meaning of "this observation publishes nothing", stated once
+/// per answer type rather than per projection.
 ///
 /// A rehearsal and the run it precedes project through this one function, so
 /// their answers stay comparable entry for entry rather than drifting into two
 /// shapes.
-fn selection_observations<Observation: Clone>(
+fn selection_observations<Observation: Clone + SelectionObservation>(
     closure: Vec<Observation>,
-    id_of: impl Fn(&Observation) -> &str,
     roots: &[ProfilePackage],
-    downgrade_repeat: impl Fn(&mut Observation),
 ) -> Result<Vec<Observation>> {
     let root_ids = roots
         .iter()
@@ -70,11 +60,11 @@ fn selection_observations<Observation: Clone>(
         .collect::<BTreeSet<_>>();
     let by_id = closure
         .iter()
-        .map(|observation| (id_of(observation), observation))
+        .map(|observation| (observation.profile_id(), observation))
         .collect::<BTreeMap<_, _>>();
     let mut observations = closure
         .iter()
-        .filter(|observation| !root_ids.contains(id_of(observation)))
+        .filter(|observation| !root_ids.contains(observation.profile_id()))
         .cloned()
         .collect::<Vec<_>>();
     let mut occurrences = BTreeMap::<&str, usize>::new();
@@ -88,7 +78,7 @@ fn selection_observations<Observation: Clone>(
         *occurrence += 1;
         let mut observation = (*source).clone();
         if !first {
-            downgrade_repeat(&mut observation);
+            observation.observe_without_publishing();
         }
         observations.push(observation);
     }
@@ -1442,14 +1432,7 @@ impl CommandExecutor<JsonFileStorage> {
                     targets: profile_target_changes(&plan, &package.model().id),
                 })
                 .collect::<Vec<_>>();
-            let plans = selection_observations(
-                rehearsed,
-                |entry| entry.id.as_str(),
-                selected,
-                |entry| {
-                    entry.status = ProfilePlanStatus::Unchanged;
-                },
-            )?;
+            let plans = selection_observations(rehearsed, selected)?;
             Ok(SessionStep::Done(ProfilePlanResult::new(plans)))
         })
     }
@@ -6284,6 +6267,131 @@ template = true
         );
     }
 
+    /// A root declaring `dependency`, one variable, and one templated target.
+    fn dependent_variable_package(temp: &TempDir, id: &str, dependency: &str) -> ProfilePackage {
+        authored_manifest_package(
+            temp,
+            &format!("packages/{id}"),
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
+                 compatible-jit = \"*\"\n\n\
+                 [[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n\n\
+                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
+                 [[asset]]\nsource = \"assets/own.txt\"\n\
+                 target = \"docs/{id}.txt\"\ntemplate = true\n"
+            ),
+            &[("assets/own.txt", "greeting={{jit:var:GREETING}}\n")],
+        )
+    }
+
+    /// A package publishing one static target and declaring no variable.
+    fn static_package(temp: &TempDir, id: &str) -> ProfilePackage {
+        authored_manifest_package(
+            temp,
+            &format!("packages/{id}"),
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
+                 compatible-jit = \"*\"\n\n\
+                 [[asset]]\nsource = \"assets/own.txt\"\ntarget = \"docs/{id}.txt\"\n"
+            ),
+            &[("assets/own.txt", "no variable reaches this\n")],
+        )
+    }
+
+    /// The entry at `position`, which the occurrence order fixes.
+    fn entry_at(planned: &ProfilePlanResult, position: usize) -> &ProfilePlanEntry {
+        planned
+            .profiles
+            .get(position)
+            .unwrap_or_else(|| panic!("the rehearsal reports an entry at {position}"))
+    }
+
+    #[test]
+    fn test_plan_reconfigure_profiles_from_sources_answers_every_occurrence_shape_truthfully() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        static_package(&temp, "base");
+        let root = dependent_variable_package(&temp, "leaf", "base");
+        apply_package(&executor, &root, &supplied_values(&[]));
+
+        // One selection naming the same root twice, carrying a value only that
+        // root resolves: its dependency has nothing to publish, the first
+        // occurrence would publish, and the repeat observes that publication.
+        let planned = executor
+            .plan_reconfigure_profiles_from_sources(
+                &[
+                    ProfileSelector::id("leaf").unwrap(),
+                    ProfileSelector::id("leaf").unwrap(),
+                ],
+                &supplied_values(&[("GREETING", "supplied")]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            planned
+                .profiles
+                .iter()
+                .map(|entry| entry.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["base", "leaf", "leaf"],
+            "closure members precede the roots, and each root occurrence is kept"
+        );
+
+        // A closure member with nothing to publish still reports the targets it
+        // decides, each decided unchanged.
+        let dependency = entry_at(&planned, 0);
+        assert_eq!(dependency.status, ProfilePlanStatus::Unchanged);
+        assert!(
+            dependency
+                .targets
+                .iter()
+                .all(|target| target.action == ProfileTargetAction::Unchanged),
+            "a profile that would publish nothing decides no change: {:?}",
+            dependency.targets
+        );
+        assert!(
+            dependency
+                .targets
+                .iter()
+                .any(|target| target.path == "docs/base.txt"),
+            "a closure member still answers for the targets it decides"
+        );
+
+        // The occurrence that carries the publication reports it.
+        let publishing = entry_at(&planned, 1);
+        assert_eq!(publishing.status, ProfilePlanStatus::WouldApply);
+        assert!(
+            publishing
+                .targets
+                .iter()
+                .any(|target| target.path == "docs/leaf.txt"
+                    && target.action != ProfileTargetAction::Unchanged),
+            "the first occurrence reports the change it would publish: {:?}",
+            publishing.targets
+        );
+
+        // The repeat observes that same publication and claims none of it.
+        let repeat = entry_at(&planned, 2);
+        assert_eq!(repeat.status, ProfilePlanStatus::Unchanged);
+        assert!(
+            repeat.targets.is_empty(),
+            "an observation that publishes nothing lists no target decision: {:?}",
+            repeat.targets
+        );
+        assert_eq!(
+            (
+                repeat.id.as_str(),
+                repeat.version.as_str(),
+                &repeat.plan_hash
+            ),
+            (
+                publishing.id.as_str(),
+                publishing.version.as_str(),
+                &publishing.plan_hash
+            ),
+            "a repeat still names its profile, its version, and the plan it came from"
+        );
+    }
+
     #[test]
     fn test_plan_reconfigure_profiles_from_sources_rehearses_every_profile_the_run_reports() {
         let (temp, _storage, executor, _fixture) = fixture();
@@ -6368,6 +6476,21 @@ template = true
             ProfilePlanStatus::Unchanged,
             "a profile with nothing to publish is not reported as changing \
              because a peer in the same selection would"
+        );
+        let unchanged_root = planned
+            .profiles
+            .iter()
+            .find(|entry| entry.id == "beta")
+            .expect("the rehearsal reports an entry for beta");
+        assert!(
+            !unchanged_root.targets.is_empty()
+                && unchanged_root
+                    .targets
+                    .iter()
+                    .all(|target| target.action == ProfileTargetAction::Unchanged),
+            "a first occurrence still answers for the targets it decides, each \
+             decided unchanged: {:?}",
+            unchanged_root.targets
         );
     }
 

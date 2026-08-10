@@ -41,6 +41,7 @@ pub mod template_region;
 
 pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
+pub(crate) use application::SelectionObservation;
 pub use application::{
     ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
     ProfileComposedApplyResult, ProfileListResult, ProfilePlanEntry, ProfilePlanResult,

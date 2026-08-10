@@ -81,6 +81,49 @@ impl ProfileComposedApplyResult {
     }
 }
 
+/// One profile's answer inside a selection's ordered observations.
+///
+/// A selection settles once and is then observed in the order the caller named
+/// its roots, so the same profile can be observed more than once. Every field
+/// of an answer is either about the profile itself — which every observation of
+/// it shares — or about the publication that answer describes, which only the
+/// observation carrying the publication may claim.
+pub(crate) trait SelectionObservation {
+    /// The profile this answer is about.
+    fn profile_id(&self) -> &str;
+
+    /// Reduce this answer to what an observation that publishes nothing may
+    /// say: it still names its profile, its version, and the plan it was
+    /// derived from, and it claims no change and nothing a publication carried.
+    ///
+    /// A repeated selector observes a transaction its first occurrence already
+    /// accounts for, so this is what its second and later observations report.
+    fn observe_without_publishing(&mut self);
+}
+
+impl SelectionObservation for ProfileApplyResult {
+    fn profile_id(&self) -> &str {
+        &self.id
+    }
+
+    fn observe_without_publishing(&mut self) {
+        self.status = ProfileApplicationStatus::Unchanged;
+        self.transaction_id = None;
+        self.warnings.clear();
+    }
+}
+
+impl SelectionObservation for ProfilePlanEntry {
+    fn profile_id(&self) -> &str {
+        &self.id
+    }
+
+    fn observe_without_publishing(&mut self) {
+        self.status = ProfilePlanStatus::Unchanged;
+        self.targets.clear();
+    }
+}
+
 /// One profile exposed by `jit profile list`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileSummary {
@@ -202,6 +245,9 @@ pub struct ProfilePlanEntry {
     /// entry was derived from.
     pub plan_hash: String,
     /// The targets this profile decides, sorted by path.
+    ///
+    /// An observation that would publish nothing decides no target, so a
+    /// repeated selector's later observations carry none.
     pub targets: Vec<ProfileTargetChange>,
 }
 
