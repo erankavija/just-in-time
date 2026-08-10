@@ -33,37 +33,66 @@ fn selection_profile_results(
     applied: Vec<ProfileApplyResult>,
     roots: &[ProfilePackage],
 ) -> Result<ProfileComposedApplyResult> {
+    selection_observations(
+        applied,
+        |result| result.id.as_str(),
+        roots,
+        |result| {
+            result.status = ProfileApplicationStatus::Unchanged;
+            result.transaction_id = None;
+            result.warnings.clear();
+        },
+    )
+    .map(ProfileComposedApplyResult::new)
+}
+
+/// Project one aggregate selection's per-package answers onto the ordered root
+/// observations the caller made.
+///
+/// A closure member the caller did not name is still part of what the selection
+/// settles, so it is reported once, before the roots. A repeated root selector
+/// observes the transaction's first answer, then reports a repeat observation
+/// that `downgrade_repeat` strips of everything a second publication would have
+/// carried.
+///
+/// A rehearsal and the run it precedes project through this one function, so
+/// their answers stay comparable entry for entry rather than drifting into two
+/// shapes.
+fn selection_observations<Observation: Clone>(
+    closure: Vec<Observation>,
+    id_of: impl Fn(&Observation) -> &str,
+    roots: &[ProfilePackage],
+    downgrade_repeat: impl Fn(&mut Observation),
+) -> Result<Vec<Observation>> {
     let root_ids = roots
         .iter()
         .map(|root| root.model().id.as_str())
         .collect::<BTreeSet<_>>();
-    let applied_by_id = applied
+    let by_id = closure
         .iter()
-        .map(|result| (result.id.as_str(), result))
+        .map(|observation| (id_of(observation), observation))
         .collect::<BTreeMap<_, _>>();
-    let mut results = applied
+    let mut observations = closure
         .iter()
-        .filter(|result| !root_ids.contains(result.id.as_str()))
+        .filter(|observation| !root_ids.contains(id_of(observation)))
         .cloned()
         .collect::<Vec<_>>();
     let mut occurrences = BTreeMap::<&str, usize>::new();
     for root in roots {
         let id = root.model().id.as_str();
-        let Some(source) = applied_by_id.get(id) else {
-            anyhow::bail!("selected root '{id}' has no aggregate application result");
+        let Some(source) = by_id.get(id) else {
+            anyhow::bail!("selected root '{id}' has no aggregate selection answer");
         };
         let occurrence = occurrences.entry(id).or_default();
         let first = *occurrence == 0;
         *occurrence += 1;
-        let mut result = (*source).clone();
+        let mut observation = (*source).clone();
         if !first {
-            result.status = ProfileApplicationStatus::Unchanged;
-            result.transaction_id = None;
-            result.warnings.clear();
+            downgrade_repeat(&mut observation);
         }
-        results.push(result);
+        observations.push(observation);
     }
-    Ok(ProfileComposedApplyResult::new(results))
+    Ok(observations)
 }
 
 /// One ordered profile selection from the command boundary.
@@ -1399,20 +1428,28 @@ impl CommandExecutor<JsonFileStorage> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let plans = selected
+            let rehearsed = packages
                 .iter()
                 .map(|package| ProfilePlanEntry {
                     id: package.model().id.to_string(),
                     version: package.model().version.clone(),
-                    status: if plan.delta().actions().is_empty() {
-                        ProfilePlanStatus::Unchanged
-                    } else {
+                    status: if plan.applied_profiles().contains(&package.model().id) {
                         ProfilePlanStatus::WouldApply
+                    } else {
+                        ProfilePlanStatus::Unchanged
                     },
                     plan_hash: plan.hash().to_string(),
                     targets: profile_target_changes(&plan, &package.model().id),
                 })
-                .collect();
+                .collect::<Vec<_>>();
+            let plans = selection_observations(
+                rehearsed,
+                |entry| entry.id.as_str(),
+                selected,
+                |entry| {
+                    entry.status = ProfilePlanStatus::Unchanged;
+                },
+            )?;
             Ok(SessionStep::Done(ProfilePlanResult::new(plans)))
         })
     }
@@ -6244,6 +6281,93 @@ template = true
         assert!(
             alpha_paths.contains("docs/shared.txt") && beta_paths.contains("docs/shared.txt"),
             "a target both profiles contribute is decided by each, so neither entry drops it"
+        );
+    }
+
+    #[test]
+    fn test_plan_reconfigure_profiles_from_sources_rehearses_every_profile_the_run_reports() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let dependency = package_declaring(&temp, "packages/base", "base", &[]);
+        let root = package_declaring(&temp, "packages/leaf", "leaf", &["base"]);
+        apply_package(&executor, &root, &supplied_values(&[]));
+
+        let planned = executor
+            .plan_reconfigure_profiles_from_sources(
+                &installed_selector("leaf"),
+                &supplied_values(&[]),
+            )
+            .unwrap();
+        let published = executor
+            .reconfigure_profiles_from_sources(&installed_selector("leaf"), &supplied_values(&[]))
+            .unwrap();
+
+        assert_eq!(
+            planned
+                .profiles
+                .iter()
+                .map(|entry| entry.id.as_str())
+                .collect::<Vec<_>>(),
+            published
+                .profiles
+                .iter()
+                .map(|result| result.id.as_str())
+                .collect::<Vec<_>>(),
+            "a rehearsal reports the profiles its run reports, in that order"
+        );
+        assert!(
+            planned_paths(&planned, dependency.model().id.as_str()).contains("docs/base.txt"),
+            "a dependency the selection settles has its own decisions rehearsed"
+        );
+        assert!(
+            !planned_paths(&planned, root.model().id.as_str()).contains("docs/base.txt"),
+            "the root does not claim its dependency's decisions"
+        );
+    }
+
+    #[test]
+    fn test_plan_reconfigure_profiles_from_sources_reports_each_profile_status_independently() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        // Only one of the two profiles declares the variable being supplied, so
+        // one has work to publish and the other cannot.
+        let variable = shared_target_package(&temp, "alpha", "one body, two owners\n");
+        let fixed = package_publishing(
+            &temp,
+            "packages/beta",
+            "beta",
+            "docs/beta-own.txt",
+            "no variable reaches this\n",
+        );
+        apply_package(&executor, &variable, &supplied_values(&[]));
+        apply_package(&executor, &fixed, &supplied_values(&[]));
+
+        let planned = executor
+            .plan_reconfigure_profiles_from_sources(
+                &[
+                    ProfileSelector::id("alpha").unwrap(),
+                    ProfileSelector::id("beta").unwrap(),
+                ],
+                &supplied_values(&[("GREETING", "supplied")]),
+            )
+            .unwrap();
+
+        let status_of = |id: &str| {
+            planned
+                .profiles
+                .iter()
+                .find(|entry| entry.id == id)
+                .unwrap_or_else(|| panic!("the rehearsal reports an entry for {id}"))
+                .status
+        };
+        assert_eq!(
+            status_of("alpha"),
+            ProfilePlanStatus::WouldApply,
+            "the profile the supplied value reaches would publish"
+        );
+        assert_eq!(
+            status_of("beta"),
+            ProfilePlanStatus::Unchanged,
+            "a profile with nothing to publish is not reported as changing \
+             because a peer in the same selection would"
         );
     }
 

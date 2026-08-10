@@ -114,9 +114,11 @@ Profile enumeration and its handling of applied-profile records are defined in
 All profile commands support `--json`. Profile commands that emit collections
 use the standard count-wrapped collection shape. A show response
 contains one package entry per selector occurrence in selector order, including
-repeated selectors; a dry-run reports one plan entry per selected occurrence;
-normal application reports one result per applied package, dependencies before
-the package that declares them. Each show entry carries the manifest, package
+repeated selectors; `profile apply --dry-run` reports one plan entry per
+selected occurrence, while a `profile reconfigure` or `profile upgrade`
+rehearsal reports the entries its own run reports; normal application reports
+one result per applied package, dependencies before the package that declares
+them. Each show entry carries the manifest, package
 identity, target hashes, size, and stored provenance record when present.
 Showing that record does not re-verify current target bytes. Use
 `jit profile apply --profile id:jit-dogfood --dry-run` for exact current-state

@@ -196,20 +196,22 @@ pub struct ProfilePlanEntry {
     pub id: String,
     /// Semantic package version.
     pub version: String,
-    /// Whether execution would publish.
+    /// Whether execution would publish this profile.
     pub status: ProfilePlanStatus,
-    /// Identity of the complete canonical repository materialization plan.
+    /// Identity of the complete canonical repository materialization plan this
+    /// entry was derived from.
     pub plan_hash: String,
-    /// Every package target, sorted by path.
+    /// The targets this profile decides, sorted by path.
     pub targets: Vec<ProfileTargetChange>,
 }
 
-/// Count-wrapped, occurrence-ordered profile application previews.
+/// Count-wrapped profile application previews.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfilePlanResult {
     /// Number of previews in [`Self::profiles`].
     pub count: usize,
-    /// One preview per selector occurrence, in selector order.
+    /// One preview per profile this rehearsal reports. Which profiles those are
+    /// is stated by the command that produced them.
     pub profiles: Vec<ProfilePlanEntry>,
 }
 

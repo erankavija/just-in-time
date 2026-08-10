@@ -755,7 +755,10 @@ is republished; every other owned target keeps its exact bytes.
 `--dry-run` reports the decisions publication would make and writes nothing: no
 target, no provenance record, and no audit event. JSON returns the count-wrapped
 `ProfilePlanResult` collection `{"count": N, "profiles": [...]}` in the entry
-shape [`jit profile apply`](#jit-profile-apply) documents. Without `--dry-run`,
+shape [`jit profile apply`](#jit-profile-apply) documents. A rehearsal reports
+the same profiles in the same order its run reports, so the two compare entry
+for entry: each entry carries the targets its own profile decides and a `status`
+of `would_apply` only when that profile would publish. Without `--dry-run`,
 JSON returns `ProfileComposedApplyResult` in the standard count-wrapped envelope
 `{"count": N, "profiles": [...]}`, one `ProfileApplyResult` per package the
 selection publishes. A published run uses the same recoverable multi-target
