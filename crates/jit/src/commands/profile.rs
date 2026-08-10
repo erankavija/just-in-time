@@ -671,7 +671,7 @@ impl CommandExecutor<JsonFileStorage> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let changes = profile_target_changes(&plan);
+            let changes = profile_target_changes(&plan, &metadata.id);
             Ok(SessionStep::Done(ProfilePlanEntry {
                 id: metadata.id.to_string(),
                 version: metadata.version.clone(),
@@ -1399,7 +1399,6 @@ impl CommandExecutor<JsonFileStorage> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            let targets = profile_target_changes(&plan);
             let plans = selected
                 .iter()
                 .map(|package| ProfilePlanEntry {
@@ -1411,7 +1410,7 @@ impl CommandExecutor<JsonFileStorage> {
                         ProfilePlanStatus::WouldApply
                     },
                     plan_hash: plan.hash().to_string(),
-                    targets: targets.clone(),
+                    targets: profile_target_changes(&plan, &package.model().id),
                 })
                 .collect();
             Ok(SessionStep::Done(ProfilePlanResult::new(plans)))
@@ -1440,7 +1439,7 @@ impl CommandExecutor<JsonFileStorage> {
             ProfileLifecycleOperation::Apply,
         )?;
         Ok(plan.map(|plan| {
-            let changes = profile_target_changes(&plan);
+            let changes = profile_target_changes(&plan, &package.model().id);
             (plan, changes)
         }))
     }
@@ -1681,14 +1680,23 @@ impl CommandExecutor<JsonFileStorage> {
     }
 }
 
-/// Project a prepared plan's owned targets into the public dry-run vocabulary.
+/// Project the targets `owner` decided in a prepared plan into the public
+/// dry-run vocabulary.
 ///
 /// Every profile command that reports targets reads them from the plan it
 /// prepared, so what an adopter is shown and what the transaction would publish
-/// come from one derivation.
-fn profile_target_changes(plan: &MaterializationPlan) -> Vec<ProfileTargetChange> {
+/// come from one derivation. One plan composes every member of its selection,
+/// so the answer is scoped to the profile the caller is reporting: an entry
+/// carries the decisions its own profile made and no others. A target more than
+/// one selected profile contributes is decided by each of them, so it appears
+/// under each — attributing it to one owner would misreport the others.
+fn profile_target_changes(
+    plan: &MaterializationPlan,
+    owner: &ProfileId,
+) -> Vec<ProfileTargetChange> {
     plan.profile_targets()
         .iter()
+        .filter(|target| &target.owner == owner)
         .map(|target| {
             let action = match target.disposition {
                 ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
@@ -6157,6 +6165,85 @@ template = true
             "greeting=carried farewell=new default\n",
             "a stored supplied value survives the replacement while a newly declared \
              variable takes the new package's default"
+        );
+    }
+
+    /// A package publishing one target of its own and one it shares with a
+    /// peer, both fed by the same declared variable.
+    fn shared_target_package(temp: &TempDir, id: &str, shared_body: &str) -> ProfilePackage {
+        authored_manifest_package(
+            temp,
+            &format!("packages/{id}"),
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
+                 compatible-jit = \"*\"\n\n\
+                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
+                 [[asset]]\nsource = \"assets/own.txt\"\n\
+                 target = \"docs/{id}-own.txt\"\ntemplate = true\n\n\
+                 [[asset]]\nsource = \"assets/shared.txt\"\ntarget = \"docs/shared.txt\"\n"
+            ),
+            &[
+                ("assets/own.txt", "greeting={{jit:var:GREETING}}\n"),
+                ("assets/shared.txt", shared_body),
+            ],
+        )
+    }
+
+    /// The repository-relative target paths one rehearsal entry reports.
+    fn planned_paths(planned: &ProfilePlanResult, id: &str) -> BTreeSet<String> {
+        planned
+            .profiles
+            .iter()
+            .find(|entry| entry.id == id)
+            .unwrap_or_else(|| panic!("the rehearsal reports an entry for {id}"))
+            .targets
+            .iter()
+            .map(|target| target.path.clone())
+            .collect()
+    }
+
+    #[test]
+    fn test_plan_reconfigure_profiles_from_sources_scopes_each_entry_to_the_targets_its_profile_decides(
+    ) {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let shared_body = "one body, two owners\n";
+        let alpha = shared_target_package(&temp, "alpha", shared_body);
+        let beta = shared_target_package(&temp, "beta", shared_body);
+        apply_package(&executor, &alpha, &supplied_values(&[]));
+        apply_package(&executor, &beta, &supplied_values(&[]));
+
+        let planned = executor
+            .plan_reconfigure_profiles_from_sources(
+                &[
+                    ProfileSelector::id("alpha").unwrap(),
+                    ProfileSelector::id("beta").unwrap(),
+                ],
+                &supplied_values(&[("GREETING", "supplied")]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            planned
+                .profiles
+                .iter()
+                .map(|entry| entry.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["alpha", "beta"]
+        );
+        let alpha_paths = planned_paths(&planned, "alpha");
+        let beta_paths = planned_paths(&planned, "beta");
+        assert!(
+            alpha_paths.contains("docs/alpha-own.txt")
+                && !alpha_paths.contains("docs/beta-own.txt"),
+            "an entry reports the targets its own profile decides: {alpha_paths:?}"
+        );
+        assert!(
+            beta_paths.contains("docs/beta-own.txt") && !beta_paths.contains("docs/alpha-own.txt"),
+            "an entry reports the targets its own profile decides: {beta_paths:?}"
+        );
+        assert!(
+            alpha_paths.contains("docs/shared.txt") && beta_paths.contains("docs/shared.txt"),
+            "a target both profiles contribute is decided by each, so neither entry drops it"
         );
     }
 

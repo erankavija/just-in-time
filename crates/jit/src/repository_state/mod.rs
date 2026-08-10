@@ -590,6 +590,13 @@ pub(crate) enum ProfileTargetDisposition {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProfileTargetMaterialization {
+    /// Package whose composed claims decided this target.
+    ///
+    /// One aggregate plan carries the targets of every member it composes, so a
+    /// reader that reports per profile needs each decision to name the profile
+    /// that made it. A target two packages both contribute is decided by each
+    /// of them and therefore appears once per contributing owner.
+    pub(crate) owner: crate::profile::ProfileId,
     pub(crate) path: VirtualPath,
     pub(crate) disposition: ProfileTargetDisposition,
     pub(crate) mode: FileMode,

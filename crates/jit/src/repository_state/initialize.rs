@@ -1034,6 +1034,7 @@ fn derive_profile_application_candidate(
         .map(|(path, (bytes, mode))| {
             let disposition = profile_target_disposition(base, &path, &bytes, mode)?;
             targets.push(ProfileTargetMaterialization {
+                owner: profile.id.clone(),
                 path: path.clone(),
                 disposition,
                 mode,
