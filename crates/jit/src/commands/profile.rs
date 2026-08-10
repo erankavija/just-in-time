@@ -1,12 +1,14 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
+use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
-    build_profile_claims_from_resolved, resolve_package, resolve_package_from_record,
-    EngineVersion, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
-    ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
-    ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
-    ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent,
-    ResolvedProfileGraph, ResolvedVariables, VariableInputs,
+    build_profile_claims_from_resolved, resolve_package, resolve_package_for_upgrade,
+    resolve_package_from_record, resolve_package_from_record_with_inputs, EngineVersion,
+    ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult, ProfileGraphError,
+    ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage, ProfilePackageError,
+    ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
+    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileVariableAssignment, ProfileVariableName, ResolvedProfileContent, ResolvedProfileGraph,
+    ResolvedVariables, VariableInputs,
 };
 use crate::repository_state::{
     apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -17,6 +19,7 @@ use crate::repository_state::{
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
+use semver::Version;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
@@ -297,6 +300,35 @@ pub enum ProfileDependencyError {
 /// Profile application conflict detected before transaction preparation.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileApplyError {
+    /// Reconfiguration selected package bytes that no longer match the
+    /// installed package provenance.
+    #[error(
+        "profile '{id}' cannot be reconfigured because its installed package identity changed (installed version '{installed_version}' hash '{installed_hash}', found version '{found_version}' hash '{found_hash}')"
+    )]
+    ReconfigurationPackageChanged {
+        /// Stable profile identity.
+        id: String,
+        /// Version recorded when the package was installed.
+        installed_version: String,
+        /// Package digest recorded when the package was installed.
+        installed_hash: String,
+        /// Version currently supplied by the selected package.
+        found_version: String,
+        /// Package digest currently supplied by the selected package.
+        found_hash: String,
+    },
+    /// An upgrade replacement did not advance the installed semantic version.
+    #[error(
+        "profile '{id}' cannot be upgraded from version '{installed_version}' to non-newer version '{candidate_version}'"
+    )]
+    UpgradeVersionNotNewer {
+        /// Stable profile identity.
+        id: String,
+        /// Version recorded when the package was installed.
+        installed_version: String,
+        /// Replacement package version.
+        candidate_version: String,
+    },
     /// The installed record is not readable provenance for its own profile.
     #[error("installed profile record '{path}' is not a readable record for profile '{id}'")]
     InstalledRecordConflict {
@@ -635,6 +667,7 @@ impl CommandExecutor<JsonFileStorage> {
                 std::slice::from_ref(&resolved),
                 &contribution_context,
                 &context,
+                ProfileLifecycleOperation::Apply,
             )?
             else {
                 return Ok(SessionStep::Retry);
@@ -705,15 +738,30 @@ impl CommandExecutor<JsonFileStorage> {
         packages: &[ProfilePackage],
         inputs: &VariableInputs,
     ) -> Result<Vec<ProfileContributionClaim>> {
-        let layout = self.require_layout()?;
-        packages
+        let resolved = packages
             .iter()
             .map(|package| {
-                let resolved = resolve_package(
+                resolve_package(
                     package,
                     &inputs.for_declarations(&package.model().variables),
-                )?;
-                Ok(build_profile_claims_from_resolved(&resolved, &layout, false)?.contributions)
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        self.profile_contribution_candidates_from_resolved(&resolved)
+    }
+
+    /// Build semantic ownership candidates from content whose variables have
+    /// already been resolved by one lifecycle operation.
+    fn profile_contribution_candidates_from_resolved(
+        &self,
+        resolved: &[ResolvedProfileContent],
+    ) -> Result<Vec<ProfileContributionClaim>> {
+        let layout = self.require_layout()?;
+        resolved
+            .iter()
+            .map(|resolved| {
+                build_profile_claims_from_resolved(resolved, &layout, false)
+                    .map(|claims| claims.contributions)
             })
             .collect::<Result<Vec<_>>>()
             .map(|claims| claims.into_iter().flatten().collect())
@@ -738,6 +786,202 @@ impl CommandExecutor<JsonFileStorage> {
             &options.assignments,
         )?;
         self.apply_profile_with_inputs(selectors, &inputs)
+    }
+
+    /// Re-render already installed packages from their recorded values and
+    /// newly supplied inputs without changing package identity.
+    pub fn reconfigure_profiles_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<ProfileComposedApplyResult> {
+        let (selected, packages, resolved) =
+            self.reconfiguration_selection_from_sources(selectors, options)?;
+        if selected.is_empty() {
+            return Ok(ProfileComposedApplyResult::new(Vec::new()));
+        }
+        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
+        let applied = self.apply_resolved_profile_selection(
+            &packages,
+            &resolved,
+            &contribution_context,
+            ProfileLifecycleOperation::Reconfigure,
+        )?;
+        selection_profile_results(applied.profiles, &selected)
+    }
+
+    /// Preview the exact reconfiguration aggregate without publishing files,
+    /// provenance, or an audit event.
+    pub fn plan_reconfigure_profiles_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<ProfilePlanResult> {
+        let (selected, packages, resolved) =
+            self.reconfiguration_selection_from_sources(selectors, options)?;
+        if selected.is_empty() {
+            return Ok(ProfilePlanResult::new(Vec::new()));
+        }
+        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
+        self.plan_resolved_profile_selection(
+            &selected,
+            &packages,
+            &resolved,
+            &contribution_context,
+            ProfileLifecycleOperation::Reconfigure,
+        )
+    }
+
+    /// Replace selected installed packages with newer package versions while
+    /// retaining stored values for declarations that survive the replacement.
+    pub fn upgrade_profiles_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<ProfileComposedApplyResult> {
+        let (selected, packages, resolved) =
+            self.upgrade_selection_from_sources(selectors, options)?;
+        if selected.is_empty() {
+            return Ok(ProfileComposedApplyResult::new(Vec::new()));
+        }
+        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
+        let applied = self.apply_resolved_profile_selection(
+            &packages,
+            &resolved,
+            &contribution_context,
+            ProfileLifecycleOperation::Upgrade,
+        )?;
+        selection_profile_results(applied.profiles, &selected)
+    }
+
+    /// Preview the exact upgrade aggregate without publishing files,
+    /// provenance, or an audit event.
+    pub fn plan_upgrade_profiles_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<ProfilePlanResult> {
+        let (selected, packages, resolved) =
+            self.upgrade_selection_from_sources(selectors, options)?;
+        if selected.is_empty() {
+            return Ok(ProfilePlanResult::new(Vec::new()));
+        }
+        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
+        self.plan_resolved_profile_selection(
+            &selected,
+            &packages,
+            &resolved,
+            &contribution_context,
+            ProfileLifecycleOperation::Upgrade,
+        )
+    }
+
+    /// Resolve and render reconfiguration candidates from the installed
+    /// records. The recorded package identity is verified before defaults or
+    /// ambient process state could affect a replay.
+    fn reconfiguration_selection_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<(
+        Vec<ProfilePackage>,
+        Vec<ProfilePackage>,
+        Vec<ResolvedProfileContent>,
+    )> {
+        let selected = self.resolve_profile_selectors(selectors)?;
+        if selected.is_empty() {
+            return Ok((selected, Vec::new(), Vec::new()));
+        }
+        let packages = self
+            .resolve_profile_graph_for_mutation(&selected)?
+            .selected_packages();
+        let inputs = load_profile_variable_inputs(
+            &packages,
+            options.values_file.as_deref(),
+            &options.assignments,
+        )?;
+        let resolved = packages
+            .iter()
+            .map(|package| {
+                let id = package.model().id.as_str();
+                let record_path = applied_record_path(id)?;
+                let record = self.read_applied_profile_record(id)?.ok_or_else(|| {
+                    ProfileApplyError::InstalledRecordConflict {
+                        path: record_path.repository_relative(),
+                        id: id.to_string(),
+                    }
+                })?;
+                ensure_reconfiguration_package_identity(package, &record)?;
+                resolve_package_from_record_with_inputs(
+                    package,
+                    &record.variables,
+                    &inputs.for_declarations(&package.model().variables),
+                )
+                .map_err(Into::into)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok((selected, packages, resolved))
+    }
+
+    /// Resolve upgrade candidates and settle their graph against every applied
+    /// package that survives the selection before any profile is rendered.
+    fn upgrade_selection_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<(
+        Vec<ProfilePackage>,
+        Vec<ProfilePackage>,
+        Vec<ResolvedProfileContent>,
+    )> {
+        let selected = self.resolve_profile_selectors(selectors)?;
+        if selected.is_empty() {
+            return Ok((selected, Vec::new(), Vec::new()));
+        }
+        let selected_ids = selected
+            .iter()
+            .map(|package| package.model().id.clone())
+            .collect::<BTreeSet<_>>();
+        let packages = self
+            .resolve_profile_graph_for_mutation(&selected)?
+            .selected_packages();
+        let inputs = load_profile_variable_inputs(
+            &packages,
+            options.values_file.as_deref(),
+            &options.assignments,
+        )?;
+        let resolved = packages
+            .iter()
+            .map(|package| {
+                let id = package.model().id.as_str();
+                let record_path = applied_record_path(id)?;
+                let record = self.read_applied_profile_record(id)?;
+                if selected_ids.contains(&package.model().id) && record.is_none() {
+                    return Err(ProfileApplyError::InstalledRecordConflict {
+                        path: record_path.repository_relative(),
+                        id: id.to_string(),
+                    }
+                    .into());
+                }
+                if let Some(record) = &record {
+                    ensure_upgrade_version_is_newer_when_replaced(package, record)?;
+                }
+                match record {
+                    Some(record) => resolve_package_for_upgrade(
+                        package,
+                        &record.variables,
+                        &inputs.for_declarations(&package.model().variables),
+                    )
+                    .map_err(Into::into),
+                    None => resolve_package(
+                        package,
+                        &inputs.for_declarations(&package.model().variables),
+                    )
+                    .map_err(Into::into),
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok((selected, packages, resolved))
     }
 
     /// Resolve the complete set of packages applying `package` applies, in the
@@ -1069,15 +1313,33 @@ impl CommandExecutor<JsonFileStorage> {
                 .map_err(anyhow::Error::from)
             })
             .collect::<Result<Vec<_>>>()?;
+        self.apply_resolved_profile_selection(
+            packages,
+            &resolved,
+            contribution_context,
+            ProfileLifecycleOperation::Apply,
+        )
+    }
+
+    /// Publish already resolved package candidates through the one aggregate
+    /// profile-selection transaction.
+    fn apply_resolved_profile_selection(
+        &self,
+        packages: &[ProfilePackage],
+        resolved: &[ResolvedProfileContent],
+        contribution_context: &[ProfileContributionClaim],
+        operation: ProfileLifecycleOperation,
+    ) -> Result<ProfileComposedApplyResult> {
         let layout = self.require_layout()?;
         let context = MutationContext::production();
         with_mutation_session(self.storage(), &layout, "profile application", |session| {
             let Some(plan) = self.prepare_profile_selection(
                 session,
                 packages,
-                &resolved,
+                resolved,
                 contribution_context,
                 &context,
+                operation,
             )?
             else {
                 return Ok(SessionStep::Retry);
@@ -1133,6 +1395,60 @@ impl CommandExecutor<JsonFileStorage> {
         })
     }
 
+    /// Preview an aggregate lifecycle selection through the same planner used
+    /// by durable publication.
+    fn plan_resolved_profile_selection(
+        &self,
+        selected: &[ProfilePackage],
+        packages: &[ProfilePackage],
+        resolved: &[ResolvedProfileContent],
+        contribution_context: &[ProfileContributionClaim],
+        operation: ProfileLifecycleOperation,
+    ) -> Result<ProfilePlanResult> {
+        let layout = self.require_layout()?;
+        let context = MutationContext::preview();
+        with_mutation_session(self.storage(), &layout, "profile planning", |session| {
+            let Some(plan) = self.prepare_profile_selection(
+                session,
+                packages,
+                resolved,
+                contribution_context,
+                &context,
+                operation,
+            )?
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            let targets = plan
+                .profile_targets()
+                .iter()
+                .map(|target| {
+                    let action = match target.disposition {
+                        ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
+                        ProfileTargetDisposition::Create => ProfileTargetAction::Create,
+                        ProfileTargetDisposition::Update => ProfileTargetAction::Update,
+                    };
+                    ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
+                })
+                .collect::<Vec<_>>();
+            let plans = selected
+                .iter()
+                .map(|package| ProfilePlanEntry {
+                    id: package.model().id.to_string(),
+                    version: package.model().version.clone(),
+                    status: if plan.delta().actions().is_empty() {
+                        ProfilePlanStatus::Unchanged
+                    } else {
+                        ProfilePlanStatus::WouldApply
+                    },
+                    plan_hash: plan.hash().to_string(),
+                    targets: targets.clone(),
+                })
+                .collect();
+            Ok(SessionStep::Done(ProfilePlanResult::new(plans)))
+        })
+    }
+
     /// Test-only single-member view of the aggregate preparation path.
     #[cfg(test)]
     fn prepare_profile(
@@ -1152,6 +1468,7 @@ impl CommandExecutor<JsonFileStorage> {
             std::slice::from_ref(&resolved),
             &contribution_context,
             context,
+            ProfileLifecycleOperation::Apply,
         )?;
         Ok(plan.map(|plan| {
             let changes = plan
@@ -1180,6 +1497,7 @@ impl CommandExecutor<JsonFileStorage> {
         resolved: &[ResolvedProfileContent],
         contribution_context: &[ProfileContributionClaim],
         context: &MutationContext,
+        operation: ProfileLifecycleOperation,
     ) -> Result<Option<MaterializationPlan>> {
         if packages.len() != resolved.len() {
             anyhow::bail!("profile selection packages and resolved content differ in length");
@@ -1323,6 +1641,7 @@ impl CommandExecutor<JsonFileStorage> {
             MaterializationRequest::ApplyProfileSelection {
                 profiles: inputs,
                 context,
+                operation,
             },
         )?;
         let mut extra_paths = expanded_paths;
@@ -1368,6 +1687,7 @@ impl CommandExecutor<JsonFileStorage> {
             MaterializationRequest::ApplyProfileSelection {
                 profiles: inputs,
                 context,
+                operation,
             },
         )?;
         if plan.delta().actions().iter().any(|action| {
@@ -1438,6 +1758,63 @@ fn insert_candidate_package(
     }
     packages.insert(id, package);
     Ok(())
+}
+
+/// Refuse a reconfiguration that would replace package provenance instead of
+/// replaying the installed package with different values.
+fn ensure_reconfiguration_package_identity(
+    package: &ProfilePackage,
+    record: &AppliedProfileRecord,
+) -> Result<()> {
+    let metadata = package.model();
+    let unchanged_identity = record.id == metadata.id
+        && record.version == metadata.version
+        && record.compatible_jit == metadata.compatible_jit
+        && record.package_hash == package.hashes().package;
+    unchanged_identity.then_some(()).ok_or_else(|| {
+        ProfileApplyError::ReconfigurationPackageChanged {
+            id: metadata.id.to_string(),
+            installed_version: record.version.clone(),
+            installed_hash: record.package_hash.clone(),
+            found_version: metadata.version.clone(),
+            found_hash: package.hashes().package.clone(),
+        }
+        .into()
+    })
+}
+
+/// Require a changed replacement package to advance semantic version. An exact
+/// package replay is a valid no-op upgrade rehearsal or invocation.
+fn ensure_upgrade_version_is_newer_when_replaced(
+    package: &ProfilePackage,
+    record: &AppliedProfileRecord,
+) -> Result<()> {
+    let metadata = package.model();
+    if record.package_hash == package.hashes().package && record.version == metadata.version {
+        return Ok(());
+    }
+    let installed = Version::parse(&record.version).map_err(|_| {
+        anyhow::anyhow!(
+            "installed profile '{}' records invalid version '{}'",
+            record.id,
+            record.version
+        )
+    })?;
+    let candidate = Version::parse(&metadata.version).map_err(|_| {
+        anyhow::anyhow!(
+            "replacement profile '{}' declares invalid version '{}'",
+            metadata.id,
+            metadata.version
+        )
+    })?;
+    (candidate > installed).then_some(()).ok_or_else(|| {
+        ProfileApplyError::UpgradeVersionNotNewer {
+            id: metadata.id.to_string(),
+            installed_version: record.version.clone(),
+            candidate_version: metadata.version.clone(),
+        }
+        .into()
+    })
 }
 
 /// Stable source spelling used only to choose between byte-identical package
@@ -2274,6 +2651,41 @@ mod tests {
                 "[profile]\nmanifest-version = 1\nid = \"{id}\"\nversion = \"2.0.0\"\njit = \">=0.2.0, <2.0.0\"\n"
             ),
         )
+    }
+
+    /// A versioned package with one stored-variable input and explicit assets,
+    /// assembled by reusing the common profile fixture tree.
+    fn variable_asset_package(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        version: &str,
+        assets: &[(&str, &str, &str)],
+    ) -> ProfilePackage {
+        let tree = crate::test_utils::copy_package_tree(
+            &fixture_package_tree(),
+            &temp.path().join(relative),
+        );
+        let assets_manifest = assets
+            .iter()
+            .map(|(source, target, _)| {
+                format!(
+                    "\n[[asset]]\nsource = \"{source}\"\ntarget = \"{target}\"\ntemplate = true\n"
+                )
+            })
+            .collect::<String>();
+        fs::write(
+            tree.join(crate::profile::MANIFEST_FILE_NAME),
+            format!(
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"{version}\"\ncompatible-jit = \"*\"\n\n[[variable]]\nname = \"VALUE\"\ndefault = \"default\"\n{assets_manifest}"
+            ),
+        )
+        .unwrap();
+        fs::create_dir_all(tree.join("assets")).unwrap();
+        for (source, _, content) in assets {
+            fs::write(tree.join(source), content).unwrap();
+        }
+        ProfilePackage::from_directory(&tree).expect("a valid variable fixture package")
     }
 
     /// A package declaring `id`, publishing an asset target of its own, and

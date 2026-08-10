@@ -56,6 +56,8 @@
     "jit_profile_list": "Lists the offline workflow packages and repository locations named by the connected repository's own records.",
     "jit_profile_show": "Inspects a profile manifest and package identity read from a repository package location before an agent applies it.",
     "jit_profile_apply": "Dry-runs or recoverably applies a workflow package read from a repository location to the current repository.",
+    "jit_profile_reconfigure": "Replays an installed package from its recorded values with explicit overrides, preserving unrelated owned targets.",
+    "jit_profile_upgrade": "Dry-runs or recoverably advances an installed profile package after validating its surviving profile constraints.",
     "jit_search": "Text search across issues and documents in one call.",
     "jit_apply": "Instantiates a graph template into a container, the plan-before-fan-out scaffold.",
     "jit_validate": "Repository integrity check; an agent runs it before handing work back."

@@ -236,6 +236,109 @@ pub fn resolve_variables(
     Ok(ResolvedVariables(resolved))
 }
 
+/// Resolve declared variables from applied-record values, with newly supplied
+/// values taking their ordinary precedence over the record.
+///
+/// Reconfiguration deliberately never falls back to declaration defaults:
+/// once a value was recorded, that record is the deterministic baseline for
+/// replaying the installed package.
+pub fn resolve_variables_from_record(
+    declarations: &[ProfileVariableDeclaration],
+    recorded: &ResolvedVariables,
+    inputs: &VariableInputs,
+) -> Result<ResolvedVariables, VariableError> {
+    resolve_variables_from_record_with_defaults(declarations, recorded, inputs, false)
+}
+
+/// Resolve variables for a replacement package from an installed record.
+///
+/// Values whose declarations survive are carried forward from `recorded`.
+/// Values first declared by the replacement package fall back to that package's
+/// defaults. Values no longer declared by the replacement package are dropped.
+pub fn resolve_variables_for_upgrade(
+    declarations: &[ProfileVariableDeclaration],
+    recorded: &ResolvedVariables,
+    inputs: &VariableInputs,
+) -> Result<ResolvedVariables, VariableError> {
+    let declared = declarations
+        .iter()
+        .map(|declaration| declaration.name.clone())
+        .collect::<BTreeSet<_>>();
+    let retained = ResolvedVariables(
+        recorded
+            .0
+            .iter()
+            .filter(|(name, _)| declared.contains(*name))
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect(),
+    );
+    resolve_variables_from_record_with_defaults(declarations, &retained, inputs, true)
+}
+
+fn resolve_variables_from_record_with_defaults(
+    declarations: &[ProfileVariableDeclaration],
+    recorded: &ResolvedVariables,
+    inputs: &VariableInputs,
+    include_defaults_for_missing_values: bool,
+) -> Result<ResolvedVariables, VariableError> {
+    validate_declarations(declarations)?;
+    validate_recorded_variables(declarations, recorded)?;
+    let declared = declarations
+        .iter()
+        .map(|declaration| declaration.name.clone())
+        .collect::<BTreeSet<_>>();
+    let environment_names = declarations
+        .iter()
+        .filter_map(|declaration| declaration.env.clone())
+        .collect::<BTreeSet<_>>();
+    inputs.validate_against_names(&declared, &environment_names)?;
+
+    let command_line = inputs
+        .command_line
+        .iter()
+        .map(|assignment| (assignment.name.clone(), assignment.value.clone()))
+        .collect::<BTreeMap<_, _>>();
+    let resolved = declarations
+        .iter()
+        .filter_map(|declaration| {
+            let selected = command_line
+                .get(&declaration.name)
+                .map(|value| (value.clone(), VariableSource::Set))
+                .or_else(|| {
+                    declaration.env.as_ref().and_then(|environment| {
+                        inputs
+                            .environment
+                            .get(environment)
+                            .map(|value| (value.clone(), VariableSource::Environment))
+                    })
+                })
+                .or_else(|| {
+                    inputs
+                        .values_file
+                        .get(&declaration.name)
+                        .map(|value| (value.clone(), VariableSource::ValuesFile))
+                })
+                .or_else(|| {
+                    recorded
+                        .get(&declaration.name)
+                        .map(|value| (value.value.clone(), value.source))
+                })
+                .or_else(|| {
+                    include_defaults_for_missing_values.then(|| {
+                        declaration
+                            .default
+                            .clone()
+                            .map(|value| (value, VariableSource::Default))
+                    })?
+                });
+            selected.map(|(value, source)| {
+                (declaration.name.clone(), ResolvedVariable { value, source })
+            })
+        })
+        .collect();
+    Ok(ResolvedVariables(resolved))
+}
+
 /// Resolve and substitute one immutable package without changing its package
 /// identity or unresolved source bytes.
 pub fn resolve_package(
@@ -264,10 +367,37 @@ pub fn resolve_package_from_record(
     package: &ProfilePackage,
     variables: &ResolvedVariables,
 ) -> Result<ResolvedProfileContent, VariableError> {
+    resolve_package_from_record_with_inputs(package, variables, &VariableInputs::default())
+}
+
+/// Resolve an installed package from its recorded values and newly supplied
+/// command inputs, without consulting declaration defaults for a stored value.
+pub fn resolve_package_from_record_with_inputs(
+    package: &ProfilePackage,
+    variables: &ResolvedVariables,
+    inputs: &VariableInputs,
+) -> Result<ResolvedProfileContent, VariableError> {
     let model = package.model();
     validate_model_references(model)?;
-    validate_recorded_variables(&model.variables, variables)?;
-    resolve_package_content(package, variables.clone())
+    resolve_package_content(
+        package,
+        resolve_variables_from_record(&model.variables, variables, inputs)?,
+    )
+}
+
+/// Resolve a replacement package from the surviving values of its installed
+/// predecessor, defaulting only variables newly declared by that replacement.
+pub fn resolve_package_for_upgrade(
+    package: &ProfilePackage,
+    variables: &ResolvedVariables,
+    inputs: &VariableInputs,
+) -> Result<ResolvedProfileContent, VariableError> {
+    let model = package.model();
+    validate_model_references(model)?;
+    resolve_package_content(
+        package,
+        resolve_variables_for_upgrade(&model.variables, variables, inputs)?,
+    )
 }
 
 fn resolve_package_content(
@@ -1022,6 +1152,118 @@ mod tests {
         assert_eq!(
             resolved.sources()[&"COMMAND_LINE".try_into().unwrap()],
             VariableSource::Set
+        );
+    }
+
+    #[test]
+    fn test_resolve_variables_from_record_preserves_stored_values_until_supplied_inputs_override_them(
+    ) {
+        let declarations = [
+            declaration("UNCHANGED", Some("manifest-default"), None),
+            declaration("FROM_ENV", Some("manifest-default"), Some("PROFILE_ENV")),
+            declaration("FROM_SET", Some("manifest-default"), None),
+        ];
+        let stored = ResolvedVariables(
+            [
+                (
+                    "UNCHANGED".try_into().unwrap(),
+                    ResolvedVariable {
+                        value: "stored-value".to_string(),
+                        source: VariableSource::ValuesFile,
+                    },
+                ),
+                (
+                    "FROM_ENV".try_into().unwrap(),
+                    ResolvedVariable {
+                        value: "stored-environment".to_string(),
+                        source: VariableSource::Environment,
+                    },
+                ),
+                (
+                    "FROM_SET".try_into().unwrap(),
+                    ResolvedVariable {
+                        value: "stored-set".to_string(),
+                        source: VariableSource::Set,
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let inputs = VariableInputs {
+            values_file: [("UNCHANGED", "file-value")]
+                .into_iter()
+                .map(|(name, value)| (name.try_into().unwrap(), value.to_string()))
+                .collect(),
+            environment: [("PROFILE_ENV", "environment-value")]
+                .into_iter()
+                .map(|(name, value)| (name.try_into().unwrap(), value.to_string()))
+                .collect(),
+            command_line: vec![ProfileVariableAssignment::new(
+                "FROM_SET".try_into().unwrap(),
+                "set-value",
+            )],
+        };
+
+        let resolved = resolve_variables_from_record(&declarations, &stored, &inputs).unwrap();
+
+        assert_eq!(
+            resolved.values()[&"UNCHANGED".try_into().unwrap()],
+            "file-value"
+        );
+        assert_eq!(
+            resolved.values()[&"FROM_ENV".try_into().unwrap()],
+            "environment-value"
+        );
+        assert_eq!(
+            resolved.values()[&"FROM_SET".try_into().unwrap()],
+            "set-value"
+        );
+        assert_eq!(
+            resolved.sources()[&"UNCHANGED".try_into().unwrap()],
+            VariableSource::ValuesFile
+        );
+    }
+
+    #[test]
+    fn test_resolve_variables_for_upgrade_carries_stored_values_and_defaults_new_declarations() {
+        let declarations = [
+            declaration("CARRIED", Some("new-default"), None),
+            declaration("NEW", Some("new-default"), None),
+        ];
+        let stored = ResolvedVariables(
+            [
+                (
+                    "CARRIED".try_into().unwrap(),
+                    ResolvedVariable {
+                        value: "stored-value".to_string(),
+                        source: VariableSource::Set,
+                    },
+                ),
+                (
+                    "REMOVED".try_into().unwrap(),
+                    ResolvedVariable {
+                        value: "obsolete-value".to_string(),
+                        source: VariableSource::Set,
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        let resolved =
+            resolve_variables_for_upgrade(&declarations, &stored, &VariableInputs::default())
+                .unwrap();
+
+        assert_eq!(
+            resolved.values(),
+            [
+                ("CARRIED".try_into().unwrap(), "stored-value".to_string()),
+                ("NEW".try_into().unwrap(), "new-default".to_string()),
+            ]
+            .into_iter()
+            .collect()
         );
     }
 

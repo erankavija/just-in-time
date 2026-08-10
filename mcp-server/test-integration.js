@@ -383,13 +383,14 @@ async function main() {
         'jit_profile_list',
         'jit_profile_show',
         'jit_profile_apply',
+        'jit_profile_reconfigure',
+        'jit_profile_upgrade',
       ]) {
         assert.ok(names.has(required), `missing core tool: ${required}`);
       }
       for (const deferred of [
         'jit_profile_install',
         'jit_profile_compose',
-        'jit_profile_upgrade',
         'jit_profile_remove',
         'jit_profile_diff',
       ]) {
@@ -406,14 +407,24 @@ async function main() {
       assert.deepStrictEqual(profileInputKeys, {
         jit_profile_apply: ['dry-run', 'json', 'profile', 'set', 'values-file'],
         jit_profile_list: ['json'],
+        jit_profile_reconfigure: ['dry-run', 'json', 'profile', 'set', 'values-file'],
         jit_profile_show: ['json', 'profile'],
+        jit_profile_upgrade: ['dry-run', 'json', 'profile', 'set', 'values-file'],
       });
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.required,
         ['profile']
       );
       assert.deepStrictEqual(
+        tools.find(tool => tool.name === 'jit_profile_reconfigure').inputSchema.required,
+        ['profile']
+      );
+      assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_show').inputSchema.required,
+        ['profile']
+      );
+      assert.deepStrictEqual(
+        tools.find(tool => tool.name === 'jit_profile_upgrade').inputSchema.required,
         ['profile']
       );
       assert.deepStrictEqual(

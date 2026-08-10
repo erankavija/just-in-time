@@ -481,6 +481,64 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Re-render an installed profile from recorded values and supplied overrides
+    Reconfigure {
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append,
+            required = true
+        )]
+        profile: Vec<String>,
+
+        /// Optional TOML file containing the `[variables]` value map.
+        #[arg(long, value_name = "PATH")]
+        values_file: Option<std::path::PathBuf>,
+
+        /// Set one declared profile variable; repeatable and last-wins.
+        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+        set: Vec<String>,
+
+        /// Build and validate the exact reconfiguration plan without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Replace an installed profile with a newer package version
+    Upgrade {
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append,
+            required = true
+        )]
+        profile: Vec<String>,
+
+        /// Optional TOML file containing the `[variables]` value map.
+        #[arg(long, value_name = "PATH")]
+        values_file: Option<std::path::PathBuf>,
+
+        /// Set one declared profile variable; repeatable and last-wins.
+        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+        set: Vec<String>,
+
+        /// Build and validate the exact upgrade plan without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// Addressable structured item subcommands.
@@ -3084,7 +3142,9 @@ impl Commands {
 impl ProfileCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Apply { dry_run, .. } => !*dry_run,
+            Self::Apply { dry_run, .. }
+            | Self::Reconfigure { dry_run, .. }
+            | Self::Upgrade { dry_run, .. } => !*dry_run,
             Self::List { .. } | Self::Show { .. } => false,
         }
     }
@@ -3254,7 +3314,11 @@ impl SnapshotCommands {
 impl ProfileCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::List { .. } | Self::Show { .. } | Self::Apply { .. } => false,
+            Self::List { .. }
+            | Self::Show { .. }
+            | Self::Apply { .. }
+            | Self::Reconfigure { .. }
+            | Self::Upgrade { .. } => false,
         }
     }
 }
@@ -3591,7 +3655,9 @@ mod recovery_dispatch_tests {
         "migrate lifecycle-timestamps",
         "profile apply",
         "profile list",
+        "profile reconfigure",
         "profile show",
+        "profile upgrade",
         "project render",
         "query all",
         "query available",

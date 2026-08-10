@@ -111,8 +111,8 @@ so a package and its dependency may declare the same thing.
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).
 
-All profile commands support `--json`. `profile list`, `profile show`, and
-`profile apply` use the standard count-wrapped collection shape. A show response
+All profile commands support `--json`. Profile commands that emit collections
+use the standard count-wrapped collection shape. A show response
 contains one package entry per selector occurrence in selector order, including
 repeated selectors; a dry-run reports one plan entry per selected occurrence;
 normal application reports one result per applied package, dependencies before

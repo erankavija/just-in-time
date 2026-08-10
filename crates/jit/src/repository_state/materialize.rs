@@ -988,6 +988,7 @@ kind = "advisory"
             MaterializationRequest::ApplyProfileSelection {
                 profiles: vec![profile],
                 context: &context,
+                operation: crate::domain::ProfileLifecycleOperation::Apply,
             },
         )
         .unwrap();
@@ -1065,6 +1066,7 @@ kind = "advisory"
             MaterializationRequest::ApplyProfileSelection {
                 profiles: vec![profile],
                 context: &context,
+                operation: crate::domain::ProfileLifecycleOperation::Apply,
             },
         )
         .expect("one plan carries both record writes");
@@ -1174,6 +1176,7 @@ kind = "advisory"
             MaterializationRequest::ApplyProfileSelection {
                 profiles: vec![profile],
                 context: &context,
+                operation: crate::domain::ProfileLifecycleOperation::Apply,
             },
         )
         .expect("the selected replacement accepts its authenticated v1 preimage");
