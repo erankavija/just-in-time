@@ -7,6 +7,7 @@
   ],
   "description": "Replace the per-application audit record with one event describing what a\nlifecycle operation actually changed.\n\n## Background\n\nMutations append an application event per package, which cannot describe a\nselection that reconfigured one profile, upgraded another, and left a third alone.\nThe event also has to carry variable provenance without carrying values.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation that changes the aggregate appends exactly one event naming the requested operation and, per profile in a stable order, whether it was installed, unchanged, reconfigured, or upgraded.\n- [hard] REQ-02: A rehearsal, and a mutation that leaves the aggregate entirely unchanged, append no event.\n- [hard] REQ-03: The event names variables by name and by which source supplied them, and carries no resolved value and no rendered content.\n- [hard] REQ-04: Conversion of a record in the shipped format is reported inside the event for the operation that encountered it rather than as an operation of its own.\n- [hard] REQ-05: The prior per-application event is no longer constructed or appended; the existing log continues to decode historical entries.\n",
   "documents": [],
+  "first_ready_at": "2026-08-10T00:35:33.678533626Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "satisfies:REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Record one lifecycle event per changed mutation",
-  "updated_at": "2026-08-08T23:11:26.421913953Z"
+  "updated_at": "2026-08-10T00:35:33.678533626Z"
 }
