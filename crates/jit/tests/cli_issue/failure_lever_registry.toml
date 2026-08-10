@@ -690,6 +690,24 @@ expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
+path = "profile reconfigure"
+argv = ["profile", "reconfigure", "--profile", "id:absent-profile", "--json"]
+setup = ["init"]
+expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
+expected_code = "PROFILE_NOT_FOUND"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
+path = "profile upgrade"
+argv = ["profile", "upgrade", "--profile", "id:absent-profile", "--json"]
+setup = ["init"]
+expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
+expected_code = "PROFILE_NOT_FOUND"
+expected_exit = 3
+confirmation = "invoked"
+
+[[arms]]
 path = "query"
 argv = ["query", "--json"]
 setup = ["init", "malformed-index"]
