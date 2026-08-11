@@ -387,6 +387,27 @@ cargo test -- --nocapture
 cargo test -- --test-threads=1
 ```
 
+### Nextest
+
+The repository provisions cargo-nextest 0.9.133 for the workspace suite. Install that
+version with:
+
+```bash
+cargo install cargo-nextest --locked --version 0.9.133
+```
+
+Run the workspace suite with nextest, then run doctests as a separate substep because
+nextest does not cover them:
+
+```bash
+cargo nextest run --workspace
+cargo test --doc --workspace
+```
+
+The committed nextest policy is documented in
+[`.config/nextest.toml`](../.config/nextest.toml). The `cargo-ci` gate still runs
+`cargo test --workspace`; the CI runner cutover to nextest is a separate follow-up.
+
 Lint and format alongside tests. Both must be clean before a commit:
 
 ```bash
