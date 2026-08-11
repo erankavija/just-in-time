@@ -476,34 +476,14 @@ impl InitializationScaffold {
             return Ok(Vec::new());
         }
         let profiles = self.profiles();
-        let migrations = profiles
-            .first()
-            .map(|profile| &profile.shipped_v1_migrations)
-            .cloned()
-            .unwrap_or_default();
         let neutral = self.profile_composition_base(base)?;
-        let migrated = super::apply_overlay(
-            &neutral,
-            migrations
-                .iter()
-                .map(|(path, record)| {
-                    record
-                        .to_bytes()
-                        .map(|bytes| (path.clone(), Some(bytes)))
-                        .map_err(|error| {
-                            InitializationError::RuleMaterialization(error.to_string())
-                        })
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-        )
-        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
         let contribution_context = profiles
             .iter()
             .flat_map(|profile| profile.contribution_context.iter().cloned())
             .collect::<Vec<_>>();
         let contribution_base = super::apply_overlay(
-            &migrated,
-            super::profile_contribution_overrides(&migrated, &contribution_context)
+            &neutral,
+            super::profile_contribution_overrides(&neutral, &contribution_context)
                 .map_err(profile_composition_error)?,
         )
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
@@ -726,16 +706,6 @@ fn profile_record_changed(
     profile: &ProfileApplicationInput,
     record: &AppliedProfileRecord,
 ) -> Result<bool, InitializationError> {
-    // The selected package may replace the same shipped-v1 record that the
-    // operation authenticated. Its raw v1 preimage is still carried by this
-    // final record write, while the current selected record is the one final
-    // persisted provenance image.
-    if profile
-        .shipped_v1_migrations
-        .contains_key(&profile.record_path)
-    {
-        return Ok(true);
-    }
     match base.entry(&profile.record_path)? {
         RepositoryEntry::Absent => Ok(true),
         RepositoryEntry::File { bytes, .. } => {
@@ -1015,10 +985,8 @@ fn derive_profile_application_candidate(
     base: &RepositoryImage,
     profile: &ProfileApplicationInput,
 ) -> Result<MaterializationDerivation, InitializationError> {
-    let composition_base = super::profile_apply::profile_composition_base(base, profile)
-        .map_err(profile_composition_error)?;
     let composed = super::profile_apply::compose_profile_targets_with_context(
-        &composition_base,
+        base,
         profile.claims.clone(),
         profile.contribution_context.clone(),
     )
@@ -1064,21 +1032,6 @@ fn derive_profile_application_candidate(
             });
         }
     }
-    let migrated_records = profile
-        .shipped_v1_migrations
-        .iter()
-        .filter(|(path, _)| *path != &profile.record_path)
-        .map(|(path, record)| {
-            Ok(DesiredFile {
-                path: path.clone(),
-                bytes: serialize_profile_record(record)?,
-                mode: FileMode::Regular,
-                policy: WritePolicy::Always,
-                owner: PROFILE_OWNER,
-            })
-        })
-        .collect::<Result<Vec<_>, InitializationError>>()?;
-    push_file_actions(base, &migrated_records, &mut actions)?;
     let config_path = VirtualPath::CONFIG;
     let rules_path = VirtualPath::RULES;
     if profile.target_hashes.contains_key(".jit/config.toml")
@@ -1164,8 +1117,7 @@ pub(super) fn derive_profile_applications(
     let mut aggregate_changed = !forced_changed.is_empty();
 
     for profile in profiles {
-        let status_base = super::profile_apply::profile_composition_base(&proposed, profile)
-            .map_err(profile_composition_error)?;
+        let status_base = proposed.clone();
         let candidate = derive_profile_application_candidate(&proposed, profile)?;
         let candidate_actions = candidate
             .delta
@@ -1174,14 +1126,7 @@ pub(super) fn derive_profile_applications(
             .filter(|action| action.path() != &VirtualPath::EVENTS)
             .cloned()
             .collect::<Vec<_>>();
-        let migration_paths = profile
-            .shipped_v1_migrations
-            .keys()
-            .collect::<std::collections::BTreeSet<_>>();
-        let changed = forced_changed.contains(&profile.id)
-            || candidate_actions
-                .iter()
-                .any(|action| !migration_paths.contains(action.path()));
+        let changed = forced_changed.contains(&profile.id) || !candidate_actions.is_empty();
         aggregate_changed |= !candidate_actions.is_empty();
         for action in &candidate_actions {
             fold_rebased_action(base, &mut actions, action)?;
@@ -1194,20 +1139,8 @@ pub(super) fn derive_profile_applications(
         lifecycle_profiles.push(profile_lifecycle_profile(&status_base, profile, changed)?);
     }
 
-    let converted_records = profiles
-        .iter()
-        .flat_map(|profile| {
-            profile
-                .shipped_v1_migrations
-                .values()
-                .map(|record| record.id.clone())
-        })
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    if aggregate_changed || !converted_records.is_empty() {
-        let event =
-            Event::draft_profile_lifecycle(operation, lifecycle_profiles, converted_records);
+    if aggregate_changed {
+        let event = Event::draft_profile_lifecycle(operation, lifecycle_profiles);
         if let Some(action) = finalize_audit_append(base, context, vec![(2, event)])? {
             fold_rebased_action(base, &mut actions, &action)?;
         }
@@ -1476,7 +1409,6 @@ mod tests {
                 regions: Vec::new(),
             },
             contribution_context: Vec::new(),
-            shipped_v1_migrations: BTreeMap::new(),
             record_path: VirtualPath::data(format!("profiles/{id}.json")).unwrap(),
         }
     }

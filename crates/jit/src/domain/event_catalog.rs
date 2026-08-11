@@ -449,7 +449,6 @@ impl EventTag {
                         source: crate::profile::VariableSource::Set,
                     }],
                 }],
-                converted_records: Vec::new(),
                 isolated_torn_tail: false,
             },
         }

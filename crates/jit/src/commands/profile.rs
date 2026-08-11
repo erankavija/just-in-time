@@ -220,8 +220,8 @@ pub enum ProfileResolutionError {
         /// Package-reader failure.
         source: ProfilePackageError,
     },
-    /// A converted shipped-v1 record preserves an embedded origin, but this
-    /// binary deliberately has no embedded-package discovery surface.
+    /// An embedded-origin record has no package discovery surface in this
+    /// binary.
     #[error(
         "applied profile record '{record}' has embedded provenance, which is unavailable for package resolution"
     )]
@@ -1235,20 +1235,13 @@ impl CommandExecutor<JsonFileStorage> {
                     .into_iter()
                     .map(|id| {
                         let path = applied_record_path(&id)?;
-                        let RepositoryEntry::File { bytes, .. } = image.entry(&path)? else {
+                        let RepositoryEntry::File { .. } = image.entry(&path)? else {
                             return Ok(None);
                         };
-                        let embedded_current =
-                            match serde_json::from_slice::<AppliedProfileRecord>(bytes) {
-                                Ok(record) => {
-                                    record.id.as_str() == id
-                                        && matches!(record.origin, ProfileOrigin::Embedded)
-                                }
-                                Err(_) => false,
-                            };
-                        Ok((embedded_current
-                            || crate::repository_state::is_shipped_v1_candidate(bytes))
-                        .then_some(id))
+                        let Some(record) = read_applied_record(&image, &path, &id)? else {
+                            return Ok(None);
+                        };
+                        Ok(matches!(record.origin, ProfileOrigin::Embedded).then_some(id))
                     })
                     .collect::<Result<Vec<_>>>()?
                     .into_iter()
@@ -1269,10 +1262,10 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Resolve a package graph for a pending repository mutation.
     ///
-    /// Current embedded records and the named shipped-v1 boundary remain
-    /// ownership evidence in the materialization image, but do not describe
-    /// rediscoverable packages. Ordinary graph readers intentionally continue
-    /// through [`Self::resolve_profile_graph`] and reject those records.
+    /// Current embedded records remain ownership evidence in the materialization
+    /// image, but do not describe rediscoverable packages. Ordinary graph
+    /// readers intentionally continue through [`Self::resolve_profile_graph`]
+    /// and reject those records.
     pub(crate) fn resolve_profile_graph_for_mutation(
         &self,
         selected: &[ProfilePackage],
@@ -1648,67 +1641,13 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(base) => base,
             };
 
-        // Candidate detection is intentionally shallow: the exact five-field
-        // decoder runs below only after this same session has captured every
-        // pinned historical unit it must authenticate.
-        let mut migration_paths = Vec::new();
-        let has_candidate = recorded_profile_ids(&base, &profiles_dir)?
-            .into_iter()
-            .map(|id| applied_record_path(&id))
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .map(|path| {
-                Ok(matches!(
-                    base.entry(&path)?,
-                    RepositoryEntry::File { bytes, .. }
-                        if crate::repository_state::is_shipped_v1_candidate(bytes)
-                ))
-            })
-            .collect::<Result<Vec<_>>>()?
-            .into_iter()
-            .any(|candidate| candidate);
-        if has_candidate {
-            migration_paths = crate::repository_state::shipped_v1_migration_paths()?
-                .into_iter()
-                .map(|path| layout.classify_repository_relative(&path))
-                .collect::<Result<Vec<_>, _>>()?;
-        }
-        let mut authenticated_paths = content_paths.clone();
-        let base = if migration_paths.is_empty() {
-            base
-        } else {
-            authenticated_paths.extend(migration_paths);
-            match self.capture_proposed_base(
-                session,
-                &BTreeMap::new(),
-                &authenticated_paths,
-                None,
-            )? {
-                None => return Ok(None),
-                Some(base) => base,
-            }
-        };
-        // This is the sole exact legacy decode/conversion for this operation.
-        // The authenticated rewrite map stays immutable through closure,
-        // preview, and final derivation; final delta preimages revalidate the
-        // raw record bytes before publication.
-        let migrations = crate::repository_state::migrate_shipped_v1_records(&base)?;
-        let inputs = profile_selection_inputs(
-            packages,
-            resolved,
-            base.layout(),
-            contribution_context,
-            &migrations,
-        )?;
-        let migration_base = migration_overlay(&base, &migrations)?;
+        let inputs =
+            profile_selection_inputs(packages, resolved, base.layout(), contribution_context)?;
         let contribution_base = apply_overlay(
-            &migration_base,
-            crate::repository_state::profile_contribution_overrides(
-                &migration_base,
-                contribution_context,
-            )?,
+            &base,
+            crate::repository_state::profile_contribution_overrides(&base, contribution_context)?,
         )?;
-        let mut expanded_paths = authenticated_paths;
+        let mut expanded_paths = content_paths;
         for input in &inputs {
             expanded_paths.extend(crate::repository_state::profile_capture_closure(
                 &contribution_base,
@@ -1730,13 +1669,8 @@ impl CommandExecutor<JsonFileStorage> {
                 None => return Ok(None),
                 Some(base) => base,
             };
-        let inputs = profile_selection_inputs(
-            packages,
-            resolved,
-            base.layout(),
-            contribution_context,
-            &migrations,
-        )?;
+        let inputs =
+            profile_selection_inputs(packages, resolved, base.layout(), contribution_context)?;
         let preview = derive_materialization(
             &base,
             MaterializationRequest::ApplyProfileSelection {
@@ -1758,20 +1692,11 @@ impl CommandExecutor<JsonFileStorage> {
             None => return Ok(None),
             Some(base) => base,
         };
-        let inputs = profile_selection_inputs(
-            packages,
-            resolved,
-            probe.layout(),
-            contribution_context,
-            &migrations,
-        )?;
-        let migration_probe = migration_overlay(&probe, &migrations)?;
+        let inputs =
+            profile_selection_inputs(packages, resolved, probe.layout(), contribution_context)?;
         let contribution_probe = apply_overlay(
-            &migration_probe,
-            crate::repository_state::profile_contribution_overrides(
-                &migration_probe,
-                contribution_context,
-            )?,
+            &probe,
+            crate::repository_state::profile_contribution_overrides(&probe, contribution_context)?,
         )?;
         for input in &inputs {
             let final_closure =
@@ -2310,48 +2235,25 @@ pub(super) fn expected_record(
     ))
 }
 
-/// Build one canonical aggregate input collection. The authenticated migration
-/// map belongs to its first dependency-first member only, so one selection
-/// converts each shipped-v1 record once while every later member plans against
-/// the same proposed current-format image.
+/// Build one canonical aggregate input collection for a dependency-first
+/// selection.
 fn profile_selection_inputs(
     packages: &[ProfilePackage],
     resolved: &[ResolvedProfileContent],
     layout: &RepositoryLayout,
     contribution_context: &[ProfileContributionClaim],
-    migrations: &BTreeMap<VirtualPath, AppliedProfileRecord>,
 ) -> Result<Vec<ProfileApplicationInput>> {
     packages
         .iter()
         .zip(resolved)
-        .enumerate()
-        .map(|(index, (package, resolved))| {
+        .map(|(package, resolved)| {
             let record_path = applied_record_path(package.model().id.as_str())?;
-            let input = profile_application_input(package, resolved, layout, record_path)?
-                .with_contribution_context(contribution_context);
-            Ok(if index == 0 {
-                input.with_shipped_v1_migrations(migrations.clone())
-            } else {
-                input
-            })
+            Ok(
+                profile_application_input(package, resolved, layout, record_path)?
+                    .with_contribution_context(contribution_context),
+            )
         })
         .collect()
-}
-
-/// Apply authenticated migration bytes to an in-memory image for later
-/// aggregate members. The durable migration actions remain in the final plan.
-fn migration_overlay(
-    base: &RepositoryImage,
-    migrations: &BTreeMap<VirtualPath, AppliedProfileRecord>,
-) -> Result<RepositoryImage> {
-    apply_overlay(
-        base,
-        migrations
-            .iter()
-            .map(|(path, record)| Ok((path.clone(), Some(record.to_bytes()?))))
-            .collect::<Result<Vec<_>, serde_json::Error>>()?,
-    )
-    .map_err(Into::into)
 }
 
 /// Convert an immutable package into neutral claims plus provenance metadata.
@@ -2373,7 +2275,6 @@ fn profile_application_input(
         origin: package_origin(package, layout)?,
         contribution_context: claims.contributions.clone(),
         claims,
-        shipped_v1_migrations: BTreeMap::new(),
         record_path,
     })
 }
@@ -3097,36 +2998,6 @@ mod tests {
         .unwrap();
     }
 
-    /// Encode the exact historical five-field wire only to prove ordinary
-    /// readers do not accept it. The migration boundary owns all legacy input.
-    fn shipped_v1_record(record: &AppliedProfileRecord) -> Vec<u8> {
-        serde_json::to_vec(&serde_json::json!({
-            "id": record.id,
-            "version": record.version,
-            "origin": record.origin,
-            "package_hash": record.package_hash,
-            "target_hashes": {},
-        }))
-        .unwrap()
-    }
-
-    fn exact_shipped_dogfood_v1_record() -> Vec<u8> {
-        let evidence: serde_json::Value = serde_json::from_slice(include_bytes!(
-            "../repository_state/shipped_v1_dogfood_evidence.json"
-        ))
-        .expect("pinned evidence is JSON");
-        let mut bytes = serde_json::to_vec_pretty(&serde_json::json!({
-            "id": "jit-dogfood",
-            "version": "1.0.0",
-            "origin": { "source": "embedded" },
-            "package_hash": "43829e7e032e5e9ec40776103b1996f15e7291664c8b11e403c20b7f54af905c",
-            "target_hashes": evidence["target_hashes"],
-        }))
-        .expect("v1 fixture serializes");
-        bytes.push(b'\n');
-        bytes
-    }
-
     #[test]
     fn test_resolve_profile_package_reads_the_package_a_supplied_location_holds() {
         let (temp, _storage, executor, _package) = fixture();
@@ -3273,26 +3144,6 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_profile_package_authenticates_a_shipped_v1_record_once_before_publication() {
-        let (temp, storage, executor, _package) = fixture();
-        let raw_v1 = exact_shipped_dogfood_v1_record();
-        fs::create_dir_all(temp.path().join(".jit/profiles")).unwrap();
-        let record_path = temp.path().join(".jit/profiles/jit-dogfood.json");
-        fs::write(&record_path, &raw_v1).unwrap();
-        let later =
-            package_publishing(&temp, "vendor/later", "later", "notes/later.txt", "later\n");
-
-        crate::repository_state::reset_shipped_v1_conversion_count();
-        let error = executor.apply_profile_package(&later).unwrap_err();
-
-        assert!(error.to_string().contains("shipped-v1 migration"));
-        assert_eq!(crate::repository_state::shipped_v1_conversion_count(), 1);
-        assert_eq!(fs::read(&record_path).unwrap(), raw_v1);
-        assert!(!temp.path().join("notes/later.txt").exists());
-        assert!(storage.read_events().unwrap().is_empty());
-    }
-
-    #[test]
     fn test_apply_profile_package_retains_an_adopted_managed_region_across_reapplication() {
         let (temp, _storage, executor, _package) = fixture();
         let package_root = temp.path().join("vendor/managed-region");
@@ -3346,16 +3197,27 @@ placement = "append"
     }
 
     #[test]
-    fn test_ordinary_profile_readers_reject_shipped_v1_records() {
+    fn test_ordinary_profile_readers_reject_an_undecodable_record_with_record_and_profile() {
         let (temp, _storage, executor, _package) = fixture();
         let applied = package_read_from(&temp, "vendor/recorded");
         executor.apply_profile_package(&applied).unwrap();
         let id = applied.model().id.to_string();
         let record_path = temp.path().join(format!(".jit/profiles/{id}.json"));
-        fs::write(&record_path, shipped_v1_record(&stored_record(&temp))).unwrap();
+        fs::write(&record_path, br#"{"record_version":1}"#).unwrap();
         let selector = ProfileSelector::id(&id).unwrap();
 
-        assert!(executor.resolve_profile_package(&selector).is_err());
+        let error = executor
+            .resolve_profile_package(&selector)
+            .expect_err("an undecodable record must be rejected");
+        let conflict = error
+            .downcast_ref::<ProfileApplyError>()
+            .expect("record decoding must remain a typed profile error");
+        assert_eq!(
+            conflict.to_string(),
+            format!(
+                "installed profile record '.jit/profiles/{id}.json' is not a readable record for profile '{id}'"
+            )
+        );
         assert!(executor.list_recorded_profiles().is_err());
         assert!(executor
             .show_profiles(std::slice::from_ref(&selector))
@@ -4816,11 +4678,9 @@ template = true
             [Event::ProfileLifecycle {
                 operation: ProfileLifecycleOperation::Apply,
                 profiles,
-                converted_records,
                 ..
             }]
-                if converted_records.is_empty()
-                    && profiles.len() == 2
+                if profiles.len() == 2
                     && profiles.iter().all(|profile| profile.status
                         == ProfileLifecycleStatus::Installed)
         ));
