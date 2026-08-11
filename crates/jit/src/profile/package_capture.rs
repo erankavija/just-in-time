@@ -16,21 +16,29 @@
 //! in-place edit to profile-owned content reaches the package that owns it, and
 //! the package identity a capture reports reflects that edit.
 //!
-//! Reading is confined by the repository layout: every declared source resolves
-//! through it, and a source that is a symbolic link, is not an ordinary file,
-//! or resolves outside the worktree is refused before any bytes are drawn.
+//! Every source is read through one no-follow open beneath a handle on the
+//! worktree root ([`super::nofollow`]), so that open is where containment is
+//! established rather than checked: a resolution leaving the worktree is
+//! refused, a link at the name itself is refused, and the bytes and the mode a
+//! source is judged against both come from the handle it returns. Whether a
+//! source may be read at all is the layout's answer — it resolves each declared
+//! target, and one placed outside the worktree is refused before any open.
+//!
 //! Publication belongs to the caller — this module reads and validates, and the
 //! command layer publishes the result through the shared recoverable
 //! transaction.
 
+use super::nofollow::{classify_open_failure, is_executable, open_path_nofollow, OpenRefusal};
 use super::{
     ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageModel,
     LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
 };
 use crate::repository_state::{FileMode, RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use cap_std::ambient_authority;
+use cap_std::fs::Dir as CapDir;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::path::Path;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 
 /// Which side owns the bytes of one declared package source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -223,10 +231,16 @@ pub fn capture_package_tree(
     package_source: &VirtualPath,
     layout: &RepositoryLayout,
 ) -> Result<CapturedPackageTree, PackageCaptureError> {
-    // The layout already refuses a root reached through a symbolic link, so
-    // the worktree root it names is the resolved directory every source below
-    // is compared against.
-    let worktree = layout.worktree_root().to_path_buf();
+    // Every source below is opened through this one handle, so "inside the
+    // worktree" is established once, by the directory a capture may read,
+    // rather than re-derived from a pathname per source.
+    let worktree = CapDir::open_ambient_dir(layout.worktree_root(), ambient_authority()).map_err(
+        |source| PackageCaptureError::UnreadableSource {
+            declared: MANIFEST_FILE_NAME.to_string(),
+            path: layout.worktree_root().display().to_string(),
+            source,
+        },
+    )?;
     let manifest_path = package_relative(package_source, MANIFEST_FILE_NAME).map_err(|source| {
         PackageCaptureError::UnaddressableTarget {
             declared: MANIFEST_FILE_NAME.to_string(),
@@ -351,24 +365,86 @@ pub(crate) fn package_relative(
     }
 }
 
-/// Read one declared source, refusing anything a capture must not follow.
+/// Read one declared source through a single no-follow open beneath the
+/// worktree handle.
 ///
-/// The parent directory is fully resolved and required to stay inside the
-/// worktree, so a symbolic link anywhere above the file cannot lead the read
-/// out of the repository, and the file itself is inspected without following a
-/// link ([`fs::symlink_metadata`]) so a symlinked leaf is refused rather than
-/// silently dereferenced.
+/// The layout says where the source lives and the worktree root says whether a
+/// capture may read it, so a source the layout places outside the worktree —
+/// content under a data root that is not itself inside the worktree — is
+/// refused without being opened at all. Everything after that is the open:
+/// `cap_std` refuses a resolution that leaves the handle, so no ancestor can
+/// redirect the read out of the worktree, and it refuses a link at the name
+/// itself, so a symbolic link is reported rather than dereferenced.
+///
+/// The bytes and the mode both come from that one opened handle, so they
+/// describe one object. Nothing here looks the name up a second time, which is
+/// what stops something replacing the name between two lookups from deciding
+/// either what a capture reads or what mode it is judged against.
 fn read_confined(
     declared: &str,
     path: &VirtualPath,
     layout: &RepositoryLayout,
-    worktree: &Path,
+    worktree: &CapDir,
 ) -> Result<ReadSource, PackageCaptureError> {
+    let refusal = |kind: fn(String, String) -> PackageCaptureError| {
+        kind(declared.to_string(), path.repository_relative())
+    };
     let unreadable = |source: std::io::Error| PackageCaptureError::UnreadableSource {
         declared: declared.to_string(),
         path: path.repository_relative(),
         source,
     };
+    let relative = worktree_relative(path, layout, declared)?;
+    let opened =
+        open_path_nofollow(worktree, &relative, false).map_err(
+            |error| match classify_open_failure(&error) {
+                OpenRefusal::Symlink => refusal(symlinked_source),
+                OpenRefusal::Escape => refusal(source_outside_worktree),
+                OpenRefusal::Unopenable => refusal(irregular_source),
+                OpenRefusal::Io => unreadable(error),
+            },
+        )?;
+    let metadata = opened.metadata().map_err(unreadable)?;
+    if !metadata.is_file() {
+        return Err(refusal(irregular_source));
+    }
+    let mut bytes = Vec::new();
+    (&opened).read_to_end(&mut bytes).map_err(unreadable)?;
+    Ok(ReadSource {
+        bytes,
+        mode: if is_executable(&metadata) {
+            FileMode::Executable
+        } else {
+            FileMode::Regular
+        },
+    })
+}
+
+fn symlinked_source(declared: String, path: String) -> PackageCaptureError {
+    PackageCaptureError::SymlinkedSource { declared, path }
+}
+
+fn irregular_source(declared: String, path: String) -> PackageCaptureError {
+    PackageCaptureError::IrregularSource { declared, path }
+}
+
+fn source_outside_worktree(declared: String, path: String) -> PackageCaptureError {
+    PackageCaptureError::SourceOutsideWorktree { declared, path }
+}
+
+/// Where one declared source sits relative to the worktree root.
+///
+/// The layout resolves the identity to its physical location — which is how a
+/// target under the data root reaches the directory that root actually names —
+/// and the worktree root then decides whether a capture may read it. Both are
+/// absolute paths the layout already holds, so this derives the name to open
+/// rather than consulting the filesystem; the open itself is what enforces
+/// containment.
+fn worktree_relative(
+    path: &VirtualPath,
+    layout: &RepositoryLayout,
+    declared: &str,
+) -> Result<PathBuf, PackageCaptureError> {
     let physical =
         layout
             .resolve(path)
@@ -377,55 +453,20 @@ fn read_confined(
                 target: path.repository_relative(),
                 source,
             })?;
-    let parent = physical
-        .parent()
-        .ok_or_else(|| unreadable(std::io::Error::from(std::io::ErrorKind::NotFound)))?;
-    let resolved_parent = fs::canonicalize(parent).map_err(unreadable)?;
-    if !resolved_parent.starts_with(worktree) {
-        return Err(PackageCaptureError::SourceOutsideWorktree {
+    physical
+        .strip_prefix(layout.worktree_root())
+        .map(Path::to_path_buf)
+        .map_err(|_| PackageCaptureError::SourceOutsideWorktree {
             declared: declared.to_string(),
             path: path.repository_relative(),
-        });
-    }
-    let metadata = fs::symlink_metadata(&physical).map_err(unreadable)?;
-    if metadata.file_type().is_symlink() {
-        return Err(PackageCaptureError::SymlinkedSource {
-            declared: declared.to_string(),
-            path: path.repository_relative(),
-        });
-    }
-    if !metadata.file_type().is_file() {
-        return Err(PackageCaptureError::IrregularSource {
-            declared: declared.to_string(),
-            path: path.repository_relative(),
-        });
-    }
-    Ok(ReadSource {
-        bytes: fs::read(&physical).map_err(unreadable)?,
-        mode: read_mode(&metadata),
-    })
-}
-
-/// The mode the filesystem reports for one read source.
-#[cfg(unix)]
-fn read_mode(metadata: &fs::Metadata) -> FileMode {
-    use std::os::unix::fs::PermissionsExt;
-    if metadata.permissions().mode() & 0o111 == 0 {
-        FileMode::Regular
-    } else {
-        FileMode::Executable
-    }
-}
-
-#[cfg(not(unix))]
-fn read_mode(_metadata: &fs::Metadata) -> FileMode {
-    FileMode::Regular
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::storage::discover_repository_layout;
+    use std::fs;
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -654,6 +695,50 @@ target = "docs/guide.md"
             .map(|(source, _)| source.as_str())
             .collect::<Vec<_>>();
         assert_eq!(executable, vec!["assets/live/bin/check.sh"]);
+    }
+
+    /// The mode a source is judged against is the mode of the very object whose
+    /// bytes were captured, taken from one opened handle rather than from a
+    /// separate look at the name.
+    ///
+    /// Observed by moving only the mode: the same declaration over the same
+    /// unchanged bytes is admitted, refused, and admitted again as the file's
+    /// executable bit is set and cleared, and the bytes captured either side of
+    /// the refusal are identical. A mode read from anywhere other than the
+    /// source that supplied those bytes could not track that.
+    #[cfg(unix)]
+    #[test]
+    fn test_capture_package_tree_judges_the_mode_of_the_source_whose_bytes_it_captured() {
+        use std::os::unix::fs::PermissionsExt;
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST);
+        let source = fixture.worktree.join("docs/guide.md");
+        let set_mode = |mode: u32| {
+            fs::set_permissions(&source, fs::Permissions::from_mode(mode)).unwrap();
+        };
+
+        let before = fixture.capture().expect("a regular source is admitted");
+        set_mode(0o755);
+        let refused = fixture
+            .capture()
+            .expect_err("the same bytes carrying an undeclared executable bit are refused");
+        set_mode(0o644);
+        let after = fixture.capture().expect("clearing the bit admits it again");
+
+        assert!(
+            matches!(
+                &refused,
+                PackageCaptureError::InvalidCapturedTree(
+                    ProfilePackageError::UndeclaredExecutable { path }
+                ) if path == "assets/live/docs/guide.md"
+            ),
+            "{refused}"
+        );
+        assert_eq!(
+            before.files()["assets/live/docs/guide.md"].bytes,
+            after.files()["assets/live/docs/guide.md"].bytes,
+            "the mode decision moved without the bytes moving with it"
+        );
+        assert_eq!(before.hashes().package, after.hashes().package);
     }
 
     /// A repository file carrying executable permission its declaration did not

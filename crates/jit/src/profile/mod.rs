@@ -8,6 +8,7 @@ mod application;
 mod apply_claims;
 mod graph;
 mod manifest;
+mod nofollow;
 mod package;
 pub mod package_capture;
 mod repository_package;
