@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T22:05:02.999505147Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f78babf6-d35a-4a25-bf65-f4891f7cdf9f",
   "labels": [
     "epic:test-suite-performance",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mirror prepared rollback failure points in memory recovery",
-  "updated_at": "2026-08-11T21:30:34.300349668Z"
+  "updated_at": "2026-08-11T22:05:02.999505147Z"
 }
