@@ -16,10 +16,11 @@
     "component:testing",
     "component:core",
     "milestone:v1.0",
-    "type:task"
+    "type:task",
+    "epic:v1-release"
   ],
   "priority": "high",
   "state": "ready",
   "title": "The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T12:38:27.983656428Z"
+  "updated_at": "2026-08-11T12:39:44.778074739Z"
 }
