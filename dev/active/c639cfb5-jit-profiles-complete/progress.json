@@ -1143,6 +1143,27 @@
       "subject": "Tier 2.5 sweep patterns missed the removed mechanism's own vocabulary",
       "detail": "Wave 11's stale-narrative sweep grepped for 'migration boundary|compatibility path|legacy record|five-field|pre-canonical' plus the residual symbol names, and passed. It missed 'authenticated v1 conversion' at profile_apply.rs:1836 and 'authenticated embedded' at commands/profile.rs:1139, both caught later by the container holistic review. The per-issue code-review gate also returned 0 findings on that tree. Lesson: sweep on the removed mechanism's domain vocabulary (convert, conversion, authenticate, v1, migrate) and not only on the phrases the lead expects to find.",
       "status": "process-note"
+    },
+    {
+      "subject": "whole-class sweep found a defect no reviewer had cited",
+      "detail": "Reworking F1 (directory-entry mode unchecked), the worker swept for siblings as instructed and found the archive metadata entry's mode was never checked at all - present since the first submission, cited by no reviewer. Both now reach one comparison, require_entry_mode (package_archive.rs:620), with three call sites: manifest-declared file modes, DIRECTORY_MODE, REGULAR_FILE_MODE. Evidence that demanding the class rather than the cited line finds defects the review process would not have surfaced.",
+      "status": "closed-in-15cc28c5"
+    },
+    {
+      "subject": "worker shell commands ran from the session cwd instead of its worktree",
+      "detail": "Several of the wave-12 worker's Bash calls in rework round 2 ran from /home/vkaskivuo/Projects/just-in-time rather than its worktree. Tool-based edits used absolute worktree paths and were unaffected. Lead verified independently: main's git status --porcelain is empty, no tracked source modified, leak check clean - no damage. One consequence was a false MCP failure: npm test from main tested main's curated-tools.json against the worktree-built binary, reporting undecided tools; re-run from the worktree passed 64+13. The worker discarded an unattributable cargo-ci run and re-ran rather than report it. Same cwd trap hit the lead three times this session (gate evaluated against main, install-jit resolving main's repo root, gate-status wrong tree).",
+      "status": "resolved-no-damage"
+    },
+    {
+      "subject": "worker and lead both run the full cargo-ci on the same commit",
+      "detail": "Each rework round pays cargo-ci twice: once by the worker to self-check before submitting, once by the lead as the authoritative gate. At 601-703 s per run that is ~12 minutes duplicated per round. From wave 13, dispatch prompts should ask the worker to run its own added tests plus clippy and fmt, and leave the single full cargo-ci to the lead's gate run.",
+      "status": "process-note"
+    },
+    {
+      "subject": "the limits CLI round trip costs ~33 s, over the whole 30 s suite budget",
+      "detail": "test_profile_pack_and_add_carry_a_package_at_the_model_limits publishes 512 files totalling 4 MiB through the repository transaction and measures ~33 s alone, exceeding the standing budget 4b7c06d0 sets for the entire suite. Kept deliberately: it is the test that proves the pack->add round trip the bound defect broke, and it was added at lead instruction during rework. Not trimmed in 15cc28c5 because that would be a third rework round on a passing issue, which policy sends to escalation rather than dispatch. A concrete cheaper shape exists and belongs to 4b7c06d0: the bound that broke was the ENTRY count, not the byte payload, so the CLI test needs 512 files with small content to exercise both the entry count and the real publication path, while the unit test already proves the 4 MiB byte bound without publishing. That split should keep both properties at a fraction of the cost.",
+      "status": "open",
+      "owner": "4b7c06d0"
     }
   ],
   "scope_changes": [
