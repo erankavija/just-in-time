@@ -203,12 +203,9 @@ pub use profile_apply::{
     ProfileTargetConflictError, ProfileThreeWayConflictError, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
-    is_shipped_v1_candidate, migrate_shipped_v1_records, preflight_profile_contributions,
-    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
-    shipped_v1_migration_paths,
+    preflight_profile_contributions, profile_capture_closure, profile_contribution_overrides,
+    profile_contribution_target_paths,
 };
-#[cfg(test)]
-pub(crate) use profile_apply::{reset_shipped_v1_conversion_count, shipped_v1_conversion_count};
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
 };

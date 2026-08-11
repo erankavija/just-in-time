@@ -33,24 +33,6 @@ use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
 use toml_edit::{Array, ArrayOfTables, DocumentMut, InlineTable, Item, Table, Value};
 
-#[path = "shipped_v1_record.rs"]
-mod shipped_v1_record;
-
-pub(crate) use shipped_v1_record::{
-    is_shipped_v1_candidate, migrate_shipped_v1_record, shipped_v1_migration_paths,
-    ShippedV1MigrationError,
-};
-
-#[cfg(test)]
-pub(crate) fn reset_shipped_v1_conversion_count() {
-    shipped_v1_record::reset_exact_conversion_count();
-}
-
-#[cfg(test)]
-pub(crate) fn shipped_v1_conversion_count() -> usize {
-    shipped_v1_record::exact_conversion_count()
-}
-
 /// A semantic contribution to one JIT registry.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
@@ -708,8 +690,7 @@ impl Contribution {
 }
 
 /// The sole installed-profile provenance wire version accepted by ordinary
-/// readers. The five-field shipped v1 image is intentionally *not* accepted by
-/// this type; it is decoded only by the dedicated one-way migration boundary.
+/// readers.
 pub const APPLIED_PROFILE_RECORD_VERSION: u8 = 2;
 
 /// A domain-separated SHA-256 fingerprint of one profile-owned base value.
@@ -1089,9 +1070,6 @@ pub struct ProfileApplicationInput {
     /// retain the same complete owner set without making unrelated package
     /// declarations part of this package's materialization.
     pub(crate) contribution_context: Vec<ProfileContributionClaim>,
-    /// Exact current-format rewrites produced by the sole shipped-v1 boundary.
-    /// They are provenance-only and are written with this application delta.
-    pub(crate) shipped_v1_migrations: BTreeMap<VirtualPath, AppliedProfileRecord>,
     pub record_path: VirtualPath,
 }
 
@@ -1112,15 +1090,6 @@ impl ProfileApplicationInput {
             .filter(|claim| identities.contains(&claim.contribution.semantic_identity()))
             .cloned()
             .collect();
-        self
-    }
-
-    /// Attach authenticated shipped-v1 rewrites to this mutating operation.
-    pub(crate) fn with_shipped_v1_migrations(
-        mut self,
-        migrations: BTreeMap<VirtualPath, AppliedProfileRecord>,
-    ) -> Self {
-        self.shipped_v1_migrations = migrations;
         self
     }
 
@@ -1223,12 +1192,11 @@ pub(crate) fn profile_capture_closure(
     {
         return Ok(required_paths);
     }
-    let composition_base = profile_composition_base(base, profile)?;
-    let composed = compose_profile_contributions(&composition_base, &profile.contribution_context)?;
+    let composed = compose_profile_contributions(base, &profile.contribution_context)?;
     let composed = owned_composed_contributions(composed, &profile.claims.package_id);
-    let registries = render_composed_contributions(&composition_base, &composed)?;
+    let registries = render_composed_contributions(base, &composed)?;
     let proposed = apply_overlay(
-        &composition_base,
+        base,
         registries
             .into_iter()
             .map(|(path, (bytes, _))| (path, Some(bytes))),
@@ -1248,65 +1216,6 @@ pub(crate) fn profile_capture_closure(
         rules.as_deref(),
     )?);
     Ok(closure.into_iter().collect())
-}
-
-pub(super) fn profile_composition_base(
-    base: &RepositoryImage,
-    profile: &ProfileApplicationInput,
-) -> Result<RepositoryImage, RepositoryStateError> {
-    profile_composition_base_from_migrations(base, &profile.shipped_v1_migrations)
-}
-
-fn profile_composition_base_from_migrations(
-    base: &RepositoryImage,
-    migrations: &BTreeMap<VirtualPath, AppliedProfileRecord>,
-) -> Result<RepositoryImage, RepositoryStateError> {
-    Ok(apply_overlay(
-        base,
-        migrations
-            .iter()
-            .map(|(path, record)| {
-                record
-                    .to_bytes()
-                    .map(|bytes| (path.clone(), Some(bytes)))
-                    .map_err(|error| ProducerError::ProfileRecordParse {
-                        path: path.repository_relative(),
-                        source: error,
-                    })
-            })
-            .collect::<Result<Vec<_>, _>>()?,
-    )?)
-}
-
-/// Find records that only the named mutating shipped-v1 boundary may convert.
-/// Current records are deliberately decoded first; a malformed current record
-/// reaches the v1 decoder only while a lifecycle operation is already building
-/// one recoverable materialization transaction.
-pub(crate) fn migrate_shipped_v1_records(
-    base: &RepositoryImage,
-) -> Result<BTreeMap<VirtualPath, AppliedProfileRecord>, ShippedV1MigrationError> {
-    applied_profile_record_paths(base)
-        .map_err(|error| ShippedV1MigrationError::InvalidEvidence(error.to_string()))?
-        .into_iter()
-        .filter_map(|path| match base.entry(&path) {
-            Ok(RepositoryEntry::File { bytes, .. }) if is_shipped_v1_candidate(bytes) => {
-                Some(migrate_shipped_v1_record(bytes, base).and_then(|record| {
-                    let expected = VirtualPath::data(format!("profiles/{}.json", record.id))
-                        .map_err(|error| {
-                            ShippedV1MigrationError::InvalidEvidence(error.to_string())
-                        })?;
-                    (path == expected)
-                        .then_some((path.clone(), record.clone()))
-                        .ok_or_else(|| ShippedV1MigrationError::RecordPathMismatch {
-                            path: path.repository_relative(),
-                            id: record.id.to_string(),
-                            expected: expected.repository_relative(),
-                        })
-                }))
-            }
-            _ => None,
-        })
-        .collect()
 }
 
 /// Target bytes and semantic owner evidence derived by profile composition.
@@ -2920,7 +2829,6 @@ mod tests {
             origin: ProfileOrigin::Embedded,
             claims,
             contribution_context: Vec::new(),
-            shipped_v1_migrations: BTreeMap::new(),
             record_path: VirtualPath::data("profiles/example.json").expect("record path"),
         };
         let composition = ProfileTargetComposition {
@@ -3272,7 +3180,6 @@ mod tests {
             ),
             claims,
             contribution_context: Vec::new(),
-            shipped_v1_migrations: BTreeMap::new(),
             record_path: VirtualPath::data("profiles/workflow-package.json")
                 .expect("canonical record path"),
         };

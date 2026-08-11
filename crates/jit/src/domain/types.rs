@@ -1109,9 +1109,9 @@ pub enum GateRunStatus {
 pub enum ProfileOrigin {
     /// Package bytes were compiled into the historical JIT binary.
     ///
-    /// This provenance-only variant is retained solely for the authenticated
-    /// shipped-v1 applied-record conversion. Current package discovery never
-    /// resolves it and configured behavior is never read from a record.
+    /// This provenance-only variant identifies a package source that is not
+    /// available for current package discovery. Configured behavior is never
+    /// read from a record.
     Embedded,
     /// Package bytes were read from this worktree-relative directory.
     Directory(RootRelativePath),
@@ -1121,8 +1121,8 @@ pub enum ProfileOrigin {
 ///
 /// The enum includes the post-apply operations so the event contract is stable
 /// before those command surfaces consume it. An audit record still names the
-/// operation that actually encountered the repository; record conversion is
-/// never represented as a standalone operation.
+/// operation that actually encountered the repository; it is never represented
+/// as a standalone operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileLifecycleOperation {
@@ -1484,8 +1484,7 @@ pub enum Event {
     ///
     /// One record summarizes the requested operation and every profile in the
     /// dependency-first aggregate. It carries variable provenance only, never
-    /// resolved values or rendered bytes. Shipped-format record conversion is
-    /// represented by `converted_records` on this operation's event.
+    /// resolved values or rendered bytes.
     ProfileLifecycle {
         /// Event ID.
         id: String,
@@ -1495,9 +1494,6 @@ pub enum Event {
         operation: ProfileLifecycleOperation,
         /// Per-profile outcomes in stable aggregate order.
         profiles: Vec<ProfileLifecycleProfile>,
-        /// Canonical profile ids whose shipped-format records were converted
-        /// while this operation was being planned.
-        converted_records: Vec<crate::profile::ProfileId>,
         /// Whether the transaction isolated a pre-existing non-newline,
         /// malformed event tail immediately before this record.
         isolated_torn_tail: bool,
@@ -1814,14 +1810,12 @@ impl Event {
     pub fn draft_profile_lifecycle(
         operation: ProfileLifecycleOperation,
         profiles: Vec<ProfileLifecycleProfile>,
-        converted_records: Vec<crate::profile::ProfileId>,
     ) -> Self {
         Event::ProfileLifecycle {
             id: String::new(),
             timestamp: DateTime::UNIX_EPOCH,
             operation,
             profiles,
-            converted_records,
             isolated_torn_tail: false,
         }
     }
