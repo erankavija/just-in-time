@@ -1209,8 +1209,8 @@ fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package
     // resolved from the directory named after it beside the package declaring
     // it — the shape an obtained set of packages arrives in.
     let dependency = "vendor/jit-default";
-    jit::test_utils::assemble_repository_package("jit-default", &repo.path().join(dependency))
-        .expect("this repository's jit-default package assembles");
+    jit::test_utils::capture_repository_package("jit-default", &repo.path().join(dependency))
+        .expect("this repository's jit-default package captures");
 
     let init = jit(
         repo.path(),
@@ -1988,4 +1988,122 @@ fn test_profile_reconfigure_exits_non_zero_and_publishes_nothing_on_a_conflict()
         fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
         record_before
     );
+}
+
+/// A package directory whose live assets are absent from it and present in the
+/// repository, so a captured live asset's bytes can only have come from the
+/// repository file its declaration targets.
+fn capture_sources(repo: &Path, location: &str) -> String {
+    let root = repo.join(location);
+    fs::create_dir_all(root.join("assets/install")).unwrap();
+    fs::write(
+        root.join("manifest.toml"),
+        "[profile]\nmanifest-version = 1\nid = \"captured\"\nversion = \"1.0.0\"\njit = \">=0.2.0, <2.0.0\"\n\n[[live-source]]\nroot = \"docs\"\nexclude = []\n\n[[asset]]\nsource = \"assets/live/docs/guide.md\"\ntarget = \"docs/guide.md\"\n\n[[asset]]\nsource = \"assets/install/settings.toml\"\ntarget = \"settings.toml\"\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("assets/install/settings.toml"),
+        "installed = true\n",
+    )
+    .unwrap();
+    fs::create_dir_all(repo.join("docs")).unwrap();
+    fs::write(repo.join("docs/guide.md"), "# Captured guide\n").unwrap();
+    location.to_string()
+}
+
+/// `profile capture` publishes the declared tree at the destination its
+/// arguments name and reports it through the list envelope.
+#[test]
+fn test_profile_capture_publishes_the_declared_tree_and_reports_the_list_envelope() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    capture_sources(repo.path(), "packages/captured");
+
+    let output = jit(
+        repo.path(),
+        &[
+            "profile",
+            "capture",
+            "--source",
+            "packages/captured",
+            "--destination",
+            "build/captured",
+            "--json",
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = json(&output);
+    assert_eq!(payload["id"], "captured");
+    assert_eq!(payload["destination"], "build/captured");
+    assert_eq!(payload["source"], "packages/captured");
+    let files = payload["files"]
+        .as_array()
+        .expect("a capture reports one entry per decided path");
+    assert_eq!(payload["count"], files.len());
+    assert_eq!(
+        files
+            .iter()
+            .map(|file| file["path"].as_str().expect("each entry names its path"))
+            .collect::<Vec<_>>(),
+        vec![
+            "build/captured/assets/install/settings.toml",
+            "build/captured/assets/live/docs/guide.md",
+            "build/captured/manifest.toml",
+        ]
+    );
+    assert_eq!(
+        fs::read_to_string(repo.path().join("build/captured/assets/live/docs/guide.md")).unwrap(),
+        "# Captured guide\n",
+        "the published live asset did not carry the repository file's bytes"
+    );
+
+    // The published tree is a package this repository can go on to apply.
+    let applied = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            "path:build/captured",
+            "--json",
+        ],
+    );
+    assert!(applied.status.success(), "{applied:?}");
+    assert_eq!(applied_ids(&json(&applied)), vec!["captured"]);
+}
+
+/// A destination outside the repository worktree is a typed JSON failure that
+/// publishes nothing.
+#[test]
+fn test_profile_capture_refuses_a_destination_outside_the_worktree_without_publishing() {
+    let repo = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    capture_sources(repo.path(), "packages/captured");
+    let destination = outside.path().join("captured");
+
+    let output = jit(
+        repo.path(),
+        &[
+            "profile",
+            "capture",
+            "--source",
+            "packages/captured",
+            "--destination",
+            destination.to_str().unwrap(),
+            "--json",
+        ],
+    );
+
+    assert!(!output.status.success(), "{output:?}");
+    let payload = json(&output);
+    assert!(
+        payload["error"]["message"]
+            .as_str()
+            .expect("a typed failure carries an error message")
+            .contains("worktree"),
+        "{payload}"
+    );
+    assert!(!destination.exists(), "a refused capture published a tree");
 }

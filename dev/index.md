@@ -109,7 +109,7 @@ them.
 
 ---
 
-## Assembling the Workflow Package
+## Capturing the Workflow Package
 
 This repository's workflow package is a directory: a manifest, the assets it
 declares, and a managed-region source. Most of those assets name a repository
@@ -117,28 +117,25 @@ file as their target and carry that file's bytes, so the repository file is the
 authority and the tree is produced from it:
 
 ```bash
-./scripts/assemble-package.sh target/package/jit-dogfood
+jit profile capture --source profiles/jit-dogfood --destination target/package/jit-dogfood
 ```
 
-The entry point takes the destination and draws each declared source from the
-side that owns it — a live asset from the repository file its declaration
-targets, everything else from the checked-in sources under
-[profiles/jit-dogfood](../profiles/jit-dogfood). Each run publishes a freshly
-staged tree, so a source the manifest stops declaring is absent from the next
-one. It exits 0 when the tree is assembled at the destination, 1 when the
-assembly or the publication failed, and 2 on a usage or environment error.
+Capture is the product command an adopter runs the same way, documented in
+[the CLI reference](../docs/reference/cli-commands.md#jit-profile-capture); this
+repository has no entry point of its own over it. It draws each declared source
+from the side that owns it — a live asset from the repository file its
+declaration targets, everything else from the checked-in sources under
+[profiles/jit-dogfood](../profiles/jit-dogfood) — and republishes the whole
+tree, so a source the manifest stops declaring is absent from the next run.
 
-It is not one of the artifacts above: what it writes is not committed, so it
+The captured tree is not one of the artifacts above: it is not committed, so it
 carries no drift assertion. The destination is whichever path the caller names —
-the example above names one under `target/`, which this repository ignores — and
-a run replaces it whole. No build consumes what a run produces; the run reads its
-own result back to validate it, which is a check rather than a dependency, so
-assembling during a build would make every build do work no build consumes, and
-the directory watching a build step needs is what once relinked every test
-target on an unchanged rebuild. The render lives in
-[crates/jit/src/profile/package_assembly.rs](../crates/jit/src/profile/package_assembly.rs)
-and reads the manifest through the crate's own package model, which leaves the
-manifest one reader.
+the example above names one under `target/`, which this repository ignores. No
+build consumes what a run produces, so capturing during a build would make every
+build do work no build consumes, and the directory watching a build step needs
+is what once relinked every test target on an unchanged rebuild. The release
+workflow captures the package with the binary it ships, so the packaged tree is
+the one the released commit declares.
 
 ---
 

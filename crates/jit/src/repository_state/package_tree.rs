@@ -219,7 +219,12 @@ impl PackageTreeCapture {
     fn tree_path(&self, relative: &RootRelativePath) -> Result<VirtualPath, RepositoryLayoutError> {
         VirtualPath::from_root(
             self.destination.root_class(),
-            RootRelativePath::parse(self.destination.relative().as_path().join(relative.as_path()))?,
+            RootRelativePath::parse(
+                self.destination
+                    .relative()
+                    .as_path()
+                    .join(relative.as_path()),
+            )?,
         )
     }
 }

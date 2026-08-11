@@ -15,9 +15,10 @@ use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
     finalize_package_tree_capture, AppliedProfileRecord, CaptureBudget, CaptureSpec,
     CapturedTreeFile, FileMode, MaterializationPlan, MaterializationRequest, MutationContext,
-    PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim, ProfileTargetDisposition,
-    RepositoryEntry, RepositoryExportDestination, RepositoryImage, RepositoryLayout,
-    RepositoryLayoutError, RepositoryRootClass, RootRelativePath, TreeFileDisposition, VirtualPath,
+    PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim,
+    ProfileTargetDisposition, RepositoryEntry, RepositoryExportDestination, RepositoryImage,
+    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RootRelativePath,
+    TreeFileDisposition, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -3432,11 +3433,11 @@ placement = "append"
             .retain(|key, _| matches!(key, "version" | "project"));
         fs::write(&config_path, bare.to_string()).unwrap();
 
-        crate::test_utils::assemble_repository_package(
+        crate::test_utils::capture_repository_package(
             "jit-default",
             &temp.path().join("vendor/jit-default"),
         )
-        .expect("this repository's jit-default package assembles");
+        .expect("this repository's jit-default package captures");
         let workflow = package_declaring(&temp, "vendor/workflow", "workflow", &["jit-default"]);
         let applied = executor.apply_profile_package(&workflow).unwrap();
 
@@ -3797,8 +3798,8 @@ placement = "append"
     /// `worktree`, which is where a package has to sit to be applied to the
     /// repository rooted there.
     fn shipped_package_in(worktree: &Path, id: &str) -> ProfilePackage {
-        crate::test_utils::assemble_repository_package(id, &worktree.join("profiles").join(id))
-            .expect("this repository's package assembles")
+        crate::test_utils::capture_repository_package(id, &worktree.join("profiles").join(id))
+            .expect("this repository's package captures")
     }
 
     /// The project name every repository built by
@@ -6978,7 +6979,11 @@ target = "docs/guide.md"
 
         let reduced = CAPTURE_MANIFEST.replace(CAPTURE_DROPPED_ASSET, "\n");
         assert_ne!(reduced, CAPTURE_MANIFEST);
-        fs::write(temp.path().join("profiles/captured/manifest.toml"), &reduced).unwrap();
+        fs::write(
+            temp.path().join("profiles/captured/manifest.toml"),
+            &reduced,
+        )
+        .unwrap();
         let result = executor
             .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
             .expect("the reduced package captures over the previous tree");
@@ -7106,13 +7111,12 @@ target = "docs/guide.md"
         capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
         let outside = TempDir::new().unwrap();
 
-        for destination in [outside.path().join("captured"), temp.path().join(".jit/captured")] {
+        for destination in [
+            outside.path().join("captured"),
+            temp.path().join(".jit/captured"),
+        ] {
             let error = executor
-                .capture_profile_package(
-                    temp.path(),
-                    Path::new("profiles/captured"),
-                    &destination,
-                )
+                .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
                 .expect_err("a destination that is not worktree content is refused");
 
             assert!(

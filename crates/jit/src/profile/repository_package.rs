@@ -1794,12 +1794,12 @@ mod tests {
         // application records the package's worktree-relative location, and
         // beside the package it declares a dependency on, which is where that
         // dependency is looked for.
-        crate::test_utils::assemble_repository_package(
+        crate::test_utils::capture_repository_package(
             "jit-default",
             &temp.path().join("profiles/jit-default"),
         )
         .unwrap();
-        let package = crate::test_utils::assemble_repository_package(
+        let package = crate::test_utils::capture_repository_package(
             PACKAGE_ID,
             &temp.path().join("profiles").join(PACKAGE_ID),
         )

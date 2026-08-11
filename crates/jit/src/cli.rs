@@ -3690,6 +3690,7 @@ mod recovery_dispatch_tests {
         "list",
         "migrate lifecycle-timestamps",
         "profile apply",
+        "profile capture",
         "profile list",
         "profile reconfigure",
         "profile show",

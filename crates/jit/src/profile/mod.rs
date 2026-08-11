@@ -9,11 +9,11 @@ mod apply_claims;
 mod graph;
 mod manifest;
 mod package;
+pub mod package_capture;
 mod repository_package;
 mod three_way;
 mod variables;
 mod wire;
-pub mod package_capture;
 // Repository-local check seam: this checkout's packaged contributions bound to
 // the registry entries they restate, plus the report shape that and the
 // template-region drift assertion share. Neither has a production caller, and
@@ -37,11 +37,10 @@ pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
 pub(crate) use application::SelectionObservation;
 pub use application::{
-    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
-    ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
-    ProfileListResult, ProfilePlanEntry, ProfilePlanResult,
-    ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileCaptureAction,
+    ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult, ProfileListResult,
+    ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult,
+    ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,

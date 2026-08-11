@@ -2559,10 +2559,7 @@ fn run() -> Result<()> {
                                 result.id, result.version, result.destination
                             );
                             println!("Package hash: {}", result.package_hash);
-                            println!(
-                                "Files: {} ({} bytes)",
-                                result.file_count, result.byte_size
-                            );
+                            println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
                             for file in &result.files {
                                 println!(
                                     "  {} {}",

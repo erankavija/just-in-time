@@ -801,7 +801,19 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         .contains("recoverable multi-target transaction"));
     assert_eq!(
         commands.keys().cloned().collect::<BTreeSet<_>>(),
-        expected_keys(&["apply", "list", "reconfigure", "show", "upgrade"])
+        expected_keys(&["apply", "capture", "list", "reconfigure", "show", "upgrade"])
+    );
+    // Capture authors a package rather than selecting an applied one, so it
+    // takes the two directories it works between instead of the selector
+    // stream and value channels the lifecycle commands share.
+    assert_eq!(
+        commands["capture"]["flags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|flag| flag["name"].as_str().unwrap().to_string())
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&["destination", "json", "source"])
     );
     // The three commands that change what a profile publishes take one input
     // surface: an ordered selector stream, the same value channels, and the

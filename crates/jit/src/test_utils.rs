@@ -162,7 +162,7 @@ fn repository_checkout() -> PathBuf {
 /// or resolves outside the worktree, a manifest that does not parse, and
 /// content that does not validate as a package — plus the filesystem failures
 /// of writing the tree and reading it back.
-pub fn assemble_repository_package(id: &str, destination: &Path) -> Result<ProfilePackage> {
+pub fn capture_repository_package(id: &str, destination: &Path) -> Result<ProfilePackage> {
     let checkout = repository_checkout();
     let layout = discover_repository_layout(&checkout, checkout.join(".jit"))?;
     let source = VirtualPath::worktree(Path::new(PROFILE_PACKAGE_SOURCES).join(id))?;
@@ -243,13 +243,13 @@ pub fn published_package_ids() -> Vec<String> {
 /// restating the dependency graph (`@/invariant/shared-test-contracts`).
 ///
 /// Panics when the checkout's package sources cannot be listed or a package
-/// does not assemble, which is a defect in the checkout rather than a condition
+/// does not capture, which is a defect in the checkout rather than a condition
 /// a test distinguishes.
 pub fn stage_repository_packages(worktree: &Path, id: &str) -> PathBuf {
     let staged = worktree.join(PROFILE_PACKAGE_SOURCES);
     published_package_ids().into_iter().for_each(|package| {
-        assemble_repository_package(&package, &staged.join(&package)).unwrap_or_else(|error| {
-            panic!("this repository's {package} package assembles: {error}")
+        capture_repository_package(&package, &staged.join(&package)).unwrap_or_else(|error| {
+            panic!("this repository's {package} package captures: {error}")
         });
     });
     let location = staged.join(id);
@@ -260,22 +260,22 @@ pub fn stage_repository_packages(worktree: &Path, id: &str) -> PathBuf {
     location
 }
 
-/// This repository's profile package `id` assembled into a temporary
+/// This repository's profile package `id` captured into a temporary
 /// destination, answered with the directory that owns it.
 ///
-/// The fixture over [`assemble_repository_package`] for a caller that reads a
+/// The fixture over [`capture_repository_package`] for a caller that reads a
 /// package's declarations and has no repository to publish it into. The
 /// returned directory holds the published tree, so the package's recorded
 /// source stays readable for as long as the caller keeps it; a caller that
 /// applies the package names its own destination and calls the entry point
 /// directly.
 ///
-/// Panics when the package does not assemble, which is a defect in the checkout
+/// Panics when the package does not capture, which is a defect in the checkout
 /// rather than a condition a test distinguishes.
 pub fn temporary_repository_package(id: &str) -> (TempDir, ProfilePackage) {
     let workspace = TempDir::new().expect("create a package destination");
-    let package = assemble_repository_package(id, &workspace.path().join(id))
-        .unwrap_or_else(|error| panic!("this repository's {id} package assembles: {error}"));
+    let package = capture_repository_package(id, &workspace.path().join(id))
+        .unwrap_or_else(|error| panic!("this repository's {id} package captures: {error}"));
     (workspace, package)
 }
 
@@ -405,13 +405,23 @@ mod tests {
     use super::*;
     use crate::storage::IssueStore;
 
-    /// One package source directory this repository ships, which is all a
-    /// property about the fixture itself needs to name.
-    fn shipped_package_id() -> String {
+    /// The shipped package that carries more than a manifest, which is the one
+    /// whose capture actually draws content out of the checkout.
+    ///
+    /// Derived rather than named: a package this repository stops shipping, or
+    /// one that stops declaring sources, moves the answer instead of leaving a
+    /// literal here that no longer points at a package with content.
+    fn package_carrying_drawn_content() -> String {
+        let workspace = TempDir::new().expect("a package destination");
         published_package_ids()
             .into_iter()
-            .next()
-            .expect("this repository publishes a profile package")
+            .find(|id| {
+                capture_repository_package(id, &workspace.path().join(id))
+                    .unwrap_or_else(|error| panic!("{id} does not capture: {error}"))
+                    .file_count()
+                    > 1
+            })
+            .expect("a shipped package carries more than a manifest")
     }
 
     #[test]
@@ -436,7 +446,7 @@ mod tests {
     /// directory is named after, which is what makes an id a sufficient way to
     /// name one.
     #[test]
-    fn test_assemble_repository_package_answers_the_shipped_package_its_id_names() {
+    fn test_capture_repository_package_answers_the_shipped_package_its_id_names() {
         let shipped = published_package_ids();
         assert!(
             shipped.len() > 1,
@@ -448,8 +458,8 @@ mod tests {
         let misnamed: Vec<(String, String)> = shipped
             .iter()
             .map(|id| {
-                let package = assemble_repository_package(id, &workspace.path().join(id))
-                    .unwrap_or_else(|error| panic!("{id} does not assemble: {error}"));
+                let package = capture_repository_package(id, &workspace.path().join(id))
+                    .unwrap_or_else(|error| panic!("{id} does not capture: {error}"));
                 (id.clone(), package.model().id.to_string())
             })
             .filter(|(directory, declared)| directory != declared)
@@ -470,7 +480,7 @@ mod tests {
     /// call, so a relative path anywhere in the resolution would find nothing,
     /// and restored before anything is asserted.
     #[test]
-    fn test_assemble_repository_package_resolves_the_checkout_independently_of_the_working_directory(
+    fn test_capture_repository_package_resolves_the_checkout_independently_of_the_working_directory(
     ) {
         let checkout = repository_checkout();
         assert!(
@@ -481,18 +491,19 @@ mod tests {
 
         let elsewhere = TempDir::new().unwrap();
         let workspace = TempDir::new().unwrap();
+        let id = package_carrying_drawn_content();
         let destination = workspace.path().join("package");
-        let id = shipped_package_id();
-        let assembled = {
+        let captured = {
             let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
-            assemble_repository_package(&id, &destination)
+            capture_repository_package(&id, &destination)
         };
 
-        let package = assembled.expect("the package captures from an unrelated working directory");
+        let package = captured.expect("the package captures from an unrelated working directory");
         assert_eq!(package.model().id.as_str(), id);
         assert!(
             package.file_count() > 1,
-            "the captured package carries more than a manifest"
+            "the captured package carries only a manifest, so a capture that \
+             read nothing from the checkout would pass this"
         );
     }
 
@@ -503,13 +514,13 @@ mod tests {
     /// the manifest does not describe, which is what reading the destination
     /// back as a package catches.
     #[test]
-    fn test_assemble_repository_package_republishes_over_its_own_previous_destination() {
+    fn test_capture_repository_package_republishes_over_its_own_previous_destination() {
         let workspace = TempDir::new().unwrap();
         let destination = workspace.path().join("package");
-        let id = shipped_package_id();
+        let id = package_carrying_drawn_content();
 
-        let first = assemble_repository_package(&id, &destination).unwrap();
-        let second = assemble_repository_package(&id, &destination).unwrap();
+        let first = capture_repository_package(&id, &destination).unwrap();
+        let second = capture_repository_package(&id, &destination).unwrap();
 
         assert_eq!(second.hashes(), first.hashes());
         let reread = ProfilePackage::from_directory(&destination)

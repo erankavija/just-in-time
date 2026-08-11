@@ -46,8 +46,8 @@ fn jit_binary() -> &'static str {
 fn setup_test_repo() -> TempDir {
     let temp = TempDir::new().unwrap();
     let location = "packages/jit-default";
-    jit::test_utils::assemble_repository_package("jit-default", &temp.path().join(location))
-        .expect("this repository's default package assembles");
+    jit::test_utils::capture_repository_package("jit-default", &temp.path().join(location))
+        .expect("this repository's default package captures");
     let output = Command::new(jit_binary())
         .args(["init", "--profile", &format!("path:{location}")])
         .current_dir(temp.path())

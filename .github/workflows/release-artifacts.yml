@@ -120,9 +120,14 @@ jobs:
             --bin jit --bin jit-server
 
       # The binaries and license texts land at the extraction root. The
-      # assembled workflow package and the checked-in default package travel
+      # captured workflow package and the checked-in default package travel
       # under the same package directory so the extracted archive is sufficient
       # for offline profile application.
+      #
+      # The package tree is captured by the binary being shipped, running
+      # against this checkout: its live assets carry the bytes of the repository
+      # files their declarations target, so the shipped package is the one this
+      # commit declares.
       - name: Assemble the archive
         run: |
           mkdir -p stage dist
@@ -130,7 +135,9 @@ jobs:
           cp target/x86_64-unknown-linux-musl/release/jit-server stage/jit-server
           strip stage/jit stage/jit-server
           cp LICENSE-MIT LICENSE-APACHE stage/
-          scripts/assemble-package.sh stage/packages/jit-dogfood
+          stage/jit profile capture \
+            --source profiles/jit-dogfood \
+            --destination stage/packages/jit-dogfood
           # The default package has no live assets; its checked-in directory is
           # already complete and is copied unchanged into the staging tree.
           cp -R profiles/jit-default stage/packages/jit-default

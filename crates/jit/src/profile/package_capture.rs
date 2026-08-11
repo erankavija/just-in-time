@@ -315,20 +315,24 @@ fn source_path(
     layout: &RepositoryLayout,
 ) -> Result<VirtualPath, PackageCaptureError> {
     match &declared.authority {
-        SourceAuthority::Repository(target) => layout.classify_repository_relative(target).map_err(
-            |source| PackageCaptureError::UnaddressableTarget {
-                declared: declared.source.clone(),
-                target: target.clone(),
-                source,
-            },
-        ),
-        SourceAuthority::Package => package_relative(package_source, &declared.source).map_err(
-            |source| PackageCaptureError::UnaddressableTarget {
-                declared: declared.source.clone(),
-                target: declared.source.clone(),
-                source,
-            },
-        ),
+        SourceAuthority::Repository(target) => {
+            layout
+                .classify_repository_relative(target)
+                .map_err(|source| PackageCaptureError::UnaddressableTarget {
+                    declared: declared.source.clone(),
+                    target: target.clone(),
+                    source,
+                })
+        }
+        SourceAuthority::Package => {
+            package_relative(package_source, &declared.source).map_err(|source| {
+                PackageCaptureError::UnaddressableTarget {
+                    declared: declared.source.clone(),
+                    target: declared.source.clone(),
+                    source,
+                }
+            })
+        }
     }
 }
 
@@ -377,13 +381,14 @@ fn read_confined(
         path: path.repository_relative(),
         source,
     };
-    let physical = layout
-        .resolve(path)
-        .map_err(|source| PackageCaptureError::UnaddressableTarget {
-            declared: declared.to_string(),
-            target: path.repository_relative(),
-            source,
-        })?;
+    let physical =
+        layout
+            .resolve(path)
+            .map_err(|source| PackageCaptureError::UnaddressableTarget {
+                declared: declared.to_string(),
+                target: path.repository_relative(),
+                source,
+            })?;
     let parent = physical
         .parent()
         .ok_or_else(|| unreadable(std::io::Error::from(std::io::ErrorKind::NotFound)))?;
@@ -527,7 +532,11 @@ target = "docs/guide.md"
                 false,
             );
             write_file(&worktree.join("bin/check.sh"), b"#!/bin/sh\nexit 0\n", true);
-            write_file(&worktree.join("docs/guide.md"), b"# Synthetic guide\n", false);
+            write_file(
+                &worktree.join("docs/guide.md"),
+                b"# Synthetic guide\n",
+                false,
+            );
             let layout = discover_repository_layout(&worktree, worktree.join(".jit"))
                 .expect("a repository layout over the fixture");
             Self {
@@ -695,7 +704,9 @@ target = "docs/guide.md"
         fs::remove_file(&target).unwrap();
         std::os::unix::fs::symlink("real.md", &target).unwrap();
 
-        let error = fixture.capture().expect_err("a symlinked target is refused");
+        let error = fixture
+            .capture()
+            .expect_err("a symlinked target is refused");
 
         assert!(
             matches!(&error, PackageCaptureError::SymlinkedSource { declared, path }
@@ -751,7 +762,9 @@ target = "docs/guide.md"
         let live = Fixture::new(SYNTHETIC_MANIFEST);
         fs::remove_file(live.worktree.join("docs/guide.md")).unwrap();
 
-        let error = live.capture().expect_err("an absent live source is refused");
+        let error = live
+            .capture()
+            .expect_err("an absent live source is refused");
 
         assert!(
             matches!(&error, PackageCaptureError::UnreadableSource { declared, path, .. }
