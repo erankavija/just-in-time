@@ -54,7 +54,23 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "traps": [
+    "`cargo nextest show-config default-config` does not exist in cargo-nextest 0.9.133; the only `show-config` subcommands are `version` and `test-groups`. To verify one of nextest's own defaults for the pinned version, grep the installed binary — `strings -n 6 $(which cargo-nextest) | grep leak-timeout` prints the embedded default-config values (confirmed `leak-timeout = \"200ms\"`). Do not take a default value on trust from documentation for another version.",
+    "`scripts/cargo-ci.sh` runs `incremental-preflight` (scripts/cargo-ci.sh:305) BEFORE paying for any compilation, and it fails when a non-empty `incremental` directory exists anywhere under the worktree's `target/`. cargo-ci sets `CARGO_INCREMENTAL=0` for its own steps, but any ad-hoc `cargo build`/`cargo test`/`cargo clippy` run in the worktree beforehand leaves `target/debug/incremental` behind and the gate then fails for that reason alone, with nothing wrong in the change. Remedy before every gate run in a worktree: `rm -rf target/debug/incremental`, or export `CARGO_INCREMENTAL=0` for any ad-hoc cargo invocation.",
+    "`scripts/cargo-ci.sh` takes a MACHINE-GLOBAL flock at `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock` and holds it for the whole run (scripts/cargo-ci.sh:64-68), waiting up to `CARGO_CI_LOCK_TIMEOUT` (default 1800s) and exiting 75 on timeout. Gate runs across different worktrees therefore SERIALIZE: parallel waves parallelise authoring only, never gates. Do not launch more concurrent gate runs than can finish inside 1800s, or the queued ones fail on lock timeout rather than on their own content. The cheap pattern is to gate once on merged `main`, where `target/` is warm, and let `jit gate evaluate` reuse that verdict for every issue sharing the same content.",
+    "Two gate runs redirecting to the same log path clobber each other's evidence. Give every gate run its own log file name.",
+    "A backgrounded gate run SURVIVES stopping the agent that launched it, keeps the global cargo-ci flock, and blocks later runs while writing to its original log path. After stopping any agent, check for orphans holding the lock (`fuser -v /tmp/cargo-ci.lock`, then `readlink /proc/<pid>/cwd`) before launching a replacement."
+  ],
+  "created_during_execution": [
+    {
+      "short_id": "b1f2f001",
+      "type": "bug",
+      "title": "Stop pinning the live dogfood package identity hash to a literal",
+      "why": "`main` was already red at epic start, independent of this epic: `test_shipped_package_decodes_without_edits_and_preserves_identity_hash` pinned the LIVE dogfood profile package's identity hash to a literal, and the dogfood profile packages this repository's own config (including contrib/gates prompts) as assets, so an earlier prompt edit moved the hash. Every cargo-ci gate in all seven waves would have failed on it. The invoker judged the test wrong and the commit right. Fixed on main as d2c8693b by keeping the independent recomputation of the released v1 identity algorithm and dropping the literal; synthetic-fixture literals kept.",
+      "state_at_record": "in_progress"
+    }
+  ],
+  "delegation_model": "Hard tasks go to an Opus subagent via the Agent tool. Easier tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high` invoked DIRECTLY by the lead in the background; the lead then reviews the diff, runs the gate, and commits. Do not wrap a codex invocation in an intermediate Claude driver subagent — it adds no verification the lead does not already owe and costs a full agent's context.",
   "escalations": [],
   "rework_counts": {},
   "surfaced_pitfalls": [],
