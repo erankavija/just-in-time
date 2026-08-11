@@ -294,24 +294,30 @@ pub fn capture_package_tree(
     .chain(drawn.into_iter().map(|(source, (file, _))| (source, file)))
     .collect::<BTreeMap<_, _>>();
 
-    compose(files, observed_executable)
+    compose_captured_tree(files, observed_executable)
+        .map_err(PackageCaptureError::InvalidCapturedTree)
 }
 
 /// Validate composed package content and close it into a captured tree.
 ///
-/// `observed_executable` names the sources whose drawn bytes came from a file
+/// The single constructor of a [`CapturedPackageTree`], shared by both routes
+/// that compose one — drawing a tree from the repository files a manifest
+/// declares, and extracting one from a portable archive — so a tree that exists
+/// has passed the same package validation whichever route produced it
+/// (`@/inv/convention-convergence`).
+///
+/// `observed_executable` names the sources whose bytes came from a file
 /// carrying executable permission, which is what lets the shared package
 /// validation refuse one whose declaration did not.
-fn compose(
+pub(super) fn compose_captured_tree(
     files: BTreeMap<String, CapturedFile>,
     observed_executable: BTreeSet<String>,
-) -> Result<CapturedPackageTree, PackageCaptureError> {
+) -> Result<CapturedPackageTree, ProfilePackageError> {
     let bytes = files
         .iter()
         .map(|(source, file)| (source.clone(), file.bytes.clone()))
         .collect::<BTreeMap<_, _>>();
-    let (model, hashes) = ProfilePackage::validate_content(&bytes, &observed_executable)
-        .map_err(PackageCaptureError::InvalidCapturedTree)?;
+    let (model, hashes) = ProfilePackage::validate_content(&bytes, &observed_executable)?;
     Ok(CapturedPackageTree {
         model,
         hashes,

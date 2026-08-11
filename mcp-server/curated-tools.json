@@ -71,6 +71,8 @@
     "jit_migrate_lifecycle-timestamps": "One-shot backfill run once per repository upgrade.",
     "jit_version": "Build provenance; the host, not the agent, decides CLI compatibility.",
     "jit_snapshot_export": "Archival export for maintainers.",
+    "jit_profile_pack": "Writes a package archive to hand to someone outside this repository; distribution is a maintainer step, not work an agent drives here.",
+    "jit_profile_add": "Places a package obtained out of band into the worktree; which archive to trust is a human decision made before any agent connects.",
     "jit_worktree_info": "Worktree identity is host state the agent already has from its shell.",
     "jit_worktree_list": "Fleet-wide worktree inspection is a coordinating lead's view.",
     "jit_events_tail": "Event-log forensics; agents act on current state rather than history.",

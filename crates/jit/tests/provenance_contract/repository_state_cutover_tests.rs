@@ -3,11 +3,14 @@
 //! Publisher access itself is compiler-enforced rather than asserted here: the
 //! in-repository writers (`storage::atomic_write`) and the transaction kernel
 //! (`storage::file_transaction`) are `pub(in crate::storage)`, so `crate::commands`
-//! cannot name them and a regression fails the build. This file covers the two
-//! properties visibility cannot express — deleted modules/wrappers and canonical
-//! renderer ownership — plus the one residual publication channel visibility has
-//! no handle on (see
-//! [`test_cutover_command_modules_publish_no_raw_filesystem_writes`]).
+//! cannot name them and a regression fails the build. This file covers the
+//! properties visibility cannot express — deleted modules and wrappers,
+//! canonical renderer ownership, and the modules that must reach the filesystem
+//! only through a named discipline or not at all — because `std::fs` is public
+//! to every crate and no `pub(in ...)` restriction reaches it. Each such test
+//! carries a guard asserting the mechanism it is about is still present, so an
+//! absent call shape can only mean the discipline held rather than that the
+//! code it was about moved away.
 
 use std::path::{Path, PathBuf};
 
@@ -220,4 +223,87 @@ fn test_profile_package_reads_build_no_follow_options_in_one_place() {
         vec![PathBuf::from("nofollow.rs")],
         "each entry names a profile module building its own no-follow open"
     );
+}
+
+/// Reading a package archive touches nothing outside the caller's memory.
+///
+/// This is what makes "a refused or interrupted add leaves no partially
+/// extracted package" true by construction rather than by cleanup: extraction
+/// produces a value, and the only thing that reaches the filesystem is the
+/// recoverable transaction the command layer publishes the finished tree
+/// through. A module that opened a staging directory would have to unwind it on
+/// every refusal path, and the one path that forgot would be the one that
+/// leaked. It is also what makes the read local: no network client, no
+/// subprocess, and no environment lookup can be reached from a module that
+/// names none of them.
+///
+/// The property is structural because the alternative is to interrupt a real
+/// extraction at each of its refusal points and inspect the filesystem after
+/// each one, which tests the points someone remembered to enumerate rather than
+/// the absence of the capability.
+#[test]
+fn test_package_archive_read_reaches_no_filesystem_network_or_process() {
+    let archive = production_source(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src/profile/package_archive.rs"),
+    );
+    for capability in [
+        "fs::",
+        "File::",
+        "std::net",
+        "ureq",
+        "reqwest",
+        "Command::",
+        "env::",
+        "tempfile",
+    ] {
+        assert!(
+            !archive.contains(capability),
+            "the package archive module reached for {capability}"
+        );
+    }
+    for entry_point in [
+        "pub fn pack_package_archive(",
+        "pub fn read_package_archive(",
+    ] {
+        assert!(
+            archive.contains(entry_point),
+            "{entry_point} no longer lives here, so the absence of the capabilities above \
+             establishes nothing"
+        );
+    }
+}
+
+/// A package tree reaches the worktree through one publication.
+///
+/// Capturing a tree from the repository files a manifest declares and adding
+/// one from a portable archive differ in where the bytes came from, not in how
+/// they land: both derive one plan against one captured image and publish it
+/// through the shared recoverable transaction. A second publication route is
+/// where the no-replace guarantee, the whole-tree delta, or the retry on a
+/// concurrent change goes missing for one of them
+/// (`@/inv/convention-convergence`).
+#[test]
+fn test_package_tree_publication_has_one_owner_in_the_command_layer() {
+    let profile =
+        production_source(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src/commands/profile.rs"));
+    assert_eq!(
+        profile.matches("finalize_package_tree_capture(").count(),
+        1,
+        "a package tree is finalized in more than one place in the profile commands"
+    );
+    assert_eq!(
+        profile.matches("PackageTreeCapture::new(").count(),
+        1,
+        "a package tree publication is declared in more than one place in the profile commands"
+    );
+    for caller in [
+        "TreePlacement::Republish",
+        "TreePlacement::RequireAbsent",
+        "fn publish_package_tree(",
+    ] {
+        assert!(
+            profile.contains(caller),
+            "{caller} is absent, so the counts above are not about the two publications"
+        );
+    }
 }

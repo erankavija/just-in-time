@@ -331,9 +331,120 @@
     "44ec7192": 0,
     "9f493686": 2,
     "7156f64b": 5,
-    "6a479c58": 1
+    "6a479c58": 1,
+    "15cc28c5": 2
   },
   "review_verdicts": [
+    {
+      "issue": "15cc28c5",
+      "round": 2,
+      "verdict": "FAIL",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed at bc956d3a (4545 tests, targets 11/12, 703s)",
+        "mcp-ci": "passed (3s)",
+        "security-review": "passed (precheck attestation)",
+        "code-review": "failed, 1 blocking + 1 advisory"
+      },
+      "finding": "F1 blocking high: package_archive.rs:515 admits a directory entry at any mode, and a test asserts a 0700 directory is accepted. Cites @/issue/15cc28c5/requirement/REQ-03 ('an archive entry with an unexpected mode is refused') and the linked threat model.",
+      "lead_error": "The worker disclosed this change proactively and the lead reviewed it and judged REQ-03 still met, reasoning that a directory entry has no declared mode to be unexpected against and no directory mode is ever published. The reviewer's literal reading governs: the criterion carves out no entry kind. Recorded as a lead misjudgement, not a worker defect. The lead did leave the question open for the gate rather than pre-closing it, which is why it was caught rather than shipped.",
+      "advisory": "F2 pre-existing: the publication budget's max_paths assumption. Already filed as cf42d08b and pulled into the epic at v1.0 by invoker decision; the reviewer independently reaching the same finding confirms that call. Explicitly out of scope for this issue."
+    },
+    {
+      "issue": "42c8c9c1",
+      "round": 1,
+      "verdict": "FAIL",
+      "date": "2026-08-11",
+      "gates": {
+        "repo-validate": "passed",
+        "holistic-review": "failed, 1 blocking finding"
+      },
+      "finding": "F1 medium blocking: profile_apply.rs:1836 still said a record may be 'replaced after an authenticated v1 conversion'. The v1 decoder and conversion were removed by 9a81ab12, so the statement was false. Cited @/issue/9a81ab12/requirement/REQ-05 and @/invariant/canonical-cutover.",
+      "resolution": "Fixed both instances of the class in one pass (5b05104f): profile_apply.rs:1836 and commands/profile.rs:1139, which carried the same stale 'authenticated'. package.rs:1059 legacy_v1_identity_hash inspected and kept - it is a cfg(test) oracle for the frozen package-manifest identity hash required by epic REQ-09, an unrelated subject.",
+      "note": "The finding I had flagged as the in-subject risk (fail-fast conflict reporting) was NOT raised by the independent reviewer, which supports the reconciliation judgement rather than overturning it."
+    },
+    {
+      "issue": "6a479c58",
+      "round": 1,
+      "verdict": "FAIL",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed (4528 tests; first attempt failed 142ms on leftover target incremental caches)",
+        "mcp-ci": "passed (64 unit + 13 integration)",
+        "code-review": "failed, 1 blocking finding"
+      },
+      "criteria": {
+        "REQ-01": "MET",
+        "REQ-02": "MET",
+        "REQ-03": "UNMET",
+        "REQ-04": "MET",
+        "REQ-05": "MET"
+      },
+      "finding": "F1 high blocking: read_confined checks a pathname (fs::canonicalize/:383, fs::symlink_metadata/:390) then reopens it (fs::read/:404). A concurrent swap to a symlink defeats both the symlink refusal and the undeclared-executable screening, since read_mode derives from the pre-check metadata. REQ-03 unmet; also @/inv/convention-convergence, since profile/package.rs already has the cap-std handle-anchored no-follow discipline.",
+      "accepted": "--source/--destination distinct from selectors (verified: profiles/jit-dogfood/assets holds no live/, so from_directory raises MissingContent and a path: selector cannot address a capture source); count/file_count pair."
+    },
+    {
+      "issue": "6a479c58",
+      "round": 2,
+      "verdict": "PASS",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed at fec3a45f (4531 tests, +3; integration-targets 11/12)",
+        "mcp-ci": "passed (64+13)",
+        "code-review": "passed, 0 findings \u2014 'the prior TOCTOU finding is remedied by the current no-follow descriptor read'"
+      },
+      "criteria": {
+        "REQ-01": "MET",
+        "REQ-02": "MET",
+        "REQ-03": "MET",
+        "REQ-04": "MET",
+        "REQ-05": "MET"
+      },
+      "tier_1_5": "F1 closed at HEAD, verified independently: the capture production source contains no fs::read/read_to_string/metadata/symlink_metadata/canonicalize/File::open, and does contain open_path_nofollow. No regression in prior criteria.",
+      "resolution": "read_confined now performs one handle-anchored no-follow open and derives kind, mode, and bytes from that single handle; the canonicalize+starts_with pre-check is deleted rather than demoted. The opener moved to crates/jit/src/profile/nofollow.rs, shared with package.rs, which shrank 66 lines; exactly one module under src/profile/ mentions _cap_fs_ext_follow.",
+      "merge": "merge commit on main; merged tree byte-identical to the gated tree fec3a45f over every path outside .jit/ and dev/active, and cargo-ci's declared inputs exclude .jit/gate-runs, .jit/issues, and .jit/events.jsonl."
+    },
+    {
+      "issue": "7156f64b",
+      "verdict": "PASS",
+      "round": 2,
+      "gates": {
+        "cargo-ci": "passed",
+        "mcp-ci": "passed",
+        "code-review": "passed"
+      },
+      "notes": "Round 1 code-review FAIL was a lead-caused scope error: the dispatch forbade documenting the commands in cli-commands.md, leaving them with no canonical home (@/charter/D-13). Lead wrote the reference entries; gate re-run passed."
+    },
+    {
+      "issue": "7156f64b",
+      "verdict": "PASS",
+      "round": 5,
+      "gates": {
+        "cargo-ci": "passed",
+        "mcp-ci": "passed",
+        "code-review": "passed"
+      },
+      "notes": "Five code-review rounds. R1 docs home (lead scope error). R2 aggregate target list cloned per entry. R3 repeat occurrence listed targets it does not publish. R4 schema prose stated apply's entry-set rule for all three commands. Root cause across R2-R4: changing the rehearsal entry-set shape invalidates every statement describing it, and findings were supplied one at a time. Closed by a worker-authored field-by-occurrence-shape matrix and a SelectionObservation trait that states 'publishes nothing' once per answer type."
+    },
+    {
+      "issue": "9a81ab12",
+      "round": 1,
+      "verdict": "PASS",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed on a clean tree at 3a77038e (4516 tests; provenance 3/3, fixture 1528 files = exactly two fewer; targets 11/12)",
+        "code-review": "passed, 0 findings"
+      },
+      "criteria": {
+        "REQ-01": "MET",
+        "REQ-02": "MET",
+        "REQ-03": "MET",
+        "REQ-04": "MET",
+        "REQ-05": "MET"
+      },
+      "evidence": "Residual grep for shipped_v1|ShippedV1|converted_records|conversion_count outside .jit is empty. REQ-02 is pinned by test_ordinary_profile_readers_reject_an_undecodable_record_with_record_and_profile (commands/profile.rs:3200), which asserts the typed downcast, the exact message naming record path and profile id, and that resolve/list/show/plan all reject. REQ-03 verified by the removal of the second capture_proposed_base and the migration overlay. REQ-04 verified: no static conversion counter survives; remaining statics are unrelated temp-name and retention-id counters.",
+      "worker": "codex gpt-5.6-luna (workspace-write sandbox)"
+    },
     {
       "issue_id": "fc47a7bf-1e2a-43b1-8887-4546375c35c6",
       "reviewed_commit": "7e7103f992e3fa24728e8febe42cf0311b6b30c0",
@@ -946,101 +1057,6 @@
       "holistic_review": "the pure exhaustive decision table reuses the canonical claim fingerprint, production aggregate planning applies safe updates/deletions atomically, conflict mapping remains typed and actionable, and lifecycle-event integration is clean",
       "gate_evidence": "cargo-ci run 6b7af235-68b1-444d-b224-1d3095dedf5a passed the combined Wave 8 workspace plus fmt, clippy, provenance, build-budget, and incremental checks; code-review run 7c5630d1-6af1-4a09-8ad2-24132e4f5d52 passed with zero findings. Run 561e0edb-7efa-4687-8435-eda4a597b987 is retained but excluded because it reused another worktree's Cargo target.",
       "reviewed_at": "2026-08-10T09:17:00Z"
-    },
-    {
-      "issue": "7156f64b",
-      "verdict": "PASS",
-      "round": 2,
-      "gates": {
-        "cargo-ci": "passed",
-        "mcp-ci": "passed",
-        "code-review": "passed"
-      },
-      "notes": "Round 1 code-review FAIL was a lead-caused scope error: the dispatch forbade documenting the commands in cli-commands.md, leaving them with no canonical home (@/charter/D-13). Lead wrote the reference entries; gate re-run passed."
-    },
-    {
-      "issue": "7156f64b",
-      "verdict": "PASS",
-      "round": 5,
-      "gates": {
-        "cargo-ci": "passed",
-        "mcp-ci": "passed",
-        "code-review": "passed"
-      },
-      "notes": "Five code-review rounds. R1 docs home (lead scope error). R2 aggregate target list cloned per entry. R3 repeat occurrence listed targets it does not publish. R4 schema prose stated apply's entry-set rule for all three commands. Root cause across R2-R4: changing the rehearsal entry-set shape invalidates every statement describing it, and findings were supplied one at a time. Closed by a worker-authored field-by-occurrence-shape matrix and a SelectionObservation trait that states 'publishes nothing' once per answer type."
-    },
-    {
-      "issue": "6a479c58",
-      "round": 1,
-      "verdict": "FAIL",
-      "date": "2026-08-11",
-      "gates": {
-        "cargo-ci": "passed (4528 tests; first attempt failed 142ms on leftover target incremental caches)",
-        "mcp-ci": "passed (64 unit + 13 integration)",
-        "code-review": "failed, 1 blocking finding"
-      },
-      "criteria": {
-        "REQ-01": "MET",
-        "REQ-02": "MET",
-        "REQ-03": "UNMET",
-        "REQ-04": "MET",
-        "REQ-05": "MET"
-      },
-      "finding": "F1 high blocking: read_confined checks a pathname (fs::canonicalize/:383, fs::symlink_metadata/:390) then reopens it (fs::read/:404). A concurrent swap to a symlink defeats both the symlink refusal and the undeclared-executable screening, since read_mode derives from the pre-check metadata. REQ-03 unmet; also @/inv/convention-convergence, since profile/package.rs already has the cap-std handle-anchored no-follow discipline.",
-      "accepted": "--source/--destination distinct from selectors (verified: profiles/jit-dogfood/assets holds no live/, so from_directory raises MissingContent and a path: selector cannot address a capture source); count/file_count pair."
-    },
-    {
-      "issue": "6a479c58",
-      "round": 2,
-      "verdict": "PASS",
-      "date": "2026-08-11",
-      "gates": {
-        "cargo-ci": "passed at fec3a45f (4531 tests, +3; integration-targets 11/12)",
-        "mcp-ci": "passed (64+13)",
-        "code-review": "passed, 0 findings \u2014 'the prior TOCTOU finding is remedied by the current no-follow descriptor read'"
-      },
-      "criteria": {
-        "REQ-01": "MET",
-        "REQ-02": "MET",
-        "REQ-03": "MET",
-        "REQ-04": "MET",
-        "REQ-05": "MET"
-      },
-      "tier_1_5": "F1 closed at HEAD, verified independently: the capture production source contains no fs::read/read_to_string/metadata/symlink_metadata/canonicalize/File::open, and does contain open_path_nofollow. No regression in prior criteria.",
-      "resolution": "read_confined now performs one handle-anchored no-follow open and derives kind, mode, and bytes from that single handle; the canonicalize+starts_with pre-check is deleted rather than demoted. The opener moved to crates/jit/src/profile/nofollow.rs, shared with package.rs, which shrank 66 lines; exactly one module under src/profile/ mentions _cap_fs_ext_follow.",
-      "merge": "merge commit on main; merged tree byte-identical to the gated tree fec3a45f over every path outside .jit/ and dev/active, and cargo-ci's declared inputs exclude .jit/gate-runs, .jit/issues, and .jit/events.jsonl."
-    },
-    {
-      "issue": "9a81ab12",
-      "round": 1,
-      "verdict": "PASS",
-      "date": "2026-08-11",
-      "gates": {
-        "cargo-ci": "passed on a clean tree at 3a77038e (4516 tests; provenance 3/3, fixture 1528 files = exactly two fewer; targets 11/12)",
-        "code-review": "passed, 0 findings"
-      },
-      "criteria": {
-        "REQ-01": "MET",
-        "REQ-02": "MET",
-        "REQ-03": "MET",
-        "REQ-04": "MET",
-        "REQ-05": "MET"
-      },
-      "evidence": "Residual grep for shipped_v1|ShippedV1|converted_records|conversion_count outside .jit is empty. REQ-02 is pinned by test_ordinary_profile_readers_reject_an_undecodable_record_with_record_and_profile (commands/profile.rs:3200), which asserts the typed downcast, the exact message naming record path and profile id, and that resolve/list/show/plan all reject. REQ-03 verified by the removal of the second capture_proposed_base and the migration overlay. REQ-04 verified: no static conversion counter survives; remaining statics are unrelated temp-name and retention-id counters.",
-      "worker": "codex gpt-5.6-luna (workspace-write sandbox)"
-    },
-    {
-      "issue": "42c8c9c1",
-      "round": 1,
-      "verdict": "FAIL",
-      "date": "2026-08-11",
-      "gates": {
-        "repo-validate": "passed",
-        "holistic-review": "failed, 1 blocking finding"
-      },
-      "finding": "F1 medium blocking: profile_apply.rs:1836 still said a record may be 'replaced after an authenticated v1 conversion'. The v1 decoder and conversion were removed by 9a81ab12, so the statement was false. Cited @/issue/9a81ab12/requirement/REQ-05 and @/invariant/canonical-cutover.",
-      "resolution": "Fixed both instances of the class in one pass (5b05104f): profile_apply.rs:1836 and commands/profile.rs:1139, which carried the same stale 'authenticated'. package.rs:1059 legacy_v1_identity_hash inspected and kept - it is a cfg(test) oracle for the frozen package-manifest identity hash required by epic REQ-09, an unrelated subject.",
-      "note": "The finding I had flagged as the in-subject risk (fail-fast conflict reporting) was NOT raised by the independent reviewer, which supports the reconciliation judgement rather than overturning it."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1164,6 +1180,11 @@
       "detail": "test_profile_pack_and_add_carry_a_package_at_the_model_limits publishes 512 files totalling 4 MiB through the repository transaction and measures ~33 s alone, exceeding the standing budget 4b7c06d0 sets for the entire suite. Kept deliberately: it is the test that proves the pack->add round trip the bound defect broke, and it was added at lead instruction during rework. Not trimmed in 15cc28c5 because that would be a third rework round on a passing issue, which policy sends to escalation rather than dispatch. A concrete cheaper shape exists and belongs to 4b7c06d0: the bound that broke was the ENTRY count, not the byte payload, so the CLI test needs 512 files with small content to exercise both the entry count and the real publication path, while the unit test already proves the 4 MiB byte bound without publishing. That split should keep both properties at a fraction of the cost.",
       "status": "open",
       "owner": "4b7c06d0"
+    },
+    {
+      "subject": "a criterion enumerating properties admits no implicit carve-out",
+      "detail": "REQ-03 lists 'absolute path, parent-directory traversal, symlink, or unexpected mode' as properties that must be refused. The lead accepted an implementation that stopped checking mode for one entry kind, reasoning the property had no referent there. The reviewer read the enumeration literally and failed it. Lesson: when a criterion enumerates properties to refuse, a change that stops checking one of them for any subset of inputs needs the criterion amended (escalation) rather than a lead judgement that the property does not apply.",
+      "status": "process-note"
     }
   ],
   "scope_changes": [

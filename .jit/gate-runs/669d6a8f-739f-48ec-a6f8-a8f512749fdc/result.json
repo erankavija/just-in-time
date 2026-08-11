@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-15cc28c5",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "45693c861cdfb8ca91ff5e5e9bd4130b9fc924f2",
+  "completed_at": "2026-08-11T13:00:57.486709404Z",
+  "duration_ms": 300288,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 799,
+        "origin": "pre-existing",
+        "references": [
+          "@/issue/c639cfb5/requirement/REQ-14"
+        ],
+        "severity": "medium",
+        "summary": "The shared package-tree publication budget can reject a valid deeply nested package after pack; capture has the same pre-existing limitation."
+      }
+    ],
+    "summary": "The archive implementation satisfies the issue criteria and fixes the prior mode-validation failure; one pre-existing publication-budget limitation remains advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "15cc28c5-1066-4db4-b5a6-4796b6144c08",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "669d6a8f-739f-48ec-a6f8-a8f512749fdc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T12:55:57.197754261Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4825e30f, 28fa9341, f3eaf0f5, 2afa6a1c, bc956d3a, 2dba42b2, c6e6a9c3, 45693c (all `jit:15cc28c5`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/c639cfb5/requirement/REQ-11 and REQ-14 (epic Markdown); @/invariant/atomic-writes, @/invariant/convention-convergence, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-11 12:43); mcp-ci passed (exit 0, 12:55); security-review passed (no recorded exit); prior code-review failed (exit 1, 12:16), with its blocking mode finding addressed in 45693c\nTruncation recovery: bounded per-commit stats/name-status/patch reads; narrowed current-source reads for archive parsing, publication, tests, docs, and external publication\n\n1. F1 — medium, advisory, pre-existing: `crates/jit/src/commands/profile.rs:799` still imposes path-count and depth budgets that the package model does not constrain. A sufficiently deep valid package can therefore pack successfully but be refused by add; capture uses the same publication path and has the same limitation. It predates this issue and is already tracked as `cf42d08b`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The archive implementation satisfies the issue criteria and fixes the prior mode-validation failure; one pre-existing publication-budget limitation remains advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The shared package-tree publication budget can reject a valid deeply nested package after pack; capture has the same pre-existing limitation.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":799,\"references\":[\"@/issue/c639cfb5/requirement/REQ-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -2577,6 +2577,68 @@ fn run() -> Result<()> {
                     Err(error) => return Err(error),
                 }
             }
+            ProfileCommands::Pack {
+                source,
+                output,
+                json,
+            } => {
+                let invocation_dir = std::env::current_dir()?;
+                match executor.pack_profile_package(&invocation_dir, &source, &output) {
+                    Ok((result, warnings)) => {
+                        for warning in warnings {
+                            eprintln!("Warning: {warning}");
+                        }
+                        if json {
+                            let output = JsonOutput::success(&result);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!(
+                                "Packed {} {} into {}",
+                                result.id, result.version, result.archive
+                            );
+                            println!("Package hash: {}", result.package_hash);
+                            println!(
+                                "Files: {} ({} bytes); archive {} bytes",
+                                result.file_count, result.byte_size, result.archive_bytes
+                            );
+                        }
+                    }
+                    Err(error) if json => {
+                        let json_error = profile_json_error(&error);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+            ProfileCommands::Add {
+                archive,
+                destination,
+                json,
+            } => {
+                let invocation_dir = std::env::current_dir()?;
+                match executor.add_profile_package(&invocation_dir, &archive, &destination) {
+                    Ok(result) => {
+                        if json {
+                            let output = JsonOutput::success(&result);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!(
+                                "Added {} {} at {}",
+                                result.id, result.version, result.destination
+                            );
+                            println!("Package hash: {}", result.package_hash);
+                            println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
+                        }
+                    }
+                    Err(error) if json => {
+                        let json_error = profile_json_error(&error);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
             ProfileCommands::Reconfigure {
                 profile,
                 values_file,

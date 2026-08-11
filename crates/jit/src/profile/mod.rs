@@ -10,6 +10,7 @@ mod graph;
 mod manifest;
 mod nofollow;
 mod package;
+pub mod package_archive;
 pub mod package_capture;
 mod repository_package;
 mod three_way;
@@ -38,10 +39,10 @@ pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
 pub(crate) use application::SelectionObservation;
 pub use application::{
-    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileCaptureAction,
-    ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult, ProfileListResult,
-    ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult,
-    ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileAddResult, ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
+    ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
+    ProfileListResult, ProfilePackResult, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus,
+    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
@@ -57,6 +58,10 @@ pub use manifest::{
 pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
+};
+pub use package_archive::{
+    pack_package_archive, read_package_archive, PackageArchiveError,
+    MAX_PROFILE_PACKAGE_ARCHIVE_BYTES, MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES,
 };
 pub use package_capture::{
     capture_package_tree, CapturedFile, CapturedPackageTree, PackageCaptureError,

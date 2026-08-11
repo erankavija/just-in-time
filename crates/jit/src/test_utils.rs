@@ -348,6 +348,67 @@ pub fn write_package_declaring(
     crate::profile::ProfilePackage::from_directory(&tree).expect("a valid package tree")
 }
 
+/// Write a package tree at the limits the package model permits, and return
+/// `root`.
+///
+/// The shape a route carrying a whole package has to survive, authored once
+/// because more than one such route must be held to it
+/// (`@/inv/shared-test-contracts`). Three limits at once:
+///
+/// - the file count is exactly [`MAX_PROFILE_PACKAGE_FILES`], the manifest
+///   included, so nothing that scales per file has headroom left;
+/// - the total size sits just under [`MAX_PROFILE_PACKAGE_BYTES`], filled by
+///   spreading the budget the manifest does not occupy across the assets;
+/// - every declared source is long enough that a tar writer cannot fit its name
+///   in a header field, so each file costs a long-name entry as well.
+///
+/// Each asset also sits at the end of a chain of directories no other asset
+/// shares, so the package's distinct directory count is a multiple of its file
+/// count rather than bounded by it. That is the property the package model
+/// leaves unconstrained — it bounds file count and total size, and says nothing
+/// about path depth — so a route whose cost scales with directories rather than
+/// with files fails here and nowhere else.
+///
+/// [`MAX_PROFILE_PACKAGE_FILES`]: crate::profile::MAX_PROFILE_PACKAGE_FILES
+/// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
+pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
+    let assets = crate::profile::MAX_PROFILE_PACKAGE_FILES - 1;
+    // Long enough that the composed source path exceeds the 100 bytes a tar
+    // header holds, which is what forces the long-name entry.
+    let padding = "x".repeat(70);
+    let source = |index: usize| {
+        format!(
+            "assets/outer-{padding}-{index:03}/inner-{padding}-{index:03}/\
+             source-{padding}-{index:03}.txt"
+        )
+    };
+    let manifest = std::iter::once(
+        "[profile]\nmanifest-version = 1\nid = \"bounded-package\"\nversion = \"1.0.0\"\n\
+         jit = \">=0.2.0, <2.0.0\"\n"
+            .to_string(),
+    )
+    .chain((0..assets).map(|index| {
+        format!(
+            "\n[[asset]]\nsource = \"{}\"\ntarget = \"out/target-{padding}-{index:03}.txt\"\n",
+            source(index)
+        )
+    }))
+    .collect::<String>();
+
+    let filler = crate::profile::MAX_PROFILE_PACKAGE_BYTES
+        .saturating_sub(manifest.len())
+        .saturating_div(assets);
+    fs::create_dir_all(root).expect("create the bounded package root");
+    fs::write(root.join("manifest.toml"), &manifest).expect("write the bounded package manifest");
+    for index in 0..assets {
+        let path = root.join(source(index));
+        fs::create_dir_all(path.parent().expect("an asset has a parent"))
+            .expect("create the bounded package asset directory");
+        fs::write(&path, vec![b'.'; filler]).expect("write a bounded package asset");
+    }
+    root.to_path_buf()
+}
+
 /// Copy an on-disk profile package tree to `root`, creating it and every
 /// declared parent, and return `root`.
 ///

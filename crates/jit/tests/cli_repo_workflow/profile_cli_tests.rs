@@ -2107,3 +2107,414 @@ fn test_profile_capture_refuses_a_destination_outside_the_worktree_without_publi
     );
     assert!(!destination.exists(), "a refused capture published a tree");
 }
+
+/// Copy the checked-in synthetic fixture into `repo` at the repository-relative
+/// `location`, and return that location.
+///
+/// This fixture is the one that exercises a nested source and a
+/// declared-executable asset, which is what makes a round trip through an
+/// archive say something about directories and modes as well as bytes.
+fn synthetic_package_at<'a>(repo: &Path, location: &'a str) -> &'a str {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/profile-packages/synthetic-valid");
+    jit::test_utils::copy_package_tree(&source, &repo.join(location));
+    location
+}
+
+/// Every worktree file under `root`, repository-relative, excluding the
+/// repository's own state.
+///
+/// What an operation left in the worktree is the whole answer to "was anything
+/// written outside the destination", so it is read rather than reasoned about.
+fn worktree_files(root: &Path) -> std::collections::BTreeSet<String> {
+    fn visit(root: &Path, directory: &Path, found: &mut std::collections::BTreeSet<String>) {
+        for entry in fs::read_dir(directory).expect("read worktree directory") {
+            let path = entry.expect("read worktree entry").path();
+            let relative = path
+                .strip_prefix(root)
+                .expect("worktree entry is under the root")
+                .to_string_lossy()
+                .into_owned();
+            if relative == ".jit" || relative == ".git" {
+                continue;
+            }
+            if path.is_dir() {
+                visit(root, &path, found);
+            } else {
+                found.insert(relative);
+            }
+        }
+    }
+
+    let mut found = std::collections::BTreeSet::new();
+    visit(root, root, &mut found);
+    found
+}
+
+/// The archive is a function of the package it carries: two packs of one
+/// package directory write the same file.
+#[test]
+fn test_profile_pack_writes_identical_archives_for_one_package_directory() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+
+    for output in ["first.tar", "second.tar"] {
+        let packed = jit(
+            repo.path(),
+            &[
+                "profile", "pack", "--source", package, "--output", output, "--json",
+            ],
+        );
+        assert!(packed.status.success(), "{packed:?}");
+    }
+
+    let first = fs::read(repo.path().join("first.tar")).unwrap();
+    assert!(!first.is_empty(), "a packed archive has content");
+    assert_eq!(
+        first,
+        fs::read(repo.path().join("second.tar")).unwrap(),
+        "two packs of one package directory wrote different archives"
+    );
+}
+
+/// One package reaches another repository through the archive alone: the
+/// identity the pack reported is the identity the add recomputes, the tree
+/// arrives whole, and the added package applies.
+#[test]
+fn test_profile_pack_and_add_carry_one_package_between_repositories() {
+    let source_repo = TempDir::new().unwrap();
+    let target_repo = TempDir::new().unwrap();
+    let exchange = TempDir::new().unwrap();
+    assert!(jit(source_repo.path(), &["init"]).status.success());
+    assert!(jit(target_repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(source_repo.path(), "packages/synthetic");
+    let archive = exchange.path().join("synthetic.tar");
+    let archive = archive.to_str().unwrap();
+    let before = worktree_files(target_repo.path());
+
+    let packed = jit(
+        source_repo.path(),
+        &[
+            "profile", "pack", "--source", package, "--output", archive, "--json",
+        ],
+    );
+    assert!(packed.status.success(), "{packed:?}");
+    let packed = json(&packed);
+
+    let added = jit(
+        target_repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            archive,
+            "--destination",
+            "packages/synthetic",
+            "--json",
+        ],
+    );
+    assert!(added.status.success(), "{added:?}");
+    let added = json(&added);
+
+    assert_eq!(added["id"], packed["id"]);
+    assert_eq!(added["version"], packed["version"]);
+    assert_eq!(
+        added["package_hash"], packed["package_hash"],
+        "the identity recomputed from the archive differs from the packed package's own"
+    );
+    assert_eq!(added["destination"], "packages/synthetic");
+
+    // The archive carried the package and nothing else: the target worktree
+    // gained exactly the files the source package directory holds, at the
+    // destination the invocation named and nowhere else.
+    let published = worktree_files(target_repo.path())
+        .difference(&before)
+        .cloned()
+        .collect::<Vec<_>>();
+    let expected = worktree_files(&source_repo.path().join(package))
+        .into_iter()
+        .map(|relative| format!("{package}/{relative}"))
+        .collect::<Vec<_>>();
+    assert!(!expected.is_empty(), "the source package has files");
+    assert_eq!(published, expected, "the add published a different tree");
+    for relative in &expected {
+        assert_eq!(
+            fs::read(target_repo.path().join(relative)).unwrap(),
+            fs::read(source_repo.path().join(relative)).unwrap(),
+            "{relative} arrived with different bytes"
+        );
+    }
+
+    // The published tree is a package the receiving repository reads as one,
+    // at the identity the archive travelled under.
+    let shown = jit(
+        target_repo.path(),
+        &[
+            "profile",
+            "show",
+            "--profile",
+            "path:packages/synthetic",
+            "--json",
+        ],
+    );
+    assert!(shown.status.success(), "{shown:?}");
+    assert_eq!(
+        json(&shown)["profiles"][0]["package_hash"],
+        packed["package_hash"],
+        "the published tree does not read back as the package that was packed"
+    );
+}
+
+/// An archive whose content no longer reproduces the digest it carries is
+/// refused, and the destination is left absent.
+#[test]
+fn test_profile_add_refuses_a_damaged_archive_without_publishing_a_package() {
+    let repo = TempDir::new().unwrap();
+    let exchange = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let archive = exchange.path().join("synthetic.tar");
+    let archive = archive.to_str().unwrap();
+    assert!(jit(
+        repo.path(),
+        &["profile", "pack", "--source", package, "--output", archive, "--json",],
+    )
+    .status
+    .success());
+
+    // Damage one byte of the packaged content, which the metadata's digest no
+    // longer accounts for.
+    let mut bytes = fs::read(archive).unwrap();
+    let workflow = bytes
+        .windows(b"Synthetic workflow".len())
+        .position(|window| window == b"Synthetic workflow")
+        .expect("the archive carries the fixture asset's bytes");
+    bytes[workflow] = b'X';
+    fs::write(archive, bytes).unwrap();
+
+    let added = jit(
+        repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            archive,
+            "--destination",
+            "packages/arrived",
+            "--json",
+        ],
+    );
+
+    assert!(!added.status.success(), "{added:?}");
+    assert!(
+        json(&added)["error"]["message"]
+            .as_str()
+            .expect("a typed failure carries an error message")
+            .contains("hashes to"),
+        "{added:?}"
+    );
+    assert!(
+        !repo.path().join("packages/arrived").exists(),
+        "a refused add left a partially extracted package behind"
+    );
+}
+
+/// An occupied destination is refused rather than published over, and what it
+/// held survives untouched.
+#[test]
+fn test_profile_add_refuses_an_occupied_destination_without_replacing_it() {
+    let repo = TempDir::new().unwrap();
+    let exchange = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let archive = exchange.path().join("synthetic.tar");
+    let archive = archive.to_str().unwrap();
+    assert!(jit(
+        repo.path(),
+        &["profile", "pack", "--source", package, "--output", archive, "--json",],
+    )
+    .status
+    .success());
+    fs::create_dir_all(repo.path().join("packages/occupied")).unwrap();
+    fs::write(repo.path().join("packages/occupied/mine.txt"), "mine\n").unwrap();
+
+    let added = jit(
+        repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            archive,
+            "--destination",
+            "packages/occupied",
+            "--json",
+        ],
+    );
+
+    assert!(!added.status.success(), "{added:?}");
+    assert!(
+        json(&added)["error"]["message"]
+            .as_str()
+            .expect("a typed failure carries an error message")
+            .contains("already exists"),
+        "{added:?}"
+    );
+    assert_eq!(
+        fs::read_dir(repo.path().join("packages/occupied"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>(),
+        vec!["mine.txt".to_string()],
+        "a refused add published into an occupied destination"
+    );
+}
+
+/// A destination outside the repository worktree is refused before the archive
+/// is even read, and nothing is published there.
+#[test]
+fn test_profile_add_refuses_a_destination_outside_the_worktree_without_publishing() {
+    let repo = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let archive = outside.path().join("synthetic.tar");
+    let archive = archive.to_str().unwrap();
+    assert!(jit(
+        repo.path(),
+        &["profile", "pack", "--source", package, "--output", archive, "--json",],
+    )
+    .status
+    .success());
+    let destination = outside.path().join("arrived");
+
+    let added = jit(
+        repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            archive,
+            "--destination",
+            destination.to_str().unwrap(),
+            "--json",
+        ],
+    );
+
+    assert!(!added.status.success(), "{added:?}");
+    assert!(
+        json(&added)["error"]["message"]
+            .as_str()
+            .expect("a typed failure carries an error message")
+            .contains("worktree"),
+        "{added:?}"
+    );
+    assert!(!destination.exists(), "a refused add published a tree");
+}
+
+/// An occupied output path is refused rather than overwritten, whether it lies
+/// inside the repository or outside it.
+#[test]
+fn test_profile_pack_refuses_an_occupied_output_path_without_replacing_it() {
+    let repo = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let inside = repo.path().join("taken.tar");
+    let external = outside.path().join("taken.tar");
+    fs::write(&inside, "not an archive\n").unwrap();
+    fs::write(&external, "not an archive\n").unwrap();
+
+    for output in [&inside, &external] {
+        let packed = jit(
+            repo.path(),
+            &[
+                "profile",
+                "pack",
+                "--source",
+                package,
+                "--output",
+                output.to_str().unwrap(),
+                "--json",
+            ],
+        );
+
+        assert!(!packed.status.success(), "{packed:?}");
+        assert_eq!(
+            fs::read_to_string(output).unwrap(),
+            "not an archive\n",
+            "a refused pack replaced what the output path held"
+        );
+    }
+}
+
+/// A package at the limits the model permits survives the exchange whole.
+///
+/// The round trip is where a bound that does not hold shows up as an archive
+/// `pack` writes and `add` refuses, with the operator left holding a file
+/// nothing accepts. The package this uses sits at the file-count bound, fills
+/// the byte budget, and gives every source a path too long for a tar header
+/// field and a directory of its own — the shape that costs an archive the most
+/// per file — so the exchange is exercised where its bounds bind rather than
+/// where a small fixture leaves them slack.
+#[test]
+fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
+    let source_repo = TempDir::new().unwrap();
+    let target_repo = TempDir::new().unwrap();
+    let exchange = TempDir::new().unwrap();
+    assert!(jit(source_repo.path(), &["init"]).status.success());
+    assert!(jit(target_repo.path(), &["init"]).status.success());
+    jit::test_utils::write_package_tree_at_model_limits(
+        &source_repo.path().join("packages/bounded"),
+    );
+    let archive = exchange.path().join("bounded.tar");
+    let archive = archive.to_str().unwrap();
+
+    let packed = jit(
+        source_repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            "packages/bounded",
+            "--output",
+            archive,
+            "--json",
+        ],
+    );
+    assert!(packed.status.success(), "{packed:?}");
+    let packed = json(&packed);
+    assert_eq!(
+        packed["file_count"],
+        jit::profile::MAX_PROFILE_PACKAGE_FILES,
+        "the package under test must sit at the file bound"
+    );
+    assert!(
+        fs::metadata(archive).unwrap().len()
+            <= jit::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
+        "packing a package at the model limits wrote an archive past the bound the read admits"
+    );
+
+    let added = jit(
+        target_repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            archive,
+            "--destination",
+            "packages/bounded",
+            "--json",
+        ],
+    );
+
+    assert!(added.status.success(), "{added:?}");
+    let added = json(&added);
+    assert_eq!(added["package_hash"], packed["package_hash"]);
+    assert_eq!(added["file_count"], packed["file_count"]);
+    assert_eq!(
+        worktree_files(&target_repo.path().join("packages/bounded")).len(),
+        jit::profile::MAX_PROFILE_PACKAGE_FILES,
+        "the published tree does not hold every file the package carried"
+    );
+}

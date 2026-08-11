@@ -699,6 +699,24 @@ expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
+path = "profile pack"
+argv = ["profile", "pack", "--source", "packages/absent", "--output", "packed.tar", "--json"]
+setup = ["init"]
+expected_failure = "PROFILE_ERROR for a package directory that holds no readable manifest"
+expected_code = "PROFILE_ERROR"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
+path = "profile add"
+argv = ["profile", "add", "--archive", "absent.tar", "--destination", "packages/arrived", "--json"]
+setup = ["init"]
+expected_failure = "PROFILE_ERROR for an archive path that names no readable file"
+expected_code = "PROFILE_ERROR"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
 path = "profile reconfigure"
 argv = ["profile", "reconfigure", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]
