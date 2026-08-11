@@ -13545,3 +13545,4 @@
 {"id":"c2cd99ec-fe2a-4adf-b9b1-504caa9f418b","issue_id":"7793b8b7-9eed-4598-9bc1-fd655ec0f394","rule":"label-format","timestamp":"2026-08-11T12:07:20.363683688Z","type":"local_rule_bypassed"}
 {"id":"acc10945-9973-48f3-9d5b-e1f39efa172f","issue_id":"7793b8b7-9eed-4598-9bc1-fd655ec0f394","rule":"label-format","timestamp":"2026-08-11T12:07:40.668585567Z","type":"local_rule_bypassed"}
 {"id":"0d5a3156-c9b7-4857-8d7b-6c16a18f8a4b","issue_id":"5f71a48d-16d4-442d-96e4-1fa10f4aed80","priority":"high","timestamp":"2026-08-11T12:09:24.975365830Z","title":"A reject reason can leave the repository failing validation","type":"issue_created"}
+{"id":"d91d6c46-c800-404a-9c70-69cf9426dd75","issue_id":"4b7c06d0-0436-4dd3-b3c8-52595da3e342","priority":"high","timestamp":"2026-08-11T12:38:27.983656428Z","title":"The workspace test suite runs in under 30 seconds","type":"issue_created"}
