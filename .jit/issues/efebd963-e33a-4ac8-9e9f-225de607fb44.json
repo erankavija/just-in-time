@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:47:09.884411823Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "efebd963-e33a-4ac8-9e9f-225de607fb44",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Apply the benchmark-driven fsync decision",
-  "updated_at": "2026-08-11T23:30:02.582387029Z"
+  "updated_at": "2026-08-11T23:47:09.884411823Z"
 }

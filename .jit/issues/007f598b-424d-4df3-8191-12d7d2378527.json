@@ -14,7 +14,13 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:47:09.415902509Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "007f598b-424d-4df3-8191-12d7d2378527",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Cut over journal durability documentation",
-  "updated_at": "2026-08-11T21:23:22.564351997Z"
+  "updated_at": "2026-08-11T23:47:09.415902509Z"
 }

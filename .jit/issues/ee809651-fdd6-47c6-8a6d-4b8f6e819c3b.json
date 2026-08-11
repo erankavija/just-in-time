@@ -14,7 +14,13 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:47:08.947195025Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ee809651-fdd6-47c6-8a6d-4b8f6e819c3b",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document pinned nextest installation and use",
-  "updated_at": "2026-08-11T21:23:16.478034476Z"
+  "updated_at": "2026-08-11T23:47:08.947195025Z"
 }
