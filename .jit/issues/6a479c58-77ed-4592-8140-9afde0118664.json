@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-11T04:20:51.905450408Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
@@ -27,7 +28,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Capture a package tree from declared repository targets",
-  "updated_at": "2026-08-10T16:20:21.393009296Z"
+  "updated_at": "2026-08-11T04:20:51.905450408Z"
 }
