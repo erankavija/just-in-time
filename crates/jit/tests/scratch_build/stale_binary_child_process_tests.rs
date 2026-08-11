@@ -38,10 +38,12 @@ use tempfile::TempDir;
 use jit::storage::FileLocker;
 
 const STALE_CHILD_CACHE: &str = "jit-stale-child-test-cache";
-const FIXTURE_MARKER_VERSION: u32 = 1;
+const FIXTURE_MARKER_VERSION: u32 = 3;
 const FIXTURE_LOCK_TIMEOUT: Duration = Duration::from_secs(120);
+const PINNED_NEXTEST_VERSION: &str = "0.9.133";
+const REUSE_OBSERVATION_DIR: &str = "JIT_STALE_FIXTURE_REUSE_OBSERVATION_DIR";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct VerifiedArtifactMarker {
     version: u32,
     source_sha256: String,
@@ -131,8 +133,15 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
             .expect("the reuse observation should read back from its marker");
         assert_eq!(observed.cargo_build_invocations, 1);
         assert_eq!(observed.reuse_observations, expected_reuse_observations);
+        record_scoped_reuse_observation();
         return Some(artifact);
     }
+
+    assert!(
+        !artifact.exists() && !marker_path.exists() && !build_count_path.exists(),
+        "invalid occupied stale-child cache must fail without deleting or rebuilding: {}",
+        artifact_dir.display()
+    );
 
     fs::create_dir_all(&artifact_dir)
         .expect("provenance-keyed stale-child artifact directory should be creatable");
@@ -161,13 +170,17 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
     }
 
     let staging = artifact_dir.join(format!("artifact.tmp.{}", std::process::id()));
+    let cargo_sha256 = sha256_file(&cargo_binary).expect("Cargo child output should hash");
     fs::copy(&cargo_binary, &staging)
         .expect("verified Cargo output should copy into the fixture cache");
-    if artifact.exists() {
-        fs::remove_file(&artifact).expect("invalid cached artifact should be replaceable");
-    }
-    fs::rename(&staging, &artifact)
-        .expect("verified stale-child artifact should publish atomically");
+    assert_eq!(
+        sha256_file(&staging).expect("staged child artifact should hash"),
+        cargo_sha256,
+        "staged child artifact must match Cargo output before publication"
+    );
+    assert!(binary_reports_provenance(&staging, ancestor, &short));
+    publish_staged_file_noreplace(&staging, &artifact)
+        .expect("verified stale-child artifact should publish atomically without replacement");
 
     let artifact_sha256 = sha256_file(&artifact).expect("published child artifact should hash");
     assert!(binary_reports_provenance(&artifact, ancestor, &short));
@@ -189,6 +202,7 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
 
 fn fixture_cache_key(ancestor: &str, source_sha256: &str) -> String {
     let mut hasher = Sha256::new();
+    hasher.update(FIXTURE_MARKER_VERSION.to_le_bytes());
     hasher.update(ancestor.as_bytes());
     hasher.update([0]);
     hasher.update(source_sha256.as_bytes());
@@ -220,8 +234,12 @@ fn read_marker(path: &Path) -> Option<VerifiedArtifactMarker> {
 
 fn record_cargo_build_invocation(path: &Path) -> u32 {
     let count = read_build_count(path).unwrap_or(0) + 1;
-    fs::write(path, format!("{count}\n"))
-        .expect("nested Cargo build count marker should be writable under its lock");
+    let staging = path.with_extension(format!("tmp.{}", std::process::id()));
+    fs::write(&staging, format!("{count}\n"))
+        .expect("nested Cargo build count staging file should be writable under its lock");
+    assert_eq!(read_build_count(&staging), Some(count));
+    publish_staged_file_noreplace(&staging, path)
+        .expect("nested Cargo build count should publish without replacement");
     count
 }
 
@@ -269,10 +287,149 @@ fn write_marker(path: &Path, marker: &VerifiedArtifactMarker) {
     let staging = path.with_extension(format!("json.tmp.{}", std::process::id()));
     let bytes = serde_json::to_vec_pretty(marker).expect("fixture marker should serialize");
     fs::write(&staging, bytes).expect("fixture marker staging file should be writable");
+    assert_eq!(read_marker(&staging).as_ref(), Some(marker));
     if path.exists() {
-        fs::remove_file(path).expect("fixture marker should be replaceable under its lock");
+        fs::rename(staging, path).expect("fixture marker replacement should be atomic");
+    } else {
+        publish_staged_file_noreplace(&staging, path)
+            .expect("new fixture marker should publish atomically without replacement");
     }
-    fs::rename(staging, path).expect("fixture marker should publish atomically");
+}
+
+fn publish_staged_file_noreplace(staging: &Path, destination: &Path) -> std::io::Result<()> {
+    if let Err(error) = fs::hard_link(staging, destination) {
+        // Only the unpublished staging name is cleanup-eligible. An occupied
+        // destination is never removed or overwritten.
+        let _ = fs::remove_file(staging);
+        return Err(error);
+    }
+    // `destination` now names the fully written staging inode. Removing this
+    // second name cannot create a gap at the published destination.
+    fs::remove_file(staging)
+}
+
+fn record_scoped_reuse_observation() {
+    let Some(directory) = std::env::var_os(REUSE_OBSERVATION_DIR).map(PathBuf::from) else {
+        return;
+    };
+    let process = std::process::id();
+    let staging = directory.join(format!(".reuse-{process}.tmp"));
+    let observation = directory.join(format!("reuse-{process}"));
+    let content = b"verified artifact reused without Cargo\n";
+    fs::write(&staging, content).expect("scoped reuse observation staging file should be writable");
+    assert_eq!(
+        fs::read(&staging).expect("scoped reuse observation should read back"),
+        content
+    );
+    publish_staged_file_noreplace(&staging, &observation)
+        .expect("each nextest process should publish one unique reuse observation");
+}
+
+#[test]
+fn test_stale_binary_fixture_no_replace_publication_preserves_occupied_destination() {
+    let directory = TempDir::new().unwrap();
+    let staging = directory.path().join("artifact.tmp");
+    let destination = directory.path().join("jit");
+    fs::write(&staging, b"replacement").unwrap();
+    fs::write(&destination, b"occupied").unwrap();
+
+    let error = publish_staged_file_noreplace(&staging, &destination).unwrap_err();
+
+    assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+    assert_eq!(fs::read(&destination).unwrap(), b"occupied");
+    assert!(!staging.exists());
+}
+
+#[test]
+fn test_stale_binary_fixture_marker_replacement_leaves_one_complete_file() {
+    let directory = TempDir::new().unwrap();
+    let marker_path = directory.path().join("verified-artifact.json");
+    let marker = |reuse_observations| VerifiedArtifactMarker {
+        version: FIXTURE_MARKER_VERSION,
+        source_sha256: "source".to_string(),
+        built_from: "full".to_string(),
+        short_commit: "short".to_string(),
+        artifact_sha256: "artifact".to_string(),
+        cargo_build_invocations: 1,
+        reuse_observations,
+    };
+
+    write_marker(&marker_path, &marker(0));
+    write_marker(&marker_path, &marker(1));
+
+    assert_eq!(read_marker(&marker_path).unwrap().reuse_observations, 1);
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+/// REQ-03: while Cargo remains the outer suite runner, this regression invokes
+/// the pinned nextest runner over exactly the six stale-binary semantic tests.
+/// Nextest sets `NEXTEST` in each process it launches, so the test returns when
+/// the outer suite itself is nextest and cannot recursively spawn another run.
+#[test]
+fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
+    if std::env::var_os("NEXTEST").is_some() {
+        return;
+    }
+
+    let version = Command::new("cargo")
+        .args(["nextest", "--version"])
+        .output()
+        .expect("the pinned cargo-nextest runner should be installed");
+    let version_stdout = String::from_utf8_lossy(&version.stdout);
+    assert!(
+        version.status.success()
+            && version_stdout.starts_with(&format!("cargo-nextest {PINNED_NEXTEST_VERSION} ")),
+        "expected cargo-nextest {PINNED_NEXTEST_VERSION}; stdout={} stderr={}",
+        version_stdout,
+        String::from_utf8_lossy(&version.stderr)
+    );
+
+    let workspace_root = workspace_root();
+    let ancestor = ancestor_commit(&workspace_root)
+        .expect("workspace should have enough history for the stale-binary fixture");
+    build_stale_child_binary(&workspace_root, &ancestor)
+        .expect("the cargo-test process should prewarm the verified child artifact");
+    let reuse_observations = TempDir::new().expect("nextest reuse observations need a directory");
+
+    let filter = "test(checker_child) | test(non_gate_context) | \
+                  test(gate_context_early) | test(test_gate_evaluate_)";
+    let run = Command::new("cargo")
+        .current_dir(&workspace_root)
+        .env(REUSE_OBSERVATION_DIR, reuse_observations.path())
+        .args([
+            "nextest",
+            "run",
+            "-p",
+            "jit",
+            "--test",
+            "scratch_build",
+            "--test-threads",
+            "2",
+            "-E",
+            filter,
+        ])
+        .output()
+        .expect("the pinned nextest stale-binary run should launch");
+    let report = format!(
+        "{}{}",
+        String::from_utf8_lossy(&run.stdout),
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert!(
+        run.status.success(),
+        "pinned nextest stale-binary run failed:\n{report}"
+    );
+    assert!(
+        report.contains("6 tests run: 6 passed"),
+        "pinned nextest must independently report all six semantic tests:\n{report}"
+    );
+    assert_eq!(
+        fs::read_dir(reuse_observations.path())
+            .expect("nextest reuse observation directory should remain readable")
+            .count(),
+        6,
+        "each nextest process must record one verified reuse without Cargo"
+    );
 }
 
 /// Build a scratch git repository whose `HEAD` is one commit past `ancestor`:
