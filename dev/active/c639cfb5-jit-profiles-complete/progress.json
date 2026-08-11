@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 10,
+  "current_wave": 11,
   "waves": [
     {
       "wave_number": 1,
@@ -132,7 +132,7 @@
           "short_id": "6a479c58",
           "title": "Capture a package tree from declared repository targets",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -143,7 +143,7 @@
           "short_id": "9a81ab12",
           "title": "Remove the shipped-v1 record migration boundary",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
@@ -303,7 +303,8 @@
     "9fad8581": 2,
     "44ec7192": 0,
     "9f493686": 2,
-    "7156f64b": 5
+    "7156f64b": 5,
+    "6a479c58": 1
   },
   "review_verdicts": [
     {
@@ -940,6 +941,47 @@
         "code-review": "passed"
       },
       "notes": "Five code-review rounds. R1 docs home (lead scope error). R2 aggregate target list cloned per entry. R3 repeat occurrence listed targets it does not publish. R4 schema prose stated apply's entry-set rule for all three commands. Root cause across R2-R4: changing the rehearsal entry-set shape invalidates every statement describing it, and findings were supplied one at a time. Closed by a worker-authored field-by-occurrence-shape matrix and a SelectionObservation trait that states 'publishes nothing' once per answer type."
+    },
+    {
+      "issue": "6a479c58",
+      "round": 1,
+      "verdict": "FAIL",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed (4528 tests; first attempt failed 142ms on leftover target incremental caches)",
+        "mcp-ci": "passed (64 unit + 13 integration)",
+        "code-review": "failed, 1 blocking finding"
+      },
+      "criteria": {
+        "REQ-01": "MET",
+        "REQ-02": "MET",
+        "REQ-03": "UNMET",
+        "REQ-04": "MET",
+        "REQ-05": "MET"
+      },
+      "finding": "F1 high blocking: read_confined checks a pathname (fs::canonicalize/:383, fs::symlink_metadata/:390) then reopens it (fs::read/:404). A concurrent swap to a symlink defeats both the symlink refusal and the undeclared-executable screening, since read_mode derives from the pre-check metadata. REQ-03 unmet; also @/inv/convention-convergence, since profile/package.rs already has the cap-std handle-anchored no-follow discipline.",
+      "accepted": "--source/--destination distinct from selectors (verified: profiles/jit-dogfood/assets holds no live/, so from_directory raises MissingContent and a path: selector cannot address a capture source); count/file_count pair."
+    },
+    {
+      "issue": "6a479c58",
+      "round": 2,
+      "verdict": "PASS",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed at fec3a45f (4531 tests, +3; integration-targets 11/12)",
+        "mcp-ci": "passed (64+13)",
+        "code-review": "passed, 0 findings \u2014 'the prior TOCTOU finding is remedied by the current no-follow descriptor read'"
+      },
+      "criteria": {
+        "REQ-01": "MET",
+        "REQ-02": "MET",
+        "REQ-03": "MET",
+        "REQ-04": "MET",
+        "REQ-05": "MET"
+      },
+      "tier_1_5": "F1 closed at HEAD, verified independently: the capture production source contains no fs::read/read_to_string/metadata/symlink_metadata/canonicalize/File::open, and does contain open_path_nofollow. No regression in prior criteria.",
+      "resolution": "read_confined now performs one handle-anchored no-follow open and derives kind, mode, and bytes from that single handle; the canonicalize+starts_with pre-check is deleted rather than demoted. The opener moved to crates/jit/src/profile/nofollow.rs, shared with package.rs, which shrank 66 lines; exactly one module under src/profile/ mentions _cap_fs_ext_follow.",
+      "merge": "merge commit on main; merged tree byte-identical to the gated tree fec3a45f over every path outside .jit/ and dev/active, and cargo-ci's declared inputs exclude .jit/gate-runs, .jit/issues, and .jit/events.jsonl."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -985,6 +1027,37 @@
       "detail": "Whether a package asset draws its bytes from the repository is answered by a package-relative source path prefix (JIT_DOGFOOD_LIVE_SOURCE_PREFIX = \"assets/live/\", crates/jit/src/profile/repository_package.rs:5, consumed in production only at package_assembly.rs:190) while the manifest separately declares [[live-source]] roots (manifest.rs:149, LiveSourceDeclaration at :346). Two encodings of one convention (@/inv/convention-convergence), and the constant names one package for a rule applied to every package (@/inv/domain-agnostic). The epic plan fixes the prefix convention for REQ-13, so 6a479c58 is directed to rename the constant only; converging on a declared per-asset marker would be a manifest-schema change beyond the plan.",
       "status": "reported-to-invoker",
       "owner": "invoker"
+    },
+    {
+      "subject": "empty directories survive a capture removal",
+      "detail": "RepositoryAction (repository_state/image.rs:1274) has DeleteFile and no DeleteDirectory, so a directory left empty by a whole-tree republication remains. No undeclared FILE survives, which is what REQ-01 states, and ProfilePackage::from_directory ignores empty directories. Bears on 15cc28c5 (pack), which archives a package directory and would carry the empty directory into the archive.",
+      "status": "open",
+      "owner": "15cc28c5"
+    },
+    {
+      "subject": "gate verdict memoisation hides an environmental failure",
+      "detail": "jit gate evaluate reuses a prior verdict over unchanged declared inputs ('Verdict: taken from run <id> over the same declared inputs', 0ms). target/ is not a declared input, so clearing an incremental cache does not invalidate a failure caused by it. --force is required. A lead reading the stale verdict would conclude the work is broken.",
+      "status": "process-note"
+    },
+    {
+      "subject": "codex exec blocks on stdin",
+      "detail": "codex exec -m ... \"prompt\" reads additional input from stdin and blocks until killed, producing no output (observed: a 15-minute survey returned nothing, exit 124/0 with 'Reading additional input from stdin...'). Redirect < /dev/null on every codex invocation.",
+      "status": "process-note"
+    },
+    {
+      "subject": "TreeFileDisposition / ProfileCaptureAction 1:1 duplication",
+      "detail": "repository_state::TreeFileDisposition and profile::ProfileCaptureAction have identical variants with a mapping at commands/profile.rs:670-675. Defensible layering (domain type vs Serialize/JsonSchema wire type), recorded for cb26de35 rather than failed.",
+      "status": "assigned-cb26de35"
+    },
+    {
+      "subject": "ProfileCaptureResult flattens package facts beside the envelope",
+      "detail": "count (entries in files, incl. removals) sits beside file_count (files in the captured package). Both load-bearing; the worker proposes nesting the package's own facts under \"package\". Deferred to cb26de35, which owns one presentation contract, because ProfileShowEntry flattens the same fields today.",
+      "status": "assigned-cb26de35"
+    },
+    {
+      "subject": "ProfileApplyError::PackageOutsideWorktree serves two callers",
+      "detail": "It now reports both 'a package's bytes were read from outside the worktree' and 'a caller named a capture source/destination that is not worktree content', while living on ProfileApplyError though capture is not an apply. A shared ProfilePathError would read better. Worker-reported.",
+      "status": "open"
     }
   ],
   "scope_changes": [

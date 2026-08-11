@@ -8,6 +8,7 @@
   ],
   "description": "Turn the repository-local package assembler into a supported operation that\npublishes a package tree from the repository files its manifest declares.\n\n## Background\n\nThe assembler already reads declared live targets, stages a tree, validates it as\na package, and publishes it whole, and a changed live file changes the resulting\npackage identity. It is compiled only for this crate's tests, is hardcoded to this\nrepository's own package path, follows symlinks, and does not screen executable\ncontent. Without it, a package is hand-authored and an in-place edit to\nprofile-owned content cannot be folded back into the package that owns it.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture reads the repository targets a manifest declares and publishes a package tree containing exactly the manifest, the declared asset sources, and the declared region sources; a source the manifest stopped declaring does not survive.\n- [hard] REQ-02: Capture serves any repository and any package id from supplied arguments; no repository path, package id, or entry-point script is compiled in, and the operation is present in an ordinary binary rather than behind a test feature.\n- [hard] REQ-03: A declared target that is a symlink, resolves outside the worktree, or carries executable permission the manifest did not declare is refused before anything is staged.\n- [hard] REQ-04: The published tree decodes and validates as a package, and capture publishes through the shared recoverable transaction rather than its own publication path, so a failure cannot lose an occupied destination.\n- [hard] REQ-05: Capturing a package whose owned content was edited in place produces a tree whose identity reflects that edit, so re-applying it reconciles the repository.\n",
   "documents": [],
+  "done_at": "2026-08-11T07:53:06.660347870Z",
   "first_ready_at": "2026-08-10T14:47:19.925204006Z",
   "gates_required": [
     "cargo-ci",
@@ -44,7 +45,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Capture a package tree from declared repository targets",
-  "updated_at": "2026-08-11T07:51:44.290184173Z"
+  "updated_at": "2026-08-11T07:53:06.660347870Z"
 }
