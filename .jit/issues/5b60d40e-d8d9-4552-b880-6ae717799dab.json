@@ -22,7 +22,7 @@
     "satisfies:REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Add the injectable suite duration checker",
-  "updated_at": "2026-08-11T18:52:34.177708454Z"
+  "updated_at": "2026-08-11T19:03:14.476731275Z"
 }

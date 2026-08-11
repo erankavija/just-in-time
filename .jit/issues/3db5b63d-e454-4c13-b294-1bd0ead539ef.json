@@ -22,7 +22,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Pin and configure the nextest foundation",
-  "updated_at": "2026-08-11T18:52:28.769805047Z"
+  "updated_at": "2026-08-11T19:03:09.157295483Z"
 }

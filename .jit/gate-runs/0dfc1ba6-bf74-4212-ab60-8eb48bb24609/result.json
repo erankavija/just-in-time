@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8ce318379f7bfd42e959fc825039b9722e259d78",
+  "completed_at": "2026-08-11T19:02:29.471883249Z",
+  "duration_ms": 477765,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F1",
+        "line": 5,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Several descriptions duplicate sibling sequencing or authoring metadata that content standards reserve to the DAG."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/4b7c06d0-test-suite-performance/plan.md",
+        "id": "F2",
+        "line": 112,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The enforcement-activation rationale mentions warm-profile ordering that the authoritative manifest and other sequencing contracts do not require."
+      },
+      {
+        "disposition": "advisory",
+        "id": "F3",
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "Repository validation reports four unrelated membership divergences on two issues that predate this bracket."
+      }
+    ],
+    "summary": "The created breakdown exactly matches the authoritative manifest and graph; three non-blocking advisories remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "3306433d-1740-4d5c-b166-d9f40e7fae0d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0dfc1ba6-bf74-4212-ab60-8eb48bb24609",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T18:54:31.706338769Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Mechanical checks passed: manifest validation, renderer check, native batch dry-run, and `jit validate`. The 15 manifest entries map one-to-one to stored issues, all native fields and 16 intra-manifest edges match, `planning` was neither persisted nor exported, and bracket wiring is exact: three sources→`3306433d`, `4b7c06d0`→three sinks, with no external re-home edges.\n\nKey→issue mapping: `journal-runtime-cutover`→`f5da1112`, `journal-barrier-coverage`→`340be714`, `journal-docs-cutover`→`007f598b`, `transaction-benchmark`→`0369e563`, `fsync-dedupe`→`efebd963`, `stale-binary-fixture`→`47836e2e`, `duration-checker`→`5b60d40e`, `nextest-foundation`→`3db5b63d`, `nextest-usage-docs`→`ee809651`, `suite-runner`→`69e9f213`, `step-timing-and-clock`→`2516ad90`, `suite-enforcement`→`94d85bf1`, `nextest-final-policy`→`25faa21d`, `suite-profile`→`21ba4bb4`, `inherent-cost-attribution`→`76ecc11f`.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused implementation/review cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| journal-runtime-cutover | Journal protocol cutover | Recovery runtime | Crash conformance | Yes | Yes—atomic cutover | Yes | Yes | Pass |\n| journal-barrier-coverage | New crash cases | Crash conformance | Failure-point inventory | Yes | Yes | Yes | Yes | Pass |\n| journal-docs-cutover | Architecture correction | Durability documentation | Document review | Yes | Yes | Yes | Yes | Pass |\n| transaction-benchmark | Transaction measurements | Performance evidence | Benchmark artifact | Yes | Yes | Yes | Yes | Pass |\n| fsync-dedupe | Benchmark-driven decision | Durability implementation | Benchmark rerun | Yes | Yes | Yes | Yes | Pass |\n| stale-binary-fixture | Shared build fixture | Stale-binary tests | Build-count marker | Yes | Yes | Yes | Yes | Pass |\n| duration-checker | Duration input validation | Budget checker | Boundary fixtures | Yes | Yes | Yes | Yes | Pass |\n| nextest-foundation | Reproducible nextest base | CI runner foundation | Config parsing | Yes | Yes | Yes | Yes | Pass |\n| nextest-usage-docs | Contributor guidance | Local test runners | Document review | Yes | Yes | Yes | Yes | Pass |\n| suite-runner | Runner swap | Cargo-ci reporter | Cargo-ci self-test | Yes | Yes | Yes | Yes | Pass |\n| step-timing-and-clock | Timing evidence | Cargo-ci reporting | Stable timing summary | Yes | Yes | Yes | Yes | Pass |\n| suite-enforcement | Live budget wiring | Suite enforcement | Cargo-ci enforcement | Yes | Yes | Yes | Yes | Pass |\n| nextest-final-policy | Final runtime bounds | Nextest policy | Config parse and suite | Yes | Yes | Yes | Yes | Pass |\n| suite-profile | Per-test timing artifact | Profiling evidence | Profile artifact | Yes | Yes | Yes | Yes | Pass |\n| inherent-cost-attribution | Cost attribution | Contributor documentation | Artifact-linked review | Yes | Yes | Yes | Yes | Pass |\n\n1. **F1 — advisory, issue-impact, low.** Several authoritative descriptions name sibling semantic keys to narrate sequencing, and `journal-barrier-coverage` mentions the authoring-only `landing_group`. This duplicates DAG/authoring mechanics contrary to the content standards. The bodies remain independently actionable, so this is phrasing cleanup rather than a delivery blocker. Examples begin at [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:5).\n\n2. **F2 — advisory, issue-impact, low.** The plan’s “Enforcement activation” rationale says enforcement follows the warm profile, while the authoritative manifest permits `suite-enforcement` and `suite-profile` to proceed in parallel. The other sequencing decision and task contracts consistently require the profile only before `nextest-final-policy`, making this a rationale-text mismatch rather than a graph defect. See [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/plan.md:112).\n\n3. **F3 — advisory, pre-existing, low.** `jit validate` passed with zero errors and warnings but reported four membership divergences on two unrelated issues created August 4 (`661e35c9` and `a5d01ff8`). They predate this bracket and do not affect its graph.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The created breakdown exactly matches the authoritative manifest and graph; three non-blocking advisories remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Several descriptions duplicate sibling sequencing or authoring metadata that content standards reserve to the DAG.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":5},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The enforcement-activation rationale mentions warm-profile ordering that the authoritative manifest and other sequencing contracts do not require.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/plan.md\",\"line\":112},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Repository validation reports four unrelated membership divergences on two issues that predate this bracket.\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

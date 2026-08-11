@@ -1,0 +1,36 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "builtin:rule_validation",
+  "commit": null,
+  "completed_at": "2026-08-11T18:53:44.319180981Z",
+  "duration_ms": 6,
+  "exit_code": 4,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "[coverage-preview] configured rule 'coverage-preview' does not match selected issue 3306433d"
+      }
+    ],
+    "summary": "Built-in validation failed with 1 finding(s)",
+    "verdict": "fail"
+  },
+  "gate_key": "coverage-preview",
+  "issue_id": "3306433d-1740-4d5c-b166-d9f40e7fae0d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d6bbd848-2469-4845-a2e5-1c8da439cf80",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T18:53:44.312550020Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "Built-in validation failed with 1 finding(s)\nERROR [F1] [coverage-preview] configured rule 'coverage-preview' does not match selected issue 3306433d",
+  "tree_dirty": null
+}
