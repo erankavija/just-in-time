@@ -15,8 +15,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-08-11T22:51:15.363775667Z",
+      "status": "failed",
+      "updated_at": "2026-08-11T23:28:49.358573110Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Share the stale-binary build fixture across processes",
-  "updated_at": "2026-08-11T22:58:39.645668787Z"
+  "updated_at": "2026-08-11T23:28:49.358573110Z"
 }
