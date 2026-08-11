@@ -28,6 +28,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -38,10 +39,18 @@ use tempfile::TempDir;
 use jit::storage::FileLocker;
 
 const STALE_CHILD_CACHE: &str = "jit-stale-child-test-cache";
-const FIXTURE_MARKER_VERSION: u32 = 3;
+const FIXTURE_MARKER_VERSION: u32 = 4;
 const FIXTURE_LOCK_TIMEOUT: Duration = Duration::from_secs(120);
 const PINNED_NEXTEST_VERSION: &str = "0.9.133";
 const REUSE_OBSERVATION_DIR: &str = "JIT_STALE_FIXTURE_REUSE_OBSERVATION_DIR";
+const NEXTEST_SEMANTIC_TESTS: [&str; 6] = [
+    "stale_binary_child_process_tests::test_checker_child_stale_binary_fails_gate_run_visibly",
+    "stale_binary_child_process_tests::test_checker_child_metadata_only_change_does_not_refuse",
+    "stale_binary_child_process_tests::test_non_gate_context_child_invocation_stays_unchecked",
+    "stale_binary_child_process_tests::test_gate_context_early_paths_refuse_stale_binary",
+    "stale_binary_json_exit_tests::test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes",
+    "stale_binary_json_exit_tests::test_gate_evaluate_metadata_only_commit_does_not_refuse_stale_binary",
+];
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct VerifiedArtifactMarker {
@@ -52,6 +61,22 @@ struct VerifiedArtifactMarker {
     artifact_sha256: String,
     cargo_build_invocations: u32,
     reuse_observations: u32,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum FixtureUse {
+    Built,
+    Reused,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct ScopedFixtureObservation {
+    test: String,
+    outcome: FixtureUse,
+    source_sha256: String,
+    built_from: String,
+    cargo_build_invocations: u32,
 }
 
 fn jit_binary() -> &'static str {
@@ -93,6 +118,27 @@ pub(super) fn ancestor_commit(workspace_root: &Path) -> Option<String> {
 /// verifies, and publishes both artifact and marker while still holding the
 /// lock. Returns `None` only when the nested Cargo command cannot run or fails.
 pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) -> Option<PathBuf> {
+    let target_dir = workspace_root.join("target").join(STALE_CHILD_CACHE);
+    build_stale_child_binary_with_runner(
+        workspace_root,
+        ancestor,
+        &target_dir,
+        run_nested_cargo,
+        binary_reports_provenance,
+    )
+}
+
+fn build_stale_child_binary_with_runner<RunCargo, VerifyBinary>(
+    workspace_root: &Path,
+    ancestor: &str,
+    target_dir: &Path,
+    run_cargo: RunCargo,
+    verify_binary: VerifyBinary,
+) -> Option<PathBuf>
+where
+    RunCargo: FnOnce(&Path, &Path, &str, &str) -> Option<PathBuf>,
+    VerifyBinary: Fn(&Path, &str, &str) -> bool,
+{
     let short = Command::new("git")
         .args(["rev-parse", "--short=8", ancestor])
         .current_dir(workspace_root)
@@ -104,8 +150,7 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
     let source_sha256 = sha256_file(Path::new(jit_binary()))
         .expect("the Cargo-built outer jit binary should be hashable");
     let cache_key = fixture_cache_key(ancestor, &source_sha256);
-    let target_dir = workspace_root.join("target").join(STALE_CHILD_CACHE);
-    fs::create_dir_all(&target_dir).expect("stale-child cache directory should be creatable");
+    fs::create_dir_all(target_dir).expect("stale-child cache directory should be creatable");
     let _lock = FileLocker::new(FIXTURE_LOCK_TIMEOUT)
         .lock_exclusive(&target_dir.join("fixture.lock"))
         .expect("stale-child fixture lock should be acquirable");
@@ -133,7 +178,7 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
             .expect("the reuse observation should read back from its marker");
         assert_eq!(observed.cargo_build_invocations, 1);
         assert_eq!(observed.reuse_observations, expected_reuse_observations);
-        record_scoped_reuse_observation();
+        record_scoped_fixture_observation(&marker, FixtureUse::Reused);
         return Some(artifact);
     }
 
@@ -143,32 +188,13 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
         artifact_dir.display()
     );
 
-    fs::create_dir_all(&artifact_dir)
-        .expect("provenance-keyed stale-child artifact directory should be creatable");
-    let cargo_build_invocations = record_cargo_build_invocation(&build_count_path);
-    assert_eq!(
-        cargo_build_invocations, 1,
-        "one provenance key must invoke nested Cargo exactly once"
-    );
-    let status = Command::new("cargo")
-        .args(["build", "-p", "jit", "--bin", "jit"])
-        .current_dir(workspace_root)
-        .env("JIT_BUILD_GIT_HASH", ancestor)
-        .env("JIT_BUILD_GIT_SHORT_HASH", &short)
-        .env("JIT_BUILD_GIT_DIRTY", "false")
-        .env("CARGO_TARGET_DIR", &target_dir)
-        .status()
-        .ok()?;
-    if !status.success() {
-        return None;
-    }
-    let cargo_binary = target_dir
-        .join("debug")
-        .join(format!("jit{}", std::env::consts::EXE_SUFFIX));
-    if !binary_reports_provenance(&cargo_binary, ancestor, &short) {
+    let cargo_binary = run_cargo(workspace_root, target_dir, ancestor, &short)?;
+    if !verify_binary(&cargo_binary, ancestor, &short) {
         return None;
     }
 
+    fs::create_dir_all(&artifact_dir)
+        .expect("provenance-keyed stale-child artifact directory should be creatable");
     let staging = artifact_dir.join(format!("artifact.tmp.{}", std::process::id()));
     let cargo_sha256 = sha256_file(&cargo_binary).expect("Cargo child output should hash");
     fs::copy(&cargo_binary, &staging)
@@ -178,12 +204,17 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
         cargo_sha256,
         "staged child artifact must match Cargo output before publication"
     );
-    assert!(binary_reports_provenance(&staging, ancestor, &short));
+    assert!(verify_binary(&staging, ancestor, &short));
     publish_staged_file_noreplace(&staging, &artifact)
         .expect("verified stale-child artifact should publish atomically without replacement");
 
+    let cargo_build_invocations = record_cargo_build_invocation(&build_count_path);
+    assert_eq!(
+        cargo_build_invocations, 1,
+        "one provenance key must publish exactly one successful nested Cargo build"
+    );
     let artifact_sha256 = sha256_file(&artifact).expect("published child artifact should hash");
-    assert!(binary_reports_provenance(&artifact, ancestor, &short));
+    assert!(verify_binary(&artifact, ancestor, &short));
     let marker = VerifiedArtifactMarker {
         version: FIXTURE_MARKER_VERSION,
         source_sha256,
@@ -197,7 +228,30 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
     let observed = read_marker(&marker_path).expect("the built artifact marker should read back");
     assert_eq!(observed.cargo_build_invocations, 1);
     assert_eq!(observed.reuse_observations, 0);
+    record_scoped_fixture_observation(&marker, FixtureUse::Built);
     Some(artifact)
+}
+
+fn run_nested_cargo(
+    workspace_root: &Path,
+    target_dir: &Path,
+    ancestor: &str,
+    short: &str,
+) -> Option<PathBuf> {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "jit", "--bin", "jit"])
+        .current_dir(workspace_root)
+        .env("JIT_BUILD_GIT_HASH", ancestor)
+        .env("JIT_BUILD_GIT_SHORT_HASH", short)
+        .env("JIT_BUILD_GIT_DIRTY", "false")
+        .env("CARGO_TARGET_DIR", target_dir)
+        .status()
+        .ok()?;
+    status.success().then(|| {
+        target_dir
+            .join("debug")
+            .join(format!("jit{}", std::env::consts::EXE_SUFFIX))
+    })
 }
 
 fn fixture_cache_key(ancestor: &str, source_sha256: &str) -> String {
@@ -308,21 +362,40 @@ fn publish_staged_file_noreplace(staging: &Path, destination: &Path) -> std::io:
     fs::remove_file(staging)
 }
 
-fn record_scoped_reuse_observation() {
+fn record_scoped_fixture_observation(marker: &VerifiedArtifactMarker, outcome: FixtureUse) {
     let Some(directory) = std::env::var_os(REUSE_OBSERVATION_DIR).map(PathBuf::from) else {
         return;
     };
-    let process = std::process::id();
-    let staging = directory.join(format!(".reuse-{process}.tmp"));
-    let observation = directory.join(format!("reuse-{process}"));
-    let content = b"verified artifact reused without Cargo\n";
-    fs::write(&staging, content).expect("scoped reuse observation staging file should be writable");
+    let arguments = std::env::args().collect::<Vec<_>>();
+    let (index, test) = NEXTEST_SEMANTIC_TESTS
+        .iter()
+        .enumerate()
+        .find(|(_, test)| arguments.iter().any(|argument| argument == **test))
+        .unwrap_or_else(|| {
+            panic!("nextest fixture caller has no semantic-test identity in argv: {arguments:?}")
+        });
+    let staging = directory.join(format!(".fixture-{index}.json.tmp"));
+    let destination = directory.join(format!("fixture-{index}.json"));
+    let observation = ScopedFixtureObservation {
+        test: (*test).to_string(),
+        outcome,
+        source_sha256: marker.source_sha256.clone(),
+        built_from: marker.built_from.clone(),
+        cargo_build_invocations: marker.cargo_build_invocations,
+    };
+    let content = serde_json::to_vec_pretty(&observation)
+        .expect("scoped fixture observation should serialize");
+    fs::write(&staging, &content)
+        .expect("scoped fixture observation staging file should be writable");
     assert_eq!(
-        fs::read(&staging).expect("scoped reuse observation should read back"),
-        content
+        serde_json::from_reader::<_, ScopedFixtureObservation>(
+            File::open(&staging).expect("scoped fixture observation should read back")
+        )
+        .expect("scoped fixture observation should remain valid JSON"),
+        observation
     );
-    publish_staged_file_noreplace(&staging, &observation)
-        .expect("each nextest process should publish one unique reuse observation");
+    publish_staged_file_noreplace(&staging, &destination)
+        .expect("each nextest semantic test should publish one unique fixture observation");
 }
 
 #[test]
@@ -361,6 +434,62 @@ fn test_stale_binary_fixture_marker_replacement_leaves_one_complete_file() {
     assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
 }
 
+#[test]
+fn test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable() {
+    const FAKE_CHILD: &[u8] = b"verified fake child";
+
+    let workspace_root = workspace_root();
+    let ancestor = ancestor_commit(&workspace_root)
+        .expect("workspace should have enough history for the stale-binary fixture");
+    let directory = TempDir::new().expect("failure-injection cache needs a directory");
+    let target_dir = directory.path().join(STALE_CHILD_CACHE);
+    let source_sha256 = sha256_file(Path::new(jit_binary())).unwrap();
+    let artifact_dir = target_dir
+        .join("artifacts")
+        .join(fixture_cache_key(&ancestor, &source_sha256));
+    let verify_fake =
+        |binary: &Path, _: &str, _: &str| fs::read(binary).is_ok_and(|bytes| bytes == FAKE_CHILD);
+
+    let failed = build_stale_child_binary_with_runner(
+        &workspace_root,
+        &ancestor,
+        &target_dir,
+        |_, _, _, _| None,
+        verify_fake,
+    );
+
+    assert!(failed.is_none());
+    assert!(
+        !artifact_dir.exists(),
+        "failed Cargo must not publish count, artifact, marker, or cache-key directory"
+    );
+
+    let artifact = build_stale_child_binary_with_runner(
+        &workspace_root,
+        &ancestor,
+        &target_dir,
+        |_, target_dir, _, _| {
+            let cargo_binary = target_dir.join("fake-cargo-output");
+            fs::write(&cargo_binary, FAKE_CHILD).unwrap();
+            Some(cargo_binary)
+        },
+        verify_fake,
+    )
+    .expect("a later caller should retry and publish one verified artifact");
+
+    assert_eq!(fs::read(&artifact).unwrap(), FAKE_CHILD);
+    assert_eq!(
+        read_build_count(&artifact_dir.join("cargo-build-invocations")),
+        Some(1)
+    );
+    assert_eq!(
+        read_marker(&artifact_dir.join("verified-artifact.json"))
+            .unwrap()
+            .cargo_build_invocations,
+        1
+    );
+}
+
 /// REQ-03: while Cargo remains the outer suite runner, this regression invokes
 /// the pinned nextest runner over exactly the six stale-binary semantic tests.
 /// Nextest sets `NEXTEST` in each process it launches, so the test returns when
@@ -385,10 +514,6 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
     );
 
     let workspace_root = workspace_root();
-    let ancestor = ancestor_commit(&workspace_root)
-        .expect("workspace should have enough history for the stale-binary fixture");
-    build_stale_child_binary(&workspace_root, &ancestor)
-        .expect("the cargo-test process should prewarm the verified child artifact");
     let reuse_observations = TempDir::new().expect("nextest reuse observations need a directory");
 
     let filter = "test(checker_child) | test(non_gate_context) | \
@@ -423,12 +548,62 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
         report.contains("6 tests run: 6 passed"),
         "pinned nextest must independently report all six semantic tests:\n{report}"
     );
+    let mut observations = fs::read_dir(reuse_observations.path())
+        .expect("nextest fixture observation directory should remain readable")
+        .map(|entry| {
+            let path = entry
+                .expect("fixture observation entry should be readable")
+                .path();
+            serde_json::from_reader::<_, ScopedFixtureObservation>(
+                File::open(&path).expect("fixture observation should open"),
+            )
+            .unwrap_or_else(|error| {
+                panic!("invalid fixture observation {}: {error}", path.display())
+            })
+        })
+        .collect::<Vec<_>>();
+    observations.sort_by(|left, right| left.test.cmp(&right.test));
+    eprintln!("stale-binary nextest fixture observations: {observations:#?}");
+
+    let expected_tests = NEXTEST_SEMANTIC_TESTS
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let observed_tests = observations
+        .iter()
+        .map(|observation| observation.test.as_str())
+        .collect::<BTreeSet<_>>();
     assert_eq!(
-        fs::read_dir(reuse_observations.path())
-            .expect("nextest reuse observation directory should remain readable")
-            .count(),
+        observed_tests, expected_tests,
+        "all six selected nextest semantic tests must identify their fixture outcome"
+    );
+    assert_eq!(
+        observations.len(),
         6,
-        "each nextest process must record one verified reuse without Cargo"
+        "each selected nextest semantic test must publish exactly one fixture observation"
+    );
+    assert!(
+        observations
+            .iter()
+            .all(|observation| observation.cargo_build_invocations == 1),
+        "every observed artifact must prove exactly one nested Cargo build: {observations:#?}"
+    );
+    assert_eq!(
+        observations
+            .iter()
+            .map(|observation| (&observation.source_sha256, &observation.built_from))
+            .collect::<BTreeSet<_>>()
+            .len(),
+        1,
+        "all six nextest tests must use one provenance-keyed artifact: {observations:#?}"
+    );
+    assert!(
+        observations
+            .iter()
+            .filter(|observation| observation.outcome == FixtureUse::Built)
+            .count()
+            <= 1,
+        "at most one nextest test may invoke nested Cargo: {observations:#?}"
     );
 }
 
