@@ -13689,3 +13689,5 @@
 {"from":"in_progress","id":"08174009-3bec-4693-957b-8072c8523a60","issue_id":"340be714-6209-4a43-b0e1-402eb1538a08","timestamp":"2026-08-11T21:29:38.966179397Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"55cf3562-fed0-4b59-bf41-93b65bbf56ab","issue_id":"340be714-6209-4a43-b0e1-402eb1538a08","reason":"blocked by missing in-memory rollback injection seam","timestamp":"2026-08-11T21:29:38.966179397Z","type":"issue_released"}
 {"fields":["dependencies"],"id":"69b5b052-4003-48a7-b28b-458e4e79e536","issue_id":"f78babf6-d35a-4a25-bf65-f4891f7cdf9f","timestamp":"2026-08-11T21:29:45.057064499Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"129f2029-9b70-459b-a745-d02d19b78eb1","issue_id":"340be714-6209-4a43-b0e1-402eb1538a08","timestamp":"2026-08-11T21:30:10.302751212Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"4b359d72-963f-43eb-87f5-ecb24544a1ed","issue_id":"340be714-6209-4a43-b0e1-402eb1538a08","timestamp":"2026-08-11T21:30:10.302751212Z","type":"issue_updated","updated_by":"dependency-add"}
