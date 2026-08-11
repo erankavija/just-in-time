@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d7d3bf923fb8615f409a32ffe009764208aa04b3",
+  "completed_at": "2026-08-11T22:09:00.320143875Z",
+  "duration_ms": 164475,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue hard criteria are implemented and covered by focused tests; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f78babf6-d35a-4a25-bf65-f4891f7cdf9f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5c7720c2-1dae-487d-beb0-2c735cc6ab33",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T22:06:15.844561418Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 803d6658, 176b8323, 1161f2fc, d7d3bf92, 11af17bf (`jit:f78babf6`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f78babf6/requirement/REQ-01..REQ-04 (issue description, markdown-first); @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (​.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-11T21:55:28Z); code-review pending\nTruncation recovery: recovered truncated combined output through per-commit patches, affected-file reads, line-scoped source/test reads, and item resolutions\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue hard criteria are implemented and covered by focused tests; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

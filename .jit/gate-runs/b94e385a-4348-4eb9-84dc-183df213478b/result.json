@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "11af17bf5f99f2b093f03db155eed1149f45661c",
+  "completed_at": "2026-08-11T22:12:44.370659777Z",
+  "duration_ms": 150568,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Prepared in-memory recovery now mirrors rollback failure-edge ordering and residue retry behavior, with focused coverage and passing recorded CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f78babf6-d35a-4a25-bf65-f4891f7cdf9f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b94e385a-4348-4eb9-84dc-183df213478b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T22:10:13.801943579Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 803d6658, 176b8323, 1161f2fc, d7d3bf92, 11af17bf (`jit:f78babf6`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/4b7c06d0/requirement/REQ-01 and REQ-04 (issue source)\nGate evidence: cargo-ci passed (exit 0); prior code-review passed (exit 0)\nTruncation recovery: re-read the implementation and test patches in bounded ranges; compared the narrowed memory recovery path with file_transaction rollback\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Prepared in-memory recovery now mirrors rollback failure-edge ordering and residue retry behavior, with focused coverage and passing recorded CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
