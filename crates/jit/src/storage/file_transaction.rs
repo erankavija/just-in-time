@@ -3189,6 +3189,45 @@ mod tests {
     }
 
     #[test]
+    fn test_open_relative_dir_resolves_a_barrier_name_to_the_recorded_directory() {
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp.path().join("a/b")).unwrap();
+        let root = Dir::open_ambient_dir(temp.path(), cap_std::ambient_authority()).unwrap();
+        let nested = VirtualPath::data("a/b/leaf.txt").unwrap();
+        let directly_under_root = VirtualPath::data("leaf.txt").unwrap();
+        assert_eq!(parent_relative(&nested), "a/b");
+        assert_eq!(parent_relative(&directly_under_root), "");
+
+        // A barrier names its directories instead of holding them, so the name it
+        // records must resolve back to the very directory the action mutated.
+        let identity_of = |directory: &Dir| {
+            inspect_repository_root(directory)
+                .unwrap()
+                .identity()
+                .cloned()
+                .unwrap()
+        };
+        let mutated = open_existing_dir(&open_existing_dir(&root, "a").unwrap(), "b").unwrap();
+        assert_eq!(
+            identity_of(&open_relative_dir(&root, &parent_relative(&nested)).unwrap()),
+            identity_of(&mutated)
+        );
+        assert_eq!(
+            identity_of(&open_relative_dir(&root, &parent_relative(&directly_under_root)).unwrap()),
+            identity_of(&root)
+        );
+
+        // Resolution refuses a symlinked component exactly as the mutation path
+        // does, so a barrier can never follow a link out of the repository.
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(temp.path().join("a"), temp.path().join("link")).unwrap();
+            assert!(open_relative_dir(&root, "link").is_err());
+            assert!(open_relative_dir(&root, "link/b").is_err());
+        }
+    }
+
+    #[test]
     fn test_verified_directory_cleanup_keeps_raced_name_occupant() {
         let temp = TempDir::new().unwrap();
         let parent = Dir::open_ambient_dir(temp.path(), cap_std::ambient_authority()).unwrap();
