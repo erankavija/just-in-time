@@ -1071,6 +1071,17 @@ fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
     }
 }
 
+/// Render what a capture did to one path, for human output.
+fn profile_capture_action_label(action: jit::profile::ProfileCaptureAction) -> &'static str {
+    use jit::profile::ProfileCaptureAction;
+    match action {
+        ProfileCaptureAction::Unchanged => "unchanged",
+        ProfileCaptureAction::Create => "created  ",
+        ProfileCaptureAction::Update => "updated  ",
+        ProfileCaptureAction::Remove => "removed  ",
+    }
+}
+
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
     use jit::repository_state::{InitializationError, RepositoryStateError};
@@ -2531,6 +2542,44 @@ fn run() -> Result<()> {
                 CommandExecutor::plan_profiles_from_sources,
                 CommandExecutor::apply_profile_from_sources,
             )?,
+            ProfileCommands::Capture {
+                source,
+                destination,
+                json,
+            } => {
+                let invocation_dir = std::env::current_dir()?;
+                match executor.capture_profile_package(&invocation_dir, &source, &destination) {
+                    Ok(result) => {
+                        if json {
+                            let output = JsonOutput::success(&result);
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!(
+                                "Captured {} {} at {}",
+                                result.id, result.version, result.destination
+                            );
+                            println!("Package hash: {}", result.package_hash);
+                            println!(
+                                "Files: {} ({} bytes)",
+                                result.file_count, result.byte_size
+                            );
+                            for file in &result.files {
+                                println!(
+                                    "  {} {}",
+                                    profile_capture_action_label(file.action),
+                                    file.path
+                                );
+                            }
+                        }
+                    }
+                    Err(error) if json => {
+                        let json_error = profile_json_error(&error);
+                        println!("{}", json_error.to_json_string()?);
+                        std::process::exit(json_error.exit_code().code());
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
             ProfileCommands::Reconfigure {
                 profile,
                 values_file,

@@ -69,6 +69,7 @@ pub use initialize::{
 };
 pub use package_tree::{
     finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
+    TreeFileDisposition, TreeFileOutcome,
 };
 pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{

@@ -43,6 +43,30 @@ pub struct PackageTreeCapture {
     files: Vec<CapturedTreeFile>,
 }
 
+/// What a republication does to one path beneath its destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TreeFileDisposition {
+    /// Already exactly what the tree declares, so nothing is published.
+    Unchanged,
+    /// Absent, so the tree's content is created.
+    Create,
+    /// Present with other content or mode, so it is replaced.
+    Update,
+    /// Present and not declared, so it is removed.
+    Remove,
+}
+
+/// One decision a republication reached about a path beneath its destination.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeFileOutcome {
+    /// The path the decision is about.
+    pub path: VirtualPath,
+    /// What the delta does to it.
+    pub disposition: TreeFileDisposition,
+    /// Mode the path carries after publication; a removal keeps the mode it had.
+    pub mode: FileMode,
+}
+
 /// Why a whole-tree republication could not be declared or finalized.
 #[derive(Debug, thiserror::Error)]
 pub enum PackageTreeCaptureError {
@@ -155,7 +179,7 @@ impl PackageTreeCapture {
         let listed = image
             .listing_fingerprints()
             .iter()
-            .filter(|(path, _)| self.contains(path))
+            .filter(|(path, _)| *path == &self.destination || self.contains(path))
             .flat_map(|(path, listing)| {
                 listing
                     .children()
@@ -200,13 +224,17 @@ impl PackageTreeCapture {
     }
 }
 
-/// Finalize one whole-tree republication as an exact recoverable plan.
+/// Finalize one whole-tree republication as an exact recoverable plan, with the
+/// decision it reached about every path beneath the destination.
 ///
-/// The delta creates every directory the tree needs and is absent, writes every
-/// declared file, and deletes every ordinary file the image shows beneath the
-/// destination that the tree does not declare. A directory the tree no longer
-/// needs is left in place: the repository transaction publishes files, and an
-/// empty directory carries no content the tree declares.
+/// The delta creates every directory the tree needs and is absent, publishes
+/// every declared file whose content or mode differs from what the image shows,
+/// and deletes every ordinary file the image shows beneath the destination that
+/// the tree does not declare. A file already exactly as declared is reported
+/// [`TreeFileDisposition::Unchanged`] and carries no action, so republishing an
+/// unchanged tree publishes nothing. A directory the tree no longer needs is
+/// left in place: the repository transaction publishes files, and an empty
+/// directory carries no content the tree declares.
 ///
 /// # Errors
 ///
@@ -218,7 +246,7 @@ impl PackageTreeCapture {
 pub fn finalize_package_tree_capture(
     base: &RepositoryImage,
     capture: &PackageTreeCapture,
-) -> Result<MaterializationPlan, PackageTreeCaptureError> {
+) -> Result<(MaterializationPlan, Vec<TreeFileOutcome>), PackageTreeCaptureError> {
     let published = capture
         .files
         .iter()
@@ -258,23 +286,42 @@ pub fn finalize_package_tree_capture(
         .iter()
         .map(|(path, file)| {
             let entry = base.entry(path)?;
-            match entry {
-                RepositoryEntry::Absent | RepositoryEntry::File { .. } => {
-                    Ok(RepositoryAction::WriteFile {
-                        path: (*path).clone(),
-                        owner: CAPTURE_OWNER.to_string(),
-                        expected: ExpectedPreimage::of(entry),
-                        bytes: file.bytes.clone(),
-                        mode: file.mode,
-                    })
+            let disposition = match entry {
+                RepositoryEntry::Absent => TreeFileDisposition::Create,
+                RepositoryEntry::File { bytes, mode, .. }
+                    if bytes == &file.bytes && mode == &file.mode =>
+                {
+                    TreeFileDisposition::Unchanged
                 }
-                RepositoryEntry::Directory { .. } => Err(
-                    PackageTreeCaptureError::OccupiedDirectory(path.repository_relative()),
-                ),
-                _ => Err(PackageTreeCaptureError::UnsafeOccupant(
-                    path.repository_relative(),
-                )),
-            }
+                RepositoryEntry::File { .. } => TreeFileDisposition::Update,
+                RepositoryEntry::Directory { .. } => {
+                    return Err(PackageTreeCaptureError::OccupiedDirectory(
+                        path.repository_relative(),
+                    ))
+                }
+                _ => {
+                    return Err(PackageTreeCaptureError::UnsafeOccupant(
+                        path.repository_relative(),
+                    ))
+                }
+            };
+            let action = (disposition != TreeFileDisposition::Unchanged).then(|| {
+                RepositoryAction::WriteFile {
+                    path: (*path).clone(),
+                    owner: CAPTURE_OWNER.to_string(),
+                    expected: ExpectedPreimage::of(entry),
+                    bytes: file.bytes.clone(),
+                    mode: file.mode,
+                }
+            });
+            Ok((
+                action,
+                TreeFileOutcome {
+                    path: (*path).clone(),
+                    disposition,
+                    mode: file.mode,
+                },
+            ))
         })
         .collect::<Result<Vec<_>, PackageTreeCaptureError>>()?;
 
@@ -284,22 +331,36 @@ pub fn finalize_package_tree_capture(
         .filter(|(path, _)| capture.contains(path) && !published.contains_key(*path))
         .map(|(path, entry)| match entry {
             RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => Ok(None),
-            RepositoryEntry::File { .. } => Ok(Some(RepositoryAction::DeleteFile {
-                path: path.clone(),
-                owner: CAPTURE_OWNER.to_string(),
-                expected: ExpectedPreimage::of(entry),
-            })),
+            RepositoryEntry::File { mode, .. } => Ok(Some((
+                RepositoryAction::DeleteFile {
+                    path: path.clone(),
+                    owner: CAPTURE_OWNER.to_string(),
+                    expected: ExpectedPreimage::of(entry),
+                },
+                TreeFileOutcome {
+                    path: path.clone(),
+                    disposition: TreeFileDisposition::Remove,
+                    mode: *mode,
+                },
+            ))),
             _ => Err(PackageTreeCaptureError::UnsafeOccupant(
                 path.repository_relative(),
             )),
         })
         .collect::<Result<Vec<_>, PackageTreeCaptureError>>()?;
 
+    let (removal_actions, removal_outcomes): (Vec<_>, Vec<_>) =
+        removals.into_iter().flatten().unzip();
+    let (write_actions, write_outcomes): (Vec<_>, Vec<_>) = writes.into_iter().unzip();
+    let outcomes = write_outcomes
+        .into_iter()
+        .chain(removal_outcomes)
+        .collect::<Vec<_>>();
     let actions = created
         .into_iter()
         .flatten()
-        .chain(writes)
-        .chain(removals.into_iter().flatten())
+        .chain(write_actions.into_iter().flatten())
+        .chain(removal_actions)
         .collect::<Vec<_>>();
     let delta = RepositoryDelta::new(base.layout(), actions)?;
     let seed = RepositorySeed::new(
@@ -315,12 +376,15 @@ pub fn finalize_package_tree_capture(
         ]),
         BTreeMap::new(),
     )?;
-    Ok(MaterializationPlan::new(
-        base,
-        &seed,
-        &MaterializationIntent::CapturePackageTree,
-        delta,
-    )?)
+    Ok((
+        MaterializationPlan::new(
+            base,
+            &seed,
+            &MaterializationIntent::CapturePackageTree,
+            delta,
+        )?,
+        outcomes,
+    ))
 }
 
 /// The repository identity of one named child of a captured directory.

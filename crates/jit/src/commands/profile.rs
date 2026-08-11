@@ -1,8 +1,9 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
-    build_profile_claims_from_resolved, resolve_package, resolve_package_from_record,
-    EngineVersion, ProfileApplicationStatus, ProfileApplyResult, ProfileComposedApplyResult,
+    build_profile_claims_from_resolved, capture_package_tree, resolve_package,
+    resolve_package_from_record, EngineVersion, ProfileApplicationStatus, ProfileApplyResult,
+    ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
     ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
     ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
     ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
@@ -11,10 +12,12 @@ use crate::profile::{
     VariableInputs,
 };
 use crate::repository_state::{
-    apply_overlay, derive_materialization, AppliedProfileRecord, CaptureBudget, CaptureSpec,
-    MaterializationPlan, MaterializationRequest, MutationContext, ProfileApplicationInput,
-    ProfileContributionClaim, ProfileTargetDisposition, RepositoryEntry, RepositoryImage,
-    RepositoryLayout, RepositoryRootClass, VirtualPath,
+    apply_overlay, classify_repository_export, derive_materialization,
+    finalize_package_tree_capture, AppliedProfileRecord, CaptureBudget, CaptureSpec,
+    CapturedTreeFile, FileMode, MaterializationPlan, MaterializationRequest, MutationContext,
+    PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim, ProfileTargetDisposition,
+    RepositoryEntry, RepositoryExportDestination, RepositoryImage, RepositoryLayout,
+    RepositoryLayoutError, RepositoryRootClass, RootRelativePath, TreeFileDisposition, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -565,6 +568,126 @@ impl CommandExecutor<JsonFileStorage> {
                 count: profiles.len(),
                 profiles,
             }))
+        })
+    }
+
+    /// Capture the package at `package_source` and publish the resulting tree
+    /// at `destination`.
+    ///
+    /// Both directories are the caller's, resolved against `invocation_dir` the
+    /// way every other path argument is, and both must classify as worktree
+    /// content: a package is repository material an adopter reads and commits,
+    /// so the separate data root and anything outside the repository are
+    /// refused. Nothing about which package or which repository is compiled in.
+    ///
+    /// The capture reads the sources the manifest at `package_source` declares
+    /// — each live asset from the repository file its declaration targets,
+    /// everything else from the package's own directory — and validates the
+    /// result as a package before anything is published, so a symbolic link, a
+    /// source outside the worktree, or a file carrying executable permission
+    /// its declaration did not is refused while the destination is untouched.
+    ///
+    /// Publication is whole and recoverable: the destination ends up carrying
+    /// exactly the manifest, the declared asset sources, and the declared region
+    /// sources, with every file it held that the manifest no longer declares
+    /// removed in the same transaction (`@/inv/atomic-writes`). Capturing a
+    /// package whose owned content was edited in place therefore publishes a
+    /// tree whose identity reflects that edit, which is what lets re-applying it
+    /// reconcile the repository.
+    ///
+    /// # Errors
+    ///
+    /// Every [`PackageCaptureError`] the read reports; a destination or package
+    /// directory that is not worktree content; a destination path occupied by
+    /// something a republication may neither publish over nor remove; and the
+    /// publication failures of the shared mutation session.
+    pub fn capture_profile_package(
+        &self,
+        invocation_dir: &Path,
+        package_source: &Path,
+        destination: &Path,
+    ) -> Result<ProfileCaptureResult> {
+        let layout = self.require_layout()?;
+        let source = worktree_directory(&layout, invocation_dir, package_source)?;
+        let destination = worktree_directory(&layout, invocation_dir, destination)?;
+        let captured = capture_package_tree(&source, &layout)?;
+        let capture = PackageTreeCapture::new(
+            destination.clone(),
+            captured
+                .files()
+                .iter()
+                .map(|(relative, file)| {
+                    Ok(CapturedTreeFile {
+                        relative: RootRelativePath::parse(relative)?,
+                        bytes: file.bytes.clone(),
+                        mode: file.mode,
+                    })
+                })
+                .collect::<Result<Vec<_>, RepositoryLayoutError>>()?,
+        )?;
+        // A package tree bounds itself: the package model already refuses one
+        // above `MAX_PROFILE_PACKAGE_FILES` files or `MAX_PROFILE_PACKAGE_BYTES`
+        // bytes, and the destination enumeration below reads a tree of the same
+        // shape, so the budget is that bound with room for the directories on
+        // both sides rather than a second, unrelated limit.
+        let budget = CaptureBudget {
+            max_paths: 8 * crate::profile::MAX_PROFILE_PACKAGE_FILES,
+            max_listings: 2 * crate::profile::MAX_PROFILE_PACKAGE_FILES,
+            max_bytes: 8 * crate::profile::MAX_PROFILE_PACKAGE_BYTES as u64,
+            max_depth: 32,
+        };
+
+        with_mutation_session(self.storage(), &layout, "profile capture", |session| {
+            // The destination's whole subtree must be read before the delta is
+            // derived, because a file it holds that the manifest no longer
+            // declares is one this publication removes. A listing names its
+            // children and an entry says which of them are directories, so the
+            // declaration is expanded against each freshly captured image until
+            // it stops growing; the session revalidates every path it settles
+            // on, so a file appearing beneath the destination meanwhile is a
+            // retryable conflict rather than content that survives.
+            let mut spec = capture.capture_spec(budget)?;
+            let image = loop {
+                let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
+                    return Ok(SessionStep::Retry);
+                };
+                if !capture.expand_destination_closure(&image, &mut spec)? {
+                    break image;
+                }
+            };
+
+            let (plan, outcomes) = finalize_package_tree_capture(&image, &capture)?;
+            let status = if plan.delta().actions().is_empty() {
+                ProfileApplicationStatus::Unchanged
+            } else {
+                ProfileApplicationStatus::Applied
+            };
+            let files = outcomes
+                .iter()
+                .map(|outcome| ProfileCaptureFile {
+                    path: outcome.path.repository_relative(),
+                    action: match outcome.disposition {
+                        TreeFileDisposition::Unchanged => ProfileCaptureAction::Unchanged,
+                        TreeFileDisposition::Create => ProfileCaptureAction::Create,
+                        TreeFileDisposition::Update => ProfileCaptureAction::Update,
+                        TreeFileDisposition::Remove => ProfileCaptureAction::Remove,
+                    },
+                    executable: outcome.mode == FileMode::Executable,
+                })
+                .collect::<Vec<_>>();
+            let result = ProfileCaptureResult {
+                count: files.len(),
+                id: captured.model().id.to_string(),
+                version: captured.model().version.clone(),
+                package_hash: captured.hashes().package.clone(),
+                source: source.repository_relative(),
+                destination: destination.repository_relative(),
+                file_count: captured.file_count(),
+                byte_size: captured.byte_size(),
+                status,
+                files,
+            };
+            Ok(SessionStep::Apply(plan, result))
         })
     }
 
@@ -2111,6 +2234,34 @@ fn recorded_summary(
 /// package depend on machine state. The selected data root is not a worktree
 /// location even when it nests inside one, so a package placed under it is
 /// refused by the same rule.
+/// Resolve one caller-supplied package directory to worktree content.
+///
+/// A package directory is repository material an adopter reads and commits, so
+/// the separate data root and anything outside the repository are refused —
+/// the same rule [`package_origin`] applies to the directory a package's bytes
+/// were read from, applied here to a directory the caller only named.
+/// Resolution goes through the shared export classifier, so a relative path
+/// means what the invoking shell means by it.
+fn worktree_directory(
+    layout: &RepositoryLayout,
+    invocation_dir: &Path,
+    requested: &Path,
+) -> Result<VirtualPath> {
+    let outside = || ProfileApplyError::PackageOutsideWorktree {
+        path: requested.display().to_string(),
+    };
+    match classify_repository_export(layout, invocation_dir, requested)? {
+        RepositoryExportDestination::Repository(path)
+            if path.root_class() == RepositoryRootClass::Worktree =>
+        {
+            Ok(path)
+        }
+        RepositoryExportDestination::Repository(_) | RepositoryExportDestination::External(_) => {
+            Err(outside().into())
+        }
+    }
+}
+
 pub(super) fn package_origin(
     package: &ProfilePackage,
     layout: &RepositoryLayout,
@@ -6646,5 +6797,422 @@ template = true
         );
         assert_eq!(repository_files(&temp), before);
         assert_eq!(lifecycle_event_count(&storage), events_before);
+    }
+
+    /// A manifest declaring two live assets drawn from repository files, one
+    /// install-only asset and one region source the package itself carries.
+    const CAPTURE_MANIFEST: &str = r#"
+[profile]
+manifest-version = 1
+id = "captured-workflow"
+version = "1.0.0"
+jit = ">=1.0.0"
+
+[[live-source]]
+root = "bin"
+exclude = []
+
+[[live-source]]
+root = "docs"
+exclude = []
+
+[[asset]]
+source = "assets/live/bin/check.sh"
+target = "bin/check.sh"
+executable = true
+
+[[asset]]
+source = "assets/live/docs/guide.md"
+target = "docs/guide.md"
+
+[[asset]]
+source = "assets/install/settings.toml"
+target = "settings.toml"
+
+[[region]]
+source = "assets/regions/guidance.md"
+target = "AGENTS.md"
+region-id = "guidance"
+placement = "append"
+"#;
+
+    /// The live-asset declaration a test drops to observe a whole republication.
+    const CAPTURE_DROPPED_ASSET: &str = r#"
+[[asset]]
+source = "assets/live/docs/guide.md"
+target = "docs/guide.md"
+"#;
+
+    /// Write one repository file, creating its parents.
+    fn write_repository_file(temp: &TempDir, relative: &str, bytes: &[u8]) {
+        let path = temp.path().join(relative);
+        fs::create_dir_all(path.parent().expect("a file has a parent")).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+
+    /// Author a package directory at `relative` whose live assets are absent
+    /// from it and present in the repository, so a captured live asset's bytes
+    /// can only have come from the repository file its declaration targets.
+    fn capture_sources(temp: &TempDir, relative: &str, manifest: &str) {
+        write_repository_file(
+            temp,
+            &format!("{relative}/manifest.toml"),
+            manifest.as_bytes(),
+        );
+        write_repository_file(
+            temp,
+            &format!("{relative}/assets/install/settings.toml"),
+            b"[captured]\ninstalled = true\n",
+        );
+        write_repository_file(
+            temp,
+            &format!("{relative}/assets/regions/guidance.md"),
+            b"Captured guidance.\n",
+        );
+        write_repository_file(temp, "bin/check.sh", b"#!/bin/sh\nexit 0\n");
+        write_repository_file(temp, "docs/guide.md", b"# Captured guide\n");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(
+                temp.path().join("bin/check.sh"),
+                fs::Permissions::from_mode(0o755),
+            )
+            .unwrap();
+        }
+    }
+
+    /// Every file beneath `root`, by its `root`-relative path.
+    fn tree_paths(root: &Path) -> BTreeSet<String> {
+        fn visit(root: &Path, directory: &Path, found: &mut BTreeSet<String>) {
+            for entry in fs::read_dir(directory).expect("read a tree directory") {
+                let path = entry.expect("read a tree entry").path();
+                if path.is_dir() {
+                    visit(root, &path, found);
+                } else {
+                    found.insert(
+                        path.strip_prefix(root)
+                            .expect("a path beneath the tree root")
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
+                }
+            }
+        }
+
+        let mut found = BTreeSet::new();
+        visit(root, root, &mut found);
+        found
+    }
+
+    /// The published tree carries exactly the manifest, the declared asset
+    /// sources and the declared region sources, with each live asset's bytes
+    /// drawn from the repository file its declaration targets.
+    #[test]
+    fn test_capture_profile_package_publishes_exactly_what_the_manifest_declares() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+
+        let result = executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the authored package captures");
+
+        assert_eq!(
+            tree_paths(&destination),
+            BTreeSet::from([
+                "assets/install/settings.toml".to_string(),
+                "assets/live/bin/check.sh".to_string(),
+                "assets/live/docs/guide.md".to_string(),
+                "assets/regions/guidance.md".to_string(),
+                "manifest.toml".to_string(),
+            ]),
+            "the published tree carries an undeclared path or omits a declared source"
+        );
+        assert_eq!(
+            fs::read(destination.join("assets/live/docs/guide.md")).unwrap(),
+            fs::read(temp.path().join("docs/guide.md")).unwrap(),
+            "a live asset did not carry the bytes of the repository file it targets"
+        );
+        assert_eq!(result.id, "captured-workflow");
+        assert_eq!(result.file_count, 5);
+        assert_eq!(result.count, result.files.len());
+        assert!(result
+            .files
+            .iter()
+            .all(|file| file.action == ProfileCaptureAction::Create));
+    }
+
+    /// The published tree reads back through the package model, and the
+    /// identity the capture reported is the identity of what a later consumer
+    /// of that tree reads.
+    #[test]
+    fn test_capture_profile_package_publishes_a_tree_that_reads_back_as_a_package() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+
+        let result = executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the authored package captures");
+
+        let published = ProfilePackage::from_directory(&destination)
+            .expect("the published tree reads back as a package");
+        assert_eq!(published.hashes().package, result.package_hash);
+        assert_eq!(published.model().id.as_str(), result.id);
+        assert_eq!(published.file_count(), result.file_count);
+        assert_eq!(published.byte_size(), result.byte_size);
+    }
+
+    /// A source the manifest stopped declaring does not survive the next
+    /// capture, and what is left still reads back as a package.
+    #[test]
+    fn test_capture_profile_package_removes_a_source_the_manifest_stopped_declaring() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+        executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the authored package captures");
+        assert!(destination.join("assets/live/docs/guide.md").is_file());
+
+        let reduced = CAPTURE_MANIFEST.replace(CAPTURE_DROPPED_ASSET, "\n");
+        assert_ne!(reduced, CAPTURE_MANIFEST);
+        fs::write(temp.path().join("profiles/captured/manifest.toml"), &reduced).unwrap();
+        let result = executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the reduced package captures over the previous tree");
+
+        assert!(
+            !destination.join("assets/live/docs/guide.md").exists(),
+            "a source the manifest no longer declares survived the republication"
+        );
+        assert!(destination.join("assets/live/bin/check.sh").is_file());
+        assert!(result
+            .files
+            .iter()
+            .any(|file| file.path.ends_with("assets/live/docs/guide.md")
+                && file.action == ProfileCaptureAction::Remove));
+        ProfilePackage::from_directory(&destination)
+            .expect("the republished tree still reads back as a package");
+    }
+
+    /// An in-place edit to a repository file the package owns reaches the
+    /// published tree, so the identity of what was published changes with it.
+    #[test]
+    fn test_capture_profile_package_publishes_an_identity_reflecting_an_in_place_edit() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+        let before = executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the authored package captures");
+
+        fs::write(temp.path().join("docs/guide.md"), b"# Edited in place\n").unwrap();
+        let after = executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the edited package captures");
+
+        assert_ne!(
+            after.package_hash, before.package_hash,
+            "an in-place edit to owned content left the published identity unchanged"
+        );
+        assert_eq!(
+            fs::read(destination.join("assets/live/docs/guide.md")).unwrap(),
+            b"# Edited in place\n"
+        );
+        assert_eq!(
+            ProfilePackage::from_directory(&destination)
+                .expect("the republished tree reads back as a package")
+                .hashes()
+                .package,
+            after.package_hash
+        );
+    }
+
+    /// Recapturing an unchanged package publishes nothing: every path is
+    /// already what the manifest declares, so the delta is empty and no
+    /// transaction reaches its commit point.
+    #[test]
+    fn test_capture_profile_package_publishes_nothing_when_the_destination_is_already_captured() {
+        let (temp, storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+        executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the authored package captures");
+
+        let publications = PublicationCounter::new();
+        let counted = CommandExecutor::new(JsonFileStorage::with_repository_state_failures(
+            temp.path().join(".jit"),
+            publications.clone(),
+        ))
+        .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
+        let result = counted
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("an unchanged package captures again");
+
+        assert_eq!(result.status, ProfileApplicationStatus::Unchanged);
+        assert!(result
+            .files
+            .iter()
+            .all(|file| file.action == ProfileCaptureAction::Unchanged));
+        assert_eq!(publications.count(), 0);
+    }
+
+    /// One repository serves any package directory and any destination its
+    /// caller names, so nothing about which package or which location is fixed.
+    #[test]
+    fn test_capture_profile_package_serves_each_package_directory_its_caller_names() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        capture_sources(
+            &temp,
+            "vendor/second",
+            &CAPTURE_MANIFEST.replace("captured-workflow", "second-workflow"),
+        );
+
+        let first = executor
+            .capture_profile_package(
+                temp.path(),
+                Path::new("profiles/captured"),
+                &temp.path().join("build/first"),
+            )
+            .expect("the first package captures");
+        let second = executor
+            .capture_profile_package(
+                temp.path(),
+                Path::new("vendor/second"),
+                &temp.path().join("staging/nested/second"),
+            )
+            .expect("the second package captures");
+
+        assert_eq!(first.id, "captured-workflow");
+        assert_eq!(second.id, "second-workflow");
+        assert_eq!(first.destination, "build/first");
+        assert_eq!(second.destination, "staging/nested/second");
+        assert_eq!(
+            tree_paths(&temp.path().join("build/first")),
+            tree_paths(&temp.path().join("staging/nested/second")),
+            "two captures of the same authored shape published different paths"
+        );
+    }
+
+    /// A destination outside the repository worktree is refused, and so is one
+    /// under the separate data root: a package tree is worktree content.
+    #[test]
+    fn test_capture_profile_package_refuses_a_destination_that_is_not_worktree_content() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let outside = TempDir::new().unwrap();
+
+        for destination in [outside.path().join("captured"), temp.path().join(".jit/captured")] {
+            let error = executor
+                .capture_profile_package(
+                    temp.path(),
+                    Path::new("profiles/captured"),
+                    &destination,
+                )
+                .expect_err("a destination that is not worktree content is refused");
+
+            assert!(
+                matches!(
+                    error.downcast_ref::<ProfileApplyError>(),
+                    Some(ProfileApplyError::PackageOutsideWorktree { .. })
+                ),
+                "{error:#}"
+            );
+            assert!(!destination.exists(), "the refused destination was written");
+        }
+    }
+
+    /// A declared target that is a symbolic link is refused before anything is
+    /// published, so an existing destination is left exactly as it was.
+    #[cfg(unix)]
+    #[test]
+    fn test_capture_profile_package_refuses_a_symlinked_target_without_touching_the_destination() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+        executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the authored package captures");
+        let before = tree_paths(&destination);
+        let published = fs::read(destination.join("assets/live/docs/guide.md")).unwrap();
+
+        fs::write(temp.path().join("docs/elsewhere.md"), b"# Elsewhere\n").unwrap();
+        fs::remove_file(temp.path().join("docs/guide.md")).unwrap();
+        std::os::unix::fs::symlink("elsewhere.md", temp.path().join("docs/guide.md")).unwrap();
+        let error = executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect_err("a symlinked declared target is refused");
+
+        assert!(
+            matches!(
+                error.downcast_ref::<crate::profile::PackageCaptureError>(),
+                Some(crate::profile::PackageCaptureError::SymlinkedSource { path, .. })
+                    if path == "docs/guide.md"
+            ),
+            "{error:#}"
+        );
+        assert_eq!(tree_paths(&destination), before);
+        assert_eq!(
+            fs::read(destination.join("assets/live/docs/guide.md")).unwrap(),
+            published,
+            "a refused capture changed what the destination held"
+        );
+    }
+
+    /// A repository file carrying executable permission its declaration did not
+    /// is refused before anything is published.
+    #[cfg(unix)]
+    #[test]
+    fn test_capture_profile_package_refuses_undeclared_executable_content_before_publishing() {
+        use std::os::unix::fs::PermissionsExt;
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+        fs::set_permissions(
+            temp.path().join("docs/guide.md"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+
+        let error = executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect_err("undeclared executable content is refused");
+
+        assert!(
+            matches!(
+                error.downcast_ref::<crate::profile::PackageCaptureError>(),
+                Some(crate::profile::PackageCaptureError::InvalidCapturedTree(_))
+            ),
+            "{error:#}"
+        );
+        assert!(!destination.exists(), "a refused capture published a tree");
+    }
+
+    /// A file beneath the destination that no manifest declares does not
+    /// survive a capture: the republication is whole rather than additive.
+    #[test]
+    fn test_capture_profile_package_removes_content_the_destination_gained_beside_the_tree() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
+        let destination = temp.path().join("build/captured");
+        executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the authored package captures");
+        fs::create_dir_all(destination.join("assets/live/bin")).unwrap();
+        fs::write(destination.join("assets/live/bin/stray.sh"), b"stray\n").unwrap();
+        fs::write(destination.join("stray-at-the-root"), b"stray\n").unwrap();
+
+        executor
+            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+            .expect("the package captures over a destination holding stray content");
+
+        assert!(!destination.join("assets/live/bin/stray.sh").exists());
+        assert!(!destination.join("stray-at-the-root").exists());
+        ProfilePackage::from_directory(&destination)
+            .expect("the republished tree reads back as a package");
     }
 }

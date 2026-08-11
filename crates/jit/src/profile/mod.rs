@@ -38,7 +38,8 @@ pub use crate::domain::ProfileOrigin;
 pub(crate) use application::SelectionObservation;
 pub use application::{
     ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileListResult, ProfilePlanEntry, ProfilePlanResult,
+    ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
+    ProfileListResult, ProfilePlanEntry, ProfilePlanResult,
     ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
     ProfileTargetChange,
 };
