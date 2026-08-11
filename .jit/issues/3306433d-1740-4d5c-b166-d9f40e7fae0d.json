@@ -1,0 +1,39 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-11T16:32:02.508095795Z",
+  "dependencies": [
+    "eebb3fee-b234-47bf-9859-24b6de87a347"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for The workspace test suite runs in under 30 seconds (4b7c06d0) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-08-11T16:32:02.508095795Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-08-11T16:32:02.508095795Z",
+      "updated_by": null
+    }
+  },
+  "id": "3306433d-1740-4d5c-b166-d9f40e7fae0d",
+  "labels": [
+    "component:testing",
+    "component:core",
+    "milestone:v1.0",
+    "epic:test-suite-performance",
+    "type:breakdown",
+    "brackets:4b7c06d0"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "breakdown: The workspace test suite runs in under 30 seconds",
+  "updated_at": "2026-08-11T16:32:02.508095795Z"
+}

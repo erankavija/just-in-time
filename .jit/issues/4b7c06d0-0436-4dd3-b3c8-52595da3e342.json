@@ -2,25 +2,34 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-08-11T12:38:27.983656428Z",
-  "dependencies": [],
+  "dependencies": [
+    "3306433d-1740-4d5c-b166-d9f40e7fae0d"
+  ],
   "description": "The workspace test suite is a standing 30-second budget on this host, enforced automatically rather than observed occasionally.\n\n## Background\n\nTest wall-clock is now the dominant cost of doing work in this repository. Measured from the recorded gate history at the time of filing:\n\n- `cargo-ci` has run 1166 times for 73.2 hours, the largest single consumer of gate time in the project.\n- Its median duration has grown roughly tenfold: 31.7 s in April, 122.0 s in June, 234.8 s in July, 300.0 s in August.\n- Runs over 300 s are 32% of runs but 46 of those 73 hours; three runs have hit the 900 s gate timeout exactly.\n- Recent runs on a cold worktree measured 601 s and 703 s.\n\nThe cost compounds: every review round pays it again, and a container's waves pay it once per round per issue. One epic issue consumed 8 `cargo-ci` runs.\n\nTwo facts bound what a fix must address. A single test added recently — a CLI round trip publishing 512 files totalling 4 MiB through the transaction — measures about 33 seconds by itself, which exceeds this entire budget. And `run_step` (`scripts/cargo-ci.sh:220`) records no per-step duration at all, so the suite's own contribution is not currently measured, only the whole gate's.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace test suite that required validation executes completes in under 30 seconds wall-clock on this host, measured from an already-built warm target.\n- [hard] REQ-02: The limit is enforced automatically: a checker fails when the suite exceeds it, declared once as a named constant in the same shape as the existing artifact budgets (`scripts/rust-build-budget.sh`, `MAX_INTEGRATION_TARGETS` / `MAX_EXECUTABLE_BYTES`), and cited rather than restated in prose (`@/invariant/single-source-prose`).\n- [hard] REQ-03: `cargo-ci` records and reports the wall-clock duration of each step it runs, so the budget is observable in every run's evidence rather than inferred from the gate total.\n- [hard] REQ-04: No semantic property currently covered loses its coverage. The budget is met by running the same assertions faster, not by deleting, skipping, or weakening tests.\n- [hard] REQ-05: A test whose cost is inherent to the property it proves is identified explicitly, with its measured cost and the reason, rather than left as unattributed suite time.\n\n## Notes\n\nLevers worth evaluating, none mandated:\n\n- **`cargo-nextest`** is installed on this host (0.9.133) and unused; the repository references it nowhere. Its process-per-test model parallelises better than `cargo test`'s per-binary threading, and it supports per-test hard timeouts (`slow-timeout` with `terminate-after`). Two known consequences: it does not run doctests, and this workspace has 161 doc-comment code fences, so `cargo test --doc` would remain a separate step; and its interaction with the build-footprint budgets needs checking rather than assuming.\n- A per-test timeout would also close a known coverage gap: the fifo/device case behind `_cap_fs_ext_nonblock` is deliberately untested today because a regression there hangs rather than fails, and a hanging test cannot be safely added to a suite with no bound.\n- Process-per-test isolation would structurally prevent the order-dependent-test class that produced `7793b8b7`.\n- The expensive tests are concentrated in suites that publish many files through the repository transaction. Whether the property each proves needs its full scale is the first question, not the last.\n\n30 seconds is deliberately aggressive against a suite whose slowest single test currently exceeds it. It is a forcing constraint on test design, not a target to be approached gradually.\n",
   "documents": [],
   "first_ready_at": "2026-08-11T12:38:27.983656428Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "pending",
+      "updated_at": "2026-08-11T16:32:02.508095795Z",
+      "updated_by": null
+    }
+  },
   "id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
   "labels": [
     "component:testing",
     "component:core",
     "milestone:v1.0",
-    "type:task",
-    "epic:v1-release"
+    "type:epic",
+    "epic:test-suite-performance"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T12:39:44.778074739Z"
+  "updated_at": "2026-08-11T16:32:02.508095795Z"
 }
