@@ -304,7 +304,8 @@
     "44ec7192": 0,
     "9f493686": 2,
     "7156f64b": 5,
-    "6a479c58": 1
+    "6a479c58": 1,
+    "15cc28c5": 2
   },
   "review_verdicts": [
     {
@@ -1001,6 +1002,21 @@
       },
       "evidence": "Residual grep for shipped_v1|ShippedV1|converted_records|conversion_count outside .jit is empty. REQ-02 is pinned by test_ordinary_profile_readers_reject_an_undecodable_record_with_record_and_profile (commands/profile.rs:3200), which asserts the typed downcast, the exact message naming record path and profile id, and that resolve/list/show/plan all reject. REQ-03 verified by the removal of the second capture_proposed_base and the migration overlay. REQ-04 verified: no static conversion counter survives; remaining statics are unrelated temp-name and retention-id counters.",
       "worker": "codex gpt-5.6-luna (workspace-write sandbox)"
+    },
+    {
+      "issue": "15cc28c5",
+      "round": 2,
+      "verdict": "FAIL",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed at bc956d3a (4545 tests, targets 11/12, 703s)",
+        "mcp-ci": "passed (3s)",
+        "security-review": "passed (precheck attestation)",
+        "code-review": "failed, 1 blocking + 1 advisory"
+      },
+      "finding": "F1 blocking high: package_archive.rs:515 admits a directory entry at any mode, and a test asserts a 0700 directory is accepted. Cites @/issue/15cc28c5/requirement/REQ-03 ('an archive entry with an unexpected mode is refused') and the linked threat model.",
+      "lead_error": "The worker disclosed this change proactively and the lead reviewed it and judged REQ-03 still met, reasoning that a directory entry has no declared mode to be unexpected against and no directory mode is ever published. The reviewer's literal reading governs: the criterion carves out no entry kind. Recorded as a lead misjudgement, not a worker defect. The lead did leave the question open for the gate rather than pre-closing it, which is why it was caught rather than shipped.",
+      "advisory": "F2 pre-existing: the publication budget's max_paths assumption. Already filed as cf42d08b and pulled into the epic at v1.0 by invoker decision; the reviewer independently reaching the same finding confirms that call. Explicitly out of scope for this issue."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1098,6 +1114,11 @@
       "detail": "type:bug, milestone:v1.1, no epic label. Its subject - the process-global shipped_v1 conversion counter and the order-dependent test asserting on it - is deleted by 9a81ab12, so it is unreproducible. Not transitioned: transitioning an out-of-epic issue is the invoker's call.",
       "status": "open",
       "owner": "invoker"
+    },
+    {
+      "subject": "a criterion enumerating properties admits no implicit carve-out",
+      "detail": "REQ-03 lists 'absolute path, parent-directory traversal, symlink, or unexpected mode' as properties that must be refused. The lead accepted an implementation that stopped checking mode for one entry kind, reasoning the property had no referent there. The reviewer read the enumeration literally and failed it. Lesson: when a criterion enumerates properties to refuse, a change that stops checking one of them for any subset of inputs needs the criterion amended (escalation) rather than a lead judgement that the property does not apply.",
+      "status": "process-note"
     }
   ],
   "scope_changes": [
