@@ -10,7 +10,7 @@
 | REQ-02 | Feed the named measured duration into the existing budget-checker boundary using `--test-suite-ms <integer>` and the canonical `MAX_TEST_SUITE_SECONDS` threshold. | [Investigation](investigation.md#consumer-inventories) Inventory C; [architecture fit](investigation.md#architecture-fit) |
 | REQ-03 | Emit integer millisecond timing for each cargo-ci step and define the suite parent timer around nextest plus doctests. | [Investigation](investigation.md#claim-classification) Claim 1; [surprises](investigation.md#surprises-and-planning-consequences) 3 |
 | REQ-04 | Preserve semantic coverage while provisioning pinned nextest, sharing the stale-binary fixture across processes, and removing only unused journal progress rewrites. | [Investigation](investigation.md#recommended-decomposition-constraints); [consumer inventories](investigation.md#consumer-inventories) A, B, and D |
-| REQ-05 | Produce warm per-test timing evidence and attribute inherently costly tests from that profile and the transaction benchmark artifact. | [Investigation](investigation.md#claim-classification) Claim 5; [architecture fit](investigation.md#architecture-fit) |
+| REQ-05 | Produce warm per-test timing evidence and attribute inherently costly tests from that profile, the transaction benchmark artifact, and — for the excluded provenance subset — the recorded cargo-ci per-step timing. | [Investigation](investigation.md#claim-classification) Claim 5; [architecture fit](investigation.md#architecture-fit) |
 
 ## Shared architectural contracts
 
@@ -53,7 +53,7 @@ The `transaction-benchmark` task produces the append-only measurement artifact f
 | suite-enforcement | Wire suite-clock enforcement into the duration checker | task | cargo-ci passes the measured suite-clock milliseconds to the duration checker and live enforcement holds. | suite-clock, nextest-reporter-evidence | REQ-01, REQ-02, investigation.md | touches 1 | runner-branch | step-timing-and-clock, duration-checker, fsync-dedupe |
 | nextest-final-policy | Tighten the committed nextest policy to the final bounds | task | The committed nextest policy enforces the final 20-second hard bound with profile-derived named overrides. | suite-timing-evidence | REQ-01, investigation.md | touches 1 | runner-branch | suite-profile, suite-enforcement |
 | suite-profile | Produce warm per-test suite timing evidence | task | A pinned-nextest profiler produces repository-owned warm per-test timing evidence at a stable JSON path. | nextest-reporter-evidence | REQ-05, investigation.md | creates 2 | runner-branch | suite-runner |
-| inherent-cost-attribution | Attribute inherent test costs | task | Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS. | suite-timing-evidence, transaction-benchmark-evidence | REQ-05, investigation.md | touches 1 | runner-branch | nextest-final-policy, nextest-usage-docs |
+| inherent-cost-attribution | Attribute inherent test costs | task | Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS. | suite-clock, suite-timing-evidence, transaction-benchmark-evidence | REQ-05, investigation.md | touches 1 | runner-branch | nextest-final-policy, nextest-usage-docs |
 
 ```mermaid
 flowchart LR
