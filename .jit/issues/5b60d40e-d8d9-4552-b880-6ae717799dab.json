@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-11T18:51:58.491886834Z",
+  "dependencies": [
+    "3306433d-1740-4d5c-b166-d9f40e7fae0d"
+  ],
+  "description": "Extend the rust-build-budget checker with the exact optional `--test-suite-ms <integer>` interface while preserving its existing mandatory metadata and artifact inputs.\n\n## Background\n\nThe checker defines `MAX_TEST_SUITE_SECONDS=30` once and follows the existing flag-based injection style at `scripts/rust-build-budget.sh:48`. An absent flag passes and skips this check so the checker can land before live runner wiring.\n\n## Success Criteria\n\n- [hard] REQ-01: Accepts `--test-suite-ms <integer>` and defines the canonical threshold as the named constant `MAX_TEST_SUITE_SECONDS=30` in `scripts/rust-build-budget.sh`.\n- [hard] REQ-02: Skips the suite-duration check and passes when the flag is absent; reports a checker error and fails for a non-integer, negative, or empty value; and fails when the value is greater than or equal to `MAX_TEST_SUITE_SECONDS*1000`, including the exact threshold.\n- [hard] REQ-03: Covers the five fixtures absent, malformed (non-integer/negative/empty), under-threshold (29,999 ms passes), at-threshold (30,000 ms fails), and over-threshold in `rust_build_budget_checker_tests.rs` while preserving mandatory metadata and artifact inputs.",
+  "documents": [],
+  "first_ready_at": "2026-08-11T18:51:58.491886834Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "5b60d40e-d8d9-4552-b880-6ae717799dab",
+  "labels": [
+    "type:task",
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-02"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Add the injectable suite duration checker",
+  "updated_at": "2026-08-11T18:52:34.177708454Z"
+}
