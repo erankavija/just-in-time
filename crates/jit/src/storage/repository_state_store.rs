@@ -651,19 +651,18 @@ impl RepositoryMutationSession for MemoryMutationSession {
         for index in 0..delta.actions().len() {
             failures.check(&TransactionFailurePoint::RepositoryPrepareAction { action: index })?;
             failures.check(&TransactionFailurePoint::RepositoryStageAction { action: index })?;
-            failures.check(&TransactionFailurePoint::RepositorySyncStage { action: index })?;
             if matches!(
                 delta.actions()[index].expected(),
                 ExpectedPreimage::File { .. }
             ) {
                 failures.check(&TransactionFailurePoint::RepositorySyncBackup { action: index })?;
             }
-            failures
-                .check(&TransactionFailurePoint::RepositorySyncPreparedAction { action: index })?;
-            failures.check(&TransactionFailurePoint::RepositoryBeforePreparedJournal {
-                action: index,
-            })?;
+            failures.check(&TransactionFailurePoint::RepositorySyncStage { action: index })?;
         }
+        // Model the kernel's single preparation barrier: one complete prepared
+        // record after the whole staging phase, and no per-action rewrite.
+        failures.check(&TransactionFailurePoint::RepositoryBeforePreparedJournal)?;
+        failures.check(&TransactionFailurePoint::RepositorySyncPreparedJournal)?;
         for (index, action) in delta.actions().iter().enumerate() {
             // Staged Data actions of an absent-root delta have no per-action
             // publication boundary in the kernel (they land inside the stage and
@@ -691,13 +690,10 @@ impl RepositoryMutationSession for MemoryMutationSession {
                 **final_state = candidate.clone();
             }
             if !staged_absent_data {
-                failures.check(&TransactionFailurePoint::RepositorySyncTargetParent {
+                failures.check(&TransactionFailurePoint::RepositoryAfterTargetMutation {
                     action: index,
                 })?;
                 failures.check(&TransactionFailurePoint::RepositoryVerifyFinalIdentity {
-                    action: index,
-                })?;
-                failures.check(&TransactionFailurePoint::RepositoryBeforePublishedJournal {
                     action: index,
                 })?;
                 failures

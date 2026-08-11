@@ -139,18 +139,10 @@ impl RepositoryJournalActionKind {
     }
 }
 
-/// Durable per-action preparation/publication progress.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum RepositoryActionProgress {
-    #[default]
-    Planned,
-    Prepared,
-    BackupReady,
-    Published,
-    Restored,
-}
-
+/// One durable action, described by both of its endpoints: the preimage it
+/// requires and the identity it publishes. Recovery converges from those two
+/// identities alone, so an action carries no progress state — the record is
+/// written once, complete, before the first live mutation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct RepositoryJournalAction {
     pub(crate) path: RepositoryJournalPath,
@@ -158,7 +150,6 @@ pub(crate) struct RepositoryJournalAction {
     pub(crate) expected: ExpectedPreimage,
     pub(crate) final_identity: RepositoryFinalIdentity,
     pub(crate) action: RepositoryJournalActionKind,
-    pub(crate) progress: RepositoryActionProgress,
 }
 
 /// Durable layout-aware recovery authority. `layout_digest` binds every
