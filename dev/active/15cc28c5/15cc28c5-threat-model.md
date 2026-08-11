@@ -101,9 +101,19 @@ signature.
 
 This is consistent with the epic's decision that the adopter obtains an archive
 over a channel they already trust (D-02): the channel carries the authenticity,
-the digest carries the integrity. Adopter documentation must not describe the
-digest as proof of origin. Recorded here so the eventual documentation
-(`b3d92595`) states the boundary correctly rather than overclaiming.
+the digest carries the integrity.
+
+**Owner decision (2026-08-11): integrity is the requirement for this release.**
+Authenticity — signing, provenance attestation, a key distribution story — comes
+later if it is needed at all, and is not deferred work this epic owes. Nothing
+here is a partial step toward it: a signature would be an additional artifact
+beside the digest, not a change to it, so shipping integrity alone leaves no
+half-built surface behind.
+
+The constraint this places on the implementation and on the eventual adopter
+documentation (`b3d92595`) is only that neither may describe the digest as proof
+of origin. Stating what the digest does — it detects truncation, corruption, and
+accidental modification — is accurate and sufficient.
 
 ## Residual risks accepted
 

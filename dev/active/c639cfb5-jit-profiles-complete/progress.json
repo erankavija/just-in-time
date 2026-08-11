@@ -1114,6 +1114,13 @@
       "decision": "Wave plan recomputed for the 28-member graph",
       "authority": "lead",
       "detail": "9a81ab12 was created after the original wave plan and the remaining waves were renumbered against the live DAG. Waves 10-19 replace the stale 10-18. 6a479c58 and 9a81ab12 stay serialized (handoff-9 trap: capture is the recovery path, and both touch repository_state capture phases plus commands/profile.rs)."
+    },
+    {
+      "date": "2026-08-11",
+      "decision": "Package exchange ships integrity only; authenticity deferred without obligation",
+      "authority": "invoker",
+      "detail": "The archive digest establishes integrity (truncation, corruption, accidental modification), not authenticity. It travels inside the archive, so anyone who can rewrite the content can rewrite the digest; the adopter's chosen channel carries authenticity (epic D-02). Confirmed as sufficient for this release. Signing or provenance attestation would be an additional artifact beside the digest rather than a change to it, so no half-built surface is left behind.",
+      "constraint": "Neither code documentation nor adopter documentation (b3d92595) may describe the digest as proof of origin. Recorded in dev/active/15cc28c5/15cc28c5-threat-model.md, which is linked to 15cc28c5 and backs its precheck security-review attestation."
     }
   ]
 }
