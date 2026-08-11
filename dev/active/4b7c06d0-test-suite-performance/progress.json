@@ -1,0 +1,62 @@
+{
+  "epic_id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+  "epic_short_id": "4b7c06d0",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {"id": "3db5b63d", "short_id": "3db5b63d", "title": "Pin and configure the nextest foundation", "classification": "implementation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
+        {"id": "5b60d40e", "short_id": "5b60d40e", "title": "Add the injectable suite duration checker", "classification": "implementation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
+        {"id": "f5da1112", "short_id": "f5da1112", "title": "Cut over the single-barrier journal runtime", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {"id": "3db5b63d-dep-47836e2e", "short_id": "47836e2e", "title": "Share the stale-binary build fixture across processes", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"id": "ee809651", "short_id": "ee809651", "title": "Document pinned nextest installation and use", "classification": "documentation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
+        {"id": "007f598b", "short_id": "007f598b", "title": "Cut over journal durability documentation", "classification": "documentation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
+        {"id": "0369e563", "short_id": "0369e563", "title": "Measure transaction model-limit round trips", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"id": "340be714", "short_id": "340be714", "title": "Add journal barrier crash coverage", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {"id": "69e9f213", "short_id": "69e9f213", "title": "Swap the cargo-ci suite runner", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"id": "efebd963", "short_id": "efebd963", "title": "Apply the benchmark-driven fsync decision", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {"id": "21ba4bb4", "short_id": "21ba4bb4", "title": "Produce warm per-test suite timing evidence", "classification": "implementation", "difficulty": "moderate", "worker": "opus", "status": "pending"},
+        {"id": "2516ad90", "short_id": "2516ad90", "title": "Add step timing and the named suite clock", "classification": "implementation", "difficulty": "moderate", "worker": "codex-luna", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {"id": "94d85bf1", "short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {"id": "25faa21d", "short_id": "25faa21d", "title": "Tighten the committed nextest policy to the final bounds", "classification": "implementation", "difficulty": "moderate", "worker": "codex-luna", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {"id": "76ecc11f", "short_id": "76ecc11f", "title": "Attribute inherent test costs", "classification": "documentation", "difficulty": "moderate", "worker": "opus", "status": "pending"}
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "started_at": "2026-08-11T19:10:00Z"
+}

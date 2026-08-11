@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-08-11T19:09:38.781867025Z",
   "context": {},
   "created_at": "2026-08-11T12:38:27.983656428Z",
   "dependencies": [
@@ -33,5 +34,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T18:52:50.941077380Z"
+  "updated_at": "2026-08-11T19:09:38.781867025Z"
 }
