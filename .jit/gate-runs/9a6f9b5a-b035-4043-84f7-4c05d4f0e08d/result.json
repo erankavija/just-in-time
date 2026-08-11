@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f5d699fa6d804cf58cabb052e41acbb17856a426",
+  "completed_at": "2026-08-11T23:16:58.627770728Z",
+  "duration_ms": 167431,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed benchmark implementation and append-only evidence satisfy all hard criteria; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0369e563-9bde-4695-bdf2-0166172f1d6e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9a6f9b5a-b035-4043-84f7-4c05d4f0e08d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T23:14:11.196041466Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 05c2969c, b7c0bc3f, 152cf30a, 4e7caf70, 0f2da753, 0c0ec7d8, f5d699fa\nPolicy sources: AGENTS.md\nResolved items: @/issue/0369e563/requirement/REQ-01 (issue markdown); @/invariant/event-log (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-08-11T23:00:29Z; code-review pending, no run\nTruncation recovery: narrowed reads of commit stats/patches, script lines 520–964, append publication, artifact record summaries, and model-limit authorities\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed benchmark implementation and append-only evidence satisfy all hard criteria; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

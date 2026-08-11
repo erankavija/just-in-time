@@ -7,13 +7,32 @@
     "f5da1112-0411-482b-90ea-b2a548dd087a"
   ],
   "description": "Create a dedicated warm benchmark that records model-limit transaction costs for both journal root shapes and records the fsync-residual decision without changing production code.\n\n## Background\n\nThe model-limit profile package stresses file count, aggregate bytes, path length, and directory shape. The harness exercises warm profile-pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for existing-root and absent-root transactions, then preserves reproducible JSON evidence.\n\nThe artifact is append-only measurement evidence: each run appends a dated record, and the initial record carries the fsync-residual decision; downstream consumers read records without rewriting them.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `scripts/benchmark-transaction.sh` to measure warm pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for both existing-root and absent-root journal shapes.\n- [hard] REQ-02: Creates `dev/benchmarks/test-suite-performance-4b7c06d0.json` with integer-millisecond results, method, fixture shape, cache state, and a recorded fsync-residual decision.\n- [hard] REQ-03: Makes the recorded decision reproducible by rerunning the benchmark and does not modify production code in this measurement task.\n\n## Notes\n\nThe benchmark artifact is later touched by `fsync-dedupe` in an ordered overlap: that dependent task applies or records the benchmark decision after this measurement task lands.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "benchmark",
+      "label": "Transaction benchmark evidence",
+      "path": "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+    }
+  ],
+  "done_at": "2026-08-11T23:17:23.123454646Z",
   "first_ready_at": "2026-08-11T21:17:08.157865329Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:13:41.628379136Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:16:58.992038432Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0369e563-9bde-4695-bdf2-0166172f1d6e",
   "labels": [
     "type:task",
@@ -24,7 +43,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Measure transaction model-limit round trips",
-  "updated_at": "2026-08-11T21:23:10.360145766Z"
+  "updated_at": "2026-08-11T23:17:23.123454646Z"
 }

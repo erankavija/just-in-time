@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aa08db71f710fa7bf78dbf328065a078fbbfc8f9",
+  "completed_at": "2026-08-11T23:19:44.212165232Z",
+  "duration_ms": 121739,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped implementation and focused tests satisfy all hard criteria; the latest cargo-ci projection passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4aa15137-5525-4d44-90dd-7ff394a53360",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "791c9c65-f997-4857-908b-8f61bfca0f31",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T23:17:42.472942762Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5e8f58a7, 845909e1, 6f75d742, d5ecfc0a, f5d699fa (all `jit:4aa15137`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-11T22:59:25Z); code-review pending\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped implementation and focused tests satisfy all hard criteria; the latest cargo-ci projection passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
