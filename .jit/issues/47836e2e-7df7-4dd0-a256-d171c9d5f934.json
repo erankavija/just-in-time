@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-11T21:22:58.204914628Z",
   "context": {},
   "created_at": "2026-08-11T18:51:58.491886834Z",
   "dependencies": [
@@ -22,7 +23,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Share the stale-binary build fixture across processes",
-  "updated_at": "2026-08-11T20:50:18.717371374Z"
+  "updated_at": "2026-08-11T21:22:58.204914628Z"
 }
