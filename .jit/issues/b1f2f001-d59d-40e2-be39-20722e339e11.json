@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "`test_shipped_package_decodes_without_edits_and_preserves_identity_hash` pins the live dogfood package's identity hash to a literal, so editing this repository's own configuration fails the test suite.\n\n## Background\n\nThe `jit-dogfood` profile packages this repository's live configuration as assets, including `contrib/gates/plan-review-prompt.md` and `contrib/gates/breakdown-review-prompt.md` (`profiles/jit-dogfood/manifest.toml:766-775`). The package identity hash is therefore a function of repository configuration that legitimately changes.\n\nThe test asserts that derived hash against a hand-written literal (`crates/jit/src/profile/package.rs:1233`), so any edit to a packaged asset turns a correct change into a red suite. Editing the gate review prompts in `cec90b1c` did exactly that, and the same test failed the same way once before with a different actual hash (gate run `4f8d5399`), which was resolved by re-pinning the literal rather than removing it.\n\nThe literal is a hand-maintained copy of a derived value: a staleness defect under `@/inv/single-source-prose`. The assertion immediately below it recomputes the released v1 identity algorithm independently from the package bytes (`legacy_v1_identity_hash`), so algorithm continuity is already proven without freezing content.\n\nLiteral package hashes remain correct for the synthetic in-test fixture, whose bytes the test authors (`crates/jit/src/profile/package.rs:1462`, `:1467`); only the live-repository package must not carry one.\n\n## Success Criteria\n\n- [hard] REQ-01: Editing any file the dogfood profile packages as a live asset leaves the workspace test suite green, with no literal hash to update.\n- [hard] REQ-02: The released v1 package identity algorithm remains asserted for the live dogfood package by independent recomputation, so a decoder change that altered the algorithm still fails.\n- [hard] REQ-03: Literal hash assertions over the synthetic in-test fixture package keep their current coverage.\n",
   "documents": [],
+  "done_at": "2026-08-11T20:50:36.153294373Z",
   "first_ready_at": "2026-08-11T19:47:48.582069572Z",
   "gates_required": [
     "cargo-ci",
@@ -30,7 +31,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Stop pinning the live dogfood package identity hash to a literal",
-  "updated_at": "2026-08-11T20:47:08.985744372Z"
+  "updated_at": "2026-08-11T20:50:36.153294373Z"
 }

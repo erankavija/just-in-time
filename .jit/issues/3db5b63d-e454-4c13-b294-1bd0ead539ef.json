@@ -8,6 +8,7 @@
   ],
   "description": "Make nextest reproducible before the runner swap by pinning cargo-nextest 0.9.133 in CI and committing its initial policy.\n\n## Background\n\nThe audited host version is cargo-nextest 0.9.133. The `test-rust` job in `.github/workflows/ci.yml` installs it with `cargo install cargo-nextest --locked --version 0.9.133` in a named installation step.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `.config/nextest.toml` with exact initial values `nextest-version = \"0.9.133\"`, `retries = 0`, `slow-timeout.period = \"15s\"`, `terminate-after = 4` for a hard bound of 60 seconds, and the default leak-timeout.\n- [hard] REQ-02: Declares no test groups: nested-cargo and socket-heavy suites keep default parallelism because single-build serialization is owned by the cross-process stale-binary fixture, and `cargo nextest show-config test-groups` succeeds against the workspace with the committed policy, proving the pinned binary parses it.\n- [hard] REQ-03: Adds the named cargo-nextest 0.9.133 installation step to the `test-rust` job in `.github/workflows/ci.yml` using `cargo install cargo-nextest --locked --version 0.9.133`, followed in the same job by a `cargo nextest show-config test-groups` step that validates the committed configuration.",
   "documents": [],
+  "done_at": "2026-08-11T20:50:12.949938814Z",
   "first_ready_at": "2026-08-11T18:51:58.491886834Z",
   "gates_required": [
     "cargo-ci",
@@ -34,7 +35,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Pin and configure the nextest foundation",
-  "updated_at": "2026-08-11T20:38:17.262423754Z"
+  "updated_at": "2026-08-11T20:50:12.949938814Z"
 }
