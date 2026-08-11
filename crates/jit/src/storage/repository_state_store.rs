@@ -1062,6 +1062,7 @@ fn recover_memory_state(
             failures
                 .check(&TransactionFailurePoint::RepositoryAfterReverseAction { action: index })?;
         }
+        failures.check(&TransactionFailurePoint::RepositoryBeforeStageCleanup)?;
         failures.check(&TransactionFailurePoint::RepositoryBeforeRollbackDecision)?;
     }
 
