@@ -8,6 +8,7 @@
   ],
   "description": "Mirror the file transaction kernel's prepared-rollback failure points in the in-memory conformance backend so the shared crash matrix can exercise identical observable edges.\n\n## Background\n\nThe JSON backend invokes `RepositoryBeforeReverseAction`, `RepositoryAfterReverseAction`, and `RepositoryBeforeRollbackDecision` while recovering a prepared transaction. The in-memory backend currently restores the original state atomically without invoking those configured failure points, so the epic's cross-backend rollback crash coverage cannot observe or retry the same edges. This is a conformance-seam gap: the durable journal protocol and semantic old/new recovery outcomes remain unchanged.\n\n## Success Criteria\n\n- [hard] REQ-01: In-memory prepared recovery invokes `RepositoryBeforeReverseAction` and `RepositoryAfterReverseAction` in reverse live-action order and invokes `RepositoryBeforeRollbackDecision` before the semantic restore completes.\n- [hard] REQ-02: An injected rollback-edge failure retains prepared recovery residue so a later clean session retries and converges to the original state.\n- [hard] REQ-03: Existing-root actions participate in the rollback sequence while staged absent-data-root actions are excluded consistently with the file transaction kernel.\n- [hard] REQ-04: Focused tests prove the injection order, retry behavior, and unchanged committed-recovery and successful prepared-recovery outcomes without changing journal or transaction semantics.\n",
   "documents": [],
+  "done_at": "2026-08-11T22:13:10.596307050Z",
   "first_ready_at": "2026-08-11T21:29:17.220716995Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-08-11T22:05:02.999505147Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T22:12:44.790625037Z",
       "updated_by": "auto:executor"
     }
   },
@@ -29,7 +35,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Mirror prepared rollback failure points in memory recovery",
-  "updated_at": "2026-08-11T22:05:02.999505147Z"
+  "updated_at": "2026-08-11T22:13:10.596307050Z"
 }
