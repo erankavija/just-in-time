@@ -1,0 +1,79 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c1cdf9a524da7b9774e0b47402cf345aa3cd88b5",
+  "completed_at": "2026-08-11T17:57:15.075276371Z",
+  "duration_ms": 205507,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4b7c06d0-test-suite-performance/plan.md",
+        "id": "F1",
+        "line": 19,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4b7c06d0/requirement/REQ-01",
+          "@/issue/4b7c06d0/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The enforced suite clock excludes the mandatory provenance tests, so it cannot prove the container's under-30-second required-validation outcome."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F2",
+        "line": 236,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4b7c06d0/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The stale-binary leaf requires nextest verification but is not ordered after the pinned nextest foundation."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F3",
+        "line": 301,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4b7c06d0/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The nextest-foundation terminal mixes foundation/CI implementation with contributor documentation and must be split."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F4",
+        "line": 136,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4b7c06d0/requirement/REQ-01",
+          "@/issue/4b7c06d0/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "The shared transaction benchmark artifact has no declared producer/consumer contract despite creation, mutation, and downstream consumption across leaves."
+      }
+    ],
+    "summary": "Four blocking planning defects remain.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "eebb3fee-b234-47bf-9859-24b6de87a347",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fe8c6639-f689-4c82-98e0-4479ecb37fae",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T17:53:49.567391105Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4392 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff1f5-8ef0-7072-8838-d9c99378ace4\n--------\nuser\n--- 4379 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "The helper validation, renderer check, and native batch dry-run passed; these blocking review findings remain.\n\n1. The enforced `suite-clock` excludes the required provenance test step, so it cannot establish REQ-01’s 30-second bound while preserving all required validation coverage. The plan measures only nextest plus doctests ([plan.md:19](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/plan.md:19)), but `cargo-ci` always runs ignored provenance tests afterward and documents a 3–4 minute cost ([cargo-ci.sh:315](/home/vkaskivuo/Projects/just-in-time/scripts/cargo-ci.sh:315)). Include every required test execution in the enforced clock and give that full path a credible under-30-second design, or obtain an explicit container-criterion change that excludes provenance.\n\n2. `stale-binary-fixture` promises an observable nextest run but has no dependency on `nextest-foundation` ([breakdown.json:223](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:223), [breakdown.json:236](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:236)). Its own `cargo-ci` gate still uses `cargo test` until the runner swap, so it cannot independently verify its nextest criterion against the pinned, committed configuration. Add `nextest-foundation` as a dependency of this leaf.\n\n3. `nextest-foundation` mixes a foundation/configuration/CI implementation with contributor documentation ([breakdown.json:301](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:301)). Split the `dev/TESTING.md` guidance into a documentation consumer after the foundation’s pinned executable and config are established; keep the foundation leaf to the configuration, CI provision, and parse-validation boundary.\n\n4. The transaction benchmark JSON is an undeclared cross-task contract. `transaction-benchmark` creates it, `fsync-dedupe` updates it, and attribution consumes it ([breakdown.json:136](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:136), [breakdown.json:526](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:526)), yet the plan declares no producer/consumer contract for it. Define immutable measurement evidence with exactly one producer, then a separate fsync-decision evidence contract if needed; declare each consumer and rewire dependencies accordingly.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Four blocking planning defects remain.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The enforced suite clock excludes the mandatory provenance tests, so it cannot prove the container's under-30-second required-validation outcome.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/plan.md\",\"line\":19,\"references\":[\"@/issue/4b7c06d0/requirement/REQ-01\",\"@/issue/4b7c06d0/requirement/REQ-04\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The stale-binary leaf requires nextest verification but is not ordered after the pinned nextest foundation.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":236,\"references\":[\"@/issue/4b7c06d0/requirement/REQ-04\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The nextest-foundation terminal mixes foundation/CI implementation with contributor documentation and must be split.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":301,\"references\":[\"@/issue/4b7c06d0/requirement/REQ-04\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The shared transaction benchmark artifact has no declared producer/consumer contract despite creation, mutation, and downstream consumption across leaves.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":136,\"references\":[\"@/issue/4b7c06d0/requirement/REQ-01\",\"@/issue/4b7c06d0/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

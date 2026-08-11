@@ -6,7 +6,7 @@
 
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
-| REQ-01 | Reduce transaction publication overhead with a benchmark-driven fsync decision, then enforce the measured suite clock after the transaction branch lands. | [Investigation](investigation.md#claim-classification) Claims 2, 4, and 5; [primitive verification](investigation.md#primitive-verification-and-required-crash-boundaries) |
+| REQ-01 | Reduce transaction publication overhead with a benchmark-driven fsync decision, then enforce the measured suite clock — the span the amended criterion names — after the transaction branch lands. | [Investigation](investigation.md#claim-classification) Claims 2, 4, and 5; [primitive verification](investigation.md#primitive-verification-and-required-crash-boundaries) |
 | REQ-02 | Feed the named measured duration into the existing budget-checker boundary using `--test-suite-ms <integer>` and the canonical `MAX_TEST_SUITE_SECONDS` threshold. | [Investigation](investigation.md#consumer-inventories) Inventory C; [architecture fit](investigation.md#architecture-fit) |
 | REQ-03 | Emit integer millisecond timing for each cargo-ci step and define the suite parent timer around nextest plus doctests. | [Investigation](investigation.md#claim-classification) Claim 1; [surprises](investigation.md#surprises-and-planning-consequences) 3 |
 | REQ-04 | Preserve semantic coverage while provisioning pinned nextest, sharing the stale-binary fixture across processes, and removing only unused journal progress rewrites. | [Investigation](investigation.md#recommended-decomposition-constraints); [consumer inventories](investigation.md#consumer-inventories) A, B, and D |
@@ -16,7 +16,7 @@
 
 ### `suite-clock` [plan-fixed] — Named inner suite clock
 
-The budget clock starts immediately before the `cargo nextest run` invocation and ends after the separately reported doctest substep, spanning exactly nextest plus doctests; it excludes the flock wait and the incremental-preflight, fmt, and clippy steps that precede the suite. The measured value is passed as an integer millisecond value to enforcement. This resolves the ambiguity identified in the investigation’s Claim 1 and Surprise 3.
+The budget clock starts immediately before the `cargo nextest run` invocation and ends after the separately reported doctest substep, spanning exactly nextest plus doctests; it excludes the flock wait and the incremental-preflight, fmt, and clippy steps that precede the suite. The container's amended REQ-01 names this span as the budgeted suite and places the separately required inherently cold ignored-provenance subset outside it, attributed under REQ-05. The measured value is passed as an integer millisecond value to enforcement. This resolves the ambiguity identified in the investigation’s Claim 1 and Surprise 3.
 
 ### `single-barrier-journal` [plan-fixed] — Transaction durability phases
 
@@ -30,6 +30,10 @@ The `suite-runner` task produces the repository’s tested parser-facing success
 
 The `suite-profile` task produces the machine-readable warm per-test timing artifact at its stable repository-owned location and shape, deriving timings from nextest machine-readable output. It has two consumers: `suite-enforcement` selects per-test nextest overrides mechanically from the recorded timings, and `inherent-cost-attribution` classifies inherent costs from those timings alongside the transaction benchmark artifact, reaching the producer transitively through enforcement.
 
+### `transaction-benchmark-evidence` [implementation-produced] — Append-only transaction measurement artifact
+
+The `transaction-benchmark` task produces the append-only measurement artifact for warm model-limit transaction round trips at its stable repository-owned location: each run appends a dated record, the initial record carries the fsync-residual decision, and no consumer rewrites prior records. `fsync-dedupe` reads the decision and appends its post-change measurement; `inherent-cost-attribution` reads the records for transaction cost attribution, reaching the producer transitively through enforcement.
+
 ## Generated decomposition overview
 
 <!-- jit:breakdown-overview:begin -->
@@ -39,15 +43,16 @@ The `suite-profile` task produces the machine-readable warm per-test timing arti
 | journal-barrier-coverage | Add journal barrier crash coverage | task | Crash conformance covers the single-barrier protocol across remaining boundaries, backends, and root shapes. | single-barrier-journal | REQ-04, investigation.md | touches 1 | transaction-branch | journal-runtime-cutover |
 | journal-docs-cutover | Cut over journal durability documentation | task | The architecture reference describes single-barrier decision and identity recovery without durable action progression. | single-barrier-journal | REQ-01, REQ-04, investigation.md | touches 1 | transaction-branch | journal-runtime-cutover |
 | transaction-benchmark | Measure transaction model-limit round trips | task | A warm harness records model-limit transaction costs and a reproducible fsync-residual decision for both root shapes. | single-barrier-journal | REQ-01, investigation.md | creates 2 | transaction-branch | journal-runtime-cutover |
-| fsync-dedupe | Apply the benchmark-driven fsync decision | task | The measured fsync decision is applied behind existing barriers and verified by a rerun without changing transaction semantics. | single-barrier-journal | REQ-01, investigation.md | touches 2 | transaction-branch | transaction-benchmark |
-| stale-binary-fixture | Share the stale-binary build fixture across processes | task | Six stale-binary tests share one cross-process verified child artifact without losing test granularity or semantic assertions. | — | REQ-04, investigation.md | touches 2 | runner-branch | — |
+| fsync-dedupe | Apply the benchmark-driven fsync decision | task | The measured fsync decision is applied behind existing barriers and verified by a rerun without changing transaction semantics. | single-barrier-journal, transaction-benchmark-evidence | REQ-01, investigation.md | touches 2 | transaction-branch | transaction-benchmark |
+| stale-binary-fixture | Share the stale-binary build fixture across processes | task | Six stale-binary tests share one cross-process verified child artifact without losing test granularity or semantic assertions. | — | REQ-04, investigation.md | touches 2 | runner-branch | nextest-foundation |
 | duration-checker | Add the injectable suite duration checker | task | The checker validates optional integer suite duration input against MAX_TEST_SUITE_SECONDS with five boundary fixtures. | — | REQ-02, investigation.md | touches 2 | runner-branch | — |
-| nextest-foundation | Pin and configure the nextest foundation | task | Pinned cargo-nextest and an exact initial parallel policy are reproducible in CI before runner use. | — | REQ-04, investigation.md | creates 1, touches 2 | runner-branch | — |
+| nextest-foundation | Pin and configure the nextest foundation | task | Pinned cargo-nextest and an exact initial parallel policy are reproducible in CI before runner use. | — | REQ-04, investigation.md | creates 1, touches 1 | runner-branch | — |
+| nextest-usage-docs | Document pinned nextest installation and use | task | dev/TESTING.md documents installing and running the pinned nextest and cites the committed policy. | — | REQ-04, investigation.md | touches 1 | runner-branch | nextest-foundation |
 | suite-runner | Swap the cargo-ci suite runner | task | cargo-ci runs the pinned nextest workspace suite with verified reporter evidence. | — | REQ-04, investigation.md | touches 2 | runner-branch | nextest-foundation, stale-binary-fixture |
 | step-timing-and-clock | Add step timing and the named suite clock | task | cargo-ci reports integer-millisecond step timings and a suite-clock spanning exactly the nextest and doctest substeps. | suite-clock, nextest-reporter-evidence | REQ-03, investigation.md | touches 2 | runner-branch | suite-runner |
 | suite-enforcement | Wire suite enforcement and tighten nextest bounds | task | Live suite-clock enforcement uses the exact checker flag and final bounded nextest policy after transaction optimization. | suite-clock, nextest-reporter-evidence, suite-timing-evidence | REQ-01, REQ-02, investigation.md | touches 2 | runner-branch | step-timing-and-clock, duration-checker, fsync-dedupe, suite-profile |
 | suite-profile | Produce warm per-test suite timing evidence | task | A pinned-nextest profiler produces repository-owned warm per-test timing evidence at a stable JSON path. | nextest-reporter-evidence | REQ-05, investigation.md | creates 2 | runner-branch | suite-runner |
-| inherent-cost-attribution | Attribute inherent test costs | task | Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS. | suite-timing-evidence | REQ-05, investigation.md | touches 1 | runner-branch | suite-enforcement |
+| inherent-cost-attribution | Attribute inherent test costs | task | Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS. | suite-timing-evidence, transaction-benchmark-evidence | REQ-05, investigation.md | touches 1 | runner-branch | suite-enforcement |
 
 ```mermaid
 flowchart LR
@@ -59,24 +64,27 @@ flowchart LR
     N5["stale-binary-fixture: Share the stale-binary build fixture across processes"]
     N6["duration-checker: Add the injectable suite duration checker"]
     N7["nextest-foundation: Pin and configure the nextest foundation"]
-    N8["suite-runner: Swap the cargo-ci suite runner"]
-    N9["step-timing-and-clock: Add step timing and the named suite clock"]
-    N10["suite-enforcement: Wire suite enforcement and tighten nextest bounds"]
-    N11["suite-profile: Produce warm per-test suite timing evidence"]
-    N12["inherent-cost-attribution: Attribute inherent test costs"]
+    N8["nextest-usage-docs: Document pinned nextest installation and use"]
+    N9["suite-runner: Swap the cargo-ci suite runner"]
+    N10["step-timing-and-clock: Add step timing and the named suite clock"]
+    N11["suite-enforcement: Wire suite enforcement and tighten nextest bounds"]
+    N12["suite-profile: Produce warm per-test suite timing evidence"]
+    N13["inherent-cost-attribution: Attribute inherent test costs"]
     N0 --> N1
     N0 --> N2
     N0 --> N3
     N3 --> N4
+    N7 --> N5
     N7 --> N8
-    N5 --> N8
-    N8 --> N9
+    N7 --> N9
+    N5 --> N9
     N9 --> N10
-    N6 --> N10
-    N4 --> N10
-    N11 --> N10
-    N8 --> N11
-    N10 --> N12
+    N10 --> N11
+    N6 --> N11
+    N4 --> N11
+    N12 --> N11
+    N9 --> N12
+    N11 --> N13
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -86,6 +94,7 @@ flowchart LR
 |---|---|
 | Container shape | Retype the chosen existing container rather than create a new epic; bigger JIT product defects remain in scope while this epic stays small with quick results. |
 | Strict boundary | Treat a measured suite-clock value greater than or equal to `MAX_TEST_SUITE_SECONDS*1000` as failure, enforced over the `suite-clock` span alone. |
+| Budgeted-suite scope | The container's REQ-01 names the suite-clock span (nextest plus doctests) as the budgeted suite; the ignored provenance subset — nested cold cargo builds with a documented multi-minute cost — runs as a separately required step outside the clock and is attributed under REQ-05. Rejected: including provenance in the clock, because no design brings a cold nested dependency build under the budget without deleting the coverage. |
 | Doctests | Keep `cargo test --doc --workspace` as a separately reported substep inside the suite clock because nextest does not cover doctests in the investigated design. |
 | Runner sequencing | Keep the transaction and runner branches independent until the join; provision pinned nextest first, swap the runner next, add step timing and the suite clock, produce the warm profile, and then wire enforcement after that profile, the duration checker, and the fsync fix, because enforcement selects its per-test overrides from the profile’s timings. |
 | Journal rollback marker | Retain the terminal `RolledBack` write; remove only per-action rewrites because recovery is identity-driven but the investigation does not prove marker removal safe. |

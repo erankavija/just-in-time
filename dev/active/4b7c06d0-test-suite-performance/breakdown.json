@@ -133,7 +133,7 @@
   {
     "key": "transaction-benchmark",
     "title": "Measure transaction model-limit round trips",
-    "description": "Create a dedicated warm benchmark that records model-limit transaction costs for both journal root shapes and records the fsync-residual decision without changing production code.\n\n## Background\n\nThe model-limit profile package stresses file count, aggregate bytes, path length, and directory shape. The harness exercises warm profile-pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for existing-root and absent-root transactions, then preserves reproducible JSON evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `scripts/benchmark-transaction.sh` to measure warm pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for both existing-root and absent-root journal shapes.\n- [hard] REQ-02: Creates `dev/benchmarks/test-suite-performance-4b7c06d0.json` with integer-millisecond results, method, fixture shape, cache state, and a recorded fsync-residual decision.\n- [hard] REQ-03: Makes the recorded decision reproducible by rerunning the benchmark and does not modify production code in this measurement task.\n\n## Notes\n\nThe benchmark artifact is later touched by `fsync-dedupe` in an ordered overlap: that dependent task applies or records the benchmark decision after this measurement task lands.",
+    "description": "Create a dedicated warm benchmark that records model-limit transaction costs for both journal root shapes and records the fsync-residual decision without changing production code.\n\n## Background\n\nThe model-limit profile package stresses file count, aggregate bytes, path length, and directory shape. The harness exercises warm profile-pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for existing-root and absent-root transactions, then preserves reproducible JSON evidence.\n\nThe artifact is append-only measurement evidence: each run appends a dated record, and the initial record carries the fsync-residual decision; downstream consumers read records without rewriting them.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `scripts/benchmark-transaction.sh` to measure warm pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for both existing-root and absent-root journal shapes.\n- [hard] REQ-02: Creates `dev/benchmarks/test-suite-performance-4b7c06d0.json` with integer-millisecond results, method, fixture shape, cache state, and a recorded fsync-residual decision.\n- [hard] REQ-03: Makes the recorded decision reproducible by rerunning the benchmark and does not modify production code in this measurement task.\n\n## Notes\n\nThe benchmark artifact is later touched by `fsync-dedupe` in an ordered overlap: that dependent task applies or records the benchmark decision after this measurement task lands.",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -155,7 +155,9 @@
       "contract_refs": [
         "single-barrier-journal"
       ],
-      "produces_contracts": [],
+      "produces_contracts": [
+        "transaction-benchmark-evidence"
+      ],
       "source_refs": [
         "REQ-01",
         "investigation.md"
@@ -196,7 +198,8 @@
     "planning": {
       "outcome": "The measured fsync decision is applied behind existing barriers and verified by a rerun without changing transaction semantics.",
       "contract_refs": [
-        "single-barrier-journal"
+        "single-barrier-journal",
+        "transaction-benchmark-evidence"
       ],
       "produces_contracts": [],
       "source_refs": [
@@ -233,7 +236,9 @@
       "cargo-ci",
       "code-review"
     ],
-    "depends_on": [],
+    "depends_on": [
+      "nextest-foundation"
+    ],
     "planning": {
       "outcome": "Six stale-binary tests share one cross-process verified child artifact without losing test granularity or semantic assertions.",
       "contract_refs": [],
@@ -298,7 +303,7 @@
   {
     "key": "nextest-foundation",
     "title": "Pin and configure the nextest foundation",
-    "description": "Make nextest reproducible before the runner swap by pinning cargo-nextest 0.9.133, committing its initial policy, and documenting contributor installation and use.\n\n## Background\n\nThe audited host version is cargo-nextest 0.9.133. The `test-rust` job in `.github/workflows/ci.yml` installs it with `cargo install cargo-nextest --locked --version 0.9.133` in a named installation step.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `.config/nextest.toml` with exact initial values `nextest-version = \"0.9.133\"`, `retries = 0`, `slow-timeout.period = \"15s\"`, `terminate-after = 4` for a hard bound of 60 seconds, and the default leak-timeout.\n- [hard] REQ-02: Declares no test groups: nested-cargo and socket-heavy suites keep default parallelism because single-build serialization is owned by the cross-process stale-binary fixture, and `cargo nextest show-config test-groups` succeeds against the workspace with the committed policy, proving the pinned binary parses it.\n- [hard] REQ-03: Adds the named cargo-nextest 0.9.133 installation step to the `test-rust` job in `.github/workflows/ci.yml` using `cargo install cargo-nextest --locked --version 0.9.133`.\n- [hard] REQ-04: Adds contributor install and run guidance for the pinned version and committed policy to `dev/TESTING.md`.",
+    "description": "Make nextest reproducible before the runner swap by pinning cargo-nextest 0.9.133 in CI and committing its initial policy.\n\n## Background\n\nThe audited host version is cargo-nextest 0.9.133. The `test-rust` job in `.github/workflows/ci.yml` installs it with `cargo install cargo-nextest --locked --version 0.9.133` in a named installation step.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `.config/nextest.toml` with exact initial values `nextest-version = \"0.9.133\"`, `retries = 0`, `slow-timeout.period = \"15s\"`, `terminate-after = 4` for a hard bound of 60 seconds, and the default leak-timeout.\n- [hard] REQ-02: Declares no test groups: nested-cargo and socket-heavy suites keep default parallelism because single-build serialization is owned by the cross-process stale-binary fixture, and `cargo nextest show-config test-groups` succeeds against the workspace with the committed policy, proving the pinned binary parses it.\n- [hard] REQ-03: Adds the named cargo-nextest 0.9.133 installation step to the `test-rust` job in `.github/workflows/ci.yml` using `cargo install cargo-nextest --locked --version 0.9.133`.",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -330,7 +335,46 @@
             ".config/nextest.toml"
           ],
           "touches": [
-            ".github/workflows/ci.yml",
+            ".github/workflows/ci.yml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "nextest-usage-docs",
+    "title": "Document pinned nextest installation and use",
+    "description": "Add contributor install and run guidance for the pinned cargo-nextest to the testing guide.\n\n## Background\n\nThe pinned executable, committed `.config/nextest.toml` policy, and CI provisioning land in `nextest-foundation`; this task documents them for contributors. The later `inherent-cost-attribution` task adds the cost table to the same file in a declared ordered overlap.\n\n## Success Criteria\n\n- [hard] REQ-01: Documents installing the pinned cargo-nextest 0.9.133 with `cargo install cargo-nextest --locked --version 0.9.133` and running the workspace suite and doctest substep in `dev/TESTING.md`.\n- [hard] REQ-02: Describes the committed `.config/nextest.toml` policy by citation rather than restating its values.\n\n## Notes\n\nOrdered overlap: `dev/TESTING.md` is touched here first; `inherent-cost-attribution` adds the cost table afterwards.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review"
+    ],
+    "depends_on": [
+      "nextest-foundation"
+    ],
+    "planning": {
+      "outcome": "dev/TESTING.md documents installing and running the pinned nextest and cites the committed policy.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-04",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "Contributors running the Rust suite locally",
+        "test_boundary": "doc-review gate over the updated testing guide",
+        "worker_sized_reason": "One documentation deliverable over one file with its content defined by the completed foundation.",
+        "footprint": {
+          "touches": [
             "dev/TESTING.md"
           ]
         }
@@ -523,7 +567,7 @@
   {
     "key": "inherent-cost-attribution",
     "title": "Attribute inherent test costs",
-    "description": "Document every inherently costly test using measured warm profile evidence and the transaction benchmark artifact, with one canonical suite-budget citation.\n\n## Background\n\nThe attribution consumes `dev/benchmarks/suite-profile.json` through the `suite-timing-evidence` contract and consumes `dev/benchmarks/test-suite-performance-4b7c06d0.json` for transaction costs. It records reason and measured warm cost rather than copying volatile gate history. This task owns the classification of a test as inherently costly; the profile producer records timings only.\n\n## Success Criteria\n\n- [hard] REQ-01: Updates `dev/TESTING.md` with every inherently costly test named, its measured warm cost from `suite-profile.json`, and the reason its cost is inherent.\n- [hard] REQ-02: Derives the attribution from both the suite profile and transaction benchmark artifacts and cites `MAX_TEST_SUITE_SECONDS` as the canonical threshold.\n- [hard] REQ-03: Preserves contributor guidance for the pinned nextest policy and leaves the documentation concise and structurally traceable to both artifacts.\n\n## Notes\n\nOrdered overlap: `dev/TESTING.md` is touched after `nextest-foundation`, which adds installation/run guidance; this task adds the cost table after `suite-profile` and `suite-enforcement` provide their evidence and policy.",
+    "description": "Document every inherently costly test using measured warm profile evidence and the transaction benchmark artifact, with one canonical suite-budget citation.\n\n## Background\n\nThe attribution consumes `dev/benchmarks/suite-profile.json` through the `suite-timing-evidence` contract and consumes `dev/benchmarks/test-suite-performance-4b7c06d0.json` for transaction costs. It records reason and measured warm cost rather than copying volatile gate history. This task owns the classification of a test as inherently costly; the profile producer records timings only.\n\n## Success Criteria\n\n- [hard] REQ-01: Updates `dev/TESTING.md` with every inherently costly test named, its measured warm cost from `suite-profile.json`, and the reason its cost is inherent.\n- [hard] REQ-02: Derives the attribution from both the suite profile and transaction benchmark artifacts and cites `MAX_TEST_SUITE_SECONDS` as the canonical threshold.\n- [hard] REQ-03: Preserves contributor guidance for the pinned nextest policy and leaves the documentation concise and structurally traceable to both artifacts.\n\n## Notes\n\nOrdered overlap: `dev/TESTING.md` is touched after `nextest-usage-docs`, which adds installation/run guidance; this task adds the cost table after `suite-profile` and `suite-enforcement` provide their evidence and policy.",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -543,7 +587,8 @@
     "planning": {
       "outcome": "Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS.",
       "contract_refs": [
-        "suite-timing-evidence"
+        "suite-timing-evidence",
+        "transaction-benchmark-evidence"
       ],
       "produces_contracts": [],
       "source_refs": [
