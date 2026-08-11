@@ -13647,3 +13647,5 @@
 {"id":"8e154d9c-d635-4d25-b2db-f4eaf8148dfd","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","priority":"high","timestamp":"2026-08-11T19:47:48.582069572Z","title":"Stop pinning the live dogfood package identity hash to a literal","type":"issue_created"}
 {"from":"ready","id":"76e926dd-82b9-48cc-b813-6ee8b06367ca","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","timestamp":"2026-08-11T19:50:48.693031602Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"788dad7a-7c53-4a59-af9e-4ae486b1774e","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","timestamp":"2026-08-11T19:50:48.693031602Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"d3b48e2d-b06a-4c38-9320-73fab2c909e5","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","timestamp":"2026-08-11T20:09:45.395423105Z","type":"gate_added"}
+{"gate_key":"code-review","id":"81401d89-6321-491e-93a0-1f205fa9f470","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","timestamp":"2026-08-11T20:09:46.066419397Z","type":"gate_added"}
