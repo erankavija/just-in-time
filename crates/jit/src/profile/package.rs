@@ -1225,13 +1225,16 @@ mod tests {
         let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
 
         assert_eq!(package.model().id.as_str(), "jit-dogfood");
-        // Fixed oracle for the current shipped v1 package bytes. The
-        // independent comparison below is the continuity proof; this literal
-        // remains a useful stable-contract check rather than its replacement.
-        assert_eq!(
-            package.hashes().package,
-            "5c7c1540706350e6c28452ed6fa7500a679a21b511515f52065da6f60aef62f0"
-        );
+        // This package carries the repository's own live configuration as
+        // assets, so its identity hash moves with every legitimate
+        // configuration edit; a literal oracle here would be a hand-maintained
+        // copy of a derived value (@/inv/single-source-prose) that turns such an
+        // edit into a red suite. The comparison below proves what the literal
+        // was there to protect — that the canonical decoder still computes the
+        // released v1 identity — by recomputing it from the package bytes, which
+        // holds whatever the packaged configuration currently is. Literal
+        // package hashes stay on the synthetic fixture package, whose bytes this
+        // module authors.
         assert_eq!(
             package.hashes().package,
             legacy_v1_identity_hash(&package.files),

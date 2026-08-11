@@ -13638,3 +13638,12 @@
 {"from":"backlog","id":"0b4bb306-11d0-4539-a5c4-c5b6a8008f28","issue_id":"5b60d40e-d8d9-4552-b880-6ae717799dab","timestamp":"2026-08-11T19:03:14.476731275Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"1d52ed01-5708-4d6c-8f9a-8201ce0c184b","issue_id":"f5da1112-0411-482b-90ea-b2a548dd087a","timestamp":"2026-08-11T19:03:19.785596064Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"e8de1c9c-0111-4b6b-a72b-f9605b53fb56","issue_id":"4b7c06d0-0436-4dd3-b3c8-52595da3e342","timestamp":"2026-08-11T19:09:38.781867025Z","type":"issue_claimed"}
+{"from":"ready","id":"58163696-745c-41cb-9d58-2fc95c05bbb5","issue_id":"3db5b63d-e454-4c13-b294-1bd0ead539ef","timestamp":"2026-08-11T19:10:53.669429501Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"6bda5b6f-a19c-4705-ba26-9492ec6cd6ca","issue_id":"3db5b63d-e454-4c13-b294-1bd0ead539ef","timestamp":"2026-08-11T19:10:53.669429501Z","type":"issue_claimed"}
+{"from":"ready","id":"6b1d0938-1a10-4597-a2bd-51744bc3a7f6","issue_id":"5b60d40e-d8d9-4552-b880-6ae717799dab","timestamp":"2026-08-11T19:10:59.163239303Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"36d88ba7-bc4c-443c-a9d2-24483593ccae","issue_id":"5b60d40e-d8d9-4552-b880-6ae717799dab","timestamp":"2026-08-11T19:10:59.163239303Z","type":"issue_claimed"}
+{"from":"ready","id":"375c52a2-46e8-45b3-b096-1b6171a367dd","issue_id":"f5da1112-0411-482b-90ea-b2a548dd087a","timestamp":"2026-08-11T19:11:04.647803822Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"811691e4-75cd-4c6d-bf00-23e44c617cad","issue_id":"f5da1112-0411-482b-90ea-b2a548dd087a","timestamp":"2026-08-11T19:11:04.647803822Z","type":"issue_claimed"}
+{"id":"8e154d9c-d635-4d25-b2db-f4eaf8148dfd","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","priority":"high","timestamp":"2026-08-11T19:47:48.582069572Z","title":"Stop pinning the live dogfood package identity hash to a literal","type":"issue_created"}
+{"from":"ready","id":"76e926dd-82b9-48cc-b813-6ee8b06367ca","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","timestamp":"2026-08-11T19:50:48.693031602Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"788dad7a-7c53-4a59-af9e-4ae486b1774e","issue_id":"b1f2f001-d59d-40e2-be39-20722e339e11","timestamp":"2026-08-11T19:50:48.693031602Z","type":"issue_claimed"}
