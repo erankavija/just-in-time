@@ -896,10 +896,17 @@ Every byte of the archive is treated as untrusted input. The package identity is
 recomputed from the extracted content and the archive is refused when it
 disagrees with the digest the archive carries. An entry naming an absolute path
 or a parent-directory traversal, an entry that is not a regular file or a
-directory, an entry carrying a mode the packaged manifest does not declare, and
-content over the package file or byte budget are each refused. The extracted
-content is validated as a package before anything is published, so a published
-directory always decodes as one.
+directory, an entry carrying an unexpected mode, and content over the package
+file or byte budget are each refused. The extracted content is validated as a
+package before anything is published, so a published directory always decodes as
+one.
+
+Every entry's mode is compared against the mode expected for it, never adopted
+from the archive: for a package file, the mode its manifest declaration implies;
+for the metadata entry and for a directory entry another tar wrote, the mode the
+archive format defines — `0644` and `0755` respectively. A directory entry
+contributes nothing to the package and is admitted only so an archive repacked
+with ordinary tools still reads.
 
 A refused add publishes nothing and leaves no partially extracted package: the
 archive is read into memory and the whole tree is published through one

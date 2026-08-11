@@ -144,10 +144,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   package model accepts. The digest travels inside the archive: it establishes integrity, not
   origin. An arriving archive is read as untrusted input — an entry naming an
   absolute path or a parent-directory traversal, an entry that is not a regular
-  file or a directory, an entry carrying a mode the packaged manifest does not
-  declare, and content past the package file or byte budget are each refused,
-  the budgets against running counts while the archive is being read rather than
-  after its bytes have landed. Extraction produces a value in memory and the
+  file or a directory, an entry carrying an unexpected mode, and content past
+  the package file or byte budget are each refused, the budgets against running
+  counts while the archive is being read rather than after its bytes have
+  landed. Every mode is compared and never adopted: a package file's against the
+  mode its manifest declaration implies, and the metadata entry's and any
+  directory entry's against the mode the archive format defines. Extraction produces a value in memory and the
   finished tree is published through the same recoverable transaction a capture
   uses, so a refused or interrupted add leaves no partially extracted package
   and an occupied destination is never published over.

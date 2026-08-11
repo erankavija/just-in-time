@@ -42,14 +42,23 @@
 //! Every byte of an arriving archive is untrusted, so the read refuses rather
 //! than repairs. Entry names are validated as safe relative paths before any
 //! content is admitted, only regular files and directories are admitted at all,
-//! the package bounds are enforced against running counts as entries are read
-//! rather than after they have landed, and a file's mode is compared against
-//! what the manifest declares rather than adopted from the entry. A directory
-//! entry another tar wrote is admitted and ignored, because a package's
-//! directories are created by the publication from its file paths and no
-//! directory mode is ever published. The result is a value in memory: this
-//! module opens nothing, writes nothing, and leaves the decision of where a
-//! package goes to its caller.
+//! and the package bounds are enforced against running counts as entries are
+//! read rather than after they have landed.
+//!
+//! Every entry is held to a mode, compared and never adopted. A package file's
+//! mode is the one its manifest declaration implies. The other two entries have
+//! no declaration to be held to, so the format defines their mode instead: the
+//! metadata entry, and a directory entry another tar wrote — which is admitted,
+//! because a repack by ordinary tools should still read, and contributes
+//! nothing, because a package's directories are created by the publication from
+//! its file paths. Nothing about an entry is taken on trust for being unused.
+//!
+//! Ownership and timestamps are the deliberate exception. Packing zeroes them
+//! so an archive is reproducible, and the read consults neither, so neither can
+//! make the read do anything — they carry no meaning to hold them to.
+//!
+//! The result is a value in memory: this module opens nothing, writes nothing,
+//! and leaves the decision of where a package goes to its caller.
 
 use super::manifest::{ProfileId, ProfilePackageModel, MANIFEST_FILE_NAME};
 use super::package::{
@@ -72,6 +81,15 @@ const PACKAGE_ENTRY_PREFIX: &str = "package";
 
 /// The one archive wire this build reads and writes.
 const ARCHIVE_VERSION: u32 = 1;
+
+/// Mode a directory entry must carry to be admitted.
+///
+/// Packing writes no directory entry, but the format still defines the mode of
+/// one it will read, because an entry property that is admitted without being
+/// held to a definition is a property an archive gets to choose. The
+/// conventional mode is what a `tar -c` repack of an extracted package writes,
+/// so defining it here refuses an unexpected mode without refusing portability.
+const DIRECTORY_MODE: u32 = 0o755;
 
 /// Mode an archived file carries when its declaration is executable.
 const EXECUTABLE_FILE_MODE: u32 = 0o755;
@@ -359,14 +377,11 @@ pub fn read_package_archive(bytes: &[u8]) -> Result<CapturedPackageTree, Package
         .map_err(PackageArchiveError::InvalidPackage)?;
     let executable = declared_executable_sources(&model);
     for (source, file) in &extracted.files {
-        let expected = declared_file_mode(&executable, source);
-        if file.mode != expected {
-            return Err(PackageArchiveError::UnexpectedEntryMode {
-                path: format!("{PACKAGE_ENTRY_PREFIX}/{source}"),
-                actual: file.mode,
-                expected,
-            });
-        }
+        require_entry_mode(
+            &format!("{PACKAGE_ENTRY_PREFIX}/{source}"),
+            file.mode,
+            declared_file_mode(&executable, source),
+        )?;
     }
 
     // What the entries carried, which is what lets the shared package
@@ -507,16 +522,17 @@ fn extract_archive_entries(bytes: &[u8]) -> Result<ExtractedArchive, PackageArch
 
         match (kind, classify_entry_name(&name)) {
             // Packing writes no directory entry, and one another tar wrote
-            // carries nothing this read needs: a package's directories are
-            // created by the publication from its file paths, and no directory
-            // mode is ever published. Its name is still held to the path rule
-            // above; beyond that it is ignored rather than refused, so an
-            // archive repacked by ordinary tools still reads.
+            // contributes nothing: a package's directories are created by the
+            // publication from its file paths. It is admitted so a repack by
+            // ordinary tools still reads, and held to its name and to the mode
+            // the format defines, because nothing about an entry is taken on
+            // trust for being unused.
             (
                 EntryType::Directory,
                 Some(ArchiveEntryName::PackageRoot | ArchiveEntryName::PackageRelative(_)),
-            ) => {}
+            ) => require_entry_mode(&name, mode, DIRECTORY_MODE)?,
             (EntryType::Regular, Some(ArchiveEntryName::Metadata)) => {
+                require_entry_mode(&name, mode, REGULAR_FILE_MODE)?;
                 if metadata.is_some() {
                     return Err(PackageArchiveError::DuplicateEntry { path: name });
                 }
@@ -593,6 +609,23 @@ fn entry_name<R: Read>(entry: &tar::Entry<'_, R>) -> Result<String, PackageArchi
         return Err(unsafe_path());
     }
     Ok(name.to_string())
+}
+
+/// Hold one entry to the mode defined for it.
+///
+/// The one comparison every entry's mode goes through, whether the definition
+/// comes from the manifest's own declaration or from the archive format
+/// (`@/inv/convention-convergence`). No route admits a mode without reaching
+/// here.
+fn require_entry_mode(path: &str, actual: u32, expected: u32) -> Result<(), PackageArchiveError> {
+    if actual == expected {
+        return Ok(());
+    }
+    Err(PackageArchiveError::UnexpectedEntryMode {
+        path: path.to_string(),
+        actual,
+        expected,
+    })
 }
 
 /// Hold a partially extracted package against the bounds the package model
@@ -1093,26 +1126,53 @@ mod tests {
         );
     }
 
-    /// A directory entry another tar wrote is admitted and ignored rather than
-    /// refused, so an archive repacked by ordinary tools still reads.
+    /// The two entries no manifest declaration covers are held to the mode the
+    /// format defines for them: its own metadata entry, and a directory entry
+    /// another tar wrote.
+    ///
+    /// The positive case is what the definition buys — a repack by ordinary
+    /// tools writes conventional directory modes and still reads — and the
+    /// negative cases are what it refuses.
     #[test]
-    fn test_read_package_archive_admits_and_ignores_a_directory_entry_another_tar_wrote() {
+    fn test_read_package_archive_holds_an_entry_the_format_defines_a_mode_for_to_that_mode() {
         let package = fixture_package();
-        let mut specs = entry_specs(&pack_package_archive(&package).expect("the fixture packs"));
-        specs.push(ArchiveEntrySpec {
+        let directory_entry = |mode| ArchiveEntrySpec {
             kind: EntryType::Directory,
-            // Neither the canonical mode nor one the manifest declares: no
-            // directory mode is ever published, so none is consulted.
-            mode: 0o700,
+            mode,
             name: "package/nested".to_string(),
             bytes: Vec::new(),
-        });
+        };
 
-        let tree = read_package_archive(&archive_of(&specs))
-            .expect("a directory entry is admitted and ignored");
-
+        let mut admitted = entry_specs(&pack_package_archive(&package).expect("the fixture packs"));
+        admitted.push(directory_entry(DIRECTORY_MODE));
+        let tree = read_package_archive(&archive_of(&admitted))
+            .expect("a directory entry at the conventional mode is admitted");
         assert_eq!(tree.hashes().package, package.hashes().package);
-        assert_eq!(tree.file_count(), package.file_count());
+        assert_eq!(
+            tree.file_count(),
+            package.file_count(),
+            "a directory entry contributed content to the package"
+        );
+
+        for (scenario, perturb) in [
+            (
+                "a directory entry at a mode the format does not define",
+                Box::new(|specs: &mut Vec<ArchiveEntrySpec>| specs.push(directory_entry(0o700)))
+                    as Box<dyn FnOnce(&mut Vec<ArchiveEntrySpec>)>,
+            ),
+            (
+                "the metadata entry at a mode the format does not define",
+                Box::new(|specs: &mut Vec<ArchiveEntrySpec>| {
+                    spec_named(specs, ARCHIVE_METADATA_ENTRY).mode = 0o600;
+                }),
+            ),
+        ] {
+            let refusal = refusal_after(perturb);
+            assert!(
+                matches!(refusal, PackageArchiveError::UnexpectedEntryMode { .. }),
+                "{scenario} was not refused: {refusal}"
+            );
+        }
     }
 
     /// Every package the model accepts packs into an archive the read accepts.
