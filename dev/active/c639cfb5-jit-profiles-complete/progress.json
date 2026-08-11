@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 12,
+  "current_wave": 13,
   "waves": [
     {
       "wave_number": 1,
@@ -154,13 +154,13 @@
           "short_id": "15cc28c5",
           "title": "Pack a package into a verifiable archive",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         },
         {
           "short_id": "42c8c9c1",
           "title": "Ownership, records, and safe change",
           "classification": "checkpoint",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -1057,6 +1057,42 @@
       "holistic_review": "the pure exhaustive decision table reuses the canonical claim fingerprint, production aggregate planning applies safe updates/deletions atomically, conflict mapping remains typed and actionable, and lifecycle-event integration is clean",
       "gate_evidence": "cargo-ci run 6b7af235-68b1-444d-b224-1d3095dedf5a passed the combined Wave 8 workspace plus fmt, clippy, provenance, build-budget, and incremental checks; code-review run 7c5630d1-6af1-4a09-8ad2-24132e4f5d52 passed with zero findings. Run 561e0edb-7efa-4687-8435-eda4a597b987 is retained but excluded because it reused another worktree's Cargo target.",
       "reviewed_at": "2026-08-10T09:17:00Z"
+    },
+    {
+      "issue": "15cc28c5",
+      "round": 3,
+      "verdict": "PASS",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed at 45693c86 (4545 tests, targets 11/12, 742 s incl. flock wait)",
+        "mcp-ci": "passed (3 s)",
+        "security-review": "passed (precheck attestation)",
+        "code-review": "passed, 0 blocking; 1 advisory pre-existing finding naming cf42d08b"
+      },
+      "criteria": {
+        "REQ-01": "MET",
+        "REQ-02": "MET",
+        "REQ-03": "MET",
+        "REQ-04": "MET",
+        "REQ-05": "MET"
+      },
+      "resolution": "Directory and metadata entry modes now reach require_entry_mode (package_archive.rs:620) alongside manifest-declared file modes - three call sites, one comparison. The metadata-mode defect was found by the demanded whole-class sweep and had been cited by no reviewer.",
+      "merged_tree": "main's comment fix and the worker's changes both touched commands/profile.rs and auto-merged without conflict; the merged tree passed cargo-ci independently (4545 tests, 735 s), which is the only check that observes the combination."
+    },
+    {
+      "issue": "42c8c9c1",
+      "round": 2,
+      "verdict": "PASS",
+      "date": "2026-08-11",
+      "gates": {
+        "repo-validate": "passed",
+        "holistic-review": "passed, 0 findings (132 s)"
+      },
+      "criteria": {
+        "REQ-01": "MET"
+      },
+      "resolution": "Round 1 failed on a stale code comment describing a removed v1 conversion; fixed both instances of that class (profile_apply.rs:1836, commands/profile.rs:1139) and kept package.rs:1059's cfg(test) oracle, which serves the frozen package-manifest hash epic REQ-09 requires.",
+      "note": "The fail-fast conflict-reporting pitfall the lead reconciled as in-subject-but-not-a-violation was not raised by the independent reviewer in either round, supporting that judgement."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
