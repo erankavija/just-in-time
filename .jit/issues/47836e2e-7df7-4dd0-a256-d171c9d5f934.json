@@ -8,6 +8,7 @@
   ],
   "description": "Make the six stale-binary nested-build tests reuse one verified artifact across concurrent test processes while retaining independent semantic assertions.\n\n## Background\n\nNextest runs tests in separate processes, so an in-process once-guard does not prevent six builds. The fixture uses an advisory file lock plus a provenance-keyed verified artifact in the shared target path `jit-stale-child-test-cache`; the lock protects the build and the artifact marker makes reuse observable.\n\n## Success Criteria\n\n- [hard] REQ-01: Routes all six nested-build tests through one cross-process fixture guarded by an advisory file lock.\n- [hard] REQ-02: Stores and verifies one provenance-keyed child artifact under the shared `target/jit-stale-child-test-cache` path before allowing concurrent test processes to reuse it.\n- [hard] REQ-03: Asserts via an observable marker that exactly one nested Cargo build occurs and later processes reuse the verified artifact without invoking Cargo, under both `cargo test` and nextest.\n- [hard] REQ-04: Keeps six independently reportable tests, all existing stale-binary semantic assertions, and the no-build JSON error-code test.",
   "documents": [],
+  "done_at": "2026-08-11T23:50:44.678692036Z",
   "first_ready_at": "2026-08-11T20:50:18.717371374Z",
   "gates_required": [
     "cargo-ci",
@@ -20,8 +21,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-11T22:58:39.645668787Z",
+      "status": "passed",
+      "updated_at": "2026-08-11T23:50:25.401158960Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +35,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Share the stale-binary build fixture across processes",
-  "updated_at": "2026-08-11T23:46:46.443080696Z"
+  "updated_at": "2026-08-11T23:50:44.678692036Z"
 }
