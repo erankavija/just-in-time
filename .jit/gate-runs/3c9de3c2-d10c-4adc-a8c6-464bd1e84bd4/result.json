@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-6a479c58",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a96a5c96a4ab361846952afca16a9922a1b05a2d",
+  "completed_at": "2026-08-11T07:09:25.469793521Z",
+  "duration_ms": 238824,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/package_capture.rs",
+        "id": "F1",
+        "line": 404,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/6a479c58/requirement/REQ-03",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "A source can be swapped to a symlink after its check and before fs::read, letting capture publish bytes outside the worktree."
+      }
+    ],
+    "summary": "Capture follows a symlink-check/read TOCTOU path, so hard REQ-03 remains unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6a479c58-77ed-4592-8140-9afde0118664",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3c9de3c2-d10c-4adc-a8c6-464bd1e84bd4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T07:05:26.645638553Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12687 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-6a479c58\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019fefa3-f904-7870-ad9d-f0847724d190\n--------\nuser\n--- 12674 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: dd72d0c6, 2cf97fe7, 163b685c, a96a5c9, 6895f45b (`jit:6a479c58`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/6a479c58/requirement/REQ-03, REQ-04, REQ-05 and @/issue/c639cfb5/requirement/REQ-11, REQ-13 (issue Markdown); @/invariant/convention-convergence ( .jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-11T06:58:02Z); mcp-ci passed (exit 0, 2026-08-11T06:49:54Z)\nTruncation recovery: Narrow reads of capture, package-reader, transaction, CLI, tests, docs, and item/gate records\n\n1. [blocking][issue-impact] F1 (high) — [`package_capture.rs:404`](crates/jit/src/profile/package_capture.rs:404) checks a pathname with `symlink_metadata` at line 390, then reopens that pathname with `fs::read`. A concurrent replacement can swap the checked regular file for a symlink outside the worktree, allowing its bytes to be captured and published instead of refused. This leaves hard REQ-03 unmet; use the existing no-follow, handle-anchored read discipline documented in `package.rs`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Capture follows a symlink-check/read TOCTOU path, so hard REQ-03 remains unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A source can be swapped to a symlink after its check and before fs::read, letting capture publish bytes outside the worktree.\",\"file\":\"crates/jit/src/profile/package_capture.rs\",\"line\":404,\"references\":[\"@/issue/6a479c58/requirement/REQ-03\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
