@@ -15,6 +15,7 @@
       "path": "dev/benchmarks/test-suite-performance-4b7c06d0.json"
     }
   ],
+  "done_at": "2026-08-11T23:17:23.123454646Z",
   "first_ready_at": "2026-08-11T21:17:08.157865329Z",
   "gates_required": [
     "cargo-ci",
@@ -24,6 +25,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-08-11T23:13:41.628379136Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:16:58.992038432Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,7 +43,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Measure transaction model-limit round trips",
-  "updated_at": "2026-08-11T23:13:41.628379136Z"
+  "updated_at": "2026-08-11T23:17:23.123454646Z"
 }
