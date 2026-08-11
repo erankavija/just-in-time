@@ -60,6 +60,11 @@ pub(crate) enum MemoryRecoveryResidue {
     Prepared {
         original: Box<MemoryRepositoryState>,
         final_state: Box<MemoryRepositoryState>,
+        /// Action indices whose targets are published live and therefore
+        /// participate in prepared rollback. Absent-root Data actions are
+        /// staged beneath the unpublished root and intentionally excluded,
+        /// matching the file transaction kernel's recovery sequence.
+        rollback_actions: Vec<usize>,
         _plan_hash: String,
     },
     Committed {

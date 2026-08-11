@@ -72,12 +72,26 @@
       "title": "Stop pinning the live dogfood package identity hash to a literal",
       "state": "done",
       "why": "`main` was already red at epic start, independent of this epic: `test_shipped_package_decodes_without_edits_and_preserves_identity_hash` pinned the LIVE dogfood profile package's identity hash to a literal, and that profile packages this repository's own config (including contrib/gates prompts) as assets, so an earlier prompt edit moved the hash. Every cargo-ci gate in all seven waves would have failed on it. The invoker judged the test wrong and the commit right. Fixed on main as d2c8693b by keeping the independent recomputation of the released v1 identity algorithm and dropping the literal; synthetic-fixture literals kept. Wired as a dependency of the epic so whole-repo validation passes."
+    },
+    {
+      "short_id": "f78babf6",
+      "type": "bug",
+      "title": "Mirror prepared rollback failure points in memory recovery",
+      "state": "done",
+      "why": "The shared crash matrix could not exercise the JSON kernel's prepared-rollback BeforeReverse, AfterReverse, and BeforeRollbackDecision boundaries in memory. Added protocol-equivalent observable ordering and retry retention without changing journal semantics; completed after cargo-ci and code-review passed."
+    },
+    {
+      "short_id": "4aa15137",
+      "type": "bug",
+      "title": "Mirror prepared rollback stage-cleanup edge in memory recovery",
+      "state": "in_progress",
+      "why": "A second audit found RepositoryBeforeStageCleanup was still reachable only on the JSON prepared-rollback path; the memory occurrence was post-commit cleanup and could not substantiate cross-backend rollback coverage. The scoped seam and focused tests are implemented and await lead gates."
     }
   ],
   "delegation_model": "Hard tasks go to an Opus subagent via the Agent tool. Easier tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high` invoked DIRECTLY by the lead in the background; the lead then reviews the diff, runs the gate, and commits. Do not wrap a codex invocation in an intermediate Claude driver subagent — it adds no verification the lead does not already owe and costs a full agent's context.",
   "gate_cost_model": "Measured this session on this host: a cold worktree cargo-ci run is 10+ minutes; a warm run on main is ~3-5 minutes; each `code-review` run is 3-5 minutes and is per-issue (no reuse). cargo-ci verdicts DO reuse across issues over identical content, so merge a whole wave, then evaluate cargo-ci per issue for one execution plus reuses. Worker cargo-ci runs in fresh worktrees are the single largest avoidable cost: from wave 2 on, have workers verify with focused tests plus fmt and clippy only, and let the lead's post-merge gate on warm main be the authoritative run.",
   "escalations": [],
-  "rework_counts": {"f5da1112": 1},
+  "rework_counts": {"f5da1112": 1, "47836e2e": 2, "ee809651": 1},
   "surfaced_pitfalls": [],
   "started_at": "2026-08-11T19:10:00Z",
   "wave_1_completed_at": "2026-08-11T21:20:00Z"

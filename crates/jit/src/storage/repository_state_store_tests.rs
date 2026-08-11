@@ -311,6 +311,22 @@ impl crate::storage::TransactionFailureInjector for SelectedFailures {
     }
 }
 
+#[derive(Default)]
+struct RecordingFailures(Mutex<Vec<TransactionFailurePoint>>);
+
+impl RecordingFailures {
+    fn observed(&self) -> Vec<TransactionFailurePoint> {
+        self.0.lock().unwrap().clone()
+    }
+}
+
+impl crate::storage::TransactionFailureInjector for RecordingFailures {
+    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
+        self.0.lock().unwrap().push(point.clone());
+        Ok(())
+    }
+}
+
 struct HookAt {
     point: TransactionFailurePoint,
     hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
@@ -1236,6 +1252,251 @@ fn test_memory_prepared_residue_recovers_original_aggregate_state() {
         image.entry(&VirtualPath::data("index.json").unwrap()),
         Ok(RepositoryEntry::Absent)
     ));
+}
+
+fn memory_rollback_spec() -> CaptureSpec {
+    let mut spec = CaptureSpec::phase_one(
+        [
+            VirtualPath::data("").unwrap(),
+            VirtualPath::data("record.txt").unwrap(),
+        ],
+        budget(),
+    )
+    .unwrap();
+    spec.discover_paths([
+        VirtualPath::worktree("first.txt").unwrap(),
+        VirtualPath::worktree("second.txt").unwrap(),
+    ])
+    .unwrap();
+    spec
+}
+
+fn seed_memory_rollback_fixture(storage: &InMemoryStorage, existing_data_root: bool) {
+    let mut state = storage.repository_state();
+    state.data_root_exists = existing_data_root;
+    if existing_data_root {
+        state.entries.insert(
+            VirtualPath::data("").unwrap(),
+            RepositoryEntry::Directory {
+                identity: EntryIdentity::for_bytes("memory:data-root", b"directory").unwrap(),
+                mode: FileMode::Executable,
+            },
+        );
+        state.entries.insert(
+            VirtualPath::data("record.txt").unwrap(),
+            RepositoryEntry::File {
+                identity: EntryIdentity::for_bytes("memory:data-record", b"old-data").unwrap(),
+                bytes: b"old-data".to_vec(),
+                mode: FileMode::Regular,
+            },
+        );
+    }
+    for (name, bytes) in [
+        ("first.txt", b"old-first".as_slice()),
+        ("second.txt", b"old-second".as_slice()),
+    ] {
+        let path = VirtualPath::worktree(name).unwrap();
+        state.entries.insert(
+            path.clone(),
+            RepositoryEntry::File {
+                identity: EntryIdentity::for_bytes(format!("memory:{path:?}"), bytes).unwrap(),
+                bytes: bytes.to_vec(),
+                mode: FileMode::Regular,
+            },
+        );
+    }
+}
+
+fn memory_rollback_delta(layout: &RepositoryLayout, image: &RepositoryImage) -> RepositoryDelta {
+    let actions = [
+        (
+            VirtualPath::worktree("first.txt").unwrap(),
+            b"new-first".as_slice(),
+        ),
+        (
+            VirtualPath::worktree("second.txt").unwrap(),
+            b"new-second".as_slice(),
+        ),
+        (
+            VirtualPath::data("record.txt").unwrap(),
+            b"new-data".as_slice(),
+        ),
+    ]
+    .into_iter()
+    .map(|(path, bytes)| {
+        RepositoryAction::write_file(
+            path.clone(),
+            "memory-rollback",
+            ExpectedPreimage::of(image.entry(&path).unwrap()),
+            bytes.to_vec(),
+            FileMode::Regular,
+        )
+    })
+    .collect();
+    RepositoryDelta::new(layout, actions).unwrap()
+}
+
+fn prepare_memory_rollback(
+    existing_data_root: bool,
+) -> (TempDir, RepositoryLayout, InMemoryStorage) {
+    let temp = TempDir::new().unwrap();
+    let layout = RepositoryLayout::new(
+        RepositoryRootEvidence::new(temp.path(), "memory-worktree", true),
+        RepositoryRootEvidence::new(temp.path().join(".jit"), "memory-data", true),
+    )
+    .unwrap();
+    let interruption =
+        SelectedFailures::one(TransactionFailurePoint::RepositoryBeforeAction { action: 1 });
+    let storage = InMemoryStorage::with_repository_state_failures(interruption.clone());
+    seed_memory_rollback_fixture(&storage, existing_data_root);
+
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(memory_rollback_spec()).unwrap();
+    let delta = memory_rollback_delta(&layout, &image);
+    assert!(session.apply(&test_plan(&image, &delta)).is_err());
+    assert!(interruption.is_consumed());
+    drop(session);
+    assert!(matches!(
+        storage.repository_state().recovery,
+        Some(MemoryRecoveryResidue::Prepared { .. })
+    ));
+    (temp, layout, storage)
+}
+
+fn rollback_points(
+    points: impl IntoIterator<Item = TransactionFailurePoint>,
+) -> Vec<TransactionFailurePoint> {
+    points
+        .into_iter()
+        .filter(|point| {
+            matches!(
+                point,
+                TransactionFailurePoint::RepositoryBeforeReverseAction { .. }
+                    | TransactionFailurePoint::RepositoryAfterReverseAction { .. }
+                    | TransactionFailurePoint::RepositoryBeforeStageCleanup
+                    | TransactionFailurePoint::RepositoryBeforeRollbackDecision
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn test_memory_prepared_recovery_reports_reverse_live_action_order_for_both_root_shapes() {
+    use TransactionFailurePoint::{
+        RepositoryAfterReverseAction as After, RepositoryBeforeReverseAction as Before,
+        RepositoryBeforeRollbackDecision as Decision, RepositoryBeforeStageCleanup as Cleanup,
+    };
+
+    for existing_data_root in [true, false] {
+        let (_temp, layout, storage) = prepare_memory_rollback(existing_data_root);
+        let recording = Arc::new(RecordingFailures::default());
+        let recovered = storage.with_repository_state_failure_view(recording.clone());
+        drop(recovered.open_mutation_session(layout).unwrap());
+
+        let expected = if existing_data_root {
+            vec![
+                Before { action: 2 },
+                After { action: 2 },
+                Before { action: 1 },
+                After { action: 1 },
+                Before { action: 0 },
+                After { action: 0 },
+                Cleanup,
+                Decision,
+            ]
+        } else {
+            // The absent-root Data action at index 2 was staged and is not a
+            // live action, so recovery mirrors the file kernel and skips it.
+            vec![
+                Before { action: 1 },
+                After { action: 1 },
+                Before { action: 0 },
+                After { action: 0 },
+                Cleanup,
+                Decision,
+            ]
+        };
+        assert_eq!(rollback_points(recording.observed()), expected);
+        assert!(storage.repository_state().recovery.is_none());
+    }
+}
+
+#[test]
+fn test_memory_rollback_edge_failure_retains_prepared_residue_for_retry() {
+    for existing_data_root in [true, false] {
+        for point in [
+            TransactionFailurePoint::RepositoryBeforeReverseAction { action: 1 },
+            TransactionFailurePoint::RepositoryAfterReverseAction { action: 1 },
+            TransactionFailurePoint::RepositoryBeforeStageCleanup,
+            TransactionFailurePoint::RepositoryBeforeRollbackDecision,
+        ] {
+            let (_temp, layout, storage) = prepare_memory_rollback(existing_data_root);
+            let failure = SelectedFailures::one(point.clone());
+            let recovering = storage.with_repository_state_failure_view(failure.clone());
+            assert!(recovering.open_mutation_session(layout.clone()).is_err());
+            assert!(
+                failure.is_consumed(),
+                "rollback point did not fire: {point:?}, existing_data_root={existing_data_root}"
+            );
+            assert!(matches!(
+                storage.repository_state().recovery,
+                Some(MemoryRecoveryResidue::Prepared { .. })
+            ));
+
+            let mut recovered = recovering.open_mutation_session(layout).unwrap();
+            let image = recovered.capture(memory_rollback_spec()).unwrap();
+            assert!(matches!(
+                image
+                    .entry(&VirtualPath::worktree("first.txt").unwrap())
+                    .unwrap(),
+                RepositoryEntry::File { bytes, .. } if bytes == b"old-first"
+            ));
+            let data_record = image
+                .entry(&VirtualPath::data("record.txt").unwrap())
+                .unwrap();
+            if existing_data_root {
+                assert!(matches!(
+                    data_record,
+                    RepositoryEntry::File { bytes, .. } if bytes == b"old-data"
+                ));
+            } else {
+                assert!(matches!(data_record, RepositoryEntry::Absent));
+            }
+            assert!(storage.repository_state().recovery.is_none());
+        }
+    }
+}
+
+#[test]
+fn test_memory_committed_recovery_stays_forward_without_rollback_edges() {
+    let temp = TempDir::new().unwrap();
+    let layout = RepositoryLayout::new(
+        RepositoryRootEvidence::new(temp.path(), "memory-worktree", true),
+        RepositoryRootEvidence::new(temp.path().join(".jit"), "memory-data", true),
+    )
+    .unwrap();
+    let committed = SelectedFailures::one(TransactionFailurePoint::RepositoryAfterCommit);
+    let storage = InMemoryStorage::with_repository_state_failures(committed.clone());
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    assert!(session
+        .apply(&test_plan(&image, &initialization_delta(&layout)))
+        .is_err());
+    assert!(committed.is_consumed());
+    drop(session);
+
+    let recording = Arc::new(RecordingFailures::default());
+    let recovered = storage.with_repository_state_failure_view(recording.clone());
+    let mut session = recovered.open_mutation_session(layout).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    assert!(matches!(
+        image
+            .entry(&VirtualPath::worktree("note.txt").unwrap())
+            .unwrap(),
+        RepositoryEntry::File { bytes, .. } if bytes == b"note"
+    ));
+    assert!(rollback_points(recording.observed()).is_empty());
+    assert!(storage.repository_state().recovery.is_none());
 }
 
 #[test]
