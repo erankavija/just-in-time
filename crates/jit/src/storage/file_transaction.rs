@@ -7,9 +7,9 @@
 use super::atomic_write::rename_noreplace_cap;
 use super::repo_lock::RepoWriteGuard;
 use super::transaction_journal::{
-    ActionTag, ControlName, RepositoryActionProgress, RepositoryFinalIdentity,
-    RepositoryJournalAction, RepositoryJournalActionKind, RepositoryJournalPath,
-    RepositoryTransactionJournal, TransactionDecision, JOURNAL_FILE, REPOSITORY_JOURNAL_VERSION,
+    ActionTag, ControlName, RepositoryFinalIdentity, RepositoryJournalAction,
+    RepositoryJournalActionKind, RepositoryJournalPath, RepositoryTransactionJournal,
+    TransactionDecision, JOURNAL_FILE, REPOSITORY_JOURNAL_VERSION,
 };
 use super::transaction_recovery::{
     FailurePoint, FileTransactionError, RecoveryRequiredError, RecoveryState,
@@ -26,7 +26,7 @@ use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::MetadataExt as _;
 use cap_std::fs::{Dir, OpenOptions};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::{ErrorKind, Read};
 use std::path::{Component, Path};
 use std::sync::Arc;
@@ -788,7 +788,6 @@ fn initial_repository_journal(
                 expected: action.expected().clone(),
                 final_identity,
                 action: kind,
-                progress: RepositoryActionProgress::Planned,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -814,6 +813,97 @@ fn initial_repository_journal(
         decision: TransactionDecision::Prepared,
         actions,
     })
+}
+
+/// One directory whose entries a transaction phase mutated, named by where it
+/// lives rather than by a held capability: a model-limit transaction mutates
+/// hundreds of distinct directories, and retaining one file descriptor per
+/// directory until the barrier would exhaust the process descriptor table.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum BarrierDirectory {
+    /// Staging authority colocated with the named root class.
+    Stages(RepositoryRootClass),
+    /// Backup authority colocated with the named root class.
+    Backups(RepositoryRootClass),
+    /// Directory at `relative` inside the absent-root data stage; empty names the
+    /// stage root itself.
+    DataStage { relative: String },
+    /// Live directory at `relative` under the named root; empty names the root.
+    LiveDirectory {
+        root: RepositoryRootClass,
+        relative: String,
+    },
+}
+
+/// The distinct directories one transaction phase mutated, synchronized once
+/// each at the phase's durability barrier.
+///
+/// Deduplication is what makes the barrier cheap: `N` actions staged into one
+/// authority, or published into one live parent, cost one directory
+/// synchronization rather than `N`. The barrier is a batching order, not a
+/// weakening — every recorded directory is durable before the phase's record is
+/// published (`@/inv/atomic-writes`).
+#[derive(Debug, Default)]
+struct DirectoryBarrier(BTreeSet<BarrierDirectory>);
+
+impl DirectoryBarrier {
+    fn record(&mut self, directory: BarrierDirectory) {
+        self.0.insert(directory);
+    }
+
+    /// Record the live directory holding `path`'s parent.
+    fn record_live_parent(&mut self, path: &VirtualPath) {
+        self.record(BarrierDirectory::LiveDirectory {
+            root: path.root_class(),
+            relative: parent_relative(path),
+        });
+    }
+
+    /// Synchronize every recorded directory exactly once. `data_stage` is the
+    /// open absent-root stage when the phase staged into one.
+    fn sync(
+        &self,
+        roots: &RepositoryKernelRoots,
+        control: &ControlDirs,
+        data_stage: Option<&Dir>,
+    ) -> Result<()> {
+        self.0.iter().try_for_each(|directory| {
+            let target = match directory {
+                BarrierDirectory::Stages(root) => stage_authority(control, *root).try_clone()?,
+                BarrierDirectory::Backups(root) => backup_authority(control, *root).try_clone()?,
+                BarrierDirectory::DataStage { relative } => {
+                    let stage = data_stage.ok_or(FileTransactionError::LayoutMismatch)?;
+                    open_relative_dir(stage, relative)?
+                }
+                BarrierDirectory::LiveDirectory { root, relative } => {
+                    open_relative_dir(repository_live_root(roots, *root)?, relative)?
+                }
+            };
+            sync_directory(&target).map_err(Into::into)
+        })
+    }
+}
+
+/// The directory component of a canonical path, relative to its own root. Empty
+/// when the path names an entry directly under that root.
+fn parent_relative(path: &VirtualPath) -> String {
+    path.relative()
+        .as_path()
+        .parent()
+        .map(|parent| parent.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Open the directory at an already-canonical root-relative path, transiently, so
+/// a phase barrier holds no capability between recording a directory and
+/// synchronizing it. An empty path names `root` itself; a symlinked component is
+/// rejected exactly as it is on the mutation path.
+fn open_relative_dir(root: &Dir, relative: &str) -> Result<Dir> {
+    Path::new(relative)
+        .components()
+        .try_fold(root.try_clone()?, |current, component| {
+            open_existing_dir(&current, &component.as_os_str().to_string_lossy())
+        })
 }
 
 fn write_repository_journal(
@@ -928,6 +1018,15 @@ fn execute_repository_delta(
     })
 }
 
+/// Stage every payload and rollback backup, synchronize each mutated staging or
+/// backup directory once at the phase barrier, then publish one complete
+/// prepared record before any live mutation.
+///
+/// The record is complete when it is written: every action carries the identity
+/// of the object staged for it alongside the preimage it requires, which is
+/// exactly what identity-driven rollback converges from. A crash anywhere in this
+/// phase therefore recovers from either the initial record (nothing live was
+/// touched, so every action's preimage still holds) or the prepared one.
 fn prepare_repository_actions(
     roots: &RepositoryKernelRoots,
     control: &ControlDirs,
@@ -935,6 +1034,7 @@ fn prepare_repository_actions(
     delta: &RepositoryDelta,
     injector: &dyn TransactionFailureInjector,
 ) -> Result<()> {
+    let mut barrier = DirectoryBarrier::default();
     let data_stage = if let Some(name) = &journal.data_stage {
         roots
             .data_parent
@@ -953,7 +1053,13 @@ fn prepare_repository_actions(
         let stage = open_existing_dir(&roots.data_parent, name.as_str())?;
         journal.data_stage_identity = inspect_repository_root(&stage)?.identity().cloned();
         repository_check(injector, FailurePoint::RepositoryBeforeDataStageJournal)?;
+        // The stage's identity is recorded before anything is staged into it: it
+        // is what lets recovery tell its own stage from a raced occupant, and
+        // what distinguishes a published root from an abandoned one.
         write_repository_journal(&control.transaction, journal)?;
+        barrier.record(BarrierDirectory::DataStage {
+            relative: String::new(),
+        });
         Some(stage)
     } else {
         None
@@ -973,8 +1079,8 @@ fn prepare_repository_actions(
                 data_stage.as_ref().expect("created above"),
                 action,
                 &mut journal.actions[index],
+                &mut barrier,
             )?;
-            journal.actions[index].progress = RepositoryActionProgress::Prepared;
         } else {
             let path = journal_virtual_path(roots, &journal.actions[index].path)?;
             let root = repository_live_root(roots, path.root_class())?;
@@ -988,24 +1094,23 @@ fn prepare_repository_actions(
                 RepositoryAction::CreateDirectory { .. } => {
                     let stage = create_directory_stage_name(&journal.actions[index].action, index)?;
                     stages.create_dir(stage.as_str())?;
-                    sync_directory(stages)?;
+                    barrier.record(BarrierDirectory::Stages(path.root_class()));
                     let staged = open_existing_dir(stages, stage.as_str())?;
                     journal.actions[index].final_identity =
                         repository_final_identity(&inspect_repository_root(&staged)?)?;
-                    journal.actions[index].progress = RepositoryActionProgress::Prepared;
                 }
                 RepositoryAction::WriteFile { bytes, mode, .. } => {
                     let (stage, backup) =
                         write_file_control_names(&journal.actions[index].action, index)?;
                     stage_bytes(stages, stage.as_str(), bytes)?;
                     set_mode(stages, stage.as_str(), repository_unix_mode(*mode))?;
-                    sync_directory(stages)?;
+                    barrier.record(BarrierDirectory::Stages(path.root_class()));
                     journal.actions[index].final_identity = repository_final_identity(
                         &inspect_repository_leaf(stages, stage.as_str())?,
                     )?;
                     // A replace prepares its rollback backup before publication,
                     // so an interrupted replacement can restore the exact original.
-                    journal.actions[index].progress = if matches!(
+                    if matches!(
                         journal.actions[index].expected,
                         ExpectedPreimage::File { .. }
                     ) {
@@ -1019,10 +1124,8 @@ fn prepare_repository_actions(
                             &path,
                             (injector, index),
                         )?;
-                        RepositoryActionProgress::BackupReady
-                    } else {
-                        RepositoryActionProgress::Prepared
-                    };
+                        barrier.record(BarrierDirectory::Backups(path.root_class()));
+                    }
                 }
                 RepositoryAction::SetMode { mode, .. } => {
                     let (stage, backup) =
@@ -1038,7 +1141,7 @@ fn prepare_repository_actions(
                     };
                     stage_bytes(stages, stage.as_str(), &bytes)?;
                     set_mode(stages, stage.as_str(), repository_unix_mode(*mode))?;
-                    sync_directory(stages)?;
+                    barrier.record(BarrierDirectory::Stages(path.root_class()));
                     journal.actions[index].final_identity = repository_final_identity(
                         &inspect_repository_leaf(stages, stage.as_str())?,
                     )?;
@@ -1051,7 +1154,7 @@ fn prepare_repository_actions(
                         &path,
                         (injector, index),
                     )?;
-                    journal.actions[index].progress = RepositoryActionProgress::BackupReady;
+                    barrier.record(BarrierDirectory::Backups(path.root_class()));
                 }
                 RepositoryAction::DeleteFile { .. } => {
                     let backup = delete_file_backup_name(&journal.actions[index].action, index)?;
@@ -1065,7 +1168,7 @@ fn prepare_repository_actions(
                         &path,
                         (injector, index),
                     )?;
-                    journal.actions[index].progress = RepositoryActionProgress::BackupReady;
+                    barrier.record(BarrierDirectory::Backups(path.root_class()));
                 }
             }
         }
@@ -1073,19 +1176,11 @@ fn prepare_repository_actions(
             injector,
             FailurePoint::RepositorySyncStage { action: index },
         )?;
-        repository_check(
-            injector,
-            FailurePoint::RepositoryBeforePreparedJournal { action: index },
-        )?;
-        write_repository_journal(&control.transaction, journal)?;
-        repository_check(
-            injector,
-            FailurePoint::RepositorySyncPreparedAction { action: index },
-        )?;
     }
-    if let Some(stage) = &data_stage {
-        sync_directory(stage)?;
-    }
+    barrier.sync(roots, control, data_stage.as_ref())?;
+    repository_check(injector, FailurePoint::RepositoryBeforePreparedJournal)?;
+    write_repository_journal(&control.transaction, journal)?;
+    repository_check(injector, FailurePoint::RepositorySyncPreparedJournal)?;
     Ok(())
 }
 
@@ -1197,11 +1292,13 @@ fn delete_file_backup_name(
     }
 }
 
-/// Create and synchronize the rollback backup of a replace/delete target during
-/// preparation. The live target is verified against the recorded preimage, then
-/// copied into the backup area and reverified there, so a subsequent
-/// publication converges to the exact original file even if a non-cooperating
-/// writer swaps the target afterward.
+/// Create the rollback backup of a replace/delete target during preparation. The
+/// live target is verified against the recorded preimage, then copied into the
+/// backup area and reverified there, so a subsequent publication converges to the
+/// exact original file even if a non-cooperating writer swaps the target
+/// afterward. The copy's own contents are synchronized here; its arrival in the
+/// backup directory is made durable by the caller's preparation barrier, before
+/// the prepared record is published.
 fn prepare_repository_backup(
     parent: &Dir,
     leaf: &str,
@@ -1238,7 +1335,6 @@ fn prepare_repository_backup(
         }
         .into());
     }
-    sync_directory(backups)?;
     repository_check(
         injector,
         FailurePoint::RepositorySyncBackup { action: index },
@@ -1250,6 +1346,7 @@ fn prepare_staged_data_action(
     stage: &Dir,
     action: &RepositoryAction,
     journal: &mut RepositoryJournalAction,
+    barrier: &mut DirectoryBarrier,
 ) -> Result<()> {
     if action.path().relative().is_root() {
         if !matches!(action, RepositoryAction::CreateDirectory { .. }) {
@@ -1263,20 +1360,21 @@ fn prepare_staged_data_action(
     }
     let relative = action.path().relative().as_path().to_string_lossy();
     let (parent, leaf) = open_parent(stage, &relative, false)?;
+    barrier.record(BarrierDirectory::DataStage {
+        relative: parent_relative(action.path()),
+    });
     match action {
         RepositoryAction::CreateDirectory { .. } => {
             parent.create_dir(&leaf)?;
             let directory = open_existing_dir(&parent, &leaf)?;
             journal.final_identity =
                 repository_final_identity(&inspect_repository_root(&directory)?)?;
-            sync_directory(&parent)?;
         }
         RepositoryAction::WriteFile { bytes, mode, .. } => {
             stage_bytes(&parent, &leaf, bytes)?;
             set_mode(&parent, &leaf, repository_unix_mode(*mode))?;
             journal.final_identity =
                 repository_final_identity(&inspect_repository_leaf(&parent, &leaf)?)?;
-            sync_directory(&parent)?;
         }
         RepositoryAction::SetMode { .. } | RepositoryAction::DeleteFile { .. } => {
             return Err(FileTransactionError::UnsupportedTarget {
@@ -1288,12 +1386,20 @@ fn prepare_staged_data_action(
     Ok(())
 }
 
+/// Apply every live mutation, then make each distinct live parent durable before
+/// the caller's terminal decision.
+///
+/// Nothing is recorded per action: the prepared record already describes both
+/// endpoints of every action, so a crash mid-publication rolls back from it by
+/// identity. `Committed` makes the final targets authoritative, which is why the
+/// live-parent barrier is crossed before the caller reaches that decision.
 fn publish_repository_actions(
     roots: &RepositoryKernelRoots,
     control: &ControlDirs,
     journal: &mut RepositoryTransactionJournal,
     injector: &dyn TransactionFailureInjector,
 ) -> Result<()> {
+    let mut barrier = DirectoryBarrier::default();
     for index in 0..journal.actions.len() {
         if journal.data_root_was_absent
             && journal.actions[index].path.root == RepositoryRootClass::Data
@@ -1304,18 +1410,13 @@ fn publish_repository_actions(
             injector,
             FailurePoint::RepositoryBeforeAction { action: index },
         )?;
-        publish_repository_action(roots, control, journal, index, injector)?;
-        journal.actions[index].progress = RepositoryActionProgress::Published;
-        repository_check(
-            injector,
-            FailurePoint::RepositoryBeforePublishedJournal { action: index },
-        )?;
-        write_repository_journal(&control.transaction, journal)?;
+        publish_repository_action(roots, control, journal, index, injector, &mut barrier)?;
         repository_check(
             injector,
             FailurePoint::RepositoryAfterAction { action: index },
         )?;
     }
+    barrier.sync(roots, control, None)?;
 
     // The staged data root is published only when the absent-root delta carried a
     // Data action (a `data_stage` was allocated). A worktree-only delta over an
@@ -1408,6 +1509,7 @@ fn publish_repository_action(
     journal: &RepositoryTransactionJournal,
     index: usize,
     injector: &dyn TransactionFailureInjector,
+    barrier: &mut DirectoryBarrier,
 ) -> Result<()> {
     let path = journal_virtual_path(roots, &journal.actions[index].path)?;
     let root = repository_live_root(roots, path.root_class())?;
@@ -1434,7 +1536,6 @@ fn publish_repository_action(
         RepositoryJournalActionKind::CreateDirectory { stage, .. } => {
             rename_noreplace_cap(stages, stage.as_str(), &parent, &leaf)
                 .map_err(map_noreplace_error)?;
-            sync_directory(&parent)?;
         }
         RepositoryJournalActionKind::WriteFile { stage, .. } => {
             if matches!(expected, ExpectedPreimage::File { .. }) {
@@ -1452,7 +1553,6 @@ fn publish_repository_action(
                     .hard_link(stage.as_str(), &parent, &leaf)
                     .map_err(map_noreplace_error)?;
             }
-            sync_directory(&parent)?;
         }
         RepositoryJournalActionKind::SetMode { stage, .. } => {
             move_repository_file_aside_if_identity(
@@ -1460,7 +1560,6 @@ fn publish_repository_action(
             )?;
             rename_noreplace_cap(stages, stage.as_str(), &parent, &leaf)
                 .map_err(map_noreplace_error)?;
-            sync_directory(&parent)?;
         }
         RepositoryJournalActionKind::DeleteFile { .. } => {
             // Move the live name into transaction control, then verify what the
@@ -1469,12 +1568,14 @@ fn publish_repository_action(
             remove_repository_file_if_identity(
                 &parent, &leaf, expected, &path, control, index, injector,
             )?;
-            sync_directory(&parent)?;
         }
     }
+    // The mutated live parent becomes durable at the publication barrier, before
+    // the transaction can reach its terminal decision.
+    barrier.record_live_parent(&path);
     repository_check(
         injector,
-        FailurePoint::RepositorySyncTargetParent { action: index },
+        FailurePoint::RepositoryAfterTargetMutation { action: index },
     )?;
     let actual = inspect_repository_target(roots, &path, None)?;
     repository_check(
@@ -1557,6 +1658,14 @@ fn remove_repository_file_if_identity(
     Ok(())
 }
 
+/// Reverse every published action to its recorded preimage, then publish the one
+/// terminal rolled-back decision.
+///
+/// Reversal records nothing per action because it needs nothing: each action is
+/// reversed from its recorded preimage and final identity, and doing so is
+/// idempotent, so an interrupted rollback is simply resumed from the same
+/// prepared record. The terminal decision is retained as the durable marker that
+/// only residue cleanup remains.
 fn rollback_repository_actions(
     roots: &RepositoryKernelRoots,
     control: &ControlDirs,
@@ -1574,11 +1683,9 @@ fn rollback_repository_actions(
             FailurePoint::RepositoryBeforeReverseAction { action: index },
         )?;
         rollback_repository_action(roots, control, &journal.actions[index], index)?;
-        journal.actions[index].progress = RepositoryActionProgress::Restored;
-        write_repository_journal(&control.transaction, journal)?;
         repository_check(
             injector,
-            FailurePoint::RepositorySyncRollbackJournal { action: index },
+            FailurePoint::RepositoryAfterReverseAction { action: index },
         )?;
     }
     repository_check(injector, FailurePoint::RepositoryBeforeStageCleanup)?;
@@ -2836,7 +2943,304 @@ fn remove_optional_file(directory: &Dir, name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::storage::discover_repository_layout;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    /// Reads the durable journal at every kernel boundary, so a test can assert
+    /// the exact sequence of records one transaction publishes. Every journal
+    /// publication sits between two boundaries, so every durable state the
+    /// transaction passes through is observed.
+    struct RecordedJournal {
+        path: PathBuf,
+        records: Mutex<Vec<(FailurePoint, Option<RepositoryTransactionJournal>)>>,
+    }
+
+    impl RecordedJournal {
+        fn watching(path: PathBuf) -> Arc<Self> {
+            Arc::new(Self {
+                path,
+                records: Mutex::new(Vec::new()),
+            })
+        }
+
+        /// The journal states observed in order with consecutive repeats
+        /// collapsed: one entry per publication, after the leading absence that
+        /// precedes the first one.
+        fn published(&self) -> Vec<Option<RepositoryTransactionJournal>> {
+            let mut states = self
+                .records
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(_, journal)| journal.clone())
+                .collect::<Vec<_>>();
+            states.dedup();
+            states
+        }
+
+        /// The durable journal observed at `point`, or `None` when the boundary
+        /// was never reached or no journal existed there.
+        fn at(&self, point: &FailurePoint) -> Option<RepositoryTransactionJournal> {
+            self.records
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|(seen, _)| seen == point)
+                .and_then(|(_, journal)| journal.clone())
+        }
+    }
+
+    impl TransactionFailureInjector for RecordedJournal {
+        fn check(&self, point: &FailurePoint) -> std::io::Result<()> {
+            let journal = std::fs::read(&self.path).ok().map(|bytes| {
+                serde_json::from_slice(&bytes).expect("durable journal decodes as its own schema")
+            });
+            self.records.lock().unwrap().push((point.clone(), journal));
+            Ok(())
+        }
+    }
+
+    /// A kernel over an ambient temporary repository, bypassing the session layer
+    /// so the durability protocol is exercised at the layer that owns it.
+    fn transaction_kernel(
+        worktree: &Path,
+        data: &Path,
+        injector: Arc<dyn TransactionFailureInjector>,
+    ) -> FileTransactionKernel {
+        let ambient = cap_std::ambient_authority();
+        FileTransactionKernel::for_repository_layout(
+            discover_repository_layout(worktree, data).unwrap(),
+            Dir::open_ambient_dir(worktree, ambient).unwrap(),
+            data.is_dir()
+                .then(|| Dir::open_ambient_dir(data, ambient).unwrap()),
+            Dir::open_ambient_dir(data.parent().unwrap(), ambient).unwrap(),
+            data.file_name().unwrap().to_string_lossy().into_owned(),
+            injector,
+        )
+        .unwrap()
+    }
+
+    fn created_file(path: VirtualPath, bytes: &[u8]) -> crate::repository_state::RepositoryAction {
+        RepositoryAction::write_file(
+            path,
+            "journal-protocol",
+            ExpectedPreimage::Absent,
+            bytes.to_vec(),
+            FileMode::Regular,
+        )
+    }
+
+    /// Every action's recorded final identity is the identity of the object
+    /// staged for it, not the planned placeholder the initial record carries.
+    fn carries_staged_final_identities(
+        published: &RepositoryTransactionJournal,
+        initial: &RepositoryTransactionJournal,
+    ) -> bool {
+        published.actions.len() == initial.actions.len()
+            && published
+                .actions
+                .iter()
+                .zip(&initial.actions)
+                .all(|(published, planned)| published.final_identity != planned.final_identity)
+    }
+
+    #[test]
+    fn test_execute_repository_delta_publishes_one_barrier_sequence_for_an_existing_root() {
+        // Three publications regardless of action count: the sequence is the
+        // protocol's, not a function of the delta's size.
+        for action_count in [1usize, 2, 5] {
+            let temp = TempDir::new().unwrap();
+            let data = temp.path().join(".jit");
+            std::fs::create_dir(&data).unwrap();
+            let observer =
+                RecordedJournal::watching(data.join("tmp/transactions/txn/journal.json"));
+            let kernel = transaction_kernel(temp.path(), &data, observer.clone());
+            let layout = kernel.repository.layout.clone();
+            let delta = RepositoryDelta::new(
+                &layout,
+                (0..action_count)
+                    .map(|index| {
+                        created_file(
+                            VirtualPath::data(format!("file-{index}.json")).unwrap(),
+                            format!("body-{index}").as_bytes(),
+                        )
+                    })
+                    .collect(),
+            )
+            .unwrap();
+
+            execute_repository_delta(&kernel.repository, "txn", &delta, "plan", &*observer)
+                .unwrap();
+
+            // One initial record, one complete prepared record, one committed
+            // decision — no per-action rewrite between them.
+            let published = observer.published();
+            assert_eq!(published.len(), 4, "{action_count} actions: {published:#?}");
+            assert!(published[0].is_none());
+            let initial = published[1].as_ref().expect("initial record");
+            let prepared = published[2].as_ref().expect("prepared record");
+            let committed = published[3].as_ref().expect("committed record");
+            assert_eq!(initial.decision, TransactionDecision::Prepared);
+            assert_eq!(prepared.decision, TransactionDecision::Prepared);
+            assert_eq!(committed.decision, TransactionDecision::Committed);
+            assert!(carries_staged_final_identities(prepared, initial));
+            // The committed record decides; it does not restate the actions.
+            assert_eq!(committed.actions, prepared.actions);
+            // The complete prepared record is durable before the first live
+            // mutation.
+            assert_eq!(
+                observer.at(&FailurePoint::RepositoryBeforeTargetMutation { action: 0 }),
+                Some(prepared.clone())
+            );
+            for index in 0..action_count {
+                assert_eq!(
+                    std::fs::read(data.join(format!("file-{index}.json"))).unwrap(),
+                    format!("body-{index}").as_bytes()
+                );
+            }
+            assert!(!data.join("tmp/transactions").exists());
+        }
+    }
+
+    #[test]
+    fn test_execute_repository_delta_publishes_one_barrier_sequence_for_an_absent_root() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let observer = RecordedJournal::watching(
+            temp.path()
+                .join(".jit-bootstrap/transactions/txn/journal.json"),
+        );
+        let kernel = transaction_kernel(temp.path(), &data, observer.clone());
+        let layout = kernel.repository.layout.clone();
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![
+                RepositoryAction::create_directory(
+                    VirtualPath::data("").unwrap(),
+                    "journal-protocol",
+                    ExpectedPreimage::Absent,
+                ),
+                created_file(VirtualPath::data("index.json").unwrap(), b"{}"),
+                created_file(VirtualPath::worktree("note.txt").unwrap(), b"note"),
+            ],
+        )
+        .unwrap();
+
+        execute_repository_delta(&kernel.repository, "txn", &delta, "plan", &*observer).unwrap();
+
+        // The absent-root shape adds exactly one record to the existing-root
+        // sequence: the data stage's identity, which recovery needs to tell its
+        // own stage from a raced occupant.
+        let published = observer.published();
+        assert_eq!(published.len(), 5, "{published:#?}");
+        assert!(published[0].is_none());
+        let initial = published[1].as_ref().expect("initial record");
+        let staged = published[2].as_ref().expect("data-stage record");
+        let prepared = published[3].as_ref().expect("prepared record");
+        let committed = published[4].as_ref().expect("committed record");
+        assert!(initial.data_stage_identity.is_none());
+        assert!(staged.data_stage_identity.is_some());
+        // The stage record records the stage, not action progress.
+        assert_eq!(staged.actions, initial.actions);
+        assert_eq!(prepared.decision, TransactionDecision::Prepared);
+        assert!(carries_staged_final_identities(prepared, staged));
+        assert_eq!(committed.decision, TransactionDecision::Committed);
+        assert_eq!(committed.actions, prepared.actions);
+        // Worktree paths sort before data paths, so index 0 is the live
+        // worktree write: the prepared record precedes it and the irreversible
+        // root publication alike.
+        assert_eq!(
+            observer.at(&FailurePoint::RepositoryBeforeTargetMutation { action: 0 }),
+            Some(prepared.clone())
+        );
+        assert_eq!(
+            observer.at(&FailurePoint::RepositoryBeforeDataRootPublication),
+            Some(prepared.clone())
+        );
+        assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
+        assert_eq!(
+            std::fs::read(temp.path().join("note.txt")).unwrap(),
+            b"note"
+        );
+    }
+
+    #[test]
+    fn test_execute_repository_delta_rolls_back_through_one_terminal_record() {
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        std::fs::create_dir(&data).unwrap();
+        let observer = RecordedJournal::watching(data.join("tmp/transactions/txn/journal.json"));
+        let kernel = transaction_kernel(temp.path(), &data, observer.clone());
+        let layout = kernel.repository.layout.clone();
+        // The second action's parent directory does not exist, so its live
+        // publication fails after the first action has already published.
+        let delta = RepositoryDelta::new(
+            &layout,
+            vec![
+                created_file(VirtualPath::data("a.json").unwrap(), b"a"),
+                created_file(VirtualPath::data("missing/b.json").unwrap(), b"b"),
+            ],
+        )
+        .unwrap();
+
+        let error = execute_repository_delta(&kernel.repository, "txn", &delta, "plan", &*observer)
+            .unwrap_err();
+        assert!(error.downcast_ref::<RecoveryRequiredError>().is_none());
+
+        // Reversal rewrites nothing per action: the terminal rolled-back marker
+        // is the only record rollback publishes.
+        let published = observer.published();
+        assert_eq!(published.len(), 4, "{published:#?}");
+        let prepared = published[2].as_ref().expect("prepared record");
+        let rolled_back = published[3].as_ref().expect("rolled-back record");
+        assert_eq!(prepared.decision, TransactionDecision::Prepared);
+        assert_eq!(rolled_back.decision, TransactionDecision::RolledBack);
+        assert_eq!(rolled_back.actions, prepared.actions);
+        // The published first action was reversed by its recorded identity.
+        assert!(!data.join("a.json").exists());
+        assert!(!data.join("tmp/transactions").exists());
+    }
+
+    #[test]
+    fn test_open_relative_dir_resolves_a_barrier_name_to_the_recorded_directory() {
+        let temp = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp.path().join("a/b")).unwrap();
+        let root = Dir::open_ambient_dir(temp.path(), cap_std::ambient_authority()).unwrap();
+        let nested = VirtualPath::data("a/b/leaf.txt").unwrap();
+        let directly_under_root = VirtualPath::data("leaf.txt").unwrap();
+        assert_eq!(parent_relative(&nested), "a/b");
+        assert_eq!(parent_relative(&directly_under_root), "");
+
+        // A barrier names its directories instead of holding them, so the name it
+        // records must resolve back to the very directory the action mutated.
+        let identity_of = |directory: &Dir| {
+            inspect_repository_root(directory)
+                .unwrap()
+                .identity()
+                .cloned()
+                .unwrap()
+        };
+        let mutated = open_existing_dir(&open_existing_dir(&root, "a").unwrap(), "b").unwrap();
+        assert_eq!(
+            identity_of(&open_relative_dir(&root, &parent_relative(&nested)).unwrap()),
+            identity_of(&mutated)
+        );
+        assert_eq!(
+            identity_of(&open_relative_dir(&root, &parent_relative(&directly_under_root)).unwrap()),
+            identity_of(&root)
+        );
+
+        // Resolution refuses a symlinked component exactly as the mutation path
+        // does, so a barrier can never follow a link out of the repository.
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(temp.path().join("a"), temp.path().join("link")).unwrap();
+            assert!(open_relative_dir(&root, "link").is_err());
+            assert!(open_relative_dir(&root, "link/b").is_err());
+        }
+    }
 
     #[test]
     fn test_verified_directory_cleanup_keeps_raced_name_occupant() {
@@ -2928,7 +3332,6 @@ mod tests {
                 stage: ControlName::new(format!("mode-{relative}")).unwrap(),
                 backup: ControlName::new(format!("backup-{relative}")).unwrap(),
             },
-            progress: RepositoryActionProgress::Planned,
         };
         let journal = RepositoryTransactionJournal {
             version: REPOSITORY_JOURNAL_VERSION,
@@ -3102,7 +3505,6 @@ mod tests {
                 stage: ControlName::new("mode").unwrap(),
                 backup: ControlName::new("backup").unwrap(),
             },
-            progress: RepositoryActionProgress::Planned,
         };
         let journal = RepositoryTransactionJournal {
             version: REPOSITORY_JOURNAL_VERSION,

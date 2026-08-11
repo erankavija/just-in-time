@@ -20,6 +20,18 @@ pub(crate) enum RecoveryState {
 /// `pub(crate)` (see `storage::mod`), which lets clippy's default
 /// `avoid-breaking-exported-api` guard stop suppressing `enum_variant_names`
 /// for it; silence that lint explicitly rather than rename call sites.
+///
+/// Four boundaries name the phase barriers rather than an action edge, and
+/// carry no action index because the kernel crosses each of them exactly once
+/// per transaction: `RepositoryBeforePreparedJournal` follows the batched
+/// preparation directory barrier and precedes the one complete prepared record;
+/// `RepositorySyncPreparedJournal` follows that record becoming durable and
+/// precedes the first live mutation; `RepositoryBeforeCommitDecision` follows
+/// the batched live-parent barrier; and `RepositoryBeforeRollbackDecision`
+/// precedes the terminal rolled-back record. The per-action
+/// `RepositoryAfterTargetMutation` and `RepositoryAfterReverseAction` edges sit
+/// after an action's live mutation or reversal, before the barrier that makes it
+/// durable.
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FailurePoint {
@@ -29,8 +41,7 @@ pub enum FailurePoint {
     RepositoryCreateControl,
     RepositoryBeforeInitialJournal,
     RepositoryBeforeDataStageJournal,
-    RepositoryBeforePreparedJournal { action: usize },
-    RepositoryBeforePublishedJournal { action: usize },
+    RepositoryBeforePreparedJournal,
     RepositorySyncInitialJournal,
     RepositoryCreateCompanion,
     RepositorySweepCompanions,
@@ -39,12 +50,12 @@ pub enum FailurePoint {
     RepositoryStageAction { action: usize },
     RepositorySyncStage { action: usize },
     RepositorySyncBackup { action: usize },
-    RepositorySyncPreparedAction { action: usize },
+    RepositorySyncPreparedJournal,
     RepositoryBeforeAction { action: usize },
     RepositoryBeforeTargetMutation { action: usize },
     RepositoryAfterRootBindingCheck { action: usize },
     RepositoryBeforeDeleteRename { action: usize },
-    RepositorySyncTargetParent { action: usize },
+    RepositoryAfterTargetMutation { action: usize },
     RepositoryVerifyFinalIdentity { action: usize },
     RepositoryAfterAction { action: usize },
     RepositoryBeforeDataRootPublication,
@@ -53,7 +64,7 @@ pub enum FailurePoint {
     RepositoryBeforeCommitDecision,
     RepositoryAfterCommit,
     RepositoryBeforeReverseAction { action: usize },
-    RepositorySyncRollbackJournal { action: usize },
+    RepositoryAfterReverseAction { action: usize },
     RepositoryBeforeRollbackDecision,
     RepositoryBeforeStageCleanup,
     RepositoryBeforeCompanionCleanup,

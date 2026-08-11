@@ -493,7 +493,7 @@ fn test_interruption_boundaries_recover_complete_old_or_new_state() {
     let points = [
         TransactionFailurePoint::RepositoryPrepareIntent,
         TransactionFailurePoint::RepositoryPrepareAction { action: 0 },
-        TransactionFailurePoint::RepositorySyncPreparedAction { action: 0 },
+        TransactionFailurePoint::RepositorySyncPreparedJournal,
         TransactionFailurePoint::RepositoryBeforeAction { action: 0 },
         TransactionFailurePoint::RepositoryAfterAction { action: 0 },
         TransactionFailurePoint::RepositoryBeforeDataRootPublication,
@@ -753,7 +753,7 @@ fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
 }
 
 #[test]
-fn test_rollback_journal_sync_interruption_remains_recoverable() {
+fn test_rollback_reverse_action_interruption_remains_recoverable() {
     let temp = TempDir::new().unwrap();
     let data = temp.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
@@ -761,7 +761,7 @@ fn test_rollback_journal_sync_interruption_remains_recoverable() {
     let hook_raced = raced.clone();
     let injector = Arc::new(HookThenFail {
         hook_point: TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
-        failure_point: TransactionFailurePoint::RepositorySyncRollbackJournal { action: 1 },
+        failure_point: TransactionFailurePoint::RepositoryAfterReverseAction { action: 1 },
         hook: Mutex::new(Some(Box::new(move || {
             std::fs::write(&hook_raced, b"bystander").unwrap();
         }))),
@@ -2025,7 +2025,8 @@ fn test_conformance_rejects_worktree_data_alias() {
 }
 
 /// Failure points reached by the shared absent-preimage conformance scenarios.
-/// Backup and rollback-journal sync have dedicated existing-file/race tests.
+/// Backup staging and reverse-action edges have dedicated existing-file/race
+/// tests.
 fn all_repository_failure_points() -> Vec<TransactionFailurePoint> {
     use TransactionFailurePoint::*;
     vec![
@@ -2040,14 +2041,13 @@ fn all_repository_failure_points() -> Vec<TransactionFailurePoint> {
         RepositoryPrepareAction { action: 0 },
         RepositoryStageAction { action: 0 },
         RepositorySyncStage { action: 0 },
-        RepositorySyncPreparedAction { action: 0 },
-        RepositoryBeforePreparedJournal { action: 0 },
+        RepositoryBeforePreparedJournal,
+        RepositorySyncPreparedJournal,
         RepositoryBeforeAction { action: 0 },
         RepositoryBeforeTargetMutation { action: 0 },
         RepositoryAfterRootBindingCheck { action: 0 },
-        RepositorySyncTargetParent { action: 0 },
+        RepositoryAfterTargetMutation { action: 0 },
         RepositoryVerifyFinalIdentity { action: 0 },
-        RepositoryBeforePublishedJournal { action: 0 },
         RepositoryAfterAction { action: 0 },
         RepositoryBeforeDataRootPublication,
         RepositoryAfterDataParentBindingCheck,
