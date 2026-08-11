@@ -15,8 +15,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-11T22:39:30.721063767Z",
+      "status": "passed",
+      "updated_at": "2026-08-11T23:06:38.405337031Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mirror prepared rollback stage-cleanup edge in memory recovery",
-  "updated_at": "2026-08-11T22:39:30.721063767Z"
+  "updated_at": "2026-08-11T23:06:38.405337031Z"
 }

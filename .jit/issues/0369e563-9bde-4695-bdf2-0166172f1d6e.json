@@ -20,7 +20,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:13:41.628379136Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0369e563-9bde-4695-bdf2-0166172f1d6e",
   "labels": [
     "type:task",
@@ -33,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Measure transaction model-limit round trips",
-  "updated_at": "2026-08-11T21:39:12.602759965Z"
+  "updated_at": "2026-08-11T23:13:41.628379136Z"
 }
