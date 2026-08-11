@@ -5,7 +5,10 @@ use crate::repository_state::{
 };
 use serde::{Deserialize, Serialize};
 
-pub(crate) const REPOSITORY_JOURNAL_VERSION: u32 = 2;
+// Version 3 marks the single-barrier cutover that removed per-action progress
+// state. Version-2 journals are a different durable representation that this
+// code does not interpret, so recovery rejects them rather than reading them.
+pub(crate) const REPOSITORY_JOURNAL_VERSION: u32 = 3;
 pub(crate) const JOURNAL_FILE: &str = "journal.json";
 
 /// Durable transaction decision. Prepared transactions roll back; committed
@@ -144,6 +147,7 @@ impl RepositoryJournalActionKind {
 /// identities alone, so an action carries no progress state — the record is
 /// written once, complete, before the first live mutation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RepositoryJournalAction {
     pub(crate) path: RepositoryJournalPath,
     pub(crate) owner: String,
@@ -155,6 +159,7 @@ pub(crate) struct RepositoryJournalAction {
 /// Durable layout-aware recovery authority. `layout_digest` binds every
 /// relative path to the exact selected roots supplied at session open.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RepositoryTransactionJournal {
     pub(crate) version: u32,
     pub(crate) transaction_id: String,

@@ -1037,7 +1037,7 @@ fn test_journal_rejects_traversal_control_name() {
     std::fs::create_dir(transaction.join("backups")).unwrap();
     std::fs::write(
             transaction.join("journal.json"),
-            br#"{"version":2,"transaction_id":"bad","layout_digest":"x","plan_hash":"x","data_root_was_absent":false,"data_stage":"../escape","data_stage_identity":null,"decision":"prepared","actions":[]}"#,
+            br#"{"version":3,"transaction_id":"bad","layout_digest":"x","plan_hash":"x","data_root_was_absent":false,"data_stage":"../escape","data_stage_identity":null,"decision":"prepared","actions":[]}"#,
         )
         .unwrap();
     let layout = discover_repository_layout(temp.path(), &data).unwrap();
@@ -1045,6 +1045,108 @@ fn test_journal_rejects_traversal_control_name() {
         .open_mutation_session(layout)
         .is_err());
     assert!(transaction.exists());
+}
+
+#[test]
+fn test_recovery_refuses_pre_cutover_journal_with_removed_action_progress() {
+    let temp = TempDir::new().unwrap();
+    let data = temp.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    std::fs::write(data.join("victim"), b"old").unwrap();
+    let layout = discover_repository_layout(temp.path(), &data).unwrap();
+    let storage = JsonFileStorage::with_repository_state_failures(
+        &data,
+        SelectedFailures::one(TransactionFailurePoint::RepositoryAfterAction { action: 0 }),
+    );
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let path = VirtualPath::data("victim").unwrap();
+    let image = session
+        .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+        .unwrap();
+    let expected = ExpectedPreimage::of(image.entry(&path).unwrap());
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::delete_file(path, "delete", expected)],
+    )
+    .unwrap();
+    assert!(session.apply(&test_plan(&image, &delta)).is_err());
+    drop(session);
+
+    let transaction = std::fs::read_dir(data.join("tmp/transactions"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let journal_path = transaction.join("journal.json");
+    let mut journal: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&journal_path).unwrap()).unwrap();
+    journal["version"] = serde_json::json!(2);
+    journal["actions"][0]["progress"] = serde_json::json!("planned");
+    std::fs::write(&journal_path, serde_json::to_vec(&journal).unwrap()).unwrap();
+
+    let recovery = JsonFileStorage::new(&data).open_mutation_session(layout);
+    assert!(matches!(
+        &recovery,
+        Err(RepositoryStateStoreError::Transaction(error))
+            if error.downcast_ref::<serde_json::Error>().is_some()
+    ));
+    assert!(transaction.is_dir());
+}
+
+#[test]
+fn test_recovery_refuses_a_recoverable_journal_at_the_superseded_version() {
+    // The companion test above reintroduces the removed per-action progress
+    // field, so its refusal comes from parsing. Here the journal is one recovery
+    // would otherwise complete — a real interrupted transaction, its layout
+    // digest and actions untouched — and only its version is moved back. That
+    // isolates the version boundary: the record parses, and the superseded
+    // version alone refuses it.
+    let temp = TempDir::new().unwrap();
+    let data = temp.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    std::fs::write(data.join("victim"), b"old").unwrap();
+    let layout = discover_repository_layout(temp.path(), &data).unwrap();
+    let storage = JsonFileStorage::with_repository_state_failures(
+        &data,
+        SelectedFailures::one(TransactionFailurePoint::RepositoryAfterAction { action: 0 }),
+    );
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let path = VirtualPath::data("victim").unwrap();
+    let image = session
+        .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+        .unwrap();
+    let expected = ExpectedPreimage::of(image.entry(&path).unwrap());
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::delete_file(path, "delete", expected)],
+    )
+    .unwrap();
+    assert!(session.apply(&test_plan(&image, &delta)).is_err());
+    drop(session);
+
+    let transaction = std::fs::read_dir(data.join("tmp/transactions"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let journal_path = transaction.join("journal.json");
+    let mut journal: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&journal_path).unwrap()).unwrap();
+    journal["version"] = serde_json::json!(2);
+    std::fs::write(&journal_path, serde_json::to_vec(&journal).unwrap()).unwrap();
+
+    let recovery = JsonFileStorage::new(&data).open_mutation_session(layout);
+
+    // Parsing succeeded, so the refusal is the version boundary's and not a
+    // deserialization accident.
+    assert!(matches!(
+        &recovery,
+        Err(RepositoryStateStoreError::Transaction(error))
+            if error.downcast_ref::<serde_json::Error>().is_none()
+    ));
+    assert!(transaction.is_dir());
 }
 
 #[cfg(unix)]
@@ -2562,7 +2664,7 @@ fn test_session_foreign_owner_external_journal_is_skipped_not_failed() {
     std::fs::create_dir(txn.join("backups")).unwrap();
     std::fs::write(
             txn.join("journal.json"),
-            br#"{"version":2,"transaction_id":"foreign-journal","layout_digest":"x","owner_digest":"a-different-owner","plan_hash":"x","data_root_was_absent":true,"data_stage":null,"data_stage_identity":null,"decision":"committed","actions":[]}"#,
+            br#"{"version":3,"transaction_id":"foreign-journal","layout_digest":"x","owner_digest":"a-different-owner","plan_hash":"x","data_root_was_absent":true,"data_stage":null,"data_stage_identity":null,"decision":"committed","actions":[]}"#,
         )
         .unwrap();
     std::fs::write(
