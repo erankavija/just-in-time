@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-11T22:16:50.865740979Z",
+  "context": {},
+  "created_at": "2026-08-11T22:16:01.573889817Z",
+  "dependencies": [
+    "f78babf6-d35a-4a25-bf65-f4891f7cdf9f"
+  ],
+  "description": "Mirror the file transaction kernel rollback-stage cleanup failure point in the in-memory conformance backend so shared crash coverage observes the same prepared-recovery boundary.\n\n## Background\n\nJSON prepared recovery invokes `RepositoryBeforeStageCleanup` after all reverse actions and before the rollback decision. Memory prepared recovery currently jumps directly from reverse-action checks to `RepositoryBeforeRollbackDecision`; its existing stage-cleanup hook belongs only to normal committed apply. This is a conformance observability gap, not a transaction or journal semantic change.\n\n## Success Criteria\n\n- [hard] REQ-01: In-memory prepared recovery invokes `RepositoryBeforeStageCleanup` after the final reverse-action hook and before `RepositoryBeforeRollbackDecision` for both existing-root and absent-root recovery.\n- [hard] REQ-02: A failure injected at the stage-cleanup edge retains prepared residue so a later clean session retries and converges to the original state.\n- [hard] REQ-03: Focused tests prove hook order and retry behavior while committed recovery and transaction semantics remain unchanged.",
+  "documents": [],
+  "first_ready_at": "2026-08-11T22:16:01.573889817Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4aa15137-5525-4d44-90dd-7ff394a53360",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:core",
+    "component:testing",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Mirror prepared rollback stage-cleanup edge in memory recovery",
+  "updated_at": "2026-08-11T22:16:50.865740979Z"
+}
