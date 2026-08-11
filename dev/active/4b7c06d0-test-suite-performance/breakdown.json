@@ -329,7 +329,7 @@
       "terminal": {
         "consumer_family": "nextest foundation",
         "test_boundary": "nextest config validation",
-        "worker_sized_reason": "One upstream foundation establishes the pinned executable, exact initial config, its parse verification, and contributor guidance before any runner command consumes nextest.",
+        "worker_sized_reason": "One outcome: a reproducibly pinned nextest executable and committed parallel policy validated by parse verification in CI and locally; contributor guidance is a separate downstream leaf.",
         "footprint": {
           "creates": [
             ".config/nextest.toml"
@@ -470,8 +470,8 @@
   },
   {
     "key": "suite-enforcement",
-    "title": "Wire suite enforcement and tighten nextest bounds",
-    "description": "Pass the live suite-clock measurement to the duration checker and tighten the committed nextest policy after the transaction fix and timing contract land.\n\n## Background\n\nThe runner passes the measured suite-clock integer as `--test-suite-ms <integer>`. This task lands after `fsync-dedupe` so the measured suite can pass its budget.\n\n## Success Criteria\n\n- [hard] REQ-01: Passes the live `suite-clock` integer milliseconds to the checker as `--test-suite-ms <integer>` and keeps the transaction benchmark decision applied or recorded before enforcement.\n- [hard] REQ-02: Tightens `.config/nextest.toml` to `retries = 0`, slow-timeout period `\"10s\"`, and `terminate-after = 2` for a hard bound of 20 seconds; adds exact named per-test overrides for every test whose warm `suite-profile.json` timing exceeds the 20-second hard bound.\n- [hard] REQ-03: Preserves nextest reporter summaries, doctests, ignored provenance, and the exact duration-checker behavior.\n\n## Notes\n\nOrdered overlaps are explicit: `scripts/cargo-ci.sh` is touched after `step-timing-and-clock`, and `.config/nextest.toml` is touched after `nextest-foundation`; both changes are sequenced by this task’s dependencies, and the per-test overrides are selected mechanically from the `suite-profile.json` timings this task depends on. The task consumes `suite-clock` and `nextest-reporter-evidence`.",
+    "title": "Wire suite-clock enforcement into the duration checker",
+    "description": "Pass the live suite-clock measurement to the duration checker once the transaction fix and timing contract have landed.\n\n## Background\n\nThe runner passes the measured suite-clock integer as `--test-suite-ms <integer>`. This task lands after `fsync-dedupe` so the measured suite can pass its budget; final nextest policy tightening is the separate `nextest-final-policy` leaf.\n\n## Success Criteria\n\n- [hard] REQ-01: Passes the live `suite-clock` integer milliseconds to the checker as `--test-suite-ms <integer>` in the cargo-ci budget step.\n- [hard] REQ-02: Keeps the transaction benchmark decision applied or recorded before enforcement and leaves the checker interface unchanged.\n- [hard] REQ-03: Preserves nextest reporter summaries, doctests, ignored provenance, and every existing budget check.\n\n## Notes\n\nOrdered overlap: `scripts/cargo-ci.sh` is touched after `step-timing-and-clock`, sequenced by this task's dependencies. The task consumes `suite-clock` and `nextest-reporter-evidence`.",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -488,15 +488,13 @@
     "depends_on": [
       "step-timing-and-clock",
       "duration-checker",
-      "fsync-dedupe",
-      "suite-profile"
+      "fsync-dedupe"
     ],
     "planning": {
-      "outcome": "Live suite-clock enforcement uses the exact checker flag and final bounded nextest policy after transaction optimization.",
+      "outcome": "cargo-ci passes the measured suite-clock milliseconds to the duration checker and live enforcement holds.",
       "contract_refs": [
         "suite-clock",
-        "nextest-reporter-evidence",
-        "suite-timing-evidence"
+        "nextest-reporter-evidence"
       ],
       "produces_contracts": [],
       "source_refs": [
@@ -508,10 +506,51 @@
       "terminal": {
         "consumer_family": "suite budget enforcement",
         "test_boundary": "cargo-ci enforcement",
-        "worker_sized_reason": "One final enforcement task joins one measured clock, one checker interface, one transaction prerequisite, and one policy tightening; its two shared-file overlaps are strictly dependency-ordered.",
+        "worker_sized_reason": "One outcome: the measured clock reaches the existing checker flag; one file, one consumer family (the cargo-ci gate contract), verified by the gate run and checker fixtures already in place.",
         "footprint": {
           "touches": [
-            "scripts/cargo-ci.sh",
+            "scripts/cargo-ci.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "nextest-final-policy",
+    "title": "Tighten the committed nextest policy to the final bounds",
+    "description": "Tighten the committed nextest runtime policy to its final bounds using the warm profile evidence.\n\n## Background\n\nThe initial policy from `nextest-foundation` uses transitional bounds (period \"15s\", terminate-after 4). With the suite optimized and profiled, the final bounds land here. Override selection is mechanical from `suite-profile.json`.\n\n## Success Criteria\n\n- [hard] REQ-01: Sets `.config/nextest.toml` to `retries = 0`, slow-timeout period `\"10s\"`, and `terminate-after = 2` for a hard bound of 20 seconds.\n- [hard] REQ-02: Adds a named per-test override for each test recorded in `suite-profile.json` with warm timing above the 20-second hard bound, and no others.\n- [hard] REQ-03: `cargo nextest show-config test-groups` and a suite run succeed under the tightened policy.\n\n## Notes\n\nOrdered overlap: `.config/nextest.toml` is touched after `nextest-foundation`, sequenced by this task's dependencies through `suite-enforcement`. Override selection consumes `suite-timing-evidence`.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "suite-profile",
+      "suite-enforcement"
+    ],
+    "planning": {
+      "outcome": "The committed nextest policy enforces the final 20-second hard bound with profile-derived named overrides.",
+      "contract_refs": [
+        "suite-timing-evidence"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "nextest runtime policy for every suite execution",
+        "test_boundary": "show-config parse verification plus a passing suite run under the tightened bounds",
+        "worker_sized_reason": "One outcome over one configuration file with mechanical override selection from recorded timings.",
+        "footprint": {
+          "touches": [
             ".config/nextest.toml"
           ]
         }
@@ -581,7 +620,8 @@
       "doc-review"
     ],
     "depends_on": [
-      "suite-enforcement"
+      "nextest-final-policy",
+      "nextest-usage-docs"
     ],
     "planning": {
       "outcome": "Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS.",

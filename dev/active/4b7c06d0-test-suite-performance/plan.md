@@ -28,11 +28,11 @@ The `suite-runner` task produces the repository’s tested parser-facing success
 
 ### `suite-timing-evidence` [implementation-produced] — Warm per-test timing artifact
 
-The `suite-profile` task produces the machine-readable warm per-test timing artifact at its stable repository-owned location and shape, deriving timings from nextest machine-readable output. It has two consumers: `suite-enforcement` selects per-test nextest overrides mechanically from the recorded timings, and `inherent-cost-attribution` classifies inherent costs from those timings alongside the transaction benchmark artifact, reaching the producer transitively through enforcement.
+The `suite-profile` task produces the machine-readable warm per-test timing artifact at its stable repository-owned location and shape, deriving timings from nextest machine-readable output. It has two consumers: `nextest-final-policy` selects per-test nextest overrides mechanically from the recorded timings, and `inherent-cost-attribution` classifies inherent costs from those timings alongside the transaction benchmark artifact, reaching the producer transitively through the final policy.
 
 ### `transaction-benchmark-evidence` [implementation-produced] — Append-only transaction measurement artifact
 
-The `transaction-benchmark` task produces the append-only measurement artifact for warm model-limit transaction round trips at its stable repository-owned location: each run appends a dated record, the initial record carries the fsync-residual decision, and no consumer rewrites prior records. `fsync-dedupe` reads the decision and appends its post-change measurement; `inherent-cost-attribution` reads the records for transaction cost attribution, reaching the producer transitively through enforcement.
+The `transaction-benchmark` task produces the append-only measurement artifact for warm model-limit transaction round trips at its stable repository-owned location: each run appends a dated record, the initial record carries the fsync-residual decision, and no consumer rewrites prior records. `fsync-dedupe` reads the decision and appends its post-change measurement; `inherent-cost-attribution` reads the records for transaction cost attribution, reaching the producer transitively through the final policy and enforcement chain.
 
 ## Generated decomposition overview
 
@@ -50,9 +50,10 @@ The `transaction-benchmark` task produces the append-only measurement artifact f
 | nextest-usage-docs | Document pinned nextest installation and use | task | dev/TESTING.md documents installing and running the pinned nextest and cites the committed policy. | — | REQ-04, investigation.md | touches 1 | runner-branch | nextest-foundation |
 | suite-runner | Swap the cargo-ci suite runner | task | cargo-ci runs the pinned nextest workspace suite with verified reporter evidence. | — | REQ-04, investigation.md | touches 2 | runner-branch | stale-binary-fixture |
 | step-timing-and-clock | Add step timing and the named suite clock | task | cargo-ci reports integer-millisecond step timings and a suite-clock spanning exactly the nextest and doctest substeps. | suite-clock, nextest-reporter-evidence | REQ-03, investigation.md | touches 2 | runner-branch | suite-runner |
-| suite-enforcement | Wire suite enforcement and tighten nextest bounds | task | Live suite-clock enforcement uses the exact checker flag and final bounded nextest policy after transaction optimization. | suite-clock, nextest-reporter-evidence, suite-timing-evidence | REQ-01, REQ-02, investigation.md | touches 2 | runner-branch | step-timing-and-clock, duration-checker, fsync-dedupe, suite-profile |
+| suite-enforcement | Wire suite-clock enforcement into the duration checker | task | cargo-ci passes the measured suite-clock milliseconds to the duration checker and live enforcement holds. | suite-clock, nextest-reporter-evidence | REQ-01, REQ-02, investigation.md | touches 1 | runner-branch | step-timing-and-clock, duration-checker, fsync-dedupe |
+| nextest-final-policy | Tighten the committed nextest policy to the final bounds | task | The committed nextest policy enforces the final 20-second hard bound with profile-derived named overrides. | suite-timing-evidence | REQ-01, investigation.md | touches 1 | runner-branch | suite-profile, suite-enforcement |
 | suite-profile | Produce warm per-test suite timing evidence | task | A pinned-nextest profiler produces repository-owned warm per-test timing evidence at a stable JSON path. | nextest-reporter-evidence | REQ-05, investigation.md | creates 2 | runner-branch | suite-runner |
-| inherent-cost-attribution | Attribute inherent test costs | task | Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS. | suite-timing-evidence, transaction-benchmark-evidence | REQ-05, investigation.md | touches 1 | runner-branch | suite-enforcement |
+| inherent-cost-attribution | Attribute inherent test costs | task | Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS. | suite-timing-evidence, transaction-benchmark-evidence | REQ-05, investigation.md | touches 1 | runner-branch | nextest-final-policy, nextest-usage-docs |
 
 ```mermaid
 flowchart LR
@@ -67,9 +68,10 @@ flowchart LR
     N8["nextest-usage-docs: Document pinned nextest installation and use"]
     N9["suite-runner: Swap the cargo-ci suite runner"]
     N10["step-timing-and-clock: Add step timing and the named suite clock"]
-    N11["suite-enforcement: Wire suite enforcement and tighten nextest bounds"]
-    N12["suite-profile: Produce warm per-test suite timing evidence"]
-    N13["inherent-cost-attribution: Attribute inherent test costs"]
+    N11["suite-enforcement: Wire suite-clock enforcement into the duration checker"]
+    N12["nextest-final-policy: Tighten the committed nextest policy to the final bounds"]
+    N13["suite-profile: Produce warm per-test suite timing evidence"]
+    N14["inherent-cost-attribution: Attribute inherent test costs"]
     N0 --> N1
     N0 --> N2
     N0 --> N3
@@ -81,9 +83,11 @@ flowchart LR
     N10 --> N11
     N6 --> N11
     N4 --> N11
-    N12 --> N11
-    N9 --> N12
-    N11 --> N13
+    N13 --> N12
+    N11 --> N12
+    N9 --> N13
+    N12 --> N14
+    N8 --> N14
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -95,7 +99,7 @@ flowchart LR
 | Strict boundary | Treat a measured suite-clock value greater than or equal to `MAX_TEST_SUITE_SECONDS*1000` as failure, enforced over the `suite-clock` span alone. |
 | Budgeted-suite scope | The container's REQ-01 names the suite-clock span (nextest plus doctests) as the budgeted suite; the ignored provenance subset — nested cold cargo builds with a documented multi-minute cost — runs as a separately required step outside the clock and is attributed under REQ-05. Rejected: including provenance in the clock, because no design brings a cold nested dependency build under the budget without deleting the coverage. |
 | Doctests | Keep `cargo test --doc --workspace` as a separately reported substep inside the suite clock because nextest does not cover doctests in the investigated design. |
-| Runner sequencing | Keep the transaction and runner branches independent until the join; provision pinned nextest first, swap the runner next, add step timing and the suite clock, produce the warm profile, and then wire enforcement after that profile, the duration checker, and the fsync fix, because enforcement selects its per-test overrides from the profile’s timings. |
+| Runner sequencing | Keep the transaction and runner branches independent until the join; provision pinned nextest first, swap the runner next, add step timing and the suite clock, wire enforcement after the duration checker and the fsync fix, and tighten the final policy last, because the final policy selects its per-test overrides from the warm profile's timings. |
 | Journal rollback marker | Retain the terminal `RolledBack` write; remove only per-action rewrites because recovery is identity-driven but the investigation does not prove marker removal safe. |
 | Model-limit scale | Keep the 512-file, near-4 MiB model-limit scale because its scale is the property being proven. |
 | Stale-binary granularity | Keep six independently reportable tests and one cross-process fixture with a lock, provenance-keyed artifact, and observable reuse marker; nextest groups do not substitute for fixture sharing. |
