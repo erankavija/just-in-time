@@ -13536,3 +13536,11 @@
 {"gate_key":"repo-validate","id":"78b2af42-1167-48c2-b1ad-692ee5b5ca93","issue_id":"42c8c9c1-737d-48a6-b8b4-911aafa1a263","timestamp":"2026-08-11T10:47:35.664787825Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"41a98801-ef33-4f2c-af48-495b621603ca","issue_id":"42c8c9c1-737d-48a6-b8b4-911aafa1a263","timestamp":"2026-08-11T10:49:59.215806695Z","type":"gate_failed","updated_by":"auto:executor"}
 {"id":"076d817b-d6b6-4fea-a4d5-b4a585170e46","issue_id":"cf42d08b-ce12-4038-987c-bbb0c0950fc8","priority":"normal","timestamp":"2026-08-11T12:03:49.118078050Z","title":"A deep package packs but cannot be published","type":"issue_created"}
+{"fields":["labels"],"id":"877f643d-5503-46d6-ba16-648b1c924d5d","issue_id":"cf42d08b-ce12-4038-987c-bbb0c0950fc8","timestamp":"2026-08-11T12:05:08.142748479Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"ready","id":"525988a1-b587-44db-8798-071391a670d2","issue_id":"cf42d08b-ce12-4038-987c-bbb0c0950fc8","timestamp":"2026-08-11T12:05:20.933137929Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"c7781a0f-6863-4445-911f-9c2e0f4087dd","issue_id":"cf42d08b-ce12-4038-987c-bbb0c0950fc8","timestamp":"2026-08-11T12:05:20.933137929Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"ce2cbdfb-9f9e-4444-80dd-59139458eb6d","issue_id":"f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0","timestamp":"2026-08-11T12:05:40.646430819Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"226eef18-fcf3-48e2-b03e-492a06137d9e","issue_id":"7793b8b7-9eed-4598-9bc1-fd655ec0f394","timestamp":"2026-08-11T12:06:36.615653031Z","to":"rejected","type":"issue_state_changed"}
+{"fields":["labels"],"id":"5a7e78d4-6145-4be2-9558-97a22cffe329","issue_id":"7793b8b7-9eed-4598-9bc1-fd655ec0f394","timestamp":"2026-08-11T12:07:20.363683688Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"c2cd99ec-fe2a-4adf-b9b1-504caa9f418b","issue_id":"7793b8b7-9eed-4598-9bc1-fd655ec0f394","rule":"label-format","timestamp":"2026-08-11T12:07:20.363683688Z","type":"local_rule_bypassed"}
+{"id":"acc10945-9973-48f3-9d5b-e1f39efa172f","issue_id":"7793b8b7-9eed-4598-9bc1-fd655ec0f394","rule":"label-format","timestamp":"2026-08-11T12:07:40.668585567Z","type":"local_rule_bypassed"}
