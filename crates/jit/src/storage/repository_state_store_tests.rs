@@ -327,6 +327,40 @@ impl crate::storage::TransactionFailureInjector for RecordingFailures {
     }
 }
 
+struct RecordingSelectedFailure(
+    Mutex<(
+        Option<TransactionFailurePoint>,
+        Vec<TransactionFailurePoint>,
+    )>,
+);
+
+impl RecordingSelectedFailure {
+    fn one(point: TransactionFailurePoint) -> Arc<Self> {
+        Arc::new(Self(Mutex::new((Some(point), Vec::new()))))
+    }
+
+    fn is_consumed(&self) -> bool {
+        self.0.lock().unwrap().0.is_none()
+    }
+
+    fn observed(&self) -> Vec<TransactionFailurePoint> {
+        self.0.lock().unwrap().1.clone()
+    }
+}
+
+impl crate::storage::TransactionFailureInjector for RecordingSelectedFailure {
+    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
+        let mut state = self.0.lock().unwrap();
+        state.1.push(point.clone());
+        if state.0.as_ref() == Some(point) {
+            state.0 = None;
+            Err(std::io::Error::other(format!("injected {point:?}")))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 struct HookAt {
     point: TransactionFailurePoint,
     hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
@@ -1254,7 +1288,7 @@ fn test_memory_prepared_residue_recovers_original_aggregate_state() {
     ));
 }
 
-fn memory_rollback_spec() -> CaptureSpec {
+fn barrier_spec() -> CaptureSpec {
     let mut spec = CaptureSpec::phase_one(
         [
             VirtualPath::data("").unwrap(),
@@ -1271,7 +1305,7 @@ fn memory_rollback_spec() -> CaptureSpec {
     spec
 }
 
-fn seed_memory_rollback_fixture(storage: &InMemoryStorage, existing_data_root: bool) {
+fn seed_memory_barrier_fixture(storage: &InMemoryStorage, existing_data_root: bool) {
     let mut state = storage.repository_state();
     state.data_root_exists = existing_data_root;
     if existing_data_root {
@@ -1307,36 +1341,7 @@ fn seed_memory_rollback_fixture(storage: &InMemoryStorage, existing_data_root: b
     }
 }
 
-fn memory_rollback_delta(layout: &RepositoryLayout, image: &RepositoryImage) -> RepositoryDelta {
-    let actions = [
-        (
-            VirtualPath::worktree("first.txt").unwrap(),
-            b"new-first".as_slice(),
-        ),
-        (
-            VirtualPath::worktree("second.txt").unwrap(),
-            b"new-second".as_slice(),
-        ),
-        (
-            VirtualPath::data("record.txt").unwrap(),
-            b"new-data".as_slice(),
-        ),
-    ]
-    .into_iter()
-    .map(|(path, bytes)| {
-        RepositoryAction::write_file(
-            path.clone(),
-            "memory-rollback",
-            ExpectedPreimage::of(image.entry(&path).unwrap()),
-            bytes.to_vec(),
-            FileMode::Regular,
-        )
-    })
-    .collect();
-    RepositoryDelta::new(layout, actions).unwrap()
-}
-
-fn prepare_memory_rollback(
+fn prepare_memory_barrier_rollback(
     existing_data_root: bool,
 ) -> (TempDir, RepositoryLayout, InMemoryStorage) {
     let temp = TempDir::new().unwrap();
@@ -1348,11 +1353,11 @@ fn prepare_memory_rollback(
     let interruption =
         SelectedFailures::one(TransactionFailurePoint::RepositoryBeforeAction { action: 1 });
     let storage = InMemoryStorage::with_repository_state_failures(interruption.clone());
-    seed_memory_rollback_fixture(&storage, existing_data_root);
+    seed_memory_barrier_fixture(&storage, existing_data_root);
 
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let image = session.capture(memory_rollback_spec()).unwrap();
-    let delta = memory_rollback_delta(&layout, &image);
+    let image = session.capture(barrier_spec()).unwrap();
+    let delta = barrier_delta(&layout, &image, BarrierDeltaKind::Replace);
     assert!(session.apply(&test_plan(&image, &delta)).is_err());
     assert!(interruption.is_consumed());
     drop(session);
@@ -1388,7 +1393,7 @@ fn test_memory_prepared_recovery_reports_reverse_live_action_order_for_both_root
     };
 
     for existing_data_root in [true, false] {
-        let (_temp, layout, storage) = prepare_memory_rollback(existing_data_root);
+        let (_temp, layout, storage) = prepare_memory_barrier_rollback(existing_data_root);
         let recording = Arc::new(RecordingFailures::default());
         let recovered = storage.with_repository_state_failure_view(recording.clone());
         drop(recovered.open_mutation_session(layout).unwrap());
@@ -1430,7 +1435,7 @@ fn test_memory_rollback_edge_failure_retains_prepared_residue_for_retry() {
             TransactionFailurePoint::RepositoryBeforeStageCleanup,
             TransactionFailurePoint::RepositoryBeforeRollbackDecision,
         ] {
-            let (_temp, layout, storage) = prepare_memory_rollback(existing_data_root);
+            let (_temp, layout, storage) = prepare_memory_barrier_rollback(existing_data_root);
             let failure = SelectedFailures::one(point.clone());
             let recovering = storage.with_repository_state_failure_view(failure.clone());
             assert!(recovering.open_mutation_session(layout.clone()).is_err());
@@ -1444,7 +1449,7 @@ fn test_memory_rollback_edge_failure_retains_prepared_residue_for_retry() {
             ));
 
             let mut recovered = recovering.open_mutation_session(layout).unwrap();
-            let image = recovered.capture(memory_rollback_spec()).unwrap();
+            let image = recovered.capture(barrier_spec()).unwrap();
             assert!(matches!(
                 image
                     .entry(&VirtualPath::worktree("first.txt").unwrap())
@@ -2387,10 +2392,383 @@ fn test_conformance_rejects_worktree_data_alias() {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BarrierRootShape {
+    Existing,
+    Absent,
+}
+
+impl BarrierRootShape {
+    fn data_root_exists(self) -> bool {
+        self == Self::Existing
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BarrierDeltaKind {
+    Replace,
+    DeleteFirst,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BarrierRecoveryDirection {
+    Original,
+    Final,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct BarrierView {
+    first: SemanticEntry,
+    second: SemanticEntry,
+    data_root: SemanticEntry,
+    data_record: SemanticEntry,
+}
+
+fn barrier_view(image: &RepositoryImage) -> BarrierView {
+    let entry = |path: VirtualPath| semantic_entry(image.entry(&path).unwrap());
+    BarrierView {
+        first: entry(VirtualPath::worktree("first.txt").unwrap()),
+        second: entry(VirtualPath::worktree("second.txt").unwrap()),
+        data_root: entry(VirtualPath::data("").unwrap()),
+        data_record: entry(VirtualPath::data("record.txt").unwrap()),
+    }
+}
+
+fn expected_barrier_view(
+    shape: BarrierRootShape,
+    direction: BarrierRecoveryDirection,
+) -> BarrierView {
+    let final_state = matches!(direction, BarrierRecoveryDirection::Final);
+    let file = |bytes: &[u8]| SemanticEntry::File(bytes.to_vec(), FileMode::Regular);
+    BarrierView {
+        first: file(if final_state {
+            b"new-first"
+        } else {
+            b"old-first"
+        }),
+        second: file(if final_state {
+            b"new-second"
+        } else {
+            b"old-second"
+        }),
+        data_root: if shape.data_root_exists() || final_state {
+            SemanticEntry::Directory(FileMode::Executable)
+        } else {
+            SemanticEntry::Absent
+        },
+        data_record: if shape.data_root_exists() {
+            file(if final_state {
+                b"new-data"
+            } else {
+                b"old-data"
+            })
+        } else if final_state {
+            file(b"new-data")
+        } else {
+            SemanticEntry::Absent
+        },
+    }
+}
+
+fn seed_json_barrier_fixture(worktree: &Path, data: &Path, shape: BarrierRootShape) {
+    std::fs::write(worktree.join("first.txt"), b"old-first").unwrap();
+    std::fs::write(worktree.join("second.txt"), b"old-second").unwrap();
+    if shape.data_root_exists() {
+        std::fs::create_dir(data).unwrap();
+        std::fs::write(data.join("record.txt"), b"old-data").unwrap();
+    }
+}
+
+fn barrier_delta(
+    layout: &RepositoryLayout,
+    image: &RepositoryImage,
+    kind: BarrierDeltaKind,
+) -> RepositoryDelta {
+    let expected = |path: &VirtualPath| ExpectedPreimage::of(image.entry(path).unwrap());
+    let first = VirtualPath::worktree("first.txt").unwrap();
+    let second = VirtualPath::worktree("second.txt").unwrap();
+    let data_record = VirtualPath::data("record.txt").unwrap();
+    let first_action = match kind {
+        BarrierDeltaKind::Replace => RepositoryAction::write_file(
+            first.clone(),
+            "barrier",
+            expected(&first),
+            b"new-first".to_vec(),
+            FileMode::Regular,
+        ),
+        BarrierDeltaKind::DeleteFirst => {
+            RepositoryAction::delete_file(first.clone(), "barrier", expected(&first))
+        }
+    };
+    RepositoryDelta::new(
+        layout,
+        vec![
+            first_action,
+            RepositoryAction::write_file(
+                second.clone(),
+                "barrier",
+                expected(&second),
+                b"new-second".to_vec(),
+                FileMode::Regular,
+            ),
+            RepositoryAction::write_file(
+                data_record.clone(),
+                "barrier",
+                expected(&data_record),
+                b"new-data".to_vec(),
+                FileMode::Regular,
+            ),
+        ],
+    )
+    .unwrap()
+}
+
+fn converge_forward_barrier_crash(
+    point: TransactionFailurePoint,
+    kind: BarrierDeltaKind,
+    shape: BarrierRootShape,
+) {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    seed_json_barrier_fixture(worktree.path(), &data, shape);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+    // JSON derives every preimage from a real capture, so a failure after a
+    // rename exercises identity-based recovery rather than a hand-built journal
+    // whose layout or identity digest could fail first.
+    let json_failures = SelectedFailures::one(point.clone());
+    let json = JsonFileStorage::with_repository_state_failures(&data, json_failures.clone());
+    let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
+    let json_image = json_session.capture(barrier_spec()).unwrap();
+    assert_eq!(
+        barrier_view(&json_image),
+        expected_barrier_view(shape, BarrierRecoveryDirection::Original)
+    );
+    let json_delta = barrier_delta(&layout, &json_image, kind);
+    assert!(json_session
+        .apply(&test_plan(&json_image, &json_delta))
+        .is_err());
+    assert!(json_failures.is_consumed(), "JSON did not reach {point:?}");
+    drop(json_session);
+    let json_recovered = JsonFileStorage::new(&data);
+    let mut json_session = json_recovered
+        .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+        .unwrap_or_else(|error| panic!("JSON recovery failed at {point:?} {shape:?}: {error:#}"));
+    let json_view = barrier_view(&json_session.capture(barrier_spec()).unwrap());
+
+    let memory_failures = SelectedFailures::one(point.clone());
+    let memory = InMemoryStorage::with_repository_state_failures(memory_failures.clone());
+    seed_memory_barrier_fixture(&memory, shape.data_root_exists());
+    let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
+    let memory_image = memory_session.capture(barrier_spec()).unwrap();
+    assert_eq!(
+        barrier_view(&memory_image),
+        expected_barrier_view(shape, BarrierRecoveryDirection::Original)
+    );
+    let memory_delta = barrier_delta(&layout, &memory_image, kind);
+    assert!(memory_session
+        .apply(&test_plan(&memory_image, &memory_delta))
+        .is_err());
+    assert!(
+        memory_failures.is_consumed(),
+        "memory did not reach {point:?}"
+    );
+    drop(memory_session);
+    let memory_recovered = memory.without_repository_state_failures();
+    let mut memory_session = memory_recovered
+        .open_mutation_session(layout)
+        .unwrap_or_else(|error| panic!("memory recovery failed at {point:?} {shape:?}: {error:#}"));
+    let memory_view = barrier_view(&memory_session.capture(barrier_spec()).unwrap());
+
+    let direction = if point == TransactionFailurePoint::RepositoryBeforeCommitDecision
+        && shape == BarrierRootShape::Absent
+    {
+        // Publishing the absent Data root is the irreversible commit point; a
+        // Prepared record discovered after that rename completes forward.
+        BarrierRecoveryDirection::Final
+    } else {
+        BarrierRecoveryDirection::Original
+    };
+    let expected = expected_barrier_view(shape, direction);
+    assert_eq!(json_view, expected, "JSON {point:?} {shape:?}");
+    assert_eq!(memory_view, expected, "memory {point:?} {shape:?}");
+}
+
+#[test]
+fn test_conformance_single_barrier_forward_crashes_recover_exact_views() {
+    use TransactionFailurePoint::*;
+
+    for (point, kind) in [
+        (
+            RepositorySyncBackup { action: 0 },
+            BarrierDeltaKind::Replace,
+        ),
+        (RepositoryBeforePreparedJournal, BarrierDeltaKind::Replace),
+        (RepositorySyncPreparedJournal, BarrierDeltaKind::Replace),
+        (
+            RepositoryAfterTargetMutation { action: 0 },
+            BarrierDeltaKind::Replace,
+        ),
+        (
+            RepositoryBeforeDeleteRename { action: 0 },
+            BarrierDeltaKind::DeleteFirst,
+        ),
+        (RepositoryBeforeCommitDecision, BarrierDeltaKind::Replace),
+    ] {
+        for shape in [BarrierRootShape::Existing, BarrierRootShape::Absent] {
+            converge_forward_barrier_crash(point.clone(), kind, shape);
+        }
+    }
+
+    // RepositoryBeforeDataStageJournal remains covered by the dedicated
+    // fail-closed test: it precedes publication of the stage identity and is
+    // intentionally not a recoverable old/new convergence boundary.
+}
+
+fn complete_rollback_sequence(shape: BarrierRootShape) -> Vec<TransactionFailurePoint> {
+    use TransactionFailurePoint::{
+        RepositoryAfterReverseAction as After, RepositoryBeforeReverseAction as Before,
+        RepositoryBeforeRollbackDecision as Decision, RepositoryBeforeStageCleanup as Cleanup,
+    };
+    let mut points = if shape.data_root_exists() {
+        vec![
+            Before { action: 2 },
+            After { action: 2 },
+            Before { action: 1 },
+            After { action: 1 },
+            Before { action: 0 },
+            After { action: 0 },
+        ]
+    } else {
+        // Data action 2 lives in the unpublished stage and is never reversed.
+        vec![
+            Before { action: 1 },
+            After { action: 1 },
+            Before { action: 0 },
+            After { action: 0 },
+        ]
+    };
+    points.extend([Cleanup, Decision]);
+    points
+}
+
+fn rollback_sequence_through(
+    shape: BarrierRootShape,
+    point: &TransactionFailurePoint,
+) -> Vec<TransactionFailurePoint> {
+    let sequence = complete_rollback_sequence(shape);
+    let end = sequence
+        .iter()
+        .position(|observed| observed == point)
+        .unwrap_or_else(|| panic!("{point:?} is not reachable for {shape:?}"));
+    sequence[..=end].to_vec()
+}
+
+fn json_transaction_residue_exists(worktree: &Path, data: &Path, shape: BarrierRootShape) -> bool {
+    let transactions = if shape.data_root_exists() {
+        data.join("tmp/transactions")
+    } else {
+        worktree.join(".jit-bootstrap/transactions")
+    };
+    std::fs::read_dir(transactions)
+        .ok()
+        .and_then(|mut entries| entries.next())
+        .is_some()
+}
+
+fn converge_rollback_barrier_crash(point: TransactionFailurePoint, shape: BarrierRootShape) {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    seed_json_barrier_fixture(worktree.path(), &data, shape);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+    let interruption =
+        SelectedFailures::one(TransactionFailurePoint::RepositoryBeforeAction { action: 1 });
+    let interrupted = JsonFileStorage::with_repository_state_failures(&data, interruption.clone());
+    let mut session = interrupted.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(barrier_spec()).unwrap();
+    let delta = barrier_delta(&layout, &image, BarrierDeltaKind::Replace);
+    assert!(session.apply(&test_plan(&image, &delta)).is_err());
+    assert!(interruption.is_consumed());
+    drop(session);
+    assert_eq!(
+        std::fs::read(worktree.path().join("first.txt")).unwrap(),
+        b"new-first",
+        "the first live rename must precede rollback recovery"
+    );
+
+    let failure = RecordingSelectedFailure::one(point.clone());
+    let recovering = JsonFileStorage::with_repository_state_failures(&data, failure.clone());
+    assert!(recovering
+        .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+        .is_err());
+    assert!(failure.is_consumed(), "JSON did not reach {point:?}");
+    assert_eq!(
+        rollback_points(failure.observed()),
+        rollback_sequence_through(shape, &point),
+        "JSON rollback order at {point:?} {shape:?}"
+    );
+    assert!(json_transaction_residue_exists(
+        worktree.path(),
+        &data,
+        shape
+    ));
+
+    let mut session = recovering
+        .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+        .unwrap_or_else(|error| panic!("JSON retry failed at {point:?} {shape:?}: {error:#}"));
+    let json_view = barrier_view(&session.capture(barrier_spec()).unwrap());
+    assert_eq!(
+        json_view,
+        expected_barrier_view(shape, BarrierRecoveryDirection::Original)
+    );
+
+    let (_memory_temp, memory_layout, memory) =
+        prepare_memory_barrier_rollback(shape.data_root_exists());
+    let failure = RecordingSelectedFailure::one(point.clone());
+    let recovering = memory.with_repository_state_failure_view(failure.clone());
+    assert!(recovering
+        .open_mutation_session(memory_layout.clone())
+        .is_err());
+    assert!(failure.is_consumed(), "memory did not reach {point:?}");
+    assert_eq!(
+        rollback_points(failure.observed()),
+        rollback_sequence_through(shape, &point),
+        "memory rollback order at {point:?} {shape:?}"
+    );
+    assert!(matches!(
+        memory.repository_state().recovery,
+        Some(MemoryRecoveryResidue::Prepared { .. })
+    ));
+
+    let mut session = recovering.open_mutation_session(memory_layout).unwrap();
+    let memory_view = barrier_view(&session.capture(barrier_spec()).unwrap());
+    assert_eq!(
+        memory_view,
+        expected_barrier_view(shape, BarrierRecoveryDirection::Original)
+    );
+    assert_eq!(json_view, memory_view);
+    assert!(memory.repository_state().recovery.is_none());
+}
+
+#[test]
+fn test_conformance_single_barrier_rollback_crashes_retain_prepared_for_retry() {
+    for point in [
+        TransactionFailurePoint::RepositoryBeforeReverseAction { action: 0 },
+        TransactionFailurePoint::RepositoryAfterReverseAction { action: 0 },
+        TransactionFailurePoint::RepositoryBeforeStageCleanup,
+        TransactionFailurePoint::RepositoryBeforeRollbackDecision,
+    ] {
+        for shape in [BarrierRootShape::Existing, BarrierRootShape::Absent] {
+            converge_rollback_barrier_crash(point.clone(), shape);
+        }
+    }
+}
+
 /// Failure points reached by the shared absent-preimage conformance scenarios.
-/// Backup staging and reverse-action edges have dedicated existing-file/race
-/// tests.
-fn all_repository_failure_points() -> Vec<TransactionFailurePoint> {
+/// The identity-bearing single-barrier cases above supplement this broad base
+/// with backup, delete-rename, and prepared-rollback edges.
+fn absent_preimage_failure_points() -> Vec<TransactionFailurePoint> {
     use TransactionFailurePoint::*;
     vec![
         RepositoryRecoveryExternal,
@@ -2463,7 +2841,7 @@ enum EdgeScenario {
 
 #[test]
 fn test_conformance_failure_edges_converge_on_both_backends() {
-    for point in all_repository_failure_points() {
+    for point in absent_preimage_failure_points() {
         for scenario in [
             EdgeScenario::AbsentInit,
             EdgeScenario::ExistingMixed,

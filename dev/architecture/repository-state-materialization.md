@@ -311,28 +311,46 @@ it is rooted at already-open worktree and data-root directory handles and never
 consults an ambient path after construction. `execute_repository_delta` publishes
 one delta durably.
 
-### Journal and progression
+### Journal, barriers, and decisions
 
 The durable wire format is a `RepositoryTransactionJournal`
 (`storage/transaction_journal.rs`), versioned and owner/layout-digest stamped.
 Each `RepositoryJournalAction` records its path, owner, `ExpectedPreimage`,
-`RepositoryFinalIdentity`, and a `RepositoryActionProgress` that advances
-`Planned → Prepared → BackupReady → Published`. The whole transaction carries a
-`TransactionDecision` of `Prepared`, `Committed`, or `RolledBack`.
+`RepositoryFinalIdentity`, and its staging or backup control names. It carries no
+durable per-action progress state: recovery uses the recorded preimage and final
+identity to determine whether an action is still at its original endpoint, has
+been published, or needs to be restored. The transaction-wide
+`TransactionDecision` records the prepared phase and, after publication or
+reversal, the single terminal `Committed` or `RolledBack` decision.
 
-The kernel builds the journal, writes it durably, then runs three phases:
+The kernel uses one discoverable initial record, one complete `Prepared` record
+before live mutation, and one terminal decision. The initial record is published
+after transaction control exists and before staging, so it makes the transaction
+discoverable with every action's preimage, planned final identity, and control
+names. When an absent data root needs a stage, its identity is recorded before
+payload staging; that root identity is recovery authority, not action progress.
+
+The protocol then proceeds as follows:
 
 - **Prepare** (`prepare_repository_actions`) — stage every action's content and,
   for a replace or delete, copy the live target into a verified rollback backup.
   Staging and backup are routed to the authority colocated with the target's
-  filesystem, so a worktree action never stages or hard-links across a data-root
-  filesystem boundary.
+  filesystem. Each distinct staging or backup directory is synchronized once at
+  the preparation barrier. The journal is then rewritten as one complete
+  `Prepared` record, with the identities of the staged objects, and synchronized
+  before any live mutation begins.
 - **Publish** (`publish_repository_actions`) — re-verify each target against its
   recorded preimage, rebind the held capability to the live root immediately before
-  each irreversible mutation, and rename each staged object into place.
-- **Commit or roll back** — on success, write the `Committed` decision and clean up
-  control; on a non-durable failure, `rollback_repository_actions` restores from the
-  backups and cleans up.
+  each irreversible mutation, and rename each staged object into place. The kernel
+  collects the distinct live parent directories changed by the phase and
+  synchronizes each once before the terminal decision. For an absent data root, it
+  also verifies the staged identities and atomically publishes the root before that
+  decision.
+- **Commit or roll back** — after forward publication and its barriers succeed,
+  write the terminal `Committed` decision. If publication fails, reverse actions
+  from their recorded identities and preimages. Once every restoration is verified,
+  write the terminal `RolledBack` decision; the marker is retained while only
+  transaction-control cleanup remains.
 
 File replacement uses the temp-file-plus-atomic-rename pattern, and new-file
 publication uses verified staging plus atomic no-replace publication
@@ -366,14 +384,22 @@ lands.
 Control lives at `ExternalBootstrap` (worktree `.jit-bootstrap/transactions`,
 used while the data root is absent) or `InternalRepository` (`tmp/transactions`
 under the data root). On session open, `recover_location` lists pending
-transaction ids and dispatches each to `recover_repository_transaction`, which:
+transaction ids and dispatches each to `recover_repository_transaction`. A
+partial control with no durable journal proves that live mutation was never
+reached and is removed. A `Prepared` journal is recovered by comparing each
+target with its recorded final identity and expected preimage, then restoring
+only what identity checks show was published. That reversal is idempotent, so a
+crash during rollback resumes from the same complete `Prepared` record rather
+than needing per-action journal updates.
 
-- removes a partial control that never reached a durable journal;
-- rolls a `Prepared` journal back from its backups and replays a `Committed`
-  journal's cleanup;
-- skips a worktree-side companion (owned by internal recovery and the orphan
-  sweep) and a foreign-owner external journal (another data root's residue under
-  the shared bootstrap namespace).
+After all restorations and the staged-root cleanup are verified, recovery writes
+`RolledBack`. If recovery is interrupted after that terminal marker, the marker
+means that only residue cleanup remains; recovery verifies the restored preimages
+and finishes cleanup without replaying the actions. A `Committed` journal instead
+verifies its final identities and converges forward through cleanup. Recovery also
+skips a worktree-side companion (owned by internal recovery and the orphan sweep)
+and a foreign-owner external journal (another data root's residue under the shared
+bootstrap namespace).
 
 Every durability boundary and action edge is a stable `FailurePoint`
 (`storage/transaction_recovery.rs`), and a `TransactionFailureInjector` lets tests

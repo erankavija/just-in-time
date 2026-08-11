@@ -139,7 +139,12 @@ def decision(measurements):
             key, absolute,
             0 if baseline["median_ms"] == 0 else absolute / baseline["median_ms"],
         ))
-    material = any(absolute >= 5 and ratio >= 0.05 for _, absolute, ratio in savings)
+    material = any(
+        key[0] in ("profile_pack", "profile_add")
+        and absolute >= 5
+        and ratio >= 0.05
+        for key, absolute, ratio in savings
+    )
     return "deduplicate_safe_redundant_directory_syncs" if material else "no_change"
 
 
@@ -169,6 +174,15 @@ synthetic = [
 assert decision(synthetic) == "deduplicate_safe_redundant_directory_syncs"
 synthetic[1].update({"median_ms": 119, "samples_ms": [118, 119, 120]})
 assert decision(synthetic) == "no_change"
+synthetic.extend([
+    {"operation": "profiled_init_publication", "root_shape": "absent_data_root",
+     "variant": "durable_baseline", "median_ms": 200,
+     "samples_ms": [198, 200, 202]},
+    {"operation": "profiled_init_publication", "root_shape": "absent_data_root",
+     "variant": "directory_fsync_suppressed", "median_ms": 100,
+     "samples_ms": [100, 100, 101]},
+])
+assert decision(synthetic) == "no_change", "supplemental init changed the pack/add decision"
 matrix = [
     {"operation": operation, "root_shape": root_shape}
     for operation in ("profile_pack", "profile_add")
@@ -824,6 +838,7 @@ def fsync_decision(rows, probes):
         savings.append({
             "operation": operation,
             "root_shape": root_shape,
+            "decision_eligible": operation in ("profile_pack", "profile_add"),
             "baseline_median_ms": baseline,
             "suppressed_median_ms": suppressed,
             "paired_savings_ms": paired,
@@ -831,7 +846,9 @@ def fsync_decision(rows, probes):
             "saving_percent": int(round(ratio * 100)),
         })
     material = any(
-        row["paired_median_saving_ms"] >= 5 and row["saving_percent"] >= 5
+        row["decision_eligible"]
+        and row["paired_median_saving_ms"] >= 5
+        and row["saving_percent"] >= 5
         for row in savings
     ) and all(probe["directory_fsync_calls"] > 0 for probe in probes)
     return {
@@ -842,8 +859,14 @@ def fsync_decision(rows, probes):
         "criteria": {
             "minimum_paired_median_saving_ms": 5,
             "minimum_paired_median_saving_percent": 5,
-            "required_observation": "both thresholds in at least one operation/root shape",
+            "required_observation": (
+                "both thresholds in at least one profile pack/add operation/root shape"
+            ),
         },
+        "decision_scope": (
+            "profile pack/add across existing and absent data roots; profiled init is "
+            "supplemental attribution evidence and cannot change the decision"
+        ),
         "observations": savings,
         "constraint": (
             "The suppressed variant is an unsafe upper bound, not a candidate implementation. "
@@ -858,10 +881,11 @@ version["sha256"] = hashlib.sha256(jit.read_bytes()).hexdigest()
 source_revision = run(["git", "rev-parse", "HEAD"], repo).stdout.strip()
 dirty = subprocess.run(["git", "diff", "--quiet"], cwd=repo).returncode != 0
 filesystem = run(["stat", "-f", "-c", "%T", str(scratch)], repo).stdout.strip()
+decision_result = fsync_decision(measurements, directory_fsync_probes)
 
 record = {
     "sequence": 0,
-    "record_schema_revision": 2,
+    "record_schema_revision": 3,
     "recorded_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
     "phase": phase,
     "source": {"revision": source_revision, "dirty": dirty},
@@ -919,8 +943,19 @@ record = {
     },
     "measurements": measurements,
     "directory_fsync_probes": directory_fsync_probes,
-    "fsync_residual_decision": fsync_decision(measurements, directory_fsync_probes),
+    "fsync_residual_decision": decision_result,
 }
+if phase == "post-change":
+    record["applied_fsync_decision"] = {
+        "decision": decision_result["decision"],
+        "criteria": decision_result["criteria"],
+        "scope": decision_result["decision_scope"],
+        "outcome": (
+            "no production fsync change warranted by this record"
+            if decision_result["decision"] == "no_change"
+            else "material residual remains; this record asserts no production application"
+        ),
+    }
 
 contract = {
     "schema_version": 1,
