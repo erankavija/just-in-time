@@ -1136,9 +1136,9 @@ impl CommandExecutor<JsonFileStorage> {
         self.resolve_profile_graph_with_applied(selected, applied)
     }
 
-    /// Mutating profile application may retain authenticated embedded
-    /// provenance as ownership evidence without trying to rediscover a package
-    /// that no longer exists. Ordinary graph reads never take this route.
+    /// Mutating profile application may retain embedded provenance as ownership
+    /// evidence without trying to rediscover a package that no longer exists.
+    /// Ordinary graph reads never take this route.
     fn resolve_profile_graph_with_applied(
         &self,
         selected: &[ProfilePackage],

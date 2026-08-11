@@ -1833,8 +1833,9 @@ fn existing_contribution_claims(
 }
 
 /// Preserve adoption intent when the same package record is re-applied or is
-/// replaced after an authenticated v1 conversion. The record remains ownership
-/// provenance only; registry values are still read from the captured image.
+/// replaced by another version of the same package. The record remains
+/// ownership provenance only; registry values are still read from the captured
+/// image.
 fn retained_claim_identities_for_package(
     base: &RepositoryImage,
     package_id: &ProfilePackageId,
