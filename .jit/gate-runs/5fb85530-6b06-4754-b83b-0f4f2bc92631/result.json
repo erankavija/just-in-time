@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c4363a1facc5ffbd860c58c9f64cae05b108412b",
+  "completed_at": "2026-08-11T21:16:00.162183155Z",
+  "duration_ms": 232307,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The single-barrier runtime, schema cutover, in-memory failure mirror, conformance inventory, and prior schema-review remediation satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f5da1112-0411-482b-90ea-b2a548dd087a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5fb85530-6b06-4754-b83b-0f4f2bc92631",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T21:12:07.855072921Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c4363a1f, 35ff28de (merge), 4ff0b076, f8361004, 66d8f3dc (`jit:f5da1112`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/atomic-writes, @/invariant/canonical-cutover, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml, registry-first); @/gate/cargo-ci (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-11T21:04:27Z); code-review failed (exit 1, prior F1 addressed by c4363a1f)\nTruncation recovery: narrowed the 66d8f3dc patch to its complete 718-line file transaction diff; reread current runtime, recovery, mirror, and test ranges; narrowed the broad issue search to epic 4b7c06d0\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The single-barrier runtime, schema cutover, in-memory failure mirror, conformance inventory, and prior schema-review remediation satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
