@@ -209,6 +209,16 @@ impl ProfilePackage {
         self.files.get(source).map(Vec::as_slice)
     }
 
+    /// Every validated file by its package-relative path, in canonical order.
+    ///
+    /// The complete content the package validated, which is what a route
+    /// carrying a package somewhere else has to carry. Individual declared
+    /// sources are reached by name through
+    /// [`source_bytes`](Self::source_bytes).
+    pub(crate) fn files(&self) -> &BTreeMap<String, Vec<u8>> {
+        &self.files
+    }
+
     /// Canonical package and target hashes.
     pub fn hashes(&self) -> &ProfilePackageHashes {
         &self.hashes

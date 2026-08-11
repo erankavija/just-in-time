@@ -3054,6 +3054,64 @@ pub enum ProfileCommands {
         json: bool,
     },
 
+    /// Pack a package directory into one portable archive file
+    ///
+    /// Reads the package directory, validates it, and writes an uncompressed
+    /// tar carrying the package tree beside the package id, version, and
+    /// identity digest. Packing the same package twice produces the same bytes.
+    ///
+    /// The digest lets `jit profile add` detect an archive that was truncated
+    /// or corrupted in transit. It travels inside the archive, so it establishes
+    /// integrity rather than origin.
+    ///
+    /// `--source` is a worktree path. `--output` is any path the invocation can
+    /// write, and an occupied output path is refused.
+    ///
+    /// Examples:
+    ///   jit profile pack --source profiles/my-profile --output my-profile.tar
+    ///   jit profile pack --source profiles/my-profile --output build/my-profile.tar
+    Pack {
+        /// Package directory to pack
+        #[arg(long, value_name = "DIR")]
+        source: std::path::PathBuf,
+
+        /// Archive file to write
+        #[arg(long, value_name = "FILE")]
+        output: std::path::PathBuf,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Place the package an archive carries into the worktree
+    ///
+    /// Reads the archive, recomputes the package identity from the extracted
+    /// content, and refuses the archive when it disagrees with the digest the
+    /// archive carries. An entry naming an absolute path, a parent-directory
+    /// traversal, a link, or a mode the packaged manifest does not declare is
+    /// refused, as is content over the package budget.
+    ///
+    /// `--destination` is a worktree path and must be absent: an add publishes
+    /// a package that arrived from outside, never over one already there. A
+    /// refused add publishes nothing.
+    ///
+    /// Examples:
+    ///   jit profile add --archive my-profile.tar --destination profiles/my-profile
+    Add {
+        /// Archive file to read
+        #[arg(long, value_name = "FILE")]
+        archive: std::path::PathBuf,
+
+        /// Directory the package is published at
+        #[arg(long, value_name = "DIR")]
+        destination: std::path::PathBuf,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Replace an installed profile with a newer package version
     Upgrade {
         /// Select a recorded profile id or worktree package directory
@@ -3177,9 +3235,11 @@ impl ProfileCommands {
             Self::Apply { dry_run, .. }
             | Self::Reconfigure { dry_run, .. }
             | Self::Upgrade { dry_run, .. } => !*dry_run,
-            // Capture publishes a repository transaction, so it dispatches
-            // recovery like every other mutating profile operation.
-            Self::Capture { .. } => true,
+            // Each of these publishes a repository transaction — a captured or
+            // added package tree, or an archive written inside a repository
+            // root — so they dispatch recovery like every other mutating
+            // profile operation.
+            Self::Capture { .. } | Self::Pack { .. } | Self::Add { .. } => true,
             Self::List { .. } | Self::Show { .. } => false,
         }
     }
@@ -3353,6 +3413,8 @@ impl ProfileCommands {
             | Self::Show { .. }
             | Self::Apply { .. }
             | Self::Capture { .. }
+            | Self::Pack { .. }
+            | Self::Add { .. }
             | Self::Reconfigure { .. }
             | Self::Upgrade { .. } => false,
         }
@@ -3689,9 +3751,11 @@ mod recovery_dispatch_tests {
         "label values",
         "list",
         "migrate lifecycle-timestamps",
+        "profile add",
         "profile apply",
         "profile capture",
         "profile list",
+        "profile pack",
         "profile reconfigure",
         "profile show",
         "profile upgrade",

@@ -487,6 +487,14 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::profile::ProfileCaptureResult>()),
                 "ProfileCaptureResult",
             ),
+            "profile_pack" => (
+                Some(schema_to_value::<crate::profile::ProfilePackResult>()),
+                "ProfilePackResult",
+            ),
+            "profile_add" => (
+                Some(schema_to_value::<crate::profile::ProfileAddResult>()),
+                "ProfileAddResult",
+            ),
             // Every profile lifecycle command publishes through one aggregate
             // transaction and rehearses through one planner, so they answer in
             // the same two shapes.

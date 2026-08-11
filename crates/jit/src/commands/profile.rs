@@ -1,24 +1,25 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
-    build_profile_claims_from_resolved, capture_package_tree, resolve_package,
-    resolve_package_from_record, EngineVersion, ProfileApplicationStatus, ProfileApplyResult,
+    build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
+    read_package_archive, resolve_package, resolve_package_from_record, CapturedPackageTree,
+    EngineVersion, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
     ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
-    ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackage,
-    ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
+    ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackResult,
+    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
     ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
     ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, RecordedValueAuthority,
     ResolvedProfileContent, ResolvedProfileGraph, ResolvedVariables, SelectionObservation,
-    VariableInputs,
+    VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
     finalize_package_tree_capture, AppliedProfileRecord, CaptureBudget, CaptureSpec,
     CapturedTreeFile, FileMode, MaterializationPlan, MaterializationRequest, MutationContext,
     PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim,
-    ProfileTargetDisposition, RepositoryEntry, RepositoryExportDestination, RepositoryImage,
-    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RootRelativePath,
-    TreeFileDisposition, VirtualPath,
+    ProfileTargetDisposition, RepositoryEntry, RepositoryExportDestination,
+    RepositoryExportIntent, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
+    RepositoryRootClass, RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -386,6 +387,23 @@ pub enum ProfileApplyError {
         /// Resolved package directory the bytes were read from.
         path: String,
     },
+    /// An archived package's destination already holds something.
+    #[error("profile package destination '{path}' already exists")]
+    PackageDestinationOccupied {
+        /// Repository-relative destination the add would have published at.
+        path: String,
+    },
+}
+
+/// Whether a package-tree publication may publish over what its destination
+/// already holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TreePlacement {
+    /// Republish the destination as a whole, removing what the tree stopped
+    /// declaring.
+    Republish,
+    /// Publish only into an absent destination.
+    RequireAbsent,
 }
 
 /// Read-only command options for the package's non-secret input channels.
@@ -612,10 +630,156 @@ impl CommandExecutor<JsonFileStorage> {
         let source = worktree_directory(&layout, invocation_dir, package_source)?;
         let destination = worktree_directory(&layout, invocation_dir, destination)?;
         let captured = capture_package_tree(&source, &layout)?;
+        let (status, outcomes) =
+            self.publish_package_tree(&layout, &destination, &captured, TreePlacement::Republish)?;
+        let files = outcomes
+            .iter()
+            .map(|outcome| ProfileCaptureFile {
+                path: outcome.path.repository_relative(),
+                action: match outcome.disposition {
+                    TreeFileDisposition::Unchanged => ProfileCaptureAction::Unchanged,
+                    TreeFileDisposition::Create => ProfileCaptureAction::Create,
+                    TreeFileDisposition::Update => ProfileCaptureAction::Update,
+                    TreeFileDisposition::Remove => ProfileCaptureAction::Remove,
+                },
+                executable: outcome.mode == FileMode::Executable,
+            })
+            .collect::<Vec<_>>();
+        Ok(ProfileCaptureResult {
+            count: files.len(),
+            id: captured.model().id.to_string(),
+            version: captured.model().version.clone(),
+            package_hash: captured.hashes().package.clone(),
+            source: source.repository_relative(),
+            destination: destination.repository_relative(),
+            file_count: captured.file_count(),
+            byte_size: captured.byte_size(),
+            status,
+            files,
+        })
+    }
+
+    /// Pack the package at `package_source` into one portable archive at
+    /// `output`.
+    ///
+    /// The package directory is a worktree path resolved the way every other
+    /// path argument is, and the read is the same one every route into a
+    /// package takes, so a symbolic link, an entry of another kind, or content
+    /// the manifest does not declare is refused before an archive exists. The
+    /// archive is written from those validated bytes alone: no resolved value,
+    /// no applied record, and nothing outside the package directory reaches it.
+    ///
+    /// The output path is the caller's, and it is published no-replace through
+    /// the same classification `jit snapshot export` uses — into the repository
+    /// through one recoverable transaction when it lands inside a repository
+    /// root, and through the shared external publisher when it does not. An
+    /// occupied output path is refused either way.
+    ///
+    /// The archive carries the package's identity digest so an add can verify
+    /// it. That is integrity: it detects a truncated or corrupted archive, and
+    /// says nothing about who produced one.
+    ///
+    /// # Errors
+    ///
+    /// A package directory that is not worktree content or does not read as a
+    /// package; an archive that cannot be built; and an occupied or
+    /// unpublishable output path.
+    pub fn pack_profile_package(
+        &self,
+        invocation_dir: &Path,
+        package_source: &Path,
+        output: &Path,
+    ) -> Result<(ProfilePackResult, Vec<String>)> {
+        let layout = self.require_layout()?;
+        let source = worktree_directory(&layout, invocation_dir, package_source)?;
+        let package =
+            ProfilePackage::from_directory(&layout.worktree_root().join(source.relative().as_path()))
+                .map_err(|source_error| ProfileResolutionError::UnreadableLocation {
+                    location: package_source.display().to_string(),
+                    source: source_error,
+                })?;
+        let archive = pack_package_archive(&package)?;
+        let archive_bytes = archive.len() as u64;
+        let warnings = self.publish_package_archive(&layout, invocation_dir, output, archive)?;
+        Ok((
+            ProfilePackResult {
+                id: package.model().id.to_string(),
+                version: package.model().version.clone(),
+                package_hash: package.hashes().package.clone(),
+                source: source.repository_relative(),
+                archive: output.display().to_string(),
+                file_count: package.file_count(),
+                byte_size: package.byte_size(),
+                archive_bytes,
+            },
+            warnings,
+        ))
+    }
+
+    /// Place the package one archive carries at `destination`.
+    ///
+    /// The archive is read as hostile input: its bytes are bounded before they
+    /// are held, every entry is validated as a safe relative path of an
+    /// admissible kind, the extracted content is validated as a package, and
+    /// its identity is recomputed and held against the digest the archive
+    /// carries. Nothing is written until all of that has passed, so a refused
+    /// or interrupted add leaves no partially extracted package behind.
+    ///
+    /// The destination is a worktree path, exactly as a capture's destination
+    /// is, and it must be absent: an add publishes a package that arrived from
+    /// outside, never over one already there.
+    ///
+    /// # Errors
+    ///
+    /// Every [`PackageArchiveError`] the read reports; an archive that cannot
+    /// be read or is larger than a package archive may be; a destination that
+    /// is not worktree content or is occupied; and the publication failures of
+    /// the shared mutation session.
+    pub fn add_profile_package(
+        &self,
+        invocation_dir: &Path,
+        archive: &Path,
+        destination: &Path,
+    ) -> Result<ProfileAddResult> {
+        let layout = self.require_layout()?;
+        let destination = worktree_directory(&layout, invocation_dir, destination)?;
+        let tree = read_package_archive(&read_archive_bytes(invocation_dir, archive)?)?;
+        self.publish_package_tree(&layout, &destination, &tree, TreePlacement::RequireAbsent)?;
+        Ok(ProfileAddResult {
+            id: tree.model().id.to_string(),
+            version: tree.model().version.clone(),
+            package_hash: tree.hashes().package.clone(),
+            archive: archive.display().to_string(),
+            destination: destination.repository_relative(),
+            file_count: tree.file_count(),
+            byte_size: tree.byte_size(),
+        })
+    }
+
+    /// Publish one validated package tree at `destination`.
+    ///
+    /// Both routes that place a package tree in the worktree — capturing one
+    /// from the repository files a manifest declares, and adding one from a
+    /// portable archive — publish through this one recoverable transaction, so
+    /// a package tree reaches a repository along exactly one path
+    /// (`@/inv/convention-convergence`).
+    ///
+    /// `placement` is the whole difference between them, and it is enforced
+    /// against the same captured image the plan is derived from rather than by
+    /// a separate look at the filesystem. A required-absent destination that is
+    /// occupied is refused here; one that becomes occupied afterwards is
+    /// refused by the transaction, because the plan creates it with an absent
+    /// preimage.
+    fn publish_package_tree(
+        &self,
+        layout: &RepositoryLayout,
+        destination: &VirtualPath,
+        tree: &CapturedPackageTree,
+        placement: TreePlacement,
+    ) -> Result<(ProfileApplicationStatus, Vec<TreeFileOutcome>)> {
         let capture = PackageTreeCapture::new(
             destination.clone(),
-            captured
-                .files()
+            tree.files()
                 .iter()
                 .map(|(relative, file)| {
                     Ok(CapturedTreeFile {
@@ -638,15 +802,15 @@ impl CommandExecutor<JsonFileStorage> {
             max_depth: 32,
         };
 
-        with_mutation_session(self.storage(), &layout, "profile capture", |session| {
+        with_mutation_session(self.storage(), layout, "profile package tree", |session| {
             // The destination's whole subtree must be read before the delta is
-            // derived, because a file it holds that the manifest no longer
-            // declares is one this publication removes. A listing names its
-            // children and an entry says which of them are directories, so the
-            // declaration is expanded against each freshly captured image until
-            // it stops growing; the session revalidates every path it settles
-            // on, so a file appearing beneath the destination meanwhile is a
-            // retryable conflict rather than content that survives.
+            // derived, because a file it holds that the tree no longer declares
+            // is one a republication removes. A listing names its children and
+            // an entry says which of them are directories, so the declaration is
+            // expanded against each freshly captured image until it stops
+            // growing; the session revalidates every path it settles on, so a
+            // file appearing beneath the destination meanwhile is a retryable
+            // conflict rather than content that survives.
             let mut spec = capture.capture_spec(budget)?;
             let image = loop {
                 let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
@@ -656,6 +820,14 @@ impl CommandExecutor<JsonFileStorage> {
                     break image;
                 }
             };
+            if placement == TreePlacement::RequireAbsent
+                && !matches!(image.entry(destination)?, RepositoryEntry::Absent)
+            {
+                return Err(ProfileApplyError::PackageDestinationOccupied {
+                    path: destination.repository_relative(),
+                }
+                .into());
+            }
 
             let (plan, outcomes) = finalize_package_tree_capture(&image, &capture)?;
             let status = if plan.delta().actions().is_empty() {
@@ -663,33 +835,58 @@ impl CommandExecutor<JsonFileStorage> {
             } else {
                 ProfileApplicationStatus::Applied
             };
-            let files = outcomes
-                .iter()
-                .map(|outcome| ProfileCaptureFile {
-                    path: outcome.path.repository_relative(),
-                    action: match outcome.disposition {
-                        TreeFileDisposition::Unchanged => ProfileCaptureAction::Unchanged,
-                        TreeFileDisposition::Create => ProfileCaptureAction::Create,
-                        TreeFileDisposition::Update => ProfileCaptureAction::Update,
-                        TreeFileDisposition::Remove => ProfileCaptureAction::Remove,
-                    },
-                    executable: outcome.mode == FileMode::Executable,
-                })
-                .collect::<Vec<_>>();
-            let result = ProfileCaptureResult {
-                count: files.len(),
-                id: captured.model().id.to_string(),
-                version: captured.model().version.clone(),
-                package_hash: captured.hashes().package.clone(),
-                source: source.repository_relative(),
-                destination: destination.repository_relative(),
-                file_count: captured.file_count(),
-                byte_size: captured.byte_size(),
-                status,
-                files,
-            };
-            Ok(SessionStep::Apply(plan, result))
+            Ok(SessionStep::Apply(plan, (status, outcomes)))
         })
+    }
+
+    /// Publish one built archive at the output path the caller named.
+    ///
+    /// The destination is classified exactly as a snapshot export's is, so an
+    /// archive written inside a repository root goes through the repository
+    /// transaction and one written outside goes through the shared external
+    /// publisher. Both refuse an occupied path.
+    fn publish_package_archive(
+        &self,
+        layout: &RepositoryLayout,
+        invocation_dir: &Path,
+        output: &Path,
+        archive: Vec<u8>,
+    ) -> Result<Vec<String>> {
+        match classify_repository_export(layout, invocation_dir, output)? {
+            RepositoryExportDestination::Repository(target) => {
+                let intent = RepositoryExportIntent::new_absent_file(target, archive);
+                // The archive is one file, so the export reads only its target,
+                // that target's parent, and the parent's listing.
+                let budget = CaptureBudget {
+                    max_paths: 4096,
+                    max_listings: 1,
+                    max_bytes: crate::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
+                    max_depth: 128,
+                };
+                super::map_occupied_export_error(
+                    self.publish_repository_export(layout, &intent, budget),
+                    output,
+                )?;
+                Ok(Vec::new())
+            }
+            RepositoryExportDestination::External(path) => {
+                // Staging is not publication: the archive lands in a temporary
+                // file outside both repository roots so the shared no-replace
+                // publisher can rename it into place, and nothing at the output
+                // path is touched until that publisher commits.
+                use std::io::Write as _;
+                let mut staged = tempfile::NamedTempFile::new()?;
+                staged.write_all(&archive)?;
+                staged.as_file().sync_all()?;
+                Ok(
+                    crate::storage::external_publish::publish_external_file_noreplace(
+                        &path,
+                        staged.path(),
+                    )?
+                    .warnings,
+                )
+            }
+        }
     }
 
     /// Inspect every selected profile package in selector occurrence order.
@@ -2186,6 +2383,44 @@ fn worktree_directory(
             Err(outside().into())
         }
     }
+}
+
+/// Read one archive the caller named, bounded before its bytes are held.
+///
+/// The archive is external input an adopter obtained over a channel they chose,
+/// so the path is the caller's to name and is resolved against the invocation
+/// directory like any other path argument; the worktree boundary that governs
+/// where a package may be *published* says nothing about where an archive may
+/// be read from. Nothing else is opened: no directory is searched for it, and
+/// no other location is consulted when it is absent.
+///
+/// The read stops one byte past what a package archive may occupy, so an
+/// enormous file is refused rather than held.
+fn read_archive_bytes(invocation_dir: &Path, archive: &Path) -> Result<Vec<u8>> {
+    use std::io::Read as _;
+
+    let path = if archive.is_absolute() {
+        archive.to_path_buf()
+    } else {
+        invocation_dir.join(archive)
+    };
+    let mut bytes = Vec::new();
+    fs::File::open(&path)
+        .map_err(|source| {
+            anyhow::anyhow!(
+                "cannot read profile package archive '{}': {source}",
+                archive.display()
+            )
+        })?
+        .take(MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > MAX_PROFILE_PACKAGE_ARCHIVE_BYTES {
+        anyhow::bail!(
+            "profile package archive '{}' is larger than {MAX_PROFILE_PACKAGE_ARCHIVE_BYTES} bytes",
+            archive.display()
+        );
+    }
+    Ok(bytes)
 }
 
 pub(super) fn package_origin(

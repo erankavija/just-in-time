@@ -30,6 +30,9 @@ pub mod schema;
 pub mod search;
 pub mod snapshot;
 pub mod storage;
+// Reproducible tar headers, shared by the two archive writers and named by
+// neither's vocabulary; nothing outside this crate writes a tar.
+pub(crate) mod tar_format;
 pub mod templates;
 pub mod test_taxonomy;
 pub mod test_utils;

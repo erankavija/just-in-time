@@ -410,7 +410,7 @@ pub enum ProfileCaptureAction {
     Remove,
 }
 
-/// One path a capture published or removed.
+/// One path a package-tree publication decided about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileCaptureFile {
     /// Repository-relative path in the published tree.
@@ -448,4 +448,51 @@ pub struct ProfileCaptureResult {
     pub status: ProfileApplicationStatus,
     /// Every path the capture decided about, in canonical path order.
     pub files: Vec<ProfileCaptureFile>,
+}
+
+/// Response of packing one package into a portable archive.
+///
+/// The identity fields are the package's own, read from the directory that was
+/// packed; the archive carries the same three, which is what an add holds the
+/// arriving content against.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfilePackResult {
+    /// Stable identifier the packed manifest declares.
+    pub id: String,
+    /// Semantic version the packed manifest declares.
+    pub version: String,
+    /// Identity digest of the packed package.
+    pub package_hash: String,
+    /// Repository-relative package directory that was packed.
+    pub source: String,
+    /// Path the archive was written to, as the invocation named it.
+    pub archive: String,
+    /// Packed package file count, including `manifest.toml`.
+    pub file_count: usize,
+    /// Total packed package byte size.
+    pub byte_size: usize,
+    /// Size of the written archive.
+    pub archive_bytes: u64,
+}
+
+/// Response of adding one archived package to the worktree.
+///
+/// The identity fields are recomputed from the extracted content rather than
+/// read from the archive, so they describe the package that was published.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileAddResult {
+    /// Stable identifier the added manifest declares.
+    pub id: String,
+    /// Semantic version the added manifest declares.
+    pub version: String,
+    /// Identity digest recomputed from the added content.
+    pub package_hash: String,
+    /// Path the archive was read from, as the invocation named it.
+    pub archive: String,
+    /// Repository-relative directory the package was published at.
+    pub destination: String,
+    /// Added package file count, including `manifest.toml`.
+    pub file_count: usize,
+    /// Total added package byte size.
+    pub byte_size: usize,
 }

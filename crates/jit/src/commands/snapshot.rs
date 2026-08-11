@@ -630,8 +630,9 @@ fn build_snapshot_tar(
     tree: &SnapshotTree,
     output: &Path,
 ) -> Result<tempfile::NamedTempFile> {
+    use crate::tar_format::reproducible_tar_header;
     use std::io::Write as _;
-    use tar::{Builder, EntryType, Header};
+    use tar::{Builder, EntryType};
 
     let mut staged = tempfile::NamedTempFile::new()?;
     let base = output
@@ -642,14 +643,7 @@ fn build_snapshot_tar(
         let mut archive = Builder::new(staged.as_file_mut());
         let append_directory =
             |archive: &mut Builder<&mut std::fs::File>, path: &Path| -> Result<()> {
-                let mut header = Header::new_gnu();
-                header.set_entry_type(EntryType::Directory);
-                header.set_mode(0o755);
-                header.set_uid(0);
-                header.set_gid(0);
-                header.set_mtime(0);
-                header.set_size(0);
-                header.set_cksum();
+                let mut header = reproducible_tar_header(EntryType::Directory, 0o755, 0);
                 archive.append_data(&mut header, path, std::io::empty())?;
                 Ok(())
             };
@@ -659,14 +653,8 @@ fn build_snapshot_tar(
         }
         for relative in &tree.files {
             let mut input = std::fs::File::open(root.join(relative))?;
-            let mut header = Header::new_gnu();
-            header.set_entry_type(EntryType::Regular);
-            header.set_mode(0o644);
-            header.set_uid(0);
-            header.set_gid(0);
-            header.set_mtime(0);
-            header.set_size(input.metadata()?.len());
-            header.set_cksum();
+            let mut header =
+                reproducible_tar_header(EntryType::Regular, 0o644, input.metadata()?.len());
             archive.append_data(&mut header, Path::new(base).join(relative), &mut input)?;
         }
         archive.finish()?;
@@ -720,7 +708,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         ensure_repository_snapshot_size(tree.payload_bytes(staging.path())?)?;
                         let (directories, files) = tree.repository_payload(staging.path())?;
                         let intent = RepositoryExportIntent::new_tree(target, directories, files);
-                        map_snapshot_publication_error(
+                        super::map_occupied_export_error(
                             self.publish_repository_export(&layout, &intent, budget),
                             &output_path,
                         )?;
@@ -746,7 +734,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
                         ensure_repository_snapshot_size(size)?;
                         let bytes = std::fs::read(tar.path())?;
                         let intent = RepositoryExportIntent::new_absent_file(target, bytes);
-                        map_snapshot_publication_error(
+                        super::map_occupied_export_error(
                             self.publish_repository_export(&layout, &intent, budget),
                             &output_path,
                         )?;
@@ -778,24 +766,6 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
             },
             warnings,
         ))
-    }
-}
-
-fn map_snapshot_publication_error(result: Result<()>, output: &Path) -> Result<()> {
-    match result {
-        Err(error)
-            if matches!(
-                error.downcast_ref::<crate::repository_state::RepositoryExportError>(),
-                Some(crate::repository_state::RepositoryExportError::OccupiedTarget(_))
-            ) =>
-        {
-            Err(crate::errors::AlreadyExistsError::new(format!(
-                "Output path already exists: {}",
-                output.display()
-            ))
-            .into())
-        }
-        other => other,
     }
 }
 

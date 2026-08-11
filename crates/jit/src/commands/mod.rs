@@ -207,6 +207,32 @@ pub fn capture_or_retry(
     }
 }
 
+/// Report an occupied repository export target as the caller-facing
+/// already-exists failure naming the output path the invocation asked for.
+///
+/// The typed export error names the canonical repository path it refused; an
+/// adopter asked for the path they typed. Every command publishing a file at a
+/// caller-chosen output path reports that refusal in the same words, so the
+/// translation lives here rather than once per command
+/// (`@/inv/convention-convergence`).
+pub(crate) fn map_occupied_export_error(result: Result<()>, output: &std::path::Path) -> Result<()> {
+    match result {
+        Err(error)
+            if matches!(
+                error.downcast_ref::<crate::repository_state::RepositoryExportError>(),
+                Some(crate::repository_state::RepositoryExportError::OccupiedTarget(_))
+            ) =>
+        {
+            Err(crate::errors::AlreadyExistsError::new(format!(
+                "Output path already exists: {}",
+                output.display()
+            ))
+            .into())
+        }
+        other => other,
+    }
+}
+
 /// Drive `attempt` up to [`MUTATION_SESSION_RETRY_LIMIT`] times, owning the
 /// retry bound and the terminal [`MutationSessionExhausted`] error.
 ///
