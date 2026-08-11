@@ -1,79 +1,84 @@
 {
   "epic_id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
   "epic_short_id": "4b7c06d0",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
+      "status": "complete",
       "issues": [
-        {"id": "3db5b63d", "short_id": "3db5b63d", "title": "Pin and configure the nextest foundation", "classification": "implementation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
-        {"id": "5b60d40e", "short_id": "5b60d40e", "title": "Add the injectable suite duration checker", "classification": "implementation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
-        {"id": "f5da1112", "short_id": "f5da1112", "title": "Cut over the single-barrier journal runtime", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+        {"short_id": "3db5b63d", "title": "Pin and configure the nextest foundation", "classification": "implementation", "worker": "codex-luna", "status": "done"},
+        {"short_id": "5b60d40e", "title": "Add the injectable suite duration checker", "classification": "implementation", "worker": "codex-luna", "status": "done"},
+        {"short_id": "f5da1112", "title": "Cut over the single-barrier journal runtime", "classification": "implementation", "worker": "opus subagent; rework by codex-luna", "status": "done"}
       ]
     },
     {
       "wave_number": 2,
       "issues": [
-        {"id": "3db5b63d-dep-47836e2e", "short_id": "47836e2e", "title": "Share the stale-binary build fixture across processes", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
-        {"id": "ee809651", "short_id": "ee809651", "title": "Document pinned nextest installation and use", "classification": "documentation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
-        {"id": "007f598b", "short_id": "007f598b", "title": "Cut over journal durability documentation", "classification": "documentation", "difficulty": "easy", "worker": "codex-luna", "status": "pending"},
-        {"id": "0369e563", "short_id": "0369e563", "title": "Measure transaction model-limit round trips", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
-        {"id": "340be714", "short_id": "340be714", "title": "Add journal barrier crash coverage", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+        {"short_id": "47836e2e", "title": "Share the stale-binary build fixture across processes", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"short_id": "340be714", "title": "Add journal barrier crash coverage", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"short_id": "0369e563", "title": "Measure transaction model-limit round trips", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"short_id": "ee809651", "title": "Document pinned nextest installation and use", "classification": "documentation", "difficulty": "easy", "worker": "codex-direct", "status": "pending", "spec": "scratchpad spec-ee809651.md (written, commit instruction already removed)"},
+        {"short_id": "007f598b", "title": "Cut over journal durability documentation", "classification": "documentation", "difficulty": "easy", "worker": "codex-direct", "status": "pending", "spec": "scratchpad spec-007f598b.md (written, commit instruction already removed)"}
       ]
     },
     {
       "wave_number": 3,
       "issues": [
-        {"id": "69e9f213", "short_id": "69e9f213", "title": "Swap the cargo-ci suite runner", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
-        {"id": "efebd963", "short_id": "efebd963", "title": "Apply the benchmark-driven fsync decision", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+        {"short_id": "69e9f213", "title": "Swap the cargo-ci suite runner", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"short_id": "efebd963", "title": "Apply the benchmark-driven fsync decision", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
       ]
     },
     {
       "wave_number": 4,
       "issues": [
-        {"id": "21ba4bb4", "short_id": "21ba4bb4", "title": "Produce warm per-test suite timing evidence", "classification": "implementation", "difficulty": "moderate", "worker": "opus", "status": "pending"},
-        {"id": "2516ad90", "short_id": "2516ad90", "title": "Add step timing and the named suite clock", "classification": "implementation", "difficulty": "moderate", "worker": "codex-luna", "status": "pending"}
+        {"short_id": "21ba4bb4", "title": "Produce warm per-test suite timing evidence", "classification": "implementation", "difficulty": "moderate", "worker": "opus", "status": "pending"},
+        {"short_id": "2516ad90", "title": "Add step timing and the named suite clock", "classification": "implementation", "difficulty": "moderate", "worker": "codex-direct", "status": "pending"}
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"id": "94d85bf1", "short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"id": "25faa21d", "short_id": "25faa21d", "title": "Tighten the committed nextest policy to the final bounds", "classification": "implementation", "difficulty": "moderate", "worker": "codex-luna", "status": "pending"}
+        {"short_id": "25faa21d", "title": "Tighten the committed nextest policy to the final bounds", "classification": "implementation", "difficulty": "moderate", "worker": "codex-direct", "status": "pending"}
       ]
     },
     {
       "wave_number": 7,
       "issues": [
-        {"id": "76ecc11f", "short_id": "76ecc11f", "title": "Attribute inherent test costs", "classification": "documentation", "difficulty": "moderate", "worker": "opus", "status": "pending"}
+        {"short_id": "76ecc11f", "title": "Attribute inherent test costs", "classification": "documentation", "difficulty": "moderate", "worker": "opus", "status": "pending"}
       ]
     }
   ],
   "traps": [
     "`cargo nextest show-config default-config` does not exist in cargo-nextest 0.9.133; the only `show-config` subcommands are `version` and `test-groups`. To verify one of nextest's own defaults for the pinned version, grep the installed binary — `strings -n 6 $(which cargo-nextest) | grep leak-timeout` prints the embedded default-config values (confirmed `leak-timeout = \"200ms\"`). Do not take a default value on trust from documentation for another version.",
-    "`scripts/cargo-ci.sh` runs `incremental-preflight` (scripts/cargo-ci.sh:305) BEFORE paying for any compilation, and it fails when a non-empty `incremental` directory exists anywhere under the worktree's `target/`. cargo-ci sets `CARGO_INCREMENTAL=0` for its own steps, but any ad-hoc `cargo build`/`cargo test`/`cargo clippy` run in the worktree beforehand leaves `target/debug/incremental` behind and the gate then fails for that reason alone, with nothing wrong in the change. Remedy before every gate run in a worktree: `rm -rf target/debug/incremental`, or export `CARGO_INCREMENTAL=0` for any ad-hoc cargo invocation.",
-    "`scripts/cargo-ci.sh` takes a MACHINE-GLOBAL flock at `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock` and holds it for the whole run (scripts/cargo-ci.sh:64-68), waiting up to `CARGO_CI_LOCK_TIMEOUT` (default 1800s) and exiting 75 on timeout. Gate runs across different worktrees therefore SERIALIZE: parallel waves parallelise authoring only, never gates. Do not launch more concurrent gate runs than can finish inside 1800s, or the queued ones fail on lock timeout rather than on their own content. The cheap pattern is to gate once on merged `main`, where `target/` is warm, and let `jit gate evaluate` reuse that verdict for every issue sharing the same content.",
-    "Two gate runs redirecting to the same log path clobber each other's evidence. Give every gate run its own log file name.",
+    "`scripts/cargo-ci.sh` runs `incremental-preflight` (scripts/cargo-ci.sh:305) BEFORE paying for any compilation, and it fails when a non-empty `incremental` directory exists anywhere under the worktree's `target/`. cargo-ci sets `CARGO_INCREMENTAL=0` for its own steps, but any ad-hoc `cargo build`/`cargo test`/`cargo clippy`/`cargo nextest` run beforehand leaves `target/debug/incremental` behind and the gate then fails for that reason alone, with nothing wrong in the change. Remedy before every gate run: `rm -rf target/debug/incremental`, or pass `CARGO_INCREMENTAL=0` to every ad-hoc cargo invocation.",
+    "`scripts/cargo-ci.sh` takes a MACHINE-GLOBAL flock at `${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock` and holds it for the whole run (scripts/cargo-ci.sh:64-68), waiting up to `CARGO_CI_LOCK_TIMEOUT` (default 1800s) and exiting 75 on timeout. Gate runs across different worktrees therefore SERIALIZE: parallel waves parallelise authoring only, never gates. Do not launch more concurrent gate runs than can finish inside 1800s, or queued ones fail on lock timeout rather than on their own content. Cheapest correct pattern: gate once on merged `main`, where `target/` is warm, and let `jit gate evaluate` reuse that verdict for every issue sharing the same content.",
     "The stale-binary guard blocks EVERY `jit gate evaluate` once HEAD moves ahead of the installed binary's build commit: exit 10, 'this jit binary predates the tree under review'. Any commit touching `crates/jit/**` triggers it, so it recurs throughout this epic. Remedy: `./scripts/install-jit.sh` (never a bare `cargo install`, which loses the provenance the guard reads), then confirm with `jit --version` that the reported commit matches HEAD. Reinstall AFTER the last commit of a merge batch and BEFORE evaluating gates, or the reinstall is itself immediately stale.",
-    "A backgrounded gate run SURVIVES stopping the agent that launched it, keeps the global cargo-ci flock, and blocks later runs while writing to its original log path. After stopping any agent, check for orphans holding the lock (`fuser -v /tmp/cargo-ci.lock`, then `readlink /proc/<pid>/cwd`) before launching a replacement."
+    "Two gate runs redirecting to the same log path clobber each other's evidence, and the surviving file looks like one coherent run. Give every gate run its own log file name.",
+    "A backgrounded gate run SURVIVES stopping the agent that launched it, keeps the global cargo-ci flock, and blocks later runs while still writing to its original log path. After stopping any agent, check for orphans holding the lock (`fuser -v /tmp/cargo-ci.lock`, then `readlink /proc/<pid>/cwd`) before launching a replacement.",
+    "A new issue created mid-epic with no dependency edges makes whole-repo `jit validate` exit 4 ('isolated issue not connected to the dependency graph'), which fails the epic's own `repo-validate` gate. Wire every issue created during execution into the DAG when you create it.",
+    "A raw-JSON journal fixture asserting only `.is_err()` can pass for the wrong reason: a fixture with a placeholder `layout_digest` is refused by the layout check before any version or field check runs, so it proves nothing about the boundary under test. Build the fixture from a real interrupted transaction and mutate only the field whose boundary you are testing, then prove the test fails when that boundary is reverted."
   ],
   "created_during_execution": [
     {
       "short_id": "b1f2f001",
       "type": "bug",
       "title": "Stop pinning the live dogfood package identity hash to a literal",
-      "why": "`main` was already red at epic start, independent of this epic: `test_shipped_package_decodes_without_edits_and_preserves_identity_hash` pinned the LIVE dogfood profile package's identity hash to a literal, and the dogfood profile packages this repository's own config (including contrib/gates prompts) as assets, so an earlier prompt edit moved the hash. Every cargo-ci gate in all seven waves would have failed on it. The invoker judged the test wrong and the commit right. Fixed on main as d2c8693b by keeping the independent recomputation of the released v1 identity algorithm and dropping the literal; synthetic-fixture literals kept.",
-      "state_at_record": "in_progress"
+      "state": "done",
+      "why": "`main` was already red at epic start, independent of this epic: `test_shipped_package_decodes_without_edits_and_preserves_identity_hash` pinned the LIVE dogfood profile package's identity hash to a literal, and that profile packages this repository's own config (including contrib/gates prompts) as assets, so an earlier prompt edit moved the hash. Every cargo-ci gate in all seven waves would have failed on it. The invoker judged the test wrong and the commit right. Fixed on main as d2c8693b by keeping the independent recomputation of the released v1 identity algorithm and dropping the literal; synthetic-fixture literals kept. Wired as a dependency of the epic so whole-repo validation passes."
     }
   ],
   "delegation_model": "Hard tasks go to an Opus subagent via the Agent tool. Easier tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high` invoked DIRECTLY by the lead in the background; the lead then reviews the diff, runs the gate, and commits. Do not wrap a codex invocation in an intermediate Claude driver subagent — it adds no verification the lead does not already owe and costs a full agent's context.",
+  "gate_cost_model": "Measured this session on this host: a cold worktree cargo-ci run is 10+ minutes; a warm run on main is ~3-5 minutes; each `code-review` run is 3-5 minutes and is per-issue (no reuse). cargo-ci verdicts DO reuse across issues over identical content, so merge a whole wave, then evaluate cargo-ci per issue for one execution plus reuses. Worker cargo-ci runs in fresh worktrees are the single largest avoidable cost: from wave 2 on, have workers verify with focused tests plus fmt and clippy only, and let the lead's post-merge gate on warm main be the authoritative run.",
   "escalations": [],
-  "rework_counts": {},
+  "rework_counts": {"f5da1112": 1},
   "surfaced_pitfalls": [],
-  "started_at": "2026-08-11T19:10:00Z"
+  "started_at": "2026-08-11T19:10:00Z",
+  "wave_1_completed_at": "2026-08-11T21:20:00Z"
 }
