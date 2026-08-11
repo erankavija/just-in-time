@@ -4,7 +4,15 @@
   "created_at": "2026-08-11T16:32:02.508095795Z",
   "dependencies": [],
   "description": "Plan The workspace test suite runs in under 30 seconds (4b7c06d0) against every hard success criterion, write the concise design at dev/active/4b7c06d0-test-suite-performance/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/4b7c06d0-test-suite-performance/investigation.md"
+    }
+  ],
   "first_ready_at": "2026-08-11T16:32:02.508095795Z",
   "gates_required": [
     "plan-review"
@@ -27,5 +35,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T16:32:02.508095795Z"
+  "updated_at": "2026-08-11T16:48:53.863486806Z"
 }
