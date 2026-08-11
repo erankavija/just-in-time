@@ -405,8 +405,7 @@ cargo test --doc --workspace
 ```
 
 The committed nextest policy is documented in
-[`.config/nextest.toml`](../.config/nextest.toml). The `cargo-ci` gate still runs
-`cargo test --workspace`; the CI runner cutover to nextest is a separate follow-up.
+[`.config/nextest.toml`](../.config/nextest.toml).
 
 Lint and format alongside tests. Both must be clean before a commit:
 
