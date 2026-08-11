@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "6f75d74237fe2aea33ca395d6077a4f9478c842f",
+  "completed_at": "2026-08-11T22:39:30.691968059Z",
+  "duration_ms": 646420,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "039344d19d1c8433198b21df297ad286c60d8ac1ecdfa3d4e6c643d6a5a766aa",
+  "issue_id": "4aa15137-5525-4d44-90dd-7ff394a53360",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4b75ba0b-b060-4af8-85a8-3ce36493d1c1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T22:28:44.271287876Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest stale_binary_child_process_tests::test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest ... FAILED\ntest result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 120.25s\n---- stale_binary_child_process_tests::test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest stdout ----\n\nthread 'stale_binary_child_process_tests::test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest' (3305270) panicked at crates/jit/tests/scratch_build/stale_binary_child_process_tests.rs:426:5:\nassertion `left == right` failed: each nextest process must record one verified reuse without Cargo\n  left: 5\n right: 6\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1538 bytes=29527590)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1582934904/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=skipped\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
