@@ -455,6 +455,720 @@
         "dirty": false,
         "revision": "05c2969c4d1a5fdd5f5ad4a0b78f151af19f14c4"
       }
+    },
+    {
+      "binary": {
+        "build_profile": "release",
+        "build_timestamp": "1786488168",
+        "git_commit": "c6d97a27e13d83fb733acd7fc2c6fcf430422647",
+        "git_dirty": false,
+        "git_short_commit": "c6d97a27",
+        "package": "jit",
+        "sha256": "c84b4b4b4eec0e401e25bc02ba9174b6aa7ed3c7ec6891bdb8bc3a2c23d9a08c",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "1.0.0"
+      },
+      "directory_fsync_probes": [
+        {
+          "directory_fsync_calls": 22,
+          "execution_boundary": "cli",
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 1046,
+          "execution_boundary": "cli",
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 14,
+          "execution_boundary": "public_command_layer_helper",
+          "operation": "profile_pack",
+          "root_shape": "absent_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 1038,
+          "execution_boundary": "public_command_layer_helper",
+          "operation": "profile_add",
+          "root_shape": "absent_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 21,
+          "execution_boundary": "cli",
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "timed": false
+        }
+      ],
+      "fixture": {
+        "archive_bytes": 5167104,
+        "asset_count": 511,
+        "authority": "crates/jit/src/profile/package.rs",
+        "byte_limit": 4194304,
+        "byte_size": 4193873,
+        "distinct_source_directories": 1023,
+        "file_count": 512,
+        "file_limit": 512,
+        "max_source_path_bytes": 254,
+        "package_hash": "993a32377ac174eb419b46f6a35e25f64da58f04f7267f491e40b3cf0fd09557",
+        "shape_authority": "crates/jit/src/test_utils.rs::write_package_tree_at_model_limits"
+      },
+      "fsync_residual_decision": {
+        "constraint": "The suppressed variant is an unsafe upper bound, not a candidate implementation. A production change may only deduplicate repeated directory syncs behind the existing preparation or pre-commit barrier; file fsyncs and phase barriers remain.",
+        "criteria": {
+          "minimum_paired_median_saving_ms": 5,
+          "minimum_paired_median_saving_percent": 5,
+          "required_observation": "both thresholds in at least one operation/root shape"
+        },
+        "decision": "no_change",
+        "observations": [
+          {
+            "baseline_median_ms": 81,
+            "operation": "profile_pack",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              0,
+              0,
+              0,
+              0,
+              3
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 80
+          },
+          {
+            "baseline_median_ms": 226,
+            "operation": "profile_add",
+            "paired_median_saving_ms": 5,
+            "paired_savings_ms": [
+              0,
+              7,
+              0,
+              8,
+              5
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 2,
+            "suppressed_median_ms": 221
+          },
+          {
+            "baseline_median_ms": 77,
+            "operation": "profile_pack",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              -2,
+              2,
+              -2,
+              -3,
+              2
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 77
+          },
+          {
+            "baseline_median_ms": 227,
+            "operation": "profile_add",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              1,
+              -2,
+              -1,
+              -6,
+              0
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 228
+          },
+          {
+            "baseline_median_ms": 403,
+            "operation": "profiled_init_publication",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              6,
+              -3,
+              -3,
+              -5,
+              8
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 406
+          }
+        ]
+      },
+      "host": {
+        "machine": "x86_64",
+        "measurement_filesystem": "tmpfs",
+        "release": "7.1.6-arch1-1",
+        "system": "Linux"
+      },
+      "measurements": [
+        {
+          "execution_boundary": "cli",
+          "max_ms": 83,
+          "median_ms": 81,
+          "min_ms": 79,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            81,
+            79,
+            79,
+            82,
+            83
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 82,
+          "median_ms": 80,
+          "min_ms": 79,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            81,
+            79,
+            79,
+            82,
+            80
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 229,
+          "median_ms": 226,
+          "min_ms": 220,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            220,
+            228,
+            221,
+            229,
+            226
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 221,
+          "median_ms": 221,
+          "min_ms": 220,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            220,
+            221,
+            221,
+            221,
+            221
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 79,
+          "median_ms": 77,
+          "min_ms": 74,
+          "operation": "profile_pack",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            75,
+            79,
+            77,
+            74,
+            79
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 79,
+          "median_ms": 77,
+          "min_ms": 77,
+          "operation": "profile_pack",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            77,
+            77,
+            79,
+            77,
+            77
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 228,
+          "median_ms": 227,
+          "min_ms": 222,
+          "operation": "profile_add",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            228,
+            227,
+            227,
+            222,
+            226
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 229,
+          "median_ms": 228,
+          "min_ms": 226,
+          "operation": "profile_add",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            227,
+            229,
+            228,
+            228,
+            226
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 414,
+          "median_ms": 403,
+          "min_ms": 402,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            404,
+            402,
+            403,
+            403,
+            414
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 408,
+          "median_ms": 406,
+          "min_ms": 398,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            398,
+            405,
+            406,
+            408,
+            406
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        }
+      ],
+      "method": {
+        "absent_root_helper": {
+          "build": "workspace Cargo.lock plus CARGO_INCREMENTAL=0 cargo build --release --offline outside timed regions",
+          "postcondition": ".jit and .jit-bootstrap remain absent after each command",
+          "sha256": "226fa16f4067f29cc01cf07e68c34ac2c5ab8404e3ed6c21d63d2a89c2d41df1",
+          "source": "temporary driver over public CommandExecutor profile pack/add methods"
+        },
+        "cache_state": "warm: binary and fixture pages primed by warmups; absent-root copies are created before timing; kernel page cache is not dropped",
+        "cleanup": "archive, add destination, and profiled-init repository are removed after each timed subprocess; cleanup is outside the clock",
+        "clock": "Python time.perf_counter_ns around one jit subprocess",
+        "comparison_order": "durable and suppressed observations are paired; first-run order alternates between pairs to limit progressive cache and host-load bias",
+        "fsync_comparator": "LD_PRELOAD shim preserves file fsync and suppresses directory fsync only; both variants load the shim so interception overhead is shared; one separate untimed baseline probe per operation verifies and counts intercepted directory fsync calls",
+        "measured_runs_per_variant": 5,
+        "root_shape_mapping": {
+          "profile_add_cli": "existing_data_root",
+          "profile_add_command_layer": "absent_data_root",
+          "profile_pack_cli": "existing_data_root",
+          "profile_pack_command_layer": "absent_data_root",
+          "profiled_init_publication": "absent_data_root"
+        },
+        "warmup_runs_per_variant": 2
+      },
+      "phase": "rerun",
+      "record_schema_revision": 2,
+      "recorded_at": "2026-08-11T22:53:23+00:00",
+      "sequence": 3,
+      "source": {
+        "dirty": false,
+        "revision": "4e7caf70a53a76b6e080f5815ab60b4e75f92733"
+      }
+    },
+    {
+      "binary": {
+        "build_profile": "release",
+        "build_timestamp": "1786488168",
+        "git_commit": "c6d97a27e13d83fb733acd7fc2c6fcf430422647",
+        "git_dirty": false,
+        "git_short_commit": "c6d97a27",
+        "package": "jit",
+        "sha256": "c84b4b4b4eec0e401e25bc02ba9174b6aa7ed3c7ec6891bdb8bc3a2c23d9a08c",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "1.0.0"
+      },
+      "directory_fsync_probes": [
+        {
+          "directory_fsync_calls": 22,
+          "execution_boundary": "cli",
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 1046,
+          "execution_boundary": "cli",
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 14,
+          "execution_boundary": "public_command_layer_helper",
+          "operation": "profile_pack",
+          "root_shape": "absent_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 1038,
+          "execution_boundary": "public_command_layer_helper",
+          "operation": "profile_add",
+          "root_shape": "absent_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 21,
+          "execution_boundary": "cli",
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "timed": false
+        }
+      ],
+      "fixture": {
+        "archive_bytes": 5167104,
+        "asset_count": 511,
+        "authority": "crates/jit/src/profile/package.rs",
+        "byte_limit": 4194304,
+        "byte_size": 4193873,
+        "distinct_source_directories": 1023,
+        "file_count": 512,
+        "file_limit": 512,
+        "max_source_path_bytes": 254,
+        "package_hash": "993a32377ac174eb419b46f6a35e25f64da58f04f7267f491e40b3cf0fd09557",
+        "shape_authority": "crates/jit/src/test_utils.rs::write_package_tree_at_model_limits"
+      },
+      "fsync_residual_decision": {
+        "constraint": "The suppressed variant is an unsafe upper bound, not a candidate implementation. A production change may only deduplicate repeated directory syncs behind the existing preparation or pre-commit barrier; file fsyncs and phase barriers remain.",
+        "criteria": {
+          "minimum_paired_median_saving_ms": 5,
+          "minimum_paired_median_saving_percent": 5,
+          "required_observation": "both thresholds in at least one operation/root shape"
+        },
+        "decision": "no_change",
+        "observations": [
+          {
+            "baseline_median_ms": 80,
+            "operation": "profile_pack",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              -6,
+              4,
+              -3,
+              -2,
+              0
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 82
+          },
+          {
+            "baseline_median_ms": 223,
+            "operation": "profile_add",
+            "paired_median_saving_ms": 1,
+            "paired_savings_ms": [
+              4,
+              1,
+              3,
+              0,
+              -3
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 221
+          },
+          {
+            "baseline_median_ms": 76,
+            "operation": "profile_pack",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              2,
+              1,
+              -2,
+              0,
+              0
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 76
+          },
+          {
+            "baseline_median_ms": 227,
+            "operation": "profile_add",
+            "paired_median_saving_ms": 2,
+            "paired_savings_ms": [
+              1,
+              -4,
+              2,
+              2,
+              6
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 1,
+            "suppressed_median_ms": 225
+          },
+          {
+            "baseline_median_ms": 405,
+            "operation": "profiled_init_publication",
+            "paired_median_saving_ms": 1,
+            "paired_savings_ms": [
+              1,
+              4,
+              -2,
+              0,
+              5
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 404
+          }
+        ]
+      },
+      "host": {
+        "machine": "x86_64",
+        "measurement_filesystem": "tmpfs",
+        "release": "7.1.6-arch1-1",
+        "system": "Linux"
+      },
+      "measurements": [
+        {
+          "execution_boundary": "cli",
+          "max_ms": 83,
+          "median_ms": 80,
+          "min_ms": 79,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            79,
+            83,
+            80,
+            80,
+            79
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 85,
+          "median_ms": 82,
+          "min_ms": 79,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            85,
+            79,
+            83,
+            82,
+            79
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 228,
+          "median_ms": 223,
+          "min_ms": 221,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            228,
+            221,
+            224,
+            221,
+            223
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 226,
+          "median_ms": 221,
+          "min_ms": 220,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            224,
+            220,
+            221,
+            221,
+            226
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 78,
+          "median_ms": 76,
+          "min_ms": 76,
+          "operation": "profile_pack",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            77,
+            76,
+            76,
+            76,
+            78
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 78,
+          "median_ms": 76,
+          "min_ms": 75,
+          "operation": "profile_pack",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            75,
+            75,
+            78,
+            76,
+            78
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 228,
+          "median_ms": 227,
+          "min_ms": 223,
+          "operation": "profile_add",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            226,
+            223,
+            228,
+            227,
+            227
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "public_command_layer_helper",
+          "max_ms": 227,
+          "median_ms": 225,
+          "min_ms": 221,
+          "operation": "profile_add",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            225,
+            227,
+            226,
+            225,
+            221
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 408,
+          "median_ms": 405,
+          "min_ms": 402,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            408,
+            408,
+            402,
+            405,
+            405
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "execution_boundary": "cli",
+          "max_ms": 407,
+          "median_ms": 404,
+          "min_ms": 400,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            407,
+            404,
+            404,
+            405,
+            400
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        }
+      ],
+      "method": {
+        "absent_root_helper": {
+          "build": "workspace Cargo.lock plus CARGO_INCREMENTAL=0 cargo build --release --offline outside timed regions",
+          "postcondition": ".jit and .jit-bootstrap remain absent after each command",
+          "sha256": "226fa16f4067f29cc01cf07e68c34ac2c5ab8404e3ed6c21d63d2a89c2d41df1",
+          "source": "temporary driver over public CommandExecutor profile pack/add methods"
+        },
+        "cache_state": "warm: binary and fixture pages primed by warmups; absent-root copies are created before timing; kernel page cache is not dropped",
+        "cleanup": "archive, add destination, and profiled-init repository are removed after each timed subprocess; cleanup is outside the clock",
+        "clock": "Python time.perf_counter_ns around one jit subprocess",
+        "comparison_order": "durable and suppressed observations are paired; first-run order alternates between pairs to limit progressive cache and host-load bias",
+        "fsync_comparator": "LD_PRELOAD shim preserves file fsync and suppresses directory fsync only; both variants load the shim so interception overhead is shared; one separate untimed baseline probe per operation verifies and counts intercepted directory fsync calls",
+        "measured_runs_per_variant": 5,
+        "root_shape_mapping": {
+          "profile_add_cli": "existing_data_root",
+          "profile_add_command_layer": "absent_data_root",
+          "profile_pack_cli": "existing_data_root",
+          "profile_pack_command_layer": "absent_data_root",
+          "profiled_init_publication": "absent_data_root"
+        },
+        "warmup_runs_per_variant": 2
+      },
+      "phase": "rerun",
+      "record_schema_revision": 2,
+      "recorded_at": "2026-08-11T22:53:48+00:00",
+      "sequence": 4,
+      "source": {
+        "dirty": true,
+        "revision": "4e7caf70a53a76b6e080f5815ab60b4e75f92733"
+      }
     }
   ],
   "schema_version": 1
