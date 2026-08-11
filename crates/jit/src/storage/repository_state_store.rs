@@ -466,7 +466,7 @@ impl RepositoryStateStore for InMemoryStorage {
         if data_exists {
             failures.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
         }
-        recover_memory_state(&mut state);
+        recover_memory_state(&mut state, failures.as_ref())?;
         drop(state);
         if data_exists {
             failures.check(&TransactionFailurePoint::RepositorySweepCompanions)?;
@@ -616,9 +616,20 @@ impl RepositoryMutationSession for MemoryMutationSession {
                 actions_applied: 0,
             });
         }
+        let rollback_actions = delta
+            .actions()
+            .iter()
+            .enumerate()
+            .filter_map(|(index, action)| {
+                (original.data_root_exists
+                    || action.path().root_class() != RepositoryRootClass::Data)
+                    .then_some(index)
+            })
+            .collect();
         state.recovery = Some(MemoryRecoveryResidue::Prepared {
             original: Box::new(original.clone()),
             final_state: Box::new(candidate.clone()),
+            rollback_actions,
             _plan_hash: plan_hash.clone(),
         });
         let failures = self.storage.repository_state_failures();
@@ -1037,7 +1048,26 @@ fn memory_listing(
     }
 }
 
-fn recover_memory_state(state: &mut MemoryRepositoryState) {
+fn recover_memory_state(
+    state: &mut MemoryRepositoryState,
+    failures: &dyn crate::storage::TransactionFailureInjector,
+) -> std::io::Result<()> {
+    if let Some(MemoryRecoveryResidue::Prepared {
+        rollback_actions, ..
+    }) = &state.recovery
+    {
+        for index in rollback_actions.iter().rev().copied() {
+            failures
+                .check(&TransactionFailurePoint::RepositoryBeforeReverseAction { action: index })?;
+            failures
+                .check(&TransactionFailurePoint::RepositoryAfterReverseAction { action: index })?;
+        }
+        failures.check(&TransactionFailurePoint::RepositoryBeforeRollbackDecision)?;
+    }
+
+    // Do not consume the residue until every injected rollback edge has
+    // succeeded. A failure above leaves Prepared intact so the next session
+    // retries the same idempotent sequence before restoring the old image.
     match state.recovery.take() {
         Some(MemoryRecoveryResidue::Prepared { original, .. }) => {
             state.entries = original.entries;
@@ -1049,6 +1079,7 @@ fn recover_memory_state(state: &mut MemoryRepositoryState) {
         }
         None => {}
     }
+    Ok(())
 }
 
 /// Require that an action's parent directory already exists, mirroring the JSON
