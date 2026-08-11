@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "33ba9d18103541dec1c87f679c349a829c85205c",
+  "completed_at": "2026-08-11T10:49:58.866134975Z",
+  "duration_ms": 135241,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/profile_apply.rs",
+        "id": "F1",
+        "line": 1836,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/9a81ab12/requirement/REQ-05",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "medium",
+        "summary": "A current code-documentation comment describes an authenticated v1 record conversion that the strict v2-only implementation no longer has."
+      }
+    ],
+    "summary": "A stale legacy-record migration statement remains in the canonical applied-profile implementation.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "42c8c9c1-737d-48a6-b8b4-911aafa1a263",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "21352196-0332-465b-9151-9300a5a50606",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T10:47:43.624645952Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4289 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff06f-a953-76f1-88a0-274cb96c76e7\n--------\nuser\n--- 4276 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — medium, blocking, issue-impact:** `crates/jit/src/repository_state/profile_apply.rs:1836` still says a profile may be “replaced after an authenticated v1 conversion.” The current reader strictly accepts only record version 2, and the v1 decoder/conversion was removed. This is an orphaned, incorrect migration statement, so the clean-cut documentation requirement is not fully met. References: `@/issue/9a81ab12/requirement/REQ-05`, `@/invariant/canonical-cutover`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A stale legacy-record migration statement remains in the canonical applied-profile implementation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A current code-documentation comment describes an authenticated v1 record conversion that the strict v2-only implementation no longer has.\",\"file\":\"crates/jit/src/repository_state/profile_apply.rs\",\"line\":1836,\"references\":[\"@/issue/9a81ab12/requirement/REQ-05\",\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

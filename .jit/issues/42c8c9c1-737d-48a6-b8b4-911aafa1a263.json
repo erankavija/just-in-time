@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-08-11T10:47:16.587133257Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
@@ -15,9 +16,14 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "status": "pending",
-      "updated_at": "2026-08-09T12:07:31.807918203Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-11T10:49:59.215806695Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-08-11T10:47:35.664787825Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "42c8c9c1-737d-48a6-b8b4-911aafa1a263",
@@ -31,7 +37,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Ownership, records, and safe change",
-  "updated_at": "2026-08-11T08:41:27.375473651Z"
+  "updated_at": "2026-08-11T10:49:59.215806695Z"
 }

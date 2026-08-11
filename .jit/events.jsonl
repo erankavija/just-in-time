@@ -13531,3 +13531,8 @@
 {"gate_key":"security-review","id":"ee731737-70f1-4e5d-98f7-f05728601e5d","issue_id":"15cc28c5-1066-4db4-b5a6-4796b6144c08","timestamp":"2026-08-11T09:27:21.411423786Z","type":"gate_passed","updated_by":"agent:jit-execution-lead"}
 {"from":"ready","id":"9ed45b33-36e0-4027-aea8-6d4a92cf4257","issue_id":"15cc28c5-1066-4db4-b5a6-4796b6144c08","timestamp":"2026-08-11T09:27:38.398785456Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"61b27761-e89c-42ae-b1b6-7ea0721a9321","issue_id":"15cc28c5-1066-4db4-b5a6-4796b6144c08","timestamp":"2026-08-11T09:27:38.398785456Z","type":"issue_claimed"}
+{"from":"ready","id":"04a460ca-1de7-4738-a931-d02452f12df6","issue_id":"42c8c9c1-737d-48a6-b8b4-911aafa1a263","timestamp":"2026-08-11T10:47:16.587133257Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"9314565a-32a4-488d-96b2-32f4d6d47c60","issue_id":"42c8c9c1-737d-48a6-b8b4-911aafa1a263","timestamp":"2026-08-11T10:47:16.587133257Z","type":"issue_claimed"}
+{"gate_key":"repo-validate","id":"78b2af42-1167-48c2-b1ad-692ee5b5ca93","issue_id":"42c8c9c1-737d-48a6-b8b4-911aafa1a263","timestamp":"2026-08-11T10:47:35.664787825Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"41a98801-ef33-4f2c-af48-495b621603ca","issue_id":"42c8c9c1-737d-48a6-b8b4-911aafa1a263","timestamp":"2026-08-11T10:49:59.215806695Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"076d817b-d6b6-4fea-a4d5-b4a585170e46","issue_id":"cf42d08b-ce12-4038-987c-bbb0c0950fc8","priority":"normal","timestamp":"2026-08-11T12:03:49.118078050Z","title":"A deep package packs but cannot be published","type":"issue_created"}
