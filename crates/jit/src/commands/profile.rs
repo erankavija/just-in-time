@@ -17,9 +17,9 @@ use crate::repository_state::{
     finalize_package_tree_capture, AppliedProfileRecord, CaptureBudget, CaptureSpec,
     CapturedTreeFile, FileMode, MaterializationPlan, MaterializationRequest, MutationContext,
     PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim,
-    ProfileTargetDisposition, RepositoryEntry, RepositoryExportDestination,
-    RepositoryExportIntent, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
-    RepositoryRootClass, RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
+    ProfileTargetDisposition, RepositoryEntry, RepositoryExportDestination, RepositoryExportIntent,
+    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -692,12 +692,13 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<(ProfilePackResult, Vec<String>)> {
         let layout = self.require_layout()?;
         let source = worktree_directory(&layout, invocation_dir, package_source)?;
-        let package =
-            ProfilePackage::from_directory(&layout.worktree_root().join(source.relative().as_path()))
-                .map_err(|source_error| ProfileResolutionError::UnreadableLocation {
-                    location: package_source.display().to_string(),
-                    source: source_error,
-                })?;
+        let package = ProfilePackage::from_directory(
+            &layout.worktree_root().join(source.relative().as_path()),
+        )
+        .map_err(|source_error| ProfileResolutionError::UnreadableLocation {
+            location: package_source.display().to_string(),
+            source: source_error,
+        })?;
         let archive = pack_package_archive(&package)?;
         let archive_bytes = archive.len() as u64;
         let warnings = self.publish_package_archive(&layout, invocation_dir, output, archive)?;
@@ -855,10 +856,16 @@ impl CommandExecutor<JsonFileStorage> {
         match classify_repository_export(layout, invocation_dir, output)? {
             RepositoryExportDestination::Repository(target) => {
                 let intent = RepositoryExportIntent::new_absent_file(target, archive);
-                // The archive is one file, so the export reads only its target,
-                // that target's parent, and the parent's listing.
+                // The export reads exactly two paths — the output path and its
+                // parent — plus the parent's listing, whatever the path's depth,
+                // so the path budget is that pair with headroom rather than a
+                // guess at a tree. What occupies the output path is read to
+                // decide it is occupied, and an occupant larger than a package
+                // archive may be exhausts the byte budget: that is a refusal
+                // carrying a less specific message than the occupied-path one,
+                // never a publication.
                 let budget = CaptureBudget {
-                    max_paths: 4096,
+                    max_paths: 8,
                     max_listings: 1,
                     max_bytes: crate::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
                     max_depth: 128,

@@ -215,7 +215,10 @@ pub fn capture_or_retry(
 /// caller-chosen output path reports that refusal in the same words, so the
 /// translation lives here rather than once per command
 /// (`@/inv/convention-convergence`).
-pub(crate) fn map_occupied_export_error(result: Result<()>, output: &std::path::Path) -> Result<()> {
+pub(crate) fn map_occupied_export_error(
+    result: Result<()>,
+    output: &std::path::Path,
+) -> Result<()> {
     match result {
         Err(error)
             if matches!(

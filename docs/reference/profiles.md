@@ -84,6 +84,20 @@ is how an edit made in place reaches the package that owns it:
 jit profile capture --source profiles/my-workflow --destination build/my-workflow
 ```
 
+Pack a package into one portable file to hand to somebody, and place one
+somebody handed you:
+
+```bash
+jit profile pack --source profiles/my-workflow --output my-workflow.tar
+jit profile add --archive my-workflow.tar --destination packages/my-workflow
+```
+
+The archive carries the package's identity digest, and adding one recomputes
+that identity from the extracted content and refuses an archive that disagrees.
+This detects an archive damaged or truncated in transit; it establishes
+integrity rather than origin, so the channel the archive arrived over is still
+what says who produced it.
+
 Packages may declare non-secret variables. Supply a TOML values file containing
 `[variables]` or repeat `--set NAME=VALUE`; precedence is declaration default,
 values file, declared environment variable, then `--set`, with the last

@@ -319,14 +319,15 @@ pub fn read_package_archive(bytes: &[u8]) -> Result<CapturedPackageTree, Package
     // The manifest is read before the tree is composed, for the same reason a
     // capture reads it first: it is what says which sources exist and which of
     // them are executable, and neither answer may come from the archive.
-    let manifest = extracted
-        .files
-        .get(MANIFEST_FILE_NAME)
-        .ok_or(PackageArchiveError::InvalidPackage(
-            ProfilePackageError::MissingManifest,
-        ))?;
-    let model =
-        ProfilePackage::parse_manifest(&manifest.bytes).map_err(PackageArchiveError::InvalidPackage)?;
+    let manifest =
+        extracted
+            .files
+            .get(MANIFEST_FILE_NAME)
+            .ok_or(PackageArchiveError::InvalidPackage(
+                ProfilePackageError::MissingManifest,
+            ))?;
+    let model = ProfilePackage::parse_manifest(&manifest.bytes)
+        .map_err(PackageArchiveError::InvalidPackage)?;
     let executable = declared_executable_sources(&model);
     for (source, file) in &extracted.files {
         let expected = declared_file_mode(&executable, source);
@@ -406,12 +407,7 @@ fn archived_directories<'a>(sources: impl Iterator<Item = &'a str>) -> Vec<Strin
         .flat_map(|source| {
             let segments = source.split('/').collect::<Vec<_>>();
             (0..segments.len().saturating_sub(1))
-                .map(|depth| {
-                    format!(
-                        "{PACKAGE_ENTRY_PREFIX}/{}",
-                        segments[..=depth].join("/")
-                    )
-                })
+                .map(|depth| format!("{PACKAGE_ENTRY_PREFIX}/{}", segments[..=depth].join("/")))
                 .collect::<Vec<_>>()
         })
         .chain(std::iter::once(PACKAGE_ENTRY_PREFIX.to_string()))
@@ -595,10 +591,7 @@ fn entry_name<R: Read>(entry: &tar::Entry<'_, R>) -> Result<String, PackageArchi
 
 /// Hold a partially extracted package against the bounds the package model
 /// imposes, so the walk stops at the bound rather than after it.
-fn require_package_bounds(
-    file_count: usize,
-    byte_size: usize,
-) -> Result<(), PackageArchiveError> {
+fn require_package_bounds(file_count: usize, byte_size: usize) -> Result<(), PackageArchiveError> {
     if file_count > MAX_PROFILE_PACKAGE_FILES || byte_size > MAX_PROFILE_PACKAGE_BYTES {
         return Err(PackageArchiveError::InvalidPackage(
             ProfilePackageError::PackageBounds {
@@ -628,24 +621,20 @@ fn require_metadata_agreement(
     tree: &CapturedPackageTree,
 ) -> Result<(), PackageArchiveError> {
     let disagreement = |field, declared: String, packaged: String| {
-        (declared != packaged).then(|| PackageArchiveError::MetadataDisagreement {
+        (declared != packaged).then_some(PackageArchiveError::MetadataDisagreement {
             field,
             declared,
             packaged,
         })
     };
-    let mismatch = disagreement(
-        "id",
-        metadata.id.to_string(),
-        tree.model().id.to_string(),
-    )
-    .or_else(|| {
-        disagreement(
-            "version",
-            metadata.version.clone(),
-            tree.model().version.clone(),
-        )
-    });
+    let mismatch = disagreement("id", metadata.id.to_string(), tree.model().id.to_string())
+        .or_else(|| {
+            disagreement(
+                "version",
+                metadata.version.clone(),
+                tree.model().version.clone(),
+            )
+        });
     if let Some(error) = mismatch {
         return Err(error);
     }
@@ -718,8 +707,7 @@ mod tests {
     fn archive_of(specs: &[ArchiveEntrySpec]) -> Vec<u8> {
         let mut builder = tar::Builder::new(Vec::new());
         for spec in specs {
-            let mut header =
-                reproducible_tar_header(spec.kind, spec.mode, spec.bytes.len() as u64);
+            let mut header = reproducible_tar_header(spec.kind, spec.mode, spec.bytes.len() as u64);
             let name = spec.name.as_bytes();
             let field = &mut header
                 .as_gnu_mut()
@@ -754,10 +742,7 @@ mod tests {
     }
 
     /// One entry of the packed fixture, by the name the archive gives it.
-    fn spec_named<'a>(
-        specs: &'a mut [ArchiveEntrySpec],
-        name: &str,
-    ) -> &'a mut ArchiveEntrySpec {
+    fn spec_named<'a>(specs: &'a mut [ArchiveEntrySpec], name: &str) -> &'a mut ArchiveEntrySpec {
         specs
             .iter_mut()
             .find(|spec| spec.name == name)
@@ -984,7 +969,8 @@ mod tests {
     /// against.
     #[test]
     fn test_read_package_archive_refuses_an_archive_carrying_no_metadata() {
-        let refusal = refusal_after(|specs| specs.retain(|spec| spec.name != ARCHIVE_METADATA_ENTRY));
+        let refusal =
+            refusal_after(|specs| specs.retain(|spec| spec.name != ARCHIVE_METADATA_ENTRY));
 
         assert!(
             matches!(refusal, PackageArchiveError::MissingEntry(_)),
@@ -1028,12 +1014,14 @@ mod tests {
     #[test]
     fn test_read_package_archive_refuses_more_files_than_a_package_may_hold() {
         let refusal = refusal_after(|specs| {
-            specs.extend((0..=MAX_PROFILE_PACKAGE_FILES).map(|index| ArchiveEntrySpec {
-                kind: EntryType::Regular,
-                mode: REGULAR_FILE_MODE,
-                name: format!("package/assets/filler-{index}"),
-                bytes: Vec::new(),
-            }));
+            specs.extend(
+                (0..=MAX_PROFILE_PACKAGE_FILES).map(|index| ArchiveEntrySpec {
+                    kind: EntryType::Regular,
+                    mode: REGULAR_FILE_MODE,
+                    name: format!("package/assets/filler-{index}"),
+                    bytes: Vec::new(),
+                }),
+            );
             specs.push(poison_entry());
         });
 
@@ -1067,6 +1055,62 @@ mod tests {
             ),
             "the byte bound did not stop the walk where it was exceeded: {refusal}"
         );
+    }
+
+    /// A file larger than a package archive may be is refused before it is
+    /// parsed at all, so an enormous file handed over as an archive is not a
+    /// memory-exhaustion primitive either.
+    #[test]
+    fn test_read_package_archive_refuses_a_file_larger_than_a_package_archive_may_be() {
+        let oversized = vec![0u8; MAX_PROFILE_PACKAGE_ARCHIVE_BYTES + 1];
+
+        let refusal = read_package_archive(&oversized).expect_err("an oversized file is refused");
+
+        assert!(
+            matches!(refusal, PackageArchiveError::ArchiveBytes { .. }),
+            "an oversized file was not refused by size: {refusal}"
+        );
+    }
+
+    /// The metadata is four scalars; an entry claiming to be far more than that
+    /// is refused rather than held.
+    #[test]
+    fn test_read_package_archive_refuses_metadata_larger_than_four_scalars_can_be() {
+        let refusal = refusal_after(|specs| {
+            spec_named(specs, ARCHIVE_METADATA_ENTRY).bytes =
+                vec![b' '; MAX_ARCHIVE_METADATA_BYTES + 1];
+        });
+
+        assert!(
+            matches!(refusal, PackageArchiveError::MetadataBytes { .. }),
+            "oversized metadata was not refused by size: {refusal}"
+        );
+    }
+
+    /// Metadata that is not the recognized wire is refused rather than read
+    /// past to whatever fields it happens to carry.
+    #[test]
+    fn test_read_package_archive_refuses_metadata_that_is_not_the_recognized_wire() {
+        for (scenario, metadata) in [
+            ("not TOML at all", b"{ not toml }".to_vec()),
+            (
+                "a field the wire does not declare",
+                b"[archive]\narchive-version = 1\nid = \"synthetic-workflow\"\n\
+                  version = \"1.2.3\"\npackage-hash = \"00\"\nextra = true\n"
+                    .to_vec(),
+            ),
+            ("bytes that are not UTF-8", vec![0xff, 0xfe, 0xfd]),
+        ] {
+            let refusal =
+                refusal_after(|specs| spec_named(specs, ARCHIVE_METADATA_ENTRY).bytes = metadata);
+            assert!(
+                matches!(
+                    refusal,
+                    PackageArchiveError::MetadataToml(_) | PackageArchiveError::MetadataUtf8(_)
+                ),
+                "metadata carrying {scenario} was not refused: {refusal}"
+            );
+        }
     }
 
     /// Content the packaged manifest does not declare is refused by the same

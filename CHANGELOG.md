@@ -127,6 +127,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`jit profile pack` and `jit profile add` move a package as one verifiable
+  file.** Sharing a package meant copying a directory, with nothing stating what
+  was copied and nothing confirming it arrived whole; a truncated copy became a
+  package that decoded and was wrong. `jit profile pack --source <DIR> --output
+  <FILE>` now writes one uncompressed tar carrying the package tree beside its
+  id, version, and the content digest that is already the package's identity,
+  and `jit profile add --archive <FILE> --destination <DIR>` recomputes that
+  identity from the extracted content and refuses an archive whose content does
+  not reproduce it. Packing the same package twice produces byte-identical
+  output, so an archive can be compared or checksummed without re-reading the
+  package. The digest travels inside the archive: it establishes integrity, not
+  origin. An arriving archive is read as untrusted input — an entry naming an
+  absolute path or a parent-directory traversal, an entry that is not a regular
+  file or a directory, an entry carrying a mode the packaged manifest does not
+  declare, and content past the package file or byte budget are each refused,
+  the budgets against running counts while the archive is being read rather than
+  after its bytes have landed. Extraction produces a value in memory and the
+  finished tree is published through the same recoverable transaction a capture
+  uses, so a refused or interrupted add leaves no partially extracted package
+  and an occupied destination is never published over.
+
 - **`jit profile capture` republishes a package tree from the repository files
   its manifest declares.** Producing a package tree was a repository-local
   render compiled only for this crate's tests, hardcoded to one package path and

@@ -845,6 +845,66 @@ captured package's `id`, `version`, `package_hash`, `source`, `destination`,
 repository-relative `path`, its `executable` mode intent, and an `action` of
 `unchanged`, `create`, `update`, or `remove`.
 
+### `jit profile pack`
+
+Pack a package directory into one portable archive file:
+
+```bash
+jit profile pack --source <DIR> --output <FILE> [--json]
+```
+
+`--source` names the package directory and must classify as worktree content.
+`--output` names the archive file to write, anywhere the invocation can write.
+
+The archive is an uncompressed tar holding the package tree beside the package
+`id`, `version`, and identity digest. Only the package directory is read: no
+resolved variable value, no applied-profile record, and nothing outside that
+directory reaches the archive. Packing the same package twice produces
+byte-identical output, so an archive can be compared or checksummed without
+re-reading the package.
+
+The digest lets [`jit profile add`](#jit-profile-add) detect an archive that was
+truncated or corrupted in transit. It travels inside the archive, so it
+establishes integrity rather than origin: it is not a signature, and it does not
+say who produced the archive. Authenticity is a property of the channel the
+archive arrived over.
+
+An occupied output path is refused, leaving what it held untouched.
+
+JSON reports the packed package's `id`, `version`, `package_hash`, `source`,
+`archive`, `file_count`, `byte_size`, and the written `archive_bytes`.
+
+### `jit profile add`
+
+Place the package an archive carries into the worktree:
+
+```bash
+jit profile add --archive <FILE> --destination <DIR> [--json]
+```
+
+`--archive` names the archive to read, which may live anywhere. `--destination`
+names the directory the package is published at; it must classify as worktree
+content and must be absent, so an add never publishes over a package already
+there. Applying the added package is a separate, explicit operation — see
+[`jit profile apply`](#jit-profile-apply).
+
+Every byte of the archive is treated as untrusted input. The package identity is
+recomputed from the extracted content and the archive is refused when it
+disagrees with the digest the archive carries. An entry naming an absolute path
+or a parent-directory traversal, an entry that is not a regular file or a
+directory, an entry carrying a mode the packaged manifest does not declare, and
+content over the package file or byte budget are each refused. The extracted
+content is validated as a package before anything is published, so a published
+directory always decodes as one.
+
+A refused add publishes nothing and leaves no partially extracted package: the
+archive is read into memory and the whole tree is published through one
+recoverable transaction, exactly as a capture is.
+
+JSON reports the added package's `id`, `version`, `package_hash`, `archive`,
+`destination`, `file_count`, and `byte_size`. The identity fields are recomputed
+from the extracted content rather than copied from the archive.
+
 ## Version and Provenance
 
 ### `jit version`
