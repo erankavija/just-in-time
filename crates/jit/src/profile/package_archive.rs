@@ -8,9 +8,22 @@
 //!
 //! # What the archive holds
 //!
-//! An uncompressed tar with a fixed layout: one metadata file at the archive
-//! root naming the package and carrying its identity digest, and the package's
-//! own tree beneath a single `package/` directory. Nothing else is admitted.
+//! An uncompressed tar with a fixed layout: one metadata entry at the archive
+//! root naming the package and carrying its identity digest, and one entry per
+//! package file, each named under a single `package/` prefix. Nothing else is
+//! written, and nothing outside that layout is admitted.
+//!
+//! There are deliberately no directory entries. Nothing in this codebase
+//! extracts an archive to disk — the read builds a value, and publication
+//! creates the directories a tree needs from the file paths themselves — so a
+//! directory entry would have no consumer. It would also make what the archive
+//! carries depend on the shape of a package's paths rather than on its file
+//! count, and the package model bounds file count while leaving path depth
+//! unconstrained: a package of many single-file directories would produce an
+//! archive with more entries than any bound derived from its file count. The
+//! bounds below are provable because the entry count is not a function of path
+//! shape.
+//!
 //! The archive is uncompressed by decision: an inflating layer's expanded size
 //! is not knowable before inflation, so the bounds this module enforces during
 //! extraction could not be enforced at all.
@@ -30,10 +43,13 @@
 //! than repairs. Entry names are validated as safe relative paths before any
 //! content is admitted, only regular files and directories are admitted at all,
 //! the package bounds are enforced against running counts as entries are read
-//! rather than after they have landed, and a mode is compared against what the
-//! manifest declares rather than adopted from the entry. The result is a value
-//! in memory: this module opens nothing, writes nothing, and leaves the
-//! decision of where a package goes to its caller.
+//! rather than after they have landed, and a file's mode is compared against
+//! what the manifest declares rather than adopted from the entry. A directory
+//! entry another tar wrote is admitted and ignored, because a package's
+//! directories are created by the publication from its file paths and no
+//! directory mode is ever published. The result is a value in memory: this
+//! module opens nothing, writes nothing, and leaves the decision of where a
+//! package goes to its caller.
 
 use super::manifest::{ProfileId, ProfilePackageModel, MANIFEST_FILE_NAME};
 use super::package::{
@@ -57,9 +73,6 @@ const PACKAGE_ENTRY_PREFIX: &str = "package";
 /// The one archive wire this build reads and writes.
 const ARCHIVE_VERSION: u32 = 1;
 
-/// Mode every archived directory entry carries.
-const DIRECTORY_MODE: u32 = 0o755;
-
 /// Mode an archived file carries when its declaration is executable.
 const EXECUTABLE_FILE_MODE: u32 = 0o755;
 
@@ -73,25 +86,43 @@ const REGULAR_FILE_MODE: u32 = 0o644;
 /// a metadata entry that claims to be enormous.
 const MAX_ARCHIVE_METADATA_BYTES: usize = 4 * 1024;
 
+/// One tar block, the unit every header and every padded payload occupies.
+const TAR_BLOCK_BYTES: usize = 512;
+
 /// Maximum number of tar entries one package archive may hold.
 ///
-/// A package archive holds the metadata, one entry per package file, and one
-/// directory entry per distinct parent directory of those files, of which there
-/// can be no more than one per file. The bound is therefore the package's own
-/// file bound twice over plus the metadata and the `package/` root, and it
-/// exists so an archive of many empty entries cannot exhaust inodes or run the
-/// read forever.
-pub const MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES: usize = 2 * MAX_PROFILE_PACKAGE_FILES + 2;
+/// Packing writes the metadata entry and one entry per package file, and
+/// nothing else, so an archive this build produces holds at most
+/// `MAX_PROFILE_PACKAGE_FILES + 1` entries whatever shape the package's paths
+/// have. That is what makes the round trip provable: pack cannot write an
+/// archive the read refuses for holding too many entries.
+///
+/// The bound admitted is twice that, which leaves room for an archive another
+/// tar wrote carrying a directory entry per file as well, and refuses beyond it
+/// so an archive of many empty entries cannot run the read forever.
+pub const MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES: usize = 2 * (MAX_PROFILE_PACKAGE_FILES + 1);
 
 /// Maximum bytes one package archive may occupy.
 ///
-/// The content bound is the package's own; the rest is tar framing. Each entry
-/// costs a 512-byte header, up to 511 bytes of content padding, and, when its
-/// path is too long for the header, a long-name entry of its own — 2 KiB per
-/// entry covers all three, and the trailing end-of-archive blocks are a
-/// rounding error beside it.
-pub const MAX_PROFILE_PACKAGE_ARCHIVE_BYTES: usize =
-    MAX_PROFILE_PACKAGE_BYTES + MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES * 2 * 1024;
+/// Derived from what the package model actually bounds, so an archive this
+/// build produces is always under it.
+///
+/// Two things a package can carry grow the archive, and the model bounds each
+/// by `MAX_PROFILE_PACKAGE_BYTES`. Content is bounded there directly. Paths are
+/// bounded there from the other side: every file a package holds beside the
+/// manifest is one the manifest declares by name, and no source may be declared
+/// twice, so the package's path lengths sum to less than the manifest's own
+/// size — which is itself part of that same budget.
+///
+/// The rest is framing, per entry: a 512-byte header, content padded up to the
+/// next block, and, for a path too long to sit in the header, a long-name entry
+/// with a header and its own padded payload. Four blocks per file entry cover
+/// all four terms, the metadata entry costs its bound plus two blocks, and the
+/// end-of-archive marker is two more.
+pub const MAX_PROFILE_PACKAGE_ARCHIVE_BYTES: usize = 2 * MAX_PROFILE_PACKAGE_BYTES
+    + 4 * TAR_BLOCK_BYTES * MAX_PROFILE_PACKAGE_FILES
+    + MAX_ARCHIVE_METADATA_BYTES
+    + 4 * TAR_BLOCK_BYTES;
 
 /// The archive metadata wire, decoded as strictly as a package manifest is.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -237,6 +268,13 @@ pub enum PackageArchiveError {
 /// same package twice produces the same file, and packing it on another machine
 /// produces that same file again.
 ///
+/// The archive carries the metadata entry and one entry per package file, so
+/// its entry count is the package's file count plus one whatever shape the
+/// package's paths have, and both bounds
+/// ([`MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES`],
+/// [`MAX_PROFILE_PACKAGE_ARCHIVE_BYTES`]) hold for every package the package
+/// model accepts.
+///
 /// Each file is written with the mode its manifest declaration implies rather
 /// than with any mode the package directory happened to carry, so the manifest
 /// stays the authority on which assets are executable.
@@ -267,15 +305,6 @@ pub fn pack_package_archive(package: &ProfilePackage) -> Result<Vec<u8>, Package
         ARCHIVE_METADATA_ENTRY,
         metadata.as_bytes(),
     )?;
-    for directory in archived_directories(package.files().keys().map(String::as_str)) {
-        append_entry(
-            &mut builder,
-            EntryType::Directory,
-            DIRECTORY_MODE,
-            &directory,
-            &[],
-        )?;
-    }
     for (source, bytes) in package.files() {
         append_entry(
             &mut builder,
@@ -397,27 +426,6 @@ fn declared_file_mode(executable: &BTreeSet<&str>, source: &str) -> u32 {
     }
 }
 
-/// Every directory entry a package tree needs, parents before their children.
-///
-/// Sorting by depth over an already name-ordered set is what puts a parent
-/// before the child it holds, which is what a tar reader extracting the archive
-/// with ordinary tools needs.
-fn archived_directories<'a>(sources: impl Iterator<Item = &'a str>) -> Vec<String> {
-    let mut directories = sources
-        .flat_map(|source| {
-            let segments = source.split('/').collect::<Vec<_>>();
-            (0..segments.len().saturating_sub(1))
-                .map(|depth| format!("{PACKAGE_ENTRY_PREFIX}/{}", segments[..=depth].join("/")))
-                .collect::<Vec<_>>()
-        })
-        .chain(std::iter::once(PACKAGE_ENTRY_PREFIX.to_string()))
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    directories.sort_by_key(|directory| directory.matches('/').count());
-    directories
-}
-
 /// Append one entry under the reproducible header discipline.
 fn append_entry(
     builder: &mut tar::Builder<Vec<u8>>,
@@ -498,18 +506,16 @@ fn extract_archive_entries(bytes: &[u8]) -> Result<ExtractedArchive, PackageArch
         let mode = entry.header().mode()? & 0o7777;
 
         match (kind, classify_entry_name(&name)) {
+            // Packing writes no directory entry, and one another tar wrote
+            // carries nothing this read needs: a package's directories are
+            // created by the publication from its file paths, and no directory
+            // mode is ever published. Its name is still held to the path rule
+            // above; beyond that it is ignored rather than refused, so an
+            // archive repacked by ordinary tools still reads.
             (
                 EntryType::Directory,
                 Some(ArchiveEntryName::PackageRoot | ArchiveEntryName::PackageRelative(_)),
-            ) => {
-                if mode != DIRECTORY_MODE {
-                    return Err(PackageArchiveError::UnexpectedEntryMode {
-                        path: name,
-                        actual: mode,
-                        expected: DIRECTORY_MODE,
-                    });
-                }
-            }
+            ) => {}
             (EntryType::Regular, Some(ArchiveEntryName::Metadata)) => {
                 if metadata.is_some() {
                     return Err(PackageArchiveError::DuplicateEntry { path: name });
@@ -914,7 +920,6 @@ mod tests {
             ("package/assets/workflow.txt", EXECUTABLE_FILE_MODE),
             ("package/nested/scripts/check.sh", REGULAR_FILE_MODE),
             ("package/manifest.toml", 0o777),
-            ("package/nested", 0o700),
         ] {
             let refusal = refusal_after(|specs| spec_named(specs, name).mode = mode);
             assert!(
@@ -1055,6 +1060,105 @@ mod tests {
             ),
             "the byte bound did not stop the walk where it was exceeded: {refusal}"
         );
+    }
+
+    /// Packing never writes a directory entry: an archive carries the metadata
+    /// and one entry per package file, whatever shape the package's paths have.
+    ///
+    /// This is what makes the entry bound provable rather than assumed. The
+    /// fixture nests one of its sources two directories deep, so an archive
+    /// that described its directories would have entries to show for them.
+    #[test]
+    fn test_pack_package_archive_writes_one_entry_per_file_beside_the_metadata() {
+        let package = fixture_package();
+
+        let specs = entry_specs(&pack_package_archive(&package).expect("the fixture packs"));
+
+        assert!(
+            package.files().keys().any(|source| source.contains('/')),
+            "the fixture must hold a nested source for this to establish anything"
+        );
+        assert!(
+            specs.iter().all(|spec| spec.kind == EntryType::Regular),
+            "packing wrote an entry that is not a regular file: {:?}",
+            specs
+                .iter()
+                .map(|spec| (spec.kind, spec.name.clone()))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            specs.len(),
+            package.file_count() + 1,
+            "an archive carries the metadata and one entry per package file"
+        );
+    }
+
+    /// A directory entry another tar wrote is admitted and ignored rather than
+    /// refused, so an archive repacked by ordinary tools still reads.
+    #[test]
+    fn test_read_package_archive_admits_and_ignores_a_directory_entry_another_tar_wrote() {
+        let package = fixture_package();
+        let mut specs = entry_specs(&pack_package_archive(&package).expect("the fixture packs"));
+        specs.push(ArchiveEntrySpec {
+            kind: EntryType::Directory,
+            // Neither the canonical mode nor one the manifest declares: no
+            // directory mode is ever published, so none is consulted.
+            mode: 0o700,
+            name: "package/nested".to_string(),
+            bytes: Vec::new(),
+        });
+
+        let tree = read_package_archive(&archive_of(&specs))
+            .expect("a directory entry is admitted and ignored");
+
+        assert_eq!(tree.hashes().package, package.hashes().package);
+        assert_eq!(tree.file_count(), package.file_count());
+    }
+
+    /// Every package the model accepts packs into an archive the read accepts.
+    ///
+    /// The bounds are the thing under test, so the package is the worst case
+    /// the model permits — file count at the maximum, size at the budget, and
+    /// every source path too long for a tar header field, so each file also
+    /// costs a long-name entry. Asserting against the constants rather than
+    /// against measured numbers is what keeps this test tracking the bounds if
+    /// they ever move.
+    #[test]
+    fn test_pack_package_archive_stays_within_its_bounds_for_a_package_at_the_model_limits() {
+        let temp = tempfile::tempdir().expect("temporary directory");
+        let root = crate::test_utils::write_package_tree_at_model_limits(&temp.path().join("pkg"));
+        let package = ProfilePackage::from_directory(&root)
+            .expect("a package at the model limits is still a package");
+        assert_eq!(
+            package.file_count(),
+            MAX_PROFILE_PACKAGE_FILES,
+            "the fixture must sit at the file bound for this to establish anything"
+        );
+
+        let archive = pack_package_archive(&package).expect("a package at the limits packs");
+
+        assert!(
+            archive.len() <= MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+            "packing a package at the model limits wrote {} bytes, past the {} the read admits",
+            archive.len(),
+            MAX_PROFILE_PACKAGE_ARCHIVE_BYTES
+        );
+        let specs = entry_specs(&archive);
+        assert!(
+            specs.len() <= MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES,
+            "packing a package at the model limits wrote {} entries, past the {} the read admits",
+            specs.len(),
+            MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES
+        );
+        assert!(
+            specs
+                .iter()
+                .any(|spec| spec.name.len() > TAR_BLOCK_BYTES / 5),
+            "the fixture must carry a path too long for a tar header field"
+        );
+
+        let tree = read_package_archive(&archive).expect("the read accepts what packing wrote");
+        assert_eq!(tree.hashes().package, package.hashes().package);
     }
 
     /// A file larger than a package archive may be is refused before it is

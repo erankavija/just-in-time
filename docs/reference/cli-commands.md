@@ -856,8 +856,12 @@ jit profile pack --source <DIR> --output <FILE> [--json]
 `--source` names the package directory and must classify as worktree content.
 `--output` names the archive file to write, anywhere the invocation can write.
 
-The archive is an uncompressed tar holding the package tree beside the package
-`id`, `version`, and identity digest. Only the package directory is read: no
+The archive is an uncompressed tar carrying one metadata entry — the package
+`id`, `version`, and identity digest — and one entry per package file under a
+`package/` prefix. It carries no directory entries, so extracting it with
+`tar -xf` creates the package's directories with your umask's default mode, as
+any tar archive without them does; `jit profile add` builds the tree itself and
+takes every mode from the manifest. Only the package directory is read: no
 resolved variable value, no applied-profile record, and nothing outside that
 directory reaches the archive. Packing the same package twice produces
 byte-identical output, so an archive can be compared or checksummed without

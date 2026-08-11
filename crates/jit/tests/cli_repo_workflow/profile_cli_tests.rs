@@ -2447,3 +2447,74 @@ fn test_profile_pack_refuses_an_occupied_output_path_without_replacing_it() {
         );
     }
 }
+
+/// A package at the limits the model permits survives the exchange whole.
+///
+/// The round trip is where a bound that does not hold shows up as an archive
+/// `pack` writes and `add` refuses, with the operator left holding a file
+/// nothing accepts. The package this uses sits at the file-count bound, fills
+/// the byte budget, and gives every source a path too long for a tar header
+/// field and a directory of its own — the shape that costs an archive the most
+/// per file — so the exchange is exercised where its bounds bind rather than
+/// where a small fixture leaves them slack.
+#[test]
+fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
+    let source_repo = TempDir::new().unwrap();
+    let target_repo = TempDir::new().unwrap();
+    let exchange = TempDir::new().unwrap();
+    assert!(jit(source_repo.path(), &["init"]).status.success());
+    assert!(jit(target_repo.path(), &["init"]).status.success());
+    jit::test_utils::write_package_tree_at_model_limits(
+        &source_repo.path().join("packages/bounded"),
+    );
+    let archive = exchange.path().join("bounded.tar");
+    let archive = archive.to_str().unwrap();
+
+    let packed = jit(
+        source_repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            "packages/bounded",
+            "--output",
+            archive,
+            "--json",
+        ],
+    );
+    assert!(packed.status.success(), "{packed:?}");
+    let packed = json(&packed);
+    assert_eq!(
+        packed["file_count"],
+        jit::profile::MAX_PROFILE_PACKAGE_FILES,
+        "the package under test must sit at the file bound"
+    );
+    assert!(
+        fs::metadata(archive).unwrap().len()
+            <= jit::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
+        "packing a package at the model limits wrote an archive past the bound the read admits"
+    );
+
+    let added = jit(
+        target_repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            archive,
+            "--destination",
+            "packages/bounded",
+            "--json",
+        ],
+    );
+
+    assert!(added.status.success(), "{added:?}");
+    let added = json(&added);
+    assert_eq!(added["package_hash"], packed["package_hash"]);
+    assert_eq!(added["file_count"], packed["file_count"]);
+    assert_eq!(
+        worktree_files(&target_repo.path().join("packages/bounded")).len(),
+        jit::profile::MAX_PROFILE_PACKAGE_FILES,
+        "the published tree does not hold every file the package carried"
+    );
+}
