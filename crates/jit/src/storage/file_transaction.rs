@@ -3048,45 +3048,60 @@ mod tests {
 
     #[test]
     fn test_execute_repository_delta_publishes_one_barrier_sequence_for_an_existing_root() {
-        let temp = TempDir::new().unwrap();
-        let data = temp.path().join(".jit");
-        std::fs::create_dir(&data).unwrap();
-        let observer = RecordedJournal::watching(data.join("tmp/transactions/txn/journal.json"));
-        let kernel = transaction_kernel(temp.path(), &data, observer.clone());
-        let layout = kernel.repository.layout.clone();
-        let delta = RepositoryDelta::new(
-            &layout,
-            vec![
-                created_file(VirtualPath::data("a.json").unwrap(), b"a"),
-                created_file(VirtualPath::data("b.json").unwrap(), b"b"),
-            ],
-        )
-        .unwrap();
+        // Three publications regardless of action count: the sequence is the
+        // protocol's, not a function of the delta's size.
+        for action_count in [1usize, 2, 5] {
+            let temp = TempDir::new().unwrap();
+            let data = temp.path().join(".jit");
+            std::fs::create_dir(&data).unwrap();
+            let observer =
+                RecordedJournal::watching(data.join("tmp/transactions/txn/journal.json"));
+            let kernel = transaction_kernel(temp.path(), &data, observer.clone());
+            let layout = kernel.repository.layout.clone();
+            let delta = RepositoryDelta::new(
+                &layout,
+                (0..action_count)
+                    .map(|index| {
+                        created_file(
+                            VirtualPath::data(format!("file-{index}.json")).unwrap(),
+                            format!("body-{index}").as_bytes(),
+                        )
+                    })
+                    .collect(),
+            )
+            .unwrap();
 
-        execute_repository_delta(&kernel.repository, "txn", &delta, "plan", &*observer).unwrap();
+            execute_repository_delta(&kernel.repository, "txn", &delta, "plan", &*observer)
+                .unwrap();
 
-        // One initial record, one complete prepared record, one committed
-        // decision — no per-action rewrite between them, at any action count.
-        let published = observer.published();
-        assert_eq!(published.len(), 4, "{published:#?}");
-        assert!(published[0].is_none());
-        let initial = published[1].as_ref().expect("initial record");
-        let prepared = published[2].as_ref().expect("prepared record");
-        let committed = published[3].as_ref().expect("committed record");
-        assert_eq!(initial.decision, TransactionDecision::Prepared);
-        assert_eq!(prepared.decision, TransactionDecision::Prepared);
-        assert_eq!(committed.decision, TransactionDecision::Committed);
-        assert!(carries_staged_final_identities(prepared, initial));
-        // The committed record decides; it does not restate the actions.
-        assert_eq!(committed.actions, prepared.actions);
-        // The complete prepared record is durable before the first live mutation.
-        assert_eq!(
-            observer.at(&FailurePoint::RepositoryBeforeTargetMutation { action: 0 }),
-            Some(prepared.clone())
-        );
-        assert_eq!(std::fs::read(data.join("a.json")).unwrap(), b"a");
-        assert_eq!(std::fs::read(data.join("b.json")).unwrap(), b"b");
-        assert!(!data.join("tmp/transactions").exists());
+            // One initial record, one complete prepared record, one committed
+            // decision — no per-action rewrite between them.
+            let published = observer.published();
+            assert_eq!(published.len(), 4, "{action_count} actions: {published:#?}");
+            assert!(published[0].is_none());
+            let initial = published[1].as_ref().expect("initial record");
+            let prepared = published[2].as_ref().expect("prepared record");
+            let committed = published[3].as_ref().expect("committed record");
+            assert_eq!(initial.decision, TransactionDecision::Prepared);
+            assert_eq!(prepared.decision, TransactionDecision::Prepared);
+            assert_eq!(committed.decision, TransactionDecision::Committed);
+            assert!(carries_staged_final_identities(prepared, initial));
+            // The committed record decides; it does not restate the actions.
+            assert_eq!(committed.actions, prepared.actions);
+            // The complete prepared record is durable before the first live
+            // mutation.
+            assert_eq!(
+                observer.at(&FailurePoint::RepositoryBeforeTargetMutation { action: 0 }),
+                Some(prepared.clone())
+            );
+            for index in 0..action_count {
+                assert_eq!(
+                    std::fs::read(data.join(format!("file-{index}.json"))).unwrap(),
+                    format!("body-{index}").as_bytes()
+                );
+            }
+            assert!(!data.join("tmp/transactions").exists());
+        }
     }
 
     #[test]
