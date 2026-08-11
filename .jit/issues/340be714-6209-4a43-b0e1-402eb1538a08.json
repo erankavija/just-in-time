@@ -23,7 +23,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Add journal barrier crash coverage",
-  "updated_at": "2026-08-11T22:16:44.675169268Z"
+  "updated_at": "2026-08-11T23:20:10.240076669Z"
 }

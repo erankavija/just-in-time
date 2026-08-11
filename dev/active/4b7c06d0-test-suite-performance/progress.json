@@ -84,7 +84,7 @@
       "short_id": "4aa15137",
       "type": "bug",
       "title": "Mirror prepared rollback stage-cleanup edge in memory recovery",
-      "state": "in_progress",
+      "state": "done",
       "why": "A second audit found RepositoryBeforeStageCleanup was still reachable only on the JSON prepared-rollback path; the memory occurrence was post-commit cleanup and could not substantiate cross-backend rollback coverage. The scoped seam and focused tests are implemented and await lead gates."
     }
   ],
