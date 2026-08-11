@@ -806,6 +806,45 @@ with, fails the upgrade with nothing published.
 `--dry-run`, the JSON envelopes, and conflict reporting match
 [`jit profile reconfigure`](#jit-profile-reconfigure).
 
+### `jit profile capture`
+
+Capture a package tree from the repository targets its manifest declares:
+
+```bash
+jit profile capture --source <DIR> --destination <DIR> [--json]
+```
+
+`--source` names the package directory whose `manifest.toml` declares what to
+capture; `--destination` names the directory the resulting tree is published at.
+Both are resolved like any other path argument and must classify as worktree
+content, so the separate data root and anything outside the repository are
+refused before anything is read.
+
+Each asset the manifest declares under the `assets/live/` package-source prefix
+draws the bytes of the repository file its `target` names; every other declared
+source — the manifest, the install-only assets, the region sources — is read
+from the package directory itself. Capturing a package whose owned content was
+edited in place therefore produces a tree whose package identity reflects that
+edit, which is what lets [`jit profile apply`](#jit-profile-apply) reconcile the
+repository from it.
+
+Publication is whole and recoverable. The destination ends up holding exactly
+the manifest, the declared asset sources, and the declared region sources: a
+source the manifest stopped declaring, and any other file the destination held,
+is removed in the same transaction. A capture that changes nothing publishes
+nothing.
+
+A declared target that is a symbolic link, resolves outside the worktree, or
+carries executable permission its declaration did not is refused before anything
+is published, leaving the destination exactly as it was. The captured content is
+validated as a package before publication, so a published tree always decodes.
+
+JSON uses the standard list envelope `{"count": N, "files": [...]}` beside the
+captured package's `id`, `version`, `package_hash`, `source`, `destination`,
+`file_count`, `byte_size`, and `status`. Each `files` entry carries the
+repository-relative `path`, its `executable` mode intent, and an `action` of
+`unchanged`, `create`, `update`, or `remove`.
+
 ## Version and Provenance
 
 ### `jit version`

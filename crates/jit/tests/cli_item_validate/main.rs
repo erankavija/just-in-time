@@ -54,8 +54,8 @@ pub(crate) const DEFAULT_PACKAGE: &str = "jit-default";
 /// application records its worktree-relative location.
 pub(crate) fn initialize_with_default_vocabulary(dir: &std::path::Path) {
     let location = format!("packages/{DEFAULT_PACKAGE}");
-    jit::test_utils::assemble_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
-        .expect("this repository's default package assembles");
+    jit::test_utils::capture_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
+        .expect("this repository's default package captures");
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_jit"))
         .args(["init", "--profile", &format!("path:{location}")])
         .current_dir(dir)

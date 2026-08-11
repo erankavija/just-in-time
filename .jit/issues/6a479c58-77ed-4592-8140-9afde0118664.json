@@ -14,7 +14,23 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T07:47:03.118015539Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T07:51:44.290184173Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T07:33:09.333757942Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6a479c58-77ed-4592-8140-9afde0118664",
   "labels": [
     "type:task",
@@ -30,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Capture a package tree from declared repository targets",
-  "updated_at": "2026-08-11T04:20:51.905450408Z"
+  "updated_at": "2026-08-11T07:51:44.290184173Z"
 }

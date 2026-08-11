@@ -395,3 +395,57 @@ mod tests {
         );
     }
 }
+
+/// What one capture did to a path in the tree it published.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileCaptureAction {
+    /// Already exactly what the manifest declares.
+    Unchanged,
+    /// Absent, so the declared content was created.
+    Create,
+    /// Present with other content or mode, so it was replaced.
+    Update,
+    /// Present and no longer declared, so it was removed.
+    Remove,
+}
+
+/// One path a capture published or removed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileCaptureFile {
+    /// Repository-relative path in the published tree.
+    pub path: String,
+    /// What the capture did to it.
+    pub action: ProfileCaptureAction,
+    /// Platform-neutral file-mode intent.
+    pub executable: bool,
+}
+
+/// Count-wrapped response of one package-tree capture.
+///
+/// The collection is every path the capture decided about, including the ones
+/// it removed, so an adopter reading it sees what the destination stopped
+/// carrying as well as what it now carries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileCaptureResult {
+    /// Number of entries in [`Self::files`].
+    pub count: usize,
+    /// Stable identifier the captured manifest declares.
+    pub id: String,
+    /// Semantic version the captured manifest declares.
+    pub version: String,
+    /// Hash of the complete captured package.
+    pub package_hash: String,
+    /// Repository-relative package directory the capture read.
+    pub source: String,
+    /// Repository-relative directory the tree was published at.
+    pub destination: String,
+    /// Captured package file count, including `manifest.toml`.
+    pub file_count: usize,
+    /// Total captured package byte size.
+    pub byte_size: usize,
+    /// Whether the capture published a transaction.
+    pub status: ProfileApplicationStatus,
+    /// Every path the capture decided about, in canonical path order.
+    pub files: Vec<ProfileCaptureFile>,
+}

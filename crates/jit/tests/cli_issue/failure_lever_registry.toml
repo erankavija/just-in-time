@@ -690,6 +690,15 @@ expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]
+path = "profile capture"
+argv = ["profile", "capture", "--source", "packages/absent", "--destination", "build/captured", "--json"]
+setup = ["init"]
+expected_failure = "PROFILE_ERROR for a package directory that holds no readable manifest"
+expected_code = "PROFILE_ERROR"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
 path = "profile reconfigure"
 argv = ["profile", "reconfigure", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]

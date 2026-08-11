@@ -1,11 +1,11 @@
 use super::manifest::{ProfilePackageModel, MANIFEST_FILE_NAME};
+use super::nofollow::{classify_open_failure, is_executable, open_entry_nofollow, OpenRefusal};
 use super::variables::{validate_body_references, validate_model_references, VariableError};
 use super::wire::ManifestWireError;
 use crate::domain::repository_inputs::is_safe_relative_path;
 use crate::repository_state::{Contribution, MapEntryTarget, ScalarTarget};
-use cap_primitives::fs::FollowSymlinks;
 use cap_std::ambient_authority;
-use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry, OpenOptions as CapOpenOptions};
+use cap_std::fs::{Dir as CapDir, DirEntry as CapDirEntry};
 use semver::{Version, VersionReq};
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -100,9 +100,9 @@ impl ProfilePackage {
     /// themselves.
     ///
     /// This is the crate's only manifest parse. The constructor runs it over
-    /// the bytes its package carries, and the repository's package assembly
-    /// runs it over the checked-in sources' manifest to learn which files to
-    /// draw, so a manifest key means one thing wherever it is read.
+    /// the bytes its package carries, and package capture runs it over the
+    /// manifest at a package directory to learn which files to draw, so a
+    /// manifest key means one thing wherever it is read.
     ///
     /// Everything a manifest can be judged on alone is settled here: the wire
     /// version, the package identity and its version requirements, the semantic
@@ -110,12 +110,42 @@ impl ProfilePackage {
     /// roots. A returned manifest therefore declares only safe relative paths,
     /// which is what lets a caller join one onto a directory. The cross-check
     /// against the files a package actually holds needs those files and stays
-    /// with the constructor.
-    #[cfg(any(test, feature = "test-support"))]
+    /// with [`validate_content`](Self::validate_content).
     pub(crate) fn parse_manifest(
         manifest_bytes: &[u8],
     ) -> Result<ProfilePackageModel, ProfilePackageError> {
         Ok(Self::read_manifest(manifest_bytes)?.model)
+    }
+
+    /// Validate one package's complete content and derive its identity.
+    ///
+    /// The single validation every route to a package runs: reading a
+    /// directory, and capturing a tree from the repository files a manifest
+    /// declares. `executable_sources` names the sources whose bytes came from a
+    /// file carrying executable permission, so a source whose declaration did
+    /// not is refused here rather than by each caller.
+    ///
+    /// # Errors
+    ///
+    /// Every [`ProfilePackageError`] a package's own content can produce:
+    /// bounds, an absent or invalid manifest, a declared source the content
+    /// lacks, content the manifest does not declare, an undeclared executable,
+    /// and an unresolvable variable reference.
+    pub(crate) fn validate_content(
+        files: &BTreeMap<String, Vec<u8>>,
+        executable_sources: &BTreeSet<String>,
+    ) -> Result<(ProfilePackageModel, ProfilePackageHashes), ProfilePackageError> {
+        validate_package_bounds(files)?;
+        let manifest_bytes = files
+            .get(MANIFEST_FILE_NAME)
+            .ok_or(ProfilePackageError::MissingManifest)?;
+        let decoded = Self::read_manifest(manifest_bytes)?;
+        let model = decoded.model;
+
+        validate_declared_content(&model, files, executable_sources)?;
+        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
+        let hashes = compute_hashes(&model, files, &decoded.identity_manifest)?;
+        Ok((model, hashes))
     }
 
     fn read_manifest(
@@ -155,17 +185,7 @@ impl ProfilePackage {
         executable_sources: BTreeSet<String>,
         source: ProfilePackageSource,
     ) -> Result<Self, ProfilePackageError> {
-        validate_package_bounds(&files)?;
-        let manifest_bytes = files
-            .get(MANIFEST_FILE_NAME)
-            .ok_or(ProfilePackageError::MissingManifest)?;
-        let decoded = Self::read_manifest(manifest_bytes)?;
-        let model = decoded.model;
-
-        validate_declared_content(&model, &files, &executable_sources)?;
-        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
-        let hashes = compute_hashes(&model, &files, &decoded.identity_manifest)?;
-
+        let (model, hashes) = Self::validate_content(&files, &executable_sources)?;
         Ok(Self {
             model,
             files,
@@ -450,24 +470,6 @@ fn read_package_directory(root: &Path) -> Result<PackageDirectoryContents, Profi
     })
 }
 
-/// Open one listed entry through a no-follow `openat` on the handle that listed
-/// it, so the object opened is the object listed or nothing at all.
-///
-/// The open is non-blocking because opening is where an entry of the wrong kind
-/// gets to make a decision on the reader's behalf: a pipe or a device opened for
-/// reading waits for a peer, and a reader waiting forever rejects nothing. With
-/// `O_NONBLOCK` the open returns at once and the caller's handle-metadata check
-/// refuses the entry by name. The flag has no effect on the regular files a
-/// package is made of, whose reads are unaffected by it.
-fn open_entry_nofollow(entry: &CapDirEntry, maybe_dir: bool) -> std::io::Result<cap_std::fs::File> {
-    let mut options = CapOpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    options._cap_fs_ext_maybe_dir(maybe_dir);
-    options._cap_fs_ext_nonblock(true);
-    entry.open_with(&options)
-}
-
 /// Descend into a listed subdirectory, or report why it is not one.
 fn open_child_directory(
     entry: &CapDirEntry,
@@ -523,20 +525,6 @@ fn read_regular_entry(
     }
 }
 
-/// Whether the opened regular file carries an executable Unix mode.
-#[cfg(unix)]
-fn is_executable(metadata: &cap_std::fs::Metadata) -> bool {
-    use cap_std::fs::PermissionsExt as _;
-
-    metadata.permissions().mode() & 0o111 != 0
-}
-
-/// Windows has no executable mode bit for package-reader purposes.
-#[cfg(not(unix))]
-fn is_executable(_metadata: &cap_std::fs::Metadata) -> bool {
-    false
-}
-
 /// Why an entry that is not a usable regular file or directory is refused.
 ///
 /// Reporting only. Containment is established by the no-follow open, so a stale
@@ -553,31 +541,21 @@ fn rejected_entry(root: &Path, relative: String) -> ProfilePackageError {
 /// A failed open: a refusal when the name cannot be package content, I/O
 /// otherwise.
 ///
-/// Two errors say the listed name is not a regular file, whatever the listing
-/// said. Refusing to follow a symbolic link reports `ELOOP` under POSIX and
-/// `EMLINK` on the BSDs. Reading a socket, or a device with nothing behind it,
-/// reports `ENXIO` — the kinds that cannot be opened for reading at all, as
-/// distinct from the pipes and devices that open non-blockingly and are refused
-/// by their handle's metadata.
-#[cfg(unix)]
+/// Two refusals say the listed name is not a regular file, whatever the listing
+/// said: the name is a symbolic link, which the no-follow open declines, or it
+/// is a kind that cannot be opened for reading at all — as distinct from the
+/// pipes and devices that open non-blockingly and are refused by their handle's
+/// metadata. A walk lists direct children of a handle it holds, so the escape
+/// arm cannot arise here and is reported as ordinary I/O with the rest.
 fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> ProfilePackageError {
-    let unopenable_kind = matches!(
-        source.raw_os_error(),
-        Some(code)
-            if code == nix::libc::ELOOP || code == nix::libc::EMLINK || code == nix::libc::ENXIO
-    );
-    if unopenable_kind {
+    if matches!(
+        classify_open_failure(&source),
+        OpenRefusal::Symlink | OpenRefusal::Unopenable
+    ) {
         rejected_entry(root, relative.to_string())
     } else {
         unreadable(&root.join(relative), source)
     }
-}
-
-/// Non-Unix: the ELOOP/EMLINK/ENXIO errno classification above is POSIX- and
-/// BSD-specific, so every open failure is reported as unreadable.
-#[cfg(not(unix))]
-fn entry_open_failure(root: &Path, relative: &str, source: std::io::Error) -> ProfilePackageError {
-    unreadable(&root.join(relative), source)
 }
 
 /// Whether `path` resolves outside `root`.

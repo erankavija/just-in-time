@@ -71,13 +71,14 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
             .collect::<std::collections::BTreeSet<_>>(),
         std::collections::BTreeSet::from([
             "apply".to_string(),
+            "capture".to_string(),
             "list".to_string(),
             "reconfigure".to_string(),
             "show".to_string(),
             "upgrade".to_string(),
         ])
     );
-    for command in ["list", "show", "apply", "reconfigure", "upgrade"] {
+    for command in ["list", "show", "apply", "capture", "reconfigure", "upgrade"] {
         assert!(
             profile[command]["output"]["success_schema"].is_object(),
             "profile {command} must expose a success schema"

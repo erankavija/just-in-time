@@ -77,6 +77,13 @@ jit profile apply --profile path:packages/jit-dogfood
 jit profile apply --profile id:jit-dogfood --dry-run
 ```
 
+Capture a package tree from the repository files its manifest declares, which
+is how an edit made in place reaches the package that owns it:
+
+```bash
+jit profile capture --source profiles/my-workflow --destination build/my-workflow
+```
+
 Packages may declare non-secret variables. Supply a TOML values file containing
 `[variables]` or repeat `--set NAME=VALUE`; precedence is declaration default,
 values file, declared environment variable, then `--set`, with the last

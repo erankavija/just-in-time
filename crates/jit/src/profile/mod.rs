@@ -8,18 +8,13 @@ mod application;
 mod apply_claims;
 mod graph;
 mod manifest;
+mod nofollow;
 mod package;
+pub mod package_capture;
 mod repository_package;
 mod three_way;
 mod variables;
 mod wire;
-// Repository-local generator seam: the package tree this repository assembles
-// is produced by one entry point and read back by nothing, so the render has no
-// production caller. It builds with dev-dependencies active, which turns on
-// `test-support` through the crate's own self-edge, so gating the module on
-// that pair keeps it out of an adopter build entirely.
-#[cfg(any(test, feature = "test-support"))]
-pub mod package_assembly;
 // Repository-local check seam: this checkout's packaged contributions bound to
 // the registry entries they restate, plus the report shape that and the
 // template-region drift assertion share. Neither has a production caller, and
@@ -43,10 +38,10 @@ pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
 pub(crate) use application::SelectionObservation;
 pub use application::{
-    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
-    ProfileComposedApplyResult, ProfileListResult, ProfilePlanEntry, ProfilePlanResult,
-    ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult, ProfileCaptureAction,
+    ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult, ProfileListResult,
+    ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult,
+    ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
@@ -57,13 +52,15 @@ pub use manifest::{
     profile_package_model_schema, AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration,
     ProfileDependencyRequirement, ProfileId, ProfileIncompatibility, ProfilePackageModel,
     ProfileVariableDeclaration, ProfileVariableName, RegionDeclaration, RegionId, RegionPlacement,
-    MANIFEST_FILE_NAME,
+    LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
 };
 pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
-pub use repository_package::JIT_DOGFOOD_LIVE_SOURCE_PREFIX;
+pub use package_capture::{
+    capture_package_tree, CapturedFile, CapturedPackageTree, PackageCaptureError,
+};
 pub use three_way::{
     decide_three_way, ThreeWayConflict, ThreeWayDecision, ThreeWayInput, ThreeWayValue,
 };

@@ -3022,6 +3022,38 @@ pub enum ProfileCommands {
         json: bool,
     },
 
+    /// Capture a package tree from the repository targets its manifest declares
+    ///
+    /// Reads the manifest at the package directory, draws every live asset from
+    /// the repository file its declaration targets and every other declared
+    /// source from the package directory itself, and republishes the whole tree
+    /// at the destination through one recoverable transaction. A source the
+    /// manifest no longer declares does not survive the republication.
+    ///
+    /// Both directories are worktree paths. A declared target that is a
+    /// symbolic link, resolves outside the worktree, or carries executable
+    /// permission its declaration did not is refused before anything is
+    /// published.
+    ///
+    /// Examples:
+    ///   jit profile capture --source profiles/my-profile --destination build/my-profile
+    ///   jit profile capture --source profiles/my-profile --destination profiles/my-profile
+    ///
+    /// JSON output uses the list envelope `{"count": N, "files": [...]}`.
+    Capture {
+        /// Package directory whose manifest declares what to capture
+        #[arg(long, value_name = "DIR")]
+        source: std::path::PathBuf,
+
+        /// Directory the captured package tree is published at
+        #[arg(long, value_name = "DIR")]
+        destination: std::path::PathBuf,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Replace an installed profile with a newer package version
     Upgrade {
         /// Select a recorded profile id or worktree package directory
@@ -3145,6 +3177,9 @@ impl ProfileCommands {
             Self::Apply { dry_run, .. }
             | Self::Reconfigure { dry_run, .. }
             | Self::Upgrade { dry_run, .. } => !*dry_run,
+            // Capture publishes a repository transaction, so it dispatches
+            // recovery like every other mutating profile operation.
+            Self::Capture { .. } => true,
             Self::List { .. } | Self::Show { .. } => false,
         }
     }
@@ -3317,6 +3352,7 @@ impl ProfileCommands {
             Self::List { .. }
             | Self::Show { .. }
             | Self::Apply { .. }
+            | Self::Capture { .. }
             | Self::Reconfigure { .. }
             | Self::Upgrade { .. } => false,
         }
@@ -3654,6 +3690,7 @@ mod recovery_dispatch_tests {
         "list",
         "migrate lifecycle-timestamps",
         "profile apply",
+        "profile capture",
         "profile list",
         "profile reconfigure",
         "profile show",

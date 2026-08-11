@@ -192,7 +192,7 @@ fn render_storage_records_reference(_committed: &[u8]) -> Result<Vec<u8>, String
 /// The registry's bytes with the packaged declarations spliced into its
 /// generated region.
 ///
-/// The declarations come from this repository's workflow package assembled from
+/// The declarations come from this repository's workflow package captured from
 /// the checkout, so a run renders what the checkout currently declares.
 ///
 /// A render that moved a byte outside the delimiters is a defect in the splice
@@ -202,7 +202,7 @@ fn render_template_region(committed: &[u8]) -> Result<Vec<u8>, String> {
         template_region::outside_template_region(registry).map_err(|error| error.to_string())
     };
     let destination = tempfile::TempDir::new().map_err(|error| error.to_string())?;
-    let package = crate::test_utils::assemble_repository_package(
+    let package = crate::test_utils::capture_repository_package(
         TEMPLATE_REGION_PACKAGE_ID,
         &destination.path().join(TEMPLATE_REGION_PACKAGE_ID),
     )

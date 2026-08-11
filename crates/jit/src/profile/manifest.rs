@@ -8,6 +8,17 @@ use crate::repository_state::Contribution;
 /// The only manifest filename recognized at the root of a profile package.
 pub const MANIFEST_FILE_NAME: &str = "manifest.toml";
 
+/// Package-source prefix a manifest declares a live asset under.
+///
+/// The package format's own selection rule: an asset whose source sits under
+/// this prefix carries the bytes of the repository file its declaration
+/// targets, so the repository file is its authority and a capture draws it from
+/// there. Every other declared source is one the package itself carries. The
+/// rule is stated where the assets are declared, so which side owns a source is
+/// data in the manifest rather than an inventory a reader keeps, and it holds
+/// for every package rather than for one.
+pub const LIVE_ASSET_SOURCE_PREFIX: &str = "assets/live/";
+
 /// Stable lowercase-kebab identifier used to name a profile package.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
 #[serde(transparent)]

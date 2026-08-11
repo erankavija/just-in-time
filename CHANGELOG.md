@@ -127,6 +127,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`jit profile capture` republishes a package tree from the repository files
+  its manifest declares.** Producing a package tree was a repository-local
+  render compiled only for this crate's tests, hardcoded to one package path and
+  one entry-point script, so no adopter could author a package from a configured
+  repository, and profile-owned content edited in place could not be folded back
+  into the package that owns it — an edit to a packaged skill or gate script had
+  to be made twice, and a missed second edit was drift a guard could only report
+  after the fact. `jit profile capture --source <DIR>
+  --destination <DIR>` now serves any package directory and any destination its
+  arguments name. It draws each asset declared under the `assets/live/` package
+  source prefix from the repository file its declaration targets and every other
+  declared source from the package directory itself, so a capture after an
+  in-place edit publishes a tree whose package identity reflects that edit and
+  re-applying it reconciles the repository. A declared target that is a symbolic
+  link, resolves outside the worktree, or carries executable permission its
+  declaration did not is refused before anything is published, and the captured
+  content is validated as a package before publication. Publication is whole and
+  recoverable: the destination ends up holding exactly the manifest, the
+  declared asset sources, and the declared region sources, and it rides the same
+  transaction every other repository mutation does, so a failure leaves an
+  occupied destination as it was rather than losing it. A capture that changes
+  nothing publishes nothing.
+
 - **A profile package is applied together with the packages it depends on.** A
   manifest could declare a dependency, and nothing read it: a package carrying
   only its delta over another applied against a repository missing the
@@ -148,28 +171,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   reporting a recorded package it cannot obtain states which recorded package
   declared a dependency on it, where one did.
 
-- **The workflow package tree is assembled from the repository files it
-  mirrors.** Most of the `jit-dogfood` package's assets name a repository file
-  as their target and carry a byte copy of it, so an edit to a packaged skill or
-  gate script had to be made twice and a missed second edit was drift a guard
-  could only report after the fact. `./scripts/assemble-package.sh <destination>`
-  now produces the whole tree. It draws each declared source from the side that
-  owns it — a live asset from the repository file its declaration targets,
-  everything else from the checked-in sources under `profiles/jit-dogfood` — and
-  publishes each run as a freshly staged tree, so a source the manifest stops
-  declaring is absent from the next one. The destination is the caller's and a
-  run replaces it whole; no build consumes the assembled tree, so producing it
-  in the build would make every build do work no build consumes. The render
-  lives in the crate and reads the manifest through
-  the crate's own package model, which leaves the manifest one reader; the
-  assembled tree is validated as a package before it is published, and published
-  through the storage layer's atomic no-replace rename, so an occupied
-  destination is reported rather than overwritten.
-
-- **One native download now carries the assembled `jit-dogfood` workflow package
+- **One native download now carries the captured `jit-dogfood` workflow package
   for offline profile application.** An adopter could previously download the
   native archive but still needed a second source to apply the workflow package
-  offline; the archive now carries the assembled package under
+  offline; the archive now carries the captured package under
   `packages/jit-dogfood/`. The `jit` and `jit-server` binaries and both license
   texts remain at the extraction root, so the documented install step is
   unchanged. The published asset set and checksum file are unchanged because

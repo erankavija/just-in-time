@@ -403,9 +403,11 @@ async function main() {
           .map(tool => [tool.name, Object.keys(tool.inputSchema.properties).sort()])
       );
       // `profile` names an ordered selector; enumeration takes none, because it
-      // follows the repository's own records.
+      // follows the repository's own records; capture works between two named
+      // directories rather than over a selected profile.
       assert.deepStrictEqual(profileInputKeys, {
         jit_profile_apply: ['dry-run', 'json', 'profile', 'set', 'values-file'],
+        jit_profile_capture: ['destination', 'json', 'source'],
         jit_profile_list: ['json'],
         jit_profile_reconfigure: ['dry-run', 'json', 'profile', 'set', 'values-file'],
         jit_profile_show: ['json', 'profile'],
@@ -430,6 +432,10 @@ async function main() {
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_list').inputSchema.required,
         []
+      );
+      assert.deepStrictEqual(
+        tools.find(tool => tool.name === 'jit_profile_capture').inputSchema.required,
+        ['source', 'destination']
       );
       const applyProperties = tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.properties;
       assert.strictEqual(applyProperties['values-file'].type, 'string');

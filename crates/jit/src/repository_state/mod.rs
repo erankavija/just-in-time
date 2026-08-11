@@ -15,6 +15,7 @@ mod managed_document;
 mod materialize;
 mod mutation;
 mod overlay;
+mod package_tree;
 mod path;
 mod profile_apply;
 mod projection;
@@ -71,6 +72,10 @@ pub use managed_document::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
 pub use materialize::{assemble_config, render_capture_closure};
+pub use package_tree::{
+    finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
+    TreeFileDisposition, TreeFileOutcome,
+};
 // Capture-closure seam: `validate_capture_closure` and `ValidationCaptureClosure`
 // are `pub` only for the `fast_rules` integration-test crate (no production
 // consumer outside `repository_state`/`commands::validate`), so their exposure

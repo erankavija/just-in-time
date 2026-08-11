@@ -1286,11 +1286,11 @@ source-of-truth = \"registry-first\"\n";
         // The dependency is named and no location is supplied for it, so it is
         // resolved from the directory beside the package declaring it — the
         // shape an obtained set of packages arrives in.
-        let dependency = crate::test_utils::assemble_repository_package(
+        let dependency = crate::test_utils::capture_repository_package(
             "jit-default",
             &repo.path().join("packages/jit-default"),
         )
-        .expect("this repository's jit-default package assembles");
+        .expect("this repository's jit-default package captures");
         crate::test_utils::write_package_declaring(
             &composition_package(),
             &repo.path().join("packages/workflow"),
@@ -1585,7 +1585,7 @@ source-of-truth = \"registry-first\"\n";
 
         // Read from inside the worktree it is prepared against, because the
         // preparation records the package's worktree-relative location.
-        let package = crate::test_utils::assemble_repository_package(
+        let package = crate::test_utils::capture_repository_package(
             "jit-dogfood",
             &repo.path().join("profiles/jit-dogfood"),
         )

@@ -166,3 +166,58 @@ fn test_known_projection_renderer_definitions_keep_canonical_owners() {
         );
     }
 }
+
+/// A package read must resolve each source once, at the open, and take
+/// everything it decides from that handle.
+///
+/// Pathname-addressed reads are the one shape visibility cannot forbid:
+/// `std::fs` is public to every crate. A capture that stats a declared target
+/// and then reads it by name answers two questions about two objects whenever
+/// something replaces the name in between — the read follows a link the check
+/// never saw, and the mode judged is not the mode of the bytes admitted. The
+/// property is structural rather than behavioural because reproducing that
+/// interval in a test means racing it, and a test that must win a race to fail
+/// is a test that reports nothing on the runs it loses.
+#[test]
+fn test_package_capture_addresses_no_declared_source_by_pathname() {
+    let capture = production_source(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("src/profile/package_capture.rs"),
+    );
+    for reader in [
+        "fs::read(",
+        "fs::read_to_string(",
+        "fs::metadata(",
+        "fs::symlink_metadata(",
+        "fs::canonicalize(",
+        "File::open(",
+    ] {
+        assert!(
+            !capture.contains(reader),
+            "package capture addressed a source by pathname: {reader}"
+        );
+    }
+    assert!(
+        capture.contains("open_path_nofollow("),
+        "package capture no longer reads through the shared no-follow open, so \
+         the absence of pathname readers above establishes nothing"
+    );
+}
+
+/// One no-follow opener serves every route into a package.
+///
+/// Walking a package directory and capturing a tree from declared repository
+/// files both need the same open — no link followed into the name, no
+/// resolution out of the anchoring directory, non-blocking so an entry of the
+/// wrong kind cannot hold the reader open forever. A second copy is where one
+/// of those subtleties goes missing (`@/inv/convention-convergence`), so the
+/// options are built in exactly one place.
+#[test]
+fn test_profile_package_reads_build_no_follow_options_in_one_place() {
+    let profile = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/profile");
+    let owners = definition_owners(&profile, "_cap_fs_ext_follow");
+    assert_eq!(
+        owners,
+        vec![PathBuf::from("nofollow.rs")],
+        "each entry names a profile module building its own no-follow open"
+    );
+}
