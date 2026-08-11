@@ -21,9 +21,13 @@
 //! structured `STALE_BINARY` envelope — are unchanged; only the way a
 //! genuinely-stale evaluator is obtained differs.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use tempfile::TempDir;
+
+use super::stale_binary_child_process_tests::{
+    ancestor_commit, build_stale_child_binary, workspace_root,
+};
 
 #[test]
 fn test_stale_binary_error_code_resolves_to_external_error() {
@@ -41,14 +45,6 @@ fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
 }
 
-fn workspace_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("workspace root is two levels above the jit crate manifest")
-        .to_path_buf()
-}
-
 /// A `jit` invocation with the gate-context variables scrubbed. When this test
 /// suite itself executes under a `cargo-ci` gate evaluation, the whole process
 /// tree inherits `JIT_GATE_RUN=1` from the evaluator; left in place, it would
@@ -59,55 +55,6 @@ fn scrub_gate_context(cmd: &mut Command) {
     cmd.env_remove("JIT_GATE_RUN")
         .env_remove("JIT_ISSUE_ID")
         .env_remove("JIT_GATE_KEY");
-}
-
-/// Resolve a real, well-in-the-past commit in the workspace's own history
-/// (`HEAD~8`), used as the stale evaluator binary's injected build commit.
-/// `None` when the workspace has fewer than 9 commits or git is unavailable.
-fn ancestor_commit(workspace_root: &Path) -> Option<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "HEAD~8"])
-        .current_dir(workspace_root)
-        .output()
-        .ok()?;
-    output
-        .status
-        .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
-        .filter(|s| !s.is_empty())
-}
-
-/// Build a second `jit` binary that reports `ancestor` as its OWN build commit
-/// (clean, not dirty) via `build.rs`'s env-var override — a real,
-/// separately-compiled binary. Cached under a stable directory (shared with
-/// `stale_binary_child_process_tests`) so repeat runs are incremental. Returns
-/// its path, or `None` (skip) when `cargo` is unavailable or the build fails.
-fn build_stale_binary(workspace_root: &Path, ancestor: &str) -> Option<PathBuf> {
-    let short = Command::new("git")
-        .args(["rev-parse", "--short=8", ancestor])
-        .current_dir(workspace_root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())?;
-
-    let target_dir = workspace_root
-        .join("target")
-        .join("jit-stale-child-test-cache");
-    let status = Command::new("cargo")
-        .args(["build", "-p", "jit", "--bin", "jit"])
-        .current_dir(workspace_root)
-        .env("JIT_BUILD_GIT_HASH", ancestor)
-        .env("JIT_BUILD_GIT_SHORT_HASH", &short)
-        .env("JIT_BUILD_GIT_DIRTY", "false")
-        .env("CARGO_TARGET_DIR", &target_dir)
-        .status()
-        .ok()?;
-    if !status.success() {
-        return None;
-    }
-    let binary = target_dir.join("debug").join("jit");
-    binary.is_file().then_some(binary)
 }
 
 /// Build a scratch git repository whose `HEAD` is one commit past `ancestor`:
@@ -258,7 +205,7 @@ fn test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes() {
         eprintln!("SKIP: workspace does not have 9+ commits to pick a safe ancestor from");
         return;
     };
-    let Some(stale_binary) = build_stale_binary(&workspace_root, &ancestor) else {
+    let Some(stale_binary) = build_stale_child_binary(&workspace_root, &ancestor) else {
         eprintln!("SKIP: could not build the stale binary (cargo unavailable?)");
         return;
     };
@@ -342,7 +289,7 @@ fn test_gate_evaluate_metadata_only_commit_does_not_refuse_stale_binary() {
         eprintln!("SKIP: workspace does not have 9+ commits to pick a safe ancestor from");
         return;
     };
-    let Some(stale_binary) = build_stale_binary(&workspace_root, &ancestor) else {
+    let Some(stale_binary) = build_stale_child_binary(&workspace_root, &ancestor) else {
         eprintln!("SKIP: could not build the stale binary (cargo unavailable?)");
         return;
     };
