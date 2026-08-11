@@ -443,10 +443,22 @@ fn test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable() {
         .expect("workspace should have enough history for the stale-binary fixture");
     let directory = TempDir::new().expect("failure-injection cache needs a directory");
     let target_dir = directory.path().join(STALE_CHILD_CACHE);
-    let source_sha256 = sha256_file(Path::new(jit_binary())).unwrap();
-    let artifact_dir = target_dir
-        .join("artifacts")
-        .join(fixture_cache_key(&ancestor, &source_sha256));
+    let artifacts_root = target_dir.join("artifacts");
+    let artifact_directories = || match fs::read_dir(&artifacts_root) {
+        Ok(entries) => entries
+            .map(|entry| {
+                entry
+                    .expect("fixture artifact entry should remain readable")
+                    .path()
+            })
+            .filter(|path| path.is_dir())
+            .collect::<Vec<_>>(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => panic!(
+            "fixture artifacts root {} should remain readable: {error}",
+            artifacts_root.display()
+        ),
+    };
     let verify_fake =
         |binary: &Path, _: &str, _: &str| fs::read(binary).is_ok_and(|bytes| bytes == FAKE_CHILD);
 
@@ -459,9 +471,10 @@ fn test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable() {
     );
 
     assert!(failed.is_none());
+    let directories_before_retry = artifact_directories();
     assert!(
-        !artifact_dir.exists(),
-        "failed Cargo must not publish count, artifact, marker, or cache-key directory"
+        directories_before_retry.is_empty(),
+        "failed Cargo must leave no published artifact directories before retry: {directories_before_retry:?}"
     );
 
     let artifact = build_stale_child_binary_with_runner(
@@ -477,6 +490,14 @@ fn test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable() {
     )
     .expect("a later caller should retry and publish one verified artifact");
 
+    let artifact_directories = artifact_directories();
+    assert_eq!(
+        artifact_directories.len(),
+        1,
+        "successful retry must publish exactly one provenance-key directory: {artifact_directories:?}"
+    );
+    let artifact_dir = &artifact_directories[0];
+    assert_eq!(artifact.parent(), Some(artifact_dir.as_path()));
     assert_eq!(fs::read(&artifact).unwrap(), FAKE_CHILD);
     assert_eq!(
         read_build_count(&artifact_dir.join("cargo-build-invocations")),
