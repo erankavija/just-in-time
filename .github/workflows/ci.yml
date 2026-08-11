@@ -135,6 +135,12 @@ jobs:
       
       - name: Install ripgrep (for search tests)
         run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Install cargo-nextest
+        run: cargo install cargo-nextest --locked --version 0.9.133
+
+      - name: Validate nextest configuration
+        run: cargo nextest show-config test-groups
       
       - name: Configure git default branch
         run: git config --global init.defaultBranch main

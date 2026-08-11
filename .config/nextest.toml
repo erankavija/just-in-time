@@ -1,0 +1,14 @@
+nextest-version = "0.9.133"
+
+[profile.default]
+retries = 0
+
+# 15s × 4 = 60s hard per-test bound.
+slow-timeout = { period = "15s", terminate-after = 4 }
+
+# Explicitly pins nextest's default leak timeout.
+# Verified from the pinned tag source: https://raw.githubusercontent.com/nextest-rs/nextest/cargo-nextest-0.9.133/nextest-runner/default-config.toml
+leak-timeout = "200ms"
+
+# Nested-cargo and socket-heavy suites keep default parallelism; the
+# cross-process stale-binary fixture owns single-build serialization (issue 47836e2e).
