@@ -48,7 +48,7 @@ The `transaction-benchmark` task produces the append-only measurement artifact f
 | duration-checker | Add the injectable suite duration checker | task | The checker validates optional integer suite duration input against MAX_TEST_SUITE_SECONDS with five boundary fixtures. | — | REQ-02, investigation.md | touches 2 | runner-branch | — |
 | nextest-foundation | Pin and configure the nextest foundation | task | Pinned cargo-nextest and an exact initial parallel policy are reproducible in CI before runner use. | — | REQ-04, investigation.md | creates 1, touches 1 | runner-branch | — |
 | nextest-usage-docs | Document pinned nextest installation and use | task | dev/TESTING.md documents installing and running the pinned nextest and cites the committed policy. | — | REQ-04, investigation.md | touches 1 | runner-branch | nextest-foundation |
-| suite-runner | Swap the cargo-ci suite runner | task | cargo-ci runs the pinned nextest workspace suite with verified reporter evidence. | — | REQ-04, investigation.md | touches 2 | runner-branch | nextest-foundation, stale-binary-fixture |
+| suite-runner | Swap the cargo-ci suite runner | task | cargo-ci runs the pinned nextest workspace suite with verified reporter evidence. | — | REQ-04, investigation.md | touches 2 | runner-branch | stale-binary-fixture |
 | step-timing-and-clock | Add step timing and the named suite clock | task | cargo-ci reports integer-millisecond step timings and a suite-clock spanning exactly the nextest and doctest substeps. | suite-clock, nextest-reporter-evidence | REQ-03, investigation.md | touches 2 | runner-branch | suite-runner |
 | suite-enforcement | Wire suite enforcement and tighten nextest bounds | task | Live suite-clock enforcement uses the exact checker flag and final bounded nextest policy after transaction optimization. | suite-clock, nextest-reporter-evidence, suite-timing-evidence | REQ-01, REQ-02, investigation.md | touches 2 | runner-branch | step-timing-and-clock, duration-checker, fsync-dedupe, suite-profile |
 | suite-profile | Produce warm per-test suite timing evidence | task | A pinned-nextest profiler produces repository-owned warm per-test timing evidence at a stable JSON path. | nextest-reporter-evidence | REQ-05, investigation.md | creates 2 | runner-branch | suite-runner |
@@ -76,7 +76,6 @@ flowchart LR
     N3 --> N4
     N7 --> N5
     N7 --> N8
-    N7 --> N9
     N5 --> N9
     N9 --> N10
     N10 --> N11

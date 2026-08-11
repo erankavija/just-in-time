@@ -398,7 +398,6 @@
       "code-review"
     ],
     "depends_on": [
-      "nextest-foundation",
       "stale-binary-fixture"
     ],
     "planning": {
