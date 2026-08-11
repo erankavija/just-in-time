@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "0c0ec7d8a2095ac4c39cba1e820291e4fb7362b5",
+  "completed_at": "2026-08-11T23:13:41.613085052Z",
+  "duration_ms": 792098,
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "01da3894d1f4e25756bf1a4cc04916d6c40f42cd05301256169fc039ff8d0637",
+  "issue_id": "0369e563-9bde-4695-bdf2-0166172f1d6e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ae512549-8c89-417f-a87e-2d8ee3416a5b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T23:00:29.514150561Z",
+  "status": "passed",
+  "stderr": "cargo-ci: another build holds /tmp/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE  PATH\nflock           3425515 WRITE /tmp/cargo-ci.lock\n",
+  "stdout": "  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✓ test: 4564 passed, 0 failed, 10 ignored\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1540 bytes=29603680)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1583508072/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=skipped\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}
