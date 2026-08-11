@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2a11110bbadecde87c2ded2e9feadf8c949818ed",
+  "completed_at": "2026-08-11T23:55:26.450109741Z",
+  "duration_ms": 233164,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue adds shared, identity-driven barrier crash conformance coverage across both backends and root shapes without changing the transaction protocol.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "340be714-6209-4a43-b0e1-402eb1538a08",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "84d05267-6b3f-432a-b7aa-9c367feb41ae",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T23:51:33.285635402Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: df86b0e2, 48cd7903, 761592c9, e31c53cf, 2469644b (`jit:340be714`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4b7c06d0/requirement/REQ-04 (.jit/issues/4b7c06d0-0436-4dd3-b3c8-52595da3e342.json); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code unavailable); code-review pending (this run)\nTruncation recovery: bounded per-commit patches, targeted protocol and line-range reads, and scoped policy reads recovered all relevant evidence\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue adds shared, identity-driven barrier crash conformance coverage across both backends and root shapes without changing the transaction protocol.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

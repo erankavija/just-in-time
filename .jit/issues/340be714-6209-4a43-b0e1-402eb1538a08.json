@@ -8,6 +8,7 @@
   ],
   "description": "The shared crash-conformance inventory covers every barrier introduced or retained by the single-barrier journal protocol across both backends and both root shapes.\n\n## Background\n\nThe runtime cutover mechanically updates the existing inventory so the suite stays green; this task adds genuinely new coverage for the protocol’s barrier semantics. The shared file is intentionally shared: the prerequisite removes obsolete inventory entries, while this task adds the new crash cases after the runtime protocol exists.\n\n## Success Criteria\n\n- [hard] REQ-01: Injects crashes at every remaining phase boundary, including between `Prepared` publication and the first live mutation, after a live rename before its parent sync, after all parent syncs before `Committed`, and at rollback crash edges.\n- [hard] REQ-02: Runs the new crash cases against both storage backends and both existing-root and absent-root shapes.\n- [hard] REQ-03: Extends only the shared conformance inventory and verifies identity-driven recovery outcomes without changing the transaction protocol.\n\n## Notes\n\nThe shared `repository_state_store_tests.rs` footprint is intentional. The prerequisite edits it mechanically to remove names of deleted variants; this task adds new barrier cases in the same file, and the dependency plus `landing_group` make the ownership boundary explicit.",
   "documents": [],
+  "done_at": "2026-08-11T23:55:43.436425981Z",
   "first_ready_at": "2026-08-11T21:17:14.018950796Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-08-11T23:46:55.675080427Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:55:26.782001446Z",
       "updated_by": "auto:executor"
     }
   },
@@ -29,7 +35,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Add journal barrier crash coverage",
-  "updated_at": "2026-08-11T23:46:55.675080427Z"
+  "updated_at": "2026-08-11T23:55:43.436425981Z"
 }
