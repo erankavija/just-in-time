@@ -1373,6 +1373,7 @@ fn rollback_points(
                 point,
                 TransactionFailurePoint::RepositoryBeforeReverseAction { .. }
                     | TransactionFailurePoint::RepositoryAfterReverseAction { .. }
+                    | TransactionFailurePoint::RepositoryBeforeStageCleanup
                     | TransactionFailurePoint::RepositoryBeforeRollbackDecision
             )
         })
@@ -1383,7 +1384,7 @@ fn rollback_points(
 fn test_memory_prepared_recovery_reports_reverse_live_action_order_for_both_root_shapes() {
     use TransactionFailurePoint::{
         RepositoryAfterReverseAction as After, RepositoryBeforeReverseAction as Before,
-        RepositoryBeforeRollbackDecision as Decision,
+        RepositoryBeforeRollbackDecision as Decision, RepositoryBeforeStageCleanup as Cleanup,
     };
 
     for existing_data_root in [true, false] {
@@ -1400,6 +1401,7 @@ fn test_memory_prepared_recovery_reports_reverse_live_action_order_for_both_root
                 After { action: 1 },
                 Before { action: 0 },
                 After { action: 0 },
+                Cleanup,
                 Decision,
             ]
         } else {
@@ -1410,6 +1412,7 @@ fn test_memory_prepared_recovery_reports_reverse_live_action_order_for_both_root
                 After { action: 1 },
                 Before { action: 0 },
                 After { action: 0 },
+                Cleanup,
                 Decision,
             ]
         };
@@ -1420,39 +1423,47 @@ fn test_memory_prepared_recovery_reports_reverse_live_action_order_for_both_root
 
 #[test]
 fn test_memory_rollback_edge_failure_retains_prepared_residue_for_retry() {
-    for point in [
-        TransactionFailurePoint::RepositoryBeforeReverseAction { action: 1 },
-        TransactionFailurePoint::RepositoryAfterReverseAction { action: 1 },
-        TransactionFailurePoint::RepositoryBeforeRollbackDecision,
-    ] {
-        let (_temp, layout, storage) = prepare_memory_rollback(true);
-        let failure = SelectedFailures::one(point.clone());
-        let recovering = storage.with_repository_state_failure_view(failure.clone());
-        assert!(recovering.open_mutation_session(layout.clone()).is_err());
-        assert!(
-            failure.is_consumed(),
-            "rollback point did not fire: {point:?}"
-        );
-        assert!(matches!(
-            storage.repository_state().recovery,
-            Some(MemoryRecoveryResidue::Prepared { .. })
-        ));
+    for existing_data_root in [true, false] {
+        for point in [
+            TransactionFailurePoint::RepositoryBeforeReverseAction { action: 1 },
+            TransactionFailurePoint::RepositoryAfterReverseAction { action: 1 },
+            TransactionFailurePoint::RepositoryBeforeStageCleanup,
+            TransactionFailurePoint::RepositoryBeforeRollbackDecision,
+        ] {
+            let (_temp, layout, storage) = prepare_memory_rollback(existing_data_root);
+            let failure = SelectedFailures::one(point.clone());
+            let recovering = storage.with_repository_state_failure_view(failure.clone());
+            assert!(recovering.open_mutation_session(layout.clone()).is_err());
+            assert!(
+                failure.is_consumed(),
+                "rollback point did not fire: {point:?}, existing_data_root={existing_data_root}"
+            );
+            assert!(matches!(
+                storage.repository_state().recovery,
+                Some(MemoryRecoveryResidue::Prepared { .. })
+            ));
 
-        let mut recovered = recovering.open_mutation_session(layout).unwrap();
-        let image = recovered.capture(memory_rollback_spec()).unwrap();
-        assert!(matches!(
-            image
-                .entry(&VirtualPath::worktree("first.txt").unwrap())
-                .unwrap(),
-            RepositoryEntry::File { bytes, .. } if bytes == b"old-first"
-        ));
-        assert!(matches!(
-            image
+            let mut recovered = recovering.open_mutation_session(layout).unwrap();
+            let image = recovered.capture(memory_rollback_spec()).unwrap();
+            assert!(matches!(
+                image
+                    .entry(&VirtualPath::worktree("first.txt").unwrap())
+                    .unwrap(),
+                RepositoryEntry::File { bytes, .. } if bytes == b"old-first"
+            ));
+            let data_record = image
                 .entry(&VirtualPath::data("record.txt").unwrap())
-                .unwrap(),
-            RepositoryEntry::File { bytes, .. } if bytes == b"old-data"
-        ));
-        assert!(storage.repository_state().recovery.is_none());
+                .unwrap();
+            if existing_data_root {
+                assert!(matches!(
+                    data_record,
+                    RepositoryEntry::File { bytes, .. } if bytes == b"old-data"
+                ));
+            } else {
+                assert!(matches!(data_record, RepositoryEntry::Absent));
+            }
+            assert!(storage.repository_state().recovery.is_none());
+        }
     }
 }
 
