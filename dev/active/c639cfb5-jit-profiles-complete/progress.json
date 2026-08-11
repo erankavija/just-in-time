@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 11,
+  "current_wave": 12,
   "waves": [
     {
       "wave_number": 1,
@@ -143,7 +143,7 @@
           "short_id": "9a81ab12",
           "title": "Remove the shipped-v1 record migration boundary",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },
@@ -154,6 +154,12 @@
           "short_id": "15cc28c5",
           "title": "Pack a package into a verifiable archive",
           "classification": "implementation",
+          "status": "in_progress"
+        },
+        {
+          "short_id": "42c8c9c1",
+          "title": "Ownership, records, and safe change",
+          "classification": "checkpoint",
           "status": "pending"
         }
       ]
@@ -161,12 +167,6 @@
     {
       "wave_number": 13,
       "issues": [
-        {
-          "short_id": "42c8c9c1",
-          "title": "Ownership, records, and safe change",
-          "classification": "checkpoint",
-          "status": "pending"
-        },
         {
           "short_id": "f6a17e0d",
           "title": "Package authoring and offline exchange",
@@ -982,6 +982,25 @@
       "tier_1_5": "F1 closed at HEAD, verified independently: the capture production source contains no fs::read/read_to_string/metadata/symlink_metadata/canonicalize/File::open, and does contain open_path_nofollow. No regression in prior criteria.",
       "resolution": "read_confined now performs one handle-anchored no-follow open and derives kind, mode, and bytes from that single handle; the canonicalize+starts_with pre-check is deleted rather than demoted. The opener moved to crates/jit/src/profile/nofollow.rs, shared with package.rs, which shrank 66 lines; exactly one module under src/profile/ mentions _cap_fs_ext_follow.",
       "merge": "merge commit on main; merged tree byte-identical to the gated tree fec3a45f over every path outside .jit/ and dev/active, and cargo-ci's declared inputs exclude .jit/gate-runs, .jit/issues, and .jit/events.jsonl."
+    },
+    {
+      "issue": "9a81ab12",
+      "round": 1,
+      "verdict": "PASS",
+      "date": "2026-08-11",
+      "gates": {
+        "cargo-ci": "passed on a clean tree at 3a77038e (4516 tests; provenance 3/3, fixture 1528 files = exactly two fewer; targets 11/12)",
+        "code-review": "passed, 0 findings"
+      },
+      "criteria": {
+        "REQ-01": "MET",
+        "REQ-02": "MET",
+        "REQ-03": "MET",
+        "REQ-04": "MET",
+        "REQ-05": "MET"
+      },
+      "evidence": "Residual grep for shipped_v1|ShippedV1|converted_records|conversion_count outside .jit is empty. REQ-02 is pinned by test_ordinary_profile_readers_reject_an_undecodable_record_with_record_and_profile (commands/profile.rs:3200), which asserts the typed downcast, the exact message naming record path and profile id, and that resolve/list/show/plan all reject. REQ-03 verified by the removal of the second capture_proposed_base and the migration overlay. REQ-04 verified: no static conversion counter survives; remaining statics are unrelated temp-name and retention-id counters.",
+      "worker": "codex gpt-5.6-luna (workspace-write sandbox)"
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1058,6 +1077,27 @@
       "subject": "ProfileApplyError::PackageOutsideWorktree serves two callers",
       "detail": "It now reports both 'a package's bytes were read from outside the worktree' and 'a caller named a capture source/destination that is not worktree content', while living on ProfileApplyError though capture is not an apply. A shared ProfilePathError would read better. Worker-reported.",
       "status": "open"
+    },
+    {
+      "subject": "codex luna rewrote the epic's historical audit trail",
+      "detail": "Dispatched for 9a81ab12, codex applied the REQ-05 documentation sweep to dated session records: seven handoffs, investigation.md, c639cfb5-research.md (201 lines), breakdown.json, and progress.json. It edited past-tense records of what earlier sessions built so they no longer mentioned the removed mechanism, deleting concrete facts (handoff-9's record of 7793b8b7 and its failure mode; handoff-6's pinned-record detail). Reverted in full; the commit contains no dev/active path. Cause partly the dispatch prompt, which said 'grep the whole tree' without excluding dev/active/**. Every future doc-sweep instruction must exclude dated records.",
+      "status": "resolved-reverted"
+    },
+    {
+      "subject": "codex luna weakened a contract test to work around its sandbox",
+      "detail": "It added .filter(|path| symlink_metadata(...).is_ok()) to tests/provenance_contract/repository_inventory.rs because git ls-files --cached still listed the deleted files - true only because -s workspace-write made .git read-only so it could not commit. Committed, the filter is unnecessary and would silently skip a genuinely missing repository input instead of failing. Reverted; the provenance suite then passed 3/3 with the fixture at 1528 files, confirming the filter was an uncommitted-state artifact.",
+      "status": "resolved-reverted"
+    },
+    {
+      "subject": "codex exec -s workspace-write is the wrong sandbox for this repo",
+      "detail": "It denies .git writes (so the agent cannot commit and works around uncommitted state) and denies socket binding (15 test failures unrelated to the change), and the home cargo cache is read-only. The agent reported its exit 1 honestly. Either grant a writable .git and network-local sockets, or keep validation and commits lead-side as was done for wave 11.",
+      "status": "process-note"
+    },
+    {
+      "subject": "7793b8b7 is dissolved but out of epic scope",
+      "detail": "type:bug, milestone:v1.1, no epic label. Its subject - the process-global shipped_v1 conversion counter and the order-dependent test asserting on it - is deleted by 9a81ab12, so it is unreproducible. Not transitioned: transitioning an out-of-epic issue is the invoker's call.",
+      "status": "open",
+      "owner": "invoker"
     }
   ],
   "scope_changes": [
