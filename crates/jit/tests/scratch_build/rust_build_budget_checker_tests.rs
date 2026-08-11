@@ -136,22 +136,36 @@ impl Fixture {
         path
     }
 
-    fn run(&self, metadata: &Path, artifacts: &Path) -> Output {
+    fn run_with_suite_duration(
+        &self,
+        metadata: &Path,
+        artifacts: &Path,
+        suite_duration_ms: Option<&str>,
+    ) -> Output {
         // Invoked through `bash` so the exec bit is irrelevant to the test; the
         // gate's own `./scripts/cargo-ci.sh` self-run exercises direct
         // execution.
-        Command::new("bash")
-            .arg(checker_script())
-            .args([
-                "--root",
-                self.root().to_str().unwrap(),
-                "--metadata-json",
-                metadata.to_str().unwrap(),
-                "--artifacts-json",
-                artifacts.to_str().unwrap(),
-            ])
-            .output()
-            .expect("run rust-build-budget.sh")
+        let mut command = Command::new("bash");
+        command.arg(checker_script()).args([
+            "--root",
+            self.root().to_str().unwrap(),
+            "--metadata-json",
+            metadata.to_str().unwrap(),
+            "--artifacts-json",
+            artifacts.to_str().unwrap(),
+        ]);
+        if let Some(value) = suite_duration_ms {
+            command.args(["--test-suite-ms", value]);
+        }
+        command.output().expect("run rust-build-budget.sh")
+    }
+
+    fn run(&self, metadata: &Path, artifacts: &Path) -> Output {
+        self.run_with_suite_duration(metadata, artifacts, None)
+    }
+
+    fn run_with_suite_ms(&self, metadata: &Path, artifacts: &Path, value: &str) -> Output {
+        self.run_with_suite_duration(metadata, artifacts, Some(value))
     }
 }
 
@@ -365,5 +379,156 @@ ureq = { version = \"3\", default-features = false, features = [\"rustls\", \"na
             && stderr.contains("native-tls")
             && stderr.contains("ureq"),
         "diagnostic must name the duplicate backend and corrective area: {stderr}"
+    );
+}
+
+fn suite_duration_fixture() -> (Fixture, PathBuf, PathBuf) {
+    let fx = Fixture::compliant();
+    let metadata = fx.write_metadata(11);
+    let executable = fx.sparse_exe("a", EXACT_HALF_GIB);
+    let artifacts = fx.write_artifacts(&[(&executable, true)]);
+    (fx, metadata, artifacts)
+}
+
+#[test]
+fn test_checker_passes_when_test_suite_duration_flag_is_absent_and_reports_skip() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run(&metadata, &artifacts);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "absent duration must pass: {stdout}"
+    );
+    assert!(
+        stdout.contains("suite") && stdout.contains("skip"),
+        "success report must say the suite-duration check was skipped: {stdout}"
+    );
+}
+
+#[test]
+fn test_checker_returns_checker_error_for_non_integer_test_suite_duration() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run_with_suite_ms(&metadata, &artifacts, "29.999");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "non-integer duration must be an input error: {stderr}"
+    );
+    assert!(
+        stderr.contains("test-suite-ms") && stderr.contains("integer"),
+        "diagnostic must identify the invalid duration input: {stderr}"
+    );
+}
+
+#[test]
+fn test_checker_returns_checker_error_for_negative_test_suite_duration() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run_with_suite_ms(&metadata, &artifacts, "-1");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "negative duration must be an input error: {stderr}"
+    );
+    assert!(
+        stderr.contains("test-suite-ms") && stderr.contains("integer"),
+        "diagnostic must identify the invalid duration input: {stderr}"
+    );
+}
+
+#[test]
+fn test_checker_returns_checker_error_for_empty_test_suite_duration() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run_with_suite_ms(&metadata, &artifacts, "");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(2),
+        "empty duration must be an input error: {stderr}"
+    );
+    assert!(
+        stderr.contains("test-suite-ms") && stderr.contains("integer"),
+        "diagnostic must identify the invalid duration input: {stderr}"
+    );
+}
+
+#[test]
+fn test_checker_passes_for_under_threshold_test_suite_duration() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run_with_suite_ms(&metadata, &artifacts, "29999");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "under-threshold duration must pass: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
+fn test_checker_fails_for_at_threshold_test_suite_duration() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run_with_suite_ms(&metadata, &artifacts, "30000");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "at-threshold duration must violate the budget: {stderr}"
+    );
+    assert!(
+        stderr.contains("30000") && stderr.contains("threshold"),
+        "diagnostic must name the measured duration and threshold: {stderr}"
+    );
+}
+
+#[test]
+fn test_checker_fails_for_over_threshold_test_suite_duration() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run_with_suite_ms(&metadata, &artifacts, "45000");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "over-threshold duration must violate the budget: {stderr}"
+    );
+    assert!(
+        stderr.contains("45000") && stderr.contains("threshold"),
+        "diagnostic must name the measured duration and threshold: {stderr}"
     );
 }

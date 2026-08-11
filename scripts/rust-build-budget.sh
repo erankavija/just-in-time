@@ -9,7 +9,7 @@
 # compilation so `cargo metadata` and `cargo test --no-run` reuse warm artifacts
 # rather than triggering a second cold build (REQ-05).
 #
-# The three inputs are injectable so every failure mode has an independent
+# The inputs are injectable so every failure mode has an independent
 # regression fixture that needs no compilation (REQ-04):
 #   --root DIR           workspace root holding Cargo.toml, crates/jit/Cargo.toml
 #                        and scripts/cargo-ci.sh (policy sources); default: the
@@ -20,6 +20,8 @@
 #                        --message-format=json`; default: run it live under
 #                        --root. Executable paths are read from this stream and
 #                        their on-disk sizes summed.
+#   --test-suite-ms INTEGER measured nextest-plus-doctest suite duration;
+#                        absent: skip this check.
 #
 # Exit codes:
 #   0 — every budget and policy holds
@@ -35,14 +37,17 @@ set -euo pipefail
 # "Benchmark protocol").
 readonly MAX_INTEGRATION_TARGETS=12
 readonly MAX_EXECUTABLE_BYTES=$((2 * 1024 * 1024 * 1024)) # 2 GiB
+readonly MAX_TEST_SUITE_SECONDS=30
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(dirname "$SCRIPT_DIR")
 METADATA_JSON=""
 ARTIFACTS_JSON=""
+TEST_SUITE_MS=""
+TEST_SUITE_MS_PROVIDED=false
 
 usage() {
-  sed -n '2,26p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 while [ "$#" -gt 0 ]; do
@@ -50,6 +55,13 @@ while [ "$#" -gt 0 ]; do
     --root) ROOT="$2"; shift 2 ;;
     --metadata-json) METADATA_JSON="$2"; shift 2 ;;
     --artifacts-json) ARTIFACTS_JSON="$2"; shift 2 ;;
+    --test-suite-ms)
+      if [ "$#" -lt 2 ]; then
+        echo "rust-build-budget: missing value for --test-suite-ms" >&2
+        exit 2
+      fi
+      TEST_SUITE_MS="$2"; TEST_SUITE_MS_PROVIDED=true; shift 2
+      ;;
     -h | --help) usage; exit 0 ;;
     *)
       echo "rust-build-budget: unknown argument: $1" >&2
@@ -133,6 +145,30 @@ dep_line() {
 
 # --- Checks -----------------------------------------------------------------
 errors=()
+
+suite_duration_status="skipped"
+if [ "$TEST_SUITE_MS_PROVIDED" = true ]; then
+  if ! [[ "$TEST_SUITE_MS" =~ ^[0-9]+$ ]]; then
+    echo "rust-build-budget: invalid --test-suite-ms value: expected a non-negative integer" >&2
+    exit 2
+  fi
+  suite_duration_threshold_ms=$((MAX_TEST_SUITE_SECONDS * 1000))
+  # Order by digit count before comparing arithmetically, because bash's (( ))
+  # is 64-bit and wraps: `(( 9223372036854775808 >= 30000 ))` is false, so an
+  # unguarded comparison lets a long enough value pass the budget it exceeds.
+  # Stripping leading zeros makes digit count a magnitude order, so a wider
+  # value exceeds the threshold without arithmetic and every value that reaches
+  # (( )) fits the threshold's width.
+  measured_ms="${TEST_SUITE_MS#"${TEST_SUITE_MS%%[!0]*}"}"
+  measured_ms="${measured_ms:-0}"
+  if [ "${#measured_ms}" -gt "${#suite_duration_threshold_ms}" ] \
+    || { [ "${#measured_ms}" -eq "${#suite_duration_threshold_ms}" ] \
+      && (( measured_ms >= suite_duration_threshold_ms )); }; then
+    errors+=("test suite duration: observed ${TEST_SUITE_MS} ms, threshold ${suite_duration_threshold_ms} ms (must be below threshold).")
+  else
+    suite_duration_status="${TEST_SUITE_MS}ms"
+  fi
+fi
 
 # REQ-01: integration-test target count from `cargo metadata`.
 metadata=$(read_metadata)
@@ -229,4 +265,4 @@ fi
 
 # REQ-06: one concise, parseable success line. cargo-ci.sh's summarize_pass
 # folds it into the persisted gate summary.
-echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} incremental=${incremental_mode} dep-features=${dep_feature_policy}"
+echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} incremental=${incremental_mode} dep-features=${dep_feature_policy} suite-duration=${suite_duration_status}"
