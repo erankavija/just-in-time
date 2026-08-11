@@ -1,0 +1,461 @@
+{
+  "append_policy": "records are chronological and immutable; producers append one complete record and never rewrite an earlier record",
+  "contract": "transaction-benchmark-evidence",
+  "records": [
+    {
+      "binary": {
+        "build_profile": "release",
+        "build_timestamp": "1786482203",
+        "git_commit": "c4363a1facc5ffbd860c58c9f64cae05b108412b",
+        "git_dirty": false,
+        "git_short_commit": "c4363a1f",
+        "package": "jit",
+        "sha256": "16cacf4cc127aabe94ae28baa066653b947cab0c4ce711d8e18db9879e386a86",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "1.0.0"
+      },
+      "directory_fsync_probes": [
+        {
+          "directory_fsync_calls": 22,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 1046,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 21,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "timed": false
+        }
+      ],
+      "fixture": {
+        "archive_bytes": 5167104,
+        "asset_count": 511,
+        "authority": "crates/jit/src/profile/package.rs",
+        "byte_limit": 4194304,
+        "byte_size": 4193873,
+        "distinct_source_directories": 1023,
+        "file_count": 512,
+        "file_limit": 512,
+        "max_source_path_bytes": 254,
+        "package_hash": "993a32377ac174eb419b46f6a35e25f64da58f04f7267f491e40b3cf0fd09557",
+        "shape_authority": "crates/jit/src/test_utils.rs::write_package_tree_at_model_limits"
+      },
+      "fsync_residual_decision": {
+        "constraint": "The suppressed variant is an unsafe upper bound, not a candidate implementation. A production change may only deduplicate repeated directory syncs behind the existing preparation or pre-commit barrier; file fsyncs and phase barriers remain.",
+        "criteria": {
+          "minimum_paired_median_saving_ms": 5,
+          "minimum_paired_median_saving_percent": 5,
+          "required_observation": "both thresholds in at least one operation/root shape"
+        },
+        "decision": "no_change",
+        "observations": [
+          {
+            "baseline_median_ms": 100,
+            "operation": "profile_pack",
+            "paired_median_saving_ms": 2,
+            "paired_savings_ms": [
+              2,
+              15,
+              1,
+              -5,
+              3
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 2,
+            "suppressed_median_ms": 99
+          },
+          {
+            "baseline_median_ms": 276,
+            "operation": "profile_add",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              -14,
+              2,
+              -3,
+              0,
+              15
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 279
+          },
+          {
+            "baseline_median_ms": 515,
+            "operation": "profiled_init_publication",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              4,
+              -3,
+              -7,
+              4,
+              -3
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 511
+          }
+        ]
+      },
+      "host": {
+        "machine": "x86_64",
+        "measurement_filesystem": "tmpfs",
+        "release": "7.1.6-arch1-1",
+        "system": "Linux"
+      },
+      "measurements": [
+        {
+          "max_ms": 113,
+          "median_ms": 100,
+          "min_ms": 99,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            101,
+            113,
+            100,
+            99,
+            99
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "max_ms": 104,
+          "median_ms": 99,
+          "min_ms": 96,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            99,
+            98,
+            99,
+            104,
+            96
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "max_ms": 287,
+          "median_ms": 276,
+          "min_ms": 274,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            276,
+            274,
+            276,
+            287,
+            286
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "max_ms": 290,
+          "median_ms": 279,
+          "min_ms": 271,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            290,
+            272,
+            279,
+            287,
+            271
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "max_ms": 519,
+          "median_ms": 515,
+          "min_ms": 494,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            503,
+            494,
+            519,
+            515,
+            518
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "max_ms": 526,
+          "median_ms": 511,
+          "min_ms": 497,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            499,
+            497,
+            526,
+            511,
+            521
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        }
+      ],
+      "method": {
+        "cache_state": "warm: binary and fixture pages primed by warmups; absent-root copies are created before timing; kernel page cache is not dropped",
+        "cleanup": "archive, add destination, and profiled-init repository are removed after each timed subprocess; cleanup is outside the clock",
+        "clock": "Python time.perf_counter_ns around one jit subprocess",
+        "comparison_order": "durable and suppressed observations are paired; first-run order alternates between pairs to limit progressive cache and host-load bias",
+        "fsync_comparator": "LD_PRELOAD shim preserves file fsync and suppresses directory fsync only; both variants load the shim so interception overhead is shared; one separate untimed baseline probe per operation verifies and counts intercepted directory fsync calls",
+        "measured_runs_per_variant": 5,
+        "root_shape_mapping": {
+          "profile_add": "existing_data_root",
+          "profile_pack": "existing_data_root",
+          "profiled_init_publication": "absent_data_root"
+        },
+        "warmup_runs_per_variant": 2
+      },
+      "phase": "initial",
+      "recorded_at": "2026-08-11T21:38:03+00:00",
+      "sequence": 1,
+      "source": {
+        "dirty": false,
+        "revision": "05c2969c4d1a5fdd5f5ad4a0b78f151af19f14c4"
+      }
+    },
+    {
+      "binary": {
+        "build_profile": "release",
+        "build_timestamp": "1786482203",
+        "git_commit": "c4363a1facc5ffbd860c58c9f64cae05b108412b",
+        "git_dirty": false,
+        "git_short_commit": "c4363a1f",
+        "package": "jit",
+        "sha256": "16cacf4cc127aabe94ae28baa066653b947cab0c4ce711d8e18db9879e386a86",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "1.0.0"
+      },
+      "directory_fsync_probes": [
+        {
+          "directory_fsync_calls": 22,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 1046,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "timed": false
+        },
+        {
+          "directory_fsync_calls": 21,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "timed": false
+        }
+      ],
+      "fixture": {
+        "archive_bytes": 5167104,
+        "asset_count": 511,
+        "authority": "crates/jit/src/profile/package.rs",
+        "byte_limit": 4194304,
+        "byte_size": 4193873,
+        "distinct_source_directories": 1023,
+        "file_count": 512,
+        "file_limit": 512,
+        "max_source_path_bytes": 254,
+        "package_hash": "993a32377ac174eb419b46f6a35e25f64da58f04f7267f491e40b3cf0fd09557",
+        "shape_authority": "crates/jit/src/test_utils.rs::write_package_tree_at_model_limits"
+      },
+      "fsync_residual_decision": {
+        "constraint": "The suppressed variant is an unsafe upper bound, not a candidate implementation. A production change may only deduplicate repeated directory syncs behind the existing preparation or pre-commit barrier; file fsyncs and phase barriers remain.",
+        "criteria": {
+          "minimum_paired_median_saving_ms": 5,
+          "minimum_paired_median_saving_percent": 5,
+          "required_observation": "both thresholds in at least one operation/root shape"
+        },
+        "decision": "no_change",
+        "observations": [
+          {
+            "baseline_median_ms": 98,
+            "operation": "profile_pack",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              -3,
+              -5,
+              -1,
+              0,
+              4
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 98
+          },
+          {
+            "baseline_median_ms": 283,
+            "operation": "profile_add",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              -15,
+              -42,
+              7,
+              -9,
+              8
+            ],
+            "root_shape": "existing_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 276
+          },
+          {
+            "baseline_median_ms": 541,
+            "operation": "profiled_init_publication",
+            "paired_median_saving_ms": 0,
+            "paired_savings_ms": [
+              -728,
+              -471,
+              283,
+              -52,
+              -32
+            ],
+            "root_shape": "absent_data_root",
+            "saving_percent": 0,
+            "suppressed_median_ms": 610
+          }
+        ]
+      },
+      "host": {
+        "machine": "x86_64",
+        "measurement_filesystem": "tmpfs",
+        "release": "7.1.6-arch1-1",
+        "system": "Linux"
+      },
+      "measurements": [
+        {
+          "max_ms": 101,
+          "median_ms": 98,
+          "min_ms": 97,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            101,
+            98,
+            97,
+            97,
+            99
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "max_ms": 104,
+          "median_ms": 98,
+          "min_ms": 95,
+          "operation": "profile_pack",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            104,
+            103,
+            98,
+            97,
+            95
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "max_ms": 287,
+          "median_ms": 283,
+          "min_ms": 262,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            286,
+            287,
+            283,
+            262,
+            282
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "max_ms": 329,
+          "median_ms": 276,
+          "min_ms": 271,
+          "operation": "profile_add",
+          "root_shape": "existing_data_root",
+          "samples_ms": [
+            301,
+            329,
+            276,
+            271,
+            274
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        },
+        {
+          "max_ms": 893,
+          "median_ms": 541,
+          "min_ms": 518,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            541,
+            687,
+            893,
+            520,
+            518
+          ],
+          "unit": "integer_ms",
+          "variant": "durable_baseline"
+        },
+        {
+          "max_ms": 1269,
+          "median_ms": 610,
+          "min_ms": 550,
+          "operation": "profiled_init_publication",
+          "root_shape": "absent_data_root",
+          "samples_ms": [
+            1269,
+            1158,
+            610,
+            572,
+            550
+          ],
+          "unit": "integer_ms",
+          "variant": "directory_fsync_suppressed"
+        }
+      ],
+      "method": {
+        "cache_state": "warm: binary and fixture pages primed by warmups; absent-root copies are created before timing; kernel page cache is not dropped",
+        "cleanup": "archive, add destination, and profiled-init repository are removed after each timed subprocess; cleanup is outside the clock",
+        "clock": "Python time.perf_counter_ns around one jit subprocess",
+        "comparison_order": "durable and suppressed observations are paired; first-run order alternates between pairs to limit progressive cache and host-load bias",
+        "fsync_comparator": "LD_PRELOAD shim preserves file fsync and suppresses directory fsync only; both variants load the shim so interception overhead is shared; one separate untimed baseline probe per operation verifies and counts intercepted directory fsync calls",
+        "measured_runs_per_variant": 5,
+        "root_shape_mapping": {
+          "profile_add": "existing_data_root",
+          "profile_pack": "existing_data_root",
+          "profiled_init_publication": "absent_data_root"
+        },
+        "warmup_runs_per_variant": 2
+      },
+      "phase": "rerun",
+      "recorded_at": "2026-08-11T21:38:31+00:00",
+      "sequence": 2,
+      "source": {
+        "dirty": false,
+        "revision": "05c2969c4d1a5fdd5f5ad4a0b78f151af19f14c4"
+      }
+    }
+  ],
+  "schema_version": 1
+}
