@@ -58,8 +58,7 @@ pub use package::{
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
 pub use package_capture::{
-    capture_package_tree, CapturedFile, CapturedPackageTree, DeclaredSource, PackageCaptureError,
-    SourceAuthority,
+    capture_package_tree, CapturedFile, CapturedPackageTree, PackageCaptureError,
 };
 pub use three_way::{
     decide_three_way, ThreeWayConflict, ThreeWayDecision, ThreeWayInput, ThreeWayValue,

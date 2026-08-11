@@ -30,11 +30,11 @@ use super::{
 use crate::repository_state::{FileMode, RepositoryLayout, RepositoryLayoutError, VirtualPath};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Which side owns the bytes of one declared package source.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SourceAuthority {
+enum SourceAuthority {
     /// The repository file the declaration targets, in the adopter-facing
     /// repository-relative spelling.
     Repository(String),
@@ -44,13 +44,13 @@ pub enum SourceAuthority {
 
 /// One source a manifest declares, and the side that owns its bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeclaredSource {
+struct DeclaredSource {
     /// Package-relative source the manifest declares.
-    pub source: String,
+    source: String,
     /// Where a capture draws its bytes from.
-    pub authority: SourceAuthority,
+    authority: SourceAuthority,
     /// Mode the manifest declares the captured file is published with.
-    pub mode: FileMode,
+    mode: FileMode,
 }
 
 /// One file of a captured package tree.
@@ -170,7 +170,7 @@ pub enum PackageCaptureError {
 ///
 /// The manifest itself is not among them: it is the input a capture reads
 /// before it knows what else to draw, not something the manifest declares.
-pub fn declared_sources(model: &ProfilePackageModel) -> Vec<DeclaredSource> {
+fn declared_sources(model: &ProfilePackageModel) -> Vec<DeclaredSource> {
     model
         .assets
         .iter()
@@ -223,7 +223,10 @@ pub fn capture_package_tree(
     package_source: &VirtualPath,
     layout: &RepositoryLayout,
 ) -> Result<CapturedPackageTree, PackageCaptureError> {
-    let worktree = canonical_worktree_root(layout)?;
+    // The layout already refuses a root reached through a symbolic link, so
+    // the worktree root it names is the resolved directory every source below
+    // is compared against.
+    let worktree = layout.worktree_root().to_path_buf();
     let manifest_path = package_relative(package_source, MANIFEST_FILE_NAME).map_err(|source| {
         PackageCaptureError::UnaddressableTarget {
             declared: MANIFEST_FILE_NAME.to_string(),
@@ -348,21 +351,6 @@ pub(crate) fn package_relative(
     }
 }
 
-/// The worktree root as the filesystem resolves it.
-///
-/// The layout already refuses a root with a symlinked component, so this is the
-/// same directory the layout names; resolving it once is what lets each source
-/// below be compared against a fully resolved parent.
-fn canonical_worktree_root(layout: &RepositoryLayout) -> Result<PathBuf, PackageCaptureError> {
-    fs::canonicalize(layout.worktree_root()).map_err(|source| {
-        PackageCaptureError::UnreadableSource {
-            declared: String::new(),
-            path: layout.worktree_root().display().to_string(),
-            source,
-        }
-    })
-}
-
 /// Read one declared source, refusing anything a capture must not follow.
 ///
 /// The parent directory is fully resolved and required to stay inside the
@@ -438,6 +426,7 @@ fn read_mode(_metadata: &fs::Metadata) -> FileMode {
 mod tests {
     use super::*;
     use crate::storage::discover_repository_layout;
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
     /// A manifest declaring two live assets drawn from repository files, one

@@ -129,11 +129,6 @@ impl PackageTreeCapture {
         Ok(Self { destination, files })
     }
 
-    /// Where the tree is published.
-    pub fn destination(&self) -> &VirtualPath {
-        &self.destination
-    }
-
     /// The bounded capture declaration this republication starts from.
     ///
     /// It reads the destination, every directory above it, every path the tree
