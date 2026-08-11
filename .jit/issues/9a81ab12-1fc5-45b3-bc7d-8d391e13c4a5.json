@@ -13,14 +13,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-10T15:47:36.955991217Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-11T08:37:31.689327990Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-10T15:47:37.211565310Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-11T08:40:44.732461270Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "9a81ab12-1fc5-45b3-bc7d-8d391e13c4a5",
@@ -34,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the shipped-v1 record migration boundary",
-  "updated_at": "2026-08-11T07:54:39.020757684Z"
+  "updated_at": "2026-08-11T08:40:44.732461270Z"
 }
