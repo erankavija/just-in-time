@@ -129,18 +129,10 @@
       "wave_number": 10,
       "issues": [
         {
-          "id": "42c8c9c1-737d-48a6-b8b4-911aafa1a263",
-          "short_id": "42c8c9c1",
-          "title": "Ownership, records, and safe change",
-          "classification": "implementation",
-          "status": "pending"
-        },
-        {
-          "id": "6a479c58-77ed-4592-8140-9afde0118664",
           "short_id": "6a479c58",
           "title": "Capture a package tree from declared repository targets",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
@@ -148,19 +140,10 @@
       "wave_number": 11,
       "issues": [
         {
-          "id": "15cc28c5-1066-4db4-b5a6-4796b6144c08",
-          "short_id": "15cc28c5",
-          "title": "Pack a package into a verifiable archive",
-          "classification": "implementation",
-          "status": "pending"
-        },
-        {
-          "id": "9a81ab12",
           "short_id": "9a81ab12",
           "title": "Remove the shipped-v1 record migration boundary",
           "classification": "implementation",
-          "status": "pending",
-          "note": "No DAG edge onto 6a479c58: the cross-story edge would force jit to drop 42c8c9c1->7156f64b and route that issue's containment through another story, diverging its membership label. Sequenced here instead - capture must exist before the migration path is deleted (protect before destroy)."
+          "status": "pending"
         }
       ]
     },
@@ -168,16 +151,8 @@
       "wave_number": 12,
       "issues": [
         {
-          "id": "f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0",
-          "short_id": "f6a17e0d",
-          "title": "Package authoring and offline exchange",
-          "classification": "implementation",
-          "status": "pending"
-        },
-        {
-          "id": "f2389b18-5ce3-4e55-ab22-c7807c2ab62c",
-          "short_id": "f2389b18",
-          "title": "Check applied profiles against their packages and the repository",
+          "short_id": "15cc28c5",
+          "title": "Pack a package into a verifiable archive",
           "classification": "implementation",
           "status": "pending"
         }
@@ -187,9 +162,20 @@
       "wave_number": 13,
       "issues": [
         {
-          "id": "96268a98-ef75-487d-acab-22a813ff7803",
-          "short_id": "96268a98",
-          "title": "Report what an operation would change before it runs",
+          "short_id": "42c8c9c1",
+          "title": "Ownership, records, and safe change",
+          "classification": "checkpoint",
+          "status": "pending"
+        },
+        {
+          "short_id": "f6a17e0d",
+          "title": "Package authoring and offline exchange",
+          "classification": "checkpoint",
+          "status": "pending"
+        },
+        {
+          "short_id": "f2389b18",
+          "title": "Check applied profiles against their packages and the repository",
           "classification": "implementation",
           "status": "pending"
         }
@@ -199,9 +185,8 @@
       "wave_number": 14,
       "issues": [
         {
-          "id": "cb26de35-de6b-4297-983b-00aa8ef4c64f",
-          "short_id": "cb26de35",
-          "title": "Give the profile subcommands one presentation contract",
+          "short_id": "96268a98",
+          "title": "Report what an operation would change before it runs",
           "classification": "implementation",
           "status": "pending"
         }
@@ -211,23 +196,8 @@
       "wave_number": 15,
       "issues": [
         {
-          "id": "b3d92595-a878-478c-825d-529b9a15572e",
-          "short_id": "b3d92595",
-          "title": "Document the completed profile lifecycle for adopters",
-          "classification": "documentation",
-          "status": "pending"
-        },
-        {
-          "id": "6574f951-ec39-4952-80e0-b02005d08b04",
-          "short_id": "6574f951",
-          "title": "Prove publication survives interruption",
-          "classification": "implementation",
-          "status": "pending"
-        },
-        {
-          "id": "3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3",
-          "short_id": "3dcce8a8",
-          "title": "Prove no superseded lifecycle path survives",
+          "short_id": "cb26de35",
+          "title": "Give the profile subcommands one presentation contract",
           "classification": "implementation",
           "status": "pending"
         }
@@ -237,9 +207,20 @@
       "wave_number": 16,
       "issues": [
         {
-          "id": "d7558ef6-fffe-43ac-9bc7-27f914295c47",
-          "short_id": "d7558ef6",
-          "title": "Prove concurrent lifecycle callers serialize",
+          "short_id": "b3d92595",
+          "title": "Document the completed profile lifecycle for adopters",
+          "classification": "documentation",
+          "status": "pending"
+        },
+        {
+          "short_id": "6574f951",
+          "title": "Prove publication survives interruption",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "short_id": "3dcce8a8",
+          "title": "Prove no superseded lifecycle path survives",
           "classification": "implementation",
           "status": "pending"
         }
@@ -249,9 +230,8 @@
       "wave_number": 17,
       "issues": [
         {
-          "id": "8021d507-2f7b-4580-af2c-da242c831d75",
-          "short_id": "8021d507",
-          "title": "Prove the lifecycle runs without version control",
+          "short_id": "d7558ef6",
+          "title": "Prove concurrent lifecycle callers serialize",
           "classification": "implementation",
           "status": "pending"
         }
@@ -261,10 +241,20 @@
       "wave_number": 18,
       "issues": [
         {
-          "id": "dd268d0f-2656-4e85-8527-990dc6aea0b4",
+          "short_id": "8021d507",
+          "title": "Prove the lifecycle runs without version control",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 19,
+      "issues": [
+        {
           "short_id": "dd268d0f",
           "title": "Surface, documentation, and evidence",
-          "classification": "implementation",
+          "classification": "checkpoint",
           "status": "pending"
         }
       ]
@@ -989,6 +979,12 @@
       "subject": "lead triage: findings supplied one at a time",
       "detail": "Rounds 2 and 3 of code-review were the same defect class (rehearsal entry fidelity). The lead passed on each finding individually instead of the whole entry contract; the reviewer has no cross-round memory, so completeness must come from the lead. Round 4 requires a full field-by-occurrence-shape matrix as the deliverable.",
       "status": "process-note"
+    },
+    {
+      "subject": "live-asset classification encoded twice",
+      "detail": "Whether a package asset draws its bytes from the repository is answered by a package-relative source path prefix (JIT_DOGFOOD_LIVE_SOURCE_PREFIX = \"assets/live/\", crates/jit/src/profile/repository_package.rs:5, consumed in production only at package_assembly.rs:190) while the manifest separately declares [[live-source]] roots (manifest.rs:149, LiveSourceDeclaration at :346). Two encodings of one convention (@/inv/convention-convergence), and the constant names one package for a rule applied to every package (@/inv/domain-agnostic). The epic plan fixes the prefix convention for REQ-13, so 6a479c58 is directed to rename the constant only; converging on a declared per-asset marker would be a manifest-schema change beyond the plan.",
+      "status": "reported-to-invoker",
+      "owner": "invoker"
     }
   ],
   "scope_changes": [
@@ -999,6 +995,12 @@
       "detail": "Charter D-8 reversed and D-14 amended in dev/vision/9db27a3a-charter.md, re-projected. All 27 epic issues relabelled milestone:v1.0. Release boundary rewired: bb03df0a (cut the v1.0.0 tag) now depends on c639cfb5 and moved ready->backlog; 0735879a->c639cfb5 removed.",
       "criteria_amended": "REQ-05, REQ-09, REQ-11, REQ-12, D-01, D-05, RISK-02, RISK-04 and the background framing - the v1.0-record migration promises are gone, replaced by a clean cut.",
       "new_work": "9a81ab12 removes the shipped-v1 boundary (126 refs across 7 files); dissolves 7793b8b7."
+    },
+    {
+      "date": "2026-08-11",
+      "decision": "Wave plan recomputed for the 28-member graph",
+      "authority": "lead",
+      "detail": "9a81ab12 was created after the original wave plan and the remaining waves were renumbered against the live DAG. Waves 10-19 replace the stale 10-18. 6a479c58 and 9a81ab12 stay serialized (handoff-9 trap: capture is the recovery path, and both touch repository_state capture phases plus commands/profile.rs)."
     }
   ]
 }
