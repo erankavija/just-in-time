@@ -7,7 +7,15 @@
     "0369e563-9bde-4695-bdf2-0166172f1d6e"
   ],
   "description": "Apply the transaction benchmark’s recorded fsync-residual decision behind the existing preparation and pre-commit barriers, or record that no deduplication is needed when the criteria show no avoidable cost.\n\n## Background\n\nThe benchmark owns measurement and evidence; this dependent task owns the narrowly bounded production follow-up. Directory fsyncs remain load-bearing and the transaction protocol remains unchanged.\n\n## Success Criteria\n\n- [hard] REQ-01: Re-runs `scripts/benchmark-transaction.sh` and applies deduplication only in `crates/jit/src/storage/file_transaction.rs` where the artifact shows avoidable directory-fsync cost behind existing preparation or pre-commit barriers.\n- [hard] REQ-02: Updates `dev/benchmarks/test-suite-performance-4b7c06d0.json` with the applied decision, criteria, and rerun evidence, including a no-change decision when no deduplication is needed.\n- [hard] REQ-03: Preserves atomic publication, durability barriers, both root shapes, and recovery semantics.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "benchmark",
+      "label": "Applied fsync decision evidence",
+      "path": "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+    }
+  ],
+  "done_at": "2026-08-11T23:59:12.604709065Z",
   "first_ready_at": "2026-08-11T23:17:28.696916161Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +25,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-08-11T23:47:09.884411823Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T23:58:49.035896201Z",
       "updated_by": "auto:executor"
     }
   },
@@ -29,7 +42,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Apply the benchmark-driven fsync decision",
-  "updated_at": "2026-08-11T23:47:09.884411823Z"
+  "updated_at": "2026-08-11T23:59:12.604709065Z"
 }
