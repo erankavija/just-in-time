@@ -118,6 +118,27 @@ pub(super) fn ancestor_commit(workspace_root: &Path) -> Option<String> {
 /// verifies, and publishes both artifact and marker while still holding the
 /// lock. Returns `None` only when the nested Cargo command cannot run or fails.
 pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) -> Option<PathBuf> {
+    let target_dir = workspace_root.join("target").join(STALE_CHILD_CACHE);
+    build_stale_child_binary_with_runner(
+        workspace_root,
+        ancestor,
+        &target_dir,
+        run_nested_cargo,
+        binary_reports_provenance,
+    )
+}
+
+fn build_stale_child_binary_with_runner<RunCargo, VerifyBinary>(
+    workspace_root: &Path,
+    ancestor: &str,
+    target_dir: &Path,
+    run_cargo: RunCargo,
+    verify_binary: VerifyBinary,
+) -> Option<PathBuf>
+where
+    RunCargo: FnOnce(&Path, &Path, &str, &str) -> Option<PathBuf>,
+    VerifyBinary: Fn(&Path, &str, &str) -> bool,
+{
     let short = Command::new("git")
         .args(["rev-parse", "--short=8", ancestor])
         .current_dir(workspace_root)
@@ -129,8 +150,7 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
     let source_sha256 = sha256_file(Path::new(jit_binary()))
         .expect("the Cargo-built outer jit binary should be hashable");
     let cache_key = fixture_cache_key(ancestor, &source_sha256);
-    let target_dir = workspace_root.join("target").join(STALE_CHILD_CACHE);
-    fs::create_dir_all(&target_dir).expect("stale-child cache directory should be creatable");
+    fs::create_dir_all(target_dir).expect("stale-child cache directory should be creatable");
     let _lock = FileLocker::new(FIXTURE_LOCK_TIMEOUT)
         .lock_exclusive(&target_dir.join("fixture.lock"))
         .expect("stale-child fixture lock should be acquirable");
@@ -168,32 +188,13 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
         artifact_dir.display()
     );
 
-    fs::create_dir_all(&artifact_dir)
-        .expect("provenance-keyed stale-child artifact directory should be creatable");
-    let cargo_build_invocations = record_cargo_build_invocation(&build_count_path);
-    assert_eq!(
-        cargo_build_invocations, 1,
-        "one provenance key must invoke nested Cargo exactly once"
-    );
-    let status = Command::new("cargo")
-        .args(["build", "-p", "jit", "--bin", "jit"])
-        .current_dir(workspace_root)
-        .env("JIT_BUILD_GIT_HASH", ancestor)
-        .env("JIT_BUILD_GIT_SHORT_HASH", &short)
-        .env("JIT_BUILD_GIT_DIRTY", "false")
-        .env("CARGO_TARGET_DIR", &target_dir)
-        .status()
-        .ok()?;
-    if !status.success() {
-        return None;
-    }
-    let cargo_binary = target_dir
-        .join("debug")
-        .join(format!("jit{}", std::env::consts::EXE_SUFFIX));
-    if !binary_reports_provenance(&cargo_binary, ancestor, &short) {
+    let cargo_binary = run_cargo(workspace_root, target_dir, ancestor, &short)?;
+    if !verify_binary(&cargo_binary, ancestor, &short) {
         return None;
     }
 
+    fs::create_dir_all(&artifact_dir)
+        .expect("provenance-keyed stale-child artifact directory should be creatable");
     let staging = artifact_dir.join(format!("artifact.tmp.{}", std::process::id()));
     let cargo_sha256 = sha256_file(&cargo_binary).expect("Cargo child output should hash");
     fs::copy(&cargo_binary, &staging)
@@ -203,12 +204,17 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
         cargo_sha256,
         "staged child artifact must match Cargo output before publication"
     );
-    assert!(binary_reports_provenance(&staging, ancestor, &short));
+    assert!(verify_binary(&staging, ancestor, &short));
     publish_staged_file_noreplace(&staging, &artifact)
         .expect("verified stale-child artifact should publish atomically without replacement");
 
+    let cargo_build_invocations = record_cargo_build_invocation(&build_count_path);
+    assert_eq!(
+        cargo_build_invocations, 1,
+        "one provenance key must publish exactly one successful nested Cargo build"
+    );
     let artifact_sha256 = sha256_file(&artifact).expect("published child artifact should hash");
-    assert!(binary_reports_provenance(&artifact, ancestor, &short));
+    assert!(verify_binary(&artifact, ancestor, &short));
     let marker = VerifiedArtifactMarker {
         version: FIXTURE_MARKER_VERSION,
         source_sha256,
@@ -224,6 +230,28 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
     assert_eq!(observed.reuse_observations, 0);
     record_scoped_fixture_observation(&marker, FixtureUse::Built);
     Some(artifact)
+}
+
+fn run_nested_cargo(
+    workspace_root: &Path,
+    target_dir: &Path,
+    ancestor: &str,
+    short: &str,
+) -> Option<PathBuf> {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "jit", "--bin", "jit"])
+        .current_dir(workspace_root)
+        .env("JIT_BUILD_GIT_HASH", ancestor)
+        .env("JIT_BUILD_GIT_SHORT_HASH", short)
+        .env("JIT_BUILD_GIT_DIRTY", "false")
+        .env("CARGO_TARGET_DIR", target_dir)
+        .status()
+        .ok()?;
+    status.success().then(|| {
+        target_dir
+            .join("debug")
+            .join(format!("jit{}", std::env::consts::EXE_SUFFIX))
+    })
 }
 
 fn fixture_cache_key(ancestor: &str, source_sha256: &str) -> String {
@@ -404,6 +432,62 @@ fn test_stale_binary_fixture_marker_replacement_leaves_one_complete_file() {
 
     assert_eq!(read_marker(&marker_path).unwrap().reuse_observations, 1);
     assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable() {
+    const FAKE_CHILD: &[u8] = b"verified fake child";
+
+    let workspace_root = workspace_root();
+    let ancestor = ancestor_commit(&workspace_root)
+        .expect("workspace should have enough history for the stale-binary fixture");
+    let directory = TempDir::new().expect("failure-injection cache needs a directory");
+    let target_dir = directory.path().join(STALE_CHILD_CACHE);
+    let source_sha256 = sha256_file(Path::new(jit_binary())).unwrap();
+    let artifact_dir = target_dir
+        .join("artifacts")
+        .join(fixture_cache_key(&ancestor, &source_sha256));
+    let verify_fake =
+        |binary: &Path, _: &str, _: &str| fs::read(binary).is_ok_and(|bytes| bytes == FAKE_CHILD);
+
+    let failed = build_stale_child_binary_with_runner(
+        &workspace_root,
+        &ancestor,
+        &target_dir,
+        |_, _, _, _| None,
+        verify_fake,
+    );
+
+    assert!(failed.is_none());
+    assert!(
+        !artifact_dir.exists(),
+        "failed Cargo must not publish count, artifact, marker, or cache-key directory"
+    );
+
+    let artifact = build_stale_child_binary_with_runner(
+        &workspace_root,
+        &ancestor,
+        &target_dir,
+        |_, target_dir, _, _| {
+            let cargo_binary = target_dir.join("fake-cargo-output");
+            fs::write(&cargo_binary, FAKE_CHILD).unwrap();
+            Some(cargo_binary)
+        },
+        verify_fake,
+    )
+    .expect("a later caller should retry and publish one verified artifact");
+
+    assert_eq!(fs::read(&artifact).unwrap(), FAKE_CHILD);
+    assert_eq!(
+        read_build_count(&artifact_dir.join("cargo-build-invocations")),
+        Some(1)
+    );
+    assert_eq!(
+        read_marker(&artifact_dir.join("verified-artifact.json"))
+            .unwrap()
+            .cargo_build_invocations,
+        1
+    );
 }
 
 /// REQ-03: while Cargo remains the outer suite runner, this regression invokes

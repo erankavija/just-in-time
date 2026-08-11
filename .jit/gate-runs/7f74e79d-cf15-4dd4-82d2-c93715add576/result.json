@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "00adf25eb835530c1e8b62d7e0bb582ab780098b",
+  "completed_at": "2026-08-11T23:28:49.339393464Z",
+  "duration_ms": 407284,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "3177bef4f717a9ccc807d59bce781cf1bea27bf412a335834d26c22e2b8b31bf",
+  "issue_id": "47836e2e-7df7-4dd0-a256-d171c9d5f934",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7f74e79d-cf15-4dd4-82d2-c93715add576",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T23:22:02.054818039Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\ntest stale_binary_child_process_tests::test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable ... FAILED\ntest result: FAILED. 35 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 72.68s\n---- stale_binary_child_process_tests::test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable stdout ----\n\nthread 'stale_binary_child_process_tests::test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable' (3644557) panicked at crates/jit/tests/scratch_build/stale_binary_child_process_tests.rs:481:5:\nassertion `left == right` failed\n  left: None\n right: Some(1)\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n  ✓ incremental-preflight: ok\n  ✓ fmt: ok\n  ✓ clippy: ok\n  ✗ test: FAILED (exit 101)\n  ✓ provenance: 3 passed, 0 failed, 0 ignored (provenance-fixture: files=1540 bytes=29606256)\n  ✓ budget: integration-targets=11/12 active-executables=15 bytes=1583553096/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=skipped\n  ✓ incremental-state: ok\n\n",
+  "tree_dirty": false
+}

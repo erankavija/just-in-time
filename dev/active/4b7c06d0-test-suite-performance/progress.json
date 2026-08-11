@@ -91,7 +91,7 @@
   "delegation_model": "Hard tasks go to an Opus subagent via the Agent tool. Easier tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high` invoked DIRECTLY by the lead in the background; the lead then reviews the diff, runs the gate, and commits. Do not wrap a codex invocation in an intermediate Claude driver subagent — it adds no verification the lead does not already owe and costs a full agent's context.",
   "gate_cost_model": "Measured this session on this host: a cold worktree cargo-ci run is 10+ minutes; a warm run on main is ~3-5 minutes; each `code-review` run is 3-5 minutes and is per-issue (no reuse). cargo-ci verdicts DO reuse across issues over identical content, so merge a whole wave, then evaluate cargo-ci per issue for one execution plus reuses. Worker cargo-ci runs in fresh worktrees are the single largest avoidable cost: from wave 2 on, have workers verify with focused tests plus fmt and clippy only, and let the lead's post-merge gate on warm main be the authoritative run.",
   "escalations": [],
-  "rework_counts": {"f5da1112": 1, "47836e2e": 3, "0369e563": 1, "ee809651": 1},
+  "rework_counts": {"f5da1112": 1, "47836e2e": 4, "0369e563": 1, "ee809651": 1},
   "surfaced_pitfalls": [
     "A merged issue's cargo-ci can fail on a different in-progress issue already present on main. Run 4b75ba0b for 4aa15137 reproduced 47836e2e's deterministic 5/6 nextest observation defect while the recovery-seam focused tests, fmt, and clippy were green. Preserve the failed run as shared-branch evidence; do not charge rework to the unaffected issue, and rerun after the owning fix lands."
   ],
