@@ -24,6 +24,21 @@
     "security-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T12:55:23.890295711Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T13:00:57.811467097Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T12:55:47.993393647Z",
+      "updated_by": "auto:executor"
+    },
     "security-review": {
       "status": "passed",
       "updated_at": "2026-08-11T09:27:21.411423786Z",
@@ -45,5 +60,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Pack a package into a verifiable archive",
-  "updated_at": "2026-08-11T09:27:38.398785456Z"
+  "updated_at": "2026-08-11T13:00:57.811467097Z"
 }

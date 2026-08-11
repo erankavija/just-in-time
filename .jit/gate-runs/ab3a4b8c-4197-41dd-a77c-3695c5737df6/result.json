@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-15cc28c5",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2afa6a1c01aad1b5e2fab63af19887c7b430ea69",
+  "completed_at": "2026-08-11T11:20:11.223037274Z",
+  "duration_ms": 300392,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/package_archive.rs",
+        "id": "F1",
+        "line": 84,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c639cfb5/requirement/REQ-14"
+        ],
+        "severity": "high",
+        "summary": "The archive entry cap rejects archives produced from valid deeply nested package trees."
+      }
+    ],
+    "summary": "Packed archives for valid nested package trees can exceed the reader's incorrect entry limit.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "15cc28c5-1066-4db4-b5a6-4796b6144c08",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ab3a4b8c-4197-41dd-a77c-3695c5737df6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T11:15:10.831029372Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 25846 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-15cc28c5\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff088-9b22-7442-bf1d-ea6a5233becc\n--------\nuser\n--- 25833 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4825e30f, 28fa9341, 2afa6a1c (`jit:15cc28c5`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c639cfb5/requirement/REQ-14 and REQ-11 (issue markdown); @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, derived-state-coherence, convention-convergence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); mcp-ci passed (exit 0); security-review passed (no recorded run)\nTruncation recovery: re-read tagged commits and current implementation/tests/docs by bounded path and line ranges; no truncated evidence used for the finding\n\n1. **[blocking][issue-impact] F1:** `MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES` assumes at most one directory per package file, but packing emits every ancestor directory. A valid 512-file package with 511 sources in separate two-level directories yields 1,536 entries and is refused by `add` after `pack` created it, violating portable pack/add exchange. [crates/jit/src/profile/package_archive.rs:84](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-15cc28c5/crates/jit/src/profile/package_archive.rs:84) [@/issue/c639cfb5/requirement/REQ-14]\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Packed archives for valid nested package trees can exceed the reader's incorrect entry limit.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The archive entry cap rejects archives produced from valid deeply nested package trees.\",\"file\":\"crates/jit/src/profile/package_archive.rs\",\"line\":84,\"references\":[\"@/issue/c639cfb5/requirement/REQ-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
