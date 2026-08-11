@@ -13685,3 +13685,7 @@
 {"assignee":"agent:worker","id":"1a90bddc-ac6d-456e-9750-a386de762f6a","issue_id":"ee809651-fdd6-47c6-8a6d-4b8f6e819c3b","timestamp":"2026-08-11T21:23:16.478034476Z","type":"issue_claimed"}
 {"from":"ready","id":"4a2f5d86-f6b3-4014-a468-87db7e27c63b","issue_id":"007f598b-424d-4df3-8191-12d7d2378527","timestamp":"2026-08-11T21:23:22.564351997Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"4653413f-83f0-4141-a8ce-1b4ad96e3292","issue_id":"007f598b-424d-4df3-8191-12d7d2378527","timestamp":"2026-08-11T21:23:22.564351997Z","type":"issue_claimed"}
+{"id":"adcecb25-1d8f-4a26-8926-1bf608452f17","issue_id":"f78babf6-d35a-4a25-bf65-f4891f7cdf9f","priority":"high","timestamp":"2026-08-11T21:29:17.220716995Z","title":"Mirror prepared rollback failure points in memory recovery","type":"issue_created"}
+{"from":"in_progress","id":"08174009-3bec-4693-957b-8072c8523a60","issue_id":"340be714-6209-4a43-b0e1-402eb1538a08","timestamp":"2026-08-11T21:29:38.966179397Z","to":"ready","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"55cf3562-fed0-4b59-bf41-93b65bbf56ab","issue_id":"340be714-6209-4a43-b0e1-402eb1538a08","reason":"blocked by missing in-memory rollback injection seam","timestamp":"2026-08-11T21:29:38.966179397Z","type":"issue_released"}
+{"fields":["dependencies"],"id":"69b5b052-4003-48a7-b28b-458e4e79e536","issue_id":"f78babf6-d35a-4a25-bf65-f4891f7cdf9f","timestamp":"2026-08-11T21:29:45.057064499Z","type":"issue_updated","updated_by":"dependency-add"}
