@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3d644e2fbb20abd050560ac64041cc0427e00d27",
+  "completed_at": "2026-08-11T18:38:02.160310438Z",
+  "duration_ms": 150803,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F1",
+        "line": 430,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4b7c06d0/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The plan-fixed suite-clock contract is declared as produced by step-timing-and-clock; rewrite the task to emit measurement conforming to the fixed definition instead."
+      }
+    ],
+    "summary": "A plan-fixed contract is incorrectly assigned an implementation producer.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "eebb3fee-b234-47bf-9859-24b6de87a347",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9aac9252-5572-49fd-bef3-f16265711f08",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T18:35:31.357309573Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4703 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff21b-bcea-7fe2-8475-6acc42c47661\n--------\nuser\n--- 4690 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 (high, blocking):** `suite-clock` is declared plan-fixed, yet `step-timing-and-clock` says it “Produces the `suite-clock` contract.” This violates the no-producer rule for plan-fixed contracts and makes ownership ambiguous. Replace that criterion with emitting a measurement conforming to the plan-fixed clock definition; do not declare it a produced contract. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:430) [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/plan.md:17)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A plan-fixed contract is incorrectly assigned an implementation producer.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan-fixed suite-clock contract is declared as produced by step-timing-and-clock; rewrite the task to emit measurement conforming to the fixed definition instead.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":430,\"references\":[\"@/issue/4b7c06d0/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

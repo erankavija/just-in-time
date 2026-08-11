@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e5c516b4cb2efecfafda1a3c3e260d294b17f803",
+  "completed_at": "2026-08-11T18:03:14.788948516Z",
+  "duration_ms": 148616,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F1",
+        "line": 400,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/dag-acyclic"
+        ],
+        "severity": "high",
+        "summary": "suite-runner directly depends on nextest-foundation although stale-binary-fixture already provides that transitive dependency; remove the redundant direct edge."
+      }
+    ],
+    "summary": "The manifest contains a transitively redundant dependency edge.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "eebb3fee-b234-47bf-9859-24b6de87a347",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f4637098-11a9-4822-9735-79e4833c11b0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T18:00:46.172454967Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4204 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff1fb-ea33-70d1-aeeb-79ebb211e6b5\n--------\nuser\n--- 4191 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — High, blocking:** The manifest fails native validation because `suite-runner` directly depends on `nextest-foundation` while its `stale-binary-fixture` dependency already depends on that foundation. Remove the redundant direct `nextest-foundation` edge from [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:400) and regenerate the overview. `@/inv/dag-acyclic`\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest contains a transitively redundant dependency edge.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"suite-runner directly depends on nextest-foundation although stale-binary-fixture already provides that transitive dependency; remove the redundant direct edge.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":400,\"references\":[\"@/inv/dag-acyclic\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

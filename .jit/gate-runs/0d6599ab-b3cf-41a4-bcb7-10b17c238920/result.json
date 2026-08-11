@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5e63e5daa425da149d11e57b29113a3c557da534",
+  "completed_at": "2026-08-11T18:09:23.799674901Z",
+  "duration_ms": 325472,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F1",
+        "line": 583,
+        "severity": "high",
+        "summary": "inherent-cost-attribution and nextest-usage-docs both touch dev/TESTING.md but have no ordering dependency."
+      },
+      {
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F2",
+        "line": 472,
+        "severity": "high",
+        "summary": "suite-enforcement combines independently testable enforcement and nextest-policy work with a broad quantifier and no visible override."
+      },
+      {
+        "file": "dev/active/4b7c06d0-test-suite-performance/breakdown.json",
+        "id": "F3",
+        "line": 332,
+        "severity": "medium",
+        "summary": "nextest-foundation's worker-sizing rationale claims contributor guidance outside its declared footprint and ordering."
+      }
+    ],
+    "summary": "The graph has an unordered documentation overlap and two inaccurate or oversized leaf definitions.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "eebb3fee-b234-47bf-9859-24b6de87a347",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0d6599ab-b3cf-41a4-bcb7-10b17c238920",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T18:03:58.327372373Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9375 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff1fe-d8e8-71a3-ae9d-02ef0f88c4b8\n--------\nuser\n--- 9362 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[high]** `inherent-cost-attribution` claims its `dev/TESTING.md` overlap follows `nextest-usage-docs`, but depends only on `suite-enforcement`; no dependency orders the two writers. Add `nextest-usage-docs` to its dependencies, then regenerate the overview. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:583)\n\n2. **[high]** `suite-enforcement` combines independently testable runner enforcement and nextest-policy/per-test override generation, including an unbounded “every test” quantifier, without a visible warning override. Split it or add a concrete allowed override. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:472)\n\n3. **[medium]** `nextest-foundation` claims to establish contributor guidance, but its footprint excludes `dev/TESTING.md`; that work belongs to `nextest-usage-docs`, which the runner does not await. Correct the worker-sizing rationale to match its actual footprint. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/breakdown.json:332)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The graph has an unordered documentation overlap and two inaccurate or oversized leaf definitions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"inherent-cost-attribution and nextest-usage-docs both touch dev/TESTING.md but have no ordering dependency.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":583},{\"id\":\"F2\",\"severity\":\"high\",\"summary\":\"suite-enforcement combines independently testable enforcement and nextest-policy work with a broad quantifier and no visible override.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":472},{\"id\":\"F3\",\"severity\":\"medium\",\"summary\":\"nextest-foundation's worker-sizing rationale claims contributor guidance outside its declared footprint and ordering.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/breakdown.json\",\"line\":332}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -7,6 +7,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for The workspace test suite runs in under 30 seconds (4b7c06d0) into well-ordered implementation issues.",
   "documents": [],
+  "first_ready_at": "2026-08-11T18:50:46.539785898Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
@@ -33,7 +34,7 @@
     "brackets:4b7c06d0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "breakdown: The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T16:32:02.508095795Z"
+  "updated_at": "2026-08-11T18:50:46.539785898Z"
 }

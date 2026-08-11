@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:claude",
+  "claimed_at": "2026-08-11T18:50:30.198313713Z",
   "context": {},
   "created_at": "2026-08-11T16:32:02.508095795Z",
   "dependencies": [],
@@ -45,14 +46,15 @@
       "path": "dev/active/4b7c06d0-test-suite-performance/breakdown.json"
     }
   ],
+  "done_at": "2026-08-11T18:50:41.204588302Z",
   "first_ready_at": "2026-08-11T16:32:02.508095795Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
-      "updated_at": "2026-08-11T17:57:15.465243673Z",
+      "status": "passed",
+      "updated_at": "2026-08-11T18:50:16.477831348Z",
       "updated_by": "auto:executor"
     }
   },
@@ -65,7 +67,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T17:57:15.465243673Z"
+  "updated_at": "2026-08-11T18:50:41.204588302Z"
 }
