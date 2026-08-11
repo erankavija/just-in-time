@@ -1,12 +1,8 @@
-//! Repository-local checks and package-source conventions for this checkout's
-//! workflow package.
-
-/// Package-source prefix identifying assets that also project into this source tree.
-pub const JIT_DOGFOOD_LIVE_SOURCE_PREFIX: &str = "assets/live/";
+//! Repository-local checks over this checkout's own workflow package.
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::super::LIVE_ASSET_SOURCE_PREFIX;
     use crate::commands::CommandExecutor;
     use crate::config::ProjectionStyle;
     use crate::declarations::invariants::InvariantRegistry;
@@ -335,7 +331,7 @@ mod tests {
             .model()
             .assets
             .iter()
-            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+            .filter(|asset| asset.source.starts_with(LIVE_ASSET_SOURCE_PREFIX))
             .map(|asset| asset.target.as_str())
             .collect()
     }
@@ -348,7 +344,7 @@ mod tests {
             .model()
             .assets
             .iter()
-            .filter(|asset| !asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+            .filter(|asset| !asset.source.starts_with(LIVE_ASSET_SOURCE_PREFIX))
             .map(|asset| asset.source.as_str())
             .chain(
                 package
@@ -445,7 +441,7 @@ mod tests {
                 .model()
                 .assets
                 .iter()
-                .filter(|asset| !asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+                .filter(|asset| !asset.source.starts_with(LIVE_ASSET_SOURCE_PREFIX))
                 .any(|asset| roots
                     .iter()
                     .any(|declaration| declaration.root.relative_path(&asset.target).is_some())),
@@ -815,14 +811,14 @@ mod tests {
             .model()
             .regions
             .iter()
-            .all(|region| !region.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX)));
+            .all(|region| !region.source.starts_with(LIVE_ASSET_SOURCE_PREFIX)));
     }
 
     #[test]
     fn test_checked_in_package_has_no_live_source_files() {
         let package_sources = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../profiles/jit-dogfood")
-            .join(JIT_DOGFOOD_LIVE_SOURCE_PREFIX);
+            .join(LIVE_ASSET_SOURCE_PREFIX);
         fn contains_file(path: &Path) -> bool {
             let entries = match fs::read_dir(path) {
                 Ok(entries) => entries,
@@ -2003,7 +1999,7 @@ mod tests {
             .model()
             .assets
             .iter()
-            .filter(|asset| asset.source.starts_with(JIT_DOGFOOD_LIVE_SOURCE_PREFIX))
+            .filter(|asset| asset.source.starts_with(LIVE_ASSET_SOURCE_PREFIX))
             .map(|asset| (asset.target.as_str(), asset.executable))
             .collect()
     }

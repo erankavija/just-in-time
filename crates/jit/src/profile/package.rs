@@ -100,9 +100,9 @@ impl ProfilePackage {
     /// themselves.
     ///
     /// This is the crate's only manifest parse. The constructor runs it over
-    /// the bytes its package carries, and the repository's package assembly
-    /// runs it over the checked-in sources' manifest to learn which files to
-    /// draw, so a manifest key means one thing wherever it is read.
+    /// the bytes its package carries, and package capture runs it over the
+    /// manifest at a package directory to learn which files to draw, so a
+    /// manifest key means one thing wherever it is read.
     ///
     /// Everything a manifest can be judged on alone is settled here: the wire
     /// version, the package identity and its version requirements, the semantic
@@ -110,12 +110,42 @@ impl ProfilePackage {
     /// roots. A returned manifest therefore declares only safe relative paths,
     /// which is what lets a caller join one onto a directory. The cross-check
     /// against the files a package actually holds needs those files and stays
-    /// with the constructor.
-    #[cfg(any(test, feature = "test-support"))]
+    /// with [`validate_content`](Self::validate_content).
     pub(crate) fn parse_manifest(
         manifest_bytes: &[u8],
     ) -> Result<ProfilePackageModel, ProfilePackageError> {
         Ok(Self::read_manifest(manifest_bytes)?.model)
+    }
+
+    /// Validate one package's complete content and derive its identity.
+    ///
+    /// The single validation every route to a package runs: reading a
+    /// directory, and capturing a tree from the repository files a manifest
+    /// declares. `executable_sources` names the sources whose bytes came from a
+    /// file carrying executable permission, so a source whose declaration did
+    /// not is refused here rather than by each caller.
+    ///
+    /// # Errors
+    ///
+    /// Every [`ProfilePackageError`] a package's own content can produce:
+    /// bounds, an absent or invalid manifest, a declared source the content
+    /// lacks, content the manifest does not declare, an undeclared executable,
+    /// and an unresolvable variable reference.
+    pub(crate) fn validate_content(
+        files: &BTreeMap<String, Vec<u8>>,
+        executable_sources: &BTreeSet<String>,
+    ) -> Result<(ProfilePackageModel, ProfilePackageHashes), ProfilePackageError> {
+        validate_package_bounds(files)?;
+        let manifest_bytes = files
+            .get(MANIFEST_FILE_NAME)
+            .ok_or(ProfilePackageError::MissingManifest)?;
+        let decoded = Self::read_manifest(manifest_bytes)?;
+        let model = decoded.model;
+
+        validate_declared_content(&model, files, executable_sources)?;
+        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
+        let hashes = compute_hashes(&model, files, &decoded.identity_manifest)?;
+        Ok((model, hashes))
     }
 
     fn read_manifest(
@@ -155,17 +185,7 @@ impl ProfilePackage {
         executable_sources: BTreeSet<String>,
         source: ProfilePackageSource,
     ) -> Result<Self, ProfilePackageError> {
-        validate_package_bounds(&files)?;
-        let manifest_bytes = files
-            .get(MANIFEST_FILE_NAME)
-            .ok_or(ProfilePackageError::MissingManifest)?;
-        let decoded = Self::read_manifest(manifest_bytes)?;
-        let model = decoded.model;
-
-        validate_declared_content(&model, &files, &executable_sources)?;
-        validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
-        let hashes = compute_hashes(&model, &files, &decoded.identity_manifest)?;
-
+        let (model, hashes) = Self::validate_content(&files, &executable_sources)?;
         Ok(Self {
             model,
             files,

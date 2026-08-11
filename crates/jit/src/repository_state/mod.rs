@@ -15,6 +15,7 @@ mod managed_document;
 mod materialize;
 mod mutation;
 mod overlay;
+mod package_tree;
 mod path;
 mod profile_apply;
 mod projection;
@@ -65,6 +66,9 @@ pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
 pub use initialize::{
     render_repo_config, structural_minimum_config, GitattributesClaim, GitattributesStatus,
     InitializationError, InitializationScaffold, FRESH_CONFIG_SCHEMA_VERSION,
+};
+pub use package_tree::{
+    finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
 };
 pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{

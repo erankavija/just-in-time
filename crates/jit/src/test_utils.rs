@@ -5,8 +5,8 @@
 #![cfg(any(test, feature = "test-support"))]
 
 use crate::commands::CommandExecutor;
-use crate::profile::package_assembly::{assemble_package_tree, PackageAssemblyError};
-use crate::profile::ProfilePackage;
+use crate::profile::{capture_package_tree, ProfilePackage};
+use crate::repository_state::{FileMode, VirtualPath};
 use crate::storage::worktree_paths::WorktreePaths;
 use crate::storage::{discover_repository_layout, JsonFileStorage};
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
@@ -126,14 +126,21 @@ fn repository_checkout() -> PathBuf {
         .to_path_buf()
 }
 
-/// This repository's profile package `id`, assembled from its checkout and
-/// published at `destination`.
+/// This repository's profile package `id`, captured from its checkout and
+/// written at `destination`.
 ///
 /// One route serves every test that needs this repository's own package. The
-/// manifest and the sources the package authors itself come from the checked-in
-/// package directory named after `id` under [`PROFILE_PACKAGE_SOURCES`]; every
-/// live asset's bytes come from the repository file its declaration targets. A
-/// caller therefore reads the checkout's current repository files.
+/// capture itself is the product's, [`capture_package_tree`]: the manifest and
+/// the sources the package authors itself come from the checked-in package
+/// directory named after `id` under [`PROFILE_PACKAGE_SOURCES`], and every live
+/// asset's bytes come from the repository file its declaration targets, so a
+/// caller reads the checkout's current repository files.
+///
+/// What this fixture supplies around it is the write: the product publishes a
+/// captured tree through a repository's own mutation session, and a test that
+/// wants this checkout's package in a temporary directory has no session over
+/// this checkout to publish through — nor may it open one, since that would
+/// make a test a writer of the developer's repository.
 ///
 /// `destination` belongs to the caller. That is what lets a test which applies
 /// the package name a directory inside the repository it applies it to: an
@@ -141,29 +148,53 @@ fn repository_checkout() -> PathBuf {
 /// package read from outside the worktree. A caller that only reads
 /// declarations names a temporary directory it owns.
 ///
-/// Each call assembles afresh and takes `destination` over whole, so calling
-/// twice at one destination answers with the checkout's state at each call.
-/// Nothing is cached between calls: a cached tree would answer from the state
-/// at the first call, and this repository's managed-region and executable-mode
+/// Each call captures afresh and replaces `destination` whole, so calling twice
+/// at one destination answers with the checkout's state at each call. Nothing
+/// is cached between calls: a cached tree would answer from the state at the
+/// first call, and this repository's managed-region and executable-mode
 /// contracts assert about the checkout at the moment they read it, so a stale
 /// answer would report an agreement that no longer holds.
 ///
 /// # Errors
 ///
-/// Every failure [`assemble_package_tree`] reports: a declared source absent
-/// from either side, a checked-in manifest that does not parse or declares
-/// something invalid, a staged tree that does not validate as a package, and a
-/// destination occupied at the moment of publication.
-pub fn assemble_repository_package(
-    id: &str,
-    destination: &Path,
-) -> Result<ProfilePackage, PackageAssemblyError> {
+/// Every failure [`capture_package_tree`] reports — a declared source absent
+/// from either side, a source that is a symbolic link, is not an ordinary file
+/// or resolves outside the worktree, a manifest that does not parse, and
+/// content that does not validate as a package — plus the filesystem failures
+/// of writing the tree and reading it back.
+pub fn assemble_repository_package(id: &str, destination: &Path) -> Result<ProfilePackage> {
     let checkout = repository_checkout();
-    assemble_package_tree(
-        &checkout.join(PROFILE_PACKAGE_SOURCES).join(id),
-        &checkout,
-        destination,
-    )
+    let layout = discover_repository_layout(&checkout, checkout.join(".jit"))?;
+    let source = VirtualPath::worktree(Path::new(PROFILE_PACKAGE_SOURCES).join(id))?;
+    let captured = capture_package_tree(&source, &layout)?;
+
+    if fs::symlink_metadata(destination).is_ok() {
+        fs::remove_dir_all(destination)?;
+    }
+    for (relative, file) in captured.files() {
+        let path = destination.join(relative);
+        fs::create_dir_all(path.parent().unwrap_or(destination))?;
+        fs::write(&path, &file.bytes)?;
+        set_captured_mode(&path, file.mode)?;
+    }
+    Ok(ProfilePackage::from_directory(destination)?)
+}
+
+/// Publish one captured file's declared mode, on the platforms that carry one.
+#[cfg(unix)]
+fn set_captured_mode(path: &Path, mode: FileMode) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let bits = match mode {
+        FileMode::Executable => 0o755,
+        FileMode::Regular => 0o644,
+    };
+    fs::set_permissions(path, fs::Permissions::from_mode(bits))?;
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn set_captured_mode(_path: &Path, _mode: FileMode) -> Result<()> {
+    Ok(())
 }
 
 /// The manifest id of every profile package this repository publishes, sorted.
@@ -372,31 +403,15 @@ pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::profile::package_assembly::PACKAGE_SOURCE_PATH;
     use crate::storage::IssueStore;
 
-    /// The directory names under [`PROFILE_PACKAGE_SOURCES`], which is the set
-    /// of package sources this repository ships.
-    fn shipped_package_directories() -> Vec<String> {
-        fs::read_dir(repository_checkout().join(PROFILE_PACKAGE_SOURCES))
-            .expect("the checkout carries the profile package sources")
-            .map(|entry| {
-                entry
-                    .expect("read a package source entry")
-                    .file_name()
-                    .to_string_lossy()
-                    .into_owned()
-            })
-            .collect()
-    }
-
-    /// The id of the package whose sources [`PACKAGE_SOURCE_PATH`] names, taken
-    /// from that declaration so this module states no second location for it.
-    fn assembled_package_id() -> &'static str {
-        Path::new(PACKAGE_SOURCE_PATH)
-            .file_name()
-            .and_then(std::ffi::OsStr::to_str)
-            .expect("the package source path names a directory")
+    /// One package source directory this repository ships, which is all a
+    /// property about the fixture itself needs to name.
+    fn shipped_package_id() -> String {
+        published_package_ids()
+            .into_iter()
+            .next()
+            .expect("this repository publishes a profile package")
     }
 
     #[test]
@@ -417,21 +432,12 @@ mod tests {
         assert_eq!(std::env::current_dir().unwrap(), original.unwrap());
     }
 
-    /// Every package this repository ships assembles under the id its source
+    /// Every package this repository ships captures under the id its source
     /// directory is named after, which is what makes an id a sufficient way to
     /// name one.
     #[test]
     fn test_assemble_repository_package_answers_the_shipped_package_its_id_names() {
-        // The assembly module's own package-source path sits under the
-        // directory this module resolves an id against, so the two agree about
-        // where package sources live rather than each stating it.
-        assert_eq!(
-            Path::new(PACKAGE_SOURCE_PATH).parent(),
-            Some(Path::new(PROFILE_PACKAGE_SOURCES)),
-            "the assembled package's sources sit outside the shipped package directory"
-        );
-
-        let shipped = shipped_package_directories();
+        let shipped = published_package_ids();
         assert!(
             shipped.len() > 1,
             "this repository ships one package source directory, so a rule over \
@@ -476,33 +482,34 @@ mod tests {
         let elsewhere = TempDir::new().unwrap();
         let workspace = TempDir::new().unwrap();
         let destination = workspace.path().join("package");
+        let id = shipped_package_id();
         let assembled = {
             let _cwd = CurrentDirGuard::new(elsewhere.path()).unwrap();
-            assemble_repository_package(assembled_package_id(), &destination)
+            assemble_repository_package(&id, &destination)
         };
 
-        let package = assembled.expect("the package assembles from an unrelated working directory");
-        assert_eq!(package.model().id.as_str(), assembled_package_id());
+        let package = assembled.expect("the package captures from an unrelated working directory");
+        assert_eq!(package.model().id.as_str(), id);
         assert!(
             package.file_count() > 1,
-            "the assembled package carries more than a manifest"
+            "the captured package carries more than a manifest"
         );
     }
 
     /// A second call at one destination is answered rather than refused, and
     /// what it leaves there is one whole tree.
     ///
-    /// The publication underneath is atomic no-replace, so a run that merely
-    /// renamed onto an occupied destination would fail here; a run that merged
-    /// into it would leave a tree the manifest does not describe.
+    /// A fixture that merged into its previous destination would leave a tree
+    /// the manifest does not describe, which is what reading the destination
+    /// back as a package catches.
     #[test]
     fn test_assemble_repository_package_republishes_over_its_own_previous_destination() {
         let workspace = TempDir::new().unwrap();
         let destination = workspace.path().join("package");
-        let id = assembled_package_id();
+        let id = shipped_package_id();
 
-        let first = assemble_repository_package(id, &destination).unwrap();
-        let second = assemble_repository_package(id, &destination).unwrap();
+        let first = assemble_repository_package(&id, &destination).unwrap();
+        let second = assemble_repository_package(&id, &destination).unwrap();
 
         assert_eq!(second.hashes(), first.hashes());
         let reread = ProfilePackage::from_directory(&destination)

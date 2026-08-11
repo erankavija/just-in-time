@@ -1137,6 +1137,12 @@ pub enum MaterializationIntent {
     /// [`finalize_repository_export`](crate::repository_state::finalize_repository_export),
     /// not the declaration-derived producer graph.
     RepositoryExport,
+    /// Republish one whole package tree at a worktree destination from the
+    /// sources its manifest declares. Finalized by
+    /// [`finalize_package_tree_capture`](crate::repository_state::finalize_package_tree_capture),
+    /// not the declaration-derived producer graph: the content comes from a
+    /// package manifest rather than from this repository's declarations.
+    CapturePackageTree,
 }
 
 /// Stable ownership identity for a target claim.

@@ -15,13 +15,6 @@
 //! no-replace publishers refuse an occupied destination
 //! (`@/inv/atomic-writes`).
 //!
-//! [`publish_staged_directory_noreplace`] serves the one caller-chosen
-//! destination that is not an export and therefore cannot be classified:
-//! the disposable tree the repository's own package assembly writes, which is
-//! ordinarily a path inside the worktree under the ignored build directory. It
-//! reaches the same [`rename_noreplace_cap`] rather than carrying a second
-//! no-replace rename of its own.
-//!
 //! [`RepositoryStateStore`]: super::RepositoryStateStore
 //! [`classify_repository_export`]: crate::repository_state::classify_repository_export
 
@@ -236,74 +229,6 @@ pub(crate) fn publish_external_directory_noreplace(
     Ok(outcome)
 }
 
-/// Publish the already-staged directory tree at `staged` onto `destination`
-/// with one atomic no-replace rename.
-///
-/// The destination is an ordinary caller-chosen path rather than an
-/// [`ExternalExportPath`](crate::repository_state::ExternalExportPath), which is
-/// what separates this from [`publish_external_directory_noreplace`]: the
-/// repository's own package assembly publishes a disposable tree into a path
-/// that ordinarily sits inside the worktree, and the export classifier mints an
-/// external path only for one outside both repository roots. Nothing
-/// repository-owned travels through here — the caller hands over a tree it has
-/// already staged and verified, and no repository state is read or transacted —
-/// so the mutation-session API is not the route for it.
-///
-/// Both paths must name entries in one filesystem, and both parents must exist.
-///
-/// # Errors
-///
-/// [`crate::errors::AlreadyExistsError`] when `destination` is occupied, which
-/// is refused rather than overwritten (`@/inv/atomic-writes`);
-/// [`FileTransactionError::UnsupportedFilesystem`](crate::storage::FileTransactionError::UnsupportedFilesystem)
-/// on a filesystem or platform without an atomic no-replace rename, where
-/// publishing at all would mean overwriting.
-///
-/// Compiled only where its caller is: the package assembly is a
-/// repository-local generator seam, so an adopter build carries neither.
-#[cfg(any(test, feature = "test-support"))]
-pub(crate) fn publish_staged_directory_noreplace(staged: &Path, destination: &Path) -> Result<()> {
-    let (staged_leaf, staged_parent) = staged_directory_parent(staged)?;
-    let (leaf, parent) = staged_directory_parent(destination)?;
-    rename_noreplace_cap(&staged_parent, staged_leaf, &parent, leaf).map_err(|error| {
-        match error.kind() {
-            std::io::ErrorKind::AlreadyExists => crate::errors::AlreadyExistsError::new(format!(
-                "Output path already exists: {}",
-                destination.display()
-            ))
-            .into(),
-            std::io::ErrorKind::Unsupported => {
-                crate::storage::FileTransactionError::UnsupportedFilesystem {
-                    operation: "atomic no-replace directory publication".into(),
-                }
-                .into()
-            }
-            _ => anyhow::Error::new(error),
-        }
-    })
-}
-
-/// Resolve one directory-tree path into its existing parent handle and leaf.
-///
-/// The parent is canonicalized before it is opened, so a caller may name the
-/// tree relatively or through a link while the handle chain still anchors at a
-/// real directory reached without following one.
-#[cfg(any(test, feature = "test-support"))]
-fn staged_directory_parent(target: &Path) -> Result<(&OsStr, Dir)> {
-    let parent_path = target
-        .parent()
-        .filter(|parent| !parent.as_os_str().is_empty())
-        .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-    let parent_path = fs::canonicalize(&parent_path)
-        .with_context(|| format!("resolving directory parent {}", parent_path.display()))?;
-    let leaf = target
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("directory target has no file name"))?;
-    let parent = super::repository_state_store::open_absolute_dir_nofollow(&parent_path)
-        .with_context(|| format!("opening directory parent {}", parent_path.display()))?;
-    Ok((leaf, parent))
-}
-
 fn external_parent(target: &Path) -> Result<(&Path, &OsStr, Dir)> {
     let parent_path = target
         .parent()
@@ -405,52 +330,6 @@ mod tests {
                 .count(),
             1
         );
-    }
-
-    /// A staged tree publishes onto a free destination, and a destination
-    /// occupied at the moment of publication is refused with the tree left
-    /// where it was staged — so a caller that retired an occupant and then lost
-    /// a race reports rather than overwrites (`@/inv/atomic-writes`).
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn test_publish_staged_directory_noreplace_refuses_an_occupied_destination() {
-        let root = tempfile::tempdir().unwrap();
-        let staged = root.path().join("stage/tree");
-        std::fs::create_dir_all(staged.join("nested")).unwrap();
-        std::fs::write(staged.join("nested/file"), b"staged").unwrap();
-        let destination = root.path().join("published");
-
-        publish_staged_directory_noreplace(&staged, &destination).unwrap();
-        assert_eq!(
-            std::fs::read(destination.join("nested/file")).unwrap(),
-            b"staged"
-        );
-        assert!(!staged.exists(), "the staged tree moved rather than copied");
-
-        // A second tree, staged while the destination is occupied.
-        let raced = root.path().join("stage/second");
-        std::fs::create_dir_all(&raced).unwrap();
-        std::fs::write(raced.join("marker"), b"second").unwrap();
-        let error = publish_staged_directory_noreplace(&raced, &destination)
-            .expect_err("an occupied destination is refused");
-
-        assert!(
-            error
-                .downcast_ref::<crate::errors::AlreadyExistsError>()
-                .is_some(),
-            "{error}"
-        );
-        assert!(error.to_string().contains("published"), "{error}");
-        assert_eq!(
-            std::fs::read(destination.join("nested/file")).unwrap(),
-            b"staged",
-            "the occupant was overwritten"
-        );
-        assert!(
-            !destination.join("marker").exists(),
-            "the refused tree reached the destination"
-        );
-        assert!(raced.join("marker").is_file(), "the refused tree was lost");
     }
 
     #[cfg(target_os = "linux")]
