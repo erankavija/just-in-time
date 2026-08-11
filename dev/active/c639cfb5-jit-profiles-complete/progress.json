@@ -168,6 +168,17 @@
       "wave_number": 13,
       "issues": [
         {
+          "short_id": "cf42d08b",
+          "title": "A deep package packs but cannot be published",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 14,
+      "issues": [
+        {
           "short_id": "f6a17e0d",
           "title": "Package authoring and offline exchange",
           "classification": "checkpoint",
@@ -182,7 +193,7 @@
       ]
     },
     {
-      "wave_number": 14,
+      "wave_number": 15,
       "issues": [
         {
           "short_id": "96268a98",
@@ -193,7 +204,7 @@
       ]
     },
     {
-      "wave_number": 15,
+      "wave_number": 16,
       "issues": [
         {
           "short_id": "cb26de35",
@@ -204,7 +215,7 @@
       ]
     },
     {
-      "wave_number": 16,
+      "wave_number": 17,
       "issues": [
         {
           "short_id": "b3d92595",
@@ -227,7 +238,7 @@
       ]
     },
     {
-      "wave_number": 17,
+      "wave_number": 18,
       "issues": [
         {
           "short_id": "d7558ef6",
@@ -238,7 +249,7 @@
       ]
     },
     {
-      "wave_number": 18,
+      "wave_number": 19,
       "issues": [
         {
           "short_id": "8021d507",
@@ -249,7 +260,7 @@
       ]
     },
     {
-      "wave_number": 19,
+      "wave_number": 20,
       "issues": [
         {
           "short_id": "dd268d0f",
@@ -260,7 +271,23 @@
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "cf42d08b",
+      "title": "A deep package packs but cannot be published",
+      "reason": "Found reviewing 15cc28c5. publish_package_tree's CaptureBudget max_paths multiplier assumes a path shape the package model does not constrain, so a deep package packs but cannot be published; capture fails identically, placing it in the publication layer since 6a479c58. Filed at v1.1 initially; the invoker corrected that fixing bugs we find is our responsibility, not scope expansion, so it is now epic work at milestone:v1.0, wired 15cc28c5 -> cf42d08b -> f6a17e0d with the redundant story edge reduced."
+    },
+    {
+      "short_id": "5f71a48d",
+      "title": "A reject reason can leave the repository failing validation",
+      "reason": "Found by dogfooding: jit issue reject --reason writes the reason as a resolution: label, so a prose reason violates @/inv/label-format and leaves the repository failing jit validate and therefore the repo-validate gate. Recovery is blocked by two further defects: --remove-label exits 0 without removing a malformed label, and jit validate --fix reports no fixes needed while jit validate fails. Repaired by hand-editing the issue JSON plus jit recover. Not part of this epic; filed at milestone:v1.0 with no epic label - placing it under an epic is a planning call above the lead."
+    },
+    {
+      "short_id": "7793b8b7",
+      "title": "Shipped-v1 conversion counter test (rejected)",
+      "reason": "Rejected as obsolete: 9a81ab12 deleted both the process-global counter and the test asserting on it, and its REQ-03 required an authentication-once property that no longer exists."
+    }
+  ],
   "escalations": [
     {
       "category": "blocker-outside-epic-and-shared-infrastructure",
@@ -1001,6 +1028,19 @@
       },
       "evidence": "Residual grep for shipped_v1|ShippedV1|converted_records|conversion_count outside .jit is empty. REQ-02 is pinned by test_ordinary_profile_readers_reject_an_undecodable_record_with_record_and_profile (commands/profile.rs:3200), which asserts the typed downcast, the exact message naming record path and profile id, and that resolve/list/show/plan all reject. REQ-03 verified by the removal of the second capture_proposed_base and the migration overlay. REQ-04 verified: no static conversion counter survives; remaining statics are unrelated temp-name and retention-id counters.",
       "worker": "codex gpt-5.6-luna (workspace-write sandbox)"
+    },
+    {
+      "issue": "42c8c9c1",
+      "round": 1,
+      "verdict": "FAIL",
+      "date": "2026-08-11",
+      "gates": {
+        "repo-validate": "passed",
+        "holistic-review": "failed, 1 blocking finding"
+      },
+      "finding": "F1 medium blocking: profile_apply.rs:1836 still said a record may be 'replaced after an authenticated v1 conversion'. The v1 decoder and conversion were removed by 9a81ab12, so the statement was false. Cited @/issue/9a81ab12/requirement/REQ-05 and @/invariant/canonical-cutover.",
+      "resolution": "Fixed both instances of the class in one pass (5b05104f): profile_apply.rs:1836 and commands/profile.rs:1139, which carried the same stale 'authenticated'. package.rs:1059 legacy_v1_identity_hash inspected and kept - it is a cfg(test) oracle for the frozen package-manifest identity hash required by epic REQ-09, an unrelated subject.",
+      "note": "The finding I had flagged as the in-subject risk (fail-fast conflict reporting) was NOT raised by the independent reviewer, which supports the reconciliation judgement rather than overturning it."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1098,6 +1138,11 @@
       "detail": "type:bug, milestone:v1.1, no epic label. Its subject - the process-global shipped_v1 conversion counter and the order-dependent test asserting on it - is deleted by 9a81ab12, so it is unreproducible. Not transitioned: transitioning an out-of-epic issue is the invoker's call.",
       "status": "open",
       "owner": "invoker"
+    },
+    {
+      "subject": "Tier 2.5 sweep patterns missed the removed mechanism's own vocabulary",
+      "detail": "Wave 11's stale-narrative sweep grepped for 'migration boundary|compatibility path|legacy record|five-field|pre-canonical' plus the residual symbol names, and passed. It missed 'authenticated v1 conversion' at profile_apply.rs:1836 and 'authenticated embedded' at commands/profile.rs:1139, both caught later by the container holistic review. The per-issue code-review gate also returned 0 findings on that tree. Lesson: sweep on the removed mechanism's domain vocabulary (convert, conversion, authenticate, v1, migrate) and not only on the phrases the lead expects to find.",
+      "status": "process-note"
     }
   ],
   "scope_changes": [

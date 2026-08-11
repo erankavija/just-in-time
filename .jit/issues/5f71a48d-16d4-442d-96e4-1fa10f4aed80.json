@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-11T12:09:24.975365830Z",
+  "dependencies": [],
+  "description": "`jit issue reject --reason \"<prose>\"` writes a repository state that `jit validate` rejects, and neither documented repair path recovers it.\n\n## Background\n\n`jit issue reject` records its `--reason` as a `resolution:<reason>` label. A label must match `@/invariant/label-format` (`^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9._/-]*|...)$`), so any reason containing spaces, capitals, or punctuation produces a label that fails whole-repository validation.\n\nThe command warns but still commits the write, so the repository is left failing `jit validate` — and therefore failing the `repo-validate` gate — as the direct result of one documented invocation with a documented flag. Reproduced during epic `c639cfb5`:\n\n```\n$ jit issue reject 7793b8b7 --reason \"Premise removed by 9a81ab12. ...\"\nWarning: [label-format] at raw_labels.2: \"resolution:Premise removed by ...\" is not valid\nRejected issue: 7793b8b7-...\n$ jit validate\n❌ Repository validation failed with 1 rule error(s)\n```\n\nTwo further defects block recovery, which is what turns a bad write into a stuck state:\n\n- `jit issue update <id> --remove-label \"<the exact stored label>\"` exits 0 and reports \"Updated issue\", but the label is still present afterwards. Passing the byte-exact string read from the issue's own JSON does not remove it, with or without `--force`. A caller cannot tell the no-op from a success.\n- `jit validate --fix` reports \"✓ No fixes needed\" while `jit validate` on the same repository reports the error. The two disagree about whether the repository is valid.\n\nRecovery required editing `.jit/issues/<id>.json` by hand and running `jit recover`, which is exactly what the CLI exists to make unnecessary.\n\n## Success Criteria\n\n- [hard] REQ-01: A `--reason` that cannot form a valid label is refused before anything is written, naming the constraint, or is recorded somewhere that carries prose; no invocation leaves the repository failing `jit validate`.\n- [hard] REQ-02: `--remove-label` removes the named label whenever it is present, including a label that does not satisfy the format rule, or it fails loudly; it never reports success without removing.\n- [hard] REQ-03: `jit validate --fix` and `jit validate` agree on whether a repository is valid; `--fix` either repairs the finding or states that it cannot and why.\n- [hard] REQ-04: Tests cover a reject reason that cannot form a label, removal of a malformed label, and the `--fix`/validate agreement.\n\n## Notes\n\nFound by dogfooding during epic `c639cfb5`; not part of that epic's scope. Whichever surface owns it should decide whether prose reasons belong in a label at all — the description or an event record carries prose without constraining it to a token vocabulary.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-11T12:09:24.975365830Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "5f71a48d-16d4-442d-96e4-1fa10f4aed80",
+  "labels": [
+    "component:cli",
+    "milestone:v1.0",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "A reject reason can leave the repository failing validation",
+  "updated_at": "2026-08-11T12:09:24.975365830Z"
+}
