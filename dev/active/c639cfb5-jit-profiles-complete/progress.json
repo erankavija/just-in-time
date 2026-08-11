@@ -1007,14 +1007,14 @@
   "surfaced_pitfalls": [
     {
       "subject": "v1.0 applied-record migration boundary",
-      "detail": "is_shipped_v1_candidate authenticates only the pinned embedded jit-dogfood record; a real v1.0 repository (gf2, two directory-package records) is rejected outright by jit validate. Bears on epic REQ-09 and REQ-12.",
-      "status": "open-escalation",
+      "detail": "is_shipped_v1_candidate authenticates only the pinned embedded jit-dogfood record; a real v1.0 repository (gf2, two directory-package records) is rejected outright by jit validate. Bears on epic REQ-09 and REQ-12. RESOLVED: 9a81ab12 deleted the boundary; the owner settled it as a clean cut and capture (6a479c58) is the recovery path for a repository holding pre-release state.",
+      "status": "resolved-by-9a81ab12",
       "owner": "invoker"
     },
     {
       "subject": "shipped_v1_conversion_count test race",
-      "detail": "commands::init::tests::test_profiled_init_authenticates_shipped_v1_once_before_any_publication asserts on a process-global counter; fails under `cargo test -p jit --lib profile`, passes unfiltered and with --test-threads=1. Pre-existing, needs its own issue.",
-      "status": "open"
+      "detail": "commands::init::tests::test_profiled_init_authenticates_shipped_v1_once_before_any_publication asserts on a process-global counter; fails under `cargo test -p jit --lib profile`, passes unfiltered and with --test-threads=1. Pre-existing, needs its own issue. RESOLVED: the counter and the test asserting on it are both deleted. Tracking bug 7793b8b7 is out of epic scope and left for the invoker.",
+      "status": "resolved-by-9a81ab12"
     },
     {
       "subject": "fail-fast conflict reporting",
@@ -1121,6 +1121,62 @@
       "authority": "invoker",
       "detail": "The archive digest establishes integrity (truncation, corruption, accidental modification), not authenticity. It travels inside the archive, so anyone who can rewrite the content can rewrite the digest; the adopter's chosen channel carries authenticity (epic D-02). Confirmed as sufficient for this release. Signing or provenance attestation would be an additional artifact beside the digest rather than a change to it, so no half-built surface is left behind.",
       "constraint": "Neither code documentation nor adopter documentation (b3d92595) may describe the digest as proof of origin. Recorded in dev/active/15cc28c5/15cc28c5-threat-model.md, which is linked to 15cc28c5 and backs its precheck security-review attestation."
+    }
+  ],
+  "container_reconciliations": [
+    {
+      "container": "42c8c9c1",
+      "date": "2026-08-11",
+      "criterion": "REQ-01: child work lands per-target ownership claims, one aggregate publication, resolved variables, and three-way reconfiguration and upgrade, so an applied profile can change without stranding the repository.",
+      "method": "Every surfaced_pitfalls entry examined against REQ-01's named subjects. A pitfall whose subject a criterion names is a criterion violation, not a follow-up.",
+      "in_subject": [
+        {
+          "pitfall": "fail-fast conflict reporting",
+          "subject_match": "REQ-01 names 'three-way reconfiguration and upgrade', and this concerns that seam's conflict reporting.",
+          "assessment": "The seam reports the first conflicting target rather than all of them. REQ-01's test is whether an applied profile can change without stranding the repository: a reported conflict is actionable, the user resolves it and re-runs, and nothing is stranded. Epic REQ-07 requires conflicts be 'actionable', not exhaustive in one pass. Judged not a violation, and deliberately NOT argued away in advance - the holistic-review gate is an independent judge and runs without this pitfall being pre-closed. If it fails on this, the resolution is a remediation task inside the container, not a softer reading of the criterion."
+        }
+      ],
+      "out_of_subject": [
+        {
+          "pitfall": "profiles.md stale deferral",
+          "owner": "b3d92595",
+          "reason": "documentation; REQ-01 names no documentation surface"
+        },
+        {
+          "pitfall": "apply --dry-run rehearsal/run asymmetry",
+          "owner": "cb26de35",
+          "reason": "rehearsal/preview shape of apply; not among REQ-01's named subjects"
+        },
+        {
+          "pitfall": "live-asset classification encoded twice",
+          "owner": "invoker",
+          "reason": "package format convention; not among REQ-01's named subjects"
+        },
+        {
+          "pitfall": "empty directories survive a capture removal",
+          "owner": "15cc28c5",
+          "reason": "capture belongs to the authoring-and-exchange story, not this container"
+        },
+        {
+          "pitfall": "TreeFileDisposition / ProfileCaptureAction duplication",
+          "owner": "cb26de35",
+          "reason": "presentation contract"
+        },
+        {
+          "pitfall": "ProfileCaptureResult flattens package facts",
+          "owner": "cb26de35",
+          "reason": "presentation contract"
+        },
+        {
+          "pitfall": "ProfileApplyError::PackageOutsideWorktree serves two callers",
+          "owner": "open",
+          "reason": "error typing on capture paths; not among REQ-01's named subjects"
+        }
+      ],
+      "resolved": [
+        "v1.0 applied-record migration boundary",
+        "shipped_v1_conversion_count test race"
+      ]
     }
   ]
 }
