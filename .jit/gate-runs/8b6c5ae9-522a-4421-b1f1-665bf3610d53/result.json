@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "35ff28de64761ffe4ae8431b7e11f94c68a4e8ff",
+  "completed_at": "2026-08-11T20:40:25.595567101Z",
+  "duration_ms": 126938,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed checker and fixture coverage satisfy the issue's hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5b60d40e-d8d9-4552-b880-6ae717799dab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8b6c5ae9-522a-4421-b1f1-665bf3610d53",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T20:38:18.657130793Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 00f3fbfa (feature patch); 126baec4 (tagged merge, no separate diff); uncommitted changes excluded\nPolicy sources: AGENTS.md\nResolved items: @/issue/5b60d40e/requirement/REQ-02 (issue success-criteria section, markdown-first); @/invariant/bounded-rust-build-footprint, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/single-source-prose (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci — passed; exit code not recorded; 2026-08-11T20:36:00Z\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed checker and fixture coverage satisfy the issue's hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

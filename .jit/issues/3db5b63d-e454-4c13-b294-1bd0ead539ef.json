@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T20:35:58.717493436Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T20:38:17.262423754Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3db5b63d-e454-4c13-b294-1bd0ead539ef",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Pin and configure the nextest foundation",
-  "updated_at": "2026-08-11T19:10:53.669429501Z"
+  "updated_at": "2026-08-11T20:38:17.262423754Z"
 }

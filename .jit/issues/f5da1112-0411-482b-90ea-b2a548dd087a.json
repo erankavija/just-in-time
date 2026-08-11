@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T20:36:00.552288281Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-11T20:44:41.593885643Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f5da1112-0411-482b-90ea-b2a548dd087a",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Cut over the single-barrier journal runtime",
-  "updated_at": "2026-08-11T19:11:04.647803822Z"
+  "updated_at": "2026-08-11T20:44:41.593885643Z"
 }

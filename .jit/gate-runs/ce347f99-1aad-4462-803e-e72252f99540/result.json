@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "35ff28de64761ffe4ae8431b7e11f94c68a4e8ff",
+  "completed_at": "2026-08-11T20:38:16.848352826Z",
+  "duration_ms": 134445,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The pinned nextest policy and CI validation steps satisfy all issue-scoped hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3db5b63d-e454-4c13-b294-1bd0ead539ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ce347f99-1aad-4462-803e-e72252f99540",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T20:36:02.402681701Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 82f5599d, b005cb38 (first-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4b7c06d0/requirement/REQ-04 (.jit/issues/4b7c06d0-0436-4dd3-b3c8-52595da3e342.json); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-11T20:30:15Z)\nTruncation recovery: narrowed the truncated REQ-04 search to dev/active/4b7c06d0-test-suite-performance/plan.md and resolved the parent requirement directly\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The pinned nextest policy and CI validation steps satisfy all issue-scoped hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

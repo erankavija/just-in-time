@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-11T20:36:00.016785088Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-11T20:40:26.010760620Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "5b60d40e-d8d9-4552-b880-6ae717799dab",
   "labels": [
     "type:task",
@@ -25,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Add the injectable suite duration checker",
-  "updated_at": "2026-08-11T19:10:59.163239303Z"
+  "updated_at": "2026-08-11T20:40:26.010760620Z"
 }

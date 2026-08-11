@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "35ff28de64761ffe4ae8431b7e11f94c68a4e8ff",
+  "completed_at": "2026-08-11T20:47:08.559683820Z",
+  "duration_ms": 145560,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b1f2f001-d59d-40e2-be39-20722e339e11",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0ddd0c7d-92d3-47dd-93a3-147d7e8b9191",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T20:44:42.999077035Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d2c8693b, faa3ff98\nPolicy sources: AGENTS.md\nResolved items: @/invariant/single-source-prose (.jit/invariants.toml); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/shared-test-contracts (.jit/invariants.toml); @/invariant/canonical-cutover (.jit/invariants.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-08-11T20:36:01Z; exit code none); code-review pending\nTruncation recovery: reread AGENTS.md, per-commit/path patches, and affected package/test/helper/manifest ranges\n1. No blocking or advisory findings. `package.rs:1238` retains the independent v1 recomputation for the live package; the synthetic fixture’s literal assertions remain at `package.rs:1463`.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -13,14 +13,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-11T20:09:45.395423105Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-11T20:36:01.070099100Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-11T20:09:46.066419397Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-11T20:47:08.985744372Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b1f2f001-d59d-40e2-be39-20722e339e11",
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Stop pinning the live dogfood package identity hash to a literal",
-  "updated_at": "2026-08-11T20:09:46.066419397Z"
+  "updated_at": "2026-08-11T20:47:08.985744372Z"
 }
