@@ -4,10 +4,13 @@ set -euo pipefail
 # Warm transaction benchmark for the model-limit profile-package fixture.
 #
 # The operation/root mapping is deliberate:
-#   - `profile pack` and `profile add` require an initialized repository, so
-#     they measure the existing-data-root journal shape;
-#   - `init --profile` starts with no `.jit` and measures the absent-data-root
-#     bootstrap journal while publishing the same model-limit package.
+#   - CLI `profile pack` and `profile add` require an initialized repository and
+#     measure the existing-data-root journal shape;
+#   - a temporary benchmark-only Rust helper calls those same public command
+#     methods over an absent `.jit` layout, measuring the external-bootstrap
+#     journal without weakening the CLI's repository precondition;
+#   - CLI `init --profile` remains a supplemental absent-data-root publication,
+#     not a substitute for the absent-root pack/add round trip.
 #
 # Each operation is measured normally and with directory fsync suppressed by a
 # temporary LD_PRELOAD shim. The latter is NOT a safe implementation: it is an
@@ -24,6 +27,7 @@ set -euo pipefail
 #   TRANSACTION_BENCH_SAMPLES   measured runs per variant/scenario (default: 5)
 #   TRANSACTION_BENCH_ARTIFACT  output artifact path
 #   TRANSACTION_BENCH_PHASE     record phase, e.g. initial/rerun/post-change
+#   TRANSACTION_BENCH_HELPER_TARGET  cached Cargo target dir for the helper
 #
 # Usage:
 #   scripts/benchmark-transaction.sh
@@ -139,6 +143,16 @@ def decision(measurements):
     return "deduplicate_safe_redundant_directory_syncs" if material else "no_change"
 
 
+def assert_full_pack_add_matrix(measurements):
+    required = {
+        (operation, root_shape)
+        for operation in ("profile_pack", "profile_add")
+        for root_shape in ("existing_data_root", "absent_data_root")
+    }
+    observed = {(row["operation"], row["root_shape"]) for row in measurements}
+    assert required <= observed, f"missing benchmark scenarios: {sorted(required - observed)}"
+
+
 source = (repo / "crates/jit/src/profile/package.rs").read_text()
 assert rust_usize_constant(source, "MAX_PROFILE_PACKAGE_FILES") > 1
 assert rust_usize_constant(source, "MAX_PROFILE_PACKAGE_BYTES") > 1024
@@ -155,6 +169,18 @@ synthetic = [
 assert decision(synthetic) == "deduplicate_safe_redundant_directory_syncs"
 synthetic[1].update({"median_ms": 119, "samples_ms": [118, 119, 120]})
 assert decision(synthetic) == "no_change"
+matrix = [
+    {"operation": operation, "root_shape": root_shape}
+    for operation in ("profile_pack", "profile_add")
+    for root_shape in ("existing_data_root", "absent_data_root")
+]
+assert_full_pack_add_matrix(matrix)
+try:
+    assert_full_pack_add_matrix(matrix[:-1])
+except AssertionError:
+    pass
+else:
+    raise AssertionError("an incomplete operation/root-shape matrix was accepted")
 
 with tempfile.TemporaryDirectory() as raw:
     artifact = pathlib.Path(raw) / "evidence.json"
@@ -172,10 +198,12 @@ print("transaction benchmark self-test: PASS")
 PYEOF
 fi
 
-command -v cc >/dev/null 2>&1 || {
-  echo "transaction benchmark: 'cc' not found" >&2
-  exit 2
-}
+for tool in cc cargo; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "transaction benchmark: '$tool' not found" >&2
+    exit 2
+  }
+done
 
 JIT_BIN=${TRANSACTION_BENCH_JIT:-$(command -v jit || true)}
 [ -n "$JIT_BIN" ] && [ -x "$JIT_BIN" ] || {
@@ -262,10 +290,112 @@ CEOF
 cc -shared -fPIC -O2 -Wall -Wextra -Werror \
   -o "$scratch/directory-fsync-shim.so" "$scratch/directory-fsync-shim.c" -ldl
 
+# Pack/add are CLI-invalid before repository initialization, but their public
+# command-layer methods deliberately support worktree-only transactions over an
+# absent data root. Compile a temporary driver once, outside every timed region,
+# to exercise that exact external-bootstrap journal path without production
+# code or a benchmark-only product switch.
+HELPER_TARGET=${TRANSACTION_BENCH_HELPER_TARGET:-$REPO_ROOT/target/transaction-benchmark-helper}
+mkdir -p "$scratch/helper/src"
+cat >"$scratch/helper/Cargo.toml" <<EOF
+[package]
+name = "transaction-benchmark-helper"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+jit = { path = "$REPO_ROOT/crates/jit" }
+EOF
+cat >"$scratch/helper/src/main.rs" <<'RSEOF'
+use jit::storage::discover_repository_layout;
+use jit::{CommandExecutor, JsonFileStorage};
+use std::error::Error;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+fn count_files(root: &Path) -> std::io::Result<usize> {
+    fs::read_dir(root)?.try_fold(0, |count, entry| {
+        let path = entry?.path();
+        Ok(count
+            + if path.is_dir() {
+                count_files(&path)?
+            } else {
+                usize::from(path.is_file())
+            })
+    })
+}
+
+fn ensure_absent_root(worktree: &Path, moment: &str) -> Result<(), Box<dyn Error>> {
+    if worktree.join(".jit").exists() {
+        return Err(std::io::Error::other(format!(
+            "data root exists {moment}: {}",
+            worktree.join(".jit").display()
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let arguments = std::env::args().collect::<Vec<_>>();
+    if arguments.len() != 5 {
+        return Err(std::io::Error::other(
+            "usage: transaction-benchmark-helper <pack|add> <worktree> <input> <output>",
+        )
+        .into());
+    }
+    let operation = &arguments[1];
+    let worktree = PathBuf::from(&arguments[2]);
+    let input = PathBuf::from(&arguments[3]);
+    let output = PathBuf::from(&arguments[4]);
+    let data_root = worktree.join(".jit");
+    ensure_absent_root(&worktree, "before command")?;
+    let layout = discover_repository_layout(&worktree, &data_root)?;
+    let executor = CommandExecutor::new(JsonFileStorage::new(&data_root)).with_layout(layout);
+
+    let file_count = match operation.as_str() {
+        "pack" => {
+            let (result, _) = executor.pack_profile_package(&worktree, &input, &output)?;
+            if !worktree.join(&output).is_file() {
+                return Err(std::io::Error::other("pack did not publish its archive").into());
+            }
+            result.file_count
+        }
+        "add" => {
+            let result = executor.add_profile_package(&worktree, &input, &output)?;
+            let published_count = count_files(&worktree.join(&output))?;
+            if published_count != result.file_count {
+                return Err(std::io::Error::other(format!(
+                    "add reported {} files but published {published_count}",
+                    result.file_count
+                ))
+                .into());
+            }
+            result.file_count
+        }
+        _ => return Err(std::io::Error::other("operation must be pack or add").into()),
+    };
+    ensure_absent_root(&worktree, "after command")?;
+    if worktree.join(".jit-bootstrap").exists() {
+        return Err(std::io::Error::other("successful command left bootstrap residue").into());
+    }
+    println!("file_count={file_count}");
+    Ok(())
+}
+RSEOF
+cp "$REPO_ROOT/Cargo.lock" "$scratch/helper/Cargo.lock"
+CARGO_INCREMENTAL=0 cargo build --quiet --release --offline \
+  --manifest-path "$scratch/helper/Cargo.toml" --target-dir "$HELPER_TARGET"
+HELPER_BIN="$HELPER_TARGET/release/transaction-benchmark-helper"
+[ -x "$HELPER_BIN" ] || {
+  echo "transaction benchmark: helper build did not produce $HELPER_BIN" >&2
+  exit 2
+}
+
 mkdir -p "$(dirname "$ARTIFACT")"
 
 exec python3 - "$REPO_ROOT" "$JIT_BIN" "$WARMUP" "$SAMPLES" "$ARTIFACT" \
-  "$PHASE" "$scratch" "$scratch/directory-fsync-shim.so" <<'PYEOF'
+  "$PHASE" "$scratch" "$scratch/directory-fsync-shim.so" "$HELPER_BIN" <<'PYEOF'
 import ast
 import copy
 import datetime as dt
@@ -291,6 +421,7 @@ artifact = pathlib.Path(sys.argv[5])
 phase = sys.argv[6]
 scratch = pathlib.Path(sys.argv[7])
 shim = pathlib.Path(sys.argv[8])
+helper = pathlib.Path(sys.argv[9])
 
 
 def run(argv, cwd, env=None):
@@ -388,7 +519,7 @@ def initialized_repo(path):
     run([jit, "init", "--json"], path)
 
 
-def timed_variants(operation, root_shape, setup, invoke, verify, cleanup):
+def timed_variants(operation, root_shape, execution_boundary, setup, invoke, verify, cleanup):
     variants = ("durable_baseline", "directory_fsync_suppressed")
 
     def variant_env(variant):
@@ -429,6 +560,7 @@ def timed_variants(operation, root_shape, setup, invoke, verify, cleanup):
         return {
             "operation": operation,
             "root_shape": root_shape,
+            "execution_boundary": execution_boundary,
             "variant": variant,
             "unit": "integer_ms",
             "samples_ms": values,
@@ -440,7 +572,8 @@ def timed_variants(operation, root_shape, setup, invoke, verify, cleanup):
     return [row(variant) for variant in variants]
 
 
-def count_directory_fsyncs(operation, root_shape, setup, invoke, verify, cleanup):
+def count_directory_fsyncs(
+        operation, root_shape, execution_boundary, setup, invoke, verify, cleanup):
     log = scratch / f"directory-fsync-{operation}-{root_shape}.log"
     log.unlink(missing_ok=True)
     env = os.environ.copy()
@@ -457,6 +590,7 @@ def count_directory_fsyncs(operation, root_shape, setup, invoke, verify, cleanup
     return {
         "operation": operation,
         "root_shape": root_shape,
+        "execution_boundary": execution_boundary,
         "directory_fsync_calls": calls,
         "timed": False,
     }
@@ -477,6 +611,9 @@ absent_template.mkdir(parents=True)
 source_package = source_repo / "packages/bounded"
 fixture = write_model_limit_package(source_package, max_files, max_bytes)
 shutil.copytree(source_package, absent_template / "packages/bounded")
+absent_command_repo = fixtures / "command-absent"
+shutil.copytree(source_package, absent_command_repo / "packages/bounded")
+(absent_command_repo / "exchange").mkdir()
 
 archive = source_repo / "exchange/bounded.tar"
 archive.parent.mkdir(parents=True)
@@ -538,6 +675,60 @@ def add_cleanup(context):
     shutil.rmtree(context["destination"])
 
 
+absent_archive = absent_command_repo / "exchange/bounded.tar"
+
+
+def assert_absent_command_root():
+    if (absent_command_repo / ".jit").exists():
+        raise RuntimeError("absent command-layer fixture unexpectedly contains .jit")
+    if (absent_command_repo / ".jit-bootstrap").exists():
+        raise RuntimeError("absent command-layer fixture contains bootstrap residue")
+
+
+def absent_pack_setup():
+    absent_archive.unlink(missing_ok=True)
+    assert_absent_command_root()
+    return {"cwd": absent_command_repo, "output": absent_archive}
+
+
+def absent_pack_invoke(_):
+    return [helper, "pack", absent_command_repo, "packages/bounded", "exchange/bounded.tar"]
+
+
+def absent_pack_verify(context, completed):
+    if completed.stdout.strip() != f"file_count={max_files}" or not context["output"].is_file():
+        raise RuntimeError("command-layer pack did not carry the complete model-limit fixture")
+    assert_absent_command_root()
+
+
+def absent_pack_cleanup(context):
+    context["output"].unlink()
+    assert_absent_command_root()
+
+
+def absent_add_setup():
+    destination = absent_command_repo / "packages/arrived"
+    shutil.rmtree(destination, ignore_errors=True)
+    assert_absent_command_root()
+    return {"cwd": absent_command_repo, "destination": destination}
+
+
+def absent_add_invoke(_):
+    return [helper, "add", absent_command_repo, add_archive, "packages/arrived"]
+
+
+def absent_add_verify(context, completed):
+    count = sum(path.is_file() for path in context["destination"].rglob("*"))
+    if completed.stdout.strip() != f"file_count={max_files}" or count != max_files:
+        raise RuntimeError("command-layer add did not publish the complete model-limit fixture")
+    assert_absent_command_root()
+
+
+def absent_add_cleanup(context):
+    shutil.rmtree(context["destination"])
+    assert_absent_command_root()
+
+
 init_counter = 0
 
 
@@ -569,19 +760,37 @@ def init_cleanup(context):
 measurements = []
 directory_fsync_probes = []
 scenarios = [
-    ("profile_pack", "existing_data_root", pack_setup, pack_invoke, pack_verify, pack_cleanup),
-    ("profile_add", "existing_data_root", add_setup, add_invoke, add_verify, add_cleanup),
-    ("profiled_init_publication", "absent_data_root", init_setup, init_invoke,
+    ("profile_pack", "existing_data_root", "cli", pack_setup, pack_invoke,
+     pack_verify, pack_cleanup),
+    ("profile_add", "existing_data_root", "cli", add_setup, add_invoke,
+     add_verify, add_cleanup),
+    ("profile_pack", "absent_data_root", "public_command_layer_helper", absent_pack_setup,
+     absent_pack_invoke, absent_pack_verify, absent_pack_cleanup),
+    ("profile_add", "absent_data_root", "public_command_layer_helper", absent_add_setup,
+     absent_add_invoke, absent_add_verify, absent_add_cleanup),
+    ("profiled_init_publication", "absent_data_root", "cli", init_setup, init_invoke,
      init_verify, init_cleanup),
 ]
-for operation, root_shape, setup, invoke, verify, cleanup in scenarios:
+for operation, root_shape, execution_boundary, setup, invoke, verify, cleanup in scenarios:
     print(f"[transaction-bench] {operation}/{root_shape}/paired-variants", file=sys.stderr)
     measurements.extend(timed_variants(
-        operation, root_shape, setup, invoke, verify, cleanup
+        operation, root_shape, execution_boundary, setup, invoke, verify, cleanup
     ))
     directory_fsync_probes.append(count_directory_fsyncs(
-        operation, root_shape, setup, invoke, verify, cleanup
+        operation, root_shape, execution_boundary, setup, invoke, verify, cleanup
     ))
+
+required_pack_add_matrix = {
+    (operation, root_shape)
+    for operation in ("profile_pack", "profile_add")
+    for root_shape in ("existing_data_root", "absent_data_root")
+}
+observed_pack_add_matrix = {
+    (row["operation"], row["root_shape"]) for row in measurements
+}
+missing_pack_add_scenarios = required_pack_add_matrix - observed_pack_add_matrix
+if missing_pack_add_scenarios:
+    raise RuntimeError(f"incomplete pack/add root-shape matrix: {sorted(missing_pack_add_scenarios)}")
 
 
 def fsync_decision(rows, probes):
@@ -652,6 +861,7 @@ filesystem = run(["stat", "-f", "-c", "%T", str(scratch)], repo).stdout.strip()
 
 record = {
     "sequence": 0,
+    "record_schema_revision": 2,
     "recorded_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
     "phase": phase,
     "source": {"revision": source_revision, "dirty": dirty},
@@ -675,9 +885,20 @@ record = {
             "timed subprocess; cleanup is outside the clock"
         ),
         "root_shape_mapping": {
-            "profile_pack": "existing_data_root",
-            "profile_add": "existing_data_root",
+            "profile_pack_cli": "existing_data_root",
+            "profile_add_cli": "existing_data_root",
+            "profile_pack_command_layer": "absent_data_root",
+            "profile_add_command_layer": "absent_data_root",
             "profiled_init_publication": "absent_data_root",
+        },
+        "absent_root_helper": {
+            "build": (
+                "workspace Cargo.lock plus CARGO_INCREMENTAL=0 cargo build --release --offline "
+                "outside timed regions"
+            ),
+            "source": "temporary driver over public CommandExecutor profile pack/add methods",
+            "sha256": hashlib.sha256(helper.read_bytes()).hexdigest(),
+            "postcondition": ".jit and .jit-bootstrap remain absent after each command",
         },
         "fsync_comparator": (
             "LD_PRELOAD shim preserves file fsync and suppresses directory fsync only; both "
