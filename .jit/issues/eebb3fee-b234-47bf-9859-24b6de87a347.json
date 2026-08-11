@@ -11,6 +11,38 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/4b7c06d0-test-suite-performance/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "1db9500734174849384c456c5e1c5a19966540dc1fe06d2c42508359eda3ad44",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/4b7c06d0-test-suite-performance/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "df6f2c058f3a41726d2c577b9209f3c4cef241c1357d0bec1768832a3b340412",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/4b7c06d0-test-suite-performance/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/4b7c06d0-test-suite-performance/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/4b7c06d0-test-suite-performance/breakdown.json"
     }
   ],
   "first_ready_at": "2026-08-11T16:32:02.508095795Z",
@@ -35,5 +67,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T16:48:53.863486806Z"
+  "updated_at": "2026-08-11T17:10:20.659425241Z"
 }

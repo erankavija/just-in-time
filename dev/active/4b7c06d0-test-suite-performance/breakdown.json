@@ -1,0 +1,566 @@
+[
+  {
+    "key": "journal-runtime-cutover",
+    "title": "Cut over the single-barrier journal runtime",
+    "description": "The file transaction runtime uses the single-barrier journal protocol while removing obsolete per-action progress state and keeping both storage backends compiling and green.\n\n## Background\n\nRecovery is identity-driven and does not read `RepositoryActionProgress`; the schema cutover therefore removes that state while preserving atomic publication, durability barriers, and the terminal rollback marker. The shared conformance inventory and direct fixtures must change mechanically in this same red-to-green cutover because they name removed variants or progress fields.\n\n## Success Criteria\n\n- [hard] REQ-01: Publishes one initial journal, batches preparation durability, publishes one complete `Prepared` journal before the first live mutation, synchronizes distinct live parents, and publishes one `Committed` journal for existing-root and absent-root transactions.\n- [hard] REQ-02: Removes `RepositoryActionProgress` and its five states from the transaction schema while retaining identity-driven idempotent restore and the terminal `RolledBack` write.\n- [hard] REQ-03: Updates the `FailurePoint` vocabulary, mirrored in-memory failure edges, shared conformance inventory, and direct journal fixtures so both backends compile and preserve existing conformance.\n\n## Notes\n\nThe conformance inventory names the removed `FailurePoint` variants, so its mechanical update cannot be a separate issue without a red intermediate state; genuinely new barrier coverage is split into `journal-barrier-coverage`.\n\nFootprint rationale: `repository_state_store_tests.rs` is included here for the required mechanical inventory cutover; new crash coverage for that same file belongs to the dependent coverage task.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:core",
+      "satisfies:REQ-01",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The transaction runtime uses one prepared barrier and one terminal decision without per-action progress state.",
+      "contract_refs": [
+        "single-barrier-journal"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "REQ-04",
+        "investigation.md"
+      ],
+      "landing_group": "transaction-branch",
+      "terminal": {
+        "consumer_family": "file transaction recovery",
+        "test_boundary": "repository-state crash conformance",
+        "worker_sized_reason": "the conformance inventory names the removed FailurePoint variants, so its mechanical update cannot be a separate issue without a red intermediate state; genuinely NEW coverage is split out to journal-barrier-coverage.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/file_transaction.rs",
+            "crates/jit/src/storage/transaction_journal.rs",
+            "crates/jit/src/storage/transaction_recovery.rs",
+            "crates/jit/src/storage/repository_state_store.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "journal-barrier-coverage",
+    "title": "Add journal barrier crash coverage",
+    "description": "The shared crash-conformance inventory covers every barrier introduced or retained by the single-barrier journal protocol across both backends and both root shapes.\n\n## Background\n\nThe runtime cutover mechanically updates the existing inventory so the suite stays green; this task adds genuinely new coverage for the protocol’s barrier semantics. The shared file is intentionally shared: the prerequisite removes obsolete inventory entries, while this task adds the new crash cases after the runtime protocol exists.\n\n## Success Criteria\n\n- [hard] REQ-01: Injects crashes at every remaining phase boundary, including between `Prepared` publication and the first live mutation, after a live rename before its parent sync, after all parent syncs before `Committed`, and at rollback crash edges.\n- [hard] REQ-02: Runs the new crash cases against both storage backends and both existing-root and absent-root shapes.\n- [hard] REQ-03: Extends only the shared conformance inventory and verifies identity-driven recovery outcomes without changing the transaction protocol.\n\n## Notes\n\nThe shared `repository_state_store_tests.rs` footprint is intentional. The prerequisite edits it mechanically to remove names of deleted variants; this task adds new barrier cases in the same file, and the dependency plus `landing_group` make the ownership boundary explicit.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:core",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "journal-runtime-cutover"
+    ],
+    "planning": {
+      "outcome": "Crash conformance covers the single-barrier protocol across remaining boundaries, backends, and root shapes.",
+      "contract_refs": [
+        "single-barrier-journal"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04",
+        "investigation.md"
+      ],
+      "landing_group": "transaction-branch",
+      "terminal": {
+        "consumer_family": "transaction crash conformance",
+        "test_boundary": "shared failure-point inventory",
+        "worker_sized_reason": "One shared inventory receives new barrier cases after the prerequisite schema cutover, with both backend and root-shape matrices in one focused test cycle.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/repository_state_store_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "journal-docs-cutover",
+    "title": "Cut over journal durability documentation",
+    "description": "Update only `dev/architecture/repository-state-materialization.md` so its journal narrative describes decision and identity recovery without per-action progress state.\n\n## Background\n\nThe storage-format, profiles, and guarantees references already describe the decision and identity primitive correctly, so this task leaves them untouched. The architecture narrative is the one remaining documentation consumer that presents per-action progress as durable journal state.\n\n## Success Criteria\n\n- [hard] REQ-01: Revises `dev/architecture/repository-state-materialization.md` to describe the single-barrier protocol and its decision/identity recovery model.\n- [hard] REQ-02: Removes claims that per-action progress is durable journal state while retaining the terminal rollback marker and recoverability guarantees.\n- [hard] REQ-03: Leaves the storage-format, profiles, and guarantees references byte-unchanged.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:core"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review"
+    ],
+    "depends_on": [
+      "journal-runtime-cutover"
+    ],
+    "planning": {
+      "outcome": "The architecture reference describes single-barrier decision and identity recovery without durable action progression.",
+      "contract_refs": [
+        "single-barrier-journal"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "REQ-04",
+        "investigation.md"
+      ],
+      "landing_group": "transaction-branch",
+      "terminal": {
+        "consumer_family": "transaction durability architecture documentation",
+        "test_boundary": "architecture document review",
+        "worker_sized_reason": "One documentation consumer remains after verification of the storage-format, profiles, and guarantees references; the issue has one file and one coherent runtime decision to describe.",
+        "footprint": {
+          "touches": [
+            "dev/architecture/repository-state-materialization.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "transaction-benchmark",
+    "title": "Measure transaction model-limit round trips",
+    "description": "Create a dedicated warm benchmark that records model-limit transaction costs for both journal root shapes and records the fsync-residual decision without changing production code.\n\n## Background\n\nThe model-limit profile package stresses file count, aggregate bytes, path length, and directory shape. The harness exercises warm profile-pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for existing-root and absent-root transactions, then preserves reproducible JSON evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `scripts/benchmark-transaction.sh` to measure warm pack and add round trips at `MAX_PROFILE_PACKAGE_FILES` for both existing-root and absent-root journal shapes.\n- [hard] REQ-02: Creates `dev/benchmarks/test-suite-performance-4b7c06d0.json` with integer-millisecond results, method, fixture shape, cache state, and a recorded fsync-residual decision.\n- [hard] REQ-03: Makes the recorded decision reproducible by rerunning the benchmark and does not modify production code in this measurement task.\n\n## Notes\n\nThe benchmark artifact is later touched by `fsync-dedupe` in an ordered overlap: that dependent task applies or records the benchmark decision after this measurement task lands.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:core",
+      "component:testing",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "journal-runtime-cutover"
+    ],
+    "planning": {
+      "outcome": "A warm harness records model-limit transaction costs and a reproducible fsync-residual decision for both root shapes.",
+      "contract_refs": [
+        "single-barrier-journal"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "investigation.md"
+      ],
+      "landing_group": "transaction-branch",
+      "terminal": {
+        "consumer_family": "transaction performance measurement",
+        "test_boundary": "repository-owned transaction benchmark artifact",
+        "worker_sized_reason": "One measurement harness owns one model-limit scenario across two root shapes; the dependent fsync task owns the benchmark-driven production decision in an explicitly ordered artifact overlap.",
+        "footprint": {
+          "creates": [
+            "scripts/benchmark-transaction.sh",
+            "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "fsync-dedupe",
+    "title": "Apply the benchmark-driven fsync decision",
+    "description": "Apply the transaction benchmark’s recorded fsync-residual decision behind the existing preparation and pre-commit barriers, or record that no deduplication is needed when the criteria show no avoidable cost.\n\n## Background\n\nThe benchmark owns measurement and evidence; this dependent task owns the narrowly bounded production follow-up. Directory fsyncs remain load-bearing and the transaction protocol remains unchanged.\n\n## Success Criteria\n\n- [hard] REQ-01: Re-runs `scripts/benchmark-transaction.sh` and applies deduplication only in `crates/jit/src/storage/file_transaction.rs` where the artifact shows avoidable directory-fsync cost behind existing preparation or pre-commit barriers.\n- [hard] REQ-02: Updates `dev/benchmarks/test-suite-performance-4b7c06d0.json` with the applied decision, criteria, and rerun evidence, including a no-change decision when no deduplication is needed.\n- [hard] REQ-03: Preserves atomic publication, durability barriers, both root shapes, and recovery semantics.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:core",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "transaction-benchmark"
+    ],
+    "planning": {
+      "outcome": "The measured fsync decision is applied behind existing barriers and verified by a rerun without changing transaction semantics.",
+      "contract_refs": [
+        "single-barrier-journal"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "investigation.md"
+      ],
+      "landing_group": "transaction-branch",
+      "terminal": {
+        "consumer_family": "transaction durability barrier implementation",
+        "test_boundary": "benchmark rerun",
+        "worker_sized_reason": "One dependent production decision consumes one recorded benchmark result; the shared benchmark artifact overlap is ordered after transaction-benchmark and limited to decision evidence.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/file_transaction.rs",
+            "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "stale-binary-fixture",
+    "title": "Share the stale-binary build fixture across processes",
+    "description": "Make the six stale-binary nested-build tests reuse one verified artifact across concurrent test processes while retaining independent semantic assertions.\n\n## Background\n\nNextest runs tests in separate processes, so an in-process once-guard does not prevent six builds. The fixture uses an advisory file lock plus a provenance-keyed verified artifact in the shared target path `jit-stale-child-test-cache`; the lock protects the build and the artifact marker makes reuse observable.\n\n## Success Criteria\n\n- [hard] REQ-01: Routes all six nested-build tests through one cross-process fixture guarded by an advisory file lock.\n- [hard] REQ-02: Stores and verifies one provenance-keyed child artifact under the shared `target/jit-stale-child-test-cache` path before allowing concurrent test processes to reuse it.\n- [hard] REQ-03: Asserts via an observable marker that exactly one nested Cargo build occurs and later processes reuse the verified artifact without invoking Cargo, under both `cargo test` and nextest.\n- [hard] REQ-04: Keeps six independently reportable tests, all existing stale-binary semantic assertions, and the no-build JSON error-code test.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Six stale-binary tests share one cross-process verified child artifact without losing test granularity or semantic assertions.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "stale-binary scratch-build tests",
+        "test_boundary": "cross-process build-count marker",
+        "worker_sized_reason": "One fixture protocol spans the two existing stale-binary test modules because the shared cache, lock, provenance key, and observable marker must be exercised by both cargo test and nextest process isolation.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/scratch_build/stale_binary_child_process_tests.rs",
+            "crates/jit/tests/scratch_build/stale_binary_json_exit_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "duration-checker",
+    "title": "Add the injectable suite duration checker",
+    "description": "Extend the rust-build-budget checker with the exact optional `--test-suite-ms <integer>` interface while preserving its existing mandatory metadata and artifact inputs.\n\n## Background\n\nThe checker defines `MAX_TEST_SUITE_SECONDS` once and follows the existing flag-based injection style at `scripts/rust-build-budget.sh:48`. An absent flag passes and skips this check so the checker can land before live runner wiring.\n\n## Success Criteria\n\n- [hard] REQ-01: Accepts `--test-suite-ms <integer>` and defines the canonical `MAX_TEST_SUITE_SECONDS` threshold in `scripts/rust-build-budget.sh`.\n- [hard] REQ-02: Skips the suite-duration check and passes when the flag is absent; reports a checker error and fails for a non-integer, negative, or empty value; and fails when the value is greater than or equal to `MAX_TEST_SUITE_SECONDS*1000`, including the exact threshold.\n- [hard] REQ-03: Covers the five fixtures absent, malformed (non-integer/negative/empty), under-threshold, at-threshold, and over-threshold in `rust_build_budget_checker_tests.rs` while preserving mandatory metadata and artifact inputs.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The checker validates optional integer suite duration input against MAX_TEST_SUITE_SECONDS with five boundary fixtures.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "rust-build-budget duration input",
+        "test_boundary": "duration checker flag fixtures",
+        "worker_sized_reason": "One optional flag, one canonical threshold, and its five observable input classes form a bounded script-and-fixture contract before live runner wiring.",
+        "footprint": {
+          "touches": [
+            "scripts/rust-build-budget.sh",
+            "crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "nextest-foundation",
+    "title": "Pin and configure the nextest foundation",
+    "description": "Make nextest reproducible before the runner swap by pinning cargo-nextest 0.9.133, committing its initial policy, and documenting contributor installation and use.\n\n## Background\n\nThe audited host version is cargo-nextest 0.9.133. The `test-rust` job in `.github/workflows/ci.yml` installs it with `cargo install cargo-nextest --locked --version 0.9.133` in a named installation step.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `.config/nextest.toml` with exact initial values `nextest-version = \"0.9.133\"`, `retries = 0`, `slow-timeout.period = \"15s\"`, `terminate-after = 4` for a hard bound of 60 seconds, and the default leak-timeout.\n- [hard] REQ-02: Declares no test groups: nested-cargo and socket-heavy suites keep default parallelism because single-build serialization is owned by the cross-process stale-binary fixture, and `cargo nextest show-config test-groups` succeeds against the workspace with the committed policy, proving the pinned binary parses it.\n- [hard] REQ-03: Adds the named cargo-nextest 0.9.133 installation step to the `test-rust` job in `.github/workflows/ci.yml` using `cargo install cargo-nextest --locked --version 0.9.133`.\n- [hard] REQ-04: Adds contributor install and run guidance for the pinned version and committed policy to `dev/TESTING.md`.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Pinned cargo-nextest and an exact initial parallel policy are reproducible in CI before runner use.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "nextest foundation",
+        "test_boundary": "nextest config validation",
+        "worker_sized_reason": "One upstream foundation establishes the pinned executable, exact initial config, its parse verification, and contributor guidance before any runner command consumes nextest.",
+        "footprint": {
+          "creates": [
+            ".config/nextest.toml"
+          ],
+          "touches": [
+            ".github/workflows/ci.yml",
+            "dev/TESTING.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "suite-runner",
+    "title": "Swap the cargo-ci suite runner",
+    "description": "Replace the cargo-ci workspace test step with pinned cargo nextest, adapt reporter parsing and summaries, retain the doctest substep and ignored provenance step, and establish the reporter evidence contract.\n\n## Background\n\nThe `test-rust` job and initial nextest policy land in `nextest-foundation`. This task consumes that foundation and owns the first ordered touch of `scripts/cargo-ci.sh` and `scripts/cargo-ci-selftest.sh`; later timing and enforcement tasks modify those files only after this task.\n\n## Success Criteria\n\n- [hard] REQ-01: Runs `cargo nextest run --workspace` for the cargo-ci workspace test step and preserves the ignored provenance step.\n- [hard] REQ-02: Updates `summarize_pass` and `summarize_fail` for the nextest reporter while preserving the stable summary prefixes recognized by `cargo-ci-selftest.sh`.\n- [hard] REQ-03: Keeps `cargo test --doc --workspace` as the separately reported doctest substep.\n- [hard] REQ-04: Verifies the nextest reporter success/failure evidence and updates `scripts/cargo-ci-selftest.sh` to recognize it without weakening semantic coverage.\n- [hard] REQ-05: Fails fast with a clear error when `cargo nextest --version` does not report the pinned 0.9.133, so reporter parsing never runs against an unpinned message format.\n\n## Notes\n\nOrdered overlap: `scripts/cargo-ci.sh` and `scripts/cargo-ci-selftest.sh` are first touched here; `step-timing-and-clock` follows this task, and `suite-enforcement` follows that timing task.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "nextest-foundation",
+      "stale-binary-fixture"
+    ],
+    "planning": {
+      "outcome": "cargo-ci runs the pinned nextest workspace suite with verified reporter evidence.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "nextest-reporter-evidence"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "cargo-ci reporter",
+        "test_boundary": "cargo-ci self-test",
+        "worker_sized_reason": "One runner swap owns one reporter contract and the adjacent self-test parser; doctest and provenance retention stay within that same runner boundary, while timing and enforcement are sequenced siblings.",
+        "footprint": {
+          "touches": [
+            "scripts/cargo-ci.sh",
+            "scripts/cargo-ci-selftest.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "step-timing-and-clock",
+    "title": "Add step timing and the named suite clock",
+    "description": "Record integer-millisecond timing for every cargo-ci step and define the named `suite-clock` around the nextest and doctest substeps.\n\n## Background\n\nThe clock starts immediately before the `cargo nextest run` invocation and stops after `cargo test --doc --workspace`; it excludes the outer flock wait and the preceding incremental-preflight, fmt, and clippy steps. Each `run_step` writes its wall-clock integer milliseconds on the stable summary line consumed by gate evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: Records every `run_step` wall-clock duration as integer milliseconds on its stable summary line while preserving the prefixes recognized by `cargo-ci-selftest.sh`.\n- [hard] REQ-02: Starts `suite-clock` immediately before the `cargo nextest run` invocation, stops it after the doctest substep, and records one integer-millisecond parent duration spanning exactly nextest and doctests.\n- [hard] REQ-03: Produces the `suite-clock` contract for live enforcement without changing the threshold or checker interface.\n\n## Notes\n\nOrdered overlap: this task modifies `scripts/cargo-ci.sh` and `scripts/cargo-ci-selftest.sh` after `suite-runner` and before `suite-enforcement`; it consumes `nextest-reporter-evidence` for stable summary placement.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-03"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "suite-runner"
+    ],
+    "planning": {
+      "outcome": "cargo-ci reports integer-millisecond step timings and a suite-clock spanning exactly the nextest and doctest substeps.",
+      "contract_refs": [
+        "suite-clock",
+        "nextest-reporter-evidence"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-03",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "cargo-ci timing evidence",
+        "test_boundary": "stable timing summary",
+        "worker_sized_reason": "One timing layer adds per-step evidence and one parent clock to the already-swapped runner; the ordered shared-script overlap keeps enforcement in a dependent task.",
+        "footprint": {
+          "touches": [
+            "scripts/cargo-ci.sh",
+            "scripts/cargo-ci-selftest.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "suite-enforcement",
+    "title": "Wire suite enforcement and tighten nextest bounds",
+    "description": "Pass the live suite-clock measurement to the duration checker and tighten the committed nextest policy after the transaction fix and timing contract land.\n\n## Background\n\nThe runner passes the measured suite-clock integer as `--test-suite-ms <integer>`. This task lands after `fsync-dedupe` so the measured suite can pass its budget.\n\n## Success Criteria\n\n- [hard] REQ-01: Passes the live `suite-clock` integer milliseconds to the checker as `--test-suite-ms <integer>` and keeps the transaction benchmark decision applied or recorded before enforcement.\n- [hard] REQ-02: Tightens `.config/nextest.toml` to `retries = 0`, slow-timeout period `\"10s\"`, and `terminate-after = 2` for a hard bound of 20 seconds; adds exact named per-test overrides for every test whose warm `suite-profile.json` timing exceeds the 20-second hard bound.\n- [hard] REQ-03: Preserves nextest reporter summaries, doctests, ignored provenance, and the exact duration-checker behavior.\n\n## Notes\n\nOrdered overlaps are explicit: `scripts/cargo-ci.sh` is touched after `step-timing-and-clock`, and `.config/nextest.toml` is touched after `nextest-foundation`; both changes are sequenced by this task’s dependencies, and the per-test overrides are selected mechanically from the `suite-profile.json` timings this task depends on. The task consumes `suite-clock` and `nextest-reporter-evidence`.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-01",
+      "satisfies:REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "step-timing-and-clock",
+      "duration-checker",
+      "fsync-dedupe",
+      "suite-profile"
+    ],
+    "planning": {
+      "outcome": "Live suite-clock enforcement uses the exact checker flag and final bounded nextest policy after transaction optimization.",
+      "contract_refs": [
+        "suite-clock",
+        "nextest-reporter-evidence",
+        "suite-timing-evidence"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "REQ-02",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "suite budget enforcement",
+        "test_boundary": "cargo-ci enforcement",
+        "worker_sized_reason": "One final enforcement task joins one measured clock, one checker interface, one transaction prerequisite, and one policy tightening; its two shared-file overlaps are strictly dependency-ordered.",
+        "footprint": {
+          "touches": [
+            "scripts/cargo-ci.sh",
+            ".config/nextest.toml"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "suite-profile",
+    "title": "Produce warm per-test suite timing evidence",
+    "description": "Create a repository-owned profiling producer that records warm per-test timings from nextest machine-readable output for attribution and final policy selection.\n\n## Background\n\nThe profile must be reproducible from the runner’s pinned reporter contract and must distinguish warm per-test cost from outer gate timing. Its artifact is consumed alongside the transaction benchmark artifact.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `scripts/profile-test-suite.sh` that runs the pinned nextest suite with machine-readable output and produces `dev/benchmarks/suite-profile.json`.\n- [hard] REQ-02: Records warm integer-millisecond timing for every profiled test with stable test identity, package/target identity, method, and cache state.\n- [hard] REQ-03: Defines the implementation-produced `suite-timing-evidence` contract as the artifact’s stable location and machine-readable shape for its two consumers: mechanical override selection in enforcement and inherent-cost classification in attribution.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-05"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "suite-runner"
+    ],
+    "planning": {
+      "outcome": "A pinned-nextest profiler produces repository-owned warm per-test timing evidence at a stable JSON path.",
+      "contract_refs": [
+        "nextest-reporter-evidence"
+      ],
+      "produces_contracts": [
+        "suite-timing-evidence"
+      ],
+      "source_refs": [
+        "REQ-05",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "suite timing evidence production",
+        "test_boundary": "repository-owned per-test profile artifact",
+        "worker_sized_reason": "One producer converts one pinned nextest machine-readable stream into one stable warm timing artifact; attribution owns the separate documentation decision.",
+        "footprint": {
+          "creates": [
+            "scripts/profile-test-suite.sh",
+            "dev/benchmarks/suite-profile.json"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "inherent-cost-attribution",
+    "title": "Attribute inherent test costs",
+    "description": "Document every inherently costly test using measured warm profile evidence and the transaction benchmark artifact, with one canonical suite-budget citation.\n\n## Background\n\nThe attribution consumes `dev/benchmarks/suite-profile.json` through the `suite-timing-evidence` contract and consumes `dev/benchmarks/test-suite-performance-4b7c06d0.json` for transaction costs. It records reason and measured warm cost rather than copying volatile gate history. This task owns the classification of a test as inherently costly; the profile producer records timings only.\n\n## Success Criteria\n\n- [hard] REQ-01: Updates `dev/TESTING.md` with every inherently costly test named, its measured warm cost from `suite-profile.json`, and the reason its cost is inherent.\n- [hard] REQ-02: Derives the attribution from both the suite profile and transaction benchmark artifacts and cites `MAX_TEST_SUITE_SECONDS` as the canonical threshold.\n- [hard] REQ-03: Preserves contributor guidance for the pinned nextest policy and leaves the documentation concise and structurally traceable to both artifacts.\n\n## Notes\n\nOrdered overlap: `dev/TESTING.md` is touched after `nextest-foundation`, which adds installation/run guidance; this task adds the cost table after `suite-profile` and `suite-enforcement` provide their evidence and policy.",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-suite-performance",
+      "milestone:v1.0",
+      "component:testing",
+      "satisfies:REQ-05"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review"
+    ],
+    "depends_on": [
+      "suite-enforcement"
+    ],
+    "planning": {
+      "outcome": "Contributor guidance attributes named inherent test costs to warm profile and transaction evidence and cites MAX_TEST_SUITE_SECONDS.",
+      "contract_refs": [
+        "suite-timing-evidence"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "investigation.md"
+      ],
+      "landing_group": "runner-branch",
+      "terminal": {
+        "consumer_family": "contributor performance documentation",
+        "test_boundary": "artifact-linked documentation review",
+        "worker_sized_reason": "One documentation consumer joins the two completed evidence artifacts and one canonical threshold citation; the ordered overlap with foundation guidance is limited to the same configured reference file.",
+        "footprint": {
+          "touches": [
+            "dev/TESTING.md"
+          ]
+        }
+      }
+    }
+  }
+]
