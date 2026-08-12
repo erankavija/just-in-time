@@ -36,10 +36,11 @@ use std::process::Command;
 use std::time::{Duration, UNIX_EPOCH};
 use tempfile::TempDir;
 
-use jit::storage::FileLocker;
+use jit::storage::{publish_fixture_directory_noreplace, FileLocker};
 
 const STALE_CHILD_CACHE: &str = "jit-stale-child-test-cache";
 const FIXTURE_MARKER_VERSION: u32 = 5;
+const SCRATCH_BASELINE_CONTRACT_VERSION: u32 = 1;
 const FIXTURE_LOCK_TIMEOUT: Duration = Duration::from_secs(120);
 const PINNED_NEXTEST_VERSION: &str = "0.9.133";
 const SETUP_MODE: &str = "JIT_STALE_FIXTURE_SETUP";
@@ -199,10 +200,12 @@ fn consume_prepared_stale_child(workspace_root: &Path, ancestor: &str) -> PathBu
         .parent()
         .expect("prepared artifact should have a cache directory")
         .join("verified-artifact.json");
-    assert_eq!(
-        read_marker(&marker_path).as_ref(),
-        Some(&receipt.marker),
-        "the setup-verified marker must remain unchanged"
+    let observed_marker =
+        read_marker(&marker_path).expect("the setup-verified marker must remain readable");
+    assert!(
+        marker_preserves_verified_receipt(&observed_marker, &receipt.marker),
+        "the setup-verified marker's immutable evidence must remain unchanged: receipt={:?} observed={observed_marker:?}",
+        receipt.marker
     );
 
     record_scoped_fixture_observation(&receipt.marker, FixtureUse::PreparedReuse);
@@ -400,13 +403,68 @@ fn scratch_shape_change(shape: ScratchShape) -> (&'static str, &'static [u8]) {
     }
 }
 
+fn scratch_baseline_cache_key(ancestor: &str, shape: ScratchShape) -> String {
+    let (changed_path, change) = scratch_shape_change(shape);
+    let mut hasher = Sha256::new();
+    hasher.update(SCRATCH_BASELINE_CONTRACT_VERSION.to_le_bytes());
+    hasher.update([0]);
+    hasher.update(ancestor.as_bytes());
+    hasher.update([0]);
+    hasher.update(format!("{shape:?}").as_bytes());
+    hasher.update([0]);
+    hasher.update(changed_path.as_bytes());
+    hasher.update([0]);
+    hasher.update(change);
+    format!("{:x}", hasher.finalize())
+}
+
+fn scratch_baseline_path(target_dir: &Path, ancestor: &str, shape: ScratchShape) -> PathBuf {
+    target_dir
+        .join("scratch-baselines")
+        .join(scratch_baseline_cache_key(ancestor, shape))
+}
+
 fn prepare_scratch_baseline(
     workspace_root: &Path,
     target_dir: &Path,
     ancestor: &str,
     shape: ScratchShape,
 ) -> PathBuf {
-    let repository = TempDir::new_in(target_dir)
+    prepare_scratch_baseline_with_hook(workspace_root, target_dir, ancestor, shape, || {})
+}
+
+fn prepare_scratch_baseline_with_hook<BeforePublish>(
+    workspace_root: &Path,
+    target_dir: &Path,
+    ancestor: &str,
+    shape: ScratchShape,
+    before_publish: BeforePublish,
+) -> PathBuf
+where
+    BeforePublish: FnOnce(),
+{
+    let destination = scratch_baseline_path(target_dir, ancestor, shape);
+    match fs::symlink_metadata(&destination) {
+        Ok(_) => {
+            assert!(
+                verify_persistent_scratch_baseline(&destination, ancestor, shape),
+                "occupied persistent scratch baseline must be fully verified: {}",
+                destination.display()
+            );
+            return destination;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => panic!(
+            "persistent scratch baseline {} should be inspectable: {error}",
+            destination.display()
+        ),
+    }
+
+    let baselines = destination
+        .parent()
+        .expect("persistent scratch baseline should have a cache parent");
+    fs::create_dir_all(baselines).expect("persistent scratch baseline cache should be creatable");
+    let repository = TempDir::new_in(baselines)
         .expect("scratch baseline repository staging should be creatable");
     let run = |args: &[&str]| {
         Command::new("git")
@@ -445,12 +503,38 @@ fn prepare_scratch_baseline(
         "advance past the build commit",
     ]));
     remove_inherited_git_topology(repository.path());
-    assert!(verify_scratch_repository(
+    detach_shared_git_objects(repository.path());
+    assert!(verify_persistent_scratch_baseline(
         repository.path(),
         ancestor,
         shape
     ));
-    repository.keep()
+    before_publish();
+    let staging = repository.keep();
+    match publish_fixture_directory_noreplace(&staging, &destination) {
+        Ok(()) => destination,
+        Err(error)
+            if error
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|error| error.kind() == std::io::ErrorKind::AlreadyExists) =>
+        {
+            fs::remove_dir_all(&staging)
+                .expect("losing scratch baseline staging should be removable");
+            assert!(
+                verify_persistent_scratch_baseline(&destination, ancestor, shape),
+                "concurrently occupied scratch baseline must be fully verified: {}",
+                destination.display()
+            );
+            destination
+        }
+        Err(error) => {
+            let _ = fs::remove_dir_all(&staging);
+            panic!(
+                "verified scratch baseline {} should publish atomically without replacement: {error}",
+                destination.display()
+            );
+        }
+    }
 }
 
 fn verify_scratch_repository(repository: &Path, ancestor: &str, shape: ScratchShape) -> bool {
@@ -490,6 +574,35 @@ fn verify_scratch_repository(repository: &Path, ancestor: &str, shape: ScratchSh
         && changed.as_deref() == Some(changed_path)
         && fs::read(repository.join(changed_path)).ok().as_deref() == Some(change)
         && clean
+}
+
+fn verify_persistent_scratch_baseline(
+    repository: &Path,
+    ancestor: &str,
+    shape: ScratchShape,
+) -> bool {
+    fs::symlink_metadata(repository.join(".git/objects/info/alternates"))
+        .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+        && verify_scratch_repository(repository, ancestor, shape)
+}
+
+fn detach_shared_git_objects(repository: &Path) {
+    let repacked = Command::new("git")
+        .args(["repack", "-a", "-d", "-q"])
+        .current_dir(repository)
+        .status()
+        .expect("prepared scratch object detachment should launch");
+    assert!(
+        repacked.success(),
+        "prepared scratch repository should copy every reachable shared object"
+    );
+    let alternates = repository.join(".git/objects/info/alternates");
+    fs::remove_file(&alternates).unwrap_or_else(|error| {
+        panic!(
+            "prepared scratch shared-object link {} should be removable: {error}",
+            alternates.display()
+        )
+    });
 }
 
 fn remove_inherited_git_topology(repository: &Path) {
@@ -620,6 +733,107 @@ fn assert_main_branch_source_does_not_leak_into_prepared_scratch() {
         "isolated prepared consumer must admit real jit init: stdout={} stderr={}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
+    );
+
+    let concurrent_target =
+        TempDir::new().expect("scratch baseline publication regression needs a private target");
+    let rendezvous = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let (first, second) = std::thread::scope(|scope| {
+        let first_rendezvous = std::sync::Arc::clone(&rendezvous);
+        let source_path = source.path();
+        let target_path = concurrent_target.path();
+        let ancestor = ancestor.as_str();
+        let first = scope.spawn(move || {
+            prepare_scratch_baseline_with_hook(
+                source_path,
+                target_path,
+                ancestor,
+                ScratchShape::MetadataOnly,
+                || {
+                    first_rendezvous.wait();
+                },
+            )
+        });
+        let second_rendezvous = std::sync::Arc::clone(&rendezvous);
+        let second = scope.spawn(move || {
+            prepare_scratch_baseline_with_hook(
+                source_path,
+                target_path,
+                ancestor,
+                ScratchShape::MetadataOnly,
+                || {
+                    second_rendezvous.wait();
+                },
+            )
+        });
+        (first.join().unwrap(), second.join().unwrap())
+    });
+    assert_eq!(first, second);
+    assert!(verify_persistent_scratch_baseline(
+        &first,
+        &ancestor,
+        ScratchShape::MetadataOnly
+    ));
+    assert_eq!(
+        fs::read_dir(concurrent_target.path().join("scratch-baselines"))
+            .unwrap()
+            .count(),
+        1,
+        "concurrent verified publishers must leave one persistent baseline"
+    );
+
+    let (changed_path, _) = scratch_shape_change(ScratchShape::BuildInputChange);
+    fs::write(baseline.join(changed_path), b"corrupt occupied baseline\n").unwrap();
+    let corrupt_reuse = std::panic::catch_unwind(|| {
+        prepare_scratch_baseline(
+            source.path(),
+            target.path(),
+            &ancestor,
+            ScratchShape::BuildInputChange,
+        )
+    });
+    assert!(
+        corrupt_reuse.is_err(),
+        "an occupied corrupt persistent baseline must fail closed"
+    );
+    assert_eq!(
+        fs::read_dir(target.path().join("scratch-baselines"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>(),
+        vec![baseline.clone()],
+        "corrupt-cache refusal must not leave a private staging directory"
+    );
+
+    let irregular_target =
+        TempDir::new().expect("scratch baseline type regression needs a private target");
+    let irregular_destination = scratch_baseline_path(
+        irregular_target.path(),
+        &ancestor,
+        ScratchShape::BuildInputChange,
+    );
+    fs::create_dir_all(irregular_destination.parent().unwrap()).unwrap();
+    fs::write(&irregular_destination, b"occupied by an ordinary file\n").unwrap();
+    let missing_workspace = irregular_target.path().join("must-not-be-cloned");
+    let irregular_reuse = std::panic::catch_unwind(|| {
+        prepare_scratch_baseline(
+            &missing_workspace,
+            irregular_target.path(),
+            &ancestor,
+            ScratchShape::BuildInputChange,
+        )
+    });
+    assert!(
+        irregular_reuse.is_err(),
+        "an irregular occupied baseline path must fail before invoking Git"
+    );
+    assert_eq!(
+        fs::read_dir(irregular_target.path().join("scratch-baselines"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>(),
+        vec![irregular_destination],
+        "irregular-cache refusal must not leave a private staging directory"
     );
 }
 
@@ -781,6 +995,19 @@ fn read_marker(path: &Path) -> Option<VerifiedArtifactMarker> {
     serde_json::from_reader(BufReader::new(File::open(path).ok()?)).ok()
 }
 
+fn marker_preserves_verified_receipt(
+    observed: &VerifiedArtifactMarker,
+    receipt: &VerifiedArtifactMarker,
+) -> bool {
+    observed.version == receipt.version
+        && observed.source_sha256 == receipt.source_sha256
+        && observed.built_from == receipt.built_from
+        && observed.short_commit == receipt.short_commit
+        && observed.artifact_sha256 == receipt.artifact_sha256
+        && observed.cargo_build_invocations == receipt.cargo_build_invocations
+        && observed.reuse_observations >= receipt.reuse_observations
+}
+
 fn record_cargo_build_invocation(path: &Path) -> u32 {
     let count = read_build_count(path).unwrap_or(0) + 1;
     let staging = path.with_extension(format!("tmp.{}", std::process::id()));
@@ -819,6 +1046,31 @@ fn binary_reports_provenance(binary: &Path, ancestor: &str, short: &str) -> bool
 }
 
 fn sha256_file(path: &Path) -> std::io::Result<String> {
+    let optimized_digest = ["/usr/bin/sha256sum", "/bin/sha256sum"]
+        .into_iter()
+        .find_map(|binary| {
+            Command::new(binary)
+                .arg("--")
+                .arg(path)
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .and_then(|output| {
+                    String::from_utf8_lossy(&output.stdout)
+                        .split_ascii_whitespace()
+                        .next()
+                        .filter(|digest| digest.len() == 64)
+                        .filter(|digest| digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
+                        .map(str::to_ascii_lowercase)
+                })
+        });
+    if let Some(digest) = optimized_digest {
+        return Ok(digest);
+    }
+
+    // Keep direct cargo-test fallback portable when the optimized system
+    // utility is unavailable. Setup runs this debug-built test binary, where
+    // the utility avoids charging several seconds per 130 MiB fixture hash.
     let mut file = File::open(path)?;
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
@@ -1054,8 +1306,29 @@ fn test_stale_binary_fixture_marker_replacement_leaves_one_complete_file() {
         reuse_observations,
     };
 
-    write_marker(&marker_path, &marker(0));
-    write_marker(&marker_path, &marker(1));
+    let receipt_marker = marker(0);
+    write_marker(&marker_path, &receipt_marker);
+    std::thread::scope(|scope| {
+        let advanced = marker(1);
+        let writer_marker_path = marker_path.clone();
+        scope
+            .spawn(move || write_marker(&writer_marker_path, &advanced))
+            .join()
+            .unwrap();
+        let observed = read_marker(&marker_path).unwrap();
+        assert!(
+            marker_preserves_verified_receipt(&observed, &receipt_marker),
+            "a concurrent telemetry advance must preserve immutable setup evidence"
+        );
+        let changed_artifact = VerifiedArtifactMarker {
+            artifact_sha256: "different-artifact".to_string(),
+            ..marker(1)
+        };
+        assert!(
+            !marker_preserves_verified_receipt(&changed_artifact, &receipt_marker),
+            "changed immutable evidence must still fail closed"
+        );
+    });
 
     assert_eq!(read_marker(&marker_path).unwrap().reuse_observations, 1);
     assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
@@ -1348,7 +1621,7 @@ fn clone_prepared_scratch(workspace_root: &Path, ancestor: &str, shape: ScratchS
         baseline.display()
     );
     assert!(
-        verify_scratch_repository(baseline, ancestor, shape),
+        verify_persistent_scratch_baseline(baseline, ancestor, shape),
         "prepared scratch baseline must remain verified after setup"
     );
     let scratch = clone_scratch_baseline(baseline, ancestor, shape);
