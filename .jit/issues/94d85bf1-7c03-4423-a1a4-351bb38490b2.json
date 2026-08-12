@@ -16,7 +16,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-12T22:30:01.404863236Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "94d85bf1-7c03-4423-a1a4-351bb38490b2",
   "labels": [
     "type:task",
@@ -29,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Wire suite-clock enforcement into the duration checker",
-  "updated_at": "2026-08-12T22:06:57.077569747Z"
+  "updated_at": "2026-08-12T22:30:01.404863236Z"
 }
