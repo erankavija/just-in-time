@@ -618,13 +618,19 @@ impl CaptureSpec {
         self.advisory.contains(path)
     }
 
-    /// Require complete non-recursive listings.
+    /// Require a complete non-recursive listing.
+    pub fn discover_listing(&mut self, path: VirtualPath) -> Result<(), CaptureError> {
+        self.discover_listings([path])
+    }
+
+    /// Require complete non-recursive listings, validating the declaration once
+    /// for the whole batch.
     ///
-    /// Plural like [`discover_paths`](Self::discover_paths), and for the same
-    /// reason: one declaration is validated once. A caller expanding a whole
-    /// subtree adds a listing per directory it found, and validating each
-    /// separately would cost a clone and a full revalidation of the growing
-    /// declaration per directory.
+    /// A caller that learns a listing at a time can add them one at a time
+    /// through [`discover_listing`](Self::discover_listing); a caller expanding
+    /// a whole subtree cannot, because each call clones and revalidates the
+    /// declaration it is growing, and a destination holding a directory per file
+    /// makes that quadratic in the tree's size.
     pub fn discover_listings(
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
@@ -1695,7 +1701,7 @@ mod tests {
                 },
             )
             .unwrap();
-            spec.discover_listings([dir.clone()]).unwrap();
+            spec.discover_listing(dir.clone()).unwrap();
             spec
         };
         let bytes = vec![seed_byte];
@@ -1973,7 +1979,7 @@ mod tests {
             },
         )
         .unwrap();
-        listing_spec.discover_listings([directory.clone()]).unwrap();
+        listing_spec.discover_listing(directory.clone()).unwrap();
         assert!(matches!(
             RepositoryImage::close(
                 layout(),
@@ -2030,7 +2036,7 @@ mod tests {
             })
             .collect::<Result<BTreeMap<_, _>, CaptureError>>()?;
         let mut spec = CaptureSpec::phase_one(entries.keys().cloned(), budget)?;
-        spec.discover_listings([path.clone()])?;
+        spec.discover_listing(path.clone())?;
         RepositoryImage::close(
             layout(),
             spec,
@@ -2101,11 +2107,11 @@ mod tests {
             max_depth: 4,
         };
         let mut spec = CaptureSpec::phase_one([], budget).unwrap();
-        spec.discover_listings([VirtualPath::data("issues").unwrap()])
+        spec.discover_listing(VirtualPath::data("issues").unwrap())
             .unwrap();
 
         assert!(matches!(
-            spec.discover_listings([VirtualPath::data("templates").unwrap()]),
+            spec.discover_listing(VirtualPath::data("templates").unwrap()),
             Err(CaptureError::ListingBudgetExceeded {
                 actual: 2,
                 maximum: 1
@@ -2147,8 +2153,8 @@ mod tests {
             },
         )
         .unwrap();
-        spec.discover_listings([root.clone()]).unwrap();
-        spec.discover_listings([issues.clone()]).unwrap();
+        spec.discover_listing(root.clone()).unwrap();
+        spec.discover_listing(issues.clone()).unwrap();
 
         let result = RepositoryImage::close(
             layout(),

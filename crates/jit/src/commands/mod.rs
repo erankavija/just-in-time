@@ -1838,7 +1838,7 @@ fn capture_gate_run_results(
         image
     } else {
         spec.discover_paths([root.clone()])?;
-        spec.discover_listings([root.clone()])?;
+        spec.discover_listing(root.clone())?;
         let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
             return Ok(None);
         };

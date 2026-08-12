@@ -315,8 +315,8 @@ fn capture_gate_preset_image(
         captured_gate_preset_fixed_paths(),
         GATE_PRESET_CAPTURE_BUDGET,
     )?;
-    first_spec.discover_listings([presets_dir.clone()])?;
-    first_spec.discover_listings([issues_dir.clone()])?;
+    first_spec.discover_listing(presets_dir.clone())?;
+    first_spec.discover_listing(issues_dir.clone())?;
     let Some(first) = capture_or_retry(session.capture(first_spec))? else {
         return Ok(None);
     };
@@ -356,8 +356,8 @@ fn capture_gate_preset_image(
             .chain(closure)
             .chain(create_path),
     )?;
-    spec.discover_listings([presets_dir])?;
-    spec.discover_listings([issues_dir.clone()])?;
+    spec.discover_listing(presets_dir)?;
+    spec.discover_listing(issues_dir.clone())?;
     let Some(image) = capture_or_retry(session.capture(spec))? else {
         return Ok(None);
     };

@@ -2582,7 +2582,7 @@ mod tests {
             },
         )
         .unwrap();
-        spec.discover_listings([profiles.clone()]).unwrap();
+        spec.discover_listing(profiles.clone()).unwrap();
         let record_identity = EntryIdentity::for_bytes("record", &record_bytes).unwrap();
         let mut entries = BTreeMap::from([
             (

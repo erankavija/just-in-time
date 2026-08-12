@@ -318,7 +318,9 @@ fn capture_more(
     }
     let mut spec = image.capture_spec().clone();
     spec.discover_paths(paths)?;
-    spec.discover_listings(listings)?;
+    for listing in listings {
+        spec.discover_listing(listing)?;
+    }
     match capture_or_retry(session.capture(spec))? {
         Some(next) if next.has_stable_overlap(image) => {
             *image = next;
@@ -338,7 +340,9 @@ fn capture_advisory_more(
     let listings = listings.into_iter().collect::<BTreeSet<_>>();
     let mut spec = image.capture_spec().clone();
     spec.discover_advisory_paths(paths)?;
-    spec.discover_listings(listings)?;
+    for listing in listings {
+        spec.discover_listing(listing)?;
+    }
     match capture_or_retry(session.capture(spec))? {
         Some(next) if next.has_stable_overlap(image) => {
             *image = next;

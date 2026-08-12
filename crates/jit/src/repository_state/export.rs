@@ -112,7 +112,7 @@ impl RepositoryExportIntent {
                 .into_iter()
                 .filter(|path| path.root_class() == RepositoryRootClass::Worktree),
         )?;
-        spec.discover_listings([parent])?;
+        spec.discover_listing(parent)?;
         Ok(spec)
     }
 }

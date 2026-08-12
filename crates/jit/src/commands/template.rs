@@ -405,7 +405,7 @@ fn capture_template_image(
     let presets_dir = VirtualPath::GATE_PRESETS;
     let issues_dir = VirtualPath::ISSUES;
     let mut first_spec = CaptureSpec::phase_one(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
-    first_spec.discover_listings([presets_dir.clone()])?;
+    first_spec.discover_listing(presets_dir.clone())?;
     let Some(first) = capture_or_retry(session.capture(first_spec))? else {
         return Ok(None);
     };
@@ -422,8 +422,8 @@ fn capture_template_image(
     discovered_paths.extend(discovered_presets.iter().cloned());
     discovered_paths.extend(closure.iter().cloned());
     spec.discover_paths(discovered_paths)?;
-    spec.discover_listings([issues_dir])?;
-    spec.discover_listings([presets_dir.clone()])?;
+    spec.discover_listing(issues_dir)?;
+    spec.discover_listing(presets_dir.clone())?;
     let Some(mut image) = capture_or_retry(session.capture(spec.clone()))? else {
         return Ok(None);
     };

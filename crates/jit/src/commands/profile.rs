@@ -2236,7 +2236,7 @@ pub(super) fn capture_applied_records(
     profiles_dir: &VirtualPath,
 ) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
     let mut spec = CaptureSpec::phase_one([], RECORD_CAPTURE_BUDGET)?;
-    spec.discover_listings([profiles_dir.clone()])?;
+    spec.discover_listing(profiles_dir.clone())?;
     let Some(listed) = capture_or_retry(session.capture(spec.clone()))? else {
         return Ok(None);
     };

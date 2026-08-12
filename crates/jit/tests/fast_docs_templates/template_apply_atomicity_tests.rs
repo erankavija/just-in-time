@@ -450,7 +450,7 @@ fn repository_image<S: IssueStore + RepositoryStateStore>(store: &S) -> Reposito
             .map(|issue| VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap()),
     );
     let mut spec = CaptureSpec::phase_one(paths, SNAPSHOT_BUDGET).unwrap();
-    spec.discover_listings([VirtualPath::data("issues").unwrap()])
+    spec.discover_listing(VirtualPath::data("issues").unwrap())
         .unwrap();
     let mut session = store.open_mutation_session(layout).unwrap();
     session.capture(spec).unwrap()

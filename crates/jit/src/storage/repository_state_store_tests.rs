@@ -50,7 +50,7 @@ fn test_json_apply_retries_when_advisory_unreadable_listing_becomes_readable() {
         let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
         spec.discover_advisory_paths([secret_path.clone()]).unwrap();
         spec.discover_paths([published_path.clone()]).unwrap();
-        spec.discover_listings([secret_path.clone()]).unwrap();
+        spec.discover_listing(secret_path.clone()).unwrap();
         spec
     };
     let delta = RepositoryDelta::new(
@@ -2103,7 +2103,7 @@ fn test_conformance_listing_over_file_errors_on_both_backends() {
     let spec = || {
         let mut spec =
             CaptureSpec::phase_one([VirtualPath::data("file.txt").unwrap()], budget()).unwrap();
-        spec.discover_listings([VirtualPath::data("file.txt").unwrap()])
+        spec.discover_listing(VirtualPath::data("file.txt").unwrap())
             .unwrap();
         spec
     };
@@ -2133,7 +2133,7 @@ fn test_conformance_worktree_root_listing_canonicalizes_nested_data_child() {
         let root = VirtualPath::worktree("").unwrap();
         let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
         spec.discover_paths([root.clone()]).unwrap();
-        spec.discover_listings([root]).unwrap();
+        spec.discover_listing(root).unwrap();
         spec
     };
 
@@ -2197,7 +2197,7 @@ fn capture_listing_errors(
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = || {
         let mut spec = CaptureSpec::phase_one([], budget).unwrap();
-        spec.discover_listings([VirtualPath::data("issues").unwrap()])
+        spec.discover_listing(VirtualPath::data("issues").unwrap())
             .unwrap();
         spec
     };
