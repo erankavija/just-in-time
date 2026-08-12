@@ -24,6 +24,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T00:24:53.989210338Z",
       "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T00:26:35.765114116Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "007f598b-424d-4df3-8191-12d7d2378527",
@@ -36,5 +41,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Cut over journal durability documentation",
-  "updated_at": "2026-08-12T00:24:53.989210338Z"
+  "updated_at": "2026-08-12T00:26:35.765114116Z"
 }
