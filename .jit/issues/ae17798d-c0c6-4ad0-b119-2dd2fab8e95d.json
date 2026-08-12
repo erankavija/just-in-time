@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:sol-applied-lib-fixtures",
+  "claimed_at": "2026-08-12T05:33:16.137148334Z",
+  "context": {},
+  "created_at": "2026-08-12T05:32:40.881174997Z",
+  "dependencies": [],
+  "description": "Reuse the existing verified applied-profile baselines in selected in-process profile, initialization, and repair tests whose expensive first application is setup rather than the behavior under test.\n\n## Background\n\nThe integrated warm profile still attributes 64,894 aggregate milliseconds to ten stable library-test identities that independently construct equivalent applied-default or applied-dogfood repositories. The nextest run already prepares those two immutable baselines for other consumers. Extend the shared fixture boundary to these exact tests without adding another setup recipe or changing any product transaction behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: The selected six validation, two reinitialization, and two profile-recovery tests consume verified applied-default or applied-dogfood baselines and receive independent mutable filesystem or in-memory state.\n- [hard] REQ-02: Preserves every existing stable test identity and semantic assertion, including real package-resolution roots, relative provenance, file modes, and the behavior under test; fresh, absent-root, conflict, and concurrent initialization cases remain unchanged.\n- [hard] REQ-03: Adds a mode-preserving in-memory adapter whose semantic bytes, modes, profile records, and clone isolation conform to the file-backed baseline.\n- [hard] REQ-04: Nextest setup filters select only the intended identities, add no setup recipe, and the same-host setup-inclusive selected span is at most 25 seconds with at least 25 seconds of aggregate reduction from the recorded 64,894-millisecond baseline.\n- [hard] REQ-05: Focused filesystem and memory fixture tests, all changed test families, the cargo-ci self-test, formatting, and warning-free linting pass.\n\n## Notes\n\nThe expected footprint is `.config/nextest.toml`, shared test support in `crates/jit/src/test_utils.rs` and `crates/jit/src/storage/test_support.rs`, and selected consumers in `crates/jit/src/commands/profile.rs`, `init.rs`, and `validate.rs`. Production persistence code and new cache shapes are out of scope.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T05:32:40.881174997Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ae17798d-c0c6-4ad0-b119-2dd2fab8e95d",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Reuse applied-profile baselines in library tests",
+  "updated_at": "2026-08-12T05:33:16.137148334Z"
+}
