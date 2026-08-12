@@ -42,17 +42,23 @@
     {
       "wave_number": 5,
       "issues": [
-        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"}
+        {"short_id": "6d10e5d4", "title": "Reduce profiled warm suite work below the enforcement bound", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "ready", "note": "Execution-discovered prerequisite; shared test configuration/support dispatch awaits invoker approval."}
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"short_id": "25faa21d", "title": "Tighten the committed nextest policy to the final bounds", "classification": "implementation", "difficulty": "moderate", "worker": "codex-direct", "status": "pending"}
+        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "pending"}
       ]
     },
     {
       "wave_number": 7,
+      "issues": [
+        {"short_id": "25faa21d", "title": "Tighten the committed nextest policy to the final bounds", "classification": "implementation", "difficulty": "moderate", "worker": "codex-direct", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 8,
       "issues": [
         {"short_id": "76ecc11f", "title": "Attribute inherent test costs", "classification": "documentation", "difficulty": "moderate", "worker": "opus", "status": "pending"}
       ]
@@ -89,15 +95,30 @@
       "title": "Mirror prepared rollback stage-cleanup edge in memory recovery",
       "state": "done",
       "why": "A second audit found RepositoryBeforeStageCleanup was still reachable only on the JSON prepared-rollback path; the memory occurrence was post-commit cleanup and could not substantiate cross-backend rollback coverage. The scoped seam and focused tests passed lead gates and the issue is complete."
+    },
+    {
+      "short_id": "6d10e5d4",
+      "type": "task",
+      "title": "Reduce profiled warm suite work below the enforcement bound",
+      "state": "ready",
+      "why": "The fixed live suite clock cannot be wired while warm evidence remains at 60,562-113,272 ms. The pre-change profile records 883,556 aggregate test-ms; even ideal packing over 24 logical CPUs plus doctests exceeds 30 seconds, so an in-epic optimization prerequisite is required without weakening the checker or coverage."
     }
   ],
   "delegation_model": "Hard tasks go to gpt-5.6-sol collaboration subagents. Moderate tasks go to `codex exec -m gpt-5.6-terra -c model_reasoning_effort=high`, and easy tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high`; the lead reviews every diff, runs configured gates, and owns integration.",
   "gate_cost_model": "Measured this session on this host: a cold worktree cargo-ci run is 10+ minutes; a warm run on main is ~3-5 minutes; each `code-review` run is 3-5 minutes and is per-issue (no reuse). cargo-ci verdicts DO reuse across issues over identical content, so merge a whole wave, then evaluate cargo-ci per issue for one execution plus reuses. Worker cargo-ci runs in fresh worktrees are the single largest avoidable cost: from wave 2 on, have workers verify with focused tests plus fmt and clippy only, and let the lead's post-merge gate on warm main be the authoritative run.",
-  "escalations": [],
+  "escalations": [
+    {
+      "category": "changes to shared infrastructure",
+      "status": "open",
+      "issue": "6d10e5d4",
+      "summary": "Independent audits recommend nextest-level stale-fixture preparation plus shared immutable profile/repair fixture support. Those changes affect project-wide test configuration/support and require invoker approval before dispatch."
+    }
+  ],
   "rework_counts": {"f5da1112": 1, "47836e2e": 4, "0369e563": 1, "ee809651": 1, "007f598b": 1, "2516ad90": 1, "21ba4bb4": 1},
   "surfaced_pitfalls": [
     "A merged issue's cargo-ci can fail on a different in-progress issue already present on main. Run 4b75ba0b for 4aa15137 reproduced 47836e2e's deterministic 5/6 nextest observation defect while the recovery-seam focused tests, fmt, and clippy were green. Preserve the failed run as shared-branch evidence; do not charge rework to the unaffected issue, and rerun after the owning fix lands.",
-    "A direct workspace nextest run can fail merged_tree_gate_verification_tests because its nested cargo-ci self-test enables a host sccache path that passes inside the outer cargo-ci gate but fails when invoked standalone. The warm profiler sets CARGO_CI_NO_SCCACHE=1 for both runs; per-test exec_time excludes compilation, and the profiler self-test asserts the isolation. Do not weaken the producer with --no-fail-fast or publish partial evidence."
+    "A direct workspace nextest run can fail merged_tree_gate_verification_tests because its nested cargo-ci self-test enables a host sccache path that passes inside the outer cargo-ci gate but fails when invoked standalone. The warm profiler sets CARGO_CI_NO_SCCACHE=1 for both runs; per-test exec_time excludes compilation, and the profiler self-test asserts the isolation. Do not weaken the producer with --no-fail-fast or publish partial evidence.",
+    "Do not wire --test-suite-ms into cargo-ci before reducing warm suite work. A complete run measured 113,272 ms and a separate warm incomplete span already measured 60,562 ms; the unchanged checker correctly rejects both against 30,000 ms. The 883,556 ms aggregate profile also has a 42,139 ms perfect-packing lower bound after doctests on 24 logical CPUs, proving this is not just scheduler noise."
   ],
   "started_at": "2026-08-11T19:10:00Z",
   "wave_1_completed_at": "2026-08-11T21:20:00Z"

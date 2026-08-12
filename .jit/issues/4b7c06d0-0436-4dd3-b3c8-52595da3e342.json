@@ -23,6 +23,13 @@
       "doc_type": "progress",
       "label": "Execution progress",
       "path": "dev/active/4b7c06d0-test-suite-performance/progress.json"
+    },
+    {
+      "commit": null,
+      "doc_type": "handoff",
+      "format": "markdown",
+      "label": "Session 2 handoff",
+      "path": "dev/active/4b7c06d0-test-suite-performance/handoff-2.md"
     }
   ],
   "first_ready_at": "2026-08-11T12:38:27.983656428Z",
@@ -49,5 +56,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-11T21:20:22.624401556Z"
+  "updated_at": "2026-08-12T01:29:58.014362878Z"
 }

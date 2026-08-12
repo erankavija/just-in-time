@@ -13785,3 +13785,10 @@
 {"id":"a8611860-253f-44b7-a585-0270e89e67e2","issue_id":"21ba4bb4-95bc-40b2-926a-44b477475cf4","timestamp":"2026-08-12T01:11:26.656171596Z","type":"issue_completed"}
 {"from":"ready","id":"6e1503ba-d81c-4b63-8e24-15971208a595","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T01:13:56.956183597Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sol-suite-enforcement","id":"75910b6d-1cb0-47a3-bcdf-58a29986ab72","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T01:13:56.956183597Z","type":"issue_claimed"}
+{"id":"ce810de9-014b-4774-8805-6c3f52359838","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","priority":"high","timestamp":"2026-08-12T01:27:14.561722004Z","title":"Reduce profiled warm suite work below the enforcement bound","type":"issue_created"}
+{"fields":["assignee"],"id":"30963ee0-6e1f-4ddd-b716-097c1f1bb1cc","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T01:27:22.291366866Z","type":"issue_updated","updated_by":"issue-unassign"}
+{"fields":["dependencies"],"id":"8c6caf3b-be18-4d4b-84d1-9c45c5a33e8a","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T01:27:27.773431654Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"6b333e3a-c671-4012-affe-a5a213737c23","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T01:27:33.256128703Z","type":"issue_updated","updated_by":"dependency-add"}
+{"id":"212b2cd9-59a8-49f2-a5ea-4bf6c7468008","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","new_count":1,"old_count":2,"removed_deps":["21ba4bb4-95bc-40b2-926a-44b477475cf4"],"timestamp":"2026-08-12T01:27:33.256128703Z","type":"dependency_reduced"}
+{"from":"in_progress","id":"4f853fd9-0745-43be-8780-59c383f457d3","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T01:27:47.576953240Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["documents"],"id":"e223aab1-e4d6-445f-8c99-2bdcfdf11967","issue_id":"4b7c06d0-0436-4dd3-b3c8-52595da3e342","timestamp":"2026-08-12T01:29:58.014362878Z","type":"issue_updated","updated_by":"doc-add"}
