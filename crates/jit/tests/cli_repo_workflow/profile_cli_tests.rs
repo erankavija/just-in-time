@@ -2151,6 +2151,31 @@ fn worktree_files(root: &Path) -> std::collections::BTreeSet<String> {
     found
 }
 
+/// Every directory under `root`, root-relative.
+///
+/// A publication enumerates directories as well as files, so a test that says
+/// something about which of the two drives its cost reads both.
+fn worktree_directories(root: &Path) -> std::collections::BTreeSet<String> {
+    fn visit(root: &Path, directory: &Path, found: &mut std::collections::BTreeSet<String>) {
+        for entry in fs::read_dir(directory).expect("read worktree directory") {
+            let path = entry.expect("read worktree entry").path();
+            if path.is_dir() {
+                found.insert(
+                    path.strip_prefix(root)
+                        .expect("worktree entry is under the root")
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+                visit(root, &path, found);
+            }
+        }
+    }
+
+    let mut found = std::collections::BTreeSet::new();
+    visit(root, root, &mut found);
+    found
+}
+
 /// The archive is a function of the package it carries: two packs of one
 /// package directory write the same file.
 #[test]
@@ -2516,5 +2541,119 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
         worktree_files(&target_repo.path().join("packages/bounded")).len(),
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
         "the published tree does not hold every file the package carried"
+    );
+}
+
+/// Both routes that publish a package tree carry a package at the model limits,
+/// including a republication over one already published.
+///
+/// A package the model accepts and `pack` writes an archive for has to be one
+/// `add` publishes, or the operator is left holding an archive nothing takes.
+/// The package used here sits at the file bound, fills the byte budget, and
+/// gives every asset a directory chain no other asset shares, so what a
+/// publication enumerates is driven by the package's directories rather than by
+/// its files — the shape the package model leaves unconstrained. The second
+/// capture is the one that republishes over that whole tree, so what the first
+/// capture published is read back rather than assumed absent.
+#[test]
+fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_its_files() {
+    let source_repo = TempDir::new().unwrap();
+    let target_repo = TempDir::new().unwrap();
+    let exchange = TempDir::new().unwrap();
+    assert!(jit(source_repo.path(), &["init"]).status.success());
+    assert!(jit(target_repo.path(), &["init"]).status.success());
+    jit::test_utils::write_package_tree_at_model_limits(
+        &source_repo.path().join("packages/bounded"),
+    );
+    let archive = exchange.path().join("bounded.tar");
+    let archive = archive.to_str().unwrap();
+
+    let packed = jit(
+        source_repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            "packages/bounded",
+            "--output",
+            archive,
+            "--json",
+        ],
+    );
+    assert!(packed.status.success(), "{packed:?}");
+    let packed = json(&packed);
+
+    // The package under test binds every dimension the model constrains, so a
+    // publication that survives it has no headroom left in any of them.
+    assert_eq!(
+        packed["file_count"], jit::profile::MAX_PROFILE_PACKAGE_FILES,
+        "the package under test must sit at the file bound"
+    );
+    let byte_size = packed["byte_size"]
+        .as_u64()
+        .expect("a pack reports the package's byte size");
+    assert!(
+        byte_size <= jit::profile::MAX_PROFILE_PACKAGE_BYTES as u64
+            && byte_size
+                > (jit::profile::MAX_PROFILE_PACKAGE_BYTES
+                    - jit::profile::MAX_PROFILE_PACKAGE_BYTES / 8) as u64,
+        "the package under test must fill the byte budget, not sit well below it: {byte_size}"
+    );
+
+    let added = jit(
+        target_repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            archive,
+            "--destination",
+            "packages/bounded",
+            "--json",
+        ],
+    );
+    assert!(added.status.success(), "{added:?}");
+    assert_eq!(json(&added)["package_hash"], packed["package_hash"]);
+
+    // The directories the publication had to enumerate outnumber the files it
+    // published, which is the shape the model does not bound.
+    let published = target_repo.path().join("packages/bounded");
+    assert_eq!(
+        worktree_files(&published).len(),
+        jit::profile::MAX_PROFILE_PACKAGE_FILES,
+        "the published tree does not hold every file the package carried"
+    );
+    assert!(
+        worktree_directories(&published).len() > worktree_files(&published).len(),
+        "the package under test must publish more directories than files"
+    );
+
+    // Capturing the added package publishes the same tree again, and capturing
+    // it a second time republishes over the tree the first capture wrote.
+    for expected in ["applied", "unchanged"] {
+        let captured = jit(
+            target_repo.path(),
+            &[
+                "profile",
+                "capture",
+                "--source",
+                "packages/bounded",
+                "--destination",
+                "build/bounded",
+                "--json",
+            ],
+        );
+        assert!(captured.status.success(), "{captured:?}");
+        let captured = json(&captured);
+        assert_eq!(captured["package_hash"], packed["package_hash"]);
+        assert_eq!(
+            captured["status"], expected,
+            "a capture of an unchanged package republished content"
+        );
+    }
+    assert_eq!(
+        worktree_files(&target_repo.path().join("build/bounded")),
+        worktree_files(&published),
+        "the captured tree differs from the package it was captured from"
     );
 }

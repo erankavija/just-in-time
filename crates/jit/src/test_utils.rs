@@ -1133,6 +1133,15 @@ pub fn write_package_declaring(
     crate::profile::ProfilePackage::from_directory(&tree).expect("a valid package tree")
 }
 
+/// Directory levels each asset of [`write_package_tree_at_model_limits`] sits
+/// below, sharing none of them with another asset.
+///
+/// Every level multiplies the distinct directories a publication of the package
+/// has to enumerate, and the package model bounds none of them, so this is the
+/// dimension along which a route carrying an assumed path shape breaks. Nine
+/// path components is the shape reported against `jit profile add`.
+pub const UNSHARED_ASSET_DIRECTORY_LEVELS: usize = 8;
+
 /// Write a package tree at the limits the package model permits, and return
 /// `root`.
 ///
@@ -1147,12 +1156,12 @@ pub fn write_package_declaring(
 /// - every declared source is long enough that a tar writer cannot fit its name
 ///   in a header field, so each file costs a long-name entry as well.
 ///
-/// Each asset also sits at the end of a chain of directories no other asset
-/// shares, so the package's distinct directory count is a multiple of its file
-/// count rather than bounded by it. That is the property the package model
-/// leaves unconstrained — it bounds file count and total size, and says nothing
-/// about path depth — so a route whose cost scales with directories rather than
-/// with files fails here and nowhere else.
+/// Each asset also sits at the end of a chain of [`UNSHARED_ASSET_DIRECTORY_LEVELS`]
+/// directories no other asset shares, so the package's distinct directory count
+/// is a multiple of its file count rather than bounded by it. That is the
+/// property the package model leaves unconstrained — it bounds file count and
+/// total size, and says nothing about path depth — so a route whose cost scales
+/// with directories rather than with files fails here and nowhere else.
 ///
 /// [`MAX_PROFILE_PACKAGE_FILES`]: crate::profile::MAX_PROFILE_PACKAGE_FILES
 /// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
@@ -1162,10 +1171,12 @@ pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
     // header holds, which is what forces the long-name entry.
     let padding = "x".repeat(70);
     let source = |index: usize| {
-        format!(
-            "assets/outer-{padding}-{index:03}/inner-{padding}-{index:03}/\
-             source-{padding}-{index:03}.txt"
-        )
+        (0..UNSHARED_ASSET_DIRECTORY_LEVELS)
+            .map(|level| format!("level-{level}-{index:03}/"))
+            .chain(std::iter::once(format!(
+                "source-{padding}-{index:03}.txt"
+            )))
+            .collect::<String>()
     };
     let manifest = std::iter::once(
         "[profile]\nmanifest-version = 1\nid = \"bounded-package\"\nversion = \"1.0.0\"\n\
