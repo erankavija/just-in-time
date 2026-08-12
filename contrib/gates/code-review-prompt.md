@@ -31,6 +31,12 @@ Do not enumerate every project item or turn the review into a repository-wide po
 
 Treat `satisfies:`, `enforces:`, and `per:` relationship labels as evidence claims, not proof. Resolve their targets and test the assertions against current behavior, at the strength the label's own `[namespaces.<ns>]` declaration gives it: a label declared to denote contribution or conformance claims that the issue's criteria are consistent with the target, not that this issue delivers the target whole. Attributable dangling, contradictory, or unsupported claims are blocking. An unrelated pre-existing defect is advisory.
 
+## Records of the past
+
+An event log, gate-run result, benchmark artifact, session handoff, or progress
+file records what was true when written; review none of them against current
+behavior and raise no finding whose remedy is editing one.
+
 ## Bounded inspection and truncation recovery
 
 Read patches and current files in bounded calls, partitioned by commit, path, or line range. Search only relevant directories and patterns. Do not combine a full patch, the full gate registry, and repository-wide searches in one command.
