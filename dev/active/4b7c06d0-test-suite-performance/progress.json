@@ -42,7 +42,7 @@
     {
       "wave_number": 5,
       "issues": [
-        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "ready"}
+        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"}
       ]
     },
     {
