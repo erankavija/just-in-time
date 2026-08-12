@@ -13826,3 +13826,7 @@
 {"fields":["dependencies"],"id":"8f90900f-6b11-4967-80bb-91d1515ff4f3","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T06:57:59.859465948Z","type":"issue_updated","updated_by":"dependency-add"}
 {"assignee":"agent:sol-scoped-test-profile","id":"a7b12146-fcd8-43b8-bc52-2446b7369d68","issue_id":"efaec52f-da76-438a-a55b-d4cefd5e6217","timestamp":"2026-08-12T06:58:01.918425207Z","type":"issue_claimed"}
 {"from":"ready","id":"10a62a80-ff73-4a3a-8ce5-6a4b5282566c","issue_id":"efaec52f-da76-438a-a55b-d4cefd5e6217","timestamp":"2026-08-12T06:58:05.700367729Z","to":"in_progress","type":"issue_state_changed"}
+{"id":"65c1da27-288a-4710-8d08-8c3ca22b28c1","issue_id":"934985ca-8650-4a98-9c09-df9ec8fd9863","priority":"high","timestamp":"2026-08-12T07:27:33.294557511Z","title":"Tune nextest worker concurrency","type":"issue_created"}
+{"fields":["dependencies"],"id":"6f97d51d-28e6-4673-bcbc-e5371b412f55","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T07:27:48.104366299Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"34a59454-8fde-4a69-abc1-0dfb7089910a","issue_id":"934985ca-8650-4a98-9c09-df9ec8fd9863","timestamp":"2026-08-12T07:28:06.966430685Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:sol-nextest-concurrency","id":"da68e91a-3780-48c1-9a8f-54d7ef9b4032","issue_id":"934985ca-8650-4a98-9c09-df9ec8fd9863","timestamp":"2026-08-12T07:28:06.966430685Z","type":"issue_claimed"}

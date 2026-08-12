@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:sol-nextest-concurrency",
+  "claimed_at": "2026-08-12T07:28:06.966430685Z",
+  "context": {},
+  "created_at": "2026-08-12T07:27:33.294557511Z",
+  "dependencies": [],
+  "description": "Tune nextest worker concurrency from matched full-suite evidence so the opt-level-0 test profile uses this host efficiently without changing a test, assertion, or build profile.\n\n## Background\n\nThe fixed runner currently uses nextest’s 24-worker host default. The opt-level-0 suite contains thousands of subprocess- and filesystem-heavy tests whose summed wall time does not establish CPU saturation, while setup scripts remain serialized. A bounded concurrency experiment can reduce the post-setup region without the rejected global optimization’s build regression, but excessive workers can increase contention, memory pressure, or flakiness and must not be accepted from one fast sample.\n\n## Success Criteria\n\n- [hard] REQ-01: Compares the current 24-worker baseline with bounded 36-, 48-, and, only if useful and safe, 64-worker candidates on one already-built target under identical source, nextest 0.9.133, no-sccache, incremental-disabled, and setup-script conditions.\n- [hard] REQ-02: Every measured run preserves the exact runnable and ignored identity sets with no missing or duplicate identities, all assertions pass, and setup time is reported separately from the post-setup test region.\n- [hard] REQ-03: Accepts one fixed concurrency only after three consecutive full-suite samples each complete at or below 23,500 milliseconds, with no timeout, resource failure, order dependence, or selected-test duration regression above the committed 20-second final per-test bound.\n- [hard] REQ-04: Records wall, aggregate test work, setup durations, peak memory or an equivalent host-pressure observation, and doctest control timing; rejects a faster candidate when memory pressure, flakiness, or doctest/suite-clock behavior makes it unsafe.\n- [hard] REQ-05: If accepted, declares the chosen worker count once in the pinned nextest configuration and passes the profiler self-test, cargo-ci self-test, full suite, doctests, formatting, and configuration inspection; if rejected, records complete raw evidence and `no_change` without weakening any threshold.\n\n## Notes\n\nThe experiment changes scheduling only. It must not add test groups that serialize or skip work, change retries/timeouts, alter the Rust build profile, or move setup or doctests outside the named suite clock.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T07:27:33.294557511Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "934985ca-8650-4a98-9c09-df9ec8fd9863",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Tune nextest worker concurrency",
+  "updated_at": "2026-08-12T07:28:06.966430685Z"
+}
