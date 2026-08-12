@@ -24,6 +24,26 @@ incremental = true
 debug = "line-tables-only"
 incremental = true
 
+# SHA-256 is the identity function of every content-addressed fixture, cache
+# entry and provenance record the test suite publishes, and its inputs include
+# whole build artifacts: one fixture consumer hashes a ~137 MB executable. An
+# unoptimized build of the compression function runs that at roughly 55 MB/s,
+# which cost 2.5 s per consumer and dominated fixture preparation; an optimized
+# one costs under 0.1 s. Only the hash implementation and the block plumbing it
+# runs through are named, so the rest of the dependency graph keeps the debug
+# profile's build times (jit:6d10e5d4).
+[profile.dev.package.sha2]
+opt-level = 3
+
+[profile.dev.package.digest]
+opt-level = 3
+
+[profile.dev.package.block-buffer]
+opt-level = 3
+
+[profile.dev.package.cpufeatures]
+opt-level = 3
+
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
