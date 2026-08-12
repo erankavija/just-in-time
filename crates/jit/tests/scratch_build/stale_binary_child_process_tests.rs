@@ -444,6 +444,7 @@ fn prepare_scratch_baseline(
         "-m",
         "advance past the build commit",
     ]));
+    remove_inherited_git_topology(repository.path());
     assert!(verify_scratch_repository(
         repository.path(),
         ancestor,
@@ -459,6 +460,9 @@ fn verify_scratch_repository(repository: &Path, ancestor: &str, shape: ScratchSh
     {
         return false;
     }
+    let topology_is_isolated = git_refs(repository, "refs/heads")
+        .is_some_and(|refs| refs == ["refs/heads/fixture"])
+        && git_refs(repository, "refs/remotes").is_some_and(|refs| refs.is_empty());
     let parent = Command::new("git")
         .args(["rev-parse", "HEAD^"])
         .current_dir(repository)
@@ -481,10 +485,142 @@ fn verify_scratch_repository(repository: &Path, ancestor: &str, shape: ScratchSh
         .filter(|output| output.status.success())
         .is_some_and(|output| output.stdout.is_empty());
     let (changed_path, change) = scratch_shape_change(shape);
-    parent.as_deref() == Some(ancestor)
+    topology_is_isolated
+        && parent.as_deref() == Some(ancestor)
         && changed.as_deref() == Some(changed_path)
         && fs::read(repository.join(changed_path)).ok().as_deref() == Some(change)
         && clean
+}
+
+fn remove_inherited_git_topology(repository: &Path) {
+    let remote = Command::new("git")
+        .args(["remote", "remove", "origin"])
+        .current_dir(repository)
+        .status()
+        .expect("prepared scratch origin removal should launch");
+    assert!(
+        remote.success(),
+        "prepared scratch origin should be removable"
+    );
+
+    git_refs(repository, "refs/heads")
+        .expect("prepared scratch local heads should be readable")
+        .into_iter()
+        .filter(|reference| reference != "refs/heads/fixture")
+        .for_each(|reference| {
+            let deleted = Command::new("git")
+                .args(["update-ref", "-d", &reference])
+                .current_dir(repository)
+                .status()
+                .expect("inherited scratch head removal should launch");
+            assert!(
+                deleted.success(),
+                "inherited scratch head should be removable: {reference}"
+            );
+        });
+}
+
+fn git_refs(repository: &Path, namespace: &str) -> Option<Vec<String>> {
+    Command::new("git")
+        .args(["for-each-ref", "--format=%(refname)", namespace])
+        .current_dir(repository)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .map(str::to_owned)
+                .collect()
+        })
+}
+
+fn assert_main_branch_source_does_not_leak_into_prepared_scratch() {
+    let source = TempDir::new().expect("main-branch regression needs a source repository");
+    let run = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(source.path())
+            .status()
+            .is_ok_and(|status| status.success())
+    };
+    assert!(run(&["init", "-q", "-b", "main"]));
+    let changed_path = source.path().join("crates/jit/src/main.rs");
+    fs::create_dir_all(changed_path.parent().unwrap()).unwrap();
+    fs::write(&changed_path, b"fn main() {}\n").unwrap();
+    assert!(run(&["add", "."]));
+    assert!(run(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "fixture ancestor",
+    ]));
+    let ancestor = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(source.path())
+        .output()
+        .expect("fixture ancestor should resolve");
+    assert!(ancestor.status.success());
+    let ancestor = String::from_utf8_lossy(&ancestor.stdout).trim().to_owned();
+    fs::write(
+        source.path().join("main-only.txt"),
+        b"integrated main head\n",
+    )
+    .unwrap();
+    assert!(run(&["add", "."]));
+    assert!(run(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "main advances past fixture ancestor",
+    ]));
+
+    let target = TempDir::new().expect("main-branch regression needs a target directory");
+    let baseline = prepare_scratch_baseline(
+        source.path(),
+        target.path(),
+        &ancestor,
+        ScratchShape::BuildInputChange,
+    );
+    assert_eq!(
+        git_refs(&baseline, "refs/heads").unwrap(),
+        vec!["refs/heads/fixture"],
+        "a source main head must not survive in the prepared baseline"
+    );
+    assert!(
+        git_refs(&baseline, "refs/remotes").unwrap().is_empty(),
+        "prepared baseline must not retain source remote-tracking refs"
+    );
+    let consumer = clone_scratch_baseline(&baseline, &ancestor, ScratchShape::BuildInputChange);
+    assert!(
+        git_refs(consumer.path(), "refs/remotes")
+            .unwrap()
+            .is_empty(),
+        "a prepared consumer must not synthesize origin/main"
+    );
+    let mut init = Command::new(jit_binary());
+    init.current_dir(consumer.path())
+        .arg("init")
+        .env_remove("JIT_GATE_RUN")
+        .env_remove("JIT_ISSUE_ID")
+        .env_remove("JIT_GATE_KEY");
+    let output = init
+        .output()
+        .expect("real jit init should launch in the prepared main-branch consumer");
+    assert!(
+        output.status.success(),
+        "isolated prepared consumer must admit real jit init: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn build_stale_child_binary_with_runner<RunCargo, VerifyBinary>(
@@ -1016,6 +1152,7 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
     if std::env::var_os("NEXTEST").is_some() {
         return;
     }
+    assert_main_branch_source_does_not_leak_into_prepared_scratch();
 
     let version = Command::new("cargo")
         .args(["nextest", "--version"])
@@ -1214,6 +1351,13 @@ fn clone_prepared_scratch(workspace_root: &Path, ancestor: &str, shape: ScratchS
         verify_scratch_repository(baseline, ancestor, shape),
         "prepared scratch baseline must remain verified after setup"
     );
+    let scratch = clone_scratch_baseline(baseline, ancestor, shape);
+    scrub_stale_repository_data(scratch.path());
+    record_scoped_scratch_observation(shape, scratch.path());
+    scratch
+}
+
+fn clone_scratch_baseline(baseline: &Path, ancestor: &str, shape: ScratchShape) -> TempDir {
     let scratch = TempDir::new().expect("prepared scratch clone needs a unique directory");
     let status = Command::new("git")
         .args(["clone", "--shared", "--no-checkout", "-q"])
@@ -1235,6 +1379,12 @@ fn clone_prepared_scratch(workspace_root: &Path, ancestor: &str, shape: ScratchS
         .status()
         .expect("prepared scratch checkout should launch");
     assert!(checkout.success());
+    let remote = Command::new("git")
+        .args(["remote", "remove", "origin"])
+        .current_dir(scratch.path())
+        .status()
+        .expect("prepared scratch consumer origin removal should launch");
+    assert!(remote.success());
     let parent = Command::new("git")
         .args(["rev-parse", "HEAD^"])
         .current_dir(scratch.path())
@@ -1247,8 +1397,7 @@ fn clone_prepared_scratch(workspace_root: &Path, ancestor: &str, shape: ScratchS
             .expect("prepared scratch clone should preserve its shape"),
         change
     );
-    scrub_stale_repository_data(scratch.path());
-    record_scoped_scratch_observation(shape, scratch.path());
+    assert!(verify_scratch_repository(scratch.path(), ancestor, shape));
     scratch
 }
 
