@@ -13822,3 +13822,7 @@
 {"fields":["dependencies"],"id":"9fb0d7c7-dc90-451f-b06b-ca744ae0d53a","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T06:53:30.834802519Z","type":"issue_updated","updated_by":"dependency-add"}
 {"assignee":"agent:sol-cli-profile-fixture","id":"be418c65-5980-461f-9028-8194f1d23db2","issue_id":"bfd215fa-5d5c-40d4-85e9-bd082a991464","timestamp":"2026-08-12T06:53:34.393626177Z","type":"issue_claimed"}
 {"from":"ready","id":"7ce961bd-2bd0-4d19-a641-9673b5a0cb44","issue_id":"bfd215fa-5d5c-40d4-85e9-bd082a991464","timestamp":"2026-08-12T06:53:53.539879865Z","to":"in_progress","type":"issue_state_changed"}
+{"id":"c8184b4d-c113-4d4d-ab72-12b39407807c","issue_id":"efaec52f-da76-438a-a55b-d4cefd5e6217","priority":"high","timestamp":"2026-08-12T06:57:45.028588745Z","title":"Optimize only the JIT package test profile","type":"issue_created"}
+{"fields":["dependencies"],"id":"8f90900f-6b11-4967-80bb-91d1515ff4f3","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T06:57:59.859465948Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:sol-scoped-test-profile","id":"a7b12146-fcd8-43b8-bc52-2446b7369d68","issue_id":"efaec52f-da76-438a-a55b-d4cefd5e6217","timestamp":"2026-08-12T06:58:01.918425207Z","type":"issue_claimed"}
+{"from":"ready","id":"10a62a80-ff73-4a3a-8ce5-6a4b5282566c","issue_id":"efaec52f-da76-438a-a55b-d4cefd5e6217","timestamp":"2026-08-12T06:58:05.700367729Z","to":"in_progress","type":"issue_state_changed"}

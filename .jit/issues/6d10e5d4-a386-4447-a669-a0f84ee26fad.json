@@ -8,7 +8,8 @@
     "4731256d-69ac-4993-b815-5d7d0fb0c153",
     "ae17798d-c0c6-4ad0-b119-2dd2fab8e95d",
     "bfd215fa-5d5c-40d4-85e9-bd082a991464",
-    "deb33646-edb9-4ee9-aea4-c808495f24c8"
+    "deb33646-edb9-4ee9-aea4-c808495f24c8",
+    "efaec52f-da76-438a-a55b-d4cefd5e6217"
   ],
   "description": "Reduce duplicated expensive setup in the already-built workspace suite so the fixed 30-second suite-clock enforcement can be enabled without weakening coverage.\n\n## Background\n\nThe named suite clock currently exceeds its fixed budget even on a warm target, so passing that live value to the unchanged duration checker would deterministically fail the repository gate. The authoritative warm profile in `dev/benchmarks/suite-profile.json` shows that repeated profile lifecycle setup, derived-state repair setup, and stale-binary process setup dominate the reducible aggregate work. The transaction benchmark's applied decision is `no_change`, so transaction durability is not a remaining performance lever for this enforcement boundary.\n\nOptimize test topology and reusable fixture setup at the cheapest layer that preserves independent observations. Do not skip identities, collapse independently named semantic tests, share mutable repository state between tests, weaken assertions, change the 30-second checker constant, or move doctests outside the named suite clock.\n\n## Success Criteria\n\n- [hard] REQ-01: Completes three consecutive already-built warm measurements with nextest at or below 23,500 milliseconds, doctests at or below 5,500 milliseconds, and their combined named suite clock below 29,000 milliseconds on this host.\n- [hard] REQ-02: Preserves every stable test identity recorded by the pre-change warm profile and every semantic assertion, including all six independently named stale-binary process tests.\n- [hard] REQ-03: Shares or removes duplicated expensive setup without introducing test-order dependence, mutable cross-test repository state, an extra nested Cargo build, or silent fallback after fixture corruption.\n- [hard] REQ-04: Regenerates the complete warm profile with no missing or duplicate identities and passes the profiler self-test, the cargo-ci self-test, focused tests for every changed family, formatting, and warning-free linting.\n\n## Notes\n\nThe initial measured concentration is in `crates/jit/tests/cli_repo_workflow`, the derived-state repair tests under `cli_item_validate` and `fast_rules`, and the stale-binary tests under `scratch_build`. Reuse existing test support or converge repeated setup into one appropriately scoped helper when the evidence shows it is shared; production behavior and storage durability semantics are outside this leaf.\n",
   "documents": [],
@@ -30,5 +31,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Reduce profiled warm suite work below the enforcement bound",
-  "updated_at": "2026-08-12T06:53:30.834802519Z"
+  "updated_at": "2026-08-12T06:57:59.859465948Z"
 }

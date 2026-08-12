@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:sol-scoped-test-profile",
+  "claimed_at": "2026-08-12T06:58:01.918425207Z",
+  "context": {},
+  "created_at": "2026-08-12T06:57:45.028588745Z",
+  "dependencies": [],
+  "description": "Measure and apply optimization only to the `jit` package’s test-profile artifacts when that scope retains the proven runtime benefit without the global profile’s unacceptable build regression.\n\n## Background\n\nA matched global `[profile.test] opt-level = 1` experiment reduced median warm aggregate work from 628.922 to 218.713 seconds and median nextest wall from 37.331 to 14.964 seconds, but doubled both clean and representative rebuild times, so it was rejected. The `jit` package owns nearly all profiled test work, while a package override leaves registry dependencies and `jit-server` test artifacts unoptimized. This narrower candidate requires its own matched evidence; the global result is motivation, not acceptance evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: Compares a fixed opt-level-0 baseline with `[profile.test.package.jit] opt-level = 1` in separate clean target directories under identical Rust, Cargo, nextest 0.9.133, incremental-disabled, no-sccache, and 24-thread conditions.\n- [hard] REQ-02: Compiler-artifact evidence proves every `jit` test-profile artifact uses opt-level 1 while `jit-server` and non-workspace dependencies remain opt-level 0; the exact runnable, ignored, and doctest identity sets are preserved with no missing or duplicate identities.\n- [hard] REQ-03: Accepts the candidate only when three already-built warm samples have median aggregate test work at least 200 seconds lower than the matched baseline, median nextest wall at most 23,500 milliseconds with no sample above 30,000 milliseconds, and median doctest wall at most 5,500 milliseconds.\n- [hard] REQ-04: Keeps active test-executable bytes below two gibibytes and limits both clean test-build and representative `crates/jit/src/lib.rs` comment-touch rebuild median regressions to at most 25 percent.\n- [hard] REQ-05: An initial one-sample scoped rebuild may reject the candidate early when it exceeds the build ceiling; acceptance requires all three matched samples. The final decision records complete raw evidence and either commits only the scoped profile change or records `no_change`, without weakening any runtime or build threshold.\n\n## Notes\n\nReuse the completed opt-level-0 arm only if the source revision, toolchain, environment, and harness inputs are identical; otherwise collect a new baseline. Do not infer scoped build cost from the rejected global candidate.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T06:57:45.028588745Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "efaec52f-da76-438a-a55b-d4cefd5e6217",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Optimize only the JIT package test profile",
+  "updated_at": "2026-08-12T06:58:05.700367729Z"
+}
