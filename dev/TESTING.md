@@ -282,6 +282,14 @@ for the measured comparison.
   `debug = "line-tables-only"`: enough for line-number backtraces on a local failure, without
   embedding the full debugger payload (type info, macro expansions) that dominates a test
   executable's size.
+- **Dependency optimization** — `[profile.dev.package."*"]` sets `opt-level = 2`, so third-party
+  crates are compiled optimized while workspace crates keep the debug profile's compile times.
+  The suite runs dependency code far more often than it compiles it: its CPU profile is spread
+  across SHA-256 over whole build artifacts, TOML parsing, and JSON serialization, none of which
+  is workspace code. A package override changes no other profile key, so `debug-assertions` and
+  `overflow-checks` still hold everywhere. The measured build cost of the override, against the
+  matched unoptimized arm and both fixed 25% ceilings, is in
+  [dev/benchmarks/dependency-profile-6d10e5d4/](benchmarks/dependency-profile-6d10e5d4/).
 - **Incremental compilation** — both profiles also state `incremental = true` explicitly, for
   ordinary interactive development, where the cost amortizes across many rebuilds of the same
   tree. `scripts/cargo-ci.sh` overrides this with `CARGO_INCREMENTAL=0` for every gate step,

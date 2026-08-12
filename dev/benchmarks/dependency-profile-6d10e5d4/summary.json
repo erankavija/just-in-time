@@ -1,0 +1,92 @@
+{
+  "contract": "dependency-profile-screen-evidence",
+  "schema_version": 1,
+  "issue": "6d10e5d4",
+  "artifact": "dev/benchmarks/dependency-profile-6d10e5d4/summary.json",
+  "candidate": {
+    "change": "[profile.dev.package.\"*\"] opt-level in the workspace manifest",
+    "scope": "every non-workspace dependency; workspace crates keep the debug profile",
+    "unchanged_profile_keys": [
+      "debug",
+      "debug-assertions",
+      "incremental",
+      "overflow-checks"
+    ],
+    "selected_opt_level": 1
+  },
+  "method": {
+    "harness": "scripts/benchmark-rust-build.sh",
+    "samples_per_arm": "3 clean, 2 rebuild for the two compared arms; 2 clean, 1 rebuild for the intermediate opt-level 2 arm",
+    "isolation": "one freshly created CARGO_TARGET_DIR per sample, removed after its measurements",
+    "serialization": "the host-wide CARGO_CI_BUILD_LOCK shared with scripts/cargo-ci.sh",
+    "clean_sample": "cargo clippy --workspace --all-targets -- -D warnings, then cargo test --workspace --no-run, timed separately",
+    "rebuild_sample": "an equivalent completed clean build, one fixed comment-only probe appended to crates/jit/src/lib.rs, then a second timed cargo test --workspace --no-run",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "arms_differ_only_by": "the presence and value of the manifest key under test",
+    "raw_evidence": {
+      "opt0": ["raw/opt0-screen-a.json", "raw/opt0-screen-b.json"],
+      "opt1": ["raw/opt1-screen.json"],
+      "opt2": ["raw/opt2-screen-a.json", "raw/opt2-screen-b.json"]
+    }
+  },
+  "ceilings": {
+    "source": "the fixed maximum regression the prior compiler-optimization screens jit:7a2fc6f6 and jit:b883f916 were judged against",
+    "maximum_regression_percent": 25.0,
+    "both_mandatory": [
+      "clean build",
+      "representative rebuild"
+    ],
+    "target_directory_bytes": 10737418240,
+    "target_directory_bytes_source": "dev/TESTING.md, fresh validation target directory acceptance threshold"
+  },
+  "build_screen": {
+    "opt0_baseline": {
+      "clean_clippy_seconds": [40.572, 40.605, 40.646],
+      "clean_test_no_run_seconds": [52.78, 51.608, 52.344],
+      "representative_rebuild_seconds": [20.931, 17.234],
+      "clean_target_directory_bytes": [5584978120, 5584978149, 5584978057],
+      "rebuild_target_directory_bytes": [6740238926, 6740238798]
+    },
+    "opt1_candidate": {
+      "clean_clippy_seconds": [45.587, 45.627],
+      "clean_test_no_run_seconds": [56.88, 56.873],
+      "representative_rebuild_seconds": [19.666],
+      "clean_target_directory_bytes": [5644381291, 5644381232],
+      "rebuild_target_directory_bytes": [6816101144]
+    },
+    "opt2_rejected_arm": {
+      "clean_clippy_seconds": [49.831, 50.195, 50.178],
+      "clean_test_no_run_seconds": [59.591, 59.086, 58.691],
+      "representative_rebuild_seconds": [22.049, 18.624],
+      "clean_target_directory_bytes": [5751110458, 5751110428, 5751110448],
+      "rebuild_target_directory_bytes": [6929077831, 6929077899]
+    }
+  },
+  "suite_runtime": {
+    "method": "already-built warm workspace runs with CARGO_INCREMENTAL=0 and CARGO_CI_NO_SCCACHE=1, measuring exactly the named suite clock of scripts/cargo-ci.sh",
+    "bounds": {
+      "nextest_ms": 23500,
+      "doctest_ms": 5500,
+      "suite_clock_ms_exclusive": 29000
+    },
+    "pre_change": [
+      {"nextest_ms": 40740, "doctest_ms": 5339, "suite_clock_ms": 46079}
+    ],
+    "opt1_candidate": [
+      {"nextest_ms": 18078, "doctest_ms": 4621, "suite_clock_ms": 22699},
+      {"nextest_ms": 18088, "doctest_ms": 4643, "suite_clock_ms": 22731},
+      {"nextest_ms": 18156, "doctest_ms": 4633, "suite_clock_ms": 22789},
+      {"nextest_ms": 18160, "doctest_ms": 4656, "suite_clock_ms": 22816}
+    ],
+    "opt2_rejected_arm": [
+      {"nextest_ms": 18517, "doctest_ms": 4540, "suite_clock_ms": 23057},
+      {"nextest_ms": 18529, "doctest_ms": 4508, "suite_clock_ms": 23037},
+      {"nextest_ms": 18594, "doctest_ms": 4483, "suite_clock_ms": 23077}
+    ]
+  },
+  "decision": {
+    "value": "accept_opt_level_1",
+    "reason": "Both dependency optimization levels clear every fixed ceiling and both reach the suite bounds, and opt-level 1 is at least as fast at runtime while costing about half the build regression of opt-level 2.",
+    "thresholds_weakened": false
+  }
+}
