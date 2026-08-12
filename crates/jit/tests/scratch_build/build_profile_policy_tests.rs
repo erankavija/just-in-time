@@ -24,6 +24,12 @@
 //! `--self-test` mode; this file re-invokes
 //! `scripts/profile-test-suite.sh --self-test` so that evidence is
 //! re-established on every suite run rather than attested once.
+//!
+//! jit:94d85bf1 added the suite-duration policy: the gate compiles the measured
+//! suite in its own reported step before the named suite clock starts, then
+//! hands the measurement to `scripts/rust-build-budget.sh` as
+//! `--test-suite-ms`, so the budget declared there is enforced live over an
+//! already-built warm target instead of silently skipped.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -140,6 +146,88 @@ fn test_cargo_ci_fails_the_gate_on_non_empty_incremental_state_after_compiling()
         "the incremental-state step must search for non-empty `incremental` \
          directories (the actual regression signal), not merely assert that \
          a variable is exported"
+    );
+}
+
+/// The shell variable `scripts/cargo-ci.sh` measures the suite clock into. The
+/// two tests below tie "the value the gate measures" to "the value the gate
+/// enforces" through this one name rather than restating either site.
+const SUITE_CLOCK_VARIABLE: &str = "suite_clock_ms";
+
+#[test]
+fn test_cargo_ci_compiles_the_measured_suite_before_starting_the_suite_clock() {
+    let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
+        .expect("read scripts/cargo-ci.sh");
+
+    let clock_start = script
+        .find("suite_clock_started_ms=")
+        .expect("scripts/cargo-ci.sh must start the named suite clock");
+    let nextest_step = script
+        .find("run_step test ")
+        .expect("scripts/cargo-ci.sh must run the test step");
+    assert!(
+        clock_start < nextest_step,
+        "the suite clock must start before the first substep it measures"
+    );
+
+    let before_clock = &script[..clock_start];
+    let build_step = before_clock
+        .rfind("run_step ")
+        .and_then(|start| before_clock[start..].lines().next())
+        .expect("scripts/cargo-ci.sh must run its gate steps through run_step");
+
+    assert!(
+        build_step.contains("--no-run"),
+        "the reported step immediately preceding the suite clock must compile \
+         the measured suite without running it. The enforced budget is defined \
+         over an already-built warm target, so compilation paid inside the \
+         clock would fail the budget on every cold target — every fresh clone \
+         and every CI runner — with nothing wrong in the tree. Found: \
+         {build_step}"
+    );
+}
+
+#[test]
+fn test_cargo_ci_enforces_the_measured_suite_clock_through_the_budget_checker() {
+    let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
+        .expect("read scripts/cargo-ci.sh");
+
+    let measurement = script
+        .find(&format!("{SUITE_CLOCK_VARIABLE}=$(("))
+        .expect("scripts/cargo-ci.sh must compute the suite-clock duration");
+    let budget_step = script
+        .find("run_step budget")
+        .expect("scripts/cargo-ci.sh must run the budget step");
+    assert!(
+        measurement < budget_step,
+        "the suite clock must be measured before the budget step that consumes it"
+    );
+
+    // Read the checker's arguments as one logical command: a shell continuation
+    // splits the invocation across physical lines without changing it.
+    let joined = script.replace("\\\n", " ");
+    let checker_invocation = joined
+        .lines()
+        .find(|line| line.contains("rust-build-budget.sh") && !line.trim_start().starts_with('#'))
+        .expect("scripts/cargo-ci.sh must invoke the build-budget checker");
+    let enforced_value = checker_invocation
+        .split_whitespace()
+        .skip_while(|token| *token != "--test-suite-ms")
+        .nth(1)
+        .unwrap_or_else(|| {
+            panic!(
+                "the budget step must pass the measured duration as \
+                 --test-suite-ms; without that argument the checker skips its \
+                 suite-duration check entirely and the budget is never \
+                 enforced: {checker_invocation}"
+            )
+        });
+
+    assert!(
+        enforced_value.contains('$') && enforced_value.contains(SUITE_CLOCK_VARIABLE),
+        "--test-suite-ms must carry the live value the gate just measured into \
+         `{SUITE_CLOCK_VARIABLE}`, not a literal or an unrelated value: \
+         {checker_invocation}"
     );
 }
 
