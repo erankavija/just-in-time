@@ -31,6 +31,12 @@ use tempfile::TempDir;
 /// so the directory has already been restored when another test acquires it.
 static CURRENT_DIR_LOCK: Mutex<()> = Mutex::new(());
 
+/// Serializes unit-test receipt-environment mutations with in-process fixture
+/// consumers. Nextest setup and its test consumers are separate processes, so
+/// this guard is deliberately absent outside `cfg(test)` builds.
+#[cfg(test)]
+static PROFILED_REPOSITORY_FIXTURE_ENV_LOCK: Mutex<()> = Mutex::new(());
+
 /// Change the process working directory for a scope and restore it on drop.
 ///
 /// This guard is intended for tests only. The process-wide lock prevents two
@@ -166,7 +172,16 @@ pub fn profiled_repository_fixture(
     package_directory: &str,
     scenario_executable: Option<&Path>,
 ) -> Result<TempDir> {
-    if let Some(entry) = nextest_profiled_repository_fixture(id, package_directory)? {
+    #[cfg(test)]
+    let nextest_entry = {
+        let _receipt_environment_lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        nextest_profiled_repository_fixture(id, package_directory)?
+    };
+    #[cfg(not(test))]
+    let nextest_entry = nextest_profiled_repository_fixture(id, package_directory)?;
+    if let Some(entry) = nextest_entry {
         let clone = TempDir::new()?;
         copy_tree_exact(&entry.join("repository"), clone.path())?;
         return Ok(clone);
@@ -215,14 +230,15 @@ fn direct_profiled_repository_fixture(
 
     let packages = capture_profile_package_closure(id)?;
     let package_root = VirtualPath::worktree(package_directory)?;
+    let fixture_setup = std::env::current_exe().context("resolve fixture setup executable")?;
     let key = profiled_repository_fixture_key(
         id,
         package_root.relative().as_path(),
-        &std::env::current_exe().context("resolve fixture setup executable")?,
+        &fixture_setup,
         scenario_provenance.as_ref(),
         &packages,
     )?;
-    let cache_root = profiled_repository_fixture_cache_root();
+    let cache_root = profiled_repository_fixture_cache_root(&fixture_setup)?;
     let entry = ensure_profiled_repository_fixture(&cache_root, &key, |repository| {
         initialize_profiled_repository_fixture(
             repository,
@@ -335,7 +351,7 @@ fn prepare_profiled_repository_fixture_receipt(
         None,
         &packages,
     )?;
-    let cache_root = profiled_repository_fixture_cache_root();
+    let cache_root = profiled_repository_fixture_cache_root(setup_executable)?;
     let entry = ensure_profiled_repository_fixture(&cache_root, &key, |repository| {
         initialize_profiled_repository_fixture(
             repository,
@@ -350,11 +366,10 @@ fn prepare_profiled_repository_fixture_receipt(
         run_id: run_id.to_string(),
         entries: BTreeMap::from([(receipt_entry_key(spec.id, spec.package_directory), entry)]),
     };
-    let receipt_path =
-        profiled_repository_fixture_cache_root().join(format!("run-{run_id}-{}.json", spec.id));
+    let receipt_path = cache_root.join(format!("run-{run_id}-{}.json", spec.id));
     let receipt_bytes = serde_json::to_vec(&receipt)?;
     let receipt_sha256 = format!("{:x}", Sha256::digest(&receipt_bytes));
-    let receipt_stage = tempfile::NamedTempFile::new_in(profiled_repository_fixture_cache_root())?;
+    let receipt_stage = tempfile::NamedTempFile::new_in(&cache_root)?;
     fs::write(receipt_stage.path(), receipt_bytes)?;
     receipt_stage.as_file().sync_all()?;
     crate::storage::publish_fixture_file_noreplace(receipt_stage.path(), &receipt_path)?;
@@ -389,6 +404,16 @@ fn nextest_profiled_repository_fixture(
     id: &str,
     package_directory: &str,
 ) -> Result<Option<PathBuf>> {
+    let runtime_artifact = std::env::current_exe()
+        .context("resolve profiled-repository fixture consumer executable")?;
+    nextest_profiled_repository_fixture_for_artifact(id, package_directory, &runtime_artifact)
+}
+
+fn nextest_profiled_repository_fixture_for_artifact(
+    id: &str,
+    package_directory: &str,
+    runtime_artifact: &Path,
+) -> Result<Option<PathBuf>> {
     let Some(receipt_environment) = receipt_environment_name(id) else {
         return Ok(None);
     };
@@ -417,7 +442,7 @@ fn nextest_profiled_repository_fixture(
         .entries
         .get(&receipt_entry_key(id, package_directory))
         .with_context(|| format!("nextest fixture receipt has no {id} at {package_directory}"))?;
-    let cache_root = profiled_repository_fixture_cache_root();
+    let cache_root = profiled_repository_fixture_cache_root(runtime_artifact)?;
     if entry.parent() != Some(cache_root.as_path()) {
         bail!("profiled-repository fixture receipt names an entry outside its cache");
     }
@@ -552,18 +577,56 @@ fn profiled_repository_fixture_key(
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn profiled_repository_fixture_cache_root() -> PathBuf {
-    let target = std::env::var_os("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .map(|path| {
-            if path.is_absolute() {
-                path
-            } else {
-                repository_checkout().join(path)
-            }
-        })
-        .unwrap_or_else(|| repository_checkout().join("target"));
-    target.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY)
+/// Derive the cache context Cargo used to place a running artifact.
+///
+/// Cargo puts binaries directly under a profile directory and test executables
+/// under that profile's `deps` directory. Stripping those two layout segments
+/// produces either the target directory or a target-triple directory. This
+/// uses the artifact Cargo actually ran, so it stays stable when a reused
+/// executable embeds a different checkout in `CARGO_MANIFEST_DIR` or when a
+/// relative `CARGO_TARGET_DIR` was resolved from a different process directory.
+fn profiled_repository_fixture_cache_root(runtime_artifact: &Path) -> Result<PathBuf> {
+    let metadata = fs::symlink_metadata(runtime_artifact).with_context(|| {
+        format!(
+            "inspect profiled-repository fixture runtime artifact {}",
+            runtime_artifact.display()
+        )
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        bail!(
+            "profiled-repository fixture runtime artifact {} must be an ordinary file",
+            runtime_artifact.display()
+        );
+    }
+    let artifact = fs::canonicalize(runtime_artifact).with_context(|| {
+        format!(
+            "canonicalize profiled-repository fixture runtime artifact {}",
+            runtime_artifact.display()
+        )
+    })?;
+    let artifact_directory = artifact.parent().with_context(|| {
+        format!(
+            "profiled-repository fixture runtime artifact {} has no parent directory",
+            artifact.display()
+        )
+    })?;
+    let profile_directory = if artifact_directory.file_name() == Some("deps".as_ref()) {
+        artifact_directory.parent().with_context(|| {
+            format!(
+                "profiled-repository fixture deps directory {} has no profile parent",
+                artifact_directory.display()
+            )
+        })?
+    } else {
+        artifact_directory
+    };
+    let target_context = profile_directory.parent().with_context(|| {
+        format!(
+            "profiled-repository fixture profile directory {} has no target parent",
+            profile_directory.display()
+        )
+    })?;
+    Ok(target_context.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY))
 }
 
 fn ensure_profiled_repository_fixture(
@@ -1190,8 +1253,6 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
 
-    static RECEIPT_ENV_LOCK: Mutex<()> = Mutex::new(());
-
     struct EnvironmentRestore {
         values: Vec<(String, Option<std::ffi::OsString>)>,
     }
@@ -1203,6 +1264,18 @@ mod tests {
                 .map(|(name, value)| {
                     let previous = std::env::var_os(&name);
                     std::env::set_var(&name, value);
+                    (name, previous)
+                })
+                .collect();
+            Self { values }
+        }
+
+        fn remove(names: impl IntoIterator<Item = String>) -> Self {
+            let values = names
+                .into_iter()
+                .map(|name| {
+                    let previous = std::env::var_os(&name);
+                    std::env::remove_var(&name);
                     (name, previous)
                 })
                 .collect();
@@ -1537,23 +1610,18 @@ mod tests {
 
     #[test]
     fn test_profiled_repository_fixture_receipt_rejects_wrong_run_and_content_identity() {
-        let _lock = RECEIPT_ENV_LOCK
+        let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let cache = TempDir::new().unwrap();
-        let _cache_environment = EnvironmentRestore::set([(
-            "CARGO_TARGET_DIR".to_string(),
-            cache.path().as_os_str().to_owned(),
-        )]);
+        let setup_artifact = cache.path().join("debug/jit");
+        fs::create_dir_all(setup_artifact.parent().unwrap()).unwrap();
+        fs::write(&setup_artifact, b"fixture setup artifact").unwrap();
         let id = "jit-default";
         let expected_run = "expected-run";
         let environment = receipt_environment_name(id).unwrap();
-        let receipt = prepare_profiled_repository_fixture_receipt(
-            id,
-            expected_run,
-            &std::env::current_exe().unwrap(),
-        )
-        .unwrap();
+        let receipt =
+            prepare_profiled_repository_fixture_receipt(id, expected_run, &setup_artifact).unwrap();
         let _environment = EnvironmentRestore::set([
             ("NEXTEST_RUN_ID".to_string(), "wrong-run".into()),
             (
@@ -1572,6 +1640,161 @@ mod tests {
         std::env::set_var(format!("{environment}_SHA256"), "0".repeat(64));
         let wrong_digest = nextest_profiled_repository_fixture(id, "packages").unwrap_err();
         assert!(wrong_digest.to_string().contains("content mismatch"));
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_cache_root_follows_runtime_artifact_layouts() {
+        let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let workspace = TempDir::new().unwrap();
+        let default_target = workspace.path().join("default-target");
+        let absolute_custom_target = TempDir::new().unwrap();
+        let relative_custom_target = workspace.path().join("relative-custom-target");
+        let _misleading_environment = EnvironmentRestore::set([(
+            "CARGO_TARGET_DIR".to_string(),
+            "relative-to-a-different-process-directory".into(),
+        )]);
+        let cases = [
+            (default_target.join("debug/jit"), default_target.clone()),
+            (
+                absolute_custom_target.path().join("debug/deps/consumer"),
+                absolute_custom_target.path().to_path_buf(),
+            ),
+            (
+                relative_custom_target.join("debug/jit"),
+                relative_custom_target.clone(),
+            ),
+            (
+                relative_custom_target.join("x86_64-unknown-linux-gnu/debug/deps/consumer"),
+                relative_custom_target.join("x86_64-unknown-linux-gnu"),
+            ),
+        ];
+
+        for (artifact, expected_target_context) in cases {
+            fs::create_dir_all(artifact.parent().unwrap()).unwrap();
+            fs::write(&artifact, b"fixture runtime artifact").unwrap();
+            assert_eq!(
+                profiled_repository_fixture_cache_root(&artifact).unwrap(),
+                expected_target_context.join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY),
+                "{} must select the cache context Cargo placed it under",
+                artifact.display()
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_profiled_repository_fixture_cache_root_refuses_non_ordinary_runtime_artifact() {
+        use std::os::unix::fs::symlink;
+
+        let workspace = TempDir::new().unwrap();
+        let target = workspace.path().join("debug/jit");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        symlink(std::env::current_exe().unwrap(), &target).unwrap();
+
+        let error = profiled_repository_fixture_cache_root(&target).unwrap_err();
+        assert!(error.to_string().contains("must be an ordinary file"));
+    }
+
+    #[test]
+    fn test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target()
+    {
+        let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let runtime_target = TempDir::new().unwrap();
+        let setup_artifact = runtime_target.path().join("debug/jit");
+        let consumer_artifact = runtime_target.path().join("debug/deps/fixture-consumer");
+        fs::create_dir_all(setup_artifact.parent().unwrap()).unwrap();
+        fs::create_dir_all(consumer_artifact.parent().unwrap()).unwrap();
+        let source = runtime_target.path().join("provenance.rs");
+        fs::write(
+            &source,
+            "fn main() { print!(\"{}\", env!(\"CARGO_MANIFEST_DIR\")); }",
+        )
+        .unwrap();
+        let setup_checkout = runtime_target.path().join("isolated-setup-checkout");
+        let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
+        let setup_compile = std::process::Command::new(&rustc)
+            .args(["--edition=2021", source.to_str().unwrap(), "-o"])
+            .arg(&setup_artifact)
+            .env("CARGO_MANIFEST_DIR", &setup_checkout)
+            .output()
+            .unwrap();
+        assert!(
+            setup_compile.status.success(),
+            "compile the isolated setup artifact: {}",
+            String::from_utf8_lossy(&setup_compile.stderr)
+        );
+        let consumer_compile = std::process::Command::new(&rustc)
+            .args(["--edition=2021", source.to_str().unwrap(), "-o"])
+            .arg(&consumer_artifact)
+            .env("CARGO_MANIFEST_DIR", repository_checkout())
+            .output()
+            .unwrap();
+        assert!(
+            consumer_compile.status.success(),
+            "compile the consumer artifact: {}",
+            String::from_utf8_lossy(&consumer_compile.stderr)
+        );
+
+        let setup_provenance = std::process::Command::new(&setup_artifact)
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(setup_provenance.stdout).unwrap(),
+            setup_checkout.to_string_lossy(),
+            "the setup artifact must embed the isolated checkout it was compiled from"
+        );
+        let consumer_provenance = std::process::Command::new(&consumer_artifact)
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8(consumer_provenance.stdout).unwrap(),
+            repository_checkout().to_string_lossy(),
+            "the consumer artifact must embed this test executable's checkout"
+        );
+        assert_ne!(
+            setup_checkout,
+            repository_checkout(),
+            "setup and consumer artifacts must have differing compile-time checkout provenance"
+        );
+        let _target_directory = EnvironmentRestore::remove(["CARGO_TARGET_DIR".to_string()]);
+        let id = "jit-default";
+        let run_id = "shared-runtime-target";
+        let environment = receipt_environment_name(id).unwrap();
+        let receipt =
+            prepare_profiled_repository_fixture_receipt(id, run_id, &setup_artifact).unwrap();
+
+        let expected_cache_root = runtime_target
+            .path()
+            .join(PROFILED_REPOSITORY_FIXTURE_DIRECTORY);
+        assert_eq!(
+            receipt.path.parent(),
+            Some(expected_cache_root.as_path()),
+            "the setup receipt must be published beside its runtime artifact, not its source checkout"
+        );
+
+        let _receipt_environment = EnvironmentRestore::set([
+            ("NEXTEST_RUN_ID".to_string(), run_id.into()),
+            (
+                environment.to_string(),
+                receipt.path.clone().into_os_string(),
+            ),
+            (
+                format!("{environment}_SHA256"),
+                receipt.sha256.clone().into(),
+            ),
+        ]);
+        let entry =
+            nextest_profiled_repository_fixture_for_artifact(id, "packages", &consumer_artifact)
+                .unwrap();
+
+        assert!(
+            entry.is_some_and(|entry| entry.parent() == Some(expected_cache_root.as_path())),
+            "a same-run consumer in the shared runtime target must accept the setup receipt"
+        );
     }
 
     #[test]
