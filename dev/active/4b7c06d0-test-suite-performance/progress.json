@@ -42,14 +42,18 @@
     {
       "wave_number": 5,
       "issues": [
-        {"short_id": "1fc8fec3", "title": "Prebuild the stale-binary semantic fixture inside nextest", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
-        {"short_id": "4731256d", "title": "Share immutable profile and repair fixtures across nextest processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
-        {"short_id": "ae17798d", "title": "Reuse applied-profile baselines in library tests", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
-        {"short_id": "deb33646", "title": "Share the recorded failure probe corpus", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
-        {"short_id": "123efe74", "title": "Optimize the Rust test profile from matched evidence", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress", "note": "Reviewed no_change: runtime target passed, but clean and representative rebuild costs both exceeded the fixed 25% ceiling."},
-        {"short_id": "bfd215fa", "title": "Reuse applied profile baselines for CLI prerequisites", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress", "note": "Reviewed no_change: 27.005 seconds saved, below the required 30 seconds, and matched wall time regressed."},
-        {"short_id": "efaec52f", "title": "Optimize only the JIT package test profile", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress", "note": "Reviewed no_change: fresh matched rebuild regressed 82.14%, exceeding the fixed 25% ceiling."},
-        {"short_id": "934985ca", "title": "Tune nextest worker concurrency", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"}
+        {"short_id": "1fc8fec3", "title": "Prebuild the stale-binary semantic fixture inside nextest", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
+        {"short_id": "4731256d", "title": "Share immutable profile and repair fixtures across nextest processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
+        {"short_id": "ae17798d", "title": "Reuse applied-profile baselines in library tests", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
+        {"short_id": "deb33646", "title": "Share the recorded failure probe corpus", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
+        {"short_id": "123efe74", "title": "Optimize the Rust test profile from matched evidence", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done", "note": "Reviewed no_change: runtime target passed, but clean and representative rebuild costs both exceeded the fixed 25% ceiling."},
+        {"short_id": "bfd215fa", "title": "Reuse applied profile baselines for CLI prerequisites", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "rejected", "note": "Reviewed no_change: 27.005 seconds saved, below the required 30 seconds, and matched wall time regressed."},
+        {"short_id": "efaec52f", "title": "Optimize only the JIT package test profile", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done", "note": "Reviewed no_change: fresh matched rebuild regressed 82.14%, exceeding the fixed 25% ceiling."},
+        {"short_id": "934985ca", "title": "Tune nextest worker concurrency", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done", "note": "Reviewed no_change: 36 workers missed both timing bounds and 48 workers produced a forbidden lock-timeout failure."},
+        {"short_id": "527bd363", "title": "Isolate the project-defined preset fixture root", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "done"},
+        {"short_id": "4ee95d17", "title": "Avoid durability sync for ephemeral nextest receipts", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "rejected", "note": "Candidate saved only 59-108 ms against the hard 5,115 ms minimum; implementation reverted and no_change evidence retained."},
+        {"short_id": "7a2fc6f6", "title": "Screen ordinary JIT artifacts with a compiler wrapper", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress", "note": "Candidate clean build exceeded its 25% ceiling; evidence is reviewed, but cargo-ci exposed prerequisite bug 7094dfa5."},
+        {"short_id": "7094dfa5", "title": "Bind profile fixture cache roots to runtime artifacts", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "in_progress"}
       ]
     },
     {
@@ -171,6 +175,34 @@
       "title": "Tune nextest worker concurrency",
       "state": "in_progress",
       "why": "The remaining opt-level-0 workload includes thousands of subprocess- and filesystem-heavy tests. A bounded matched experiment tests whether safe worker overcommit can reduce the post-setup region without changing assertions, identities, build profiles, or suite-clock accounting."
+    },
+    {
+      "short_id": "527bd363",
+      "type": "bug",
+      "title": "Isolate the project-defined preset fixture root",
+      "state": "done",
+      "why": "Concurrency measurements exposed a real shared bootstrap-lock timeout in the project-defined preset fixture. The fixture now owns a unique nested worktree and `.jit` root, with bounded concurrency regression coverage."
+    },
+    {
+      "short_id": "4ee95d17",
+      "type": "task",
+      "title": "Avoid durability sync for ephemeral nextest receipts",
+      "state": "rejected",
+      "why": "A shared ephemeral receipt publisher was implemented and measured, but all three warm samples remained near 10.5 seconds and missed the hard repeated 5.5-second bound. The candidate was reverted and the leaf rejected after its review gate confirmed the unmet criteria."
+    },
+    {
+      "short_id": "7a2fc6f6",
+      "type": "task",
+      "title": "Screen ordinary JIT artifacts with a compiler wrapper",
+      "state": "in_progress",
+      "why": "Global and package test-profile optimization met runtime targets but failed build-cost bounds. This narrower compiler-wrapper experiment optimizes only ordinary JIT artifacts and records a mandatory no_change result when its clean-build screen fails."
+    },
+    {
+      "short_id": "7094dfa5",
+      "type": "bug",
+      "title": "Bind profile fixture cache roots to runtime artifacts",
+      "state": "in_progress",
+      "why": "The 7a2fc6f6 cargo-ci gate exposed a reused setup binary whose compile-time checkout path disagreed with the consumer executable's checkout, causing a valid same-run fixture receipt to point outside the consumer-derived cache. The prerequisite binds cache identity to runtime Cargo artifacts."
     }
   ],
   "delegation_model": "Hard tasks go to gpt-5.6-sol collaboration subagents. Moderate tasks go to `codex exec -m gpt-5.6-terra -c model_reasoning_effort=high`, and easy tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high`; the lead reviews every diff, runs configured gates, and owns integration.",
