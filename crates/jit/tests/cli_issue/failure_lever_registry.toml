@@ -672,6 +672,16 @@ expected_exit = 4
 confirmation = "invoked"
 
 [[arms]]
+path = "profile validate"
+argv = ["profile", "validate", "--json"]
+setup = ["init", "malformed-profile-record"]
+setup_notes = "Create .jit/profiles/jit-dogfood.json with malformed JSON after initialization."
+expected_failure = "PROFILE_CONFLICT because provenance that cannot be read is a repository the check cannot answer over, not a profile that diverged"
+expected_code = "PROFILE_CONFLICT"
+expected_exit = 4
+confirmation = "invoked"
+
+[[arms]]
 path = "profile show"
 argv = ["profile", "show", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]
