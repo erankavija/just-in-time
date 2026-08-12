@@ -1,7 +1,7 @@
 {
   "epic_id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
   "epic_short_id": "4b7c06d0",
-  "current_wave": 5,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -41,6 +41,7 @@
     },
     {
       "wave_number": 5,
+      "status": "complete",
       "issues": [
         {"short_id": "1fc8fec3", "title": "Prebuild the stale-binary semantic fixture inside nextest", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
         {"short_id": "4731256d", "title": "Share immutable profile and repair fixtures across nextest processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
@@ -59,8 +60,10 @@
     },
     {
       "wave_number": 6,
+      "status": "complete",
       "issues": [
-        {"short_id": "6d10e5d4", "title": "Reduce profiled warm suite work below the enforcement bound", "classification": "implementation", "difficulty": "hard", "worker": "native Opus subagent; evidence rework by native Sonnet subagent", "status": "in_progress", "note": "Implementation merged as e2da055a and cargo-ci passed. The lead independently measured three warm runs: nextest 18,101/18,156/18,173 ms, doctests 4,691/4,656/4,659 ms, suite clock 22,792/22,812/22,832 ms, 4515 passing every run, against a 40,819 ms nextest baseline. Aggregate fell 606,912 to 301,268 ms and the identity sets are exactly equal (4515 both sides, zero missing, added, or duplicate). The winning lever was optimizing the dependency graph rather than jit's own artifacts: dependencies compile once and cache, so `[profile.dev.package.\"*\"] opt-level = 1` clears the 25% rebuild ceiling that rejected 123efe74, efaec52f, 7a2fc6f6, and b883f916. opt-level 2 was measured and rejected — no faster, roughly twice the build regression. The lead corrected one doc defect in 58476d63: f8ad49f9 changed the manifest to opt-level 1 and documented 2 in the same commit. code-review then failed on under-sampled evidence for the accepted arm; rework in flight."}
+        {"short_id": "6d10e5d4", "title": "Reduce profiled warm suite work below the enforcement bound", "classification": "implementation", "difficulty": "hard", "worker": "native Opus subagent; evidence rework by native Sonnet subagent", "status": "in_progress", "note": "Implementation merged as e2da055a and cargo-ci passed. The lead independently measured three warm runs: nextest 18,101/18,156/18,173 ms, doctests 4,691/4,656/4,659 ms, suite clock 22,792/22,812/22,832 ms, 4515 passing every run, against a 40,819 ms nextest baseline. Aggregate fell 606,912 to 301,268 ms and the identity sets are exactly equal (4515 both sides, zero missing, added, or duplicate). The winning lever was optimizing the dependency graph rather than jit's own artifacts: dependencies compile once and cache, so `[profile.dev.package.\"*\"] opt-level = 1` clears the 25% rebuild ceiling that rejected 123efe74, efaec52f, 7a2fc6f6, and b883f916. opt-level 2 was measured and rejected — no faster, roughly twice the build regression. The lead corrected one doc defect in 58476d63: f8ad49f9 changed the manifest to opt-level 1 and documented 2 in the same commit. code-review then failed on under-sampled evidence for the accepted arm; the rework re-sampled the accepted arms and both gates passed."},
+        {"short_id": "355565c2", "title": "Remove build provenance, the stale-binary guard, and the disk-backed gate TMPDIR", "classification": "implementation", "difficulty": "hard", "worker": "opus subagent", "status": "done", "note": "Blocker of 94d85bf1 filed mid-wave. Warm gate after the removal: suite clock 22,072-22,199 ms against a 25,000 ms budget, total 24,175-24,435 ms against 45,000 ms, from 192,994 ms before. The first code-review failed on live session records still describing the removed guard; that criterion was amended and the reviewer's scope corrected rather than the records rewritten (see the traps). The re-run passed with no findings."}
       ]
     },
     {
@@ -93,7 +96,9 @@
     "The named suite clock spans whatever `cargo nextest run --workspace` does, compilation included, so its value depends entirely on whether the target was already built. The authoritative cargo-ci run for 6d10e5d4 on main recorded suite-clock 239,771 ms (test 235,047 ms) because the merge changed the dependency profile and invalidated every dependency artifact; three warm runs of the identical tree measured 22,792-22,832 ms. The epic's REQ-01 defines the budget 'measured from an already-built warm target', so wiring enforcement against the raw clock would fail cargo-ci on every cold target — every CI runner and every fresh clone. 94d85bf1 must place an explicit build step before the clock starts. That is consistent with the plan-fixed `suite-clock` contract rather than a change to it: the contract fixes what the clock spans (nextest plus doctests) and already excludes the steps preceding it.",
     "`/tmp` on this host is a ~16 GiB tmpfs, and earlier sessions of this epic left about 12 GiB of scratch in it (per-issue cargo target dirs `/tmp/jit-<short-id>-target`, seven finished worktrees, benchmark helper targets). When it fills, the suite fails for reasons that look like product defects — a whole-workspace run showed 57 doctest failures and CLI exit-code failures — and the agent's own shell stops capturing command output (writes fail with EDQUOT, `echo` returns exit 1 with no output). Check `stat -f -c '%a' /tmp` before trusting any measurement or gate result, and reclaim worktrees per wave as the protocol requires. Every warm number recorded before session 6 (60,562-113,272 ms) was measured under this pressure and is not comparable to a clean-host measurement.",
     "The first warm suite run after any change that invalidates the nextest setup-script fixture caches costs about 26 s extra: a cold-cache `cargo nextest run -p jit --lib` measured 41.4 s against 15.1 s warm on the same tree. Discard the first run after such a change; measuring it as if it were warm reads as a large regression that does not exist.",
-    "A raw-JSON journal fixture asserting only `.is_err()` can pass for the wrong reason: a fixture with a placeholder `layout_digest` is refused by the layout check before any version or field check runs, so it proves nothing about the boundary under test. Build the fixture from a real interrupted transaction and mutate only the field whose boundary you are testing, then prove the test fails when that boundary is reverted."
+    "A raw-JSON journal fixture asserting only `.is_err()` can pass for the wrong reason: a fixture with a placeholder `layout_digest` is refused by the layout check before any version or field check runs, so it proves nothing about the boundary under test. Build the fixture from a real interrupted transaction and mutate only the field whose boundary you are testing, then prove the test fails when that boundary is reverted.",
+    "SUPERSEDES the stale-binary trap above: 355565c2 removed build provenance and the guard, so gate evaluation no longer refuses on binary age and no reinstall is required before evaluating a gate. Install with `./scripts/install-jit.sh` when you want the installed binary to match the tree. The trap above stands as what was true for sessions 1-6.",
+    "A criterion demanding that a removed concept leave the repository does NOT reach the repository's records of its own past. Session 7 inherited 20 rewritten handoff and progress files across four containers, produced by chasing one such finding; the reviewer then rejected the annotations themselves as prohibited prose, and the loop cannot converge because a record is not editable into compliance. Amend the criterion or the reviewer's scope, and leave the records alone — `contrib/gates/code-review-prompt.md` now carries a 'Records of the past' section for exactly this. Supersede a record by appending, never by editing it."
   ],
   "created_during_execution": [
     {
@@ -121,7 +126,7 @@
       "short_id": "6d10e5d4",
       "type": "task",
       "title": "Reduce profiled warm suite work below the enforcement bound",
-      "state": "backlog",
+      "state": "done",
       "why": "The fixed live suite clock cannot be wired while warm evidence remains at 60,562-113,272 ms. The pre-change profile records 883,556 aggregate test-ms; even ideal packing over 24 logical CPUs plus doctests exceeds 30 seconds, so an in-epic optimization prerequisite is required without weakening the checker or coverage."
     },
     {
@@ -212,8 +217,15 @@
       "short_id": "b883f916",
       "type": "task",
       "title": "Screen an optimized ordinary JIT library artifact",
-      "state": "in_progress",
+      "state": "done",
       "why": "The prior ordinary library-plus-binary wrapper missed its clean-build ceiling by 4.59 percentage points. Restricting optimization to the ordinary library recovered nearly all of that build margin, but its representative rebuild still missed the hard 25% ceiling by 437 ms, so runtime was correctly not sampled and the integration was reverted with reviewed evidence."
+    },
+    {
+      "short_id": "355565c2",
+      "type": "task",
+      "state": "done",
+      "title": "Remove build provenance, the stale-binary guard, and the disk-backed gate TMPDIR",
+      "why": "The provenance step was 61% of a warm cargo-ci run and forced TMPDIR off tmpfs for the whole gate, a measured 5.8x tax on every other test. Enforcement in 94d85bf1 was unreachable while the live suite clock read 69,000-104,000 ms for that reason alone. Removed with its guard, its three #[ignore]d contract tests, and the TMPDIR override; the warm gate is now 24.4 s with a 22.2 s suite clock."
     }
   ],
   "delegation_model": "Set by the invoker in session 6, superseding the earlier codex-only model: hard tasks go to native Opus subagents dispatched with the Agent tool, moderate tasks go to native Sonnet subagents, and easy tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high`. gpt-5.6-sol and gpt-5.6-terra are no longer permitted. The lead reviews every diff, runs configured gates, and owns integration. When a codex worker must run the test suite, pass `-c sandbox_workspace_write.network_access=true`, or the three `commands::serve::tests` listener tests fail with `Operation not permitted` and nextest cancels the run.",
