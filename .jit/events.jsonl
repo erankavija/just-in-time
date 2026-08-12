@@ -13970,3 +13970,7 @@
 {"assignee":"agent:sonnet-nextest-final-policy","id":"d1146390-3faf-419e-b09c-ee87b022584b","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:48:19.957302024Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"f77f6fea-b9eb-4e2d-b4d3-ebdb9f95f269","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:53:42.204503320Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"a5c474de-f807-4ded-85e4-7bf023b4846f","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:55:47.131682941Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"c3568381-e427-446c-8957-b3bd289a0b0c","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:58:33.462899359Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"0ea86907-8b2f-4677-b695-23324beb3d0f","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:59:06.694964837Z","to":"done","type":"issue_state_changed"}
+{"id":"abdfc750-f92f-4f19-b1fa-f699e4d55edd","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:59:06.694964837Z","type":"issue_completed"}
+{"from":"backlog","id":"2cf35d75-adef-4fc7-948b-a93ebec3f123","issue_id":"76ecc11f-21e1-4280-b8cb-c06d10b9d820","timestamp":"2026-08-12T22:59:14.053771422Z","to":"ready","type":"issue_state_changed"}

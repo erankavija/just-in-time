@@ -8,6 +8,7 @@
   ],
   "description": "Tighten the committed nextest runtime policy to its final bounds using the warm profile evidence.\n\n## Background\n\nThe initial policy from `nextest-foundation` uses transitional bounds (period \"15s\", terminate-after 4). With the suite optimized and profiled, the final bounds land here. Override selection is mechanical from `suite-profile.json`.\n\n## Success Criteria\n\n- [hard] REQ-01: Sets `.config/nextest.toml` to `retries = 0`, slow-timeout period `\"10s\"`, and `terminate-after = 2` for a hard bound of 20 seconds.\n- [hard] REQ-02: Adds a named per-test override for each test recorded in `suite-profile.json` with warm timing above the 20-second hard bound, and no others.\n- [hard] REQ-03: `cargo nextest show-config test-groups` and a suite run succeed under the tightened policy.\n\n## Notes\n\nOrdered overlap: `.config/nextest.toml` is touched after `nextest-foundation`, sequenced by this task's dependencies through `suite-enforcement`. Override selection consumes `suite-timing-evidence`.",
   "documents": [],
+  "done_at": "2026-08-12T22:59:06.694964837Z",
   "first_ready_at": "2026-08-12T22:38:31.014022916Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-08-12T22:55:47.131682941Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T22:58:33.462899359Z",
       "updated_by": "auto:executor"
     }
   },
@@ -29,7 +35,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Tighten the committed nextest policy to the final bounds",
-  "updated_at": "2026-08-12T22:55:47.131682941Z"
+  "updated_at": "2026-08-12T22:59:06.694964837Z"
 }
