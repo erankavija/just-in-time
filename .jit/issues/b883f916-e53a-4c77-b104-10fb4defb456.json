@@ -7,7 +7,42 @@
     "7a2fc6f6-854d-4764-8585-3757c6d9c7ac"
   ],
   "description": "Screen and retain only from matched evidence a SHA-addressed compiler wrapper that applies opt-level 1 to the ordinary `jit` library while leaving the CLI main, every test harness, dependency, server artifact, and direct developer Cargo invocation at opt-level 0.\n\n## Background\n\nGlobal test-profile optimization met the runtime target but nearly doubled build costs. Package-scoped optimization still optimized all `jit` harnesses and failed its representative rebuild ceiling. The narrower ordinary-library-plus-binary wrapper classified real compiler invocations exactly, preserved identity and debug contracts, and was correctly rejected only because its clean test build regressed 29.59 percent against a 25-percent ceiling. Integration harnesses and the ordinary CLI both link the ordinary `jit` library, so optimizing that library alone may preserve most runtime benefit while removing the separate optimized CLI-main compilation and its downstream fingerprint cost.\n\n## Success Criteria\n\n- [hard] REQ-01: A tracked, shell-safe, SHA-addressed wrapper adds exactly one trailing `-C opt-level=1` only to the ordinary non-test `jit` library invocation for canonical `crates/jit/src/lib.rs`; the ordinary CLI main, all `--test` harnesses, integrations, `jit-server`, dependencies, build scripts, probes, unknown shapes, output streams, statuses, and signals pass through unchanged or fail closed on conflicting optimization arguments.\n- [hard] REQ-02: A real compiler audit proves exactly one eligible library invocation and zero modified CLI-main, test, server, dependency, build-script, or probe invocations; Cargo fingerprinting changes for the optimized library without weakening line-table backtraces, direct Cargo behavior, formatting, or clippy boundaries.\n- [hard] REQ-03: A fixed-revision one-sample screen uses fresh isolated baseline and candidate targets with identical 24-worker, no-sccache, incremental-disabled conditions and rejects before retention if clean build or representative library comment-touch rebuild regresses more than 25 percent, identity sets differ, active executables reach two gibibytes, target bytes reach ten gibibytes, or any correctness, classification, restoration, or resource check fails.\n- [hard] REQ-04: A passing screen is followed by three matched clean-build, representative-rebuild, already-built nextest, and doctest samples. Retention requires exact runnable, ignored, and doctest identity sets, all assertions passing, median aggregate test-work reduction of at least 200 seconds, every nextest sample at or below 23,500 milliseconds with no test above 20 seconds, doctests at or below 5,500 milliseconds, active executables below two gibibytes, target size below ten gibibytes, and a green authoritative cargo-ci.\n- [hard] REQ-05: The retained path scopes the wrapper only to the named gate build/test commands, refuses an ambient workspace wrapper, proves or explicitly disables sccache nesting, preserves direct ordinary Cargo behavior, and is covered by classifier/staging/security self-tests. If any hard screen or acceptance bound fails, the wrapper is fully reverted and complete integrity-checked `no_change` evidence records the decision.\n\n## Notes\n\nReuse the validated classification, staging, audit, line-table, identity, restoration, and evidence protocol from the ordinary-artifact wrapper experiment, but independently measure this narrower compiler scope. Do not infer acceptance from the earlier global opt-level profile or from projected aggregate savings.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "5ce16793e67d820e2cf99ff51ec3dfa3127de151e0ed34933742477e9cb7fd55",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "summary.json",
+          "resolved_path": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/summary.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1596a035608fb84242b3e1c784449027dc30867f057f57896705b00a74c7d598",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "rejected-candidate.patch",
+          "resolved_path": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/rejected-candidate.patch"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "339931b24c54d0279d7f7e2cb178494ea2e0e2368538c1b1c6fba437dae7ca21",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "compiler-audit.json",
+          "resolved_path": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/compiler-audit.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": "Ordinary library artifact wrapper screen (no_change evidence)",
+      "path": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/README.md"
+    }
+  ],
+  "done_at": "2026-08-12T14:59:54.303723854Z",
   "first_ready_at": "2026-08-12T11:00:51.683773049Z",
   "gates_required": [
     "cargo-ci",
@@ -20,8 +55,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-12T11:49:01.508148154Z",
+      "status": "passed",
+      "updated_at": "2026-08-12T14:58:29.798915927Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +69,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Screen an optimized ordinary JIT library artifact",
-  "updated_at": "2026-08-12T11:49:01.508148154Z"
+  "updated_at": "2026-08-12T14:59:54.303723854Z"
 }

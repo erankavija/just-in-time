@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d34d37de4f4ea70bb5c69faa68aaaf027e75b2b6",
+  "completed_at": "2026-08-12T14:58:29.453943999Z",
+  "duration_ms": 183474,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The failed rebuild screen correctly rejected and fully reverted the candidate; retained evidence integrity and current-tree checks pass.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b883f916-e53a-4c77-b104-10fb4defb456",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "98e07faf-af49-43f0-8d9a-871957f4e651",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T14:55:25.979416986Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f7794d680, fd63950b7, fb283b744, a03f4047b\nPolicy sources: AGENTS.md\nResolved items: @/issue/b883f916/requirement/REQ-01 (issue description); @/issue/4b7c06d0/requirement/REQ-01 (issue description); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/invariant/bounded-rust-build-footprint and @/invariant/atomic-writes (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T11:36:23Z); code-review failed (exit 1, independent judgment run)\nTruncation recovery: Re-read tagged patches by commit and affected path/range; separately inspected the retained candidate patch, validator, summary, and manifest.\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The failed rebuild screen correctly rejected and fully reverted the candidate; retained evidence integrity and current-tree checks pass.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
