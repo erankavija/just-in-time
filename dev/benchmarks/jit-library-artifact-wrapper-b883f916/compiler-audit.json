@@ -178,6 +178,7 @@
   ],
   "ordinary_cli_main_passthrough": true,
   "passthrough_count": 24,
+  "recorded_checkout_root": "/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-b883f916",
   "record_count": 25,
   "records": [
     {

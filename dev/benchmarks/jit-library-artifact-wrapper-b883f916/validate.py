@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -51,6 +52,74 @@ def inventory_identities(path: pathlib.Path):
         for identity in identities
     )
     return identities, hashlib.sha256(encoded).hexdigest()
+
+
+def validate_audit_provenance(audit, summary_audit, raw_audit_build: str):
+    """Validate exact captured roots without consulting the current checkout."""
+    recorded_checkout = pathlib.Path(audit["recorded_checkout_root"])
+    assert recorded_checkout.is_absolute()
+    assert os.path.normpath(str(recorded_checkout)) == str(recorded_checkout)
+    assert ".." not in recorded_checkout.parts
+    assert summary_audit["recorded_checkout_root"] == str(recorded_checkout)
+    assert f"Compiling jit v1.0.0 ({recorded_checkout}/crates/jit)" in raw_audit_build
+    assert (
+        f"Compiling jit-server v1.0.0 ({recorded_checkout}/crates/server)"
+        in raw_audit_build
+    )
+
+    optimized = [record for record in audit["records"] if record["decision"] == "optimize"]
+    passthrough = [
+        record for record in audit["records"] if record["decision"] == "passthrough"
+    ]
+    recorded_roots = [
+        pathlib.Path(record["root"])
+        for record in audit["records"]
+        if record["root"]
+    ]
+    assert all(root.is_absolute() for root in recorded_roots)
+    assert all(os.path.normpath(str(root)) == str(root) for root in recorded_roots)
+    assert all(".." not in root.parts for root in recorded_roots)
+    assert all(root.is_relative_to(recorded_checkout) for root in recorded_roots)
+    expected_lib = recorded_checkout / "crates/jit/src/lib.rs"
+    expected_main = recorded_checkout / "crates/jit/src/main.rs"
+    assert optimized[0]["root"] == str(expected_lib)
+    ordinary_main = [
+        record
+        for record in passthrough
+        if record["root"] == str(expected_main)
+        and record["package"] == record["crate"] == "jit"
+        and record["has_test"] == "0"
+    ]
+    assert len(ordinary_main) == 1
+    return optimized, passthrough
+
+
+def selftest_audit_relocation(audit, summary_audit, raw_audit_build: str) -> None:
+    """Prove audit validation is independent of the validator checkout path."""
+    original = audit["recorded_checkout_root"]
+    relocated_root = "/capture/relocated-jit-b883f916"
+    relocated_audit = copy.deepcopy(audit)
+    relocated_audit["recorded_checkout_root"] = relocated_root
+    for record in relocated_audit["records"]:
+        if record["root"]:
+            assert record["root"].startswith(f"{original}/")
+            record["root"] = relocated_root + record["root"][len(original) :]
+    relocated_summary = dict(summary_audit)
+    relocated_summary["recorded_checkout_root"] = relocated_root
+    relocated_raw = raw_audit_build.replace(original, relocated_root)
+    validate_audit_provenance(relocated_audit, relocated_summary, relocated_raw)
+
+    inexact_audit = copy.deepcopy(relocated_audit)
+    optimized = next(
+        record for record in inexact_audit["records"] if record["decision"] == "optimize"
+    )
+    optimized["root"] = f"{relocated_root}/crates/jit/src/main.rs"
+    try:
+        validate_audit_provenance(inexact_audit, relocated_summary, relocated_raw)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("audit root validation accepted an inexact optimized path")
 
 
 def validate_rejected_patch(required_revision: str) -> None:
@@ -171,23 +240,19 @@ def validate() -> None:
     assert sum(identity[3] for identity in doctests) == summary["identity"]["doctest_ignored"]
 
     assert audit["authority"] == "one fresh cargo test --workspace --no-run command"
+    raw_audit_build = (HERE / "raw/compiler-audit-build.stderr").read_text(
+        encoding="utf-8"
+    )
     assert audit["record_count"] == len(audit["records"]) == 25
-    optimized = [record for record in audit["records"] if record["decision"] == "optimize"]
-    passthrough = [record for record in audit["records"] if record["decision"] == "passthrough"]
+    optimized, passthrough = validate_audit_provenance(
+        audit, summary["compiler_audit"], raw_audit_build
+    )
+    selftest_audit_relocation(audit, summary["compiler_audit"], raw_audit_build)
     assert len(optimized) == audit["optimized_count"] == 1
     assert len(passthrough) == audit["passthrough_count"] == 24
     assert audit["rejected_count"] == audit["conflicting_opt_level_count"] == 0
-    assert optimized[0]["root"] == str((ROOT / "crates/jit/src/lib.rs").resolve())
     assert optimized[0]["package"] == optimized[0]["crate"] == "jit"
     assert optimized[0]["has_test"] == optimized[0]["opt_level_count"] == "0"
-    ordinary_main = [
-        record
-        for record in passthrough
-        if record["root"] == str((ROOT / "crates/jit/src/main.rs").resolve())
-        and record["package"] == record["crate"] == "jit"
-        and record["has_test"] == "0"
-    ]
-    assert len(ordinary_main) == 1
     assert all(record["decision"] == "passthrough" for record in passthrough)
 
     candidate_screen = candidate["clean_samples"][0]
