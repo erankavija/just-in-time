@@ -13966,3 +13966,5 @@
 {"from":"in_progress","id":"fb71e466-a0d4-4643-8a7f-929feed6e00a","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T22:38:25.559101525Z","to":"done","type":"issue_state_changed"}
 {"id":"bdfad555-dc82-45f2-ab91-418a42b1ebb8","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T22:38:25.559101525Z","type":"issue_completed"}
 {"from":"backlog","id":"29b2e0ed-ea22-45d9-a3f9-a2a93005c53f","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:38:31.014022916Z","to":"ready","type":"issue_state_changed"}
+{"from":"ready","id":"7a7dfc65-02ae-4b49-9352-485ef5ab292d","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:48:19.957302024Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:sonnet-nextest-final-policy","id":"d1146390-3faf-419e-b09c-ee87b022584b","issue_id":"25faa21d-cab1-44cb-8cc9-8973502844b2","timestamp":"2026-08-12T22:48:19.957302024Z","type":"issue_claimed"}
