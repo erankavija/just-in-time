@@ -34,8 +34,8 @@
     {
       "wave_number": 4,
       "issues": [
-        {"short_id": "21ba4bb4", "title": "Produce warm per-test suite timing evidence", "classification": "implementation", "difficulty": "moderate", "worker": "opus", "status": "pending"},
-        {"short_id": "2516ad90", "title": "Add step timing and the named suite clock", "classification": "implementation", "difficulty": "moderate", "worker": "codex-direct", "status": "pending"}
+        {"short_id": "21ba4bb4", "title": "Produce warm per-test suite timing evidence", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "in_progress"},
+        {"short_id": "2516ad90", "title": "Add step timing and the named suite clock", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "in_progress"}
       ]
     },
     {
