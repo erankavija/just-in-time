@@ -14,7 +14,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-12T05:21:10.261042729Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1fc8fec3-8bd9-42eb-a31b-441964b05ccd",
   "labels": [
     "epic:test-suite-performance",
@@ -27,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Prebuild the stale-binary semantic fixture inside nextest",
-  "updated_at": "2026-08-12T04:57:16.001886894Z"
+  "updated_at": "2026-08-12T05:21:10.261042729Z"
 }

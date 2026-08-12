@@ -13803,3 +13803,6 @@
 {"from":"ready","id":"dbd8161f-b0fb-45e5-97b4-69cab8553202","issue_id":"4731256d-69ac-4993-b815-5d7d0fb0c153","timestamp":"2026-08-12T04:16:46.420975646Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sol-profile-fixtures","id":"96ddcc85-1e48-465f-b8f9-59eb37ded8ca","issue_id":"4731256d-69ac-4993-b815-5d7d0fb0c153","timestamp":"2026-08-12T04:16:46.420975646Z","type":"issue_claimed"}
 {"fields":["description"],"id":"c84b1fde-bd61-4d25-8b01-3c049434cb1d","issue_id":"1fc8fec3-8bd9-42eb-a31b-441964b05ccd","timestamp":"2026-08-12T04:57:16.001886894Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"67b51081-a848-461c-b72b-a58fe84166cc","issue_id":"1fc8fec3-8bd9-42eb-a31b-441964b05ccd","timestamp":"2026-08-12T05:15:26.308909793Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"21c32857-d586-41d5-84d9-dca64f4337dd","issue_id":"1fc8fec3-8bd9-42eb-a31b-441964b05ccd","timestamp":"2026-08-12T05:15:46.132625365Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"ba86e92b-cb07-4962-9409-9666cc0fde20","issue_id":"1fc8fec3-8bd9-42eb-a31b-441964b05ccd","timestamp":"2026-08-12T05:21:10.261042729Z","type":"gate_failed","updated_by":"auto:executor"}
