@@ -13977,3 +13977,5 @@
 {"id":"74ec5f7a-ad6a-4736-a587-6122b859c516","issue_id":"abe2c2bd-96ef-4297-a535-cf3fe65b690e","priority":"normal","timestamp":"2026-08-12T23:02:30.641081906Z","title":"Seven ignored tests assert nothing and are recorded as an excluded cost","type":"issue_created"}
 {"from":"ready","id":"8c301692-04b4-4144-b04a-19c78af0d7b6","issue_id":"abe2c2bd-96ef-4297-a535-cf3fe65b690e","timestamp":"2026-08-12T23:02:50.971039163Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"924772f8-e80d-4a42-8ad0-0d7e40b4364b","issue_id":"abe2c2bd-96ef-4297-a535-cf3fe65b690e","timestamp":"2026-08-12T23:02:50.971039163Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"56dd0d75-2c42-455b-b506-d9d620422a75","issue_id":"76ecc11f-21e1-4280-b8cb-c06d10b9d820","timestamp":"2026-08-12T23:03:39.185309077Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:sonnet-inherent-cost-attribution","id":"134291fd-26ca-43e9-a919-c385242bfcbe","issue_id":"76ecc11f-21e1-4280-b8cb-c06d10b9d820","timestamp":"2026-08-12T23:03:39.185309077Z","type":"issue_claimed"}
