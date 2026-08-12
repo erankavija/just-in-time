@@ -392,14 +392,16 @@ only what identity checks show was published. That reversal is idempotent, so a
 crash during rollback resumes from the same complete `Prepared` record rather
 than needing per-action journal updates.
 
-After all restorations and the staged-root cleanup are verified, recovery writes
-`RolledBack`. If recovery is interrupted after that terminal marker, the marker
-means that only residue cleanup remains; recovery verifies the restored preimages
-and finishes cleanup without replaying the actions. A `Committed` journal instead
-verifies its final identities and converges forward through cleanup. Recovery also
-skips a worktree-side companion (owned by internal recovery and the orphan sweep)
-and a foreign-owner external journal (another data root's residue under the shared
-bootstrap namespace).
+Rollback verifies each restoration against its recorded preimage, verifies the
+staged-root cleanup, and only then writes `RolledBack`. If recovery is interrupted
+after that terminal marker, the marker means that restoration is already verified
+and only residue cleanup remains; a later session performs the limited terminal-
+cleanup checks (including applicable data-root checks and owned-backup removal),
+skipping Worktree and absent-root Data preimage checks, without replaying actions.
+A `Committed` journal instead verifies its final identities and converges forward
+through cleanup. Recovery also skips a worktree-side companion (owned by internal
+recovery and the orphan sweep) and a foreign-owner external journal (another data
+root's residue under the shared bootstrap namespace).
 
 Every durability boundary and action edge is a stable `FailurePoint`
 (`storage/transaction_recovery.rs`), and a `TransactionFailureInjector` lets tests
