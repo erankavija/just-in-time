@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T20:07:59.877145508Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "355565c2-2f98-45f0-b655-7bb29117e54d",
   "labels": [
     "milestone:v1.0",
@@ -22,5 +28,5 @@
   "priority": "critical",
   "state": "in_progress",
   "title": "Remove build provenance, the stale-binary guard, and the disk-backed gate TMPDIR",
-  "updated_at": "2026-08-12T19:29:40.978602208Z"
+  "updated_at": "2026-08-12T20:07:59.877145508Z"
 }
