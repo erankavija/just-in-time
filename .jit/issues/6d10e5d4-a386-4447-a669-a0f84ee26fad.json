@@ -32,7 +32,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Reduce profiled warm suite work below the enforcement bound",
-  "updated_at": "2026-08-12T09:14:33.203486322Z"
+  "updated_at": "2026-08-12T10:59:58.267680606Z"
 }
