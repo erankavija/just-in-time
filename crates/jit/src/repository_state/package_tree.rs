@@ -152,7 +152,7 @@ impl PackageTreeCapture {
         // the whole set is discovered rather than fixed.
         let mut spec = CaptureSpec::phase_one(std::iter::empty(), budget)?;
         spec.discover_paths(paths)?;
-        spec.discover_listing(self.destination.clone())?;
+        spec.discover_listings([self.destination.clone()])?;
         Ok(spec)
     }
 
@@ -194,9 +194,7 @@ impl PackageTreeCapture {
 
         let before = (spec.paths().count(), spec.listings().len());
         spec.discover_paths(listed)?;
-        for directory in directories {
-            spec.discover_listing(directory)?;
-        }
+        spec.discover_listings(directories)?;
         Ok((spec.paths().count(), spec.listings().len()) != before)
     }
 

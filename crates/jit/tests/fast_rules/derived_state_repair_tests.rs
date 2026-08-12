@@ -153,7 +153,7 @@ fn repository_image(
     let mut spec = CaptureSpec::phase_one(registries, budget).unwrap();
     spec.discover_paths(closure.paths).unwrap();
     for listing in &closure.listings {
-        spec.discover_listing(listing.clone()).unwrap();
+        spec.discover_listings([listing.clone()]).unwrap();
     }
     let (_workspace, package) = shipped_workflow_package();
     spec.discover_paths(

@@ -2180,11 +2180,20 @@ const PACKAGE_TREE_MODEL_BUDGETS: usize = 8;
 /// [`MAX_PROFILE_PACKAGE_FILES`]: crate::profile::MAX_PROFILE_PACKAGE_FILES
 /// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
 fn package_tree_capture_budget(destination: &VirtualPath) -> CaptureBudget {
-    let model_bytes = crate::profile::MAX_PROFILE_PACKAGE_BYTES;
+    // Saturating throughout: a bound that wrapped would be smaller than the
+    // model demands, which is the failure this function exists to prevent. The
+    // only term this build cannot compute at compile time is the destination's
+    // own depth, which the caller supplies.
+    const READ_BYTES: usize =
+        PACKAGE_TREE_MODEL_BUDGETS.saturating_mul(crate::profile::MAX_PROFILE_PACKAGE_BYTES);
+
     CaptureBudget {
-        max_listings: 1 + PACKAGE_TREE_MODEL_BUDGETS * model_bytes,
-        max_bytes: (PACKAGE_TREE_MODEL_BUDGETS * model_bytes) as u64,
-        max_depth: destination.relative().depth() + model_bytes,
+        max_listings: READ_BYTES.saturating_add(1),
+        max_bytes: READ_BYTES as u64,
+        max_depth: destination
+            .relative()
+            .depth()
+            .saturating_add(crate::profile::MAX_PROFILE_PACKAGE_BYTES),
     }
 }
 
@@ -2222,7 +2231,7 @@ pub(super) fn capture_applied_records(
     profiles_dir: &VirtualPath,
 ) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
     let mut spec = CaptureSpec::phase_one([], RECORD_CAPTURE_BUDGET)?;
-    spec.discover_listing(profiles_dir.clone())?;
+    spec.discover_listings([profiles_dir.clone()])?;
     let Some(listed) = capture_or_retry(session.capture(spec.clone()))? else {
         return Ok(None);
     };

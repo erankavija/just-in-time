@@ -322,15 +322,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
         spec.discover_paths(closure.paths)?;
-        for listing in &closure.listings {
-            spec.discover_listing(listing.clone())?;
-        }
+        spec.discover_listings(closure.listings.iter().cloned())?;
         // Profile composition needs the per-package target provenance to tell a
         // package occupant from repository-authored content. The profile directory
         // is listed for every captured image, and its records are added to the
         // exact phase-three read set from that one listing.
         let profiles_dir = VirtualPath::PROFILES;
-        spec.discover_listing(profiles_dir)?;
+        spec.discover_listings([profiles_dir])?;
         let mut phase_three = spec.clone();
         let image_two = match capture_or_retry(session.capture(spec))? {
             Some(image) if image.has_stable_overlap(&image_one) => image,
@@ -410,13 +408,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             if capture_precheck_history {
                 let gate_runs = VirtualPath::GATE_RUNS;
                 phase_three.discover_paths([gate_runs.clone()])?;
-                phase_three.discover_listing(gate_runs)?;
+                phase_three.discover_listings([gate_runs])?;
             }
         }
         phase_three.discover_paths(extra_paths.iter().cloned())?;
-        for listing in extra_listings {
-            phase_three.discover_listing(listing.clone())?;
-        }
+        phase_three.discover_listings(extra_listings.iter().cloned())?;
         for (revision, path) in pinned {
             phase_three.discover_pinned(revision, path)?;
         }

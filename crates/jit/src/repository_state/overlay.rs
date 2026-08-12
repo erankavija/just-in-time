@@ -170,7 +170,7 @@ mod tests {
         let mut listings = BTreeMap::new();
         if let Some(names) = issues_listing {
             let dir = VirtualPath::data("issues").unwrap();
-            spec.discover_listing(dir.clone()).unwrap();
+            spec.discover_listings([dir.clone()]).unwrap();
             let mut children = BTreeMap::new();
             for name in names {
                 children.insert(

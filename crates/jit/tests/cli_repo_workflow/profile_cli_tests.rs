@@ -2629,32 +2629,33 @@ fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_it
         "the package under test must publish more directories than files"
     );
 
-    // Capturing the added package publishes the same tree again, and capturing
-    // it a second time republishes over the tree the first capture wrote.
-    for expected in ["applied", "unchanged"] {
-        let captured = jit(
-            target_repo.path(),
-            &[
-                "profile",
-                "capture",
-                "--source",
-                "packages/bounded",
-                "--destination",
-                "build/bounded",
-                "--json",
-            ],
-        );
-        assert!(captured.status.success(), "{captured:?}");
-        let captured = json(&captured);
-        assert_eq!(captured["package_hash"], packed["package_hash"]);
-        assert_eq!(
-            captured["status"], expected,
-            "a capture of an unchanged package republished content"
-        );
-    }
+    // Recapturing the added package in place is the route that reads the whole
+    // published tree back: the destination is occupied by every directory the
+    // add just wrote, so the declaration is expanded over all of them rather
+    // than settling against an absent destination as the add did.
+    let files_before = worktree_files(&published);
+    let captured = jit(
+        target_repo.path(),
+        &[
+            "profile",
+            "capture",
+            "--source",
+            "packages/bounded",
+            "--destination",
+            "packages/bounded",
+            "--json",
+        ],
+    );
+    assert!(captured.status.success(), "{captured:?}");
+    let captured = json(&captured);
+    assert_eq!(captured["package_hash"], packed["package_hash"]);
     assert_eq!(
-        worktree_files(&target_repo.path().join("build/bounded")),
+        captured["status"], "unchanged",
+        "recapturing an unchanged package republished content"
+    );
+    assert_eq!(
         worktree_files(&published),
-        "the captured tree differs from the package it was captured from"
+        files_before,
+        "recapturing the package changed the tree it was captured from"
     );
 }
