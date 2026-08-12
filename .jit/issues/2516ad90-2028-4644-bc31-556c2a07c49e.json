@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T00:59:20.590104367Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2516ad90-2028-4644-bc31-556c2a07c49e",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Add step timing and the named suite clock",
-  "updated_at": "2026-08-12T00:29:13.364206406Z"
+  "updated_at": "2026-08-12T00:59:20.590104367Z"
 }
