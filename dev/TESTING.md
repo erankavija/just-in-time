@@ -409,9 +409,11 @@ must wait out a real connect-without-accept before it can conclude no one answer
 ### Property-based tests over real production code paths
 
 proptest's default is 256 generated cases per property. `crates/jit/src/storage/claim_coordinator_proptests.rs`
-runs its concurrency and rebuild properties against a real, fsync'd file store with real
-threads per case; its own comment records that the default case count pushed these tests
-to minutes, and caps I/O-bearing properties at 64 cases. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
+runs its concurrency and rebuild properties against a real on-disk store, with real file
+locks and real threads per case. It sets `with_fsync(false)`: these properties verify index
+and rebuild invariants rather than crash durability, so the cost is the file and lock work
+itself. Its own comment records that the default case count pushed these tests to minutes,
+and caps I/O-bearing properties at 64 cases. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
 and `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` run each case through a
 fresh in-memory `TestHarness`/`CommandExecutor` pipeline rather than a synthetic
 data structure, and cap at 48 cases for the same reason. Both caps trade case count for
