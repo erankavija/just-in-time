@@ -13881,3 +13881,4 @@
 {"id":"0a00aec8-294f-4d78-bcce-d4299eaa81c8","issue_id":"deb33646-edb9-4ee9-aea4-c808495f24c8","timestamp":"2026-08-12T09:47:28.901475113Z","type":"issue_completed"}
 {"from":"in_progress","id":"9f467722-d432-48f0-927f-77ce99518cfc","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","timestamp":"2026-08-12T09:47:34.704067843Z","to":"done","type":"issue_state_changed"}
 {"id":"514665a6-c5d8-483e-b3ac-f9afbb038056","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","timestamp":"2026-08-12T09:47:34.704067843Z","type":"issue_completed"}
+{"gate_key":"code-review","id":"6e54d7a9-82ac-4221-9482-b2cc1863490d","issue_id":"934985ca-8650-4a98-9c09-df9ec8fd9863","timestamp":"2026-08-12T09:54:09.163275489Z","type":"gate_failed","updated_by":"auto:executor"}

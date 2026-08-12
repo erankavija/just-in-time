@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "73d2c37f546f1c18c0dd269b8f91ce31a7da8822",
+  "completed_at": "2026-08-12T09:54:08.829581093Z",
+  "duration_ms": 348581,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/nextest-concurrency-934985ca/validate.py",
+        "id": "F1",
+        "line": 84,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/934985ca/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The validator checks counts and duplicates but not terminal event names against the inventory, so an identity substitution can pass despite REQ-02."
+      }
+    ],
+    "summary": "The durable-evidence validator does not enforce exact test identity-set equality required by REQ-02.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "934985ca-8650-4a98-9c09-df9ec8fd9863",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3b37f138-1a28-4051-a02c-53783f46caf5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:48:20.247748293Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11264 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff55f-7097-7b92-8a6d-d83d3a39903c\n--------\nuser\n--- 11251 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c1d072df, 0df4d88f (jit:934985ca)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/reference/content-standards.md\nResolved items: @/issue/934985ca/requirement/REQ-01 and REQ-02 (issue description, markdown-first); @/invariant/event-log (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-08-12T09:05:36Z; exit code unavailable); code-review pending\nTruncation recovery: partitioned source/summary reads, validator and checksum checks, structured raw-metric queries, failure excerpts, and inventory-to-event set comparisons\n\n1. **[blocking, issue-impact, high]** [validate.py](</home/vkaskivuo/Projects/just-in-time/dev/benchmarks/nextest-concurrency-934985ca/validate.py:84>) validates only event counts and duplicate counts, never that terminal event names equal the inventory’s runnable and ignored identity sets. A missing identity replaced by an unexpected one would pass this self-test, contrary to REQ-02. The current successful raw runs do set-match, but the committed durable-evidence validator does not enforce that hard property. References: `@/issue/934985ca/requirement/REQ-02`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The durable-evidence validator does not enforce exact test identity-set equality required by REQ-02.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The validator checks counts and duplicates but not terminal event names against the inventory, so an identity substitution can pass despite REQ-02.\",\"file\":\"dev/benchmarks/nextest-concurrency-934985ca/validate.py\",\"line\":84,\"references\":[\"@/issue/934985ca/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T09:05:36.478565023Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-12T09:54:09.163275489Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "934985ca-8650-4a98-9c09-df9ec8fd9863",
@@ -29,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Tune nextest worker concurrency",
-  "updated_at": "2026-08-12T09:05:36.478565023Z"
+  "updated_at": "2026-08-12T09:54:09.163275489Z"
 }
