@@ -13904,3 +13904,9 @@
 {"from":"in_progress","id":"ce9c482e-fa86-4fee-add7-a5b1afee1852","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T10:59:52.617570250Z","to":"done","type":"issue_state_changed"}
 {"id":"bc07d64a-a4f5-4960-94a3-15d584d86177","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T10:59:52.617570250Z","type":"issue_completed"}
 {"from":"backlog","id":"e426f67e-a291-47e7-9aca-7242c6ca81a3","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T10:59:58.267680606Z","to":"ready","type":"issue_state_changed"}
+{"id":"f0a2c076-9c53-4b3c-acb3-4b39e630f41d","issue_id":"b883f916-e53a-4c77-b104-10fb4defb456","priority":"high","timestamp":"2026-08-12T11:00:51.683773049Z","title":"Screen an optimized ordinary JIT library artifact","type":"issue_created"}
+{"fields":["dependencies"],"id":"d1a7da38-7064-486c-8986-3df541b4a32e","issue_id":"b883f916-e53a-4c77-b104-10fb4defb456","timestamp":"2026-08-12T11:01:06.772722326Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"1036e0e7-432b-424b-8b36-97452ac5e881","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T11:01:12.461791634Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"46fba239-6d5d-4b97-8102-9fe02390c0c6","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T11:01:12.461791634Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"02ca7acb-959c-4121-9f72-273ddd4294de","issue_id":"b883f916-e53a-4c77-b104-10fb4defb456","timestamp":"2026-08-12T11:01:18.170860977Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:sol-lib-artifact-wrapper","id":"4fb78458-65af-4d90-976e-f712a989a7a7","issue_id":"b883f916-e53a-4c77-b104-10fb4defb456","timestamp":"2026-08-12T11:01:18.170860977Z","type":"issue_claimed"}
