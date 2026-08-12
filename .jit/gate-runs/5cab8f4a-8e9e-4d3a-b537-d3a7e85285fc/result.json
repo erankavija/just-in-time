@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e2da055a38e27b75acfcbbf6fc328167bb241d19",
+  "completed_at": "2026-08-12T17:46:20.189384388Z",
+  "duration_ms": 299883,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/dependency-profile-6d10e5d4/summary.json",
+        "id": "F1",
+        "line": 19,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/bounded-rust-build-footprint"
+        ],
+        "severity": "high",
+        "summary": "The accepted opt-level-1 dependency profile has only two clean and one rebuild samples, below the canonical minimum of three each."
+      }
+    ],
+    "summary": "The selected dependency optimization lacks the minimum benchmark samples required by the canonical build-topology protocol.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6d10e5d4-a386-4447-a669-a0f84ee26fad",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5cab8f4a-8e9e-4d3a-b537-d3a7e85285fc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T17:41:20.305494191Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 14022 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff710-84e6-70a3-a20f-eb1d32d471d7\n--------\nuser\n--- 14009 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 12 commits tagged `jit:6d10e5d4`, ending at `e2da055a3`\nPolicy sources: AGENTS.md; dev/TESTING.md\nResolved items: issue REQ-01–04 and dependency REQ-04 (markdown-first); @/invariant/bounded-rust-build-footprint, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-08-12T17:34:22Z; code-review pending (this review)\nTruncation recovery: narrowed commit patches by path; compared profile identities and raw benchmark sample counts; inspected benchmark validator and governing protocol\n\n1. [blocking][issue-impact] The accepted dependency-profile change lacks the minimum benchmark samples required for a build-topology change. [dev/TESTING.md:321] requires at least three clean and three rebuild samples, but the selected opt-level-1 evidence declares only two clean and one rebuild sample at [summary.json:19], confirmed by its arrays at lines 50–55. Its validator checks consistency with raw files but does not enforce those minimums. The profile selection therefore lacks policy-compliant evidence. References: @/invariant/bounded-rust-build-footprint.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The selected dependency optimization lacks the minimum benchmark samples required by the canonical build-topology protocol.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The accepted opt-level-1 dependency profile has only two clean and one rebuild samples, below the canonical minimum of three each.\",\"file\":\"dev/benchmarks/dependency-profile-6d10e5d4/summary.json\",\"line\":19,\"references\":[\"@/invariant/bounded-rust-build-footprint\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

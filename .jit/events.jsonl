@@ -13923,3 +13923,5 @@
 {"from":"backlog","id":"37a996db-6df0-46c4-85b9-d5eb1f0d63ca","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T14:59:59.670902270Z","to":"ready","type":"issue_state_changed"}
 {"from":"ready","id":"ffd91cac-7545-4525-9858-0e2ce8c4f6f6","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T15:45:17.785192478Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sol-suite-reduction","id":"58e72c6a-b0c8-49db-8997-66b69aff2e74","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T15:45:17.785192478Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"be66c792-bfb1-4b10-b6fb-b6149cff18a1","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T17:41:08.238494748Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"05ef4568-7634-4185-963a-1309d0f16f2d","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T17:46:20.535145807Z","type":"gate_failed","updated_by":"auto:executor"}

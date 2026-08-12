@@ -22,7 +22,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T17:41:08.238494748Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-12T17:46:20.535145807Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6d10e5d4-a386-4447-a669-a0f84ee26fad",
   "labels": [
     "epic:test-suite-performance",
@@ -35,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Reduce profiled warm suite work below the enforcement bound",
-  "updated_at": "2026-08-12T15:45:17.785192478Z"
+  "updated_at": "2026-08-12T17:46:20.535145807Z"
 }
