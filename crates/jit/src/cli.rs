@@ -3785,6 +3785,7 @@ mod recovery_dispatch_tests {
         "profile reconfigure",
         "profile show",
         "profile upgrade",
+        "profile validate",
         "project render",
         "query all",
         "query available",

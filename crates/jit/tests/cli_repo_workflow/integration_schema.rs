@@ -78,11 +78,13 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
             "reconfigure".to_string(),
             "show".to_string(),
             "upgrade".to_string(),
+            "validate".to_string(),
         ])
     );
     for command in [
         "list",
         "show",
+        "validate",
         "apply",
         "capture",
         "pack",
