@@ -155,6 +155,7 @@ def read_audit_records():
         "schema_version": 1,
         "authority": "one fresh cargo test --workspace --no-run command",
         "source_command": "cargo test --workspace --no-run",
+        "recorded_checkout_root": str(ROOT.resolve()),
         "record_count": len(records),
         "optimized_count": len(optimized),
         "passthrough_count": len(passthrough),
@@ -254,6 +255,7 @@ def main() -> None:
         "compiler_audit": {
             "path": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/compiler-audit.json",
             "authority": audit["authority"],
+            "recorded_checkout_root": audit["recorded_checkout_root"],
             "record_count": audit["record_count"],
             "optimized_count": audit["optimized_count"],
             "passthrough_count": audit["passthrough_count"],

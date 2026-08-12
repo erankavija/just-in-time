@@ -13,7 +13,10 @@ rebuild exceeded the fixed 25-percent regression ceiling.
 from one fresh `cargo test --workspace --no-run`: exactly one optimized library
 invocation and 24 passthrough invocations. The broader screen emitted 70 audit
 records across clean, inventory, setup, and rebuild phases; those are not used
-to assert a per-command eligible count. `screen/` retains the matched fresh
+to assert a per-command eligible count. The audit binds its absolute canonical
+checkout root explicitly and corroborates it against the raw Cargo build log,
+so exact lib/main paths remain checkable after this evidence is relocated to a
+different checkout. `screen/` retains the matched fresh
 baseline and candidate harness outputs; `raw/` contains compiler output,
 wrapper self-test, line-table, backtrace, and post-screen host state.
 [`rejected-candidate.patch`](rejected-candidate.patch) is the exact measured
