@@ -1,0 +1,245 @@
+{
+  "artifact": "dev/benchmarks/test-profile-123efe74/summary.json",
+  "contract": "matched-test-profile-benchmark",
+  "schema_version": 1,
+  "issue": "123efe74-865a-401c-9932-8184aafe7feb",
+  "generated_at": "2026-08-12T06:58:15Z",
+  "source": {
+    "baseline_revision": "7119bdc1f82401d3c97dcbdc6c7ba72e59400d83",
+    "candidate_revision": "1bab66c813720f6386a34ee3fd0751a8611aab47",
+    "candidate_commit_subject": "perf(jit:123efe74): benchmark optimized test profile",
+    "candidate_change": {
+      "path": "Cargo.toml",
+      "section": "profile.test",
+      "key": "opt-level",
+      "baseline_value": 0,
+      "candidate_value": 1,
+      "patch": "dev/benchmarks/test-profile-123efe74/rejected-candidate.patch"
+    }
+  },
+  "environment": {
+    "os": "Arch Linux",
+    "kernel": "Linux 7.1.6-arch1-1",
+    "cpu_count": 24,
+    "memory_bytes": 33543049216,
+    "cargo_version": "cargo 1.97.0 (c980f4866 2026-06-30)",
+    "rustc_version": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "rustc_host_triple": "x86_64-unknown-linux-gnu",
+    "nextest_version": "0.9.133",
+    "linker": "cargo default: cc (GCC) 16.1.1 20260728 invoking GNU ld (GNU Binutils) 2.47",
+    "build_lock": "/tmp/cargo-ci.lock",
+    "cargo_incremental": 0,
+    "sccache": false,
+    "test_threads": 24
+  },
+  "method": {
+    "build_harness": "scripts/benchmark-rust-build.sh",
+    "build_samples_per_arm": 3,
+    "build_isolation": "Every clean and comment-touch sample used a fresh CARGO_TARGET_DIR. The opt0 arm set CARGO_PROFILE_TEST_OPT_LEVEL=0 against the candidate revision; the opt1 arm used the committed profile value. All Cargo commands were serialized by the repository build lock with CARGO_INCREMENTAL=0, CARGO_CI_NO_SCCACHE=1, and an empty RUSTC_WRAPPER.",
+    "comment_touch_probe": "A fixed comment was appended to crates/jit/src/lib.rs after an equivalent completed clean build, the workspace test rebuild was timed, and the source was restored and verified byte-for-byte against HEAD after every sample.",
+    "runtime_warmup_runs_per_arm": 1,
+    "runtime_samples_per_arm": 3,
+    "runner_selection": [
+      "cargo",
+      "nextest",
+      "run",
+      "--workspace",
+      "--test-threads",
+      "24"
+    ],
+    "reporter": "nextest libtest-json-plus v0.1",
+    "runtime_timing_source": "Outer epoch-millisecond clock started after acquiring the build lock; aggregate test work is the sum of exact nextest exec_time seconds for all successful test events.",
+    "doctest_selection": [
+      "cargo",
+      "test",
+      "--doc",
+      "--workspace"
+    ],
+    "doctest_tmpdir": "A dedicated disk-backed directory outside the repository checkout was used identically for both measured arms, avoiding the host's 16-GiB /tmp tmpfs quota without changing repository discovery.",
+    "cache_state": "already-built warm",
+    "sample_order": "opt1 warmup and three measured nextest/doctest pairs, then opt0 warmup and three measured nextest/doctest pairs",
+    "raw_integrity_manifest": "dev/benchmarks/test-profile-123efe74/SHA256SUMS"
+  },
+  "thresholds": {
+    "minimum_median_aggregate_reduction_seconds": 200.0,
+    "maximum_candidate_median_nextest_wall_ms": 23500,
+    "maximum_candidate_sample_nextest_wall_ms": 30000,
+    "maximum_candidate_median_doctest_wall_ms": 5500,
+    "maximum_clean_test_build_regression_percent": 25.0,
+    "maximum_comment_touch_rebuild_regression_percent": 25.0,
+    "maximum_active_test_executable_bytes": 2147483648
+  },
+  "identity_reconciliation": {
+    "compiler_inventories_semantically_equal": true,
+    "nextest_runnable_count": 4511,
+    "ignored_count": 10,
+    "doctest_count": 63,
+    "total_inventory_count": 4584,
+    "runtime_samples_with_unique_exact_identity_set": 6,
+    "missing_identities": 0,
+    "duplicate_identities": 0,
+    "note": "The 4,511 runnable identities include one regression merged after the earlier 4,510-identity profile; both matched arms contain the same set."
+  },
+  "build_results": {
+    "opt0": {
+      "clean_clippy_wall_seconds": [34.739, 34.618, 34.724],
+      "clean_test_build_wall_seconds": [41.730, 47.678, 41.765],
+      "median_clean_test_build_wall_seconds": 41.765,
+      "comment_touch_rebuild_wall_seconds": [35.462, 35.677, 35.775],
+      "median_comment_touch_rebuild_wall_seconds": 35.677,
+      "active_test_executable_bytes": [1592824928, 1592824928, 1592824928],
+      "all_samples_passed": true,
+      "all_probe_restorations_verified": true
+    },
+    "opt1": {
+      "clean_clippy_wall_seconds": [34.693, 34.817, 34.774],
+      "clean_test_build_wall_seconds": [85.852, 84.130, 83.313],
+      "median_clean_test_build_wall_seconds": 84.130,
+      "clean_test_build_regression_percent": 101.436610,
+      "comment_touch_rebuild_wall_seconds": [72.059, 71.179, 70.492],
+      "median_comment_touch_rebuild_wall_seconds": 71.179,
+      "comment_touch_rebuild_regression_percent": 99.509488,
+      "active_test_executable_bytes": [1676354008, 1676353688, 1676353896],
+      "maximum_active_test_executable_bytes": 1676354008,
+      "all_samples_passed": true,
+      "all_probe_restorations_verified": true
+    }
+  },
+  "runtime_results": {
+    "opt0": {
+      "samples": [
+        {
+          "sample": 1,
+          "nextest_wall_ms": 37619,
+          "nextest_runner_summary_ms": 37185,
+          "aggregate_test_work_seconds": 635.149346637,
+          "setup_ms": {"stale_binary": 458, "default_repository": 2580, "dogfood_repository": 2734},
+          "doctest_wall_ms": 5408,
+          "nextest_passed": 4511,
+          "nextest_skipped": 10,
+          "doctest_passed": 63
+        },
+        {
+          "sample": 2,
+          "nextest_wall_ms": 37312,
+          "nextest_runner_summary_ms": 36894,
+          "aggregate_test_work_seconds": 627.627726634,
+          "setup_ms": {"stale_binary": 480, "default_repository": 2648, "dogfood_repository": 2709},
+          "doctest_wall_ms": 5282,
+          "nextest_passed": 4511,
+          "nextest_skipped": 10,
+          "doctest_passed": 63
+        },
+        {
+          "sample": 3,
+          "nextest_wall_ms": 37331,
+          "nextest_runner_summary_ms": 36933,
+          "aggregate_test_work_seconds": 628.921916319,
+          "setup_ms": {"stale_binary": 464, "default_repository": 2615, "dogfood_repository": 2729},
+          "doctest_wall_ms": 5278,
+          "nextest_passed": 4511,
+          "nextest_skipped": 10,
+          "doctest_passed": 63
+        }
+      ],
+      "median_nextest_wall_ms": 37331,
+      "median_aggregate_test_work_seconds": 628.921916319,
+      "median_doctest_wall_ms": 5282
+    },
+    "opt1": {
+      "samples": [
+        {
+          "sample": 1,
+          "nextest_wall_ms": 15146,
+          "nextest_runner_summary_ms": 14741,
+          "aggregate_test_work_seconds": 218.713267199,
+          "setup_ms": {"stale_binary": 674, "default_repository": 71, "dogfood_repository": 91},
+          "doctest_wall_ms": 4652,
+          "nextest_passed": 4511,
+          "nextest_skipped": 10,
+          "doctest_passed": 63
+        },
+        {
+          "sample": 2,
+          "nextest_wall_ms": 14890,
+          "nextest_runner_summary_ms": 14510,
+          "aggregate_test_work_seconds": 218.712000413,
+          "setup_ms": {"stale_binary": 454, "default_repository": 73, "dogfood_repository": 81},
+          "doctest_wall_ms": 4567,
+          "nextest_passed": 4511,
+          "nextest_skipped": 10,
+          "doctest_passed": 63
+        },
+        {
+          "sample": 3,
+          "nextest_wall_ms": 14964,
+          "nextest_runner_summary_ms": 14576,
+          "aggregate_test_work_seconds": 220.154161666,
+          "setup_ms": {"stale_binary": 460, "default_repository": 72, "dogfood_repository": 81},
+          "doctest_wall_ms": 4566,
+          "nextest_passed": 4511,
+          "nextest_skipped": 10,
+          "doctest_passed": 63
+        }
+      ],
+      "median_nextest_wall_ms": 14964,
+      "median_aggregate_test_work_seconds": 218.713267199,
+      "median_doctest_wall_ms": 4567,
+      "median_aggregate_reduction_seconds": 410.208649120,
+      "median_nextest_wall_reduction_percent": 59.915352,
+      "median_doctest_wall_reduction_percent": 13.536539
+    }
+  },
+  "operational_exclusions": [
+    {
+      "attempt": "opt1 doctest warmup with default /tmp",
+      "included_in_acceptance": false,
+      "wall_ms": 136941,
+      "exit_code": 101,
+      "result": "34 passed; 29 failed",
+      "reason": "The 16-GiB /tmp tmpfs exhausted its quota while rustdoc linked parallel examples; raw output records disk-quota errors and secondary linker bus errors.",
+      "raw_stdout": "dev/benchmarks/test-profile-123efe74/opt1-runtime/raw/doctest-warmup.stdout",
+      "raw_stderr": "dev/benchmarks/test-profile-123efe74/opt1-runtime/raw/doctest-warmup.stderr",
+      "raw_time": "dev/benchmarks/test-profile-123efe74/opt1-runtime/raw/doctest-warmup.time.json"
+    },
+    {
+      "attempt": "opt1 doctest warmup with TMPDIR inside the checkout",
+      "included_in_acceptance": false,
+      "wall_ms": 6782,
+      "exit_code": 101,
+      "result": "62 passed; 1 failed",
+      "reason": "The disk-backed retry removed the quota failure, but a temporary repository nested under the checkout discovered the enclosing dogfood .jit and invalidated one doctest's isolation assumption.",
+      "raw_stdout": "dev/benchmarks/test-profile-123efe74/opt1-runtime/raw/doctest-warmup-retry.stdout",
+      "raw_stderr": "dev/benchmarks/test-profile-123efe74/opt1-runtime/raw/doctest-warmup-retry.stderr",
+      "raw_time": "dev/benchmarks/test-profile-123efe74/opt1-runtime/raw/doctest-warmup-retry.time.json"
+    }
+  ],
+  "decision_matrix": [
+    {"criterion": "exact runnable, ignored, and doctest identities", "status": "pass", "observed": "4511 runnable, 10 ignored, 63 doctests in each arm"},
+    {"criterion": "median aggregate reduction >= 200 seconds", "status": "pass", "observed": "410.208649120 seconds"},
+    {"criterion": "candidate median nextest wall <= 23500 ms", "status": "pass", "observed": "14964 ms"},
+    {"criterion": "every candidate nextest wall <= 30000 ms", "status": "pass", "observed": "maximum 15146 ms"},
+    {"criterion": "candidate median doctest wall <= 5500 ms", "status": "pass", "observed": "4567 ms"},
+    {"criterion": "active test executables < 2 GiB", "status": "pass", "observed": "maximum 1676354008 bytes"},
+    {"criterion": "clean test-build regression <= 25 percent", "status": "fail", "observed": "101.436610 percent"},
+    {"criterion": "comment-touch rebuild regression <= 25 percent", "status": "fail", "observed": "99.509488 percent"},
+    {"criterion": "all measured workspace tests and doctests pass", "status": "pass", "observed": "six full nextest samples and six measured doctest samples passed"}
+  ],
+  "decision": {
+    "value": "no_change",
+    "candidate_accepted": false,
+    "reason": "The candidate meets every runtime, identity, correctness, doctest, and executable-byte threshold, but fails both hard build-cost ceilings by approximately four times the permitted regression. The Cargo.toml change is therefore rejected and restored to opt-level 0.",
+    "thresholds_weakened": false
+  },
+  "follow_up_recommendation": {
+    "proposal": "Benchmark a package-scoped [profile.test.package.jit] opt-level = 1 override while leaving dependencies and jit-server at opt-level 0.",
+    "rationale": "Summing the median duration of each stable identity attributes 408.458288303 of 410.531244583 seconds of observed speedup to the jit package's 4305 identities; jit-server contributes only 2.072956280 seconds. A package-scoped arm may retain most runtime benefit without optimizing every test-profile dependency.",
+    "required_protocol": "Use the same three clean builds, three comment-touch rebuilds, exact identity reconciliation, three warm 24-thread JSON-plus runs, doctests, and existing thresholds. Do not infer acceptance from this global-profile run."
+  },
+  "raw_evidence": {
+    "opt0_build": "dev/benchmarks/test-profile-123efe74/opt0-build",
+    "opt1_build": "dev/benchmarks/test-profile-123efe74/opt1-build",
+    "opt0_runtime": "dev/benchmarks/test-profile-123efe74/opt0-runtime/raw",
+    "opt1_runtime": "dev/benchmarks/test-profile-123efe74/opt1-runtime/raw"
+  }
+}

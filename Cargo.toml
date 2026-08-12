@@ -23,7 +23,6 @@ incremental = true
 [profile.test]
 debug = "line-tables-only"
 incremental = true
-opt-level = 1
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }

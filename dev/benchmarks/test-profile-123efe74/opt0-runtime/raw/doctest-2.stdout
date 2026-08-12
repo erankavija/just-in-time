@@ -1,0 +1,73 @@
+
+running 63 tests
+test crates/jit/src/commands/batch_create.rs - commands::batch_create::CommandExecutor<S>::batch_create_from_json (line 238) - compile ... ok
+test crates/jit/src/commands/breakdown.rs - commands::breakdown::CommandExecutor<S>::bracket_breakdown_with_template (line 214) - compile ... ok
+test crates/jit/src/commands/breakdown.rs - commands::breakdown::BracketChild (line 34) ... ok
+test crates/jit/src/document/adapter.rs - document::adapter::AdapterRegistry (line 145) ... ok
+test crates/jit/src/document/assets.rs - document::assets::AssetScanner (line 54) ... ok
+test crates/jit/src/config.rs - config::ItemKindConfig (line 456) ... ok
+test crates/jit/src/domain/item.rs - domain::item::expand_kind_triple (line 1513) ... ok
+test crates/jit/src/document/adapter.rs - document::adapter::DocFormatAdapter (line 17) ... ok
+test crates/jit/src/config.rs - config::JitConfig::validate_item_kinds (line 1562) ... ok
+test crates/jit/src/commands/config.rs - commands::config::resolve_dotted_key (line 111) ... ok
+test crates/jit/src/config.rs - config::ItemKindConfig (line 489) ... ok
+test crates/jit/src/domain/item.rs - domain::item::ItemKind (line 617) ... ok
+test crates/jit/src/commands/batch_create.rs - commands::batch_create::BatchIssueDef (line 36) ... ok
+test crates/jit/src/config.rs - config::ItemKindConfig::missing_required_fields (line 597) ... ok
+test crates/jit/src/config.rs - config::ProjectionConfig (line 1011) ... ok
+test crates/jit/src/domain/item.rs - domain::item::index_project_sources (line 1195) ... ok
+test crates/jit/src/domain/queries.rs - domain::queries::bracket_scope_ids (line 409) ... ok
+test crates/jit/src/domain/item.rs - domain::item::index_items (line 1043) ... ok
+test crates/jit/src/commands/template_expand.rs - commands::template_expand::expand_template (line 126) ... ok
+test crates/jit/src/commands/gate.rs - commands::gate::CommandExecutor<S>::update_gate (line 1298) ... ok
+test crates/jit/src/domain/item.rs - domain::item::load_toml_scope_items (line 1274) ... ok
+test crates/jit/src/query_engine/mod.rs - query_engine (line 18) ... ok
+test crates/jit/src/commands/issue.rs - commands::issue::CommandExecutor<S>::issue_children (line 340) ... ok
+test crates/jit/src/search.rs - search (line 8) - compile ... ok
+test crates/jit/src/domain/queries.rs - domain::queries::build_issue_map (line 109) ... ok
+test crates/jit/src/test_utils.rs - test_utils::create_test_paths (line 1170) - compile ... ok
+test crates/jit/src/test_utils.rs - test_utils::setup_test_repo (line 792) - compile ... ok
+test crates/jit/src/commands/query.rs - commands::query::CommandExecutor<S>::query_count_by_state (line 211) ... ok
+test crates/jit/src/domain/queries.rs - domain::queries::derive_lifecycle_timestamps (line 46) ... ok
+test crates/jit/src/commands/issue.rs - commands::issue::CommandExecutor<S>::issue_progress (line 394) ... ok
+test crates/jit/src/output.rs - output::GateRunSummary (line 2411) ... ok
+test crates/jit/src/domain/type_taxonomy.rs - domain::type_taxonomy (line 39) ... ok
+test crates/jit/src/graph/hierarchy.rs - graph::hierarchy::detect_membership_divergences (line 603) ... ok
+test crates/jit/src/graph/hierarchy.rs - graph::hierarchy::resolve_hierarchy (line 323) ... ok
+test crates/jit/src/repository_state/default_rules.rs - repository_state::default_rules::default_ruleset (line 84) ... ok
+test crates/jit/src/domain/queries.rs - domain::queries::query_by_labels (line 296) ... ok
+test crates/jit/src/errors.rs - errors::ActionableError (line 22) ... ok
+test crates/jit/src/output.rs - output::GraphTreeResponse (line 1683) ... ok
+test crates/jit/src/gate_presets/planning.rs - gate_presets::planning::preview_coverage_rule (line 43) ... ok
+test crates/jit/src/graph/hierarchy.rs - graph::hierarchy (line 104) ... ok
+test crates/jit/src/graph/hierarchy.rs - graph::hierarchy::NodeHierarchy (line 197) ... ok
+test crates/jit/src/output.rs - output::IssueStatusResponse (line 1964) ... ok
+test crates/jit/src/repository_state/default_rules.rs - repository_state::default_rules::default_rule_membership_diff (line 372) ... ok
+test crates/jit/src/output.rs - output::HierarchyNodeView (line 1635) ... ok
+test crates/jit/src/commands/graph.rs - commands::graph::CommandExecutor<S>::detect_divergences (line 545) ... ok
+test crates/jit/src/repository_state/default_rules.rs - repository_state::default_rules::reconcile_default_rules_with_config (line 222) ... ok
+test crates/jit/src/repository_state/rules_gates_projection.rs - repository_state::rules_gates_projection::render_rules_and_gates_markdown (line 66) ... ok
+test crates/jit/src/storage/claim_coordinator.rs - storage::claim_coordinator::Lease::is_expired (line 67) ... ok
+test crates/jit/src/commands/graph.rs - commands::graph::CommandExecutor<S>::resolve_hierarchy_tree (line 456) ... ok
+test crates/jit/src/type_icons.rs - type_icons (line 14) ... ok
+test crates/jit/src/validation/engine.rs - validation::engine::KeywordFactory (line 67) ... ok
+test crates/jit/src/validation/drift.rs - validation::drift::enforcement_drift_tolerant (line 162) ... ok
+test crates/jit/src/validation/engine.rs - validation::engine::SchemaEngine (line 142) ... ok
+test crates/jit/src/validation/engine.rs - validation::engine::SchemaEngine::validate (line 336) ... ok
+test crates/jit/src/visualization.rs - visualization::export_mermaid (line 173) ... ok
+test crates/jit/src/visualization.rs - visualization::export_dot (line 106) ... ok
+test crates/jit/src/validation/engine.rs - validation::engine::SchemaEngine::with_keyword (line 239) ... ok
+test crates/jit/src/validation/graph.rs - validation::graph::evaluate_graph (line 315) ... ok
+test crates/jit/src/validation/graph.rs - validation::graph::GraphFinding (line 206) ... ok
+test crates/jit/src/visualization.rs - visualization::export_json_full (line 289) ... ok
+test crates/jit/src/validation/engine.rs - validation::engine::render_finding_message (line 506) ... ok
+test crates/jit/src/validation/local.rs - validation::local::LocalEvaluation (line 77) ... ok
+test crates/jit/src/validation/local.rs - validation::local::evaluate_local (line 235) ... ok
+
+test result: ok. 63 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.63s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

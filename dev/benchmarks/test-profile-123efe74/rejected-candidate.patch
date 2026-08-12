@@ -1,0 +1,12 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 330ee409..920004d0 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -23,6 +23,7 @@ incremental = true
+ [profile.test]
+ debug = "line-tables-only"
+ incremental = true
++opt-level = 1
+ 
+ [workspace.dependencies]
+ clap = { version = "4.5", features = ["derive"] }

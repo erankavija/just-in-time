@@ -1,0 +1,3 @@
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.24s
+   Doc-tests jit
+error: doctest failed, to rerun pass `-p jit --doc`
