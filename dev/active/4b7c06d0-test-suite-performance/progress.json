@@ -224,9 +224,9 @@
     },
     {
       "category": "blocker outside epic scope",
-      "status": "awaiting-invoker",
+      "status": "blocked-awaiting-invoker",
       "issue": "b883f916",
-      "summary": "The configured code-review checker invokes the local Codex CLI, whose OAuth access and refresh tokens remain revoked. `codex login status` misleadingly reports Logged in using ChatGPT, but a fresh unsandboxed gate attempt and direct session resume still reproduce HTTP 401 token_revoked/refresh_token_invalidated. The human must log out and sign in again before required AI review gates can run."
+      "summary": "The configured code-review checker invokes the local Codex CLI, whose OAuth access and refresh tokens remain revoked. Across three consecutive goal turns, cached status and even one minimal echo request gave misleading positive signals, while every configured gate attempt and exact-session resume reproduced HTTP 401 token_revoked/refresh_token_invalidated. The human must log out and sign in again before required AI review gates can run."
     }
   ],
   "rework_counts": {"f5da1112": 1, "47836e2e": 4, "0369e563": 1, "ee809651": 1, "007f598b": 1, "2516ad90": 1, "21ba4bb4": 1, "7094dfa5": 1, "b883f916": 2},
@@ -238,7 +238,8 @@
     "Do not accept benchmark validators that compare captured compiler paths to the validator's current checkout. The b883f916 validator passed in its worker worktree but failed immediately after merge on main. Bind and corroborate the recorded audit checkout root, then validate exact joined paths without requiring that historical path to still exist.",
     "A clean-build sample that barely passes a build ceiling does not authorize retention by itself. The b883f916 clean screen passed by only 122 ms, but its mandatory representative rebuild failed by 437 ms; preserve both and stop before runtime as the contract requires.",
     "If an automatic AI review returns 'Agent produced no output' in a few seconds, inspect the provider session before retrying repeatedly. For b883f916, direct resume showed HTTP 401 token_revoked and refresh_token_invalidated; repository rework cannot fix that external authentication state.",
-    "Do not treat `codex login status` as proof that the OAuth session is usable. It reported `Logged in using ChatGPT` while fresh model and websocket requests still returned token_revoked and refresh_token_invalidated. A real `codex logout` followed by `codex login` is required."
+    "Do not treat `codex login status` as proof that the OAuth session is usable. It reported `Logged in using ChatGPT` while fresh model and websocket requests still returned token_revoked and refresh_token_invalidated. A real `codex logout` followed by `codex login` is required.",
+    "Do not use a trivial requested echo as the sole authentication proof. One low-effort `codex exec` printed `AUTH_OK` after multiple 401 errors, but the configured high-effort review and exact session resume still failed with revoked tokens. The gate itself must complete successfully."
   ],
   "started_at": "2026-08-11T19:10:00Z",
   "wave_1_completed_at": "2026-08-11T21:20:00Z"
