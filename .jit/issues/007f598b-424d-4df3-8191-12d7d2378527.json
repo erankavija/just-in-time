@@ -17,7 +17,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-11T23:47:09.415902509Z",
+      "updated_at": "2026-08-12T00:18:04.711658273Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Cut over journal durability documentation",
-  "updated_at": "2026-08-12T00:08:35.877980988Z"
+  "updated_at": "2026-08-12T00:18:04.711658273Z"
 }
