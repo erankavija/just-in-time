@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "db82ac6cc5344d8d8343e76f058e71f8c55812c4",
+  "completed_at": "2026-08-12T09:21:37.737461522Z",
+  "duration_ms": 203265,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed corpus sharing implementation satisfies the reviewed criteria; recorded cargo-ci evidence passed after the tagged commit.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "deb33646-edb9-4ee9-aea4-c808495f24c8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8ac60a4e-89e5-4c84-907b-2787d8a35549",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:18:14.472090017Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9b4d5322 `test: share recorded failure corpus jit:deb33646`\nPolicy sources: AGENTS.md\nResolved items: @/issue/deb33646/requirement/REQ-01 and REQ-05 (issue description); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml); @/invariant/atomic-writes, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, and @/invariant/bounded-rust-build-footprint (AGENTS.md)\nGate evidence: cargo-ci passed (exit code none, 2026-08-12T09:05:34Z); code-review pending (exit code none)\nTruncation recovery: recovered fixture implementation and tests through bounded current-file reads; inspected each remaining changed-file patch separately\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed corpus sharing implementation satisfies the reviewed criteria; recorded cargo-ci evidence passed after the tagged commit.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T09:05:35.632768721Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-12T09:28:29.909552555Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "bfd215fa-5d5c-40d4-85e9-bd082a991464",
@@ -29,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Reuse applied profile baselines for CLI prerequisites",
-  "updated_at": "2026-08-12T09:05:35.632768721Z"
+  "updated_at": "2026-08-12T09:28:29.909552555Z"
 }

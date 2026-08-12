@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "db82ac6cc5344d8d8343e76f058e71f8c55812c4",
+  "completed_at": "2026-08-12T09:28:29.571516958Z",
+  "duration_ms": 158876,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".config/nextest.toml",
+        "id": "F1",
+        "line": 14,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/bfd215fa/requirement/REQ-01",
+          "@/issue/bfd215fa/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "No retained CLI or nextest wiring reuses the verified profile baselines for the seven required tests."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/cli-profile-prerequisites-bfd215fa.json",
+        "id": "F2",
+        "line": 87,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/bfd215fa/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "The recorded candidate missed the required aggregate saving and regressed selected-family wall time."
+      }
+    ],
+    "summary": "The attempted fixture reuse was deliberately reverted after failing the required setup-inclusive timing and wall-time criteria.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bfd215fa-5d5c-40d4-85e9-bd082a991464",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2e55f9bf-05f5-49d3-9bf2-9c786ed4765a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:25:50.695234133Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2230 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff54a-d8e4-75d1-93db-b70b67272a8a\n--------\nuser\n--- 2217 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e3bb5ad0, 3f12b1f0 (both `jit:bfd215fa`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/bfd215fa/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci — passed, exit code unavailable (2026-08-12T09:05:35Z); code-review — pending\nTruncation recovery: Re-read the relevant profiled-fixture implementation in crates/jit/src/test_utils.rs:160-180 and 362-445 after a broad fixture search truncated.\n\n1. **Blocking — issue-impact:** The requested setup reuse was not retained. The three CLI tests still create a fresh repository and run `init --profile` (for example, `profile_cli_tests.rs:1488`), and the warning-family shared setup still stages and applies the dogfood profile (`cli_warnings_integration_tests.rs:41-44`). `.config/nextest.toml:14-30` has no setup filters for these seven tests. The only implementation-attempt record explicitly says production/config files were restored. This leaves REQ-01 and REQ-03 unmet. References: @/issue/bfd215fa/requirement/REQ-01, @/issue/bfd215fa/requirement/REQ-03.\n\n2. **Blocking — issue-impact:** The attributable benchmark records that the candidate saved only 27,005 ms—2,995 ms short of the required 30,000 ms—and regressed selected-family wall time by 2,977 ms. Both quantitative REQ-05 clauses therefore failed. [dev/benchmarks/cli-profile-prerequisites-bfd215fa.json:87](dev/benchmarks/cli-profile-prerequisites-bfd215fa.json:87) References: @/issue/bfd215fa/requirement/REQ-05.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The attempted fixture reuse was deliberately reverted after failing the required setup-inclusive timing and wall-time criteria.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"No retained CLI or nextest wiring reuses the verified profile baselines for the seven required tests.\",\"file\":\".config/nextest.toml\",\"line\":14,\"references\":[\"@/issue/bfd215fa/requirement/REQ-01\",\"@/issue/bfd215fa/requirement/REQ-03\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The recorded candidate missed the required aggregate saving and regressed selected-family wall time.\",\"file\":\"dev/benchmarks/cli-profile-prerequisites-bfd215fa.json\",\"line\":87,\"references\":[\"@/issue/bfd215fa/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -13863,3 +13863,6 @@
 {"from":"ready","id":"c9b2e8b7-95a6-4c9d-bde8-3675567e91db","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T09:14:38.922362798Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sol-jit-artifact-wrapper","id":"da59eef4-459d-4f06-9748-5fbd80339876","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T09:14:38.922362798Z","type":"issue_claimed"}
 {"gate_key":"code-review","id":"2133caf2-0cb2-419d-b330-8b5c4be27a34","issue_id":"ae17798d-c0c6-4ad0-b119-2dd2fab8e95d","timestamp":"2026-08-12T09:17:09.506806930Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"dc3fb7be-98bc-43d8-bd68-a9472b769919","issue_id":"deb33646-edb9-4ee9-aea4-c808495f24c8","timestamp":"2026-08-12T09:21:38.072998498Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"40aeefb1-b67d-4ead-90f0-e8ff5a6f896f","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","timestamp":"2026-08-12T09:25:39.418352777Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"e6b870ea-540c-4216-bad0-8756fe836b13","issue_id":"bfd215fa-5d5c-40d4-85e9-bd082a991464","timestamp":"2026-08-12T09:28:29.909552555Z","type":"gate_failed","updated_by":"auto:executor"}

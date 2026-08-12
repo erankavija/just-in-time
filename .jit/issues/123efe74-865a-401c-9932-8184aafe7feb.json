@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T09:05:35.214112732Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:25:39.418352777Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "123efe74-865a-401c-9932-8184aafe7feb",
@@ -29,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Optimize the Rust test profile from matched evidence",
-  "updated_at": "2026-08-12T09:05:35.214112732Z"
+  "updated_at": "2026-08-12T09:25:39.418352777Z"
 }
