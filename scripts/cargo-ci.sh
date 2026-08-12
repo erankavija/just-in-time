@@ -3,13 +3,13 @@ set -euo pipefail
 
 # Cargo CI gate wrapper for jit.
 #
-# Runs the Rust CI pipeline (fmt check, zero-warning clippy, workspace tests)
-# and produces CONCISE output: one-line summaries on success, full diagnostics
-# only on failure.
+# Runs the Rust CI pipeline (fmt check, zero-warning clippy, pinned nextest
+# workspace tests, and doctests) and produces CONCISE output: one-line summaries
+# on success, full diagnostics only on failure.
 #
 # Why a wrapper instead of the raw `cargo fmt && clippy && test` command:
 # the `code-review` gate ingests this gate's stored stdout as the authoritative
-# test-run evidence (`--pass-context` run history). The raw `cargo test
+# test-run evidence (`--pass-context` run history). The raw `cargo nextest run
 # --workspace` output is thousands of lines (every test name across every
 # binary); dumping that verbatim floods the reviewer's context and pushes it to
 # distrust the evidence and re-run tests itself in a restricted sandbox where
@@ -20,7 +20,7 @@ set -euo pipefail
 # Exit codes:
 #   0 — all steps passed
 #   1 — one or more steps failed
-#   2 — environment problem: no real cargo available on PATH
+#   2 — environment problem: Cargo prerequisites are missing or mismatched
 #
 # `./scripts/cargo-ci.sh --cargo <args...>` applies the same host lock, real
 # Cargo selection, and guarded sccache setup, then runs only that focused Cargo
@@ -126,6 +126,23 @@ if [ "${1:-}" = "--cargo" ]; then
   exec cargo "$@"
 fi
 
+# The concise reporter below parses cargo-nextest's human summary contract.
+# Fail before creating gate scratch state or running any step unless the exact
+# version provisioned by CI and committed in .config/nextest.toml is active.
+readonly PINNED_NEXTEST_VERSION="0.9.133"
+ensure_pinned_nextest() {
+  local probe expected
+  probe=$(cargo nextest --version 2>&1 || true)
+  expected="cargo-nextest $PINNED_NEXTEST_VERSION"
+  if [ "$probe" != "$expected" ] && [[ "$probe" != "$expected "* ]]; then
+    echo "ERROR: cargo-ci requires cargo-nextest $PINNED_NEXTEST_VERSION; reporter parsing is pinned to that version." >&2
+    echo "       cargo nextest --version output: $probe" >&2
+    exit 2
+  fi
+}
+
+ensure_pinned_nextest
+
 # Disk-backed TMPDIR: a few tests (provenance_contract suite) compile the whole crate
 # into a fresh temp target dir; on a small tmpfs /tmp that hits "Disk quota
 # exceeded". Use a disk-backed cache dir. It must live OUTSIDE any git repo:
@@ -155,7 +172,23 @@ summary=""
 summarize_pass() {
   local name="$1"
   case "$name" in
-    test | provenance)
+    test)
+      # Pinned nextest emits one final line shaped as:
+      # "Summary [...] N tests run: P passed[, F failed][, S skipped]".
+      # Treat a missing/unparseable line as a reporter-contract failure rather
+      # than persisting a misleading zero-count pass.
+      local reporter p f s
+      reporter=$(grep -E 'Summary .* [0-9]+ tests run:' "$WORK/$name.out" | tail -1 || true)
+      p=$(grep -oP '\K[0-9]+(?= passed)' <<<"$reporter" | tail -1 || true)
+      f=$(grep -oP '\K[0-9]+(?= failed)' <<<"$reporter" | tail -1 || true)
+      s=$(grep -oP '\K[0-9]+(?= skipped)' <<<"$reporter" | tail -1 || true)
+      if [ -z "$reporter" ] || [ -z "$p" ]; then
+        echo "cargo-ci: could not parse pinned nextest success summary" >&2
+        return 1
+      fi
+      echo "$p passed, ${f:-0} failed, ${s:-0} skipped"
+      ;;
+    doctest | provenance)
       # cargo test runs many binaries, each printing its own
       # "test result: ok. N passed; M failed; K ignored; ...". Sum them.
       local p f i
@@ -194,7 +227,16 @@ summarize_pass() {
 summarize_fail() {
   local name="$1"
   case "$name" in
-    test | provenance)
+    test)
+      echo "--- $name failures ---"
+      # Preserve nextest's semantic test identity/timing records and final
+      # totals. Tail output retains the captured assertion/panic diagnostics;
+      # the explicit greps keep identities/totals visible for a broad suite.
+      grep -E '^[[:space:]]*(FAIL|ABORT|TIMEOUT) \[' "$WORK/$name.out" | head -60 || true
+      grep -E '^[[:space:]]*Summary .* tests run:' "$WORK/$name.out" | tail -1 || true
+      tail -80 "$WORK/$name.out"
+      ;;
+    doctest | provenance)
       echo "--- $name failures ---"
       # Failed test names and the captured panic/assert output blocks.
       grep -E '^test .* FAILED$' "$WORK/$name.out" || true
@@ -221,7 +263,14 @@ run_step() {
   local name="$1"
   shift
   if "$@" >"$WORK/$name.out" 2>&1; then
-    summary+="  ✓ $name: $(summarize_pass "$name")"$'\n'
+    local passed_summary
+    if passed_summary=$(summarize_pass "$name"); then
+      summary+="  ✓ $name: $passed_summary"$'\n'
+    else
+      summary+="  ✗ $name: REPORTER FAILED"$'\n'
+      summarize_fail "$name"
+      failed=1
+    fi
   else
     local rc=$?
     summary+="  ✗ $name: FAILED (exit $rc)"$'\n'
@@ -310,10 +359,11 @@ fi
 
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
 run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
-run_step test   "${NICE_PREFIX[@]}" cargo test --workspace
+run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
+run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
 
-# Build-provenance contract suites (jit:5d862134). These are #[ignore]d for plain
-# `cargo test` — each spawns cold scratch `cargo` builds into throwaway target
+# Build-provenance contract suites (jit:5d862134). These are #[ignore]d for
+# the default nextest run — each spawns cold scratch `cargo` builds into throwaway target
 # dirs to exercise the build script under real git states, costing ~3-4 min that
 # ordinary dev runs should not pay — so the `test` step above skips them. The gate
 # paying that cost is exactly the point: REQ-06's hard metadata-only-invalidation

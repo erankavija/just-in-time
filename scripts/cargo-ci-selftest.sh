@@ -59,6 +59,7 @@ cleanup() { rm -rf "$scratch"; }
 trap cleanup EXIT
 
 fail=0
+real_cargo=$(command -v cargo)
 
 # Records one assertion. The condition is a command so each call reads as the
 # property it asserts rather than as a bare status code.
@@ -75,15 +76,75 @@ check() { # check <message> <command...>
 
 # --- the gate's reported verdict ---------------------------------------------
 # cargo-ci prints one summary line per step: "  ✓ <step>: ..." when the step
-# passed and "  ✗ <step>: FAILED (exit N)" when it did not. `test` is the step
-# that compiles every target and runs the tests, so its line is the gate's
-# verdict on the merged tree. The repository-specific steps (provenance, budget)
-# cannot hold in a throwaway crate and are not what these assertions read.
+# passed and "  ✗ <step>: FAILED (exit N)" when it did not. `test` is the
+# pinned-nextest step that compiles every target and runs the tests, so its line
+# is the gate's verdict on the merged tree. The repository-specific steps
+# (provenance, budget) cannot hold in a throwaway crate and are not what these
+# assertions read.
 readonly STEP_PASSED="  ✓ "
 readonly STEP_FAILED="  ✗ "
 
 step_passed() { grep -qF "$STEP_PASSED$2:" "$1"; }
 step_failed() { grep -qF "$STEP_FAILED$2:" "$1"; }
+
+# Real reporter evidence, not just the stable step prefix. The healthy fixture
+# has exactly four nextest-run tests. The stale-expect fixture has exactly three
+# tests, one of which fails at runtime. These predicates ensure cargo-ci's
+# concise reporter preserves both totals and the failing semantic test identity.
+nextest_success_reported() {
+  grep -qF "$STEP_PASSED"'test: 4 passed, 0 failed, 0 skipped' "$1"
+}
+
+nextest_runtime_failure_reported() {
+  grep -qF -- '--- test failures ---' "$1" &&
+    grep -Eq 'FAIL .*test_alpha_value_is_the_base_value' "$1" &&
+    grep -Eq 'Summary .*3 tests run: 2 passed, 1 failed' "$1"
+}
+
+# The gate must reject any reporter version other than the provisioned pin
+# before it reaches fmt or another gate step. A cargo shim delegates the real
+# cargo probe but injects an older nextest version; any later Cargo invocation
+# is an assertion failure in the fixture itself.
+test_wrong_nextest_version_fails_fast() {
+  local fixture="$scratch/wrong-nextest-version"
+  local fake_bin="$fixture/bin"
+  local out="$fixture/gate.out"
+  local unexpected="$fixture/unexpected-cargo"
+  local rc
+  mkdir -p "$fake_bin" "$fixture/repo"
+  cat >"$fake_bin/cargo" <<'EOF'
+#!/usr/bin/env bash
+if [ "${1:-}" = "--version" ]; then
+  exec "$SELFTEST_REAL_CARGO" "$@"
+fi
+if [ "${1:-}" = "nextest" ] && [ "${2:-}" = "--version" ]; then
+  echo "cargo-nextest 0.9.132 (injected selftest fixture)"
+  exit 0
+fi
+printf '%s\n' "$*" >"$SELFTEST_UNEXPECTED_CARGO"
+exit 97
+EOF
+  chmod +x "$fake_bin/cargo"
+
+  (
+    cd "$fixture/repo" || exit 3
+    PATH="$fake_bin:$PATH" \
+      SELFTEST_REAL_CARGO="$real_cargo" \
+      SELFTEST_UNEXPECTED_CARGO="$unexpected" \
+      CARGO_CI_NO_LOCK=1 \
+      CARGO_CI_NO_SCCACHE=1 \
+      CARGO_CI_TMPDIR="$scratch/gate-tmp" \
+      "$gate"
+  ) >"$out" 2>&1
+  rc=$?
+
+  check "wrong nextest version: the gate exits with an environment error" \
+    test "$rc" -eq 2
+  check "wrong nextest version: the error names the required and observed versions" \
+    grep -qF "requires cargo-nextest 0.9.133" "$out"
+  check "wrong nextest version: no gate step or later Cargo command runs" \
+    test ! -e "$unexpected"
+}
 
 # --- fixture construction ----------------------------------------------------
 
@@ -329,8 +390,8 @@ build_only_passes() { # build_only_passes <repo>
   ) >/dev/null 2>&1
 }
 
-run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-only-passes]
-  local name="$1" main_side="$2" worker_side="$3" expect="$4" build_only="${5:-}"
+run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-only-passes] [runtime-reporter]
+  local name="$1" main_side="$2" worker_side="$3" expect="$4" build_only="${5:-}" reporter="${6:-}"
   local repo="$scratch/$name" out="$scratch/$name.gate.out" rc
 
   echo
@@ -352,6 +413,10 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
     pass)
       check "$name: the gate reports its build-and-test step passing" \
         step_passed "$out" test
+      check "$name: the nextest success reporter preserves all four tests" \
+        nextest_success_reported "$out"
+      check "$name: the gate reports its separate doctest step passing" \
+        step_passed "$out" doctest
       ;;
     fail)
       check "$name: the gate reports its build-and-test step failing" \
@@ -364,12 +429,21 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
     check "$name: a build-only check passes on this same tree" \
       build_only_passes "$repo"
   fi
+
+  if [ "$reporter" = "runtime-reporter" ]; then
+    check "$name: the nextest failure reporter preserves the failing test and totals" \
+      nextest_runtime_failure_reported "$out"
+  fi
 }
+
+echo
+echo "== wrong-nextest-version: the gate must fail before its first step =="
+test_wrong_nextest_version_fails_fast
 
 run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail
 run_scenario signature "signature_mainline" "signature_worker" fail build-only-passes
-run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes
+run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
 
 echo
 if [ "$fail" -eq 0 ]; then
