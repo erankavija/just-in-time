@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T22:55:47.131682941Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "25faa21d-cab1-44cb-8cc9-8973502844b2",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Tighten the committed nextest policy to the final bounds",
-  "updated_at": "2026-08-12T22:48:19.957302024Z"
+  "updated_at": "2026-08-12T22:55:47.131682941Z"
 }
