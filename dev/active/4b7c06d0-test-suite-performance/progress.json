@@ -42,23 +42,30 @@
     {
       "wave_number": 5,
       "issues": [
-        {"short_id": "6d10e5d4", "title": "Reduce profiled warm suite work below the enforcement bound", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "ready", "note": "Execution-discovered prerequisite; shared test configuration/support dispatch awaits invoker approval."}
+        {"short_id": "1fc8fec3", "title": "Prebuild the stale-binary semantic fixture inside nextest", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
+        {"short_id": "4731256d", "title": "Share immutable profile and repair fixtures across nextest processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"}
       ]
     },
     {
       "wave_number": 6,
       "issues": [
-        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "pending"}
+        {"short_id": "6d10e5d4", "title": "Reduce profiled warm suite work below the enforcement bound", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "pending", "note": "Integrated profiling and three-run acceptance after both hard leaves."}
       ]
     },
     {
       "wave_number": 7,
       "issues": [
-        {"short_id": "25faa21d", "title": "Tighten the committed nextest policy to the final bounds", "classification": "implementation", "difficulty": "moderate", "worker": "codex-direct", "status": "pending"}
+        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "pending"}
       ]
     },
     {
       "wave_number": 8,
+      "issues": [
+        {"short_id": "25faa21d", "title": "Tighten the committed nextest policy to the final bounds", "classification": "implementation", "difficulty": "moderate", "worker": "codex-direct", "status": "pending"}
+      ]
+    },
+    {
+      "wave_number": 9,
       "issues": [
         {"short_id": "76ecc11f", "title": "Attribute inherent test costs", "classification": "documentation", "difficulty": "moderate", "worker": "opus", "status": "pending"}
       ]
@@ -102,6 +109,20 @@
       "title": "Reduce profiled warm suite work below the enforcement bound",
       "state": "ready",
       "why": "The fixed live suite clock cannot be wired while warm evidence remains at 60,562-113,272 ms. The pre-change profile records 883,556 aggregate test-ms; even ideal packing over 24 logical CPUs plus doctests exceeds 30 seconds, so an in-epic optimization prerequisite is required without weakening the checker or coverage."
+    },
+    {
+      "short_id": "1fc8fec3",
+      "type": "task",
+      "title": "Prebuild the stale-binary semantic fixture inside nextest",
+      "state": "in_progress",
+      "why": "The six independent stale-binary semantic processes spend 95,249 aggregate test-ms entering one serialized nested-build fixture. Prepare it once inside the measured nextest invocation while retaining direct cargo-test fallback and each identity."
+    },
+    {
+      "short_id": "4731256d",
+      "type": "task",
+      "title": "Share immutable profile and repair fixtures across nextest processes",
+      "state": "in_progress",
+      "why": "Profile/init/validate and derived-state repair setup dominate the remaining aggregate lower bound. Reuse only verified immutable baselines, then clone isolated mutable state per test without lowering the tested interface."
     }
   ],
   "delegation_model": "Hard tasks go to gpt-5.6-sol collaboration subagents. Moderate tasks go to `codex exec -m gpt-5.6-terra -c model_reasoning_effort=high`, and easy tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high`; the lead reviews every diff, runs configured gates, and owns integration.",
@@ -109,9 +130,9 @@
   "escalations": [
     {
       "category": "changes to shared infrastructure",
-      "status": "open",
+      "status": "approved",
       "issue": "6d10e5d4",
-      "summary": "Independent audits recommend nextest-level stale-fixture preparation plus shared immutable profile/repair fixture support. Those changes affect project-wide test configuration/support and require invoker approval before dispatch."
+      "summary": "Invoker approved nextest-level stale-fixture preparation plus shared immutable profile/repair fixture support on 2026-08-12; dispatched as hard leaves 1fc8fec3 and 4731256d."
     }
   ],
   "rework_counts": {"f5da1112": 1, "47836e2e": 4, "0369e563": 1, "ee809651": 1, "007f598b": 1, "2516ad90": 1, "21ba4bb4": 1},
