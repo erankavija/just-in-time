@@ -8,6 +8,9 @@ use jit::declarations::GateStage;
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
+use std::sync::{mpsc, Arc, Barrier};
+use std::thread;
+use std::time::Duration;
 use tempfile::TempDir;
 
 /// A file-backed executor over a repository whose gate-preset directory is the
@@ -17,11 +20,13 @@ use tempfile::TempDir;
 /// in-memory harness does not model, so these cases run over a real store.
 fn file_backed_executor(temp: &TempDir) -> CommandExecutor<JsonFileStorage> {
     std::env::set_var("JIT_TEST_MODE", "1");
-    let storage = JsonFileStorage::new(temp.path());
+    let worktree = temp.path().join("worktree");
+    std::fs::create_dir(&worktree).unwrap();
+    let data_root = worktree.join(".jit");
+    std::fs::create_dir(&data_root).unwrap();
+    let storage = JsonFileStorage::new(data_root);
     std::fs::write(storage.root().join("config.toml"), "").unwrap();
-    let layout =
-        jit::storage::discover_repository_layout(temp.path().parent().unwrap(), storage.root())
-            .unwrap();
+    let layout = jit::storage::discover_repository_layout(&worktree, storage.root()).unwrap();
     CommandExecutor::new(storage).with_layout(layout)
 }
 
@@ -65,6 +70,99 @@ fn preset_captured_from_gates(
     executor
         .create_gate_preset(preset, &reference)
         .expect("save project-defined preset")
+}
+
+enum ConcurrentFixtureMessage {
+    Ready,
+    Complete(
+        TempDir,
+        std::path::PathBuf,
+        std::path::PathBuf,
+        std::path::PathBuf,
+    ),
+}
+
+/// REQ-01 + REQ-03: each fixture owns a worktree containing its `.jit` data
+/// root, so real concurrent preset writes never converge on one bootstrap lock.
+#[test]
+fn test_project_defined_preset_fixtures_isolate_concurrent_writes() {
+    let workers = 2;
+    let ready = Arc::new(Barrier::new(workers + 1));
+    let (sender, receiver) = mpsc::channel();
+    let handles = (0..workers)
+        .map(|worker| {
+            let ready = Arc::clone(&ready);
+            let sender = sender.clone();
+            thread::spawn(move || {
+                let temp = TempDir::new().expect("create fixture temp directory");
+                let executor = file_backed_executor(&temp);
+                let data_root = executor.storage().root().to_path_buf();
+                let worktree_root = data_root
+                    .parent()
+                    .expect("fixture data root has a worktree parent")
+                    .to_path_buf();
+
+                sender
+                    .send(ConcurrentFixtureMessage::Ready)
+                    .expect("report ready fixture");
+                ready.wait();
+                let saved_path = preset_captured_from_gates(
+                    &executor,
+                    &format!("concurrent-{worker}"),
+                    &["tests"],
+                );
+                sender
+                    .send(ConcurrentFixtureMessage::Complete(
+                        temp,
+                        worktree_root,
+                        data_root,
+                        saved_path,
+                    ))
+                    .expect("report fixture result");
+            })
+        })
+        .collect::<Vec<_>>();
+    drop(sender);
+
+    (0..workers).for_each(|_| match receiver.recv_timeout(Duration::from_secs(5)) {
+        Ok(ConcurrentFixtureMessage::Ready) => {}
+        Ok(ConcurrentFixtureMessage::Complete(..)) => {
+            panic!("fixture completed before all workers were ready")
+        }
+        Err(error) => panic!("fixture setup did not complete: {error}"),
+    });
+    ready.wait();
+    let fixtures = (0..workers)
+        .map(|_| match receiver.recv_timeout(Duration::from_secs(5)) {
+            Ok(ConcurrentFixtureMessage::Complete(temp, worktree, data, saved)) => {
+                (temp, worktree, data, saved)
+            }
+            Ok(ConcurrentFixtureMessage::Ready) => {
+                panic!("fixture reported ready after concurrent writes started")
+            }
+            Err(error) => panic!("concurrent preset write did not complete: {error}"),
+        })
+        .collect::<Vec<_>>();
+    handles
+        .into_iter()
+        .for_each(|handle| handle.join().expect("concurrent fixture worker"));
+
+    assert_eq!(fixtures.len(), workers);
+    assert!(fixtures.iter().all(|(temp, worktree, data, saved)| {
+        worktree == &temp.path().join("worktree")
+            && data == &worktree.join(".jit")
+            && saved.exists()
+            && worktree.join(".jit-bootstrap.lock").exists()
+    }));
+    assert_ne!(
+        fixtures[0].1, fixtures[1].1,
+        "fixtures own distinct worktrees"
+    );
+    assert_ne!(
+        fixtures[0].1.join(".jit-bootstrap.lock"),
+        fixtures[1].1.join(".jit-bootstrap.lock"),
+        "concurrent writes use distinct bootstrap namespaces"
+    );
 }
 
 /// @/inv/event-log (jit:bb7d57a2): a preset application that WRITES the gate
@@ -170,7 +268,9 @@ fn test_project_defined_preset_save_list_show_apply_in_process() {
         "preset should be written to disk at {saved_path:?}"
     );
     assert!(
-        temp.path().join("config/gate-presets/ci.json").exists(),
+        temp.path()
+            .join("worktree/.jit/config/gate-presets/ci.json")
+            .exists(),
         "project-defined preset should live under .jit/config/gate-presets/"
     );
 
