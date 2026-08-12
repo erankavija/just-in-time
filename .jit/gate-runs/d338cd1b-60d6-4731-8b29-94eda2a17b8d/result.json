@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0e16069133df60ba684cfd75280925daa93762bd",
+  "completed_at": "2026-08-12T00:24:53.650543351Z",
+  "duration_ms": 203525,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The documentation accurately describes the single-barrier, identity-driven recovery model; the prior rollback-cleanup finding is resolved, and protected references are unchanged.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "007f598b-424d-4df3-8191-12d7d2378527",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d338cd1b-60d6-4731-8b29-94eda2a17b8d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T00:21:30.124772472Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 07db7d24, e2b451e8, f8f37f3b, 3c832c67, 438bb25f (`jit:007f598b`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/007f598b/requirement/REQ-01, REQ-02, REQ-03 (issue description, markdown-first); @/invariant/derived-state-coherence, atomic-writes, canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-08-12T00:18:04Z, reused; exit code none); doc-review pending; prior code-review failed (exit 1), and its F1 is resolved\nTruncation recovery: recovered the aggregated-output truncation through bounded per-commit patches, current documentation reads, implementation reads, and targeted reference checks\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The documentation accurately describes the single-barrier, identity-driven recovery model; the prior rollback-cleanup finding is resolved, and protected references are unchanged.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
