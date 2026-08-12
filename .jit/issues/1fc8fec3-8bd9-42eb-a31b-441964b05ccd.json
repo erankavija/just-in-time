@@ -16,8 +16,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-12T05:21:10.261042729Z",
+      "status": "passed",
+      "updated_at": "2026-08-12T09:05:33.504188552Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:09:45.492442417Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Prebuild the stale-binary semantic fixture inside nextest",
-  "updated_at": "2026-08-12T05:21:10.261042729Z"
+  "updated_at": "2026-08-12T09:09:45.492442417Z"
 }

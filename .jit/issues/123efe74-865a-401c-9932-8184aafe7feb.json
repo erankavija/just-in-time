@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:05:35.214112732Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "123efe74-865a-401c-9932-8184aafe7feb",
   "labels": [
     "epic:test-suite-performance",
@@ -23,5 +29,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Optimize the Rust test profile from matched evidence",
-  "updated_at": "2026-08-12T06:06:11.427648569Z"
+  "updated_at": "2026-08-12T09:05:35.214112732Z"
 }

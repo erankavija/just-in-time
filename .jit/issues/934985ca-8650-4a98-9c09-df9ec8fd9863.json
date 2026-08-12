@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:05:36.478565023Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "934985ca-8650-4a98-9c09-df9ec8fd9863",
   "labels": [
     "epic:test-suite-performance",
@@ -23,5 +29,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Tune nextest worker concurrency",
-  "updated_at": "2026-08-12T07:28:06.966430685Z"
+  "updated_at": "2026-08-12T09:05:36.478565023Z"
 }

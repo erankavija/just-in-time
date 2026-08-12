@@ -14,7 +14,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:05:34.010535627Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:13:31.791765862Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4731256d-69ac-4993-b815-5d7d0fb0c153",
   "labels": [
     "epic:test-suite-performance",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Share immutable profile and repair fixtures across nextest processes",
-  "updated_at": "2026-08-12T04:16:46.420975646Z"
+  "updated_at": "2026-08-12T09:13:31.791765862Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "67713111daa162be937edc18e7ca4a5bf925da32",
+  "completed_at": "2026-08-12T09:13:31.457932116Z",
+  "duration_ms": 224768,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed fixture cache preserves isolation and test boundaries, with verified fail-closed publication and passing cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4731256d-69ac-4993-b815-5d7d0fb0c153",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2d61764f-a09c-4ca0-8b60-4c5cdd5688a1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:09:46.688955159Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: cb2c2de, 75e34e0, 24c711c (individual patches, including merge resolution)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; issue 4731256d description\nResolved items: @/issue/4731256d/requirement/REQ-01, REQ-02, REQ-03, REQ-04; @/invariant/atomic-writes, shared-test-contracts, semantic-test-assertions, bounded-rust-build-footprint; @/gate/cargo-ci\nGate evidence: cargo-ci passed (reused; exit code not recorded); code-review pending\nTruncation recovery: re-read affected patches and current files in bounded commit/path/line-range calls\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed fixture cache preserves isolation and test boundaries, with verified fail-closed publication and passing cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

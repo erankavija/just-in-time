@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:05:36.905870266Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4ee95d17-02ff-41e8-af06-4381a03eaa7f",
   "labels": [
     "epic:test-suite-performance",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Avoid durability sync for ephemeral nextest receipts",
-  "updated_at": "2026-08-12T08:30:34.254300572Z"
+  "updated_at": "2026-08-12T09:05:36.905870266Z"
 }

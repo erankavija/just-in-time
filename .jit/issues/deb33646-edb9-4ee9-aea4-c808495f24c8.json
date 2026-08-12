@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T09:05:34.793997991Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "deb33646-edb9-4ee9-aea4-c808495f24c8",
   "labels": [
     "epic:test-suite-performance",
@@ -23,5 +29,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Share the recorded failure probe corpus",
-  "updated_at": "2026-08-12T06:06:05.844221781Z"
+  "updated_at": "2026-08-12T09:05:34.793997991Z"
 }
