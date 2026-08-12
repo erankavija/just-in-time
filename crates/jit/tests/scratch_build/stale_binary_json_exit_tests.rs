@@ -21,13 +21,12 @@
 //! structured `STALE_BINARY` envelope — are unchanged; only the way a
 //! genuinely-stale evaluator is obtained differs.
 
+use super::stale_binary_child_process_tests::{
+    ancestor_commit, build_stale_child_binary, scratch_repo_metadata_only_for,
+    scratch_repo_stale_for, workspace_root,
+};
 use std::path::Path;
 use std::process::Command;
-use tempfile::TempDir;
-
-use super::stale_binary_child_process_tests::{
-    ancestor_commit, build_stale_child_binary, workspace_root,
-};
 
 #[test]
 fn test_stale_binary_error_code_resolves_to_external_error() {
@@ -55,89 +54,6 @@ fn scrub_gate_context(cmd: &mut Command) {
     cmd.env_remove("JIT_GATE_RUN")
         .env_remove("JIT_ISSUE_ID")
         .env_remove("JIT_GATE_KEY");
-}
-
-/// Build a scratch git repository whose `HEAD` is one commit past `ancestor`:
-/// `ancestor` is a known commit here (fetched from the real workspace, with its
-/// history), but no longer at `HEAD`. Entirely inside the disposable scratch
-/// repo — no ref in the real workspace is read, moved, or written. Returns
-/// `None` (skip) if any local git step fails.
-fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
-    scratch_repo_advanced_with_change(
-        workspace_root,
-        ancestor,
-        "crates/jit/src/main.rs",
-        b"\n// build-input change for stale-binary coverage\n",
-    )
-}
-
-/// Build the same scratch repository shape while changing only metadata that
-/// cannot affect the compiled binary.
-fn scratch_repo_metadata_only_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
-    scratch_repo_advanced_with_change(
-        workspace_root,
-        ancestor,
-        "docs/stale-binary-metadata.md",
-        b"metadata-only change for stale-binary coverage\n",
-    )
-}
-
-fn scratch_repo_advanced_with_change(
-    workspace_root: &Path,
-    ancestor: &str,
-    changed_path: &str,
-    change: &[u8],
-) -> Option<TempDir> {
-    let temp = TempDir::new().ok()?;
-    let run = |args: &[&str]| {
-        Command::new("git")
-            .args(args)
-            .current_dir(temp.path())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-    };
-    if !run(&["init", "-q"]) {
-        return None;
-    }
-    if !run(&["fetch", "-q", workspace_root.to_str()?, ancestor]) {
-        return None;
-    }
-    if !run(&["checkout", "-q", "FETCH_HEAD"]) {
-        return None;
-    }
-    let path = temp.path().join(changed_path);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).ok()?;
-    }
-    std::fs::write(path, change).ok()?;
-    if !run(&["add", changed_path]) {
-        return None;
-    }
-    if !run(&[
-        "-c",
-        "user.name=Test",
-        "-c",
-        "user.email=test@example.com",
-        "commit",
-        "-q",
-        "-m",
-        "advance past the build commit",
-    ]) {
-        return None;
-    }
-    // The checked-out ANCESTOR predates the repository's move to canonical
-    // `.agents/skills` doc links (`.claude` was a user-local convenience symlink
-    // briefly git-tracked by mistake). A session-backed `jit init` captures the
-    // whole-repository closure, whose no-follow discipline must not traverse that
-    // symlink, so scrub the stale repository data from the disposable scratch tree:
-    // the `jit init` below then runs fresh and exercises the stale-binary refusal
-    // without any `.claude` dependency (jit:49adf23b).
-    let _ = Command::new("rm")
-        .args(["-rf", ".jit", ".claude"])
-        .current_dir(temp.path())
-        .status();
-    Some(temp)
 }
 
 /// `jit init` + one automated gate (key `g`, always-passing checker) + one
