@@ -19,6 +19,11 @@
       "status": "passed",
       "updated_at": "2026-08-11T23:47:08.947195025Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T00:02:27.853537816Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "ee809651-fdd6-47c6-8a6d-4b8f6e819c3b",
@@ -32,5 +37,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document pinned nextest installation and use",
-  "updated_at": "2026-08-11T23:47:08.947195025Z"
+  "updated_at": "2026-08-12T00:02:27.853537816Z"
 }

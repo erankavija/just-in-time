@@ -13749,3 +13749,4 @@
 {"fields":["documents"],"id":"19aae760-eafa-4129-8e2c-312158f07583","issue_id":"efebd963-e33a-4ac8-9e9f-225de607fb44","timestamp":"2026-08-11T23:59:08.922495731Z","type":"issue_updated","updated_by":"doc-add"}
 {"from":"in_progress","id":"9c8138c6-a6d2-44c3-afbc-47194899f2b2","issue_id":"efebd963-e33a-4ac8-9e9f-225de607fb44","timestamp":"2026-08-11T23:59:12.604709065Z","to":"done","type":"issue_state_changed"}
 {"id":"2a214616-5648-4c85-ac2a-62fb75fb8b0b","issue_id":"efebd963-e33a-4ac8-9e9f-225de607fb44","timestamp":"2026-08-11T23:59:12.604709065Z","type":"issue_completed"}
+{"gate_key":"code-review","id":"c312d9f1-3b1a-4059-91e8-3c747775f119","issue_id":"ee809651-fdd6-47c6-8a6d-4b8f6e819c3b","timestamp":"2026-08-12T00:02:27.853537816Z","type":"gate_passed","updated_by":"auto:executor"}
