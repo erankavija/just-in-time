@@ -13980,3 +13980,4 @@
 {"from":"ready","id":"56dd0d75-2c42-455b-b506-d9d620422a75","issue_id":"76ecc11f-21e1-4280-b8cb-c06d10b9d820","timestamp":"2026-08-12T23:03:39.185309077Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sonnet-inherent-cost-attribution","id":"134291fd-26ca-43e9-a919-c385242bfcbe","issue_id":"76ecc11f-21e1-4280-b8cb-c06d10b9d820","timestamp":"2026-08-12T23:03:39.185309077Z","type":"issue_claimed"}
 {"fields":["labels"],"id":"49a7f9be-1d30-483b-a5c8-17b3e3803cf4","issue_id":"abe2c2bd-96ef-4297-a535-cf3fe65b690e","timestamp":"2026-08-12T23:36:21.556914266Z","type":"issue_updated","updated_by":"issue-update"}
+{"gate_key":"cargo-ci","id":"8d760e6e-2f10-45c4-9d22-3c70fc49a41b","issue_id":"76ecc11f-21e1-4280-b8cb-c06d10b9d820","timestamp":"2026-08-12T23:44:05.311811037Z","type":"gate_passed","updated_by":"auto:executor"}

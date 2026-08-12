@@ -15,7 +15,13 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T23:44:05.311811037Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "76ecc11f-21e1-4280-b8cb-c06d10b9d820",
   "labels": [
     "type:task",
@@ -27,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Attribute inherent test costs",
-  "updated_at": "2026-08-12T23:03:39.185309077Z"
+  "updated_at": "2026-08-12T23:44:05.311811037Z"
 }
