@@ -24,8 +24,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-08-12T17:41:08.238494748Z",
+      "status": "failed",
+      "updated_at": "2026-08-12T18:56:44.112592632Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -46,5 +46,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Reduce profiled warm suite work below the enforcement bound",
-  "updated_at": "2026-08-12T18:50:43.209536937Z"
+  "updated_at": "2026-08-12T18:56:44.112592632Z"
 }
