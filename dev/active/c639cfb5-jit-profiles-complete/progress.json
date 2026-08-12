@@ -171,7 +171,7 @@
           "short_id": "cf42d08b",
           "title": "A deep package packs but cannot be published",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -188,7 +188,7 @@
           "short_id": "f2389b18",
           "title": "Check applied profiles against their packages and the repository",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -318,6 +318,16 @@
       "issue_id": "cbcd9318-c7eb-41c1-a75e-055b0aa5c226",
       "status": "resolved",
       "summary": "After two rework rounds, exact cargo-ci passed at abea9028 but code-review found that the first successful apply of two equal contributors records shared ownership only in the later package record; the first record converges only on a second apply. The invoker selected option 1 and authorized one targeted Terra xhigh retry spanning command, initialization, and provenance boundaries without pulling Wave 7's transaction redesign forward."
+    },
+    {
+      "category": "architectural-decision-with-significant-trade-offs",
+      "issue_id": "cf42d08b-ce12-4038-987c-bbb0c0950fc8",
+      "status": "resolved",
+      "date": "2026-08-13",
+      "summary": "How to bound package-tree publication, raised as an open question in handoff-10. Three directions put to the owner: (A) cap path depth or length in the package model, (B) derive the budget from total path bytes, (C) remove the per-path budget entirely so the capture kernel needs none. The owner chose (C). The lead had recommended (A) and recorded the disagreement rather than re-litigating.",
+      "consequence": "cf42d08b's blast radius widens from commands/profile.rs to the shared capture kernel: CaptureBudget.max_paths (repository_state/image.rs:526-535), its two enforcement sites (image.rs:679-688 phase one, image.rs:797-808 close), roughly ten construction sites across repository_state/{mod,archive,initialize,export,profile_apply,image_plan_hash_property_tests}, storage/gate_runs.rs, document/reference.rs, commands/profile.rs, plus CaptureError::PathBudgetExceeded and any generated reference naming it.",
+      "residual_risk": "max_paths is a live guard, not dead weight. After removal the remaining dimensions are max_depth, max_listings, max_bytes. Listing-driven expansion stays bounded because RepositoryImage::close folds every listing child's name length into byte_count (image.rs:777-779, 832-833). Caller-enqueued fixed/discovered/pinned/linked_worktree paths are the dimension that may become unbounded: a zero-byte entry contributes nothing to byte_count. The worker was instructed to state the bounding argument per path source, to close any gap through a dimension derived from what the model constrains rather than a renamed path count, and to stop and report as blocking if the removal cannot be made safe. This is a trust boundary: capture reads manifest-declared targets, and under `jit profile add` the manifest arrives from outside the repository.",
+      "issue_description_untouched": "cf42d08b's Notes still say two directions were considered and neither chosen, and that the choice belongs with whoever owns the package model. That text predates the decision. Left unedited per lead invariant 4 (no issue scope change without the invoker's explicit approval); the decision reached the worker through the dispatch prompt instead. A reviewer reading only the issue will find the Notes understate the option space."
     }
   ],
   "rework_counts": {
@@ -391,7 +401,7 @@
       "gates": {
         "cargo-ci": "passed at fec3a45f (4531 tests, +3; integration-targets 11/12)",
         "mcp-ci": "passed (64+13)",
-        "code-review": "passed, 0 findings \u2014 'the prior TOCTOU finding is remedied by the current no-follow descriptor read'"
+        "code-review": "passed, 0 findings — 'the prior TOCTOU finding is remedied by the current no-follow descriptor read'"
       },
       "criteria": {
         "REQ-01": "MET",
@@ -1120,7 +1130,7 @@
     },
     {
       "subject": "ProfileTargetMaterialization carries no owner",
-      "detail": "A rehearsal repeats the same aggregate target list once per selector. Fix at source belongs to cb26de35. Closed: owner field added and rehearsal entries scoped per profile (47813ac7, ac1a5cf8). Recorded here as a lead triage error \u2014 it was filed as future work and the reviewer correctly bound it to REQ-04 of this issue.",
+      "detail": "A rehearsal repeats the same aggregate target list once per selector. Fix at source belongs to cb26de35. Closed: owner field added and rehearsal entries scoped per profile (47813ac7, ac1a5cf8). Recorded here as a lead triage error — it was filed as future work and the reviewer correctly bound it to REQ-04 of this issue.",
       "status": "closed-in-7156f64b"
     },
     {
@@ -1300,6 +1310,35 @@
         "v1.0 applied-record migration boundary",
         "shipped_v1_conversion_count test race"
       ]
+    }
+  ],
+  "coordination": [
+    {
+      "date": "2026-08-13",
+      "with": "peer Claude session leading epic 4b7c06d0 (test-suite performance)",
+      "protocol": [
+        "Shared primary checkout at the repository root: both sessions commit to main in the same working tree. Main's tree stays clean between operations; each session takes an advisory flock at ${XDG_RUNTIME_DIR:-/tmp}/jit-main-checkout.lock around merge->commit, write->commit, and any gate evaluated against main's checkout. Not held around worktree work, and deliberately a different file from the cargo-ci lock so the two cannot deadlock.",
+        ".jit/ mutations commit immediately, in their own commit, never batched with source. On an events.jsonl collision take both sides in timestamp order; it is append-only and no line may be dropped.",
+        "Disjoint source ownership. Peer: scripts/cargo-ci.sh, scripts/rust-build-budget.sh, .config/nextest.toml, dev/TESTING.md, crates/jit/tests/scratch_build/, dev/benchmarks/. This epic: crates/jit/src/{commands/profile.rs,profile/**,repository_state/**}, profiles/**, profile docs. Cross-boundary work is announced before it starts; cf42d08b's capture-kernel change was announced under this rule.",
+        "Assignee names disambiguated: this session claims under agent:lead-c639cfb5; the peer holds agent:jit-execution-lead for its own epic.",
+        "contrib/gates/** prompts are profile assets on this epic's side; either session announces before editing one."
+      ],
+      "facts_learned": [
+        "scripts/cargo-ci.sh takes a machine-global flock at ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock and holds it for the whole run (scripts/cargo-ci.sh:64-68), waiting CARGO_CI_LOCK_TIMEOUT (default 1800s) then exiting 75. Exit 75 is contention, not a defect. Plain cargo commands take no such lock. A backgrounded gate run outlives the agent that launched it and keeps the lock: check `fuser -v` on the lock file before concluding anything.",
+        "The stale-binary guard and build provenance were removed on 2026-08-12 by 355565c2. crates/jit/src/domain/binary_build_inputs.txt no longer exists and exit 10 no longer means the binary predates the tree. Nothing now catches a stale binary, so reinstall via the checkout's own scripts/install-jit.sh before anything that runs through the installed jit (repo-validate, jit validate). Not a precondition for cargo-backed gates.",
+        "Peer epic 4b7c06d0 wave 7 (94d85bf1) makes scripts/cargo-ci.sh start enforcing MAX_TEST_SUITE_SECONDS=30 by threading the measured suite clock into scripts/rust-build-budget.sh --test-suite-ms. Today that argument is never passed and the check reports suite-duration=skipped. After it merges, a cargo-ci failure reading 'test suite duration: observed N ms, threshold 30000 ms' is contention with that budget, not a defect in this epic's change. Warm run measures ~22,100 ms, so the margin is about 8 s.",
+        "/tmp is a 16 GiB tmpfs shared by both sessions and by every worktree's gate TMPDIR. When it filled in an earlier session the symptom was not 'disk full' but 57 doctest failures, CLI exit-code failures, and the agent's own shell silently losing command output as writes hit EDQUOT. Check df -h /tmp before debugging a burst of unrelated-looking failures.",
+        "A remote exists (origin, github.com:erankavija/just-in-time) with local main roughly 420 commits ahead. Neither session pushes without the user asking.",
+        "Editing contrib/gates/** prompts moves the live dogfood package's identity hash. An earlier prompt edit turned main red for a whole epic until b1f2f001 stopped pinning that hash to a literal. Rebase before computing any package identity and never pin a live hash to a literal."
+      ]
+    }
+  ],
+  "measurements": [
+    {
+      "date": "2026-08-13",
+      "finding": "Per-test cost figures measured before 4dc5e9275 are stale, potentially by more than an order of magnitude.",
+      "detail": "handoff-10 recorded test_profile_pack_and_add_carry_a_package_at_the_model_limits (crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs:2461) at ~33 s and left an open question about trimming it. Re-measured at main by the peer session: 1.346 s. The dominant lever is 4dc5e9275, which set [profile.dev.package.\"*\"] opt-level = 1, so serde, tar, and the I/O paths now run optimized under cargo test; a test writing and re-reading 512 files through a real transaction is close to the ideal beneficiary. The test stays as written: it neither needs trimming nor qualifies as inherent cost.",
+      "standing_rule": "Re-measure before trimming, excluding, or attributing any test on the strength of a number from an earlier session. The failure mode is deleting coverage to solve a problem that no longer exists."
     }
   ]
 }
