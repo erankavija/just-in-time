@@ -7,7 +7,14 @@
     "69e9f213-c980-4a3c-913c-54b147d07348"
   ],
   "description": "Create a repository-owned profiling producer that records warm per-test timings from nextest machine-readable output for attribution and final policy selection.\n\n## Background\n\nThe profile must be reproducible from the runner’s pinned reporter contract and must distinguish warm per-test cost from outer gate timing. Its artifact is consumed alongside the transaction benchmark artifact.\n\n## Success Criteria\n\n- [hard] REQ-01: Creates `scripts/profile-test-suite.sh` that runs the pinned nextest suite with machine-readable output and produces `dev/benchmarks/suite-profile.json`.\n- [hard] REQ-02: Records warm integer-millisecond timing for every profiled test with stable test identity, package/target identity, method, and cache state.\n- [hard] REQ-03: Defines the implementation-produced `suite-timing-evidence` contract as the artifact’s stable location and machine-readable shape for its two consumers: mechanical override selection in enforcement and inherent-cost classification in attribution.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": "58928c35d67c9f56678b577a297ad71c7584f61b",
+      "doc_type": "benchmark",
+      "label": "Warm per-test suite timing evidence",
+      "path": "dev/benchmarks/suite-profile.json"
+    }
+  ],
   "first_ready_at": "2026-08-12T00:27:43.153484976Z",
   "gates_required": [
     "cargo-ci",
@@ -36,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Produce warm per-test suite timing evidence",
-  "updated_at": "2026-08-12T01:10:16.383528141Z"
+  "updated_at": "2026-08-12T01:10:51.375985813Z"
 }
