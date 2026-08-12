@@ -93,9 +93,10 @@
   "delegation_model": "Hard tasks go to gpt-5.6-sol collaboration subagents. Moderate tasks go to `codex exec -m gpt-5.6-terra -c model_reasoning_effort=high`, and easy tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high`; the lead reviews every diff, runs configured gates, and owns integration.",
   "gate_cost_model": "Measured this session on this host: a cold worktree cargo-ci run is 10+ minutes; a warm run on main is ~3-5 minutes; each `code-review` run is 3-5 minutes and is per-issue (no reuse). cargo-ci verdicts DO reuse across issues over identical content, so merge a whole wave, then evaluate cargo-ci per issue for one execution plus reuses. Worker cargo-ci runs in fresh worktrees are the single largest avoidable cost: from wave 2 on, have workers verify with focused tests plus fmt and clippy only, and let the lead's post-merge gate on warm main be the authoritative run.",
   "escalations": [],
-  "rework_counts": {"f5da1112": 1, "47836e2e": 4, "0369e563": 1, "ee809651": 1, "007f598b": 1},
+  "rework_counts": {"f5da1112": 1, "47836e2e": 4, "0369e563": 1, "ee809651": 1, "007f598b": 1, "2516ad90": 1, "21ba4bb4": 1},
   "surfaced_pitfalls": [
-    "A merged issue's cargo-ci can fail on a different in-progress issue already present on main. Run 4b75ba0b for 4aa15137 reproduced 47836e2e's deterministic 5/6 nextest observation defect while the recovery-seam focused tests, fmt, and clippy were green. Preserve the failed run as shared-branch evidence; do not charge rework to the unaffected issue, and rerun after the owning fix lands."
+    "A merged issue's cargo-ci can fail on a different in-progress issue already present on main. Run 4b75ba0b for 4aa15137 reproduced 47836e2e's deterministic 5/6 nextest observation defect while the recovery-seam focused tests, fmt, and clippy were green. Preserve the failed run as shared-branch evidence; do not charge rework to the unaffected issue, and rerun after the owning fix lands.",
+    "A direct workspace nextest run can fail merged_tree_gate_verification_tests because its nested cargo-ci self-test enables a host sccache path that passes inside the outer cargo-ci gate but fails when invoked standalone. The warm profiler sets CARGO_CI_NO_SCCACHE=1 for both runs; per-test exec_time excludes compilation, and the profiler self-test asserts the isolation. Do not weaken the producer with --no-fail-fast or publish partial evidence."
   ],
   "started_at": "2026-08-11T19:10:00Z",
   "wave_1_completed_at": "2026-08-11T21:20:00Z"
