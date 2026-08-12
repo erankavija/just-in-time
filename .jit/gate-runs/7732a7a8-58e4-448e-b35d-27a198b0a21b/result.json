@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a1e678bdaca9d37a73cf6ee9fb189a594c07679b",
+  "completed_at": "2026-08-12T00:08:35.544048223Z",
+  "duration_ms": 245478,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/architecture/repository-state-materialization.md",
+        "id": "F1",
+        "line": 397,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/007f598b/requirement/REQ-01",
+          "@/issue/007f598b/requirement/REQ-02",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Post-RolledBack recovery is documented as verifying restored preimages, but it intentionally skips some checks during terminal cleanup."
+      }
+    ],
+    "summary": "The updated recovery narrative overstates post-RolledBack verification.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "007f598b-424d-4df3-8191-12d7d2378527",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7732a7a8-58e4-448e-b35d-27a198b0a21b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T00:04:30.065735741Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2798 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff348-ece7-7210-ae85-d83f50a32912\n--------\nuser\n--- 2785 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 07db7d24 and e2b451e8 (`jit:007f598b`); union affects `dev/architecture/repository-state-materialization.md`\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml\nResolved items: @/issue/007f598b/requirement/REQ-01, REQ-02, REQ-03; @/issue/4b7c06d0/requirement/REQ-01, REQ-04; @/invariant/atomic-writes, derived-state-coherence, canonical-cutover\nGate evidence: cargo-ci passed (2026-08-11T23:47:09Z; exit code none); code-review pending; doc-review pending\nTruncation recovery: none\n\n1. **[blocking, issue-impact]** [`dev/architecture/repository-state-materialization.md:397`](/home/vkaskivuo/Projects/just-in-time/dev/architecture/repository-state-materialization.md:397) says post-`RolledBack` recovery verifies restored preimages, but [`file_transaction.rs:2048`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/file_transaction.rs:2048) deliberately skips worktree and absent-root preimage checks during terminal-residue cleanup. Clarify that restoration is verified before writing `RolledBack`; later recovery only performs the limited cleanup checks. References: `@/issue/007f598b/requirement/REQ-01`, `@/issue/007f598b/requirement/REQ-02`, `@/invariant/derived-state-coherence`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The updated recovery narrative overstates post-RolledBack verification.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Post-RolledBack recovery is documented as verifying restored preimages, but it intentionally skips some checks during terminal cleanup.\",\"file\":\"dev/architecture/repository-state-materialization.md\",\"line\":397,\"references\":[\"@/issue/007f598b/requirement/REQ-01\",\"@/issue/007f598b/requirement/REQ-02\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

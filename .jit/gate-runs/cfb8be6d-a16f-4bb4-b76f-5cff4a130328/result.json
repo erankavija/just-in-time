@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "38d2b71bbf146af9d456ec157e4c8a3ad5a6e954",
+  "completed_at": "2026-08-11T23:58:48.665675176Z",
+  "duration_ms": 176402,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The latest rerun records a supported no-change fsync decision across both required root shapes; transaction durability behavior remains unchanged.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "efebd963-e33a-4ac8-9e9f-225de607fb44",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cfb8be6d-a16f-4bb4-b76f-5cff4a130328",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-11T23:55:52.262953946Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f18c3051, 0ff709df, 55705670, d91ca3a9, 7f293b8f\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml\nResolved items: @/issue/efebd963/requirement/REQ-01, REQ-02, REQ-03 (issue description); @/issue/0369e563/requirement/REQ-01 (issue description); @/gate/cargo-ci (.jit/gates.toml); @/invariant/atomic-writes, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit code none, 2026-08-11T23:47:09Z\nTruncation recovery: merge artifact patch re-read in 1–380, 381–519, and 520–800 line chunks; final record re-read compactly\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The latest rerun records a supported no-change fsync decision across both required root shapes; transaction durability behavior remains unchanged.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
