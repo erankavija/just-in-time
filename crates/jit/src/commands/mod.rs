@@ -2046,7 +2046,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     paths.insert(VirtualPath::GATES);
                 }
                 let spec = CaptureSpec::phase_one(
-                    paths.clone(),
+                    paths,
                     CaptureBudget {
                         max_listings: 0,
                         max_bytes: 64 * 1024 * 1024,
