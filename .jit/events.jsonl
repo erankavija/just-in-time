@@ -13838,3 +13838,10 @@
 {"from":"ready","id":"0c051460-0469-4451-9bbb-1498fc9522e9","issue_id":"4ee95d17-02ff-41e8-af06-4381a03eaa7f","timestamp":"2026-08-12T08:04:54.081518646Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"5eb8b178-6c0f-4ac0-bdc8-f9bf5c11cbba","issue_id":"4ee95d17-02ff-41e8-af06-4381a03eaa7f","timestamp":"2026-08-12T08:04:54.081518646Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"271de5fd-0279-4073-9bc2-a6cff803678f","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T08:04:59.710751026Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"e7346ef3-abd5-427b-99e0-3e9f9a90fa46","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:19:56.635854558Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"2a141484-61d6-451d-b141-5e15ab1c88f0","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:20:27.039240007Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"5e5ed5b6-3207-49ee-a9c1-978444ce21a7","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:24:44.864991931Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"fab34d31-2bc2-47f8-b28d-ef6f88a10a7f","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:29:53.495606561Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"3b639df2-7fd3-4d91-9c84-c14b024f88fb","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:30:06.998013744Z","to":"done","type":"issue_state_changed"}
+{"id":"cb3e2f90-b06d-4c25-a456-0475aa73c3b2","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:30:06.998013744Z","type":"issue_completed"}
+{"from":"backlog","id":"0995d08a-1d7d-4145-9573-848eac75a1f1","issue_id":"4ee95d17-02ff-41e8-af06-4381a03eaa7f","timestamp":"2026-08-12T08:30:12.534124748Z","to":"ready","type":"issue_state_changed"}

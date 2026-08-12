@@ -22,7 +22,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Avoid durability sync for ephemeral nextest receipts",
-  "updated_at": "2026-08-12T08:04:54.081518646Z"
+  "updated_at": "2026-08-12T08:30:12.534124748Z"
 }
