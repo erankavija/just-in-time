@@ -33,6 +33,55 @@ def test_events(label: str) -> list[dict[str, object]]:
     return events
 
 
+def inventory_identity_sets(
+    inventory: dict[str, object],
+) -> tuple[set[str], set[str]]:
+    """Return raw-event names partitioned by runnable and ignored status."""
+    runnable: set[str] = set()
+    ignored: set[str] = set()
+    for suite in inventory["rust-suites"].values():
+        prefix = f"{suite['package-name']}::{suite['binary-name']}"
+        for test_name, test in suite["testcases"].items():
+            identity = f"{prefix}${test_name}"
+            (ignored if test["ignored"] else runnable).add(identity)
+    assert not runnable.intersection(ignored)
+    return runnable, ignored
+
+
+def assert_run_identity_sets(
+    runnable: set[str],
+    ignored: set[str],
+    events: list[dict[str, object]],
+    *,
+    successful: bool,
+) -> None:
+    """Reject missing or substituted terminal identities for one run."""
+    inventory = runnable.union(ignored)
+    started = {str(event["name"]) for event in events if event.get("event") == "started"}
+    passed = {str(event["name"]) for event in events if event.get("event") == "ok"}
+    failed = {str(event["name"]) for event in events if event.get("event") == "failed"}
+    ignored_results = {
+        str(event["name"]) for event in events if event.get("event") == "ignored"
+    }
+    completed = passed.union(failed, ignored_results)
+
+    assert not started.difference(inventory)
+    assert not completed.difference(inventory)
+    assert completed.issubset(started)
+    assert not passed.difference(runnable)
+    assert not failed.difference(runnable)
+    assert not ignored_results.difference(ignored)
+    if successful:
+        assert started == inventory
+        assert completed == inventory
+        assert passed == runnable
+        assert ignored_results == ignored
+        assert not failed
+    else:
+        assert completed < inventory
+        assert failed
+
+
 summary = load(EVIDENCE / "summary.json")
 assert summary["contract"] == "nextest-worker-concurrency-benchmark"
 assert summary["source"]["revision"] == "c1d072df3ad3aafd60055bb25b4c1f1b70b49197"
@@ -41,6 +90,9 @@ assert summary["decision"]["accepted_workers"] is None
 assert summary["thresholds"]["weakened"] is False
 
 inventory = load(RAW / "inventory" / "stdout.log")
+runnable_identities, ignored_identities = inventory_identity_sets(inventory)
+assert len(runnable_identities) == 4511
+assert len(ignored_identities) == 10
 identities = []
 for binary, suite in inventory["rust-suites"].items():
     for test_name, test in suite["testcases"].items():
@@ -87,6 +139,12 @@ for expected in summary["runs"]:
     passed = [event for event in results if event["event"] == "ok"]
     failed = [event for event in results if event["event"] == "failed"]
     ignored = [event for event in results if event["event"] == "ignored"]
+    assert_run_identity_sets(
+        runnable_identities,
+        ignored_identities,
+        events,
+        successful=expected["exit_code"] == 0,
+    )
     assert len(started) - len(set(started)) == expected["duplicate_started"]
     assert len(results) - len({event["name"] for event in results}) == expected["duplicate_results"]
     assert len(passed) == expected["passed"]
