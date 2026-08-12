@@ -645,13 +645,31 @@ impl CommandExecutor<JsonFileStorage> {
             if covered != recorded {
                 return Ok(SessionStep::Retry);
             }
-            let agreements = claimed
+            // Every record is re-read from the image its claims are compared
+            // against, and a record that moved between the two captures
+            // restarts the attempt: judging the claims one record state named
+            // against the content another produced would report a divergence
+            // no single repository state ever held.
+            let Some(agreements) = claimed
                 .iter()
-                .map(|(record, _)| {
-                    let record_path = applied_record_path(record.id.as_str())?;
-                    recorded_profile_agreement(&image, record, &record_path, &layout)
+                .map(|(planned, _)| {
+                    let record_path = applied_record_path(planned.id.as_str())?;
+                    let Some(record) =
+                        read_applied_record(&image, &record_path, planned.id.as_str())?
+                    else {
+                        return Ok(None);
+                    };
+                    if &record != planned {
+                        return Ok(None);
+                    }
+                    recorded_profile_agreement(&image, &record, &record_path, &layout).map(Some)
                 })
-                .collect::<Result<Vec<_>>>()?;
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .collect::<Option<Vec<_>>>()
+            else {
+                return Ok(SessionStep::Retry);
+            };
             Ok(SessionStep::Done(ProfileAgreementResult::new(agreements)))
         })
     }
