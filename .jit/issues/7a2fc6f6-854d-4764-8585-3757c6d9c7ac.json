@@ -15,8 +15,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-12T10:18:22.848593292Z",
+      "status": "passed",
+      "updated_at": "2026-08-12T10:57:21.883001924Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T10:59:38.476536644Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Screen ordinary JIT artifacts with a compiler wrapper",
-  "updated_at": "2026-08-12T10:19:58.725080392Z"
+  "updated_at": "2026-08-12T10:59:38.476536644Z"
 }
