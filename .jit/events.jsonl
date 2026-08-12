@@ -13949,3 +13949,6 @@
 {"from":"in_progress","id":"5f6a4e66-5f49-4a20-8d20-fafccf6ad1a2","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","timestamp":"2026-08-12T22:02:28.942096562Z","to":"done","type":"issue_state_changed"}
 {"id":"6c46a819-fa4a-4121-8d0c-196de8d3aab7","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","timestamp":"2026-08-12T22:02:28.942096562Z","type":"issue_completed"}
 {"from":"backlog","id":"a522b2f5-33c1-4adf-ad5f-4661b754858b","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T22:02:34.309244478Z","to":"ready","type":"issue_state_changed"}
+{"fields":["description"],"id":"3298e07a-9334-4206-b171-8b065e99409e","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T22:06:44.457978486Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"ready","id":"c3b3d9df-3001-4bf1-bd80-d8206667a902","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T22:06:57.077569747Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:opus-suite-clock-enforcement","id":"433c0989-04be-4bd6-9ed1-d6c86e64a9e9","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T22:06:57.077569747Z","type":"issue_claimed"}
