@@ -2,13 +2,15 @@
   "schema_version": 1,
   "issue": "efaec52f-da76-438a-a55b-d4cefd5e6217",
   "generated_at": "2026-08-12T07:30:05Z",
+  "corrected_at": "2026-08-12T09:52:07Z",
   "source": {
     "candidate_revision": "11f096377949c404766a42153ee19e203b54da46",
     "baseline_revision": "11f096377949c404766a42153ee19e203b54da46",
     "candidate_manifest": "[profile.test.package.jit] opt-level = 1",
     "candidate_manifest_sha256": "23cbd35d4f90cbb1d20bd5247f4a432e771c7d550b1f0cdab97be48d77cc8e26",
     "restored_manifest_sha256": "9136f9113a879cd11eebe6a087e3b7ce1620a1e046b812a64f27a6a62255ae43",
-    "rejected_candidate_path": "dev/benchmarks/test-profile-efaec52f/rejected-candidate.patch"
+    "rejected_candidate_path": "dev/benchmarks/test-profile-efaec52f/rejected-candidate.patch",
+    "rejected_candidate_sha256": "78bdb62a3bdb87714c6edddb23dc3e3f78addccd2a20f8ede0c9ddfed1edb37a"
   },
   "method": {
     "harness": "scripts/benchmark-rust-build.sh",
@@ -19,7 +21,8 @@
       "candidate_clean": 1,
       "candidate_rebuild": 1,
       "candidate_runtime": 0,
-      "candidate_doctest": 0
+      "candidate_doctest": 0,
+      "candidate_doctest_identity_discovery": 2
     },
     "target_isolation": "fresh per-sample baseline directories below /home/vkaskivuo/.cache/jit-efaec52f-opt0-build-screen and candidate directories below /home/vkaskivuo/.cache/jit-efaec52f-build-screen, removed by the harness after each sample",
     "serialization": "exclusive /tmp/cargo-ci.lock using the cargo-ci flock convention",
@@ -43,6 +46,15 @@
       "matched_inputs": "Same source revision, Rust/Cargo versions, harness, build lock, 24-job setting, incremental-disabled and no-sccache environment as the candidate; only the candidate Cargo profile override differs."
     },
     "early_stop_rule": "Reject after one scoped comment-touch rebuild when wall time exceeds 125 percent of the fresh same-revision opt-level-0 rebuild. Acceptance, and only acceptance, would require three matched build, warm nextest, and doctest samples.",
+    "candidate_doctest_identity_recheck": {
+      "purpose": "Correct code-review finding F1 by discovering the candidate's exact doctest identities; this does not count as a doctest runtime acceptance sample.",
+      "provenance": "dev/benchmarks/test-profile-efaec52f/candidate-doctest-recheck/provenance.json",
+      "source_revision": "11f096377949c404766a42153ee19e203b54da46",
+      "candidate_manifest_sha256": "23cbd35d4f90cbb1d20bd5247f4a432e771c7d550b1f0cdab97be48d77cc8e26",
+      "target_isolation": "fresh isolated target on the first discovery command; the ignored-list command reused only that exact target",
+      "tmpdir": "disk-backed external TMPDIR existed before both commands",
+      "serialization": "exclusive /tmp/cargo-ci.lock"
+    },
     "raw_baseline_build": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/baseline.json",
     "raw_candidate_build": "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/baseline.json"
   },
@@ -110,16 +122,21 @@
     "doctest": {
       "count": 63,
       "ignored": 0,
-      "normalized_identity_sha256": "1891865b69e6594c3ae3ed24045b2214edfbe9f4a140fa237b7f49e8b4ee18b6",
-      "authority": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/pre-change-test-inventory.json",
-      "authority_sha256": "008b56b1054146c1e2a323c4b0a2ceb126986792bb629086227daac4908dee5a",
-      "reuse_basis": "The fresh baseline and candidate use the exact same source revision; the only input difference is the candidate optimization profile, which cannot change test discovery.",
-      "candidate_list_attempt_status": "operational_error_excluded",
-      "candidate_list_attempt_error": "The external TMPDIR directory was not created before the harness list step. Raw logs retain the failed rustdoc invocation. This is not counted as a passing doctest run and no runtime acceptance claim is made after early rejection.",
-      "raw_attempts": [
+      "candidate_count": 63,
+      "candidate_ignored": 0,
+      "baseline_normalized_identity_sha256": "cfb74a80675e84df3882b6969e8584fcb14e862d78dd693e99fe93230df67c44",
+      "candidate_normalized_identity_sha256": "cfb74a80675e84df3882b6969e8584fcb14e862d78dd693e99fe93230df67c44",
+      "exact_sets_equal": true,
+      "normalization": "Sort objects {target, name, ignored} by target/name/ignored; encode compact UTF-8 JSON with sorted object keys and one trailing newline; SHA-256 the bytes.",
+      "baseline_authority": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/pre-change-test-inventory.json",
+      "candidate_authority": "dev/benchmarks/test-profile-efaec52f/candidate-doctest-recheck/raw/cargo-doctest-list.stdout",
+      "candidate_ignored_authority": "dev/benchmarks/test-profile-efaec52f/candidate-doctest-recheck/raw/cargo-doctest-list-ignored.stdout",
+      "candidate_list_status": "pass_exact_candidate_recheck",
+      "prior_operational_failures_excluded": [
         "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/raw/clean-1/cargo-doctest-list.log",
         "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/raw/clean-1/cargo-doctest-list-ignored.log"
-      ]
+      ],
+      "runtime_acceptance_claim": "none_after_authorized_early_reject"
     }
   },
   "bytes": {
@@ -144,7 +161,7 @@
     "early_rebuild_screen": "fail",
     "compiler_scope": "pass",
     "regular_identity_set": "pass",
-    "doctest_identity_set": "reused_unchanged_authority_after_early_reject",
+    "doctest_identity_set": "pass_exact_candidate_recheck",
     "active_executable_bytes": "pass",
     "three_sample_build_medians": "not_run_after_authorized_early_reject",
     "warm_runtime": "not_run_after_authorized_early_reject",

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "issue": "efaec52f-da76-438a-a55b-d4cefd5e6217",
+  "collected_at": "2026-08-12T09:52:07Z",
+  "purpose": "Candidate doctest identity discovery correcting code-review finding F1; this is not a runtime acceptance sample.",
+  "source": {
+    "revision": "11f096377949c404766a42153ee19e203b54da46",
+    "checkout": "detached exact-revision worktree",
+    "base_manifest_sha256": "9136f9113a879cd11eebe6a087e3b7ce1620a1e046b812a64f27a6a62255ae43",
+    "rejected_patch_sha256": "78bdb62a3bdb87714c6edddb23dc3e3f78addccd2a20f8ede0c9ddfed1edb37a",
+    "candidate_manifest_sha256": "23cbd35d4f90cbb1d20bd5247f4a432e771c7d550b1f0cdab97be48d77cc8e26",
+    "candidate_manifest": "[profile.test.package.jit] opt-level = 1",
+    "status_during_collection": "Only Cargo.toml differed from revision 11f09637, and its diff was byte-identical to rejected-candidate.patch."
+  },
+  "environment": {
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
+    "cpu_threads": 24,
+    "CARGO_BUILD_JOBS": 24,
+    "CARGO_INCREMENTAL": 0,
+    "RUSTC_WRAPPER": "",
+    "CARGO_CI_NO_SCCACHE": 1,
+    "build_lock": "/tmp/cargo-ci.lock",
+    "target_dir": "/home/vkaskivuo/.cache/jit-efaec52f-f1-doctest/target",
+    "target_initial_state": "absent; created empty immediately before the first command",
+    "target_filesystem": "ext4 (reported by statfs as ext2/ext3)",
+    "TMPDIR": "/home/vkaskivuo/.cache/jit-efaec52f-f1-doctest/tmp",
+    "tmpdir_initial_state": "created before either rustdoc invocation"
+  },
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--doc",
+        "--workspace",
+        "--",
+        "--list"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 33355,
+      "cache_state": "fresh isolated target",
+      "stdout": "raw/cargo-doctest-list.stdout",
+      "stderr": "raw/cargo-doctest-list.stderr",
+      "measurement": "raw/cargo-doctest-list.measurement"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--doc",
+        "--workspace",
+        "--",
+        "--ignored",
+        "--list"
+      ],
+      "exit_code": 0,
+      "elapsed_ms": 1633,
+      "cache_state": "same already-built isolated target",
+      "stdout": "raw/cargo-doctest-list-ignored.stdout",
+      "stderr": "raw/cargo-doctest-list-ignored.stderr",
+      "measurement": "raw/cargo-doctest-list-ignored.measurement"
+    }
+  ],
+  "result": {
+    "candidate_count": 63,
+    "candidate_ignored": 0,
+    "baseline_count": 63,
+    "baseline_ignored": 0,
+    "exact_identity_sets_equal": true,
+    "candidate_normalized_identity_sha256": "cfb74a80675e84df3882b6969e8584fcb14e862d78dd693e99fe93230df67c44",
+    "baseline_normalized_identity_sha256": "cfb74a80675e84df3882b6969e8584fcb14e862d78dd693e99fe93230df67c44",
+    "normalization": "Sort objects {target, name, ignored} by target/name/ignored; encode compact UTF-8 JSON with sorted object keys and one trailing newline; SHA-256 the bytes."
+  }
+}
