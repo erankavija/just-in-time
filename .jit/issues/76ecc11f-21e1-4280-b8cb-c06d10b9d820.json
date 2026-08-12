@@ -20,6 +20,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T23:44:05.311811037Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-12T23:53:01.568176611Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "76ecc11f-21e1-4280-b8cb-c06d10b9d820",
@@ -33,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Attribute inherent test costs",
-  "updated_at": "2026-08-12T23:44:05.311811037Z"
+  "updated_at": "2026-08-12T23:53:01.568176611Z"
 }
