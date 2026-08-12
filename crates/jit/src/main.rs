@@ -2188,6 +2188,14 @@ fn stale_gate_child_precheck() -> Result<()> {
 }
 
 fn run() -> Result<()> {
+    #[cfg(feature = "test-support")]
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("__test-fixture-setup")) {
+        let id = std::env::args()
+            .nth(2)
+            .context("test fixture setup requires a profile id")?;
+        return jit::test_utils::prepare_nextest_profiled_repository_fixture(&id);
+    }
+
     // REQ-02 (jit:7446af34): refuse before ANY output — before Clap even
     // parses (its `--help`/`-V` auto-exits print and terminate inside
     // `Cli::parse`), and ahead of the `--schema` and `version` early returns

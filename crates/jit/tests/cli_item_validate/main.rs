@@ -46,31 +46,12 @@ fn create_issue(
 /// resolved against.
 pub(crate) const DEFAULT_PACKAGE: &str = "jit-default";
 
-/// Initialize `dir` through the CLI with that package applied.
-///
-/// A repository declares its own vocabulary, so a suite that resolves
-/// `@/<kind>/<id>` obtains the kinds by applying a package that declares them.
-/// The package is assembled into the repository it is applied to, because an
-/// application records its worktree-relative location.
-pub(crate) fn initialize_with_default_vocabulary(dir: &std::path::Path) {
-    let location = format!("packages/{DEFAULT_PACKAGE}");
-    jit::test_utils::capture_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
-        .expect("this repository's default package captures");
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(["init", "--profile", &format!("path:{location}")])
-        .current_dir(dir)
-        .output()
-        .expect("failed to run jit init");
-    assert!(
-        output.status.success(),
-        "jit init --profile {DEFAULT_PACKAGE} failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
 /// A fresh repository carrying the default package's vocabulary.
 pub(crate) fn setup_repo_with_default_vocabulary() -> tempfile::TempDir {
-    let temp = tempfile::TempDir::new().unwrap();
-    initialize_with_default_vocabulary(temp.path());
-    temp
+    jit::test_utils::profiled_repository_fixture(
+        DEFAULT_PACKAGE,
+        "packages",
+        Some(std::path::Path::new(env!("CARGO_BIN_EXE_jit"))),
+    )
+    .expect("clone a coherent default-vocabulary repository fixture")
 }

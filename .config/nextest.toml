@@ -7,6 +7,22 @@ slow-timeout = { period = "15s", terminate-after = 8 }
 capture-stdout = true
 capture-stderr = true
 
+[scripts.setup.default-repository-fixture]
+command = { command-line = "debug/jit __test-fixture-setup jit-default", relative-to = "target" }
+slow-timeout = { period = "15s", terminate-after = 4 }
+
+[[profile.default.scripts]]
+filter = 'binary(cli_item_validate) & (test(/^invariant_registry_story_tests::/) | test(/^item_cli_tests::/) | test(/^project_render_cli_tests::/) | test(/^type_hierarchy_fix_tests::/) | test(/^validate_cli_rule_tests::/))'
+setup = 'default-repository-fixture'
+
+[scripts.setup.dogfood-repository-fixture]
+command = { command-line = "debug/jit __test-fixture-setup jit-dogfood", relative-to = "target" }
+slow-timeout = { period = "15s", terminate-after = 4 }
+
+[[profile.default.scripts]]
+filter = '(binary(cli_item_validate) | binary(fast_rules)) & test(/^derived_state_repair_tests::/)'
+setup = 'dogfood-repository-fixture'
+
 [profile.default]
 retries = 0
 

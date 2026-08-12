@@ -43,18 +43,12 @@ fn write(harness: &TestHarness, path: &str, content: &str) {
 /// applied-profile record names the worktree-relative directory its package was
 /// read from, and repair reads the package back from there.
 fn profiled_harness(omit_profile_record: bool) -> (tempfile::TempDir, TestHarness) {
-    let source = tempfile::tempdir().unwrap();
-    let source_storage = jit::storage::JsonFileStorage::new(source.path().join(".jit"));
-    let source_layout =
-        jit::storage::discover_repository_layout(source.path(), source_storage.root()).unwrap();
-    let location = jit::test_utils::stage_repository_packages(source.path(), "jit-dogfood");
-    jit::commands::CommandExecutor::new(source_storage)
-        .with_layout(source_layout)
-        .initialize_fresh_repository(
-            source.path(),
-            Some(&[jit::commands::ProfileSelector::path(&location)]),
-        )
-        .unwrap();
+    let source = jit::test_utils::profiled_repository_fixture(
+        "jit-dogfood",
+        jit::test_utils::PROFILE_PACKAGE_SOURCES,
+        None,
+    )
+    .expect("clone a coherent profiled repository fixture");
 
     let harness = TestHarness::rooted_at(source.path());
     for path in repair_paths()
@@ -198,18 +192,15 @@ fn repair_target_path_strings() -> Vec<String> {
     static PATHS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
     PATHS
         .get_or_init(|| {
-            let source = tempfile::tempdir().unwrap();
+            let source = jit::test_utils::profiled_repository_fixture(
+                "jit-dogfood",
+                jit::test_utils::PROFILE_PACKAGE_SOURCES,
+                None,
+            )
+            .expect("clone a coherent profiled repository fixture");
             let storage = jit::storage::JsonFileStorage::new(source.path().join(".jit"));
             let layout =
                 jit::storage::discover_repository_layout(source.path(), storage.root()).unwrap();
-            let location = jit::test_utils::stage_repository_packages(source.path(), "jit-dogfood");
-            jit::commands::CommandExecutor::new(storage.clone())
-                .with_layout(layout.clone())
-                .initialize_fresh_repository(
-                    source.path(),
-                    Some(&[jit::commands::ProfileSelector::path(&location)]),
-                )
-                .unwrap();
 
             let image = repository_image(&storage, &layout);
             let record_path = layout.classify_repository_relative(PROFILE_RECORD).unwrap();

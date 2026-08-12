@@ -33,24 +33,12 @@ fn json(output: &Output) -> Value {
 }
 
 fn profiled_repo() -> TempDir {
-    let repo = TempDir::new().unwrap();
-    // Applied from inside the worktree it is applied to, because the
-    // applied-profile record names the package's worktree-relative location.
-    let location = jit::test_utils::stage_repository_packages(repo.path(), "jit-dogfood");
-    let location = location
-        .strip_prefix(repo.path())
-        .unwrap()
-        .to_string_lossy();
-    let output = run(
-        repo.path(),
-        &["init", "--profile", &format!("path:{location}"), "--json"],
-    );
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    repo
+    jit::test_utils::profiled_repository_fixture(
+        "jit-dogfood",
+        jit::test_utils::PROFILE_PACKAGE_SOURCES,
+        Some(Path::new(env!("CARGO_BIN_EXE_jit"))),
+    )
+    .expect("clone a coherent profiled repository fixture")
 }
 
 fn read(repo: &Path, path: &str) -> Vec<u8> {
