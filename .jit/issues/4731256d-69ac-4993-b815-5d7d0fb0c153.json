@@ -9,6 +9,7 @@
   ],
   "description": "Share expensive immutable profile and derived-state setup across test processes while preserving isolated mutable repositories and the full-stack interfaces each test proves.\n\n## Background\n\nThe warm profile shows profile lifecycle, derived-state repair, and related in-crate profile/init/validate tests dominate the reducible aggregate suite work. Many tests independently construct equivalent dogfood packages and repository baselines before applying a small scenario-specific mutation. Cache only verified immutable inputs or baselines keyed by every source and binary input that affects them, then create a cheap isolated copy for each test before mutation.\n\n## Success Criteria\n\n- [hard] REQ-01: Repeated profile and derived-state repair tests reuse verified immutable package or repository baselines and create isolated mutable state per test, eliminating equivalent full setup work across nextest processes.\n- [hard] REQ-02: Every existing stable test identity and semantic assertion remains, including full CLI/process boundaries where those are the property under test; no assertion is replaced with a mocked or lower-layer surrogate.\n- [hard] REQ-03: Cache keys cover source, profile assets, executable provenance, and setup shape; publication is atomic, concurrent, fail-closed on corruption or occupied destinations, and never exposes or reuses mutable repository state.\n- [hard] REQ-04: Focused profile, init, validate, derived-state repair, and fixture-integrity tests pass together with the cargo-ci self-test, formatting, and warning-free linting; the integrated parent profile demonstrates the final aggregate reduction.\n\n## Notes\n\nExpected test-only support is in `crates/jit/src/test_utils.rs` and existing shared harness support, consumed by profile CLI/acceptance, derived-state repair, and in-crate init/profile/validate tests only where profiling proves equivalent setup. Production transaction behavior is out of scope. Do not regenerate the integrated suite profile in this leaf.\n",
   "documents": [],
+  "done_at": "2026-08-12T09:47:17.362124322Z",
   "first_ready_at": "2026-08-12T04:15:58.463693785Z",
   "gates_required": [
     "cargo-ci",
@@ -36,7 +37,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Share immutable profile and repair fixtures across nextest processes",
-  "updated_at": "2026-08-12T09:13:31.791765862Z"
+  "updated_at": "2026-08-12T09:47:17.362124322Z"
 }

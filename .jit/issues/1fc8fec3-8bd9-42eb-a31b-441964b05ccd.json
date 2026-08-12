@@ -9,6 +9,7 @@
   ],
   "description": "Prepare the verified stale-binary test artifact once per nextest invocation so six independent semantic tests do not occupy worker slots while serially waiting on the same nested build.\n\n## Background\n\nThe warm profile attributes 95,249 aggregate milliseconds to the six stale-binary semantic tests. They intentionally share one verified nested Cargo build, but each process currently enters the fixture protocol and lock path independently. Move the one-time preparation into a supported nextest setup mechanism whose duration remains inside the measured nextest command, then let each semantic test independently consume the verified artifact and record its own observation. Preserve a correct fallback for direct `cargo test` execution.\n\n## Success Criteria\n\n- [hard] REQ-01: A default pinned-nextest invocation prepares exactly one source- and binary-provenance-keyed stale child artifact before the six semantic tests run, and setup time remains inside the nextest wall-clock measurement.\n- [hard] REQ-02: All six existing semantic test identities execute independently and retain their assertions, with evidence attributing exactly one verified nested Cargo build and five verified reuses to those identities.\n- [hard] REQ-03: Direct cargo-test execution remains correct, concurrent publication is atomic and no-replace, corrupt or occupied cache entries fail closed, and no semantic test waits for a redundant nested Cargo build after successful setup.\n- [hard] REQ-04: The pinned nextest configuration, setup helper self-tests, complete scratch-build target, cargo-ci self-test, formatting, and warning-free linting pass without changing the suite clock or duration threshold.\n\n## Notes\n\nThe intended footprint is `.config/nextest.toml`, one focused setup helper under `scripts/`, and the stale-binary fixture modules under `crates/jit/tests/scratch_build`. Do not regenerate the integrated suite profile in this leaf; the parent performance issue owns combined profiling.\n\n\n## Acceptance clarification\n\nREQ-02 is evaluated according to the supported nextest setup topology: one verified nested Cargo build is truthfully attributed to the run-bound setup receipt, and all six independently named semantic identities must each record a verified prepared-artifact consumption. No test identity may be mislabeled as the builder. Direct cargo-test fallback retains its independently observable single-builder/reuse contract.",
   "documents": [],
+  "done_at": "2026-08-12T09:47:11.580413618Z",
   "first_ready_at": "2026-08-12T04:15:54.707101910Z",
   "gates_required": [
     "cargo-ci",
@@ -36,7 +37,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Prebuild the stale-binary semantic fixture inside nextest",
-  "updated_at": "2026-08-12T09:09:45.492442417Z"
+  "updated_at": "2026-08-12T09:47:11.580413618Z"
 }

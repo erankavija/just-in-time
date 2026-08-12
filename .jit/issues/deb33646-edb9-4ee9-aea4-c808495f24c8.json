@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Share one verified recorded-failure probe corpus across the three independent CLI error-contract aggregates so full-suite load cannot amplify hundreds of duplicate subprocess launches into timeouts.\n\n## Background\n\nThe canonical-envelope, reflected-coverage, and payload-purity tests each replay the same 104-row registry. Together they launch roughly 687 JIT processes, 87 Git processes, and create more than 300 temporary repositories. They pass concurrently in about four seconds when focused but reached the 60-second timeout under a full workspace run, demonstrating scheduler and process-start amplification rather than shared lock contention.\n\n## Success Criteria\n\n- [hard] REQ-01: Drives every registered failure arm once into an immutable corpus containing the exact output, exit-code, and observation data required by all three aggregate contracts.\n- [hard] REQ-02: Preserves the three stable test identities and their independent semantic assertions for canonical envelopes, reflected arm coverage and census publication, and single-document payload purity.\n- [hard] REQ-03: Nextest consumers use a source-, registry-, fixture-, and executable-provenance-keyed corpus through a run-bound SHA-verified receipt; direct Cargo execution uses a process-local verified reuse path.\n- [hard] REQ-04: Publication is atomic and no-replace, occupied or corrupt entries fail closed, every mutable probe repository is isolated, and no cached corpus can silently survive an input change.\n- [hard] REQ-05: The three aggregates pass under representative full-suite concurrency without a timeout, their combined attributable subprocess work is reduced by at least 60 percent, and focused tests, cargo-ci self-test, formatting, and warning-free linting pass.\n\n## Notes\n\nReuse the repository's supported nextest setup and verified-fixture conventions. A concurrency group that merely serializes the three unchanged replays does not satisfy the work-reduction requirement.\n",
   "documents": [],
+  "done_at": "2026-08-12T09:47:28.901475113Z",
   "first_ready_at": "2026-08-12T05:32:46.372354788Z",
   "gates_required": [
     "cargo-ci",
@@ -32,7 +33,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Share the recorded failure probe corpus",
-  "updated_at": "2026-08-12T09:21:38.072998498Z"
+  "updated_at": "2026-08-12T09:47:28.901475113Z"
 }
