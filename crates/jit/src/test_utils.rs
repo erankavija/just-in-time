@@ -178,6 +178,24 @@ pub fn profiled_repository_fixture(
     Ok(clone)
 }
 
+/// A verified applied-profile repository imported into isolated memory state.
+///
+/// The returned temporary repository owns both the package locations used by
+/// applied-profile provenance and the file-backed baseline clone. Keep it
+/// alive for as long as commands use the accompanying memory store.
+pub fn profiled_in_memory_repository_fixture(
+    id: &str,
+) -> Result<(TempDir, crate::storage::InMemoryStorage)> {
+    let spec = PROFILED_REPOSITORY_FIXTURES
+        .iter()
+        .find(|spec| spec.id == id)
+        .with_context(|| format!("unsupported profiled-repository fixture '{id}'"))?;
+    let repository = profiled_repository_fixture(id, spec.package_directory, None)?;
+    let storage = crate::storage::InMemoryStorage::rooted_at(repository.path());
+    storage.seed_repository_tree_fixture(repository.path())?;
+    Ok((repository, storage))
+}
+
 fn direct_profiled_repository_fixture(
     id: &str,
     package_directory: &str,
@@ -1469,6 +1487,51 @@ mod tests {
             fs::read(second.path().join("AGENTS.md")).unwrap(),
             fs::read(third.path().join("AGENTS.md")).unwrap(),
             "mutating a clone must not alter the immutable baseline"
+        );
+    }
+
+    #[test]
+    fn test_profiled_in_memory_repository_fixture_preserves_modes_and_clone_isolation() {
+        use crate::storage::IssueStore;
+
+        const EXECUTABLE: &str =
+            ".agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh";
+        const PROFILE_RECORD: &str = ".jit/profiles/jit-dogfood.json";
+        let (first_source, first) = profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
+        let (second_source, second) = profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
+
+        assert_eq!(
+            first.read_repo_file(EXECUTABLE).unwrap(),
+            Some(fs::read_to_string(first_source.path().join(EXECUTABLE)).unwrap())
+        );
+        assert_eq!(
+            first.repository_file_mode_fixture(EXECUTABLE).unwrap(),
+            FileMode::Executable,
+            "the memory adapter must retain executable profile assets"
+        );
+        assert_eq!(
+            second.repository_file_mode_fixture(EXECUTABLE).unwrap(),
+            FileMode::Executable
+        );
+        assert_eq!(
+            first.repository_file_mode_fixture(PROFILE_RECORD).unwrap(),
+            FileMode::Regular
+        );
+        assert_eq!(
+            first.read_repo_file(PROFILE_RECORD).unwrap(),
+            Some(fs::read_to_string(first_source.path().join(PROFILE_RECORD)).unwrap()),
+            "the memory adapter must retain the baseline's exact applied-profile record"
+        );
+
+        first.add_worktree_file("AGENTS.md", "mutated memory clone");
+        assert_ne!(
+            first.read_repo_file("AGENTS.md").unwrap(),
+            second.read_repo_file("AGENTS.md").unwrap(),
+            "memory fixture clones must not share mutable aggregate state"
+        );
+        assert_eq!(
+            second.read_repo_file("AGENTS.md").unwrap(),
+            Some(fs::read_to_string(second_source.path().join("AGENTS.md")).unwrap())
         );
     }
 
