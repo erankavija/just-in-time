@@ -31,10 +31,11 @@
     "milestone:v1.0",
     "component:testing",
     "satisfies:REQ-01",
-    "type:task"
+    "type:task",
+    "resolution:candidate-below-hard-performance-bound"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "rejected",
   "title": "Avoid durability sync for ephemeral nextest receipts",
-  "updated_at": "2026-08-12T10:12:18.557805417Z"
+  "updated_at": "2026-08-12T10:15:22.057972917Z"
 }
