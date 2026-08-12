@@ -1,0 +1,131 @@
+{
+  "artifact": "dev/benchmarks/cli-profile-prerequisites-bfd215fa.json",
+  "issue": "bfd215fa",
+  "base_commit": "3f12b1f0b6076df96d2a9f5c375e1a0b70e242ce",
+  "measured_at": "2026-08-12",
+  "method": {
+    "runner": "cargo-nextest 0.9.133",
+    "cache_state": "warm compiled artifacts",
+    "environment": {
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TARGET_DIR": "/home/vkaskivuo/Projects/just-in-time/target"
+    },
+    "command": "cargo nextest run -p jit --test cli_repo_workflow --test fast_rules -E 'binary(cli_repo_workflow) & test(/^(profile_cli_tests::test_validate_plain_and_json_report_installed_profile_drift|profile_cli_tests::test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op|profile_cli_tests::test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op)$/) | binary(fast_rules) & test(/^(cli_warnings_integration_tests::test_create_epic_without_label_shows_warning|cli_warnings_integration_tests::test_create_task_without_parent_shows_warning|cli_warnings_integration_tests::test_create_epic_with_label_no_warning|cli_warnings_integration_tests::test_create_task_with_parent_no_warning)$/)' --no-fail-fast",
+    "candidate_change": "Exactly three profile_cli prerequisite installations and the shared prerequisite of four cli_warnings identities cloned existing verified applied-profile baselines; exact nextest filters selected one default and six dogfood consumers.",
+    "candidate_footprint": [
+      ".config/nextest.toml",
+      "crates/jit/tests/cli_repo_workflow/main.rs",
+      "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+      "crates/jit/tests/fast_rules/cli_warnings_integration_tests.rs"
+    ]
+  },
+  "identities": [
+    {
+      "identity": "jit::cli_repo_workflow$profile_cli_tests::test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op",
+      "recorded_baseline_ms": 14974,
+      "matched_base_ms": 10650,
+      "candidate_ms": 7963
+    },
+    {
+      "identity": "jit::cli_repo_workflow$profile_cli_tests::test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op",
+      "recorded_baseline_ms": 10877,
+      "matched_base_ms": 6359,
+      "candidate_ms": 5366
+    },
+    {
+      "identity": "jit::cli_repo_workflow$profile_cli_tests::test_validate_plain_and_json_report_installed_profile_drift",
+      "recorded_baseline_ms": 5578,
+      "matched_base_ms": 3061,
+      "candidate_ms": 889
+    },
+    {
+      "identity": "jit::fast_rules$cli_warnings_integration_tests::test_create_task_without_parent_shows_warning",
+      "recorded_baseline_ms": 4074,
+      "matched_base_ms": 2138,
+      "candidate_ms": 112
+    },
+    {
+      "identity": "jit::fast_rules$cli_warnings_integration_tests::test_create_epic_with_label_no_warning",
+      "recorded_baseline_ms": 3991,
+      "matched_base_ms": 2148,
+      "candidate_ms": 120
+    },
+    {
+      "identity": "jit::fast_rules$cli_warnings_integration_tests::test_create_task_with_parent_no_warning",
+      "recorded_baseline_ms": 3944,
+      "matched_base_ms": 2146,
+      "candidate_ms": 112
+    },
+    {
+      "identity": "jit::fast_rules$cli_warnings_integration_tests::test_create_epic_without_label_shows_warning",
+      "recorded_baseline_ms": 3848,
+      "matched_base_ms": 2148,
+      "candidate_ms": 112
+    }
+  ],
+  "measurements": {
+    "recorded_baseline_test_sum_ms": 47286,
+    "matched_base": {
+      "test_sum_ms": 28650,
+      "nextest_summary_ms": 10653,
+      "wall_ms": 10940,
+      "setup_ms": 0,
+      "passed": 7
+    },
+    "candidate": {
+      "test_sum_ms": 14674,
+      "setup": {
+        "default-repository-fixture_ms": 2577,
+        "dogfood-repository-fixture_ms": 3030,
+        "sum_ms": 5607
+      },
+      "setup_inclusive_aggregate_ms": 20281,
+      "nextest_summary_ms": 13573,
+      "wall_ms": 13917,
+      "passed": 7
+    },
+    "acceptance": {
+      "required_saving_ms": 30000,
+      "actual_saving_ms": 27005,
+      "saving_shortfall_ms": 2995,
+      "wall_regression_ms": 2977,
+      "aggregate_requirement_passed": false,
+      "wall_requirement_passed": false
+    }
+  },
+  "semantic_validation": [
+    {
+      "check": "candidate exact-seven nextest selection",
+      "result": "7 passed; both existing setup recipes ran and no other test identity ran"
+    },
+    {
+      "check": "direct Cargo default-profile CLI fallback",
+      "command": "cargo test -p jit --test cli_repo_workflow profile_cli_tests::test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op -- --exact",
+      "result": "1 passed"
+    },
+    {
+      "check": "direct Cargo warning fallback",
+      "command": "cargo test -p jit --test fast_rules cli_warnings_integration_tests:: -- --test-threads=1",
+      "result": "4 passed"
+    },
+    {
+      "check": "profiled-repository fixture integrity",
+      "command": "cargo test -p jit --lib test_profiled_repository_fixture -- --test-threads=1",
+      "result": "5 passed"
+    },
+    {
+      "check": "format and diff hygiene",
+      "result": "cargo fmt --all -- --check and git diff --check passed"
+    },
+    {
+      "check": "clippy",
+      "result": "not run after the candidate was rejected; no Rust or configuration change is retained"
+    }
+  ],
+  "decision": {
+    "outcome": "no_change",
+    "reason": "The prerequisite-only candidate preserved semantics but failed both quantitative acceptance clauses after charging each activated setup once.",
+    "recommendation": "Prefer the scoped test-profile experiment, which preserves the assertions without adding setup work to the selected-family critical path.",
+    "production_and_config_files_restored_to_base": true
+  }
+}
