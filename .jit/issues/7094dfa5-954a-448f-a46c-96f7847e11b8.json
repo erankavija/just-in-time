@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:terra-profile-cache-root",
+  "claimed_at": "2026-08-12T10:20:04.427544703Z",
+  "context": {},
+  "created_at": "2026-08-12T10:19:45.026264843Z",
+  "dependencies": [],
+  "description": "Make nextest profile-fixture receipts bind to the Cargo target that produced the running setup and test artifacts, so reused binaries compiled in an isolated worktree cannot redirect consumers to that worktree's cache.\n\n## Background\n\nThe full cargo-ci gate can reuse a `target/debug/jit` setup binary whose compile-time `CARGO_MANIFEST_DIR` names a temporary agent worktree while the current unit-test executable names the main checkout. The setup publishes its receipt under the temporary worktree's inferred `target`, but consumers independently infer the main checkout's `target` and reject the otherwise valid receipt as outside their cache. Cache-root identity must follow the actual Cargo artifact location or an equally exact runtime contract, not a source path embedded in a reused artifact.\n\n## Success Criteria\n\n- [hard] REQ-01: Profiled-repository setup and consumers derive one canonical cache root from the actual Cargo target/artifact context, including default, absolute custom, and relative custom target-directory executions, without trusting an arbitrary receipt path.\n- [hard] REQ-02: A deterministic regression uses setup and consumer executables whose compile-time checkout provenance differs while their runtime target is shared, and proves a valid same-run receipt succeeds instead of falling back or escaping the cache.\n- [hard] REQ-03: Existing wrong-run, wrong-SHA, non-ordinary, corrupt, occupied, wrong-cache, scenario-provenance, isolated-clone, and atomic no-replace contracts remain fail-closed, with direct cargo-test fallback unchanged.\n- [hard] REQ-04: The previously failing profiled re-init identity passes through the nextest setup path, focused fixture tests pass, formatting and warning-free linting pass, and the authoritative cargo-ci and code-review gates are green.\n\n## Notes\n\nKeep the fix inside test support. Do not weaken cache-root validation, trust a receipt-selected root, change production storage behavior, or edit nextest filters.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T10:19:45.026264843Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7094dfa5-954a-448f-a46c-96f7847e11b8",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Bind profile fixture cache roots to runtime artifacts",
+  "updated_at": "2026-08-12T10:20:04.427544703Z"
+}

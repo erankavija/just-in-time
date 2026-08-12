@@ -13891,3 +13891,7 @@
 {"id":"0a817006-d63c-4b98-a16e-5cf35ca74d60","issue_id":"934985ca-8650-4a98-9c09-df9ec8fd9863","timestamp":"2026-08-12T10:14:47.834309425Z","type":"issue_completed"}
 {"from":"in_progress","id":"f3bed6df-081a-491f-b94c-9862200cfbd5","issue_id":"4ee95d17-02ff-41e8-af06-4381a03eaa7f","timestamp":"2026-08-12T10:15:16.595105294Z","to":"rejected","type":"issue_state_changed"}
 {"gate_key":"cargo-ci","id":"a7a843d2-34ce-4038-bfaf-d469b522c1d6","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T10:18:22.848593292Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"13b2b19c-5a99-4dd3-872f-7f969a41e2a0","issue_id":"7094dfa5-954a-448f-a46c-96f7847e11b8","priority":"high","timestamp":"2026-08-12T10:19:45.026264843Z","title":"Bind profile fixture cache roots to runtime artifacts","type":"issue_created"}
+{"fields":["dependencies"],"id":"52e5dcf3-7bc4-4f7d-8602-d5f6865e138f","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T10:19:58.725080392Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"33700449-39f0-437f-a1a6-21bcf4ffa7c8","issue_id":"7094dfa5-954a-448f-a46c-96f7847e11b8","timestamp":"2026-08-12T10:20:04.427544703Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:terra-profile-cache-root","id":"b32e763e-c556-4b49-a682-eb8e1e153294","issue_id":"7094dfa5-954a-448f-a46c-96f7847e11b8","timestamp":"2026-08-12T10:20:04.427544703Z","type":"issue_claimed"}
