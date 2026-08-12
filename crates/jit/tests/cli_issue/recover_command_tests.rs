@@ -93,7 +93,6 @@ fn leave_fresh_prepared_journal(temp: &TempDir) {
     let spec = CaptureSpec::phase_one(
         scaffold.delta_paths().unwrap(),
         CaptureBudget {
-            max_paths: 128,
             max_listings: 0,
             max_bytes: 16 * 1024 * 1024,
             max_depth: 16,

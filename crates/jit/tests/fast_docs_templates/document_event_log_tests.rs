@@ -313,32 +313,34 @@ fn test_add_pinned_document_uses_pinned_document_and_asset_bytes() {
     assert_eq!(asset.content_hash.as_deref(), Some(pinned_hash.as_str()));
 }
 
+/// A document's asset closure costs what the scan reads, so a document naming
+/// far more assets than any registry scan reads paths is captured whole rather
+/// than refused for how many it named.
 #[test]
-fn test_add_document_rejects_asset_closure_over_fixed_budget_without_writes() {
+fn test_add_document_captures_an_asset_closure_of_many_named_assets() {
     let h = TestHarness::new();
     let id = h.create_issue("Bounded document scan");
-    let content = (0..300)
+    let assets = 300;
+    let content = (0..assets)
         .map(|index| format!("![asset](./asset-{index}.png)"))
         .collect::<Vec<_>>()
         .join("\n");
     h.storage.add_worktree_file("docs/guide.md", &content);
-    let issue_before = h.storage.load_issue(&id).unwrap();
-    let events_before = h.storage.read_events().unwrap();
+    for index in 0..assets {
+        h.storage
+            .add_worktree_file(format!("docs/asset-{index}.png"), "asset");
+    }
 
-    let error = h
+    let (result, _warnings) = h
         .executor
         .add_document_reference(&id, "docs/guide.md", None, None, None, false)
-        .unwrap_err();
+        .unwrap();
 
-    assert!(matches!(
-        error.downcast_ref::<jit::repository_state::CaptureError>(),
-        Some(jit::repository_state::CaptureError::PathBudgetExceeded {
-            actual: 303,
-            maximum: 256
-        })
-    ));
-    assert_eq!(h.storage.load_issue(&id).unwrap(), issue_before);
-    assert_eq!(h.storage.read_events().unwrap(), events_before);
+    assert_eq!(
+        result.document.assets.len(),
+        assets,
+        "the scan dropped assets the document declares"
+    );
 }
 
 #[test]

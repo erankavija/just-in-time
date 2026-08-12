@@ -25,7 +25,6 @@ fn empty_image(layout: RepositoryLayout) -> RepositoryImage {
     let spec = CaptureSpec::phase_one(
         Vec::<VirtualPath>::new(),
         CaptureBudget {
-            max_paths: 0,
             max_listings: 0,
             max_bytes: 0,
             max_depth: 0,

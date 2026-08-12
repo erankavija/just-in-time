@@ -37,7 +37,6 @@ mod tests {
         let spec = CaptureSpec::phase_one(
             [VirtualPath::data("gate-runs").unwrap(), run_dir, run_file],
             CaptureBudget {
-                max_paths: 3,
                 max_listings: 0,
                 max_bytes: 1024 * 1024,
                 max_depth: 3,

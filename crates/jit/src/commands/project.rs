@@ -141,7 +141,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         let layout = self.require_layout()?;
         let budget = CaptureBudget {
-            max_paths: 4096,
             max_listings: 64,
             max_bytes: 256 * 1024 * 1024,
             max_depth: 16,

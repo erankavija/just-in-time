@@ -79,7 +79,6 @@ fn capture(
     let mut spec = CaptureSpec::phase_one(
         fixed,
         CaptureBudget {
-            max_paths: 256,
             max_listings: 0,
             max_bytes: 16 * 1024 * 1024,
             max_depth: 16,
@@ -123,7 +122,6 @@ fn repository_image(
     layout: &RepositoryLayout,
 ) -> jit::repository_state::RepositoryImage {
     let budget = CaptureBudget {
-        max_paths: 512,
         max_listings: 16,
         max_bytes: 32 * 1024 * 1024,
         max_depth: 16,

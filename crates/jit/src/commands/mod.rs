@@ -2048,7 +2048,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let spec = CaptureSpec::phase_one(
                     paths.clone(),
                     CaptureBudget {
-                        max_paths: paths.len(),
                         max_listings: 0,
                         max_bytes: 64 * 1024 * 1024,
                         max_depth: 4,
@@ -3283,7 +3282,6 @@ mod tests {
                 &layout,
                 &intent,
                 CaptureBudget {
-                    max_paths: 4,
                     max_listings: 1,
                     max_bytes: 1024,
                     max_depth: 8,
@@ -3436,7 +3434,6 @@ mod tests {
         CaptureSpec::phase_one(
             paths,
             CaptureBudget {
-                max_paths: 2,
                 max_listings: 0,
                 max_bytes: 1024 * 1024,
                 max_depth: 4,
@@ -3455,7 +3452,6 @@ mod tests {
         CaptureSpec::phase_one(
             paths,
             CaptureBudget {
-                max_paths: 3,
                 max_listings: 0,
                 max_bytes: 1024 * 1024,
                 max_depth: 4,
@@ -4220,7 +4216,6 @@ mod mutation_session_contract_tests {
         let layout = storage.repository_layout();
         let mut session = storage.open_mutation_session(layout).unwrap();
         let budget = CaptureBudget {
-            max_paths: 4,
             max_listings: 0,
             max_bytes: 1024,
             max_depth: 6,

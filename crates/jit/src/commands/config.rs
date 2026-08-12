@@ -300,7 +300,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         )?;
         let config_vpath = VirtualPath::CONFIG;
         let budget = CaptureBudget {
-            max_paths: 16,
             max_listings: 0,
             max_bytes: 64 * 1024 * 1024,
             max_depth: 6,

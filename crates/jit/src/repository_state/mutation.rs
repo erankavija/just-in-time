@@ -1312,7 +1312,6 @@ mod tests {
 
     fn budget() -> CaptureBudget {
         CaptureBudget {
-            max_paths: 16,
             max_listings: 2,
             max_bytes: 1 << 20,
             max_depth: 6,

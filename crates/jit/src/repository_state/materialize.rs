@@ -648,7 +648,6 @@ kind = "advisory"
             entries.insert(vpath, entry);
         }
         let budget = CaptureBudget {
-            max_paths: 32,
             max_listings: 0,
             max_bytes: 1 << 20,
             max_depth: 8,
@@ -676,7 +675,6 @@ kind = "advisory"
         let mut spec = CaptureSpec::phase_one(
             data_paths,
             CaptureBudget {
-                max_paths: 128,
                 max_listings: 0,
                 max_bytes: 1 << 20,
                 max_depth: 16,

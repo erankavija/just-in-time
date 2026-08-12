@@ -719,7 +719,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             return Err(crate::storage::InvalidIdPrefixError::new(requested).into());
         }
         let budget = CaptureBudget {
-            max_paths: 1 << 16,
             max_listings: 256,
             max_bytes: 512 * 1024 * 1024,
             max_depth: 32,
@@ -779,7 +778,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::BTreeMap;
 
         let budget = CaptureBudget {
-            max_paths: 1 << 16,
             max_listings: 256,
             max_bytes: 512 * 1024 * 1024,
             max_depth: 32,

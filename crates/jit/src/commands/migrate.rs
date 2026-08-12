@@ -44,7 +44,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         let index_path = VirtualPath::INDEX;
         let events_path = VirtualPath::EVENTS;
         let budget = CaptureBudget {
-            max_paths: 1 << 16,
             max_listings: 1,
             max_bytes: 512 * 1024 * 1024,
             max_depth: 8,

@@ -247,7 +247,6 @@ struct DerivedGatePresetApplication {
 
 const GATE_PRESET_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
-        max_paths: 1 << 16,
         max_listings: 64,
         max_bytes: 512 * 1024 * 1024,
         max_depth: 16,
@@ -1105,7 +1104,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = MutationContext::production();
         let budget = CaptureBudget {
-            max_paths: 4096,
             max_listings: 64,
             max_bytes: 256 * 1024 * 1024,
             max_depth: 16,
@@ -2184,7 +2182,6 @@ style = "full"
                     VirtualPath::data("events.jsonl").unwrap(),
                 ],
                 CaptureBudget {
-                    max_paths: 5,
                     max_listings: 0,
                     max_bytes: 1024 * 1024,
                     max_depth: 4,

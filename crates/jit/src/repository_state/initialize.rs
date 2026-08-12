@@ -1428,7 +1428,6 @@ mod tests {
         let spec = CaptureSpec::phase_one(
             paths,
             CaptureBudget {
-                max_paths: 8,
                 max_listings: 0,
                 max_bytes: 4096,
                 max_depth: 4,

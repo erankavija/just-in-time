@@ -691,11 +691,6 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let tree = SnapshotTree::scan(staging.path())?;
         let destination = classify_repository_export(&layout, invocation_dir, &output_path)?;
         let budget = CaptureBudget {
-            max_paths: tree
-                .files
-                .len()
-                .saturating_add(tree.directories.len())
-                .saturating_add(4096),
             max_listings: 1,
             max_bytes: 512 * 1024 * 1024,
             max_depth: 128,

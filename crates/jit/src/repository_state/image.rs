@@ -522,13 +522,28 @@ impl LinkedWorktreeEvidence {
 }
 
 /// Explicit bounds for phase-two capture closure.
+///
+/// Each dimension bounds something a capture can be asked for without anyone
+/// having declared it. A capture grows on its own in exactly one place —
+/// expanding a complete listing names children the declaration did not — and
+/// both dimensions that bound it are here: `max_listings` bounds how many
+/// listings may be requested, and `max_bytes` charges every listed child's name
+/// alongside the bytes read, so a directory cannot expand a capture for free.
+/// `max_depth` bounds the shape of every path, which bounds the ancestor
+/// closure a caller building one path at a time can reach.
+///
+/// There is deliberately no bound on how many exact paths a caller may declare.
+/// A declared path is not growth: it is one thing the caller decided to read,
+/// and the number of them is bounded by whatever the caller derives its
+/// declaration from — for the one declaration that arrives from outside the
+/// repository, the profile package model's own file-count and byte bounds. A
+/// budget here would restate that bound as a number this type cannot derive,
+/// which is how a capture came to refuse a package the model accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct CaptureBudget {
-    /// Maximum exact paths.
-    pub max_paths: usize,
     /// Maximum complete listings.
     pub max_listings: usize,
-    /// Maximum combined captured bytes.
+    /// Maximum combined captured bytes, counting every listed child's name.
     pub max_bytes: u64,
     /// Maximum root-relative depth.
     pub max_depth: usize,
@@ -676,16 +691,6 @@ impl CaptureSpec {
         if self.advisory.iter().any(|path| !self.contains_path(path)) {
             return Err(CaptureError::AdvisoryPathNotCaptured);
         }
-        let path_count = self.fixed.len()
-            + self.discovered.len()
-            + self.pinned.len()
-            + self.linked_worktree.len();
-        if path_count > self.budget.max_paths {
-            return Err(CaptureError::PathBudgetExceeded {
-                actual: path_count,
-                maximum: self.budget.max_paths,
-            });
-        }
         if self.listings.len() > self.budget.max_listings {
             return Err(CaptureError::ListingBudgetExceeded {
                 actual: self.listings.len(),
@@ -771,41 +776,23 @@ impl RepositoryImage {
                 return Err(CaptureError::IncompleteListing(path.clone()));
             }
         }
-        let mut listing_only_paths = BTreeSet::new();
-        let mut listing_bytes = 0_u64;
-        for (parent, listing) in &listings {
-            for name in listing.children().keys() {
-                listing_bytes =
-                    listing_bytes.saturating_add(u64::try_from(name.len()).unwrap_or(u64::MAX));
+        // Expanding a listing is the one way a capture grows beyond what was
+        // declared, so every child it names is held to the depth budget and
+        // charged its name to the byte budget.
+        let listing_bytes = listings
+            .iter()
+            .flat_map(|(parent, listing)| {
+                listing
+                    .children()
+                    .keys()
+                    .map(move |name| (parent, name.as_str()))
+            })
+            .try_fold(0_u64, |bytes, (parent, name)| {
                 let child = listing_child_path(&layout, parent, name)?;
-                if child.relative().depth() > spec.budget.max_depth {
-                    return Err(CaptureError::DepthBudgetExceeded(child));
-                }
-                let already_requested = spec.contains_path(&child)
-                    || spec.listings.contains(&child)
-                    || spec.linked_worktree.contains(&child)
-                    || (child.root_class() == RepositoryRootClass::Worktree
-                        && spec
-                            .pinned
-                            .iter()
-                            .any(|(_, path)| path == child.relative().as_str()));
-                if !already_requested {
-                    listing_only_paths.insert(child);
-                }
-            }
-        }
-        let path_count = spec
-            .paths()
-            .count()
-            .saturating_add(spec.pinned.len())
-            .saturating_add(spec.linked_worktree.len())
-            .saturating_add(listing_only_paths.len());
-        if path_count > spec.budget.max_paths {
-            return Err(CaptureError::PathBudgetExceeded {
-                actual: path_count,
-                maximum: spec.budget.max_paths,
-            });
-        }
+                (child.relative().depth() <= spec.budget.max_depth)
+                    .then(|| bytes.saturating_add(u64::try_from(name.len()).unwrap_or(u64::MAX)))
+                    .ok_or(CaptureError::DepthBudgetExceeded(child))
+            })?;
         for (request, evidence) in &pinned {
             if !spec.pinned.contains(request) {
                 return Err(CaptureError::UnexpectedPinnedEvidence(request.clone()));
@@ -1584,8 +1571,6 @@ impl Write for HashWriter<'_> {
 pub enum CaptureError {
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
-    #[error("capture requested {actual} paths but the maximum is {maximum}")]
-    PathBudgetExceeded { actual: usize, maximum: usize },
     #[error("capture requested {actual} listings but the maximum is {maximum}")]
     ListingBudgetExceeded { actual: usize, maximum: usize },
     #[error("captured {actual} bytes but the maximum is {maximum}")]
@@ -1695,7 +1680,6 @@ mod tests {
             let mut spec = CaptureSpec::phase_one(
                 [path.clone()],
                 CaptureBudget {
-                    max_paths: 8,
                     max_listings: 2,
                     max_bytes: 64,
                     max_depth: 4,
@@ -1828,7 +1812,6 @@ mod tests {
         let spec = CaptureSpec::phase_one(
             [requested.clone()],
             CaptureBudget {
-                max_paths: 8,
                 max_listings: 2,
                 max_bytes: 64,
                 max_depth: 4,
@@ -1915,7 +1898,6 @@ mod tests {
         let mut spec = CaptureSpec::phase_one(
             [requested.clone()],
             CaptureBudget {
-                max_paths: 4,
                 max_listings: 0,
                 max_bytes: 64,
                 max_depth: 4,
@@ -1942,7 +1924,6 @@ mod tests {
         let spec = CaptureSpec::phase_one(
             [path.clone()],
             CaptureBudget {
-                max_paths: 2,
                 max_listings: 1,
                 max_bytes: 64,
                 max_depth: 4,
@@ -1977,7 +1958,6 @@ mod tests {
         let mut listing_spec = CaptureSpec::phase_one(
             [],
             CaptureBudget {
-                max_paths: 1,
                 max_listings: 1,
                 max_bytes: 0,
                 max_depth: 4,
@@ -2052,54 +2032,41 @@ mod tests {
         )
     }
 
-    fn listing_budget(max_paths: usize, max_bytes: u64, max_depth: usize) -> CaptureBudget {
+    fn listing_budget(max_bytes: u64, max_depth: usize) -> CaptureBudget {
         CaptureBudget {
-            max_paths,
             max_listings: 1,
             max_bytes,
             max_depth,
         }
     }
 
+    /// A listing's children are bounded by what their names cost, not by how
+    /// many of them there are: a directory whose children outnumber every path
+    /// the declaration named closes when their names fit the byte budget, and is
+    /// refused only once they do not.
     #[test]
-    fn test_close_charges_listing_only_children_to_path_budget() {
-        let result = close_listing(
-            "issues",
-            &["one.json", "two.json"],
-            &[],
-            listing_budget(1, 64, 2),
-        );
+    fn test_close_bounds_listing_children_by_their_names_rather_than_their_count() {
+        let children = ["a", "b", "c", "d"];
+        let names = children.iter().map(|name| name.len() as u64).sum::<u64>();
 
+        assert!(close_listing("issues", &children, &[], listing_budget(names, 2)).is_ok());
         assert!(matches!(
-            result,
-            Err(CaptureError::PathBudgetExceeded {
-                actual: 2,
-                maximum: 1
-            })
+            close_listing("issues", &children, &[], listing_budget(names - 1, 2)),
+            Err(CaptureError::ByteBudgetExceeded { actual, maximum })
+                if actual == names && maximum == names - 1
         ));
     }
 
+    /// A listed child that is itself a requested listing root is admitted: one
+    /// path reached two ways is still one path.
     #[test]
-    fn test_close_counts_exact_listed_child_once() {
-        let result = close_listing(
-            "issues",
-            &["one.json"],
-            &["one.json"],
-            listing_budget(1, 64, 2),
-        );
-
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_close_does_not_charge_listed_child_that_is_a_listing_root() {
+    fn test_close_admits_a_listed_child_that_is_a_requested_listing_root() {
         let root = VirtualPath::data("").unwrap();
         let issues = VirtualPath::data("issues").unwrap();
         let identity = EntryIdentity::for_bytes("issues", b"directory").unwrap();
         let mut spec = CaptureSpec::phase_one(
             [],
             CaptureBudget {
-                max_paths: 0,
                 max_listings: 2,
                 max_bytes: 6,
                 max_depth: 1,
@@ -2133,7 +2100,7 @@ mod tests {
 
     #[test]
     fn test_close_charges_multibyte_listing_names_to_byte_budget() {
-        let result = close_listing("issues", &["é"], &[], listing_budget(1, 1, 2));
+        let result = close_listing("issues", &["é"], &[], listing_budget(1, 2));
 
         assert!(matches!(
             result,
@@ -2146,7 +2113,7 @@ mod tests {
 
     #[test]
     fn test_close_enforces_depth_for_listed_children() {
-        let result = close_listing("issues", &["one.json"], &[], listing_budget(1, 64, 1));
+        let result = close_listing("issues", &["one.json"], &[], listing_budget(64, 1));
 
         assert!(matches!(
             result,
@@ -2156,8 +2123,8 @@ mod tests {
     }
 
     #[test]
-    fn test_close_empty_listing_costs_no_path_or_bytes() {
-        let result = close_listing("issues", &[], &[], listing_budget(0, 0, 1));
+    fn test_close_empty_listing_costs_no_bytes() {
+        let result = close_listing("issues", &[], &[], listing_budget(0, 1));
 
         assert!(result.is_ok());
     }
@@ -2168,16 +2135,15 @@ mod tests {
         let mut spec = CaptureSpec::phase_one(
             [fixed.clone()],
             CaptureBudget {
-                max_paths: 1,
                 max_listings: 0,
                 max_bytes: 0,
-                max_depth: 2,
+                max_depth: 1,
             },
         )
         .unwrap();
         assert!(matches!(
-            spec.discover_paths([VirtualPath::data("config.toml").unwrap()]),
-            Err(CaptureError::PathBudgetExceeded { .. })
+            spec.discover_paths([VirtualPath::data("nested/config.toml").unwrap()]),
+            Err(CaptureError::DepthBudgetExceeded(_))
         ));
         assert_eq!(spec.paths().collect::<Vec<_>>(), vec![&fixed]);
     }
@@ -2185,7 +2151,6 @@ mod tests {
     #[test]
     fn test_phase_one_requires_data_fixed_paths() {
         let budget = CaptureBudget {
-            max_paths: 8,
             max_listings: 2,
             max_bytes: 64,
             max_depth: 4,
@@ -2429,7 +2394,6 @@ mod tests {
         let mut spec = CaptureSpec::phase_one(
             [fixed.clone()],
             CaptureBudget {
-                max_paths: 4,
                 max_listings: 1,
                 max_bytes: 64,
                 max_depth: 4,

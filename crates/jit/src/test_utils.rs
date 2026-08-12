@@ -1173,9 +1173,7 @@ pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
     let source = |index: usize| {
         (0..UNSHARED_ASSET_DIRECTORY_LEVELS)
             .map(|level| format!("level-{level}-{index:03}/"))
-            .chain(std::iter::once(format!(
-                "source-{padding}-{index:03}.txt"
-            )))
+            .chain(std::iter::once(format!("source-{padding}-{index:03}.txt")))
             .collect::<String>()
     };
     let manifest = std::iter::once(

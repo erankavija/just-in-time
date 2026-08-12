@@ -24,7 +24,6 @@ use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use jit::CommandExecutor;
 
 const SNAPSHOT_BUDGET: CaptureBudget = CaptureBudget {
-    max_paths: 1 << 12,
     max_listings: 1,
     max_bytes: 64 * 1024 * 1024,
     max_depth: 8,

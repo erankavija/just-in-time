@@ -99,8 +99,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             RepositoryExportDestination::Repository(target) => {
                 let intent = RepositoryExportIntent::new(target, bytes.to_vec());
                 let budget = CaptureBudget {
-                    // Includes children named by the complete parent listing.
-                    max_paths: 4096,
                     max_listings: 1,
                     max_bytes: 512 * 1024 * 1024,
                     max_depth: 128,

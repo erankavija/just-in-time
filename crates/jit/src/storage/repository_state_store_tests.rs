@@ -11,7 +11,7 @@ use tempfile::TempDir;
 fn test_advisory_error_classification_only_accepts_permission_denied_io() {
     let errors = [
         RepositoryStateStoreError::Io(std::io::Error::other("hard I/O failure")),
-        RepositoryStateStoreError::Capture(CaptureError::PathBudgetExceeded {
+        RepositoryStateStoreError::Capture(CaptureError::ListingBudgetExceeded {
             actual: 2,
             maximum: 1,
         }),
@@ -112,7 +112,6 @@ fn test_windows_metadata_identity_distinguishes_equal_size_files_and_directories
 
 fn budget() -> CaptureBudget {
     CaptureBudget {
-        max_paths: 32,
         max_listings: 8,
         max_bytes: 1024 * 1024,
         max_depth: 8,
@@ -2235,23 +2234,31 @@ fn capture_listing_errors(
     [json_error, memory_error]
 }
 
+/// Children a declaration never asked for cost what their names cost, so a
+/// directory that has gained more of them than the budget admits is refused by
+/// every backend rather than silently expanding the capture.
 #[test]
-fn test_conformance_listing_rogue_children_exceed_path_budget_on_both_backends() {
+fn test_conformance_listing_rogue_children_exceed_the_byte_budget_on_both_backends() {
+    let children: [(&str, &[u8]); 2] = [("one.json", b"one"), ("two.json", b"two")];
+    let names = children
+        .iter()
+        .map(|(name, _)| name.len() as u64)
+        .sum::<u64>();
+
     for error in capture_listing_errors(
-        &[("one.json", b"one"), ("two.json", b"two")],
+        &children,
         CaptureBudget {
-            max_paths: 1,
             max_listings: 1,
-            max_bytes: 64,
+            max_bytes: names - 1,
             max_depth: 2,
         },
     ) {
         assert!(matches!(
             error,
-            RepositoryStateStoreError::Capture(CaptureError::PathBudgetExceeded {
-                actual: 2,
-                maximum: 1
-            })
+            RepositoryStateStoreError::Capture(CaptureError::ByteBudgetExceeded {
+                actual,
+                maximum,
+            }) if actual >= names && maximum == names - 1
         ));
     }
 }
@@ -2261,7 +2268,6 @@ fn test_conformance_listing_rogue_name_bytes_exceed_budget_on_both_backends() {
     for error in capture_listing_errors(
         &[("é", b"content")],
         CaptureBudget {
-            max_paths: 1,
             max_listings: 1,
             max_bytes: 1,
             max_depth: 2,

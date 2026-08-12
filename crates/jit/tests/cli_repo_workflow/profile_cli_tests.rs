@@ -2586,7 +2586,8 @@ fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_it
     // The package under test binds every dimension the model constrains, so a
     // publication that survives it has no headroom left in any of them.
     assert_eq!(
-        packed["file_count"], jit::profile::MAX_PROFILE_PACKAGE_FILES,
+        packed["file_count"],
+        jit::profile::MAX_PROFILE_PACKAGE_FILES,
         "the package under test must sit at the file bound"
     );
     let byte_size = packed["byte_size"]

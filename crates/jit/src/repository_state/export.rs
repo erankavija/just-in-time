@@ -355,7 +355,6 @@ mod tests {
         let intent = RepositoryExportIntent::new(target.clone(), b"new".to_vec());
         let spec = intent
             .capture_spec(CaptureBudget {
-                max_paths: 4,
                 max_listings: 1,
                 max_bytes: 1024,
                 max_depth: 8,
@@ -474,7 +473,6 @@ mod tests {
         );
         let spec = intent
             .capture_spec(CaptureBudget {
-                max_paths: 8,
                 max_listings: 1,
                 max_bytes: 1024,
                 max_depth: 8,

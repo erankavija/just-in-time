@@ -4,7 +4,6 @@ use super::*;
 
 const DOCUMENT_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
-        max_paths: 256,
         max_listings: 0,
         max_bytes: 64 * 1024 * 1024,
         max_depth: 8,
@@ -36,7 +35,6 @@ enum DocumentScanSource {
 /// targets a pinned reference names at its commit.
 const LINK_CHECK_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
-        max_paths: 1 << 16,
         max_listings: 0,
         max_bytes: 512 * 1024 * 1024,
         max_depth: 32,

@@ -31,7 +31,6 @@ use serde::Serialize;
 const APPLY_ACTOR: &str = "agent:apply";
 
 const TEMPLATE_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
-    max_paths: 1 << 16,
     max_listings: 2,
     max_bytes: 512 * 1024 * 1024,
     max_depth: 16,

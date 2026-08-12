@@ -155,7 +155,6 @@ mod tests {
     /// listing for `.jit/issues` over the supplied issue file names.
     fn base_image(files: &[(&str, &str)], issues_listing: Option<&[&str]>) -> RepositoryImage {
         let budget = CaptureBudget {
-            max_paths: 64,
             max_listings: 8,
             max_bytes: 1 << 20,
             max_depth: 8,

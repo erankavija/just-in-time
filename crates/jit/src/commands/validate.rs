@@ -268,13 +268,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
 
         // An archive citation scan may enumerate every directory below its
-        // declared roots. A complete listing consumes one distinct captured
-        // path, so archive capture binds that ceiling to the existing exact-path
-        // closure limit rather than imposing a smaller repository-size cap.
-        let max_paths = 1 << 16;
+        // declared roots, so it is allowed a listing per directory an archive of
+        // the admitted size can hold rather than the handful a registry scan
+        // needs.
         let budget = CaptureBudget {
-            max_paths,
-            max_listings: if archive_scan { max_paths } else { 256 },
+            max_listings: if archive_scan { 1 << 16 } else { 256 },
             max_bytes: 512 * 1024 * 1024,
             max_depth: 32,
         };

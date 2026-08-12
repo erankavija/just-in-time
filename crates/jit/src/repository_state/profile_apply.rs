@@ -2576,7 +2576,6 @@ mod tests {
                 target.clone(),
             ],
             CaptureBudget {
-                max_paths: 16,
                 max_listings: 1,
                 max_bytes: 4096,
                 max_depth: 8,
@@ -3209,7 +3208,6 @@ mod tests {
         let mut spec = CaptureSpec::phase_one(
             [VirtualPath::CONFIG],
             CaptureBudget {
-                max_paths: 4,
                 max_listings: 0,
                 max_bytes: 4096,
                 max_depth: 4,
@@ -3370,7 +3368,6 @@ mod tests {
         let mut spec = CaptureSpec::phase_one(
             [path.clone()],
             CaptureBudget {
-                max_paths: 4,
                 max_listings: 0,
                 max_bytes: 1024,
                 max_depth: 4,

@@ -791,17 +791,7 @@ impl CommandExecutor<JsonFileStorage> {
                 })
                 .collect::<Result<Vec<_>, RepositoryLayoutError>>()?,
         )?;
-        // A package tree bounds itself: the package model already refuses one
-        // above `MAX_PROFILE_PACKAGE_FILES` files or `MAX_PROFILE_PACKAGE_BYTES`
-        // bytes, and the destination enumeration below reads a tree of the same
-        // shape, so the budget is that bound with room for the directories on
-        // both sides rather than a second, unrelated limit.
-        let budget = CaptureBudget {
-            max_paths: 8 * crate::profile::MAX_PROFILE_PACKAGE_FILES,
-            max_listings: 2 * crate::profile::MAX_PROFILE_PACKAGE_FILES,
-            max_bytes: 8 * crate::profile::MAX_PROFILE_PACKAGE_BYTES as u64,
-            max_depth: 32,
-        };
+        let budget = package_tree_capture_budget(destination);
 
         with_mutation_session(self.storage(), layout, "profile package tree", |session| {
             // The destination's whole subtree must be read before the delta is
@@ -858,14 +848,12 @@ impl CommandExecutor<JsonFileStorage> {
                 let intent = RepositoryExportIntent::new_absent_file(target, archive);
                 // The export reads exactly two paths — the output path and its
                 // parent — plus the parent's listing, whatever the path's depth,
-                // so the path budget is that pair with headroom rather than a
-                // guess at a tree. What occupies the output path is read to
-                // decide it is occupied, and an occupant larger than a package
-                // archive may be exhausts the byte budget: that is a refusal
-                // carrying a less specific message than the occupied-path one,
-                // never a publication.
+                // so one listing is all it needs. What occupies the output path
+                // is read to decide it is occupied, and an occupant larger than
+                // a package archive may be exhausts the byte budget: that is a
+                // refusal carrying a less specific message than the
+                // occupied-path one, never a publication.
                 let budget = CaptureBudget {
-                    max_paths: 8,
                     max_listings: 1,
                     max_bytes: crate::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
                     max_depth: 128,
@@ -2142,11 +2130,63 @@ fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
 /// One record per applied profile, each a small JSON document directly under
 /// `.jit/profiles/`, plus the listing that names them.
 const RECORD_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
-    max_paths: 256,
     max_listings: 1,
     max_bytes: 4 * 1024 * 1024,
     max_depth: 4,
 };
+
+/// How many package-model byte budgets one package-tree publication may span.
+///
+/// One is the tree being published. One more is what the destination already
+/// holds, which a previous publication left there as a package tree bounded the
+/// same way. The rest is headroom for content an adopter added beside it, so a
+/// republication is refused for what the destination holds rather than for the
+/// shape of the package arriving at it.
+const PACKAGE_TREE_MODEL_BUDGETS: usize = 8;
+
+/// Bounds for publishing one package tree at `destination`.
+///
+/// Every bound here is derived from what the package model constrains. That
+/// matters because the model bounds a package's file count
+/// ([`MAX_PROFILE_PACKAGE_FILES`]) and its total size
+/// ([`MAX_PROFILE_PACKAGE_BYTES`]) and says nothing about how deep or how long
+/// its paths are, so a bound assuming a path shape refuses packages the model
+/// admits — an archive `jit profile pack` writes that `jit profile add` will
+/// not take.
+///
+/// One property of the model carries all three. The manifest declares every
+/// file the package holds besides itself, by name, and no source may be
+/// declared twice, so the package's declared path lengths sum to less than the
+/// manifest's own size — which is itself part of the same byte budget its
+/// content is. From that:
+///
+/// * **Listings.** A republication takes one per directory beneath the
+///   destination. Each directory the package needs is a proper prefix of a
+///   declared path ending at a separator, so the package contributes fewer of
+///   them than its declared paths have bytes.
+/// * **Depth.** A path's component count is below its own byte length, so no
+///   declared path reaches a package byte budget's worth of components below
+///   the destination the caller named.
+/// * **Bytes.** What actually binds a publication: the tree's content is at
+///   most one package byte budget, and a republication also reads what the
+///   destination already holds.
+///
+/// Nothing bounds how many paths the capture declares, because the same
+/// property already bounds them: the closure is the declared files plus their
+/// directory prefixes, so it stays under `MAX_PROFILE_PACKAGE_FILES` plus a
+/// package byte budget. A budget stating a number that large refuses no package
+/// the model admits, and any smaller number refuses packages it does admit.
+///
+/// [`MAX_PROFILE_PACKAGE_FILES`]: crate::profile::MAX_PROFILE_PACKAGE_FILES
+/// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
+fn package_tree_capture_budget(destination: &VirtualPath) -> CaptureBudget {
+    let model_bytes = crate::profile::MAX_PROFILE_PACKAGE_BYTES;
+    CaptureBudget {
+        max_listings: 1 + PACKAGE_TREE_MODEL_BUDGETS * model_bytes,
+        max_bytes: (PACKAGE_TREE_MODEL_BUDGETS * model_bytes) as u64,
+        max_depth: destination.relative().depth() + model_bytes,
+    }
+}
 
 /// Canonical applied-profile provenance path for one profile id.
 ///
