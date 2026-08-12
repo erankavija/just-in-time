@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T09:05:36.053059822Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-12T09:45:49.453612811Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "efaec52f-da76-438a-a55b-d4cefd5e6217",
@@ -29,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Optimize only the JIT package test profile",
-  "updated_at": "2026-08-12T09:05:36.053059822Z"
+  "updated_at": "2026-08-12T09:45:49.453612811Z"
 }

@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e281da805b80f42955ff70d092afc87d1852eefa",
+  "completed_at": "2026-08-12T09:38:39.935196805Z",
+  "duration_ms": 133029,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/test-profile-efaec52f/summary.json",
+        "id": "F1",
+        "line": 117,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/efaec52f/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "Candidate doctest discovery failed and baseline identities were reused, so REQ-02's exact candidate doctest identity preservation is unproven."
+      }
+    ],
+    "summary": "The no-change decision correctly rejects the build regression, but lacks required candidate doctest identity evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "efaec52f-da76-438a-a55b-d4cefd5e6217",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0022025a-796c-4506-9af7-356669c8121e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:36:26.905567675Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2095 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff554-8e1f-7703-bfaa-d388044ea4bc\n--------\nuser\n--- 2082 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: a81639d9, e66dc7e2 (jit:efaec52f)\nPolicy sources: AGENTS.md\nResolved items: @/issue/efaec52f/requirement/REQ-01 through REQ-05 (issue description, markdown-first); @/invariant/bounded-rust-build-footprint and @/invariant/single-source-prose (.jit/invariants.toml, registry-first); @/gate/cargo-ci (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit code not recorded); code-review pending\nTruncation recovery: none\n\n1. [blocking][issue-impact] The candidate’s doctest identity set was not measured. Its inventory has one doctest target and zero doctest cases, versus the baseline’s two targets and 63 cases; `summary.json` explicitly records the candidate listing as an operational error and reuses baseline identities instead. This does not prove the candidate’s exact doctest identities were preserved, as required by REQ-02, even though the early rebuild rejection validly skips runtime samples. Rerun candidate doctest discovery with a valid `TMPDIR` and record/compare the candidate set. [dev/benchmarks/test-profile-efaec52f/summary.json](/home/vkaskivuo/Projects/just-in-time/dev/benchmarks/test-profile-efaec52f/summary.json:117) (`@/issue/efaec52f/requirement/REQ-02`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The no-change decision correctly rejects the build regression, but lacks required candidate doctest identity evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Candidate doctest discovery failed and baseline identities were reused, so REQ-02's exact candidate doctest identity preservation is unproven.\",\"file\":\"dev/benchmarks/test-profile-efaec52f/summary.json\",\"line\":117,\"references\":[\"@/issue/efaec52f/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

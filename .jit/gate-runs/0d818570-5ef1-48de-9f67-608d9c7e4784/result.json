@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e281da805b80f42955ff70d092afc87d1852eefa",
+  "completed_at": "2026-08-12T09:33:09.494216515Z",
+  "duration_ms": 189632,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; later committed benchmark evidence resolves the prior performance-evidence finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ae17798d-c0c6-4ad0-b119-2dd2fab8e95d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0d818570-5ef1-48de-9f67-608d9c7e4784",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:29:59.862158361Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 61234ddf, 420ddfb1, db82ac6c, e281da80 (`jit:ae17798d`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/ae17798d/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/gate/cargo-ci (.jit/gates.toml); @/charter/D-1 (dev/vision/9db27a3a-charter.md); applicable invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit not recorded, 2026-08-12T09:05:34Z); prior code-review F1 is addressed by the later validated benchmark evidence\nTruncation recovery: per-commit and per-file patches, current focused source reads, raw benchmark samples, and committed validator rerun\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; later committed benchmark evidence resolves the prior performance-evidence finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
