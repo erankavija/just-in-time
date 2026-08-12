@@ -66,6 +66,14 @@ jit profile show --profile id:jit-dogfood
 jit profile show --profile path:packages/jit-dogfood
 ```
 
+Check every recorded profile against the package it came from and the content it
+owns, which is what says whether a repository needs reconfiguring, upgrading, or
+capturing:
+
+```bash
+jit profile validate
+```
+
 Preview and apply a profile to an existing JIT repository:
 
 ```bash
@@ -266,10 +274,17 @@ event per package of the set. The record stores the profile ID, version, origin,
 package hash, resolved public variable values with their source kinds, and
 sorted ownership claims. Each claim names one semantic declaration, file target,
 or managed region together with its published-base fingerprint and retention
-intent. Validation and repair reuse the stored resolved variable values but load
-effective configuration from the declared registries; they do not read the
-current process environment. The audit event carries the resolved target hashes
-but never the resolved values.
+intent. That fingerprint is what
+[`jit profile validate`](cli-commands.md#jit-profile-validate) holds the
+repository's current content against, so it names the profile that diverged and
+the contribution that did. A managed region whose published body encloses a
+region another owner manages — a package's guidance region around a configured
+projection — is checked for presence rather than content: that nested body is
+rendered from what its own owner declares, so the enclosing profile's recorded
+base is not the whole of what sits between its delimiters. Validation and repair
+reuse the stored resolved variable values but load effective configuration from
+the declared registries; they do not read the current process environment. The
+audit event carries the resolved target hashes but never the resolved values.
 The record does not state why a package was applied, so it reads the same
 whether the adopter named that package or received it as another's dependency.
 
