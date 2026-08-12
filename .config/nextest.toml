@@ -38,8 +38,8 @@ setup = 'recorded-failure-corpus'
 [profile.default]
 retries = 0
 
-# 15s × 4 = 60s hard per-test bound.
-slow-timeout = { period = "15s", terminate-after = 4 }
+# 10s × 2 = 20s hard per-test bound.
+slow-timeout = { period = "10s", terminate-after = 2 }
 
 # Explicitly pins nextest's default leak timeout.
 # Verified from the pinned tag source: https://raw.githubusercontent.com/nextest-rs/nextest/cargo-nextest-0.9.133/nextest-runner/default-config.toml

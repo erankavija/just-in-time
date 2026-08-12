@@ -355,10 +355,31 @@ fi
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
 run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
 
+# Compile the measured suite before the clock starts (jit:94d85bf1). The budget
+# enforced below is defined over an already-built target, so compilation paid
+# inside the clock would fail the gate on every cold one — every fresh clone and
+# every CI runner — with nothing wrong in the tree. The recorded cargo-ci run
+# for jit:6d10e5d4 at commit e2da055a reports a 239,771 ms suite-clock on a tree
+# whose warm clock is an order of magnitude smaller
+# (dev/benchmarks/provenance-removal-355565c2/README.md), because a
+# dependency-profile change had invalidated every artifact. Reporting the build
+# as its own step keeps that cost visible in gate evidence rather than hiding
+# it.
+#
+# `cargo nextest run --no-run` links every test binary the `test` substep then
+# executes, and with it the library rlibs and dependencies `cargo test --doc`
+# links against: measured on this workspace, the doctest substep compiles
+# nothing after this step, and repeating this step on a warm target is a no-op.
+# Cargo rejects `cargo test --doc --no-run` ("can't skip running doc tests with
+# --no-run") and exposes no stable way to precompile doctests, so rustdoc's own
+# compilation of each doc fence has no prebuild and stays inside the clock,
+# measured as part of the doctest substep.
+run_step suite-build "${NICE_PREFIX[@]}" cargo nextest run --workspace --no-run
+
 # The named suite clock is deliberately narrower than the gate duration. It
 # starts immediately before the pinned workspace suite and ends after the
 # separately reported doctest substep, leaving lock acquisition, preflight,
-# formatting, and linting outside it.
+# formatting, linting, and the suite build above outside it.
 suite_clock_started_ms=$(epoch_milliseconds)
 run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
 run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
@@ -377,6 +398,13 @@ summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
 # from its own path, so the budget verdict describes the same tree the steps above
 # judged. CARGO_INCREMENTAL=0 (exported above) is inherited, so its warm --no-run
 # leaves no incremental state for the check below.
+#
+# The same step enforces the suite budget (jit:94d85bf1) by handing the checker
+# the suite clock measured above as `--test-suite-ms`. The threshold itself is
+# the checker's own MAX_TEST_SUITE_SECONDS, declared once beside the artifact
+# budgets; this script supplies the measurement, never a second copy of the
+# limit. Without the argument the checker skips its duration check, so the
+# budget would be declared and never enforced.
 CARGO_CI_SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 run_budget_check() {
   local root
@@ -385,7 +413,8 @@ run_budget_check() {
     echo "could not resolve this run's Cargo workspace root" >&2
     return 1
   fi
-  "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" --root "$root"
+  "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" \
+    --root "$root" --test-suite-ms "$suite_clock_ms"
 }
 run_step budget run_budget_check
 
