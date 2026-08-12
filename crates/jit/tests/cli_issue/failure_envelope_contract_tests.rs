@@ -9,8 +9,8 @@
 //! status. Command-specific tests may assert their own semantics, but they do
 //! not duplicate this stable external field inventory.
 
-use super::failure_lever_registry::{failure_lever_registry, FailureLever};
-use super::failure_probe_fixture::{drive_failure_lever, ForcedFailure, RecordedFailure};
+use super::failure_lever_registry::{failure_lever_registry, FailureLever, FailureLeverInvocation};
+use super::failure_probe_fixture::{recorded_failure_corpus, RecordedFailureObservation};
 use jit::output::ErrorCode;
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
@@ -20,25 +20,42 @@ fn field_set(object: &Map<String, Value>) -> BTreeSet<&str> {
     object.keys().map(String::as_str).collect()
 }
 
-fn failure_context(failure: &ForcedFailure) -> String {
+fn failure_context(failure: &RecordedFailureObservation) -> String {
+    let RecordedFailureObservation::Invoked {
+        path,
+        argv,
+        status,
+        stdout,
+        stderr,
+        ..
+    } = failure
+    else {
+        return failure.path().to_owned();
+    };
     format!(
         "{} {:?}: status={:?}, stdout={}, stderr={}",
-        failure.path,
-        failure.argv,
-        failure.status.code(),
-        String::from_utf8_lossy(&failure.stdout),
-        String::from_utf8_lossy(&failure.stderr),
+        path,
+        argv,
+        status.code(),
+        String::from_utf8_lossy(stdout),
+        String::from_utf8_lossy(stderr),
     )
 }
 
-fn assert_canonical_failure_envelope(failure: &ForcedFailure) {
+fn assert_canonical_failure_envelope(
+    invocation: &FailureLeverInvocation,
+    failure: &RecordedFailureObservation,
+) {
+    let RecordedFailureObservation::Invoked { status, stdout, .. } = failure else {
+        panic!("an invoked registry arm must remain a runtime observation")
+    };
     let context = failure_context(failure);
     assert!(
-        !failure.status.success(),
+        !status.success(),
         "a recorded failure must exit non-zero: {context}"
     );
 
-    let envelope: Value = serde_json::from_slice(&failure.stdout).unwrap_or_else(|error| {
+    let envelope: Value = serde_json::from_slice(stdout).unwrap_or_else(|error| {
         panic!("failure payload must be a JSON envelope: {error}; {context}")
     });
     let envelope = envelope
@@ -71,17 +88,17 @@ fn assert_canonical_failure_envelope(failure: &ForcedFailure) {
     let code = ErrorCode::from_str(code_text)
         .unwrap_or_else(|error| panic!("error.code must be registered: {error}; {context}"));
     assert_eq!(
-        code, failure.expected_code,
+        code, invocation.expected_code,
         "the observed error classification must match the registry contract: {context}"
     );
     assert_eq!(
-        failure.status.code(),
+        status.code(),
         Some(code.exit_code().code()),
         "the process status must be determined by the registered error classification: {context}"
     );
     assert_eq!(
-        failure.status.code(),
-        Some(failure.expected_exit),
+        status.code(),
+        Some(invocation.expected_exit),
         "the observed status must match the registry contract: {context}"
     );
     assert!(
@@ -113,17 +130,20 @@ fn assert_canonical_failure_envelope(failure: &ForcedFailure) {
 #[test]
 fn test_recorded_failure_arms_emit_the_canonical_error_envelope() {
     let mut probed_arms = 0;
+    let registry = failure_lever_registry();
+    let corpus = recorded_failure_corpus().expect("load the verified raw failure corpus");
 
-    failure_lever_registry()
+    registry
         .arms
         .iter()
-        .for_each(|lever| match lever {
-            FailureLever::Invocation(_) => match drive_failure_lever(lever) {
-                RecordedFailure::Invoked(failure) => {
+        .zip(corpus.iter())
+        .for_each(|(lever, observation)| match lever {
+            FailureLever::Invocation(invocation) => match observation {
+                RecordedFailureObservation::Invoked { .. } => {
                     probed_arms += 1;
-                    assert_canonical_failure_envelope(&failure);
+                    assert_canonical_failure_envelope(invocation, observation);
                 }
-                RecordedFailure::Exempt { .. } => {
+                RecordedFailureObservation::Exempt { .. } => {
                     panic!("an invoked registry arm must remain a runtime probe")
                 }
             },

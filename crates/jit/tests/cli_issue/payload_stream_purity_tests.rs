@@ -1,7 +1,6 @@
 //! Payload-stream purity for every recorded machine-readable command failure.
 
-use super::failure_lever_registry::failure_lever_registry;
-use super::failure_probe_fixture::{drive_failure_lever, RecordedFailure};
+use super::failure_probe_fixture::{recorded_failure_corpus, RecordedFailureObservation};
 use serde_json::Value;
 
 fn parse_single_json_document(payload: &[u8]) -> Result<Value, serde_json::Error> {
@@ -10,39 +9,46 @@ fn parse_single_json_document(payload: &[u8]) -> Result<Value, serde_json::Error
 
 #[test]
 fn test_machine_readable_failures_emit_one_json_document_on_payload_stream() {
-    failure_lever_registry()
-        .arms
+    recorded_failure_corpus()
+        .expect("load the verified raw failure corpus")
         .iter()
-        .for_each(|lever| match drive_failure_lever(lever) {
-            RecordedFailure::Invoked(failure) => {
+        .for_each(|observation| match observation {
+            RecordedFailureObservation::Invoked {
+                path,
+                argv,
+                status,
+                stdout,
+                stderr,
+                ..
+            } => {
                 assert!(
-                    !failure.status.success(),
+                    !status.success(),
                     "recorded failure {} unexpectedly succeeded: stdout={} stderr={}",
-                    failure.path,
-                    String::from_utf8_lossy(&failure.stdout),
-                    String::from_utf8_lossy(&failure.stderr)
+                    path,
+                    String::from_utf8_lossy(stdout),
+                    String::from_utf8_lossy(stderr)
                 );
-                let envelope = parse_single_json_document(&failure.stdout).unwrap_or_else(|error| {
+                let envelope = parse_single_json_document(stdout).unwrap_or_else(|error| {
                     panic!(
                         "recorded failure {} emitted an impure payload stream for {:?}: {error}; stdout={} stderr={}",
-                        failure.path,
-                        failure.argv,
-                        String::from_utf8_lossy(&failure.stdout),
-                        String::from_utf8_lossy(&failure.stderr)
+                        path,
+                        argv,
+                        String::from_utf8_lossy(stdout),
+                        String::from_utf8_lossy(stderr)
                     )
                 });
                 assert!(
                     envelope.is_object(),
                     "recorded failure {} must emit a JSON envelope object",
-                    failure.path
+                    path
                 );
                 // The fixture deliberately retains the diagnostic stream. It is
                 // not part of the payload assertion: handler-owned failures may
                 // choose their own human diagnostic policy, while this guard
                 // protects the parser-facing stream from that prose.
-                let _diagnostic_stream = &failure.stderr;
+                let _diagnostic_stream = stderr;
             }
-            RecordedFailure::Exempt { path, reason } => {
+            RecordedFailureObservation::Exempt { path, reason } => {
                 assert!(
                     !reason.is_empty(),
                     "source-only arm {path} must retain its recorded exemption reason"

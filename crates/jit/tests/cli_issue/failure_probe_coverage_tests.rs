@@ -1,7 +1,7 @@
 //! Completeness and runtime conformance guard for machine-readable failure probes.
 
 use super::failure_lever_registry::{failure_lever_registry, FailureLever, FailureLeverRegistry};
-use super::failure_probe_fixture::{drive_failure_lever, RecordedFailure};
+use super::failure_probe_fixture::{recorded_failure_corpus, RecordedFailureObservation};
 use jit::output::ErrorCode;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -258,6 +258,7 @@ fn write_census_report(report: &FailureProbeCensus) -> io::Result<PathBuf> {
 fn test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes() {
     let declared = reflected_json_arm_paths();
     let registry = failure_lever_registry();
+    let corpus = recorded_failure_corpus().expect("load the verified raw failure corpus");
     let registrations = registry_registrations(&registry);
     let mut errors = coverage_errors(&declared, &registrations);
     let mut diagnostics = Vec::with_capacity(registry.arms.len());
@@ -266,53 +267,58 @@ fn test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes() {
     registry
         .arms
         .iter()
-        .for_each(|lever| match drive_failure_lever(lever) {
-            RecordedFailure::Exempt { path, reason } => {
+        .zip(corpus.iter())
+        .for_each(|(_lever, observation)| match observation {
+            RecordedFailureObservation::Exempt { path, reason } => {
                 diagnostics.push(format!("{path}: exemption — {reason}"));
-                census
-                    .entry(path.clone())
-                    .or_insert(CensusRow::Exemption { path, reason });
+                census.entry(path.clone()).or_insert(CensusRow::Exemption {
+                    path: path.clone(),
+                    reason: reason.clone(),
+                });
             }
-            RecordedFailure::Invoked(failure) => {
-                let (has_envelope, code) = canonical_error_code(&failure.stdout);
+            RecordedFailureObservation::Invoked {
+                path,
+                status,
+                stdout,
+                ..
+            } => {
+                let (has_envelope, code) = canonical_error_code(stdout);
                 let code_for_diagnostic = code
                     .as_ref()
                     .map(|code| code.as_str())
                     .unwrap_or_else(|code| code.as_str());
                 diagnostics.push(format!(
                     "{}: envelope={} code={code_for_diagnostic} exit={:?}",
-                    failure.path,
+                    path,
                     has_envelope,
-                    failure.status.code()
+                    status.code()
                 ));
                 errors.extend(probe_contract_errors(
-                    &failure.path,
+                    path,
                     has_envelope,
                     code.as_ref().copied().map_err(String::as_str),
                 ));
-                if failure.status.success() {
-                    errors.push(format!("`{}` probe unexpectedly succeeded", failure.path));
+                if status.success() {
+                    errors.push(format!("`{path}` probe unexpectedly succeeded"));
                 }
                 if let Ok(code) = &code {
-                    if failure.status.code() != Some(code.exit_code().code()) {
+                    if status.code() != Some(code.exit_code().code()) {
                         errors.push(format!(
                             "`{}` exited {:?}, but {} requires {}",
-                            failure.path,
-                            failure.status.code(),
+                            path,
+                            status.code(),
                             code.as_str(),
                             code.exit_code().code()
                         ));
                     }
                 }
-                if let (Ok(code), Some(observed_exit)) = (code, failure.status.code()) {
-                    census
-                        .entry(failure.path.clone())
-                        .or_insert(CensusRow::Probe {
-                            path: failure.path,
-                            envelope_rendered: has_envelope,
-                            error_code: code.as_str().to_owned(),
-                            observed_exit,
-                        });
+                if let (Ok(code), Some(observed_exit)) = (code, status.code()) {
+                    census.entry(path.clone()).or_insert(CensusRow::Probe {
+                        path: path.clone(),
+                        envelope_rendered: has_envelope,
+                        error_code: code.as_str().to_owned(),
+                        observed_exit,
+                    });
                 }
             }
         });

@@ -29,6 +29,18 @@ filter = '''
 '''
 setup = 'dogfood-repository-fixture'
 
+[scripts.setup.recorded-failure-corpus]
+command = { command-line = "scripts/setup-recorded-failure-corpus.sh", relative-to = "workspace-root" }
+slow-timeout = { period = "15s", terminate-after = 4 }
+capture-stdout = true
+capture-stderr = true
+
+[[profile.default.scripts]]
+filter = '''
+binary(cli_issue) & test(/^(failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope|failure_probe_coverage_tests::test_failure_probe_coverage_matches_clap_arms_and_emits_typed_envelopes|payload_stream_purity_tests::test_machine_readable_failures_emit_one_json_document_on_payload_stream)$/)
+'''
+setup = 'recorded-failure-corpus'
+
 [profile.default]
 retries = 0
 

@@ -5,7 +5,7 @@ use serde::{de::Error as _, Deserialize, Deserializer};
 use std::collections::BTreeSet;
 use std::str::FromStr;
 
-const REGISTRY_TOML: &str = include_str!("failure_lever_registry.toml");
+pub(crate) const REGISTRY_TOML: &str = include_str!("failure_lever_registry.toml");
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct FailureLeverRegistry {
