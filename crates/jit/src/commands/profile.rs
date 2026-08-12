@@ -847,12 +847,17 @@ impl CommandExecutor<JsonFileStorage> {
             RepositoryExportDestination::Repository(target) => {
                 let intent = RepositoryExportIntent::new_absent_file(target, archive);
                 // The export reads exactly two paths — the output path and its
-                // parent — plus the parent's listing, whatever the path's depth,
-                // so one listing is all it needs. What occupies the output path
-                // is read to decide it is occupied, and an occupant larger than
-                // a package archive may be exhausts the byte budget: that is a
-                // refusal carrying a less specific message than the
-                // occupied-path one, never a publication.
+                // parent — plus that parent's listing, whatever the path's
+                // depth: it enumerates no ancestors, so nothing here scales
+                // with depth. What occupies the output path is read to decide
+                // it is occupied, and an occupant larger than a package archive
+                // may be exhausts the byte budget: that is a refusal carrying a
+                // less specific message than the occupied-path one, never a
+                // publication.
+                //
+                // `max_depth` therefore bounds only how deep an operator may
+                // name `--output`, and no package's own paths reach it: the
+                // archive is one file, wherever the operator puts it.
                 let budget = CaptureBudget {
                     max_listings: 1,
                     max_bytes: crate::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
