@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:terra-preset-isolation",
+  "claimed_at": "2026-08-12T08:02:19.467875250Z",
+  "context": {},
+  "created_at": "2026-08-12T08:01:58.584417775Z",
+  "dependencies": [],
+  "description": "Make the project-defined preset integration fixture place its worktree and `.jit` data root inside its own `TempDir`, so concurrent tests never share the process-global temporary directory’s bootstrap lock.\n\n## Background\n\nThe fixture currently constructs `JsonFileStorage` directly at `TempDir::path()` and then discovers the worktree as that path’s parent. Multiple nextest processes therefore resolve the same `$TMPDIR/.jit-bootstrap.lock`; matched concurrency runs reproduced five-second lock timeouts at both 24 and 48 workers. The preset behavior itself is correct, but its repository topology is not isolated.\n\n## Success Criteria\n\n- [hard] REQ-01: Constructs every file-backed preset fixture with a unique worktree directory and a `.jit` data root beneath that worktree, never with the shared temporary-directory parent as its worktree.\n- [hard] REQ-02: Preserves the existing save, list, show, apply, registry-event, and on-disk preset assertions without changing production lock behavior or timeouts.\n- [hard] REQ-03: Adds a deterministic regression proving two concurrently created preset fixtures resolve distinct repository roots and can complete their real preset writes without bootstrap-lock contention.\n\n## Notes\n\nThis is a test-fixture isolation repair. Do not weaken the bootstrap lock, increase its timeout, serialize the test target, or change nextest scheduling to mask the shared-root defect.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T08:01:58.584417775Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "527bd363-70fd-4a0e-9708-9ed7d08002e3",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Isolate the project-defined preset fixture root",
+  "updated_at": "2026-08-12T08:02:19.467875250Z"
+}
