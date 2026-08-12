@@ -1,7 +1,7 @@
 {
   "epic_id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
   "epic_short_id": "4b7c06d0",
-  "current_wave": 4,
+  "current_wave": 5,
   "waves": [
     {
       "wave_number": 1,
@@ -33,15 +33,16 @@
     },
     {
       "wave_number": 4,
+      "status": "complete",
       "issues": [
-        {"short_id": "21ba4bb4", "title": "Produce warm per-test suite timing evidence", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "in_progress"},
-        {"short_id": "2516ad90", "title": "Add step timing and the named suite clock", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "in_progress"}
+        {"short_id": "21ba4bb4", "title": "Produce warm per-test suite timing evidence", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "done"},
+        {"short_id": "2516ad90", "title": "Add step timing and the named suite clock", "classification": "implementation", "difficulty": "moderate", "worker": "gpt-5.6-terra", "status": "done"}
       ]
     },
     {
       "wave_number": 5,
       "issues": [
-        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"}
+        {"short_id": "94d85bf1", "title": "Wire suite-clock enforcement into the duration checker", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "ready"}
       ]
     },
     {

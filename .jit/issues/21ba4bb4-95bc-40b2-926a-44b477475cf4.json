@@ -15,6 +15,7 @@
       "path": "dev/benchmarks/suite-profile.json"
     }
   ],
+  "done_at": "2026-08-12T01:11:26.656171596Z",
   "first_ready_at": "2026-08-12T00:27:43.153484976Z",
   "gates_required": [
     "cargo-ci",
@@ -41,7 +42,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Produce warm per-test suite timing evidence",
-  "updated_at": "2026-08-12T01:10:51.375985813Z"
+  "updated_at": "2026-08-12T01:11:26.656171596Z"
 }
