@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T20:07:59.877145508Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-12T20:15:12.296028324Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "355565c2-2f98-45f0-b655-7bb29117e54d",
@@ -28,5 +33,5 @@
   "priority": "critical",
   "state": "in_progress",
   "title": "Remove build provenance, the stale-binary guard, and the disk-backed gate TMPDIR",
-  "updated_at": "2026-08-12T20:07:59.877145508Z"
+  "updated_at": "2026-08-12T20:15:12.296028324Z"
 }

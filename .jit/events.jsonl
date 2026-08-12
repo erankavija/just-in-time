@@ -13940,3 +13940,4 @@
 {"from":"ready","id":"8a7740ad-804f-4491-b83f-8cc3155c9277","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","timestamp":"2026-08-12T19:29:40.978602208Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:opus-provenance-removal","id":"c08c4297-20f2-46cc-850e-6528ddeeea5c","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","timestamp":"2026-08-12T19:29:40.978602208Z","type":"issue_claimed"}
 {"gate_key":"cargo-ci","id":"db615ed4-9584-4c7a-9009-270b2e51def7","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","timestamp":"2026-08-12T20:07:59.877145508Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"cf886dbb-50cc-4323-a49d-bdae5829e52a","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","timestamp":"2026-08-12T20:15:12.296028324Z","type":"gate_failed","updated_by":"auto:executor"}

@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6c136260ac6a10d66df38949f09fa869e4ec8d5e",
+  "completed_at": "2026-08-12T20:15:11.950192435Z",
+  "duration_ms": 287691,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4b7c06d0-test-suite-performance/progress.json",
+        "id": "F1",
+        "line": 89,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "Live dev/active records still describe the removed stale-binary guard and exit-10 behavior, violating the clean-cutover criterion."
+      }
+    ],
+    "summary": "The runtime removal is sound, but stale live workflow prose remains outside the allowed archival exceptions.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "355565c2-2f98-45f0-b655-7bb29117e54d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3200f3f1-3dde-491e-83fc-1bd23ca65a8d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T20:10:24.258587336Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 19390 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff798-fa3b-7302-aafc-bd583e484b2f\n--------\nuser\n--- 19377 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:355565c2 commits 030965f80, 6979306d7, 2e980f4d6, 75460f231, e4fc52df4, 7fe0eae65, ba8713d53, e35a36b6d, 9943a83ad, 8ece3f04d, 6c136260a\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending; direct jit validate could not acquire its lock in the read-only sandbox (exit 10)\nTruncation recovery: narrowed per-commit source, test, script, documentation, configuration, benchmark, and removal-sweep reads\n\n1. [blocking][issue-impact] REQ-08 is unmet: live `dev/active/` workflow records still instruct agents to rely on the removed stale-binary guard and exit-10 behavior—for example, [progress.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4b7c06d0-test-suite-performance/progress.json:89) and [handoff.md](/home/vkaskivuo/Projects/just-in-time/dev/active/b80e3c70-v1-release/handoff.md:89). These are outside the stated `dev/archive/` and historical-benchmark exceptions, and now describe behavior the shipped code no longer has.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The runtime removal is sound, but stale live workflow prose remains outside the allowed archival exceptions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Live dev/active records still describe the removed stale-binary guard and exit-10 behavior, violating the clean-cutover criterion.\",\"file\":\"dev/active/4b7c06d0-test-suite-performance/progress.json\",\"line\":89,\"references\":[\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
