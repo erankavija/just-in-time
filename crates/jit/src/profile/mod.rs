@@ -4,6 +4,7 @@
 //! contains no profile discovery, repository loading, application lifecycle, or
 //! production package inventory.
 
+mod agreement;
 mod application;
 mod apply_claims;
 mod graph;
@@ -37,6 +38,10 @@ pub mod template_region;
 
 pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
+pub use agreement::{
+    claimed_target_divergences, unowned_target_divergences, ProfileAgreement,
+    ProfileAgreementResult, ProfileDivergence,
+};
 pub(crate) use application::SelectionObservation;
 pub use application::{
     ProfileAddResult, ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,

@@ -2964,6 +2964,31 @@ pub enum ProfileCommands {
         json: bool,
     },
 
+    /// Check the profiles this repository records against their packages and its own content
+    ///
+    /// Reads every applied-profile record and reports, per profile, whether the
+    /// package is still readable at the location that record names, whether it
+    /// is still the package the record identifies, and whether each target the
+    /// record claims still holds the value that profile published. A target the
+    /// record claims that is no longer in the repository, and every target
+    /// claimed by a record whose package is gone, are reported in their own
+    /// right.
+    ///
+    /// The check writes nothing and exits 4 when any profile diverged, so it
+    /// serves as a repository check. A repository that has applied no profile
+    /// reports none and succeeds.
+    ///
+    /// Examples:
+    ///   jit profile validate
+    ///   jit profile validate --json
+    ///
+    /// JSON output uses the list envelope `{"count": N, "profiles": [...]}`.
+    Validate {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Apply a profile package read from a repository location through one recoverable multi-target transaction
     Apply {
         /// Select a recorded profile id or worktree package directory
@@ -3240,7 +3265,7 @@ impl ProfileCommands {
             // root — so they dispatch recovery like every other mutating
             // profile operation.
             Self::Capture { .. } | Self::Pack { .. } | Self::Add { .. } => true,
-            Self::List { .. } | Self::Show { .. } => false,
+            Self::List { .. } | Self::Show { .. } | Self::Validate { .. } => false,
         }
     }
 }
@@ -3411,6 +3436,7 @@ impl ProfileCommands {
         match self {
             Self::List { .. }
             | Self::Show { .. }
+            | Self::Validate { .. }
             | Self::Apply { .. }
             | Self::Capture { .. }
             | Self::Pack { .. }

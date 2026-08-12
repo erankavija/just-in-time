@@ -811,6 +811,35 @@ pub enum AppliedProfileClaimIdentity {
     },
 }
 
+impl AppliedProfileClaimIdentity {
+    /// The repository path this claim's value is read from.
+    ///
+    /// A semantic declaration is read from the registry its identity names, and
+    /// an asset or managed region from the path it occupies. A capture that
+    /// intends to compare a claim must cover this path, and
+    /// [`claimed_target_state`] reads exactly it, so both sides of that
+    /// arrangement derive the path here.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RepositoryLayoutError`](super::RepositoryLayoutError) when the
+    /// stored target is not a canonical path below its recorded root.
+    pub fn claimed_path(
+        &self,
+        layout: &super::RepositoryLayout,
+    ) -> Result<VirtualPath, super::RepositoryLayoutError> {
+        match self {
+            Self::Semantic { identity } => {
+                layout.classify_repository_relative(identity.registry.path())
+            }
+            Self::Asset { target } => VirtualPath::from_root(target.root, target.path.clone()),
+            Self::ManagedRegion { target, .. } => {
+                VirtualPath::from_root(target.root, target.path.clone())
+            }
+        }
+    }
+}
+
 /// The repository-relative name of what one claim owns.
 ///
 /// A semantic declaration is named by its own canonical identity, which already
@@ -1798,6 +1827,47 @@ fn render_composed_contributions(
         .collect()
 }
 
+/// Every applied-profile record the profiles listing names, each beside the
+/// path it is filed under.
+///
+/// A record is the repository's own statement about one profile, so a record
+/// that does not parse, or that is filed under a name other than its own
+/// profile's, fails the read rather than dropping that profile from the answer.
+/// An occupant of the listing that is not a regular file is not a record and
+/// contributes nothing.
+///
+/// Composition, adoption-intent retention, and repository-wide validation's
+/// profile-ownership pass all begin here, so the record inventory is enumerated
+/// and read under one rule.
+///
+/// # Errors
+///
+/// Returns [`RepositoryStateError`] when a listed record is outside the capture,
+/// does not parse, or names a profile other than the one its path does.
+pub fn applied_profile_records(
+    base: &RepositoryImage,
+) -> Result<Vec<(VirtualPath, AppliedProfileRecord)>, RepositoryStateError> {
+    applied_profile_record_paths(base)?
+        .into_iter()
+        .map(|path| {
+            let RepositoryEntry::File { bytes, .. } =
+                base.entry(&path).map_err(ProducerError::from)?
+            else {
+                return Ok(None);
+            };
+            let record: AppliedProfileRecord = serde_json::from_slice(bytes).map_err(|source| {
+                ProducerError::ProfileRecordParse {
+                    path: path.repository_relative(),
+                    source,
+                }
+            })?;
+            validate_applied_record_path(&path, &record)?;
+            Ok(Some((path, record)))
+        })
+        .filter_map(Result::transpose)
+        .collect()
+}
+
 /// Discover every captured applied-profile record named by the profiles listing.
 fn applied_profile_record_paths(
     base: &RepositoryImage,
@@ -1831,41 +1901,27 @@ fn existing_contribution_claims(
         .iter()
         .map(|claim| claim.contribution.semantic_identity())
         .collect::<BTreeSet<_>>();
-    let recorded = applied_profile_record_paths(base)?
+    let recorded = applied_profile_records(base)?
         .into_iter()
-        .map(|path| {
-            let RepositoryEntry::File { bytes, .. } =
-                base.entry(&path).map_err(ProducerError::from)?
-            else {
-                return Ok(Vec::new());
-            };
-            let record: AppliedProfileRecord = serde_json::from_slice(bytes).map_err(|source| {
-                ProducerError::ProfileRecordParse {
-                    path: path.repository_relative(),
-                    source,
-                }
-            })?;
-            validate_applied_record_path(&path, &record)?;
-            Ok(record
+        .flat_map(|(_, record)| {
+            let package_id = ProfilePackageId::new(record.id.to_string());
+            record
                 .claims
                 .into_iter()
                 .filter_map(|claim| match claim.identity {
-                    AppliedProfileClaimIdentity::Semantic { identity }
-                        if candidate_identities.contains(&identity) =>
-                    {
-                        Some(RecordedSemanticClaim {
-                            package_id: ProfilePackageId::new(record.id.to_string()),
-                            identity,
-                            base_fingerprint: claim.base_fingerprint,
-                        })
+                    AppliedProfileClaimIdentity::Semantic { identity } => {
+                        Some((identity, claim.base_fingerprint))
                     }
                     _ => None,
                 })
-                .collect::<Vec<_>>())
+                .filter(|(identity, _)| candidate_identities.contains(identity))
+                .map(move |(identity, base_fingerprint)| RecordedSemanticClaim {
+                    package_id: package_id.clone(),
+                    identity,
+                    base_fingerprint,
+                })
+                .collect::<Vec<_>>()
         })
-        .collect::<Result<Vec<_>, RepositoryStateError>>()?
-        .into_iter()
-        .flatten()
         .collect::<Vec<_>>();
     let owned_identities = recorded
         .iter()
@@ -1891,21 +1947,9 @@ fn retained_claim_identities_for_package(
     base: &RepositoryImage,
     package_id: &ProfilePackageId,
 ) -> Result<BTreeSet<AppliedProfileClaimIdentity>, RepositoryStateError> {
-    applied_profile_record_paths(base)?
+    applied_profile_records(base)?
         .into_iter()
-        .map(|path| {
-            let RepositoryEntry::File { bytes, .. } =
-                base.entry(&path).map_err(ProducerError::from)?
-            else {
-                return Ok(BTreeSet::new());
-            };
-            let record: AppliedProfileRecord = serde_json::from_slice(bytes).map_err(|source| {
-                ProducerError::ProfileRecordParse {
-                    path: path.repository_relative(),
-                    source,
-                }
-            })?;
-            validate_applied_record_path(&path, &record)?;
+        .map(|(_, record)| {
             Ok(if record.id.as_str() == package_id.as_str() {
                 record
                     .claims
@@ -2002,20 +2046,12 @@ pub fn claimed_target_state(
     base: &RepositoryImage,
     claim: &AppliedProfileClaim,
 ) -> Result<ClaimedTargetState, RepositoryStateError> {
-    let captured_file = |path: VirtualPath| -> Result<_, RepositoryStateError> {
-        if !base.capture_spec().contains_path(&path) {
-            return Ok(None);
-        }
-        Ok(Some(base.entry(&path).map_err(ProducerError::from)?))
-    };
+    let path = claim.identity.claimed_path(base.layout())?;
+    if !base.capture_spec().contains_path(&path) {
+        return Ok(ClaimedTargetState::Uncaptured);
+    }
     match &claim.identity {
         AppliedProfileClaimIdentity::Semantic { identity } => {
-            let registry = base
-                .layout()
-                .classify_repository_relative(identity.registry.path())?;
-            if !base.capture_spec().contains_path(&registry) {
-                return Ok(ClaimedTargetState::Uncaptured);
-            }
             Ok(match repository_definition(base, identity)? {
                 None => ClaimedTargetState::Absent,
                 Some(current) => ClaimedTargetState::matching(
@@ -2025,22 +2061,18 @@ pub fn claimed_target_state(
                 ),
             })
         }
-        AppliedProfileClaimIdentity::Asset { target } => {
-            let path = VirtualPath::from_root(target.root, target.path.clone())?;
-            Ok(match captured_file(path)? {
-                None => ClaimedTargetState::Uncaptured,
-                Some(RepositoryEntry::File { bytes, mode, .. }) => ClaimedTargetState::matching(
+        AppliedProfileClaimIdentity::Asset { .. } => {
+            Ok(match base.entry(&path).map_err(ProducerError::from)? {
+                RepositoryEntry::File { bytes, mode, .. } => ClaimedTargetState::matching(
                     fingerprint_profile_asset(bytes, *mode) == claim.base_fingerprint,
                 ),
-                Some(_) => ClaimedTargetState::Absent,
+                _ => ClaimedTargetState::Absent,
             })
         }
-        AppliedProfileClaimIdentity::ManagedRegion { target, region_id } => {
-            let path = VirtualPath::from_root(target.root, target.path.clone())?;
-            let Some(entry) = captured_file(path)? else {
-                return Ok(ClaimedTargetState::Uncaptured);
-            };
-            let RepositoryEntry::File { bytes, mode, .. } = entry else {
+        AppliedProfileClaimIdentity::ManagedRegion { region_id, .. } => {
+            let RepositoryEntry::File { bytes, mode, .. } =
+                base.entry(&path).map_err(ProducerError::from)?
+            else {
                 return Ok(ClaimedTargetState::Absent);
             };
             let (begin, end) = region_delimiters(region_id);
@@ -3635,7 +3667,7 @@ mod tests {
         let target = VirtualPath::worktree("docs/profile.txt").expect("canonical target");
         let claim = AppliedProfileClaim::asset(&target, b"published\n", FileMode::Regular, false);
         let state = |held: &[(VirtualPath, &[u8], FileMode)]| {
-            claimed_target_state(&image_over(&[target.clone()], held), &claim)
+            claimed_target_state(&image_over(std::slice::from_ref(&target), held), &claim)
                 .expect("the claim is comparable")
         };
 
@@ -3691,7 +3723,7 @@ mod tests {
         let state = |bytes: &[u8]| {
             claimed_target_state(
                 &image_over(
-                    &[target.clone()],
+                    std::slice::from_ref(&target),
                     &[(target.clone(), bytes, FileMode::Regular)],
                 ),
                 &claim,
@@ -3740,7 +3772,7 @@ mod tests {
         let state = |bytes: &[u8]| {
             claimed_target_state(
                 &image_over(
-                    &[config.clone()],
+                    std::slice::from_ref(&config),
                     &[(config.clone(), bytes, FileMode::Regular)],
                 ),
                 &claim,

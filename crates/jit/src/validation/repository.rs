@@ -45,6 +45,9 @@ pub enum RepositoryValidationPass {
     ItemLinks,
     /// Configured invariant and rules/gates projections match their view inputs.
     Projections,
+    /// Every target an applied-profile record claims still holds the value that
+    /// profile published.
+    ProfileOwnership,
 }
 
 /// Validation outcome, including semantic findings and stages reached.
@@ -313,6 +316,18 @@ pub(crate) fn validate_repository_with_materializations(
                 if structural_error.is_none() {
                     structural_error = Some(error);
                 }
+            }
+        }
+    }
+
+    match collect_profile_ownership_findings(image).context("profile-ownership validation pass") {
+        Ok(profile_findings) => {
+            findings.extend(profile_findings);
+            passes.push(RepositoryValidationPass::ProfileOwnership);
+        }
+        Err(error) => {
+            if structural_error.is_none() {
+                structural_error = Some(error);
             }
         }
     }
@@ -641,6 +656,52 @@ fn collect_enforcement_drift_findings(
     })
     .collect()
 }
+
+/// Report every owned target a recorded profile no longer holds the published
+/// value for.
+///
+/// The comparison is the shared per-claim one
+/// ([`claimed_target_divergences`](crate::profile::claimed_target_divergences)),
+/// so this pass and `jit profile validate` report the same divergences from one
+/// implementation rather than two views of the same evidence.
+///
+/// Whether the package a record names is still readable, and still the package
+/// that record identifies, is deliberately not asked here: answering either
+/// means reading a package directory, and every pass in this pipeline reads only
+/// the closed image. The profile-scoped check adds those two questions around
+/// this same comparison, and derived-state repair refuses to plan without them.
+///
+/// A claim whose target the image never captured produces nothing, so a
+/// narrower capture reports fewer divergences rather than inventing them.
+fn collect_profile_ownership_findings(image: &RepositoryImage) -> Result<Vec<ReportedFinding>> {
+    crate::repository_state::applied_profile_records(image)?
+        .into_iter()
+        .map(|(path, record)| {
+            Ok(crate::profile::claimed_target_divergences(image, &record)?
+                .into_iter()
+                .map(|divergence| {
+                    ReportedFinding::new(
+                        None,
+                        &Finding {
+                            rule: PROFILE_OWNERSHIP_RULE.to_string(),
+                            severity: Severity::Error,
+                            message: format!(
+                                "applied profile '{}' ({}): {}",
+                                record.id,
+                                path.repository_relative(),
+                                divergence.message()
+                            ),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>())
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|findings| findings.into_iter().flatten().collect())
+}
+
+/// Rule name under which profile-ownership divergence is reported.
+const PROFILE_OWNERSHIP_RULE: &str = "profile-ownership";
 
 fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFinding> {
     let mut keys: Vec<&str> = gates

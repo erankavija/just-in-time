@@ -193,15 +193,15 @@ pub use path::{
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 pub use profile_apply::{
-    claimed_target_state, compose_resolved_contributions, AppliedClaimTarget,
-    AppliedManagedRegionTarget, AppliedProfileClaim, AppliedProfileClaimIdentity,
-    AppliedProfileRecord, ClaimedTargetState, CompleteProjectionConfig, ComposedContribution,
-    Contribution, ContributionCompositionConflict, ContributionConflictOwner, ContributionIdentity,
-    ContributionIdentityTarget, ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget,
-    MapEntryTarget, ProfileApplicationInput, ProfileAssetClaim, ProfileBaseFingerprint,
-    ProfileClaims, ProfileConflictOccupant, ProfileContributionClaim, ProfilePackageId,
-    ProfileRegionClaim, ProfileTargetConflictError, ProfileThreeWayConflictError, ScalarTarget,
-    SetStringTarget,
+    applied_profile_records, claimed_target_state, compose_resolved_contributions,
+    AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
+    AppliedProfileClaimIdentity, AppliedProfileRecord, ClaimedTargetState,
+    CompleteProjectionConfig, ComposedContribution, Contribution, ContributionCompositionConflict,
+    ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
+    ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
+    ProfileApplicationInput, ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims,
+    ProfileConflictOccupant, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
+    ProfileTargetConflictError, ProfileThreeWayConflictError, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
     preflight_profile_contributions, profile_capture_closure, profile_contribution_overrides,

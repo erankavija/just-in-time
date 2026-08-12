@@ -12,6 +12,10 @@ use crate::profile::{
     ResolvedProfileContent, ResolvedProfileGraph, ResolvedVariables, SelectionObservation,
     VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
+use crate::profile::{
+    claimed_target_divergences, unowned_target_divergences, ProfileAgreement,
+    ProfileAgreementResult, ProfileDivergence,
+};
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
     finalize_package_tree_capture, AppliedProfileRecord, CaptureBudget, CaptureSpec,
@@ -587,6 +591,68 @@ impl CommandExecutor<JsonFileStorage> {
                 count: profiles.len(),
                 profiles,
             }))
+        })
+    }
+
+    /// Report whether every profile this repository records still agrees with
+    /// the package it came from and with the repository content it owns.
+    ///
+    /// The `.jit/profiles/` listing is the whole inventory, exactly as it is for
+    /// [`Self::list_recorded_profiles`], so a repository that has applied
+    /// nothing reports no profile. Each record is then judged by the one shared
+    /// comparison ([`recorded_profile_agreement`]): its package is read through
+    /// the location the record names, its identity is held against what that
+    /// package would record today, and each target it claims is held against the
+    /// value the record fingerprinted when it published it.
+    ///
+    /// The check writes nothing. Its captured image covers the records and every
+    /// target they claim, so a claim is compared against repository content read
+    /// under the same session guard that read the records.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the repository cannot be read — an unreadable
+    /// record, a claimed registry that is not a regular file, or a capture
+    /// failure. A profile that diverged is an answer, never an error.
+    pub fn validate_recorded_profiles(&self) -> Result<ProfileAgreementResult> {
+        let layout = self.require_layout()?;
+        let profiles_dir = VirtualPath::PROFILES;
+        with_mutation_session(self.storage(), &layout, "profile agreement", |session| {
+            let Some((records, recorded)) = capture_applied_records(session, &profiles_dir)? else {
+                return Ok(SessionStep::Retry);
+            };
+            let Some(claimed) = recorded
+                .iter()
+                .map(|id| recorded_claim_closure(&records, id, &layout))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .collect::<Option<Vec<_>>>()
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            let Some((image, covered)) = capture_applied_records_covering(
+                session,
+                &profiles_dir,
+                claimed.iter().flat_map(|(_, paths)| paths.iter().cloned()),
+                CLAIM_CAPTURE_BUDGET,
+            )?
+            else {
+                return Ok(SessionStep::Retry);
+            };
+            // The claim closure was planned from the record set the first
+            // capture saw; a concurrent application or removal restarts the
+            // attempt rather than judging over a stale inventory.
+            if covered != recorded {
+                return Ok(SessionStep::Retry);
+            }
+            let agreements = claimed
+                .iter()
+                .map(|(record, _)| {
+                    let record_path = applied_record_path(record.id.as_str())?;
+                    recorded_profile_agreement(&image, record, &record_path, &layout)
+                })
+                .collect::<Result<Vec<_>>>()?;
+            Ok(SessionStep::Done(ProfileAgreementResult::new(agreements)))
         })
     }
 
@@ -2181,7 +2247,24 @@ pub(super) fn capture_applied_records(
     session: &mut (dyn RepositoryMutationSession + '_),
     profiles_dir: &VirtualPath,
 ) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
-    let mut spec = CaptureSpec::phase_one([], RECORD_CAPTURE_BUDGET)?;
+    capture_applied_records_covering(session, profiles_dir, [], RECORD_CAPTURE_BUDGET)
+}
+
+/// Read this repository's applied-profile records together with `also`, under
+/// `budget`.
+///
+/// The agreement check reads a record and then the repository content that
+/// record claims, and both readings must describe one repository state. Widening
+/// the record capture to cover the claimed targets is what makes that true: the
+/// listing is re-read in the same capture, so a record set that moved is
+/// reported as movement rather than answered over two states.
+fn capture_applied_records_covering(
+    session: &mut (dyn RepositoryMutationSession + '_),
+    profiles_dir: &VirtualPath,
+    also: impl IntoIterator<Item = VirtualPath>,
+    budget: CaptureBudget,
+) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
+    let mut spec = CaptureSpec::phase_one([], budget)?;
     spec.discover_listing(profiles_dir.clone())?;
     let Some(listed) = capture_or_retry(session.capture(spec.clone()))? else {
         return Ok(None);
@@ -2193,6 +2276,7 @@ pub(super) fn capture_applied_records(
             .map(|id| applied_record_path(id))
             .collect::<Result<Vec<_>>>()?,
     )?;
+    spec.discover_paths(also)?;
     let Some(image) = capture_or_retry(session.capture(spec))? else {
         return Ok(None);
     };
@@ -2200,6 +2284,38 @@ pub(super) fn capture_applied_records(
         return Ok(None);
     }
     Ok(Some((image, recorded)))
+}
+
+/// Bounds for the profile-agreement capture.
+///
+/// The records plus every target they claim, which a package's own size bounds
+/// rather than the record count, at whatever depth those targets sit.
+const CLAIM_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
+    max_paths: 1 << 14,
+    max_listings: 1,
+    max_bytes: 128 * 1024 * 1024,
+    max_depth: 32,
+};
+
+/// One record and every repository path its ownership claims name.
+///
+/// `Ok(None)` reports a record the listing named that the capture no longer
+/// holds, which the caller retries rather than answering without it.
+fn recorded_claim_closure(
+    records: &RepositoryImage,
+    id: &str,
+    layout: &RepositoryLayout,
+) -> Result<Option<(AppliedProfileRecord, Vec<VirtualPath>)>> {
+    let record_path = applied_record_path(id)?;
+    let Some(record) = read_applied_record(records, &record_path, id)? else {
+        return Ok(None);
+    };
+    let claimed = record
+        .claims
+        .iter()
+        .map(|claim| claim.identity.claimed_path(layout).map_err(Into::into))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Some((record, claimed)))
 }
 
 /// Profile ids the repository's own applied-profile records name.
@@ -2325,8 +2441,8 @@ fn is_unreadable_location(error: &anyhow::Error) -> bool {
 ///
 /// Every reported fact but `applied` comes from the resolved package, so the
 /// answer states what the recorded location holds now. `applied` is the
-/// comparison between the two: the stored record against the record that
-/// package would write today.
+/// comparison between the two, read from the same identity check every other
+/// caller applies ([`package_identity_divergence`]).
 ///
 /// `Ok(None)` reports a record the listing named that the capture no longer
 /// holds, which the caller retries rather than reporting without it.
@@ -2346,12 +2462,83 @@ fn recorded_summary(
         version: metadata.version.clone(),
         origin: package_origin(&package, layout)?,
         jit: metadata.compatible_jit.clone(),
-        applied: record.matches_package_provenance(&expected_record(
-            &package,
-            layout,
-            &record.variables,
-        )?),
+        applied: package_identity_divergence(&package, &record, layout).is_none(),
     }))
+}
+
+/// Whether the package at a record's recorded location is still the package
+/// that record identifies, as the divergence a disagreement produces.
+///
+/// The comparison is the stored record against the record this package would
+/// write today for the values the record carries ([`expected_record`]), so a
+/// package that was edited, replaced, or re-versioned in place disagrees while
+/// repository content the profile owns is deliberately not consulted.
+///
+/// A recorded value the package can no longer resolve is its own divergence:
+/// the identity cannot be derived at all, so reporting it as a changed identity
+/// would name a comparison that never happened.
+pub(super) fn package_identity_divergence(
+    package: &ProfilePackage,
+    record: &AppliedProfileRecord,
+    layout: &RepositoryLayout,
+) -> Option<ProfileDivergence> {
+    let expected = match expected_record(package, layout, &record.variables) {
+        Ok(expected) => expected,
+        Err(error) => {
+            return Some(ProfileDivergence::UnresolvedValues {
+                reason: format!("{error:#}"),
+            })
+        }
+    };
+    (!record.matches_package_provenance(&expected)).then(|| {
+        ProfileDivergence::ChangedPackageIdentity {
+            recorded_version: record.version.clone(),
+            recorded_package_hash: record.package_hash.clone(),
+            current_version: expected.version,
+            current_package_hash: expected.package_hash,
+        }
+    })
+}
+
+/// Whether one recorded profile still agrees with the package its record names
+/// and with the repository content that record claims.
+///
+/// This is the sole comparison behind the profile-scoped agreement check and
+/// behind the identity gate repository-wide validation applies before deriving
+/// repair, so a profile is judged by one rule wherever it is judged. The owned
+/// targets are compared through the same pure claim comparison validation's
+/// profile-ownership pass uses ([`claimed_target_divergences`]).
+///
+/// The package is read through the location the record names, so a record whose
+/// package moved or was deleted reports that rather than an absent profile, and
+/// every target that record still claims is reported beside it as one nothing
+/// remains to compare against.
+pub(super) fn recorded_profile_agreement(
+    image: &RepositoryImage,
+    record: &AppliedProfileRecord,
+    record_path: &VirtualPath,
+    layout: &RepositoryLayout,
+) -> Result<ProfileAgreement> {
+    let divergences = match recorded_package(record, record_path, layout) {
+        // The resolver's own message already names the record, the location it
+        // names, and what the read failed on, so it is the reason verbatim
+        // rather than a re-walked context chain that restates each of them.
+        Err(error) => std::iter::once(ProfileDivergence::UnreadablePackage {
+            reason: error.to_string(),
+        })
+        .chain(unowned_target_divergences(record))
+        .collect(),
+        Ok(package) => package_identity_divergence(&package, record, layout)
+            .into_iter()
+            .chain(claimed_target_divergences(image, record)?)
+            .collect(),
+    };
+    Ok(ProfileAgreement::new(
+        record.id.as_str(),
+        record_path.repository_relative(),
+        record.origin.clone(),
+        divergences,
+    ))
 }
 
 /// The provenance origin a package's own bytes came through.

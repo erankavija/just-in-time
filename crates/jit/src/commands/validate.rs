@@ -912,16 +912,15 @@ fn captured_profile_repair_claims(
                     ))))
                 }
             };
-        if !actual.matches_package_provenance(&super::profile::expected_record(
-            package,
-            image.layout(),
-            &actual.variables,
-        )?) {
+        if let Some(divergence) =
+            super::profile::package_identity_divergence(package, &actual, image.layout())
+        {
             return Ok(Some(Err(RepositoryValidationFailure::materialization(
                 anyhow!(
-                    "applied profile provenance for '{}@{}' does not match the package its record resolves to",
+                    "applied profile provenance for '{}@{}' does not match the package its record resolves to: {}",
                     metadata.id,
-                    metadata.version
+                    metadata.version,
+                    divergence.message()
                 ),
             ))));
         }
