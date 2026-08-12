@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8d564ab3ebfdd554695e9e4cb836d427ad8dd4f6",
+  "completed_at": "2026-08-12T00:03:56.627306744Z",
+  "duration_ms": 74394,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's pinned-nextest contributor guidance is accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ee809651-fdd6-47c6-8a6d-4b8f6e819c3b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aa4c4c05-10f9-4112-874b-693b415d11ee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T00:02:42.232832550Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children. Reviewed four reachable `jit:ee809651` commits individually; their effective documentation footprint is the Nextest section in `dev/TESTING.md`. Current config, CI pinning, and both documented commands match.\n\nDocumentation impact: the guide provides the exact pinned installation command, separates the workspace suite from doctests, and cites the committed policy rather than duplicating it.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's pinned-nextest contributor guidance is accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

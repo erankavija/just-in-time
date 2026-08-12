@@ -18,7 +18,7 @@
         {"short_id": "47836e2e", "title": "Share the stale-binary build fixture across processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
         {"short_id": "340be714", "title": "Add journal barrier crash coverage", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
         {"short_id": "0369e563", "title": "Measure transaction model-limit round trips", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
-        {"short_id": "ee809651", "title": "Document pinned nextest installation and use", "classification": "documentation", "difficulty": "easy", "worker": "codex-direct", "status": "pending", "spec": "scratchpad spec-ee809651.md (written, commit instruction already removed)"},
+        {"short_id": "ee809651", "title": "Document pinned nextest installation and use", "classification": "documentation", "difficulty": "easy", "worker": "gpt-5.6-luna", "status": "done", "spec": "scratchpad spec-ee809651.md (written, commit instruction already removed)"},
         {"short_id": "007f598b", "title": "Cut over journal durability documentation", "classification": "documentation", "difficulty": "easy", "worker": "codex-direct", "status": "pending", "spec": "scratchpad spec-007f598b.md (written, commit instruction already removed)"}
       ]
     },

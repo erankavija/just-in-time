@@ -7,7 +7,90 @@
     "3db5b63d-e454-4c13-b294-1bd0ead539ef"
   ],
   "description": "Add contributor install and run guidance for the pinned cargo-nextest to the testing guide.\n\n## Background\n\nThe pinned executable, committed `.config/nextest.toml` policy, and CI provisioning land in `nextest-foundation`; this task documents them for contributors. The later `inherent-cost-attribution` task adds the cost table to the same file in a declared ordered overlap.\n\n## Success Criteria\n\n- [hard] REQ-01: Documents installing the pinned cargo-nextest 0.9.133 with `cargo install cargo-nextest --locked --version 0.9.133` and running the workspace suite and doctest substep in `dev/TESTING.md`.\n- [hard] REQ-02: Describes the committed `.config/nextest.toml` policy by citation rather than restating its values.\n\n## Notes\n\nOrdered overlap: `dev/TESTING.md` is touched here first; `inherent-cost-attribution` adds the cost table afterwards.",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "aaa5422c3c198964da32d1535ba5ece13aaa4082392ab2e9e22fae47ffad2c77",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../.github/copilot-instructions.md",
+          "resolved_path": ".github/copilot-instructions.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3580991fb5b603f6a9a87e3b3b2918eb492e512b44094562c2b6a2e2578a3cf7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../crates/jit/tests/fast_docs_templates/harness_demo.rs",
+          "resolved_path": "crates/jit/tests/fast_docs_templates/harness_demo.rs"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "096b244e5e7cf9542d8add9960a0799053ff49ec621eb58a70e7f6a3132dd676",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../.config/nextest.toml",
+          "resolved_path": ".config/nextest.toml"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "46ccd0dc545da5d6576fe1bb9d04ac81b020199236dd0847326d48b02eada01b",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../docs/reference/jit-content-standards.md",
+          "resolved_path": "docs/reference/jit-content-standards.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "af2fafea0063dbfe7e95900e1b03f2600dc7758eeb275696f66eefee9667424d",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../AGENTS.md",
+          "resolved_path": "AGENTS.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2c04f2b39aeb35eb79a7456bcc4fb91d4b39f7e0de27a68f4225113a51e9c4c5",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "benchmarks/rust-build-efficiency/report.md",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/report.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2a5921a4d076b3c753bf8f473148aae9c4c53e55adc414a7d9958b7799e72737",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md",
+          "resolved_path": "dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3e1b6ef1c58a9b4b37e8045834245b7ca21af92a3d7fd487024790ad4c148811",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../crates/jit/tests/common/harness.rs",
+          "resolved_path": "crates/jit/tests/common/harness.rs"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://docs.rs/proptest",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": "guide",
+      "format": "markdown",
+      "label": "Pinned nextest contributor guidance",
+      "path": "dev/TESTING.md"
+    }
+  ],
+  "done_at": "2026-08-12T00:04:21.301562043Z",
   "first_ready_at": "2026-08-11T20:50:24.413409704Z",
   "gates_required": [
     "cargo-ci",
@@ -24,6 +107,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T00:02:27.853537816Z",
       "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T00:03:56.960473169Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "ee809651-fdd6-47c6-8a6d-4b8f6e819c3b",
@@ -35,7 +123,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Document pinned nextest installation and use",
-  "updated_at": "2026-08-12T00:02:27.853537816Z"
+  "updated_at": "2026-08-12T00:04:21.301562043Z"
 }
