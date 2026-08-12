@@ -8,9 +8,9 @@ set -euo pipefail
 # issue corpus.
 #
 # Contract:
-#   - Builds the release `jit` binary with real git provenance injected the same
-#     way scripts/install-jit.sh does, so the artifact records the true commit,
-#     dirty flag, and profile of the binary it measured.
+#   - Builds the release `jit` binary from this checkout and records the
+#     checkout's own commit and dirty flag alongside the binary's reported
+#     version and profile, so the artifact identifies the tree it measured.
 #   - Generates ONE pristine fixture repository of a recorded issue count, then
 #     times these scenarios, each with at least 3 warmup and at least 20
 #     measured runs:
@@ -153,7 +153,18 @@ trap cleanup EXIT
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
 
-# --- build provenance (mirrors scripts/install-jit.sh) ------------------------
+# --- measured-tree identity ---------------------------------------------------
+# Read from the checkout rather than from the binary: the binary reports its
+# package version and cargo profile and nothing about the tree it came from,
+# and this harness builds it from exactly this checkout.
+JIT_COMMIT=$(git rev-parse --short=8 HEAD)
+if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
+  JIT_DIRTY=true
+else
+  JIT_DIRTY=false
+fi
+
+# --- release build ------------------------------------------------------------
 if [[ -n "${SESSION_BENCH_BIN:-}" ]]; then
   BIN=$(realpath "$SESSION_BENCH_BIN")
   echo "[session-bench] self-test binary override: $BIN" >&2
@@ -161,16 +172,7 @@ else
   TARGET_DIR="${SESSION_BENCH_TARGET_DIR:-${CARGO_TARGET_DIR:-$repo_root/target}}"
   mkdir -p "$TARGET_DIR"
   TARGET_DIR=$(realpath "$TARGET_DIR")
-  GIT_HASH=$(git rev-parse HEAD)
-  GIT_SHORT=$(git rev-parse --short=8 HEAD)
-  if [[ -n "$(git status --porcelain --untracked-files=normal)" ]]; then
-    GIT_DIRTY=true
-  else
-    GIT_DIRTY=false
-  fi
-  SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
-
-  echo "[session-bench] building release jit (commit $GIT_SHORT, dirty=$GIT_DIRTY)" >&2
+  echo "[session-bench] building release jit (commit $JIT_COMMIT, dirty=$JIT_DIRTY)" >&2
 
   # Hold the shared Cargo build lock around the release build only, so we queue
   # behind (never contend with) a concurrent gate build.
@@ -182,10 +184,6 @@ else
   flock "$LOCK_FD"
   CARGO_INCREMENTAL=0 \
   CARGO_TARGET_DIR="$TARGET_DIR" \
-  JIT_BUILD_GIT_HASH="$GIT_HASH" \
-  JIT_BUILD_GIT_SHORT_HASH="$GIT_SHORT" \
-  JIT_BUILD_GIT_DIRTY="$GIT_DIRTY" \
-  SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" \
     cargo build --release -p jit >&2 || {
     echo "ERROR: release build failed." >&2
     exit 1
@@ -197,12 +195,9 @@ else
 fi
 [[ -x "$BIN" ]] || { echo "ERROR: release binary $BIN not found." >&2; exit 1; }
 
-# Parse the binary's own provenance report: "jit <ver> (commit <c>, dirty=<d>,
-# profile <p>)". This is the authoritative identity of the measured binary.
+# Parse the binary's own version report: "jit <ver> (profile <p>)".
 VERSION_LINE=$("$BIN" --version)
 JIT_VERSION=$(sed -E 's/^jit ([^ ]+) .*/\1/' <<<"$VERSION_LINE")
-JIT_COMMIT=$(sed -E 's/.*commit ([^,]+),.*/\1/' <<<"$VERSION_LINE")
-JIT_DIRTY=$(sed -E 's/.*dirty=([^,]+),.*/\1/' <<<"$VERSION_LINE")
 JIT_PROFILE=$(sed -E 's/.*profile ([^)]+)\)/\1/' <<<"$VERSION_LINE")
 
 # --- machine identity ---------------------------------------------------------

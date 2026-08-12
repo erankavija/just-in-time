@@ -8,6 +8,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **Build provenance, the stale-binary guard, and the disk-backed gate
+  `TMPDIR`.** `crates/jit/build.rs` stamped a commit, a dirty flag, and a build
+  timestamp into the binary; `jit --version` and `jit version --json` reported
+  them; and a guard refused gate evaluation with exit code `10` and error code
+  `STALE_BINARY` when the installed binary predated the tree under review.
+  Proving that contract took three `#[ignore]`d tests that each compiled a whole
+  crate into a fresh temporary target directory, which is why `scripts/cargo-ci.sh`
+  moved `TMPDIR` off tmpfs onto a disk-backed cache directory for its entire run.
+  Measured on one host at a single commit, that override cost the whole
+  filesystem-heavy suite 104,285 ms against 18,341 ms on tmpfs — a 5.8x tax paid
+  by every other test in the gate — while the suite itself took 116,971 ms of a
+  192,994 ms gate. The guard's own remedy was a manual reinstall, which a stale
+  binary made visible anyway. All of it is gone: the build script reads nothing
+  ambient, `jit version` reports package, version, profile, and target,
+  `scripts/install-jit.sh` is `cargo install --path crates/jit`, the
+  `provenance` gate step and the `TMPDIR` override are removed, and exit code
+  `10` no longer means a refusal on binary age.
+
 - **The per-merge build guard.** `scripts/verify-commit-builds.sh` extracted a
   named commit with `git archive` and ran `cargo build --workspace` against it,
   and the worktree dispatch protocol ran it after every merge. `cargo build`
@@ -95,22 +113,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   granted the same claim once the lock is free. A survey of every remaining
   assertion in the gate's suite whose outcome could turn on host load, and the
   result recorded for each, is in `dev/active/57675b68/`.
-
-- **Installing marks a binary stale only when a path it is built from is
-  uncommitted.** `scripts/install-jit.sh` embeds a dirty flag that makes the
-  installed binary report itself stale for its whole life, and it computed that
-  flag from the whole working tree bar the tracker's data root. An uncommitted
-  plan note, changelog entry or web asset therefore produced a binary that
-  refused every gate it was asked to run, until it was reinstalled from a tree
-  clean in ways that had nothing to do with the build. The flag is now derived
-  from the paths that do feed the binary. Those paths are declared once, in
-  `crates/jit/src/domain/binary_build_inputs.txt`: the guard compiles that file
-  in and matches it with the same covering rule a quality gate's declared inputs
-  use, and the installer hands its lines to `git status` as pathspecs, so
-  neither question is answered by an inventory that can drift from the other. A
-  conformance test holds the two matchers to selecting the same files over this
-  repository, and an unreadable inventory records the tree as dirty rather than
-  assuming it clean.
 
 - **The shutdown drain property is proven against a server that breaks it.** The
   real-process graceful-shutdown case asserts that a connection stuck mid message
@@ -317,13 +319,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   in a temporary directory. Drift is the difference between the fixture's tree
   object before and after that run, so the check states no classification
   value, no region marker, and no target path: the generator owns all three.
-  Because the classification comes from the installed binary — which, if it
-  predates the repository under check, produces an outdated table the generator
-  then agrees with — the check establishes the binary's currency positively
-  against that repository first, and reports anything short of a resolved,
-  current provenance as an environment failure rather than as a documentation
-  finding. `scripts/docs-check-selftest.sh` covers a fresh tree, a seeded stale
-  region, and both ways a classification can be untrustworthy. The
+  `scripts/docs-check-selftest.sh` covers a fresh tree and a seeded stale
+  region. The
   `docs-mechanical` gate description no longer lists its members, so adding one
   cannot make it stale.
 
@@ -609,20 +606,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   manifest-derived product version, which is how publication names the release
   note it renders without carrying a version literal of its own.
 
-- **Build provenance no longer tracks Git metadata or the wall clock.**
-  `crates/jit/build.rs` previously watched `.git/index`, `HEAD`, and refs and
-  stamped the current time, so staging or committing unchanged Rust sources
-  reran the build script and relinked every test target. It now reads only the
-  four release-injection variables (`JIT_BUILD_GIT_HASH`,
-  `JIT_BUILD_GIT_SHORT_HASH`, `JIT_BUILD_GIT_DIRTY`, `SOURCE_DATE_EPOCH`) and
-  reports documented `unknown` fallbacks otherwise, so ordinary builds are
-  reproducible and insensitive to Git-metadata-only changes. Releases and
-  installs inject real provenance through the new `scripts/install-jit.sh`
-  (commit, short commit, dirty flag, and commit-time `SOURCE_DATE_EPOCH`),
-  which `jit version --json` reports exactly. The stale-binary guard composes
-  unchanged: it judges the installed binary, which `scripts/install-jit.sh`
-  stamps with the commit it was built from.
-
 - **Debug info and incremental compilation are bounded by policy instead of
   Cargo's undocumented defaults.** Full debug sections dominated a
   representative test executable's size, and incremental state accumulated
@@ -633,7 +616,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   state `incremental = true` explicitly so ordinary interactive builds and
   test runs keep Cargo's incremental cache on purpose rather than by
   accident. `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every
-  step (fmt, clippy, test, provenance) and now runs a dedicated
+  step and now runs a dedicated
   `incremental-state` step afterward that fails the gate if any non-empty
   `incremental` directory remains under the target directory the run used:
   a gate run compiles once and exits, so incremental state has no later
@@ -722,28 +705,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   an injectable-input regression fixture in
   `crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` that runs
   without compilation.
-
-- **Stale-binary detection on the gate path.** `jit gate evaluate` (and every
-  path that runs an automated checker: `gate pass`, `gate pass-all`, and a
-  state transition's pre/postchecks) refuses to run a checker when BOTH (1)
-  the repository under review can resolve the running binary's build commit
-  in its own history (the repository the binary was built from, or a clone or
-  fork sharing that history), AND (2) a committed build-input path changed
-  between that build commit and the repository's current `HEAD`, an
-  uncommitted build-input path is present in the working tree, or the binary
-  was built with an uncommitted build input — a gate verdict from such a
-  binary is not evidence about the tree under review. This is checked in two
-  places: the evaluator itself refuses before
-  spawning any checker (a typed, exit-code-10 error naming the build commit
-  and the fix, `scripts/install-jit.sh`; no gate run is recorded for
-  that refusal), and — since a checker script that itself shells out to `jit`
-  (e.g. `scripts/jit-validate.sh`) resolves that `jit` from `PATH`
-  independently of the evaluator — any such child process self-checks too, so
-  a stale child makes the gate run FAIL with the refusal visible in the
-  recorded run's stdout/stderr, rather than silently producing a misleading
-  verdict. Silent otherwise (an unrelated repository, no git, or an
-  unresolvable build commit), so an ordinary installed release validating a
-  different repository is unaffected.
 
 - **Help cross-references from mutation/inspection commands to the reporting
   commands that answer "what happened".** `jit issue show --help` now names

@@ -201,7 +201,7 @@ impl GateAlreadyExistsError {
 /// The repository carries a single format marker (`schema_version` in
 /// `.jit/index.json`). On startup the storage layer compares that marker against
 /// the version this binary understands; if the repository's is greater, it fails
-/// fast with this typed error instead of letting a stale binary misread newer
+/// fast with this typed error instead of letting an out-of-date binary misread newer
 /// data (which previously surfaced as opaque file-read or phantom-validation
 /// failures). The CLI downcasts to this type to classify the failure as an
 /// external-dependency condition (exit code `10`): the binary, not the

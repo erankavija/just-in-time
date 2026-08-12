@@ -1108,29 +1108,6 @@ A project may use `--type task` or configure `[validation].default_type` to add 
 type label. The type namespace permits at most one value; a missing type is only
 a problem when that project configures a default or a rule requiring it.
 
-#### "Refusing to run gate ... this jit binary predates the tree under review"
-
-```bash
-Error: Refusing to run gate 'tests' for issue abc123: this jit binary
-predates the tree under review
-```
-
-**Solution:** this fires only when BOTH hold: the repository under validation
-can resolve the running binary's build commit in its own history (the
-repository the binary was built from, or a clone/fork sharing that history),
-AND at least one of these conditions holds: a committed build-input path
-changed between the build commit and the repository's current `HEAD`; an
-uncommitted build-input path is present in the working tree; or build
-provenance records an uncommitted build input at build time. The refusal names
-both commits for committed changes, the responsible paths for working-tree
-changes, and the build commit for a dirty build. Commit or revert the named
-paths when they are present, then rebuild and reinstall with
-`scripts/install-jit.sh` (it injects build provenance around `cargo install
---path crates/jit`) and re-run the gate. See [the `jit gate
-evaluate` exit-code contract](../reference/cli-commands.md#jit-gate-evaluate)
-for the full condition and how this differs when it's a checker's own child
-`jit` (not the evaluator) that is stale.
-
 #### "Orphaned task"
 
 ```bash

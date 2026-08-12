@@ -7,8 +7,8 @@
 //! this file supplies only the I/O around them.
 //!
 //! The declarations come from the crate cargo compiles out of the checkout this
-//! example runs against, so there is no installed-binary currency question to
-//! settle first — unlike the shipped policy regions, whose values can only be
+//! example runs against, so a render here describes the working tree by
+//! construction — unlike the shipped policy regions, whose values can only be
 //! read out of an already-installed binary, and whose entry point therefore owns
 //! its own render.
 //!

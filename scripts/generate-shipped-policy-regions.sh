@@ -31,24 +31,6 @@ set -euo pipefail
 # because an application records the package's worktree-relative location and
 # refuses a package read from outside the worktree it is applied to.
 #
-# WHY THIS SCRIPT STILL CHECKS THE BINARY ITSELF. The values it splices come
-# from a package directory in this checkout, so the package's contents do not
-# establish the binary's currency — the guard below is belt-and-braces over a
-# route that does not depend on the binary's embedded classification. It stays
-# because it costs nothing and because the rest of what initialization writes
-# still comes from the binary.
-# The repository's own stale-binary guard could not stand in for it: that guard
-# identifies a repository by resolving a revision in it, and the throwaway
-# directory is not a repository, so it reports nothing there whatever the
-# binary's age.
-#
-# Nor is that guard's silence, taken in this repository, evidence on its own: a
-# binary with no injected provenance, an unresolvable head, and a build commit
-# outside this repository's history all produce the same silence as a genuinely
-# current binary. So currency is established positively here, against the
-# repository being written to, and anything short of a resolved, current
-# provenance refuses the write.
-#
 # Usage:
 #   generate-shipped-policy-regions.sh    (takes no arguments — targets are named above)
 #
@@ -83,11 +65,10 @@ fail() {
 
 command -v git >/dev/null 2>&1 || die "'git' not found on PATH"
 command -v jit >/dev/null 2>&1 || die "'jit' not found on PATH"
-command -v jq >/dev/null 2>&1 || die "'jq' not found on PATH"
 
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null) ||
-  die "not inside a git work tree (needed to establish binary provenance)"
+  die "not inside a git work tree (needed to locate the targets and the package)"
 
 reference="docs/reference/configuration.md"
 example="docs/reference/example-config.toml"
@@ -97,32 +78,6 @@ package_source="profiles/$package"
 # Where the package is placed inside the throwaway repository, worktree-relative
 # because that is the form a `path:` selector and applied record use.
 package_location="packages/$package"
-
-# --- provenance: establish currency, or refuse -------------------------------
-
-version_json=$(jit version --json 2>/dev/null) || die "'jit version --json' failed"
-build_commit=$(printf '%s' "$version_json" | jq -r '.git_commit // ""')
-case "$build_commit" in
-  "" | unknown)
-    die "refusing to write: the jit binary on PATH reports no build commit, so the classification it carries cannot be placed in $root — install it with ./scripts/install-jit.sh, which injects build provenance"
-    ;;
-esac
-
-git -C "$root" rev-parse --verify --quiet HEAD >/dev/null ||
-  die "refusing to write: $root has no resolvable HEAD to compare the binary against"
-
-# The engine's own identity predicate: whether the build commit is a commit
-# object this repository contains (crates/jit/src/domain/build_provenance.rs).
-git -C "$root" rev-parse --verify --quiet "$build_commit^{commit}" >/dev/null ||
-  die "refusing to write: the jit binary was built from $build_commit, which is not a commit in $root — its classification describes some other tree"
-
-# The binary's own verdict on whether it predates this repository's sources.
-# `JIT_GATE_RUN` puts it in gate-child mode, where it self-checks against the
-# repository it is invoked in and refuses rather than serving output. Asking it
-# keeps the build-input inventory in the one place that declares it.
-if ! probe=$( { cd "$root" && JIT_GATE_RUN=1 jit version --json >/dev/null; } 2>&1 ); then
-  die "refusing to write: the jit binary reports itself stale against $root — reinstall it with ./scripts/install-jit.sh and run this again. It reported: ${probe:-(no output)}"
-fi
 
 # --- the shipped table, read out of a throwaway repository --------------------
 
@@ -136,10 +91,9 @@ cp -R "$root/$package_source/." "$tmp/scaffold/$package_location/" ||
   die "could not place the $package package inside the throwaway repository"
 
 # `JIT_DATA_DIR` is cleared so discovery cannot reach out of the temporary
-# directory, and `JIT_GATE_RUN` so the throwaway directory — which is no
-# repository — never becomes the subject of a currency verdict.
+# directory.
 (cd "$tmp/scaffold" &&
-  env -u JIT_DATA_DIR -u JIT_GATE_RUN jit init --profile "path:$package_location" --quiet) >/dev/null 2>&1 ||
+  env -u JIT_DATA_DIR jit init --profile "path:$package_location" --quiet) >/dev/null 2>&1 ||
   die "'jit init --profile path:$package_location' failed in the throwaway repository"
 
 scaffold_config="$tmp/scaffold/.jit/config.toml"

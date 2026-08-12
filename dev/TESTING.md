@@ -177,8 +177,7 @@ model and subsystem:
 | --- | --- | --- |
 | `fast_issue`, `fast_rules`, `fast_docs_templates` | in-process (`CommandExecutor`) | issue lifecycle/graph, rules/labels/config, documents/templates |
 | `cli_issue`, `cli_gate`, `cli_query_graph`, `cli_item_validate`, `cli_repo_workflow` | CLI subprocess | the `jit` binary's command surface by area |
-| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (stale-binary checks and the merged-tree gate self-test), plus the build-footprint budget-checker fixtures |
-| `provenance_contract` | `#[ignore]`d contracts | build-provenance stability, run by `scripts/cargo-ci.sh` under `--ignored` |
+| `scratch_build` | heavyweight | tests that build scratch `cargo` projects (the merged-tree gate self-test), plus the build-footprint budget-checker fixtures and the manifest/source policy checks |
 
 The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
 its test step, on warm Cargo artifacts, pointing it with `--root` at the

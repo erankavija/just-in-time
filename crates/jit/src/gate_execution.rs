@@ -27,7 +27,7 @@ pub(crate) const AUTO_EXECUTOR: &str = "auto:executor";
 ///
 /// Convenience wrapper around [`execute_gate_checker_with_context`] that passes `None`
 /// for context and no linked documents. Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`,
-/// `JIT_STAGE`, `JIT_ISSUE_DOCS`, `JIT_GATE_RUN`) are still set.
+/// `JIT_STAGE`, `JIT_ISSUE_DOCS`) are still set.
 pub fn execute_gate_checker(
     gate_key: &str,
     issue_id: &str,
@@ -81,23 +81,11 @@ pub fn build_issue_docs_env(documents: &[DocumentReference]) -> String {
 /// This function runs the specified checker and captures all execution details
 /// including exit code, output, timing, and git context if available.
 ///
-/// Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS`,
-/// `JIT_GATE_RUN`) are always set. `JIT_ISSUE_DOCS` is built from `documents` via
+/// Basic env vars (`JIT_ISSUE_ID`, `JIT_GATE_KEY`, `JIT_STAGE`, `JIT_ISSUE_DOCS`)
+/// are always set. `JIT_ISSUE_DOCS` is built from `documents` via
 /// [`build_issue_docs_env`]. When `context` is `Some`, a temporary JSON file is
 /// written containing the structured context and made available via the
 /// `JIT_CONTEXT_FILE` env var.
-///
-/// `JIT_GATE_RUN=1` marks every process in the checker's subtree as running
-/// inside a gate checker (jit:7446af34 REQ-02): any `jit` invocation that
-/// inherits it — including a checker SCRIPT that itself shells out to `jit`
-/// (e.g. `scripts/jit-validate.sh`'s `exec jit validate "$@"`), which
-/// resolves `jit` from `PATH` independently of the evaluator process — self-
-/// checks its own build provenance at startup and refuses under the same
-/// condition [`check_gate`](crate::commands::CommandExecutor::check_gate)
-/// uses (see [`domain::build_provenance`](crate::domain::build_provenance)
-/// for the full predicate), so a stale binary anywhere in the checker's
-/// process tree cannot silently produce the recorded verdict. See `main`'s
-/// startup dispatch (binary crate) for the child-side check.
 pub fn execute_gate_checker_with_context(
     gate_key: &str,
     issue_id: &str,
@@ -121,11 +109,6 @@ pub fn execute_gate_checker_with_context(
         "JIT_ISSUE_DOCS".to_string(),
         build_issue_docs_env(documents),
     );
-    // REQ-02 (jit:7446af34): marks every process in the checker's subtree so
-    // any `jit` invocation, direct or nested, self-checks its own build
-    // provenance at startup — see the doc comment above.
-    base_env.insert("JIT_GATE_RUN".to_string(), "1".to_string());
-
     // Write context file if context is provided; otherwise explicitly clear
     // JIT_CONTEXT_FILE so it is never inherited from the parent environment
     // (e.g. when cargo test is invoked from inside a gate checker).
@@ -661,10 +644,9 @@ fn get_git_branch(working_dir: &Path) -> Option<String> {
 /// Report whether `working_dir`'s tree differs from `HEAD`.
 ///
 /// Returns `Some(true)` when `git status --porcelain` reports any change —
-/// staged, unstaged, or untracked (`--untracked-files=normal`, the same probe
-/// `scripts/install-jit.sh` uses to stamp build provenance) — `Some(false)` when
-/// the tree is clean, and `None` when git is unavailable or `working_dir` is not
-/// inside a git repository. Recorded into
+/// staged, unstaged, or untracked (`--untracked-files=normal`) — `Some(false)`
+/// when the tree is clean, and `None` when git is unavailable or `working_dir`
+/// is not inside a git repository. Recorded into
 /// [`GateRunResult::tree_dirty`](crate::domain::GateRunResult), so a pass
 /// produced against a modified tree is distinguishable from one evidencing the
 /// commit itself.

@@ -1,12 +1,6 @@
 nextest-version = "0.9.133"
 experimental = ["setup-scripts"]
 
-[scripts.setup.stale-binary-fixture]
-command = { command-line = "scripts/setup-stale-binary-fixture.sh", relative-to = "workspace-root" }
-slow-timeout = { period = "15s", terminate-after = 8 }
-capture-stdout = true
-capture-stderr = true
-
 [scripts.setup.default-repository-fixture]
 command = { command-line = "debug/jit __test-fixture-setup jit-default", relative-to = "target" }
 slow-timeout = { period = "15s", terminate-after = 4 }
@@ -50,10 +44,3 @@ slow-timeout = { period = "15s", terminate-after = 4 }
 # Explicitly pins nextest's default leak timeout.
 # Verified from the pinned tag source: https://raw.githubusercontent.com/nextest-rs/nextest/cargo-nextest-0.9.133/nextest-runner/default-config.toml
 leak-timeout = "200ms"
-
-# Socket-heavy suites keep default parallelism. The stale-binary setup runs
-# once when any of its six independent semantic tests are selected, before
-# nextest releases those tests to workers.
-[[profile.default.scripts]]
-filter = '''test(/^(stale_binary_child_process_tests::test_checker_child_stale_binary_fails_gate_run_visibly|stale_binary_child_process_tests::test_checker_child_metadata_only_change_does_not_refuse|stale_binary_child_process_tests::test_non_gate_context_child_invocation_stays_unchecked|stale_binary_child_process_tests::test_gate_context_early_paths_refuse_stale_binary|stale_binary_json_exit_tests::test_gate_evaluate_stale_binary_exits_10_in_text_and_json_modes|stale_binary_json_exit_tests::test_gate_evaluate_metadata_only_commit_does_not_refuse_stale_binary)$/)'''
-setup = "stale-binary-fixture"

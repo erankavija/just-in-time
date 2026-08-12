@@ -41,8 +41,7 @@ Canonical issue data lives in the `.jit/` directory within your project, version
 
 [INSTALL.md](INSTALL.md) is the installation guide: downloading the published
 Linux x64 archive and verifying its checksum, building the binaries from a
-source checkout, and the provenance-recording wrapper that keeps the
-stale-binary guard effective.
+source checkout, and installing the CLI from that checkout.
 
 **Optional components:**
 - `jit-server`: REST API server (http://localhost:3000). It also serves the Web UI when assets were embedded at build time or when you pass a built asset directory with `--web-dir`; [Deployment](docs/how-to/deployment.md) covers serving a repository natively or from the container image, and [Building the web UI](docs/how-to/deployment.md#building-the-web-ui) covers the bundle.

@@ -79,7 +79,7 @@ check() { # check <message> <command...>
 # passed and "  ✗ <step>: FAILED (exit N)" when it did not. `test` is the
 # pinned-nextest step that compiles every target and runs the tests, so its line
 # is the gate's verdict on the merged tree. The repository-specific steps
-# (provenance, budget) cannot hold in a throwaway crate and are not what these
+# (budget) cannot hold in a throwaway crate and are not what these
 # assertions read.
 readonly STEP_PASSED="  ✓ "
 readonly STEP_FAILED="  ✗ "
@@ -103,17 +103,15 @@ suite_clock_is_reported() {
 }
 
 # The scope is a source-order contract rather than an elapsed-time assertion:
-# the timer must bracket the two independently reported suite substeps, and
-# must close before the ignored provenance step starts. This remains
-# deterministic on loaded hosts and proves the clock excludes provenance.
+# the timer must bracket the two independently reported suite substeps and
+# close immediately after them. This remains deterministic on loaded hosts.
 suite_clock_has_exact_substep_scope() {
   awk '
     /suite_clock_started_ms=\$\(epoch_milliseconds\)/ { start = NR }
     /run_step test .*cargo nextest run --workspace/ { nextest = NR }
     /run_step doctest .*cargo test --doc --workspace/ { doctest = NR }
     /suite_clock_ms=\$\(\(.*suite_clock_started_ms/ { stop = NR }
-    /run_step provenance / { provenance = NR }
-    END { exit !(start < nextest && nextest < doctest && doctest < stop && stop < provenance) }
+    END { exit !(start < nextest && nextest < doctest && doctest < stop) }
   ' "$gate"
 }
 
@@ -163,7 +161,6 @@ EOF
       SELFTEST_UNEXPECTED_CARGO="$unexpected" \
       CARGO_CI_NO_LOCK=1 \
       CARGO_CI_NO_SCCACHE=1 \
-      CARGO_CI_TMPDIR="$scratch/gate-tmp" \
       "$gate"
   ) >"$out" 2>&1
   rc=$?
@@ -407,7 +404,7 @@ run_gate() { # run_gate <repo> <output-file>
   (
     cd "$repo" || exit 3
     unset CARGO_TARGET_DIR
-    CARGO_CI_NO_LOCK=1 CARGO_CI_TMPDIR="$scratch/gate-tmp" "$gate"
+    CARGO_CI_NO_LOCK=1 "$gate"
   ) >"$out" 2>&1
 }
 

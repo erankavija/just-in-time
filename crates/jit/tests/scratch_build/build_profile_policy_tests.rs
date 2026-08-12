@@ -218,3 +218,54 @@ fn test_profile_test_suite_script_passes_its_own_self_test() {
         String::from_utf8_lossy(&self_test.stderr)
     );
 }
+
+// MSRV drift guard. The supported Rust version is declared once, as
+// `rust-version` under `[workspace.package]` in the workspace `Cargo.toml`, and
+// every member inherits it via `rust-version.workspace = true`. CI's `msrv` job
+// compiles the workspace on exactly that toolchain, but that only catches a
+// member that still inherits; this test catches a member that silently *stops*
+// inheriting (dropping out of the enforced policy). It asserts structure, not a
+// specific number, so it never becomes a second hand-maintained copy of the
+// version literal.
+#[test]
+fn test_workspace_declares_and_inherits_rust_version() {
+    let workspace = workspace_root();
+
+    let root_manifest = fs::read_to_string(workspace.join("Cargo.toml")).unwrap();
+    let declared = root_manifest
+        .lines()
+        .find_map(|line| {
+            let line = line.trim();
+            line.strip_prefix("rust-version")?
+                .trim_start()
+                .strip_prefix('=')
+                .map(|rest| rest.trim().trim_matches('"').to_string())
+        })
+        .expect("workspace Cargo.toml must declare rust-version under [workspace.package]");
+
+    // A concrete "major.minor" MSRV, not a moving channel like "stable".
+    let mut parts = declared.split('.');
+    let major: u32 = parts.next().unwrap().parse().unwrap_or_else(|_| {
+        panic!("rust-version must be a numeric version, got {declared:?}");
+    });
+    let minor: u32 = parts
+        .next()
+        .expect("rust-version must include a minor component")
+        .parse()
+        .unwrap_or_else(|_| panic!("rust-version must be numeric, got {declared:?}"));
+    assert!(
+        major >= 1 && (major > 1 || minor > 0),
+        "rust-version {declared:?} is implausibly low"
+    );
+
+    // Every workspace member must inherit the single declared value rather than
+    // pin its own, so the MSRV job enforces one policy for the whole workspace.
+    for member in ["crates/jit", "crates/server"] {
+        let manifest = fs::read_to_string(workspace.join(member).join("Cargo.toml")).unwrap();
+        assert!(
+            manifest.contains("rust-version.workspace = true")
+                || manifest.contains("rust-version = { workspace = true }"),
+            "{member}/Cargo.toml must inherit rust-version from the workspace"
+        );
+    }
+}

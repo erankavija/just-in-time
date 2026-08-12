@@ -1,0 +1,9 @@
+  ✓ incremental-preflight: ok (34 ms)
+  ✓ fmt: ok (1541 ms)
+  ✓ clippy: ok (205 ms)
+  ✓ test: 4479 passed, 0 failed, 7 skipped (17491 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4664 ms)
+  ✓ suite-clock: 22173 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1569351960/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=skipped (231 ms)
+  ✓ incremental-state: ok (32 ms)
+

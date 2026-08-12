@@ -25,7 +25,7 @@ set -euo pipefail
 printf '%s\n' "$*" >>"$MOCK_JIT_LOG"
 
 if [[ "${1:-}" == "--version" ]]; then
-  echo 'jit 0.2.1 (commit deadbeef, dirty=false, profile release)'
+  echo 'jit 0.2.1 (profile release)'
   exit 0
 fi
 
@@ -80,7 +80,10 @@ run_harness() {
 }
 run_harness
 
-artifact="$out/session-cost-deadbeef.json"
+# The harness names its artifact for the checkout it measured, not for
+# anything the (mocked) binary reports.
+measured_commit=$(git -C "$repo_root" rev-parse --short=8 HEAD)
+artifact="$out/session-cost-$measured_commit.json"
 [[ -f "$artifact" ]] || {
   echo "selftest: expected artifact was not written: $artifact" >&2
   exit 1

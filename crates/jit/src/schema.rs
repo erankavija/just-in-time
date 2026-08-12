@@ -905,10 +905,7 @@ impl CommandSchema {
             row(
                 "*",
                 10,
-                "The repository's on-disk format is newer than this binary, a gate \
-                 checker refused because committed build inputs changed, because \
-                 working-tree build inputs are uncommitted, or because build \
-                 provenance records an uncommitted build input, or a \
+                "The repository's on-disk format is newer than this binary, or a \
                  filesystem/subprocess I/O operation failed.",
                 false,
             ),

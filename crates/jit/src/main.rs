@@ -197,17 +197,6 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
         return ErrorCode::RepositoryFormatTooNew;
     }
 
-    // A gate checker refused to run because the binary predates the tree
-    // under review (jit:7446af34): the same "the binary, not the repository,
-    // needs attention" family as the two checks above — external-dependency
-    // failure (exit 10).
-    if error
-        .downcast_ref::<jit::errors::StaleBinaryError>()
-        .is_some()
-    {
-        return ErrorCode::StaleBinary;
-    }
-
     // Stored-record decoding stays typed across the library/binary boundary.
     // Structural membership defects are validation failures; malformed JSON is
     // a parse failure and a future schema remains an external compatibility
@@ -626,13 +615,10 @@ fn render_validation_json(
 /// `fail`) or a runner error (`IO_ERROR`, exit 10, verdict `error`) per the
 /// carried [`GateRunStatus`](jit::domain::GateRunStatus); `GateNotRequiredError`
 /// becomes `INVALID_ARGUMENT` (exit 2); an unresolved id becomes
-/// `ISSUE_NOT_FOUND` (exit 3); [`StaleBinaryError`](jit::errors::StaleBinaryError)
-/// becomes `STALE_BINARY` (exit 10) — a PRE-verdict refusal, so, like
-/// `GateNotRequiredError`, it carries no `verdict` field and no gate run was
-/// ever recorded; anything else `GATE_ERROR`. In non-JSON mode it surfaces any
-/// gate-failure warnings and returns `Err(e)` so the top-level handler maps the
-/// exit code via [`error_to_exit_code`] — which classifies `StaleBinaryError`
-/// to the same `ExitCode::ExternalError`, so both output modes agree.
+/// `ISSUE_NOT_FOUND` (exit 3); anything else `GATE_ERROR`. In non-JSON mode it
+/// surfaces any gate-failure warnings and returns `Err(e)` so the top-level
+/// handler maps the exit code via [`error_to_exit_code`], so both output modes
+/// agree.
 fn render_gate_pass_error(
     e: anyhow::Error,
     id: &str,
@@ -721,59 +707,10 @@ fn gate_pass_json_error(e: &anyhow::Error, id: &str) -> jit::output::JsonError {
     {
         // Pre-verdict lookup error: issue id did not resolve.
         JsonError::issue_not_found(id)
-    } else if let Some(stale) = e.downcast_ref::<jit::errors::StaleBinaryError>() {
-        // Pre-verdict refusal (jit:7446af34): the checker never spawned, so —
-        // like `GateNotRequiredError` above, and unlike `GatePassFailed` — this
-        // carries no `verdict` field. `STALE_BINARY` maps to exit code 10
-        // (`ErrorCode::exit_code`), matching the non-JSON path's
-        // `ExitCode::ExternalError` classification of the same typed error in
-        // `error_to_exit_code`.
-        stale_binary_json_error(stale)
     } else {
         JsonError::new(ErrorCode::GateError, e.to_string())
     };
     json_error
-}
-
-/// Build the `--json` error envelope for a stale-binary refusal
-/// ([`StaleBinaryError`](jit::errors::StaleBinaryError), jit:7446af34).
-///
-/// Shared by [`render_gate_pass_error`] (the evaluator's own refusal, REQ-01)
-/// and [`emit_top_level_json_error`] (a checker-spawned `jit` child's own
-/// self-refusal, REQ-02), so both carry the identical `STALE_BINARY` code,
-/// `details` (issue id, gate key, reason, build commit), and reinstall
-/// suggestion — one envelope shape regardless of which process in the gate
-/// run detected the staleness.
-fn stale_binary_json_error(stale: &jit::errors::StaleBinaryError) -> jit::output::JsonError {
-    use jit::domain::build_provenance::StaleBinaryReason;
-    use jit::output::{ErrorCode, JsonError};
-
-    let (reason_code, built_from, paths) = match stale.reason() {
-        StaleBinaryReason::CommitMismatch { built_from, .. } => {
-            ("commit_mismatch", built_from.clone(), None)
-        }
-        StaleBinaryReason::UncommittedBuildInputs { built_from, paths } => (
-            "uncommitted_build_inputs",
-            built_from.clone(),
-            Some(paths.clone()),
-        ),
-        StaleBinaryReason::DirtyBuild { built_from } => ("dirty_build", built_from.clone(), None),
-    };
-    JsonError::new(ErrorCode::StaleBinary, stale.to_string())
-        .with_details(serde_json::json!({
-            "issue_id": stale.issue_id(),
-            "key": stale.gate_key(),
-            "reason": reason_code,
-            "built_from": built_from,
-            "paths": paths,
-        }))
-        .with_suggestion(
-            "Rebuild and reinstall with build provenance: scripts/install-jit.sh \
-             (wraps cargo install --path crates/jit)",
-        )
-        .with_suggestion(format!(
-            "Verify with: jit --version (should show commit {built_from})"
-        ))
 }
 
 /// Print the outcome of a graph-template apply (`jit apply <template> <container>`).
@@ -2090,9 +2027,7 @@ fn emit_top_level_json_error(error: &anyhow::Error) -> Option<ExitCode> {
         return None;
     }
 
-    let json_error = if let Some(stale) = error.downcast_ref::<jit::errors::StaleBinaryError>() {
-        stale_binary_json_error(stale)
-    } else if error
+    let json_error = if error
         .downcast_ref::<jit::errors::InvalidLabelPatternError>()
         .is_some()
     {
@@ -2110,83 +2045,6 @@ fn emit_top_level_json_error(error: &anyhow::Error) -> Option<ExitCode> {
     Some(exit_code)
 }
 
-/// REQ-02 (jit:7446af34): self-check this process's own build provenance
-/// before running ANY command, when it is itself running inside a gate
-/// checker's process tree.
-///
-/// `JIT_GATE_RUN` is set on every gate checker's environment
-/// ([`gate_execution::execute_gate_checker_with_context`](jit::gate_execution::execute_gate_checker_with_context))
-/// and inherited by anything the checker spawns — including a checker SCRIPT
-/// that itself shells out to `jit` (e.g. `scripts/jit-validate.sh`'s `exec
-/// jit validate "$@"`), which resolves `jit` from `PATH` independently of the
-/// evaluator process. The evaluator's own guard
-/// ([`check_gate`](jit::commands::CommandExecutor::check_gate), REQ-01) only
-/// covers the evaluator's own binary, so without this, a stale PATH `jit`
-/// inside the checker's process tree could still silently produce the
-/// checker's exit code and output — the incident that motivated this feature
-/// (jit:7446af34) — and the evaluator would faithfully persist it as a gate
-/// run. This makes any such staleness visible in the run record instead: the
-/// child refuses (exit `10`) rather than running its command, so the
-/// checker's own exit code and stderr — captured into the persisted
-/// [`GateRunResult`](jit::domain::GateRunResult) — carry the refusal.
-///
-/// A no-op when `JIT_GATE_RUN` is absent (an ordinary, non-gate-context
-/// invocation is completely unaffected), and silent under the identical
-/// REQ-03 identity predicate the evaluator-side check uses (outside git, an
-/// unrelated repository, or an unknown build commit never refuses). Reads
-/// `JIT_ISSUE_ID`/`JIT_GATE_KEY` (set alongside `JIT_GATE_RUN`) to label the
-/// refusal the same way the evaluator's own guard does.
-fn refuse_if_stale_gate_child(executor: &CommandExecutor<JsonFileStorage>) -> Result<()> {
-    if env::var_os("JIT_GATE_RUN").is_none() {
-        return Ok(());
-    }
-    if let Some(reason) = executor.stale_binary_reason() {
-        let issue_id = env::var("JIT_ISSUE_ID").unwrap_or_default();
-        let gate_key = env::var("JIT_GATE_KEY").unwrap_or_default();
-        return Err(jit::errors::StaleBinaryError::new(&issue_id, &gate_key, &reason).into());
-    }
-    Ok(())
-}
-
-/// [`refuse_if_stale_gate_child`] for the pre-dispatch paths: runs before any
-/// early return (`--schema`, `version`), so even those outputs are never
-/// served from a stale binary inside a gate checker's process tree — a
-/// checker script can consume them to inform its verdict just like any other
-/// command's output (REQ-02, jit:7446af34). Constructs a discovery-backed
-/// executor only when `JIT_GATE_RUN` is present; the ordinary invocation
-/// path pays nothing.
-fn stale_gate_child_precheck() -> Result<()> {
-    if env::var_os("JIT_GATE_RUN").is_none() {
-        return Ok(());
-    }
-    let current_dir = env::current_dir()?;
-    let (jit_dir, non_git_worktree_root) = if let Ok(custom_dir) = env::var("JIT_DATA_DIR") {
-        let target = normalize_absolute_path(&current_dir.join(custom_dir));
-        let worktree_root = jit::storage::discovery::discover_jit_dir(&current_dir)
-            .filter(|candidate| candidate == &target)
-            .and_then(|candidate| candidate.parent().map(Path::to_path_buf))
-            .unwrap_or_else(|| current_dir.clone());
-        (target, worktree_root)
-    } else {
-        match jit::storage::discovery::discover_jit_dir(&current_dir) {
-            Some(discovered) => {
-                let worktree_root = discovered
-                    .parent()
-                    .map(Path::to_path_buf)
-                    .unwrap_or_else(|| current_dir.clone());
-                (discovered, worktree_root)
-            }
-            None => (current_dir.join(".jit"), current_dir.clone()),
-        }
-    };
-    let worktree = jit::storage::worktree_paths::WorktreePaths::detect_with_non_git_root(
-        &non_git_worktree_root,
-    )?;
-    let layout = jit::storage::discover_repository_layout(worktree.worktree_root, &jit_dir)?;
-    let executor = CommandExecutor::new(JsonFileStorage::new(&jit_dir)).with_layout(layout);
-    refuse_if_stale_gate_child(&executor)
-}
-
 fn run() -> Result<()> {
     #[cfg(feature = "test-support")]
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("__test-fixture-setup")) {
@@ -2195,13 +2053,6 @@ fn run() -> Result<()> {
             .context("test fixture setup requires a profile id")?;
         return jit::test_utils::prepare_nextest_profiled_repository_fixture(&id);
     }
-
-    // REQ-02 (jit:7446af34): refuse before ANY output — before Clap even
-    // parses (its `--help`/`-V` auto-exits print and terminate inside
-    // `Cli::parse`), and ahead of the `--schema` and `version` early returns
-    // below — when this process is itself stale and running inside a gate
-    // checker's process tree. Nothing observable precedes this guard.
-    stale_gate_child_precheck()?;
 
     let cli = Cli::parse();
     let quiet = cli.quiet;
@@ -2227,14 +2078,7 @@ fn run() -> Result<()> {
             println!("{}", output.to_json_string()?);
         } else {
             println!("Version: {}", info.version);
-            println!("Commit: {} ({})", info.git_short_commit, info.git_commit);
-            let dirty = info
-                .git_dirty
-                .map(|value| value.to_string())
-                .unwrap_or_else(|| "unknown".to_string());
-            println!("Dirty: {}", dirty);
             println!("Profile: {}", info.build_profile);
-            println!("Built: {}", info.build_timestamp);
             println!("Target: {}", info.target);
         }
         return Ok(());
@@ -8618,19 +8462,6 @@ mod exit_code_projection_tests {
             ),
             (
                 jit::storage::RepositoryFormatTooNewError::new(9999, 1).into(),
-                10,
-                "*",
-            ),
-            (
-                jit::errors::StaleBinaryError::new(
-                    "abc123",
-                    "tests",
-                    &jit::domain::build_provenance::StaleBinaryReason::CommitMismatch {
-                        built_from: "a".repeat(40),
-                        head: "b".repeat(40),
-                    },
-                )
-                .into(),
                 10,
                 "*",
             ),
