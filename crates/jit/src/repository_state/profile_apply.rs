@@ -145,7 +145,8 @@ pub enum ContributionRegistry {
 }
 
 impl ContributionRegistry {
-    fn path(self) -> &'static str {
+    /// Repository-relative path of the registry file this vocabulary names.
+    pub fn path(self) -> &'static str {
         match self {
             Self::Config => ".jit/config.toml",
             Self::Gates => ".jit/gates.toml",
@@ -810,6 +811,29 @@ pub enum AppliedProfileClaimIdentity {
     },
 }
 
+/// The repository-relative name of what one claim owns.
+///
+/// A semantic declaration is named by its own canonical identity, which already
+/// begins with its registry path; an asset by the repository path it occupies;
+/// and a managed region by its document and region id. Every message about a
+/// claim — the profile check's report and repository-wide validation's finding —
+/// names it this way, so an adopter reading either finds the same subject.
+impl std::fmt::Display for AppliedProfileClaimIdentity {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Semantic { identity } => identity.fmt(formatter),
+            Self::Asset { target } => {
+                formatter.write_str(&super::repository_relative_path(target.root, &target.path))
+            }
+            Self::ManagedRegion { target, region_id } => write!(
+                formatter,
+                "{}#{region_id}",
+                super::repository_relative_path(target.root, &target.path)
+            ),
+        }
+    }
+}
+
 /// Provenance for one contribution a profile owns at its recorded base.
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -860,14 +884,7 @@ impl AppliedProfileClaim {
                 target: AppliedManagedRegionTarget::from_virtual_path(target),
                 region_id: region_id.clone(),
             },
-            base_fingerprint: fingerprint_bytes(
-                b"jit-profile-record-v2:managed-region\0",
-                &[
-                    region_id.as_str().as_bytes(),
-                    content,
-                    &file_mode_bytes(mode),
-                ],
-            ),
+            base_fingerprint: fingerprint_managed_region(&region_id, content, mode),
             retain_if_unowned,
         }
     }
@@ -897,6 +914,39 @@ fn fingerprint_profile_asset(bytes: &[u8], mode: FileMode) -> ProfileBaseFingerp
     fingerprint_bytes(
         b"jit-profile-record-v2:asset\0",
         &[bytes, &file_mode_bytes(mode)],
+    )
+}
+
+/// Fingerprint one managed region's published body and target mode under the
+/// sole managed-region domain.
+///
+/// Publication records this over the body it splices in; the ownership check
+/// recomputes it over the body the document currently holds, so both sides of
+/// that comparison are the same construction.
+fn fingerprint_managed_region(
+    region_id: &RegionId,
+    content: &[u8],
+    mode: FileMode,
+) -> ProfileBaseFingerprint {
+    fingerprint_bytes(
+        b"jit-profile-record-v2:managed-region\0",
+        &[
+            region_id.as_str().as_bytes(),
+            content,
+            &file_mode_bytes(mode),
+        ],
+    )
+}
+
+/// The exact delimiters one profile-owned managed region is published between.
+///
+/// Composition splices a region between these bytes and the ownership check
+/// reads it back from between them, so the pair is spelled once here rather
+/// than at each end of that round trip.
+fn region_delimiters(region_id: &RegionId) -> (Vec<u8>, Vec<u8>) {
+    (
+        format!("<!-- jit:{region_id}:begin -->").into_bytes(),
+        format!("<!-- jit:{region_id}:end -->").into_bytes(),
     )
 }
 
@@ -1282,11 +1332,12 @@ pub(super) fn compose_profile_targets_with_context(
     // region-target mode contract.
     let regions = claims.regions.iter().map(|region| {
         let path = region.claim.target().clone();
+        let (begin, end) = region_delimiters(&region.region_id);
         let claim = ManagedDocumentClaim::Region {
             owner: region.claim.owner().to_string(),
             region_id: region.region_id.to_string(),
-            begin: format!("<!-- jit:{}:begin -->", region.region_id).into_bytes(),
-            end: format!("<!-- jit:{}:end -->", region.region_id).into_bytes(),
+            begin,
+            end,
             content: region.content.clone(),
             placement: RegionPlacement::AppendIfAbsent,
         };
@@ -1823,7 +1874,7 @@ fn existing_contribution_claims(
     let repository = candidates
         .iter()
         .filter(|claim| !owned_identities.contains(&claim.contribution.semantic_identity()))
-        .map(|claim| repository_definition(base, &claim.contribution))
+        .map(|claim| repository_definition(base, &claim.contribution.semantic_identity()))
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .flatten()
@@ -1896,12 +1947,132 @@ fn retained_semantic_claim_identities(
         .collect())
 }
 
-/// Read the repository definition matching one candidate identity, if authored.
+/// What a captured image says about the value one recorded ownership claim
+/// published.
+///
+/// The comparison is against the claim's own recorded base, never against what
+/// a package would publish today, so it answers "does the repository still hold
+/// what this profile put there" for a repository whose package moved, changed,
+/// or disappeared.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClaimedTargetState {
+    /// The claimed target lies outside this capture, so this image is not
+    /// evidence either way.
+    Uncaptured,
+    /// The repository no longer holds what the claim names.
+    Absent,
+    /// The repository holds exactly the value the claim recorded.
+    Unchanged,
+    /// The repository holds a value other than the one the claim recorded.
+    Changed,
+}
+
+impl ClaimedTargetState {
+    fn matching(matches: bool) -> Self {
+        if matches {
+            Self::Unchanged
+        } else {
+            Self::Changed
+        }
+    }
+}
+
+/// Compare one recorded ownership claim against the value `base` currently
+/// holds for it.
+///
+/// This is the sole comparison behind both the profile-scoped agreement check
+/// and repository-wide validation's profile-ownership pass, so each claim kind
+/// is read back through the construction that published it: an asset by its
+/// exact bytes and mode, a managed region by the body between the delimiters
+/// composition splices it under, and a semantic declaration by the registry
+/// entry its identity names.
+///
+/// A region's published body is read back with the newline the splice inserts
+/// after the begin delimiter removed, and a content that did not end in a
+/// newline is stored with the terminator the splice supplies. Both spellings
+/// render the same document, so either matching the recorded fingerprint is
+/// agreement rather than a difference the document could express.
+///
+/// # Errors
+///
+/// Returns [`RepositoryStateError`] when the image cannot be read at a captured
+/// path, when a registry the claim names is not a regular file, or when the
+/// registry does not parse as the declaration the identity addresses.
+pub fn claimed_target_state(
+    base: &RepositoryImage,
+    claim: &AppliedProfileClaim,
+) -> Result<ClaimedTargetState, RepositoryStateError> {
+    let captured_file = |path: VirtualPath| -> Result<_, RepositoryStateError> {
+        if !base.capture_spec().contains_path(&path) {
+            return Ok(None);
+        }
+        Ok(Some(base.entry(&path).map_err(ProducerError::from)?))
+    };
+    match &claim.identity {
+        AppliedProfileClaimIdentity::Semantic { identity } => {
+            let registry = base
+                .layout()
+                .classify_repository_relative(identity.registry.path())?;
+            if !base.capture_spec().contains_path(&registry) {
+                return Ok(ClaimedTargetState::Uncaptured);
+            }
+            Ok(match repository_definition(base, identity)? {
+                None => ClaimedTargetState::Absent,
+                Some(current) => ClaimedTargetState::matching(
+                    fingerprint_semantic_contribution(&current)
+                        .map_err(ProducerError::ProfileClaimFingerprint)?
+                        == claim.base_fingerprint,
+                ),
+            })
+        }
+        AppliedProfileClaimIdentity::Asset { target } => {
+            let path = VirtualPath::from_root(target.root, target.path.clone())?;
+            Ok(match captured_file(path)? {
+                None => ClaimedTargetState::Uncaptured,
+                Some(RepositoryEntry::File { bytes, mode, .. }) => ClaimedTargetState::matching(
+                    fingerprint_profile_asset(bytes, *mode) == claim.base_fingerprint,
+                ),
+                Some(_) => ClaimedTargetState::Absent,
+            })
+        }
+        AppliedProfileClaimIdentity::ManagedRegion { target, region_id } => {
+            let path = VirtualPath::from_root(target.root, target.path.clone())?;
+            let Some(entry) = captured_file(path)? else {
+                return Ok(ClaimedTargetState::Uncaptured);
+            };
+            let RepositoryEntry::File { bytes, mode, .. } = entry else {
+                return Ok(ClaimedTargetState::Absent);
+            };
+            let (begin, end) = region_delimiters(region_id);
+            let Some(body) = super::managed_document::region_body(bytes, &begin, &end) else {
+                return Ok(ClaimedTargetState::Absent);
+            };
+            let published = body.strip_prefix(b"\n").unwrap_or(body);
+            Ok(ClaimedTargetState::matching(
+                [
+                    published,
+                    published.strip_suffix(b"\n").unwrap_or(published),
+                ]
+                .into_iter()
+                .any(|content| {
+                    fingerprint_managed_region(region_id, content, *mode) == claim.base_fingerprint
+                }),
+            ))
+        }
+    }
+}
+
+/// Read the repository definition carrying one semantic identity, if authored.
+///
+/// The identity alone decides both which registry is read and which declaration
+/// inside it answers, so a caller holding an identity without the contribution
+/// that minted it — a recorded ownership claim — reads the current value through
+/// the same function composition uses.
 fn repository_definition(
     base: &RepositoryImage,
-    candidate: &Contribution,
+    identity: &ContributionIdentity,
 ) -> Result<Option<Contribution>, RepositoryStateError> {
-    let registry = candidate.registry_path();
+    let registry = identity.registry.path();
     let path = base.layout().classify_repository_relative(registry)?;
     let existing = match base.entry(&path).map_err(ProducerError::from)? {
         RepositoryEntry::Absent => return Ok(None),
@@ -1915,8 +2086,8 @@ fn repository_definition(
     };
     let document = MergeDocument::load(registry, existing)?;
     let semantic = semantic_document(registry, &document.document)?;
-    match candidate {
-        Contribution::Scalar { target, .. } => {
+    match &identity.target {
+        ContributionIdentityTarget::Scalar { target } => {
             let (table, key) = target.config_path();
             let Some(value) = semantic.get(table).and_then(|table| table.get(key)) else {
                 return Ok(None);
@@ -1929,18 +2100,17 @@ fn repository_definition(
                 value: value.to_string(),
             }))
         }
-        Contribution::MapEntry {
-            target, identity, ..
-        } => Ok(
-            semantic_map_entry(&semantic, target.table_path(), identity).map(|value| {
-                Contribution::MapEntry {
-                    target: *target,
-                    identity: identity.clone(),
-                    value: value.clone(),
-                }
-            }),
-        ),
-        Contribution::SetString { target, value } => {
+        ContributionIdentityTarget::MapEntry { target, name } => Ok(semantic_map_entry(
+            &semantic,
+            target.table_path(),
+            name,
+        )
+        .map(|value| Contribution::MapEntry {
+            target: *target,
+            identity: name.clone(),
+            value: value.clone(),
+        })),
+        ContributionIdentityTarget::SetString { target, value } => {
             let (table, key) = target.config_path();
             let Some(values) = semantic.get(table).and_then(|table| table.get(key)) else {
                 return Ok(None);
@@ -1957,11 +2127,12 @@ fn repository_definition(
             Ok(values
                 .iter()
                 .any(|entry| entry.as_str() == Some(value))
-                .then(|| candidate.clone()))
+                .then(|| Contribution::SetString {
+                    target: *target,
+                    value: value.clone(),
+                }))
         }
-        Contribution::KeyedArray {
-            target, identity, ..
-        } => {
+        ContributionIdentityTarget::KeyedArray { target, name } => {
             let Some(entries) = semantic.get(target.array_name()) else {
                 return Ok(None);
             };
@@ -1979,16 +2150,16 @@ fn repository_definition(
                     entry
                         .get(target.identity_field())
                         .and_then(JsonValue::as_str)
-                        == Some(identity)
+                        == Some(name.as_str())
                 })
                 .cloned()
                 .map(|value| Contribution::KeyedArray {
                     target: *target,
-                    identity: identity.clone(),
+                    identity: name.clone(),
                     value,
                 }))
         }
-        Contribution::Projection { name, .. } => semantic
+        ContributionIdentityTarget::Projection { name } => semantic
             .get("projection")
             .and_then(|projections| projections.get(name))
             .map(|value| {
@@ -3398,5 +3569,197 @@ mod tests {
         assert!(render_composed_contributions(&image, &[])
             .unwrap()
             .is_empty());
+    }
+
+    /// An image whose exact-path closure is `captured` and which holds a file at
+    /// each path `held` names.
+    ///
+    /// A path in `captured` but not in `held` is captured absence; a path in
+    /// neither is outside the closure, which is what distinguishes "the
+    /// repository no longer holds this" from "this image cannot say".
+    fn image_over(
+        captured: &[VirtualPath],
+        held: &[(VirtualPath, &[u8], FileMode)],
+    ) -> RepositoryImage {
+        let layout = super::super::RepositoryLayout::new(
+            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
+            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
+        )
+        .expect("layout is valid");
+        // Phase one is seeded from the data root, so the registry is always in
+        // the closure and every other captured path is discovered onto it.
+        let mut spec = CaptureSpec::phase_one(
+            [VirtualPath::CONFIG],
+            CaptureBudget {
+                max_paths: 16,
+                max_listings: 0,
+                max_bytes: 64 * 1024,
+                max_depth: 8,
+            },
+        )
+        .expect("capture spec is valid");
+        spec.discover_paths(captured.to_vec())
+            .expect("captured paths are discoverable");
+        let captured = std::iter::once(VirtualPath::CONFIG)
+            .chain(captured.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        let entries = captured
+            .iter()
+            .map(|path| {
+                let held = held.iter().find(|(candidate, ..)| candidate == path);
+                let entry = match held {
+                    None => RepositoryEntry::Absent,
+                    Some((path, bytes, mode)) => RepositoryEntry::File {
+                        identity: EntryIdentity::for_bytes(path.repository_relative(), bytes)
+                            .expect("entry identity"),
+                        bytes: bytes.to_vec(),
+                        mode: *mode,
+                    },
+                };
+                (path.clone(), entry)
+            })
+            .collect();
+        RepositoryImage::close(
+            layout,
+            spec,
+            entries,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .expect("image closes")
+    }
+
+    #[test]
+    fn test_claimed_target_state_answers_for_an_asset_from_its_recorded_bytes_and_mode() {
+        let target = VirtualPath::worktree("docs/profile.txt").expect("canonical target");
+        let claim = AppliedProfileClaim::asset(&target, b"published\n", FileMode::Regular, false);
+        let state = |held: &[(VirtualPath, &[u8], FileMode)]| {
+            claimed_target_state(&image_over(&[target.clone()], held), &claim)
+                .expect("the claim is comparable")
+        };
+
+        assert_eq!(
+            state(&[(target.clone(), b"published\n", FileMode::Regular)]),
+            ClaimedTargetState::Unchanged
+        );
+        assert_eq!(
+            state(&[(target.clone(), b"edited in place\n", FileMode::Regular)]),
+            ClaimedTargetState::Changed
+        );
+        assert_eq!(
+            state(&[(target.clone(), b"published\n", FileMode::Executable)]),
+            ClaimedTargetState::Changed,
+            "mode belongs to the published identity, so a mode-only edit is a change"
+        );
+        assert_eq!(state(&[]), ClaimedTargetState::Absent);
+        assert_eq!(
+            claimed_target_state(&image_over(&[], &[]), &claim).expect("an uncaptured claim"),
+            ClaimedTargetState::Uncaptured,
+            "an image that never captured the target is evidence of nothing about it"
+        );
+    }
+
+    /// The region a profile published is read back out of the document the
+    /// composition engine wrote it into, so an untouched region agrees and an
+    /// edited body does not.
+    #[test]
+    fn test_claimed_target_state_reads_a_managed_region_back_out_of_its_published_document() {
+        let target = VirtualPath::worktree("AGENTS.md").expect("canonical target");
+        let region_id: RegionId = "guidance".try_into().expect("canonical region id");
+        let content = b"managed guidance\n";
+        let claim = AppliedProfileClaim::managed_region(
+            &target,
+            region_id.clone(),
+            content,
+            FileMode::Regular,
+            false,
+        );
+        let (begin, end) = region_delimiters(&region_id);
+        let published = super::super::managed_document::render_managed_document(
+            b"# Doc\n\nauthored prose\n",
+            &[ManagedDocumentClaim::Region {
+                owner: "example".to_string(),
+                region_id: region_id.to_string(),
+                begin: begin.clone(),
+                end: end.clone(),
+                content: content.to_vec(),
+                placement: RegionPlacement::AppendIfAbsent,
+            }],
+        )
+        .expect("the region composes into the document");
+        let state = |bytes: &[u8]| {
+            claimed_target_state(
+                &image_over(
+                    &[target.clone()],
+                    &[(target.clone(), bytes, FileMode::Regular)],
+                ),
+                &claim,
+            )
+            .expect("the claim is comparable")
+        };
+
+        assert_eq!(state(&published), ClaimedTargetState::Unchanged);
+        assert_eq!(
+            state(
+                &String::from_utf8(published.clone())
+                    .expect("the document is UTF-8")
+                    .replace("managed guidance", "edited guidance")
+                    .into_bytes()
+            ),
+            ClaimedTargetState::Changed
+        );
+        assert_eq!(
+            state(b"# Doc\n\nauthored prose\n"),
+            ClaimedTargetState::Absent,
+            "a document whose markers are gone no longer holds the claimed region"
+        );
+    }
+
+    /// A semantic claim is compared against the registry entry its own identity
+    /// addresses, so the check reads the current declaration without holding the
+    /// package that contributed it.
+    #[test]
+    fn test_claimed_target_state_compares_a_semantic_claim_against_the_registry_it_names() {
+        let contribution = Contribution::MapEntry {
+            target: MapEntryTarget::Namespaces,
+            identity: "stream".to_string(),
+            value: serde_json::json!({"description": "Synthetic stream.", "unique": false}),
+        };
+        let claim =
+            AppliedProfileClaim::semantic(&contribution, false).expect("claim fingerprints");
+        let rendered = |contribution: Option<&Contribution>| {
+            let mut document = "".parse::<DocumentMut>().expect("an empty document parses");
+            if let Some(contribution) = contribution {
+                merge_authored_contribution(&mut document, contribution)
+                    .expect("the contribution renders");
+            }
+            document.to_string().into_bytes()
+        };
+        let config = VirtualPath::CONFIG;
+        let state = |bytes: &[u8]| {
+            claimed_target_state(
+                &image_over(
+                    &[config.clone()],
+                    &[(config.clone(), bytes, FileMode::Regular)],
+                ),
+                &claim,
+            )
+            .expect("the claim is comparable")
+        };
+
+        assert_eq!(
+            state(&rendered(Some(&contribution))),
+            ClaimedTargetState::Unchanged
+        );
+        assert_eq!(
+            state(&rendered(Some(&Contribution::MapEntry {
+                target: MapEntryTarget::Namespaces,
+                identity: "stream".to_string(),
+                value: serde_json::json!({"description": "Edited by hand.", "unique": false}),
+            }))),
+            ClaimedTargetState::Changed
+        );
+        assert_eq!(state(&rendered(None)), ClaimedTargetState::Absent);
     }
 }
