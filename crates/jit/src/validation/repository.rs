@@ -45,9 +45,6 @@ pub enum RepositoryValidationPass {
     ItemLinks,
     /// Configured invariant and rules/gates projections match their view inputs.
     Projections,
-    /// Every target an applied-profile record claims still holds the value that
-    /// profile published.
-    ProfileOwnership,
 }
 
 /// Validation outcome, including semantic findings and stages reached.
@@ -102,6 +99,14 @@ impl RepositoryValidationFailure {
                 rule_report: RuleReport::default(),
             },
         )
+    }
+
+    /// Recompose a failure from its structural error and a report a caller
+    /// extended with findings the pipeline itself does not produce.
+    ///
+    /// The structural error stays authoritative; only the partial report grows.
+    pub(crate) fn with_report(error: anyhow::Error, report: RepositoryValidationReport) -> Self {
+        Self::new(error, report)
     }
 
     /// Partial validation report collected from the exact supplied view.
@@ -316,18 +321,6 @@ pub(crate) fn validate_repository_with_materializations(
                 if structural_error.is_none() {
                     structural_error = Some(error);
                 }
-            }
-        }
-    }
-
-    match collect_profile_ownership_findings(image).context("profile-ownership validation pass") {
-        Ok(profile_findings) => {
-            findings.extend(profile_findings);
-            passes.push(RepositoryValidationPass::ProfileOwnership);
-        }
-        Err(error) => {
-            if structural_error.is_none() {
-                structural_error = Some(error);
             }
         }
     }
@@ -662,18 +655,33 @@ fn collect_enforcement_drift_findings(
 ///
 /// The comparison is the shared per-claim one
 /// ([`claimed_target_divergences`](crate::profile::claimed_target_divergences)),
-/// so this pass and `jit profile validate` report the same divergences from one
-/// implementation rather than two views of the same evidence.
+/// so repository-wide validation and `jit profile validate` report the same
+/// divergences from one implementation rather than two views of the same
+/// evidence.
+///
+/// This runs over a CAPTURED repository, never over a proposed-state overlay: an
+/// overlay projects a delta to bytes alone, and a published asset's file mode is
+/// part of the value its owner recorded, so an overlaid executable asset would
+/// read as changed on every application. The proposed-state pipeline
+/// ([`validate_repository_with_materializations`]) therefore does not run this,
+/// and the repository-wide validation command adds it to the report it renders.
 ///
 /// Whether the package a record names is still readable, and still the package
 /// that record identifies, is deliberately not asked here: answering either
-/// means reading a package directory, and every pass in this pipeline reads only
-/// the closed image. The profile-scoped check adds those two questions around
-/// this same comparison, and derived-state repair refuses to plan without them.
+/// means reading a package directory, and this reads only the closed image. The
+/// profile-scoped check adds those two questions around this same comparison,
+/// and derived-state repair refuses to plan without them.
 ///
 /// A claim whose target the image never captured produces nothing, so a
 /// narrower capture reports fewer divergences rather than inventing them.
-fn collect_profile_ownership_findings(image: &RepositoryImage) -> Result<Vec<ReportedFinding>> {
+///
+/// # Errors
+///
+/// Returns an error when a record does not parse, is filed under another
+/// profile's name, or claims a registry that is not a regular file.
+pub(crate) fn collect_profile_ownership_findings(
+    image: &RepositoryImage,
+) -> Result<Vec<ReportedFinding>> {
     crate::repository_state::applied_profile_records(image)?
         .into_iter()
         .map(|(path, record)| {

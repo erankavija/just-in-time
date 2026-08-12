@@ -186,7 +186,10 @@ impl ProfileAgreementResult {
 ///
 /// A claim whose target lies outside the capture yields nothing: the image is
 /// not evidence about a path it never read, and reporting an unread path as
-/// absent would turn a narrow capture into a divergence.
+/// absent would turn a narrow capture into a divergence. A claim whose value is
+/// composed with content another owner manages
+/// ([`ClaimedTargetState::Composed`]) likewise yields nothing about its content,
+/// while still being reported when the target it names is gone.
 ///
 /// # Errors
 ///
@@ -201,7 +204,9 @@ pub fn claimed_target_divergences(
         .iter()
         .map(|claim| {
             Ok(match claimed_target_state(image, claim)? {
-                ClaimedTargetState::Uncaptured | ClaimedTargetState::Unchanged => None,
+                ClaimedTargetState::Uncaptured
+                | ClaimedTargetState::Composed
+                | ClaimedTargetState::Unchanged => None,
                 ClaimedTargetState::Absent => Some(ProfileDivergence::AbsentTarget {
                     target: claim.identity.to_string(),
                 }),

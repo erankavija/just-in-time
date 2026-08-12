@@ -967,16 +967,32 @@ fn fingerprint_managed_region(
     )
 }
 
+/// The byte prefix every managed-region delimiter this engine writes begins
+/// with. Text carrying it holds a region some owner manages.
+const REGION_MARKER_PREFIX: &[u8] = b"<!-- jit:";
+
 /// The exact delimiters one profile-owned managed region is published between.
 ///
 /// Composition splices a region between these bytes and the ownership check
 /// reads it back from between them, so the pair is spelled once here rather
 /// than at each end of that round trip.
 fn region_delimiters(region_id: &RegionId) -> (Vec<u8>, Vec<u8>) {
-    (
-        format!("<!-- jit:{region_id}:begin -->").into_bytes(),
-        format!("<!-- jit:{region_id}:end -->").into_bytes(),
-    )
+    let delimiter = |edge: &str| {
+        [
+            REGION_MARKER_PREFIX,
+            region_id.as_str().as_bytes(),
+            format!(":{edge} -->").as_bytes(),
+        ]
+        .concat()
+    };
+    (delimiter("begin"), delimiter("end"))
+}
+
+/// Whether `body` carries a managed-region delimiter, meaning some owner
+/// manages a region inside it.
+fn carries_nested_region(body: &[u8]) -> bool {
+    body.windows(REGION_MARKER_PREFIX.len())
+        .any(|window| window == REGION_MARKER_PREFIX)
 }
 
 fn file_mode_bytes(mode: FileMode) -> Vec<u8> {
@@ -2003,6 +2019,10 @@ pub enum ClaimedTargetState {
     /// The claimed target lies outside this capture, so this image is not
     /// evidence either way.
     Uncaptured,
+    /// The repository holds the claimed target, but its value is composed with
+    /// content another owner manages, so this claim's recorded base is not the
+    /// whole of what sits there.
+    Composed,
     /// The repository no longer holds what the claim names.
     Absent,
     /// The repository holds exactly the value the claim recorded.
@@ -2036,6 +2056,15 @@ impl ClaimedTargetState {
 /// newline is stored with the terminator the splice supplies. Both spellings
 /// render the same document, so either matching the recorded fingerprint is
 /// agreement rather than a difference the document could express.
+///
+/// A region whose published body carries a region another owner manages — a
+/// package's guidance region enclosing a configured projection's region — is
+/// [`ClaimedTargetState::Composed`] rather than compared. That nested body is
+/// rendered from what its own owner declares and moves whenever that
+/// declaration does, so the profile's recorded base is not the whole of what
+/// sits between its delimiters and a comparison against it would report every
+/// such profile as diverged. Its presence is still answered: a document or a
+/// delimiter pair that is gone is [`ClaimedTargetState::Absent`].
 ///
 /// # Errors
 ///
@@ -2079,6 +2108,9 @@ pub fn claimed_target_state(
             let Some(body) = super::managed_document::region_body(bytes, &begin, &end) else {
                 return Ok(ClaimedTargetState::Absent);
             };
+            if carries_nested_region(body) {
+                return Ok(ClaimedTargetState::Composed);
+            }
             let published = body.strip_prefix(b"\n").unwrap_or(body);
             Ok(ClaimedTargetState::matching(
                 [
@@ -3745,6 +3777,67 @@ mod tests {
             state(b"# Doc\n\nauthored prose\n"),
             ClaimedTargetState::Absent,
             "a document whose markers are gone no longer holds the claimed region"
+        );
+    }
+
+    /// A region enclosing a region another owner manages is present but not
+    /// compared: that nested body is rendered from what its own owner declares,
+    /// so the enclosing profile's recorded base is not the whole of it.
+    #[test]
+    fn test_claimed_target_state_does_not_compare_a_region_enclosing_another_owners_region() {
+        let target = VirtualPath::worktree("AGENTS.md").expect("canonical target");
+        let region_id: RegionId = "guidance".try_into().expect("canonical region id");
+        let nested: RegionId = "invariants".try_into().expect("canonical region id");
+        let (nested_begin, nested_end) = region_delimiters(&nested);
+        let declared = [
+            b"## Invariants\n\n".as_slice(),
+            &nested_begin,
+            b"\n_none declared._\n",
+            &nested_end,
+            b"\n",
+        ]
+        .concat();
+        let claim = AppliedProfileClaim::managed_region(
+            &target,
+            region_id.clone(),
+            &declared,
+            FileMode::Regular,
+            false,
+        );
+        let (begin, end) = region_delimiters(&region_id);
+        let published = super::super::managed_document::render_managed_document(
+            b"# Doc\n",
+            &[ManagedDocumentClaim::Region {
+                owner: "example".to_string(),
+                region_id: region_id.to_string(),
+                begin,
+                end,
+                content: declared.clone(),
+                placement: RegionPlacement::AppendIfAbsent,
+            }],
+        )
+        .expect("the enclosing region composes into the document");
+        // What the nested region's own owner then renders into it.
+        let rendered = String::from_utf8(published)
+            .expect("the document is UTF-8")
+            .replace("_none declared._", "- **an-invariant** — a statement.")
+            .into_bytes();
+        let state = |bytes: &[u8]| {
+            claimed_target_state(
+                &image_over(
+                    std::slice::from_ref(&target),
+                    &[(target.clone(), bytes, FileMode::Regular)],
+                ),
+                &claim,
+            )
+            .expect("the claim is comparable")
+        };
+
+        assert_eq!(state(&rendered), ClaimedTargetState::Composed);
+        assert_eq!(
+            state(b"# Doc\n"),
+            ClaimedTargetState::Absent,
+            "presence is still answered for a region that is not compared"
         );
     }
 
