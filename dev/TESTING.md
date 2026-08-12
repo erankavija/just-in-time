@@ -282,8 +282,10 @@ for the measured comparison.
   `debug = "line-tables-only"`: enough for line-number backtraces on a local failure, without
   embedding the full debugger payload (type info, macro expansions) that dominates a test
   executable's size.
-- **Dependency optimization** — `[profile.dev.package."*"]` sets `opt-level = 2`, so third-party
+- **Dependency optimization** — `[profile.dev.package."*"]` sets `opt-level = 1`, so third-party
   crates are compiled optimized while workspace crates keep the debug profile's compile times.
+  Level 1 is the measured selection over level 2, which ran no faster and cost about twice the
+  build regression.
   The suite runs dependency code far more often than it compiles it: its CPU profile is spread
   across SHA-256 over whole build artifacts, TOML parsing, and JSON serialization, none of which
   is workspace code. A package override changes no other profile key, so `debug-assertions` and
