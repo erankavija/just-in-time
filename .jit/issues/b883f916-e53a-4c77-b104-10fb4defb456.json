@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T11:40:05.843243659Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-12T11:40:21.414052174Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b883f916-e53a-4c77-b104-10fb4defb456",
   "labels": [
     "epic:test-suite-performance",
@@ -25,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Screen an optimized ordinary JIT library artifact",
-  "updated_at": "2026-08-12T11:01:18.170860977Z"
+  "updated_at": "2026-08-12T11:40:21.414052174Z"
 }
