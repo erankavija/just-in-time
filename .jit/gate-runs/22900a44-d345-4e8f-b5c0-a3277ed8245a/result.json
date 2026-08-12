@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d7d10447df8d4fe3ce2c8afebb144f3b4e5e711c",
+  "completed_at": "2026-08-12T18:35:33.129804451Z",
+  "duration_ms": 285316,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/profile-test-suite.sh",
+        "id": "F1",
+        "line": 334,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/6d10e5d4/requirement/REQ-04"
+        ],
+        "severity": "medium",
+        "summary": "REQ-04 lacks retained evidence that the distinct profiler self-test passed; artifact validation is not the --self-test mode."
+      }
+    ],
+    "summary": "REQ-04 lacks retained evidence that the profiler self-test passed.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6d10e5d4-a386-4447-a669-a0f84ee26fad",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "22900a44-d345-4e8f-b5c0-a3277ed8245a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T18:30:47.813512431Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10555 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff73d-c9a0-78a2-944a-370fef600423\n--------\nuser\n--- 10542 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 15 commits tagged `jit:6d10e5d4`, ending at `d7d10447d`\nPolicy sources: AGENTS.md; dev/TESTING.md\nResolved items: @/issue/6d10e5d4/requirement/REQ-01–REQ-04 (issue description, markdown-first); @/invariant/bounded-rust-build-footprint, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T17:34:22Z); prior code-review failed (exit 1, 2026-08-12T17:41:20Z), with its under-sampling finding resolved by three clean and three rebuild samples per decision arm\nTruncation recovery: split the WIP fixture patch by path/range; re-read final fixture/configuration, benchmark evidence, identity comparison, and raw-sample summaries\n\n1. [blocking][issue-impact] REQ-04 remains materially unverified: the current profile validates, but no retained evidence shows that the distinct profiler `--self-test` mode passed. `scripts/profile-test-suite.sh` separates `--validate` from `--self-test` at line 327; the recorded required cargo-ci projection is not a profiler self-test result. References: @/issue/6d10e5d4/requirement/REQ-04.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-04 lacks retained evidence that the profiler self-test passed.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04 lacks retained evidence that the distinct profiler self-test passed; artifact validation is not the --self-test mode.\",\"file\":\"scripts/profile-test-suite.sh\",\"line\":334,\"references\":[\"@/issue/6d10e5d4/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
