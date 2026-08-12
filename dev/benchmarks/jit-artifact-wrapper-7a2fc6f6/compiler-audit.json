@@ -1,0 +1,477 @@
+{
+  "all_noneligible_passthrough": true,
+  "conflicting_opt_level_count": 0,
+  "groups": [
+    {
+      "count": 2,
+      "crate": "jit",
+      "decision": "optimize",
+      "has_test": 0,
+      "package": "jit",
+      "reason": "ordinary-jit-artifact"
+    },
+    {
+      "count": 2,
+      "crate": "",
+      "decision": "passthrough",
+      "has_test": 0,
+      "package": "",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "___",
+      "decision": "passthrough",
+      "has_test": 0,
+      "package": "",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "build_script_build",
+      "decision": "passthrough",
+      "has_test": 0,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "cli_gate",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "cli_issue",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "cli_item_validate",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "cli_query_graph",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "cli_repo_workflow",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "fast_docs_templates",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "fast_issue",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "fast_rules",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 2,
+      "crate": "jit",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "provenance_contract",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "regenerate",
+      "decision": "passthrough",
+      "has_test": 0,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "scratch_build",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "build_script_build",
+      "decision": "passthrough",
+      "has_test": 0,
+      "package": "jit-server",
+      "reason": "unmatched"
+    },
+    {
+      "count": 2,
+      "crate": "jit_server",
+      "decision": "passthrough",
+      "has_test": 0,
+      "package": "jit-server",
+      "reason": "unmatched"
+    },
+    {
+      "count": 2,
+      "crate": "jit_server",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit-server",
+      "reason": "unmatched"
+    },
+    {
+      "count": 1,
+      "crate": "server_integration",
+      "decision": "passthrough",
+      "has_test": 1,
+      "package": "jit-server",
+      "reason": "unmatched"
+    }
+  ],
+  "optimized_count": 2,
+  "optimized_roots": [
+    "/tmp/worktree-agent-7a2fc6f6/crates/jit/src/lib.rs",
+    "/tmp/worktree-agent-7a2fc6f6/crates/jit/src/main.rs"
+  ],
+  "passthrough_count": 23,
+  "record_count": 25,
+  "records": [
+    {
+      "crate": "cli_issue",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "regenerate",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "fast_issue",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "cli_gate",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "jit_server",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit-server",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "jit_server",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit-server",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "jit",
+      "crate_name_count": "1",
+      "decision": "optimize",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "ordinary-jit-artifact",
+      "root": "/tmp/worktree-agent-7a2fc6f6/crates/jit/src/main.rs",
+      "root_match_count": "1",
+      "version": "1"
+    },
+    {
+      "crate": "scratch_build",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "jit",
+      "crate_name_count": "1",
+      "decision": "optimize",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "ordinary-jit-artifact",
+      "root": "/tmp/worktree-agent-7a2fc6f6/crates/jit/src/lib.rs",
+      "root_match_count": "1",
+      "version": "1"
+    },
+    {
+      "crate": "provenance_contract",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "jit_server",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "jit-server",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "cli_query_graph",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "jit",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "/tmp/worktree-agent-7a2fc6f6/crates/jit/src/lib.rs",
+      "root_match_count": "1",
+      "version": "1"
+    },
+    {
+      "crate": "jit",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "/tmp/worktree-agent-7a2fc6f6/crates/jit/src/main.rs",
+      "root_match_count": "1",
+      "version": "1"
+    },
+    {
+      "crate": "cli_repo_workflow",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "",
+      "crate_name_count": "0",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "build_script_build",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "cli_item_validate",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "fast_rules",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "jit_server",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "jit-server",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "fast_docs_templates",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "",
+      "crate_name_count": "0",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "server_integration",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "1",
+      "opt_level_count": "0",
+      "package": "jit-server",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "build_script_build",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "jit-server",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    },
+    {
+      "crate": "___",
+      "crate_name_count": "1",
+      "decision": "passthrough",
+      "has_test": "0",
+      "opt_level_count": "0",
+      "package": "",
+      "reason": "unmatched",
+      "root": "",
+      "root_match_count": "0",
+      "version": "1"
+    }
+  ],
+  "schema_version": 1,
+  "source_command": "fresh candidate cargo test --workspace --no-run"
+}

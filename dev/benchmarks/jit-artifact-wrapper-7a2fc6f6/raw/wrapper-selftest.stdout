@@ -1,0 +1,30 @@
+PASS: eligible library gets one trailing opt-level argument
+PASS: eligible CLI gets one trailing opt-level argument
+PASS: library test harness passes through byte-for-byte
+PASS: integration test crate passes through byte-for-byte
+PASS: server artifact passes through byte-for-byte
+PASS: dependency passes through byte-for-byte
+PASS: build script passes through byte-for-byte
+PASS: compiler probe passes through byte-for-byte
+PASS: unknown invocation shape passes through byte-for-byte
+PASS: shell metacharacters remain literal arguments
+PASS: wrapper never evaluates an argument
+PASS: conflicting opt-level form separate fails closed
+PASS: conflicting opt-level form separate never invokes rustc
+PASS: conflicting opt-level form joined fails closed
+PASS: conflicting opt-level form joined never invokes rustc
+PASS: conflicting opt-level form long fails closed
+PASS: conflicting opt-level form long never invokes rustc
+PASS: passthrough preserves exit status
+PASS: passthrough preserves stdout
+PASS: passthrough preserves stderr
+PASS: passthrough preserves signal-derived status
+PASS: one invocation emits one NUL-delimited audit record
+PASS: audit record classifies the optimized invocation
+PASS: staged wrapper path contains its exact SHA-256 digest
+PASS: staged wrapper is byte-identical
+PASS: staged wrapper is an executable ordinary file
+PASS: staging is idempotent for verified content
+PASS: staging refuses an unexpected preexisting wrapper
+PASS: staging never overwrites unexpected preexisting content
+SELFTEST: all assertions passed

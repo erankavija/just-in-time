@@ -1,0 +1,771 @@
+diff --git a/crates/jit/tests/scratch_build/build_profile_policy_tests.rs b/crates/jit/tests/scratch_build/build_profile_policy_tests.rs
+index f7d6d4c5..6e9b3a1a 100644
+--- a/crates/jit/tests/scratch_build/build_profile_policy_tests.rs
++++ b/crates/jit/tests/scratch_build/build_profile_policy_tests.rs
+@@ -16,6 +16,7 @@
+ 
+ use std::fs;
+ use std::path::{Path, PathBuf};
++use std::process::Command;
+ 
+ fn workspace_root() -> PathBuf {
+     Path::new(env!("CARGO_MANIFEST_DIR"))
+@@ -166,3 +167,63 @@ fn test_cargo_build_scripts_share_the_host_lock_and_enable_available_sccache() {
+         );
+     }
+ }
++
++#[test]
++fn test_cargo_ci_scopes_the_jit_workspace_wrapper_to_compilation_after_clippy() {
++    let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
++        .expect("read scripts/cargo-ci.sh");
++
++    for direct_step in ["run_step fmt ", "run_step clippy "] {
++        let line = script
++            .lines()
++            .find(|line| line.starts_with(direct_step))
++            .unwrap_or_else(|| panic!("cargo-ci must retain {direct_step}"));
++        assert!(
++            !line.contains("run_with_jit_workspace_wrapper"),
++            "formatting and clippy must retain their existing compiler boundary"
++        );
++    }
++    for wrapped_step in [
++        "run_step test ",
++        "run_step doctest ",
++        "run_step provenance ",
++        "run_step budget ",
++    ] {
++        let line = script
++            .lines()
++            .find(|line| line.starts_with(wrapped_step))
++            .unwrap_or_else(|| panic!("cargo-ci must retain {wrapped_step}"));
++        assert!(
++            line.contains("run_with_jit_workspace_wrapper"),
++            "test-build, nextest, doctest, provenance, and budget compilation must use the staged workspace wrapper"
++        );
++    }
++    assert!(
++        script.contains("unset RUSTC_WRAPPER")
++            && script.contains("export RUSTC_WORKSPACE_WRAPPER=\"$JIT_RUSTC_WORKSPACE_WRAPPER\""),
++        "wrapper-covered commands must explicitly disable sccache and export only the verified workspace wrapper"
++    );
++}
++
++#[test]
++fn test_cargo_ci_rejects_an_ambient_workspace_wrapper_before_gate_steps() {
++    let root = workspace_root();
++    let gate = root.join("scripts/cargo-ci.sh");
++    let output = Command::new(&gate)
++        .current_dir(&root)
++        .env("RUSTC_WORKSPACE_WRAPPER", "/unexpected/workspace-wrapper")
++        .env("CARGO_CI_NO_LOCK", "1")
++        .output()
++        .unwrap_or_else(|error| panic!("run {}: {error}", gate.display()));
++
++    assert_eq!(output.status.code(), Some(2));
++    let stderr = String::from_utf8_lossy(&output.stderr);
++    assert!(
++        stderr.contains("refuses preexisting RUSTC_WORKSPACE_WRAPPER"),
++        "gate must explain why an ambient compiler execution hook is rejected: {stderr}"
++    );
++    assert!(
++        !String::from_utf8_lossy(&output.stdout).contains("✓"),
++        "ambient wrapper rejection must happen before the first gate step"
++    );
++}
+diff --git a/crates/jit/tests/scratch_build/jit_rustc_workspace_wrapper_tests.rs b/crates/jit/tests/scratch_build/jit_rustc_workspace_wrapper_tests.rs
+new file mode 100644
+index 00000000..4444a13e
+--- /dev/null
++++ b/crates/jit/tests/scratch_build/jit_rustc_workspace_wrapper_tests.rs
+@@ -0,0 +1,29 @@
++//! Executed contract coverage for the shell compiler wrapper used by cargo-ci
++//! (jit:7a2fc6f6 REQ-01/REQ-02).
++
++use std::path::Path;
++use std::process::Command;
++
++#[test]
++fn test_jit_rustc_workspace_wrapper_selftest_passes() {
++    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
++        .parent()
++        .and_then(Path::parent)
++        .expect("workspace root is two levels above the jit crate manifest");
++    let selftest = workspace_root.join("scripts/jit-rustc-workspace-wrapper-selftest.sh");
++    let output = Command::new(&selftest)
++        .current_dir(workspace_root)
++        .output()
++        .unwrap_or_else(|error| panic!("run {}: {error}", selftest.display()));
++
++    assert!(
++        output.status.success(),
++        "wrapper selftest failed\nstdout:\n{}\nstderr:\n{}",
++        String::from_utf8_lossy(&output.stdout),
++        String::from_utf8_lossy(&output.stderr)
++    );
++    assert!(
++        String::from_utf8_lossy(&output.stdout).contains("SELFTEST: all assertions passed"),
++        "wrapper selftest did not report its complete assertion set"
++    );
++}
+diff --git a/crates/jit/tests/scratch_build/main.rs b/crates/jit/tests/scratch_build/main.rs
+index 50c8184c..552d3a89 100644
+--- a/crates/jit/tests/scratch_build/main.rs
++++ b/crates/jit/tests/scratch_build/main.rs
+@@ -4,6 +4,7 @@
+ 
+ mod build_profile_policy_tests;
+ mod dependency_feature_policy_tests;
++mod jit_rustc_workspace_wrapper_tests;
+ mod merged_tree_gate_verification_tests;
+ mod rust_build_budget_checker_tests;
+ mod stale_binary_child_process_tests;
+diff --git a/scripts/benchmark-rust-build.sh b/scripts/benchmark-rust-build.sh
+index 75b59958..b8b3c2ee 100755
+--- a/scripts/benchmark-rust-build.sh
++++ b/scripts/benchmark-rust-build.sh
+@@ -62,6 +62,14 @@ set -euo pipefail
+ #                           inventory (default 1)
+ #   BENCH_PROBE_FILE        file the rebuild probe is appended to
+ #                           (default crates/jit/src/lib.rs)
++#   BENCH_TEST_RUSTC_WORKSPACE_WRAPPER
++#                           verified compiler workspace wrapper applied only to
++#                           cargo test/test-inventory/doctest commands; clippy
++#                           retains its existing compiler boundary.
++#   BENCH_RETAIN_INVENTORY_TARGET_DIR=1
++#                           retain the designated clean inventory target after
++#                           measurement and record its path for already-built
++#                           runtime, line-table, and backtrace verification.
+ #   CARGO_CI_BUILD_LOCK     lock path shared with cargo-ci.sh
+ #                           (default ${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock)
+ #   BENCH_SKIP_SAMPLING=1   skip clean/rebuild sampling entirely and assemble
+@@ -142,6 +150,18 @@ cd "$repo_root"
+ 
+ ensure_real_cargo
+ 
++TEST_CARGO=(cargo)
++if [[ -n "${BENCH_TEST_RUSTC_WORKSPACE_WRAPPER:-}" ]]; then
++  if [[ ! -f "$BENCH_TEST_RUSTC_WORKSPACE_WRAPPER" || \
++        -L "$BENCH_TEST_RUSTC_WORKSPACE_WRAPPER" || \
++        ! -x "$BENCH_TEST_RUSTC_WORKSPACE_WRAPPER" ]]; then
++    echo "ERROR: BENCH_TEST_RUSTC_WORKSPACE_WRAPPER is not an executable ordinary file." >&2
++    exit 2
++  fi
++  TEST_CARGO=(env -u RUSTC_WRAPPER \
++    RUSTC_WORKSPACE_WRAPPER="$BENCH_TEST_RUSTC_WORKSPACE_WRAPPER" cargo)
++fi
++
+ if [[ ! -f "$PROBE_FILE" ]]; then
+   echo "ERROR: BENCH_PROBE_FILE '$PROBE_FILE' does not exist." >&2
+   exit 2
+@@ -287,7 +307,7 @@ derive_active_test_metrics() {
+   local list_tmp stderr_tmp
+   list_tmp=$(mktemp "$list_json.XXXXXX")
+   stderr_tmp=$(mktemp "$sample_raw_dir/cargo-test-list.stderr.log.XXXXXX")
+-  CARGO_TARGET_DIR="$target_dir" cargo test --workspace --no-run --message-format=json \
++  CARGO_TARGET_DIR="$target_dir" "${TEST_CARGO[@]}" test --workspace --no-run --message-format=json \
+     >"$list_tmp" 2>"$stderr_tmp"
+   mv "$list_tmp" "$list_json"
+   mv "$stderr_tmp" "$sample_raw_dir/cargo-test-list.stderr.log"
+@@ -354,13 +374,13 @@ generate_test_inventory() {
+ 
+   echo "[benchmark] deriving pre-change test inventory from $target_dir" >&2
+ 
+-  python3 - "$list_json" "$target_dir" "$OUT_DIR/pre-change-test-inventory.json" "$GIT_REVISION" "$sample_raw_dir" <<'PYEOF'
++  python3 - "$list_json" "$target_dir" "$OUT_DIR/pre-change-test-inventory.json" "$GIT_REVISION" "$sample_raw_dir" "${BENCH_TEST_RUSTC_WORKSPACE_WRAPPER:-}" <<'PYEOF'
+ import json
+ import os
+ import subprocess
+ import sys
+ 
+-list_json_path, target_dir, out_path, git_revision, sample_raw_dir = sys.argv[1:6]
++list_json_path, target_dir, out_path, git_revision, sample_raw_dir, workspace_wrapper = sys.argv[1:7]
+ 
+ 
+ def parse_test_names(text):
+@@ -437,10 +457,14 @@ dir_bytes = int(du_out.stdout.split()[0]) if du_out.returncode == 0 and du_out.s
+ # associated with the case lines that follow them, unlike capture_output's
+ # separate stdout/stderr, which would lose that association.
+ def run_doctest_list(*extra_args):
++    cargo_env = {**os.environ, "CARGO_TARGET_DIR": target_dir}
++    if workspace_wrapper:
++        cargo_env.pop("RUSTC_WRAPPER", None)
++        cargo_env["RUSTC_WORKSPACE_WRAPPER"] = workspace_wrapper
+     proc = subprocess.run(
+         ["cargo", "test", "--workspace", "--doc", "--", "--list", *extra_args],
+         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300,
+-        env={**os.environ, "CARGO_TARGET_DIR": target_dir},
++        env=cargo_env,
+     )
+     return proc
+ 
+@@ -599,7 +623,7 @@ run_clean_sample() {
+   clippy_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/clippy.log" \
+     cargo clippy --workspace --all-targets -- -D warnings)
+   test_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/test-no-run.log" \
+-    cargo test --workspace --no-run)
++    "${TEST_CARGO[@]}" test --workspace --no-run)
+ 
+   # REQ-02 (jit:26f97dc2): every clean sample records its own integration-test
+   # target count and unique active test-executable bytes; the designated
+@@ -614,7 +638,12 @@ run_clean_sample() {
+ 
+   local dir_bytes
+   dir_bytes=$(target_dir_bytes "$target_dir")
+-  rm -rf "$target_dir"
++  local retained_target_dir=''
++  if [[ "$idx" -eq "$INVENTORY_SAMPLE" && -n "${BENCH_RETAIN_INVENTORY_TARGET_DIR:-}" ]]; then
++    retained_target_dir=$target_dir
++  else
++    rm -rf "$target_dir"
++  fi
+ 
+   local clippy_exit test_exit success
+   clippy_exit=$(echo "$clippy_meas" | jq -r .exit_code)
+@@ -627,9 +656,10 @@ run_clean_sample() {
+     --argjson clippy "$clippy_meas" \
+     --argjson test_no_run "$test_meas" \
+     --argjson target_dir_bytes "${dir_bytes:-null}" \
++    --arg retained_target_dir "$retained_target_dir" \
+     --argjson inventory "$inventory_meas" \
+     --argjson success "$success" \
+-    '{sample: $sample, clippy: $clippy, test_no_run: $test_no_run, target_dir_bytes: $target_dir_bytes, inventory: $inventory, success: $success}')
++    '{sample: $sample, clippy: $clippy, test_no_run: $test_no_run, target_dir_bytes: $target_dir_bytes, retained_target_dir: (if $retained_target_dir == "" then null else $retained_target_dir end), inventory: $inventory, success: $success}')
+   append_jsonl_atomic "$CLEAN_JSONL" "$record"
+ 
+   if [[ "$success" != "true" ]]; then
+@@ -656,7 +686,7 @@ run_rebuild_sample() {
+   setup_clippy_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/setup-clippy.log" \
+     cargo clippy --workspace --all-targets -- -D warnings)
+   setup_test_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/setup-test-no-run.log" \
+-    cargo test --workspace --no-run)
++    "${TEST_CARGO[@]}" test --workspace --no-run)
+   release_lock
+ 
+   local setup_clippy_exit setup_test_exit
+@@ -681,7 +711,7 @@ run_rebuild_sample() {
+   acquire_lock
+   local rebuild_meas
+   rebuild_meas=$(CARGO_TARGET_DIR="$target_dir" run_measured "$sample_raw_dir/rebuild-test-no-run.log" \
+-    cargo test --workspace --no-run)
++    "${TEST_CARGO[@]}" test --workspace --no-run)
+   release_lock
+ 
+   mv "$backup" "$PROBE_FILE"
+diff --git a/scripts/cargo-ci.sh b/scripts/cargo-ci.sh
+index 15a98ce8..76399512 100755
+--- a/scripts/cargo-ci.sh
++++ b/scripts/cargo-ci.sh
+@@ -112,6 +112,16 @@ ensure_real_cargo() {
+ 
+ ensure_real_cargo
+ 
++# The full gate owns its workspace compiler hook. Accepting an ambient hook
++# would let an unreviewed executable rewrite rustc arguments before the gate's
++# classifier sees them. Focused `--cargo` mode keeps its historical caller-
++# controlled environment and does not opt into the hook.
++if [ "${1:-}" != "--cargo" ] && [ -n "${RUSTC_WORKSPACE_WRAPPER:-}" ]; then
++  echo "ERROR: cargo-ci refuses preexisting RUSTC_WORKSPACE_WRAPPER=${RUSTC_WORKSPACE_WRAPPER}" >&2
++  echo "       Unset it; the full gate stages and scopes its reviewed wrapper itself." >&2
++  exit 2
++fi
++
+ # Reuse the host-wide compiler cache when it is installed. Keep explicit
+ # wrappers authoritative (for instrumentation or debugging), and provide a
+ # deterministic opt-out for cache-sensitive diagnosis. Enabling a wrapper
+@@ -152,6 +162,30 @@ ensure_pinned_nextest
+ export TMPDIR="${CARGO_CI_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp}"
+ mkdir -p "$TMPDIR"
+ 
++# Stage by exact content identity before the first gate step. Cargo includes
++# the workspace-wrapper path in its fingerprints, so a wrapper-content change
++# necessarily selects a different digest directory. The stager verifies any
++# occupied destination rather than overwriting it.
++CARGO_CI_SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
++if ! JIT_RUSTC_WORKSPACE_WRAPPER=$(
++  "$CARGO_CI_SCRIPT_DIR/stage-jit-rustc-workspace-wrapper.sh"
++); then
++  echo "ERROR: cargo-ci could not stage the verified jit rustc workspace wrapper" >&2
++  exit 2
++fi
++
++# RUSTC_WRAPPER (normally sccache above) and RUSTC_WORKSPACE_WRAPPER have a
++# nesting order that is easy to misconfigure. Wrapper-covered commands disable
++# the outer cache explicitly; formatting and clippy retain the established
++# compiler boundary and may still use sccache.
++run_with_jit_workspace_wrapper() {
++  (
++    unset RUSTC_WRAPPER
++    export RUSTC_WORKSPACE_WRAPPER="$JIT_RUSTC_WORKSPACE_WRAPPER"
++    "$@"
++  )
++}
++
+ # Disable incremental compilation for every step below (jit:57d0eb79). The
+ # workspace manifest's [profile.dev]/[profile.test] leave incremental on for
+ # ordinary interactive builds, where it earns back its disk cost across many
+@@ -379,8 +413,8 @@ run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D
+ # separately reported doctest substep, leaving lock acquisition, preflight,
+ # formatting, linting, and the intentionally cold provenance suite outside it.
+ suite_clock_started_ms=$(epoch_milliseconds)
+-run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
+-run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
++run_step test run_with_jit_workspace_wrapper "${NICE_PREFIX[@]}" cargo nextest run --workspace
++run_step doctest run_with_jit_workspace_wrapper "${NICE_PREFIX[@]}" cargo test --doc --workspace
+ suite_clock_ms=$(( $(epoch_milliseconds) - suite_clock_started_ms ))
+ summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
+ 
+@@ -398,7 +432,7 @@ summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
+ # seeded-fixture file/byte count line before its cold build; this flag is what
+ # lets that line reach $WORK/provenance.out for summarize_pass to fold into
+ # the persisted gate summary below, on a passing run and not just a failure.
+-run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
++run_step provenance run_with_jit_workspace_wrapper "${NICE_PREFIX[@]}" cargo test -p jit \
+   --test provenance_contract -- --ignored --nocapture
+ 
+ # Build-footprint budget enforcement (jit:3f73423b). Runs AFTER the test step so
+@@ -413,7 +447,6 @@ run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
+ # from its own path, so the budget verdict describes the same tree the steps above
+ # judged. CARGO_INCREMENTAL=0 (exported above) is inherited, so its warm --no-run
+ # leaves no incremental state for the check below.
+-CARGO_CI_SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+ run_budget_check() {
+   local root
+   root=$(gate_workspace_root) || return 1
+@@ -423,7 +456,7 @@ run_budget_check() {
+   fi
+   "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" --root "$root"
+ }
+-run_step budget run_budget_check
++run_step budget run_with_jit_workspace_wrapper run_budget_check
+ 
+ # REQ-04 (jit:57d0eb79): fail the gate itself if the compilation steps above
+ # left behind incremental state, rather than trusting that CARGO_INCREMENTAL=0
+diff --git a/scripts/jit-rustc-workspace-wrapper-selftest.sh b/scripts/jit-rustc-workspace-wrapper-selftest.sh
+new file mode 100755
+index 00000000..95b555e6
+--- /dev/null
++++ b/scripts/jit-rustc-workspace-wrapper-selftest.sh
+@@ -0,0 +1,215 @@
++#!/usr/bin/env bash
++# Contract tests for the ordinary-jit rustc workspace wrapper and its
++# content-addressed staging helper (jit:7a2fc6f6 REQ-01/REQ-02).
++set -uo pipefail
++
++root=$(cd "$(dirname "$0")/.." && pwd)
++wrapper="$root/scripts/jit-rustc-workspace-wrapper.sh"
++stager="$root/scripts/stage-jit-rustc-workspace-wrapper.sh"
++scratch=$(mktemp -d)
++trap 'rm -rf "$scratch"' EXIT
++
++fail=0
++check() {
++  local message="$1"
++  shift
++  if "$@"; then
++    printf 'PASS: %s\n' "$message"
++  else
++    printf 'FAIL: %s\n' "$message"
++    fail=1
++  fi
++}
++
++if [[ ! -x "$wrapper" || ! -x "$stager" ]]; then
++  printf 'FAIL: wrapper and stager must exist and be executable\n'
++  exit 1
++fi
++
++fake_rustc="$scratch/fake rustc"
++cat >"$fake_rustc" <<'EOF'
++#!/usr/bin/env bash
++if [[ -n "${FAKE_CAPTURE:-}" ]]; then
++  printf '%s\0' "$@" >"$FAKE_CAPTURE"
++fi
++printf '%s' "${FAKE_STDOUT:-}"
++printf '%s' "${FAKE_STDERR:-}" >&2
++case "${FAKE_ACTION:-exit}" in
++  exit) exit "${FAKE_STATUS:-0}" ;;
++  term) kill -TERM "$$"; sleep 1 ;;
++esac
++EOF
++chmod +x "$fake_rustc"
++
++run_capture() {
++  local capture="$1"
++  shift
++  (
++    cd "$root" || exit 99
++    CARGO_PKG_NAME=jit FAKE_CAPTURE="$capture" "$wrapper" "$fake_rustc" "$@"
++  )
++}
++
++assert_args() {
++  local capture="$1"
++  shift
++  python3 - "$capture" "$@" <<'PY'
++import pathlib
++import sys
++
++actual = pathlib.Path(sys.argv[1]).read_bytes().split(b"\0")
++if actual[-1:] == [b""]:
++    actual.pop()
++expected = [value.encode() for value in sys.argv[2:]]
++raise SystemExit(0 if actual == expected else 1)
++PY
++}
++
++capture="$scratch/eligible-lib.args"
++run_capture "$capture" --crate-name jit crates/jit/src/lib.rs --crate-type lib
++check "eligible library gets one trailing opt-level argument" assert_args "$capture" \
++  --crate-name jit crates/jit/src/lib.rs --crate-type lib -C opt-level=1
++
++capture="$scratch/eligible-main.args"
++run_capture "$capture" crates/jit/src/main.rs --crate-name=jit --crate-type bin
++check "eligible CLI gets one trailing opt-level argument" assert_args "$capture" \
++  crates/jit/src/main.rs --crate-name=jit --crate-type bin -C opt-level=1
++
++passthrough_case() {
++  local name="$1" package="$2"
++  shift 2
++  local capture="$scratch/$name.args"
++  (
++    cd "$root" || exit 99
++    CARGO_PKG_NAME="$package" FAKE_CAPTURE="$capture" "$wrapper" "$fake_rustc" "$@"
++  ) || return 1
++  assert_args "$capture" "$@"
++}
++
++check "library test harness passes through byte-for-byte" passthrough_case harness jit \
++  --crate-name jit --test crates/jit/src/lib.rs
++check "integration test crate passes through byte-for-byte" passthrough_case integration jit \
++  --crate-name cli_gate crates/jit/tests/cli_gate/main.rs --test
++check "server artifact passes through byte-for-byte" passthrough_case server jit-server \
++  --crate-name jit_server crates/server/src/lib.rs
++check "dependency passes through byte-for-byte" passthrough_case dependency serde \
++  --crate-name serde /registry/serde/src/lib.rs
++check "build script passes through byte-for-byte" passthrough_case build-script jit \
++  --crate-name build_script_build crates/jit/build.rs
++check "compiler probe passes through byte-for-byte" passthrough_case probe '' -vV
++check "unknown invocation shape passes through byte-for-byte" passthrough_case unknown jit \
++  --crate-name jit --emit metadata
++
++marker="$scratch/must-not-exist"
++literal="\$(touch $marker)"
++check "shell metacharacters remain literal arguments" passthrough_case injection jit \
++  --crate-name cli_gate crates/jit/tests/cli_gate/main.rs "$literal"
++check "wrapper never evaluates an argument" test ! -e "$marker"
++
++for conflict in separate joined long; do
++  capture="$scratch/conflict-$conflict.args"
++  rm -f "$capture"
++  case "$conflict" in
++    separate) conflict_args=(-C opt-level=0) ;;
++    joined) conflict_args=(-Copt-level=2) ;;
++    long) conflict_args=(--codegen=opt-level=s) ;;
++  esac
++  (
++    cd "$root" || exit 99
++    CARGO_PKG_NAME=jit FAKE_CAPTURE="$capture" "$wrapper" "$fake_rustc" \
++      --crate-name jit crates/jit/src/lib.rs "${conflict_args[@]}"
++  ) >"$scratch/conflict-$conflict.out" 2>"$scratch/conflict-$conflict.err"
++  rc=$?
++  check "conflicting opt-level form $conflict fails closed" test "$rc" -ne 0
++  check "conflicting opt-level form $conflict never invokes rustc" test ! -e "$capture"
++done
++
++baseline_out="$scratch/baseline.out"
++baseline_err="$scratch/baseline.err"
++wrapped_out="$scratch/wrapped.out"
++wrapped_err="$scratch/wrapped.err"
++FAKE_STDOUT='stdout payload' FAKE_STDERR='stderr payload' FAKE_STATUS=42 \
++  "$fake_rustc" --crate-name cli_gate crates/jit/tests/cli_gate/main.rs \
++  >"$baseline_out" 2>"$baseline_err"
++baseline_rc=$?
++(
++  cd "$root" || exit 99
++  CARGO_PKG_NAME=jit FAKE_STDOUT='stdout payload' FAKE_STDERR='stderr payload' FAKE_STATUS=42 \
++    "$wrapper" "$fake_rustc" --crate-name cli_gate crates/jit/tests/cli_gate/main.rs
++) >"$wrapped_out" 2>"$wrapped_err"
++wrapped_rc=$?
++check "passthrough preserves exit status" test "$wrapped_rc" -eq "$baseline_rc"
++check "passthrough preserves stdout" cmp -s "$baseline_out" "$wrapped_out"
++check "passthrough preserves stderr" cmp -s "$baseline_err" "$wrapped_err"
++
++set +e
++FAKE_ACTION=term "$fake_rustc" -vV >/dev/null 2>&1
++baseline_signal_rc=$?
++(
++  cd "$root" || exit 99
++  CARGO_PKG_NAME= FAKE_ACTION=term "$wrapper" "$fake_rustc" -vV
++) >/dev/null 2>&1
++wrapped_signal_rc=$?
++set -e
++check "passthrough preserves signal-derived status" test "$wrapped_signal_rc" -eq "$baseline_signal_rc"
++
++audit_dir="$scratch/audit"
++mkdir "$audit_dir"
++(
++  cd "$root" || exit 99
++  CARGO_PKG_NAME=jit JIT_RUSTC_WRAPPER_AUDIT_DIR="$audit_dir" \
++    "$wrapper" "$fake_rustc" --crate-name jit crates/jit/src/lib.rs
++)
++check "one invocation emits one NUL-delimited audit record" \
++  test "$(find "$audit_dir" -type f | wc -l)" -eq 1
++check "audit record classifies the optimized invocation" python3 - "$audit_dir" <<'PY'
++import pathlib
++import sys
++
++files = list(pathlib.Path(sys.argv[1]).iterdir())
++fields = dict(
++    field.split(b"=", 1)
++    for field in files[0].read_bytes().split(b"\0")
++    if field
++)
++expected = {
++    b"version": b"1",
++    b"package": b"jit",
++    b"crate": b"jit",
++    b"root": str(pathlib.Path("crates/jit/src/lib.rs").resolve()).encode(),
++    b"has_test": b"0",
++    b"decision": b"optimize",
++}
++raise SystemExit(0 if expected.items() <= fields.items() else 1)
++PY
++
++stage_root="$scratch/stage"
++staged=$(JIT_RUSTC_WRAPPER_STAGE_ROOT="$stage_root" "$stager")
++source_sha=$(sha256sum "$wrapper" | awk '{print $1}')
++check "staged wrapper path contains its exact SHA-256 digest" \
++  test "$staged" = "$stage_root/$source_sha/jit-rustc-workspace-wrapper"
++check "staged wrapper is byte-identical" cmp -s "$wrapper" "$staged"
++check "staged wrapper is an executable ordinary file" test -f "$staged" -a -x "$staged" -a ! -L "$staged"
++check "staging is idempotent for verified content" \
++  test "$(JIT_RUSTC_WRAPPER_STAGE_ROOT="$stage_root" "$stager")" = "$staged"
++
++conflict_stage_root="$scratch/conflict-stage"
++conflict_staged="$conflict_stage_root/$source_sha/jit-rustc-workspace-wrapper"
++mkdir -p "$(dirname "$conflict_staged")"
++printf 'unexpected content\n' >"$conflict_staged"
++chmod +x "$conflict_staged"
++set +e
++JIT_RUSTC_WRAPPER_STAGE_ROOT="$conflict_stage_root" "$stager" \
++  >"$scratch/stage-conflict.out" 2>"$scratch/stage-conflict.err"
++stage_conflict_rc=$?
++set -e
++check "staging refuses an unexpected preexisting wrapper" test "$stage_conflict_rc" -ne 0
++check "staging never overwrites unexpected preexisting content" \
++  grep -qF 'unexpected content' "$conflict_staged"
++
++if [[ "$fail" -eq 0 ]]; then
++  echo 'SELFTEST: all assertions passed'
++else
++  echo 'SELFTEST: assertions FAILED'
++fi
++exit "$fail"
+diff --git a/scripts/jit-rustc-workspace-wrapper.sh b/scripts/jit-rustc-workspace-wrapper.sh
+new file mode 100755
+index 00000000..e59852fb
+--- /dev/null
++++ b/scripts/jit-rustc-workspace-wrapper.sh
+@@ -0,0 +1,133 @@
++#!/usr/bin/env bash
++# Optimize only the ordinary jit library and CLI compiler units. Cargo invokes
++# a workspace wrapper as: wrapper <rustc> <rustc-args...>. All non-matching
++# units are replaced by the real compiler process with their original argv.
++#
++# This parser never evaluates compiler arguments. An eligible invocation that
++# already names any opt-level is rejected: silently appending a second setting
++# would make argument order, rather than this classifier, the authority.
++set -uo pipefail
++
++if [[ "$#" -lt 1 ]]; then
++  echo "jit-rustc-workspace-wrapper: missing rustc executable" >&2
++  exit 86
++fi
++
++rustc=$1
++shift
++args=("$@")
++package=${CARGO_PKG_NAME:-}
++crate=''
++crate_name_count=0
++has_test=0
++opt_level_count=0
++
++for ((index = 0; index < ${#args[@]}; index++)); do
++  arg=${args[index]}
++  case "$arg" in
++    --crate-name)
++      if ((index + 1 < ${#args[@]})); then
++        crate=${args[index + 1]}
++        ((crate_name_count += 1))
++        ((index += 1))
++      else
++        ((crate_name_count += 2))
++      fi
++      ;;
++    --crate-name=*)
++      crate=${arg#--crate-name=}
++      ((crate_name_count += 1))
++      ;;
++    --test)
++      has_test=1
++      ;;
++    -C | --codegen)
++      if ((index + 1 < ${#args[@]})) && [[ "${args[index + 1]}" == opt-level=* ]]; then
++        ((opt_level_count += 1))
++      fi
++      ;;
++    -Copt-level=* | -C=opt-level=* | --codegen=opt-level=*)
++      ((opt_level_count += 1))
++      ;;
++  esac
++done
++
++# Cargo runs rustc from the workspace root. Canonicalizing both the known roots
++# and matching .rs arguments rejects lookalike relative paths and accepts only
++# paths resolving to the two tracked source files in this exact checkout.
++expected_lib=$(realpath -e -- crates/jit/src/lib.rs 2>/dev/null || true)
++expected_main=$(realpath -e -- crates/jit/src/main.rs 2>/dev/null || true)
++canonical_root=''
++root_match_count=0
++if [[ -n "$expected_lib" && -n "$expected_main" ]]; then
++  for arg in "${args[@]}"; do
++    [[ "$arg" == *.rs ]] || continue
++    candidate=$(realpath -e -- "$arg" 2>/dev/null || true)
++    if [[ "$candidate" == "$expected_lib" || "$candidate" == "$expected_main" ]]; then
++      canonical_root=$candidate
++      ((root_match_count += 1))
++    fi
++  done
++fi
++
++decision=passthrough
++reason=unmatched
++eligible=0
++if [[ "$package" == jit && "$crate" == jit && "$crate_name_count" -eq 1 && \
++      "$root_match_count" -eq 1 && "$has_test" -eq 0 ]]; then
++  eligible=1
++  decision=optimize
++  reason=ordinary-jit-artifact
++fi
++
++if [[ "$eligible" -eq 1 && "$opt_level_count" -ne 0 ]]; then
++  decision=reject
++  reason=preexisting-opt-level
++fi
++
++write_audit_record() {
++  local audit_dir=${JIT_RUSTC_WRAPPER_AUDIT_DIR:-}
++  [[ -n "$audit_dir" ]] || return 0
++  if [[ ! -d "$audit_dir" || -L "$audit_dir" ]]; then
++    echo "jit-rustc-workspace-wrapper: audit destination is not an ordinary directory: $audit_dir" >&2
++    return 1
++  fi
++
++  local partial published
++  partial=$(mktemp "$audit_dir/.partial.XXXXXX") || return 1
++  published=${partial/.partial./invocation.}
++  if ! printf '%s\0' \
++      'version=1' \
++      "package=$package" \
++      "crate=$crate" \
++      "crate_name_count=$crate_name_count" \
++      "root=$canonical_root" \
++      "root_match_count=$root_match_count" \
++      "has_test=$has_test" \
++      "opt_level_count=$opt_level_count" \
++      "decision=$decision" \
++      "reason=$reason" >"$partial"; then
++    rm -f -- "$partial"
++    return 1
++  fi
++  chmod 0444 "$partial" || {
++    rm -f -- "$partial"
++    return 1
++  }
++  mv -- "$partial" "$published"
++}
++
++if ! write_audit_record; then
++  echo "jit-rustc-workspace-wrapper: could not publish the compiler audit record" >&2
++  exit 86
++fi
++
++if [[ "$decision" == reject ]]; then
++  echo "jit-rustc-workspace-wrapper: refusing eligible jit invocation with a preexisting opt-level" >&2
++  exit 86
++fi
++
++if [[ "$decision" == optimize ]]; then
++  exec "$rustc" "${args[@]}" -C opt-level=1
++fi
++exec "$rustc" "${args[@]}"
+diff --git a/scripts/stage-jit-rustc-workspace-wrapper.sh b/scripts/stage-jit-rustc-workspace-wrapper.sh
+new file mode 100755
+index 00000000..79d82c92
+--- /dev/null
++++ b/scripts/stage-jit-rustc-workspace-wrapper.sh
+@@ -0,0 +1,61 @@
++#!/usr/bin/env bash
++# Publish the tracked compiler wrapper at a path containing its SHA-256. Cargo
++# fingerprints RUSTC_WORKSPACE_WRAPPER by path; the digest component therefore
++# makes a content change a new compiler input. Existing content is reused only
++# after byte, digest, type, and executable-mode verification.
++set -euo pipefail
++
++script_dir=$(cd "$(dirname "$0")" && pwd)
++source_wrapper="$script_dir/jit-rustc-workspace-wrapper.sh"
++stage_root=${JIT_RUSTC_WRAPPER_STAGE_ROOT:-${TMPDIR:-/tmp}/jit-rustc-workspace-wrappers}
++
++for tool in sha256sum cmp mktemp; do
++  command -v "$tool" >/dev/null 2>&1 || {
++    echo "stage-jit-rustc-workspace-wrapper: required tool not found: $tool" >&2
++    exit 2
++  }
++done
++if [[ ! -f "$source_wrapper" || -L "$source_wrapper" || ! -x "$source_wrapper" ]]; then
++  echo "stage-jit-rustc-workspace-wrapper: source is not an executable ordinary file: $source_wrapper" >&2
++  exit 2
++fi
++if [[ -e "$stage_root" && (! -d "$stage_root" || -L "$stage_root") ]]; then
++  echo "stage-jit-rustc-workspace-wrapper: stage root is not an ordinary directory: $stage_root" >&2
++  exit 2
++fi
++mkdir -p -- "$stage_root"
++
++digest=$(sha256sum "$source_wrapper" | awk '{print $1}')
++digest_dir="$stage_root/$digest"
++destination="$digest_dir/jit-rustc-workspace-wrapper"
++if [[ -e "$digest_dir" && (! -d "$digest_dir" || -L "$digest_dir") ]]; then
++  echo "stage-jit-rustc-workspace-wrapper: digest path is not an ordinary directory: $digest_dir" >&2
++  exit 2
++fi
++mkdir -p -- "$digest_dir"
++
++if [[ ! -e "$destination" ]]; then
++  partial=$(mktemp "$digest_dir/.wrapper.XXXXXX")
++  trap 'rm -f -- "${partial:-}"' EXIT
++  cp -- "$source_wrapper" "$partial"
++  chmod 0555 "$partial"
++  mv -n -- "$partial" "$destination"
++  rm -f -- "$partial"
++  trap - EXIT
++fi
++
++if [[ ! -f "$destination" || -L "$destination" || ! -x "$destination" ]]; then
++  echo "stage-jit-rustc-workspace-wrapper: staged path is not an executable ordinary file: $destination" >&2
++  exit 2
++fi
++if ! cmp -s -- "$source_wrapper" "$destination"; then
++  echo "stage-jit-rustc-workspace-wrapper: refusing unexpected preexisting content: $destination" >&2
++  exit 2
++fi
++staged_digest=$(sha256sum "$destination" | awk '{print $1}')
++if [[ "$staged_digest" != "$digest" ]]; then
++  echo "stage-jit-rustc-workspace-wrapper: staged digest mismatch: expected $digest, got $staged_digest" >&2
++  exit 2
++fi
++
++printf '%s\n' "$destination"
