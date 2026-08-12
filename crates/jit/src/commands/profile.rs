@@ -3610,8 +3610,14 @@ placement = "append"
 
     #[test]
     fn test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically() {
-        let (temp, executor, _default, dogfood) = bare_repository_beside_shipped_packages();
-        executor.apply_profile_package(&dogfood).unwrap();
+        let temp = crate::test_utils::profiled_repository_fixture(
+            "jit-dogfood",
+            crate::test_utils::PROFILE_PACKAGE_SOURCES,
+            None,
+        )
+        .unwrap();
+        let dogfood = ProfilePackage::from_directory(&temp.path().join("profiles/jit-dogfood"))
+            .expect("the verified baseline retains its selected package");
 
         let stale_schema = temp
             .path()
@@ -4832,14 +4838,19 @@ template = true
 
     #[test]
     fn test_profile_preparation_retries_when_final_proposed_closure_expands() {
-        let (temp, _storage, executor, _package) = fixture();
-        // The workflow package's projections name kinds its declared dependency
-        // carries, so the dependency is applied first — the order the resolved
-        // closure would apply them in.
-        executor
-            .apply_profile_package(&shipped_package_in(temp.path(), "jit-default"))
+        let temp = crate::test_utils::profiled_repository_fixture("jit-default", "packages", None)
             .unwrap();
-        let package = shipped_package_in(temp.path(), "jit-dogfood");
+        // The verified repository already carries the workflow package's
+        // declared dependency. Stage only the package whose preparation is the
+        // behavior under test.
+        let package = crate::test_utils::capture_repository_package(
+            "jit-dogfood",
+            &temp.path().join("packages/jit-dogfood"),
+        )
+        .unwrap();
+        let storage = JsonFileStorage::new(temp.path().join(".jit"));
+        let executor = CommandExecutor::new(storage.clone())
+            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
         let layout = executor.require_layout().unwrap();
         let inner = executor.storage().open_mutation_session(layout).unwrap();
         let mut session = FinalClosureRaceSession {

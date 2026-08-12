@@ -3134,19 +3134,13 @@ depends_on = ["planning"]
 
     #[test]
     fn test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files() {
-        let repo = tempfile::tempdir().unwrap();
+        let repo = crate::test_utils::profiled_repository_fixture(
+            "jit-dogfood",
+            crate::test_utils::PROFILE_PACKAGE_SOURCES,
+            None,
+        )
+        .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        CommandExecutor::new(storage.clone())
-            .with_layout(layout)
-            .initialize_fresh_repository(
-                repo.path(),
-                Some(&[crate::commands::ProfileSelector::path(
-                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
-                )]),
-            )
-            .unwrap();
 
         let owned = [
             ".jit/rules.toml",
@@ -3224,19 +3218,13 @@ depends_on = ["planning"]
 
     #[test]
     fn test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs() {
-        let repo = tempfile::tempdir().unwrap();
+        let repo = crate::test_utils::profiled_repository_fixture(
+            "jit-dogfood",
+            crate::test_utils::PROFILE_PACKAGE_SOURCES,
+            None,
+        )
+        .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
-        CommandExecutor::new(storage.clone())
-            .with_layout(layout)
-            .initialize_fresh_repository(
-                repo.path(),
-                Some(&[crate::commands::ProfileSelector::path(
-                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
-                )]),
-            )
-            .unwrap();
 
         let rules_path = repo.path().join(".jit/rules.toml");
         let agents_path = repo.path().join("AGENTS.md");
@@ -3269,7 +3257,8 @@ depends_on = ["planning"]
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::storage::IssueStore;
 
-        let (_source, storage) = memory_fixture(Some("jit-dogfood"));
+        let (_source, storage) =
+            crate::test_utils::profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
         let mut executor = memory_executor(storage.clone());
         executor.validate_silent().unwrap();
 
@@ -3339,7 +3328,8 @@ depends_on = ["planning"]
         use crate::commands::test_helpers::{memory_executor, seed_repo_file};
         use crate::storage::IssueStore;
 
-        let (_source, storage) = memory_fixture(Some("jit-dogfood"));
+        let (_source, storage) =
+            crate::test_utils::profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
         let rules =
             drift_default_assertion(&storage.read_repo_file(".jit/rules.toml").unwrap().unwrap()).0;
         let agents = storage
@@ -3439,7 +3429,8 @@ depends_on = ["planning"]
 
         const ASSET: &str = ".agents/skills/jit-manage/SKILL.md";
 
-        let (_source, storage) = memory_fixture(Some("jit-dogfood"));
+        let (_source, storage) =
+            crate::test_utils::profiled_in_memory_repository_fixture("jit-dogfood").unwrap();
         seed_repo_file(&storage, ASSET, "STALE PROFILE ASSET\n");
         let executor = memory_executor(storage);
         let layout = executor.require_layout().unwrap();
@@ -3476,19 +3467,16 @@ depends_on = ["planning"]
     /// one non-profile drift, the record present and then absent.
     #[test]
     fn test_validate_diagnoses_non_profile_drift_identically_across_record_states() {
-        let repo = tempfile::tempdir().unwrap();
+        let repo = crate::test_utils::profiled_repository_fixture(
+            "jit-dogfood",
+            crate::test_utils::PROFILE_PACKAGE_SOURCES,
+            None,
+        )
+        .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let layout =
             crate::storage::discover_repository_layout(repo.path(), storage.root()).unwrap();
         let executor = CommandExecutor::new(storage).with_layout(layout);
-        executor
-            .initialize_fresh_repository(
-                repo.path(),
-                Some(&[crate::commands::ProfileSelector::path(
-                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
-                )]),
-            )
-            .unwrap();
         let rules_path = repo.path().join(".jit/rules.toml");
         let rules = std::fs::read_to_string(&rules_path).unwrap();
         std::fs::write(&rules_path, drift_default_assertion(&rules).0).unwrap();

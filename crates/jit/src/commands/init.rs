@@ -1338,18 +1338,13 @@ source-of-truth = \"registry-first\"\n";
 
     #[test]
     fn test_reinit_profiled_over_existing_root_is_idempotent_unchanged() {
-        let repo = TempDir::new().unwrap();
+        let repo = crate::test_utils::profiled_repository_fixture(
+            "jit-dogfood",
+            crate::test_utils::PROFILE_PACKAGE_SOURCES,
+            None,
+        )
+        .unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let executor = executor_with_layout(&storage, repo.path());
-
-        executor
-            .initialize_fresh_repository(
-                repo.path(),
-                Some(&[ProfileSelector::path(
-                    crate::test_utils::stage_repository_packages(repo.path(), "jit-dogfood"),
-                )]),
-            )
-            .unwrap();
         let compact_record = {
             let record: AppliedProfileRecord = serde_json::from_slice(
                 &fs::read(repo.path().join(".jit/profiles/jit-dogfood.json")).unwrap(),
@@ -1391,14 +1386,9 @@ source-of-truth = \"registry-first\"\n";
 
     #[test]
     fn test_single_profile_reinit_attributes_coupled_schema_repair() {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        let location = crate::test_utils::stage_repository_packages(repo.path(), "jit-default");
-        let selector = ProfileSelector::path(&location);
-
-        executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), Some(std::slice::from_ref(&selector)))
+        let repo = crate::test_utils::profiled_repository_fixture("jit-default", "packages", None)
             .unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
         let schema = repo
             .path()
             .join(".jit/schemas/default-namespace-registry.json");
