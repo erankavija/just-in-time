@@ -1,7 +1,7 @@
 {
   "epic_id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
   "epic_short_id": "4b7c06d0",
-  "current_wave": 2,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -14,18 +14,20 @@
     },
     {
       "wave_number": 2,
+      "status": "complete",
       "issues": [
         {"short_id": "47836e2e", "title": "Share the stale-binary build fixture across processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
         {"short_id": "340be714", "title": "Add journal barrier crash coverage", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
         {"short_id": "0369e563", "title": "Measure transaction model-limit round trips", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
         {"short_id": "ee809651", "title": "Document pinned nextest installation and use", "classification": "documentation", "difficulty": "easy", "worker": "gpt-5.6-luna", "status": "done", "spec": "scratchpad spec-ee809651.md (written, commit instruction already removed)"},
-        {"short_id": "007f598b", "title": "Cut over journal durability documentation", "classification": "documentation", "difficulty": "easy", "worker": "codex-direct", "status": "pending", "spec": "scratchpad spec-007f598b.md (written, commit instruction already removed)"}
+        {"short_id": "007f598b", "title": "Cut over journal durability documentation", "classification": "documentation", "difficulty": "easy", "worker": "gpt-5.6-luna", "status": "done", "spec": "scratchpad spec-007f598b.md (written, commit instruction already removed)"}
       ]
     },
     {
       "wave_number": 3,
+      "status": "complete",
       "issues": [
-        {"short_id": "69e9f213", "title": "Swap the cargo-ci suite runner", "classification": "implementation", "difficulty": "hard", "worker": "opus", "status": "pending"},
+        {"short_id": "69e9f213", "title": "Swap the cargo-ci suite runner", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"},
         {"short_id": "efebd963", "title": "Apply the benchmark-driven fsync decision", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "done"}
       ]
     },
@@ -85,10 +87,10 @@
       "type": "bug",
       "title": "Mirror prepared rollback stage-cleanup edge in memory recovery",
       "state": "done",
-      "why": "A second audit found RepositoryBeforeStageCleanup was still reachable only on the JSON prepared-rollback path; the memory occurrence was post-commit cleanup and could not substantiate cross-backend rollback coverage. The scoped seam and focused tests are implemented and await lead gates."
+      "why": "A second audit found RepositoryBeforeStageCleanup was still reachable only on the JSON prepared-rollback path; the memory occurrence was post-commit cleanup and could not substantiate cross-backend rollback coverage. The scoped seam and focused tests passed lead gates and the issue is complete."
     }
   ],
-  "delegation_model": "Hard tasks go to an Opus subagent via the Agent tool. Easier tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high` invoked DIRECTLY by the lead in the background; the lead then reviews the diff, runs the gate, and commits. Do not wrap a codex invocation in an intermediate Claude driver subagent — it adds no verification the lead does not already owe and costs a full agent's context.",
+  "delegation_model": "Hard tasks go to gpt-5.6-sol collaboration subagents. Moderate tasks go to `codex exec -m gpt-5.6-terra -c model_reasoning_effort=high`, and easy tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high`; the lead reviews every diff, runs configured gates, and owns integration.",
   "gate_cost_model": "Measured this session on this host: a cold worktree cargo-ci run is 10+ minutes; a warm run on main is ~3-5 minutes; each `code-review` run is 3-5 minutes and is per-issue (no reuse). cargo-ci verdicts DO reuse across issues over identical content, so merge a whole wave, then evaluate cargo-ci per issue for one execution plus reuses. Worker cargo-ci runs in fresh worktrees are the single largest avoidable cost: from wave 2 on, have workers verify with focused tests plus fmt and clippy only, and let the lead's post-merge gate on warm main be the authoritative run.",
   "escalations": [],
   "rework_counts": {"f5da1112": 1, "47836e2e": 4, "0369e563": 1, "ee809651": 1, "007f598b": 1},
