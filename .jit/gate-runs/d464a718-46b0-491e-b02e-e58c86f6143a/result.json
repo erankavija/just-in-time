@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1513697e77436619dd83e481cb0e8611ae8281db",
+  "completed_at": "2026-08-12T01:06:35.952372585Z",
+  "duration_ms": 161927,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented, covered by the cargo-CI self-test, and supported by a passing cargo-ci gate.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2516ad90-2028-4644-bc31-556c2a07c49e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d464a718-46b0-491e-b02e-e58c86f6143a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T01:03:54.025222568Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f4f16775, 6f164c78, 75e7f666, 129f1608, f9ba9892, 1513697e (`jit:2516ad90`)\nPolicy sources: AGENTS.md; dev/active/4b7c06d0-test-suite-performance/plan.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/issue/2516ad90/requirement/REQ-01, REQ-02, REQ-03 and @/issue/69e9f213/requirement/REQ-04 (issue descriptions); @/invariant/semantic-test-assertions and @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T00:55:43Z); code-review failed (exit 1, prior run produced no structured findings)\nTruncation recovery: Narrowed reads of the plan-fixed suite-clock contract, cargo-ci budget invocation, and checker interface after broad search output truncated.\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented, covered by the cargo-CI self-test, and supported by a passing cargo-ci gate.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
