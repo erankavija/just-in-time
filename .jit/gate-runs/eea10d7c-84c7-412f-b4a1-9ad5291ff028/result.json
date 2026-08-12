@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0e752e8f2361ff5ab327963e5d3a442d7e0c7484",
+  "completed_at": "2026-08-12T19:12:12.283422554Z",
+  "duration_ms": 176642,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed suite reductions meet the issue criteria with current validation evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6d10e5d4-a386-4447-a669-a0f84ee26fad",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "eea10d7c-84c7-412f-b4a1-9ad5291ff028",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T19:09:15.641039706Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 19 commits tagged `jit:6d10e5d4`, individually inspected\nPolicy sources: AGENTS.md\nResolved items: @/issue/6d10e5d4/requirement/REQ-01–REQ-04 (issue description); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint, @/invariant/atomic-writes (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T19:03:52Z)\nTruncation recovery: narrowed generated-profile diffs to current contract, identity, and raw-sample reads; validated both recorded profile artifacts\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed suite reductions meet the issue criteria with current validation evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

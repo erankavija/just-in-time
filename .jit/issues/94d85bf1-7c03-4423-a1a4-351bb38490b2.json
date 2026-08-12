@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-08-11T18:51:58.491886834Z",
   "dependencies": [
+    "355565c2-2f98-45f0-b655-7bb29117e54d",
     "5b60d40e-d8d9-4552-b880-6ae717799dab",
     "6d10e5d4-a386-4447-a669-a0f84ee26fad",
     "efebd963-e33a-4ac8-9e9f-225de607fb44"
@@ -28,5 +29,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Wire suite-clock enforcement into the duration checker",
-  "updated_at": "2026-08-12T01:27:47.576953240Z"
+  "updated_at": "2026-08-12T19:28:26.254100119Z"
 }

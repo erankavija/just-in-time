@@ -13929,3 +13929,11 @@
 {"gate_key":"code-review","id":"e496bef3-6d2d-4a1f-bda1-57dcb1ae14df","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T18:50:43.209536937Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"5937898c-6c5b-418b-9afe-dd610b438519","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T18:56:44.112592632Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"74df0f2d-d1d3-4711-bd1d-e1ddc419735c","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T19:07:03.610205852Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"9fbf83b1-2b06-4580-b8ed-f59072c69894","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T19:12:12.637583665Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"d965a860-ec75-421c-8f68-350e8f23108a","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T19:14:32.001197097Z","to":"done","type":"issue_state_changed"}
+{"id":"5c72e524-836f-40d8-86f6-4150baae2949","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T19:14:32.001197097Z","type":"issue_completed"}
+{"from":"backlog","id":"3d198fa1-72c4-4a42-ba4c-c696529be423","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T19:14:37.302424404Z","to":"ready","type":"issue_state_changed"}
+{"id":"e84d1a24-f833-41e2-863f-cc6b2b892d30","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","priority":"critical","timestamp":"2026-08-12T19:27:57.284935671Z","title":"Remove build provenance, the stale-binary guard, and the disk-backed gate TMPDIR","type":"issue_created"}
+{"from":"ready","id":"04373ac7-1672-4cc8-bad3-fbe87e40630a","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T19:28:26.254100119Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"df0f6f71-01e2-4d3d-9c78-c4a43d16a5d7","issue_id":"94d85bf1-7c03-4423-a1a4-351bb38490b2","timestamp":"2026-08-12T19:28:26.254100119Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["description"],"id":"cdc109d2-488c-4c41-89b7-101fd8ee10d8","issue_id":"355565c2-2f98-45f0-b655-7bb29117e54d","timestamp":"2026-08-12T19:29:06.437338085Z","type":"issue_updated","updated_by":"issue-update"}
