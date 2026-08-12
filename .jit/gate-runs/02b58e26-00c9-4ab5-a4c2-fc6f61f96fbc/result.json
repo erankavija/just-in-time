@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "67713111daa162be937edc18e7ca4a5bf925da32",
+  "completed_at": "2026-08-12T09:17:09.166108483Z",
+  "duration_ms": 216176,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".config/nextest.toml",
+        "id": "F1",
+        "line": 14,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ae17798d/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "REQ-04's required setup-inclusive selected-span and reduction thresholds have no recorded measurement; reused cargo-ci evidence cannot establish them."
+      }
+    ],
+    "summary": "REQ-04's required setup-inclusive performance measurement is not evidenced.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ae17798d-c0c6-4ad0-b119-2dd2fab8e95d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "02b58e26-00c9-4ab5-a4c2-fc6f61f96fbc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:13:32.989221084Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6300 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff53f-972f-7e41-85d6-0a5c112e4342\n--------\nuser\n--- 6287 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 61234ddf, 420ddfb (merge repeats the same first-parent patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/ae17798d/requirement/REQ-01..REQ-05 (.jit/issues/ae17798d-c0c6-4ad0-b119-2dd2fab8e95d.json); @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/gate-semantics, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed; latest projection was reused, with no exit code or retained stdout\nTruncation recovery: reread truncated evidence as per-path commit patches, focused current-file ranges, and focused cargo-ci ranges\n\n1. **[blocking][issue-impact] F1:** REQ-04’s timing requirement is unverified. The nextest filters correctly enumerate the ten intended identities and add no recipe, but there is no recorded same-host, setup-inclusive selected-span measurement demonstrating ≤25 seconds and ≥25 seconds reduction. The passing reused `cargo-ci` projection retains no timing output, and its suite clock is workspace-wide rather than this selected set. [`.config/nextest.toml:14`](/home/vkaskivuo/Projects/just-in-time/.config/nextest.toml:14) `@/issue/ae17798d/requirement/REQ-04`\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-04's required setup-inclusive performance measurement is not evidenced.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04's required setup-inclusive selected-span and reduction thresholds have no recorded measurement; reused cargo-ci evidence cannot establish them.\",\"file\":\".config/nextest.toml\",\"line\":14,\"references\":[\"@/issue/ae17798d/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

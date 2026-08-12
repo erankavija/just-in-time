@@ -13862,3 +13862,4 @@
 {"fields":["dependencies"],"id":"ae09ba1c-d0b2-4259-a5fb-c9c72826fb1c","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T09:14:33.203486322Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"c9b2e8b7-95a6-4c9d-bde8-3675567e91db","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T09:14:38.922362798Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sol-jit-artifact-wrapper","id":"da59eef4-459d-4f06-9748-5fbd80339876","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T09:14:38.922362798Z","type":"issue_claimed"}
+{"gate_key":"code-review","id":"2133caf2-0cb2-419d-b330-8b5c4be27a34","issue_id":"ae17798d-c0c6-4ad0-b119-2dd2fab8e95d","timestamp":"2026-08-12T09:17:09.506806930Z","type":"gate_failed","updated_by":"auto:executor"}
