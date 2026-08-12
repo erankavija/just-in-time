@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T00:18:01.132639879Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T00:21:16.275769540Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "69e9f213-c980-4a3c-913c-54b147d07348",
@@ -31,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Swap the cargo-ci suite runner",
-  "updated_at": "2026-08-12T00:18:01.132639879Z"
+  "updated_at": "2026-08-12T00:21:16.275769540Z"
 }

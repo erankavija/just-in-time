@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "438bb25f4cb177a963ffb131317494c19ac74ca5",
+  "completed_at": "2026-08-12T00:21:15.940869574Z",
+  "duration_ms": 168351,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are met in the current source and the latest cargo-ci evidence passes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "69e9f213-c980-4a3c-913c-54b147d07348",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d634376c-407d-4d30-8e44-c017f72979ec",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T00:18:27.589594318Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2a11110b, ea66b0e1, ca121b20, 438bb25f\nPolicy sources: AGENTS.md\nResolved items: @/issue/69e9f213/requirement/REQ-04 (issue description, markdown-first); @/gate/cargo-ci (.jit/gates.toml, registry-first); @/invariant/bounded-rust-build-footprint, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T00:18:01Z); code-review pending (no prior run)\nTruncation recovery: narrowed reads of affected script ranges, item registries, gate records, and the merge patch\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are met in the current source and the latest cargo-ci evidence passes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
