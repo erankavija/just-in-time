@@ -43,7 +43,13 @@
       "wave_number": 5,
       "issues": [
         {"short_id": "1fc8fec3", "title": "Prebuild the stale-binary semantic fixture inside nextest", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
-        {"short_id": "4731256d", "title": "Share immutable profile and repair fixtures across nextest processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"}
+        {"short_id": "4731256d", "title": "Share immutable profile and repair fixtures across nextest processes", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
+        {"short_id": "ae17798d", "title": "Reuse applied-profile baselines in library tests", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
+        {"short_id": "deb33646", "title": "Share the recorded failure probe corpus", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"},
+        {"short_id": "123efe74", "title": "Optimize the Rust test profile from matched evidence", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress", "note": "Reviewed no_change: runtime target passed, but clean and representative rebuild costs both exceeded the fixed 25% ceiling."},
+        {"short_id": "bfd215fa", "title": "Reuse applied profile baselines for CLI prerequisites", "classification": "implementation", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress", "note": "Reviewed no_change: 27.005 seconds saved, below the required 30 seconds, and matched wall time regressed."},
+        {"short_id": "efaec52f", "title": "Optimize only the JIT package test profile", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress", "note": "Reviewed no_change: fresh matched rebuild regressed 82.14%, exceeding the fixed 25% ceiling."},
+        {"short_id": "934985ca", "title": "Tune nextest worker concurrency", "classification": "research", "difficulty": "hard", "worker": "gpt-5.6-sol", "status": "in_progress"}
       ]
     },
     {
@@ -123,6 +129,48 @@
       "title": "Share immutable profile and repair fixtures across nextest processes",
       "state": "in_progress",
       "why": "Profile/init/validate and derived-state repair setup dominate the remaining aggregate lower bound. Reuse only verified immutable baselines, then clone isolated mutable state per test without lowering the tested interface."
+    },
+    {
+      "short_id": "ae17798d",
+      "type": "task",
+      "title": "Reuse applied-profile baselines in library tests",
+      "state": "in_progress",
+      "why": "Ten high-cost library tests used profile application only as a prerequisite. Reuse the existing verified immutable default and dogfood baselines while preserving each real repair, retry, or reinitialization operation."
+    },
+    {
+      "short_id": "deb33646",
+      "type": "task",
+      "title": "Share the recorded failure probe corpus",
+      "state": "in_progress",
+      "why": "Three aggregate CLI failure-contract tests independently replayed the same 104 subprocess probes. One raw immutable observation corpus retains their separate semantic assertions while reducing attributable subprocess work by 66.7%."
+    },
+    {
+      "short_id": "123efe74",
+      "type": "task",
+      "title": "Optimize the Rust test profile from matched evidence",
+      "state": "in_progress",
+      "why": "A global test-profile optimization met runtime and doctest targets but doubled clean and representative rebuild costs, so the reviewed result records no production change and preserves the matched evidence."
+    },
+    {
+      "short_id": "bfd215fa",
+      "type": "task",
+      "title": "Reuse applied profile baselines for CLI prerequisites",
+      "state": "in_progress",
+      "why": "Seven additional safe prerequisite consumers were measured, but saved only 27.005 seconds against a hard 30-second requirement and regressed matched wall time, so the reviewed result is no_change."
+    },
+    {
+      "short_id": "efaec52f",
+      "type": "task",
+      "title": "Optimize only the JIT package test profile",
+      "state": "in_progress",
+      "why": "A narrower package-scoped profile was tested after the global optimization failed its build budget. Fresh same-revision evidence still showed an 82.14% representative rebuild regression, so it was rejected early."
+    },
+    {
+      "short_id": "934985ca",
+      "type": "task",
+      "title": "Tune nextest worker concurrency",
+      "state": "in_progress",
+      "why": "The remaining opt-level-0 workload includes thousands of subprocess- and filesystem-heavy tests. A bounded matched experiment tests whether safe worker overcommit can reduce the post-setup region without changing assertions, identities, build profiles, or suite-clock accounting."
     }
   ],
   "delegation_model": "Hard tasks go to gpt-5.6-sol collaboration subagents. Moderate tasks go to `codex exec -m gpt-5.6-terra -c model_reasoning_effort=high`, and easy tasks go to `codex exec -m gpt-5.6-luna -c model_reasoning_effort=high`; the lead reviews every diff, runs configured gates, and owns integration.",
