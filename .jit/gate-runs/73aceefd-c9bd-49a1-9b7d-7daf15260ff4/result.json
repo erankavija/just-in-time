@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "dba1a2b6934f055dc0da6e3ae502827c0334b157",
+  "completed_at": "2026-08-12T01:10:16.048825945Z",
+  "duration_ms": 198119,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-impact success criteria are met; no unresolved findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "21ba4bb4-95bc-40b2-926a-44b477475cf4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "73aceefd-c9bd-49a1-9b7d-7daf15260ff4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T01:06:57.929661363Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f4f16775, 6c536622, 58928c35, 7a3e2678, f9ba9892 (`jit:21ba4bb4`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4b7c06d0/requirement/REQ-05 (issue description, markdown-first); @/issue/69e9f213/requirement/REQ-04 (issue description, markdown-first); @/invariant/atomic-writes (.jit/invariants.toml, registry-first); @/gate/cargo-ci (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (latest reused projection; exit code unavailable)\nTruncation recovery: bounded script line-range reads, merge-parent changed-file inspection, artifact schema/aggregate validation, and direct plan excerpt reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-impact success criteria are met; no unresolved findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

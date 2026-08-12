@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T00:59:30.081861873Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T01:10:16.383528141Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "21ba4bb4-95bc-40b2-926a-44b477475cf4",
@@ -31,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Produce warm per-test suite timing evidence",
-  "updated_at": "2026-08-12T00:59:30.081861873Z"
+  "updated_at": "2026-08-12T01:10:16.383528141Z"
 }
