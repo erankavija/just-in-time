@@ -112,17 +112,6 @@ ensure_real_cargo() {
 
 ensure_real_cargo
 
-# Disable incremental compilation for every Cargo invocation this wrapper makes
-# (jit:57d0eb79). The workspace manifest's [profile.dev]/[profile.test] leave
-# incremental on for ordinary interactive builds, where it earns back its disk
-# cost across many rebuilds of the same tree. A gate run compiles once and
-# exits, so it has no later rebuild to amortize that cost against; left on,
-# incremental state accumulated without bound across gate runs (baseline
-# measurement: dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md,
-# Baseline table). The `incremental-state` step below turns "should be disabled"
-# into a checked fact rather than an assumption.
-export CARGO_INCREMENTAL=0
-
 # Reuse the host-wide compiler cache when it is installed. Keep explicit
 # wrappers authoritative (for instrumentation or debugging), and provide a
 # deterministic opt-out for cache-sensitive diagnosis. Enabling a wrapper
@@ -162,6 +151,17 @@ ensure_pinned_nextest
 # wrong). Overridable via CARGO_CI_TMPDIR.
 export TMPDIR="${CARGO_CI_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp}"
 mkdir -p "$TMPDIR"
+
+# Disable incremental compilation for every step below (jit:57d0eb79). The
+# workspace manifest's [profile.dev]/[profile.test] leave incremental on for
+# ordinary interactive builds, where it earns back its disk cost across many
+# rebuilds of the same tree. A gate run compiles once and exits, so it has no
+# later rebuild to amortize that cost against; left on, incremental state
+# accumulated without bound across gate runs (baseline measurement:
+# dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, Baseline table). The
+# `incremental-state` step below turns "should be disabled" into a checked
+# fact rather than an assumption.
+export CARGO_INCREMENTAL=0
 
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
