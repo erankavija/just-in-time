@@ -27,7 +27,7 @@
     "satisfies:REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Wire suite-clock enforcement into the duration checker",
-  "updated_at": "2026-08-12T19:28:26.254100119Z"
+  "updated_at": "2026-08-12T22:02:34.309244478Z"
 }
