@@ -78,6 +78,9 @@ pub(crate) use transaction_recovery::FileTransactionError;
 // resolution (`crate::storage::TransactionFailurePoint`, etc.) identical in
 // both feature states.
 #[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub use test_support::{publish_fixture_directory_noreplace, publish_fixture_file_noreplace};
+#[cfg(feature = "test-support")]
 pub use transaction_recovery::{
     FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
 };
