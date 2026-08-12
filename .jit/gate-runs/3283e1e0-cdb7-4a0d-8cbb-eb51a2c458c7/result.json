@@ -1,0 +1,23 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2dd7db04cdb88b6d1d3d2484fbbc82c4708b75b3",
+  "completed_at": "2026-08-12T11:46:27.127516505Z",
+  "duration_ms": 152,
+  "exit_code": 1,
+  "gate_key": "code-review",
+  "issue_id": "b883f916-e53a-4c77-b104-10fb4defb456",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3283e1e0-cdb7-4a0d-8cbb-eb51a2c458c7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T11:46:26.974792372Z",
+  "status": "failed",
+  "stderr": "---\nERROR: Agent produced no output.\n--- agent stderr (first 12 of 3 lines; the session id below points to the full agent transcript) ---\nWARNING: proceeding, even though we could not create PATH aliases: Read-only file system (os error 30)\nReading prompt from stdin...\nError: failed to initialize in-process app-server client: Read-only file system (os error 30)\n",
+  "stdout": "",
+  "tree_dirty": false
+}
