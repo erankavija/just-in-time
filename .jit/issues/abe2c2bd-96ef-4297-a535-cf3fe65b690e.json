@@ -13,11 +13,10 @@
   "id": "abe2c2bd-96ef-4297-a535-cf3fe65b690e",
   "labels": [
     "component:testing",
-    "milestone:v1.0",
     "type:bug"
   ],
   "priority": "normal",
   "state": "backlog",
   "title": "Seven ignored tests assert nothing and are recorded as an excluded cost",
-  "updated_at": "2026-08-12T23:02:50.971039163Z"
+  "updated_at": "2026-08-12T23:36:21.556914266Z"
 }
