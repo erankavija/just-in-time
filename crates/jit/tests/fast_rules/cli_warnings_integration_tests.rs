@@ -11,8 +11,27 @@ use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use jit::validation::graph::GraphFinding;
 use tempfile::TempDir;
 
+/// A repository carrying the workflow profile, cloned from the verified
+/// baseline every consumer of that profile shares.
+///
+/// Each of these tests needs the same prerequisite — this repository's
+/// workflow package applied to a fresh repository — and building it per test
+/// repeated one capture of every authored package and one application. The
+/// shared fixture publishes that once as an immutable baseline and hands out a
+/// deep copy, so the tests keep their own filesystem repository and share no
+/// mutable state (`@/inv/shared-test-contracts`). Membership follows from this
+/// call rather than from a test name listed in runner configuration.
 fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, TestTaxonomy) {
-    let (temp_dir, storage) = jit::test_utils::setup_test_repo().unwrap();
+    let temp_dir = jit::test_utils::profiled_repository_fixture(
+        "jit-dogfood",
+        jit::test_utils::PROFILE_PACKAGE_SOURCES,
+        None,
+    )
+    .expect("clone a coherent profiled repository fixture");
+    // Claim coordination reads this as a synthetic Git control directory, as it
+    // does in every repository `jit::test_utils` hands a test.
+    std::fs::create_dir_all(temp_dir.path().join(".git")).unwrap();
+    let storage = JsonFileStorage::new(temp_dir.path().join(".jit"));
     let mut taxonomy = test_taxonomy();
     taxonomy.hierarchy = [
         ("milestone".to_string(), 1),
@@ -36,12 +55,6 @@ fn setup_test_repo() -> (TempDir, CommandExecutor<JsonFileStorage>, TestTaxonomy
     taxonomy.default_type = "task".to_string();
     let layout = jit::storage::discover_repository_layout(temp_dir.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);
-    // Applied from inside the worktree it is applied to, because an
-    // application records the package's worktree-relative location.
-    let location = jit::test_utils::stage_repository_packages(temp_dir.path(), "jit-dogfood");
-    executor
-        .apply_profile(&[jit::commands::ProfileSelector::path(&location)])
-        .unwrap();
     (temp_dir, executor, taxonomy)
 }
 

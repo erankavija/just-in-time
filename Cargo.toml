@@ -24,6 +24,16 @@ incremental = true
 debug = "line-tables-only"
 incremental = true
 
+# Dependencies are compiled once and then run by every test process, so their
+# unoptimized code is pure repeated cost: the suite's own CPU profile is spread
+# across SHA-256 over whole build artifacts, TOML parsing, and JSON
+# serialization, none of which is workspace code. Optimizing the dependency
+# graph alone leaves workspace crates at the debug profile's compile times and
+# its `debug-assertions`/`overflow-checks`, which package overrides do not
+# change (jit:6d10e5d4).
+[profile.dev.package."*"]
+opt-level = 1
+
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }

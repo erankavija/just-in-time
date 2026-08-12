@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-12T16:51:42Z",
+  "environment": {
+    "git_revision": "14513e48ddf9a4e31c5bc9633e669135a259cb77",
+    "os": "Arch Linux",
+    "kernel": "Linux 7.1.6-arch1-1",
+    "cpu_count": 24,
+    "memory_bytes": 33543049216,
+    "cargo_version": "cargo 1.97.0 (c980f4866 2026-06-30)",
+    "rustc_version": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+    "rustc_host_triple": "x86_64-unknown-linux-gnu",
+    "linker": "cargo default (no linker override in .cargo/config.toml): cc (GCC) 16.1.1 20260728 invoking GNU ld (GNU Binutils) 2.47",
+    "cargo_rust_env": {}
+  },
+  "measurement_methodology": {
+    "max_rss_source": "getrusage(RUSAGE_CHILDREN) high-water mark after each command exits; equivalent to GNU time -v Maximum resident set size; reflects the largest single reaped process in the tree, not a sum across concurrent rustc invocations.",
+    "build_lock_path": "/tmp/cargo-ci.lock",
+    "isolation": "each sample runs in a freshly created CARGO_TARGET_DIR, removed immediately after its measurements are recorded."
+  },
+  "clean_samples": [
+    {
+      "sample": 1,
+      "clippy": {
+        "wall_seconds": 40.572,
+        "max_rss_kb": 1711296,
+        "exit_code": 0
+      },
+      "test_no_run": {
+        "wall_seconds": 52.78,
+        "max_rss_kb": 2541344,
+        "exit_code": 0
+      },
+      "target_dir_bytes": 5584978120,
+      "inventory": {
+        "target_dir_bytes": 5584978120,
+        "unique_active_test_executable_bytes": 1597956232,
+        "integration_test_target_count": 11,
+        "test_case_count": 4588,
+        "doctest_case_count": 63,
+        "ignored_test_case_count": 10
+      },
+      "success": true
+    }
+  ],
+  "rebuild_samples": [
+    {
+      "sample": 1,
+      "setup_clippy": {
+        "wall_seconds": 40.633,
+        "max_rss_kb": 1711196,
+        "exit_code": 0
+      },
+      "setup_test_no_run": {
+        "wall_seconds": 52.277,
+        "max_rss_kb": 2549888,
+        "exit_code": 0
+      },
+      "rebuild_test_no_run": {
+        "wall_seconds": 20.931,
+        "max_rss_kb": 1713472,
+        "exit_code": 0
+      },
+      "target_dir_bytes": 6740238926,
+      "probe_restored_verified": true,
+      "success": true
+    }
+  ],
+  "medians": {
+    "clean_clippy_wall_seconds": 40.572,
+    "clean_test_no_run_wall_seconds": 52.78,
+    "clean_total_wall_seconds": 93.352,
+    "rebuild_wall_seconds": 20.931
+  }
+}
