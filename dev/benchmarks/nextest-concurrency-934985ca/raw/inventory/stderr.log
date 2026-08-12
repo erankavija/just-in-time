@@ -1,0 +1,5 @@
+info: experimental features enabled: setup-scripts
+   Compiling jit v1.0.0 (/tmp/agent-934985ca/crates/jit)
+   Compiling jit-server v1.0.0 (/tmp/agent-934985ca/crates/server)
+warning: jit-server@1.0.0: web/dist/ not found — the jit-server binary will not include embedded web assets. Run 'cd web && npm run build' first, then rebuild.
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 35.97s

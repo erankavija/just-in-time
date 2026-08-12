@@ -1,0 +1,205 @@
+{
+  "artifact": "dev/benchmarks/nextest-concurrency-934985ca/summary.json",
+  "contract": "nextest-worker-concurrency-benchmark",
+  "schema_version": 1,
+  "issue": "934985ca-8650-4a98-9c09-df9ec8fd9863",
+  "source": {
+    "revision": "c1d072df3ad3aafd60055bb25b4c1f1b70b49197",
+    "nextest_configuration_sha256": "8a96223a3e9253cdefb54a655511e4b13fd28f01faf42440f875257db80afe6c",
+    "config_restored_byte_exact": true
+  },
+  "method": {
+    "runner": "cargo-nextest 0.9.133",
+    "selection": ["cargo", "nextest", "run", "--workspace"],
+    "worker_counts": [24, 36, 48],
+    "worker_count_64": "not_run_after_48_worker_resource_order_failure",
+    "message_format": "libtest-json-plus 0.1",
+    "target": "/home/vkaskivuo/Projects/just-in-time/target",
+    "cache_state": "one fixed already-built target; warmup preceded measured worker-count samples",
+    "serialization": "exclusive /tmp/cargo-ci.lock",
+    "environment": {
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_CI_NO_SCCACHE": "1",
+      "RUSTC_WRAPPER": "",
+      "TMPDIR": "/home/vkaskivuo/.cache/jit-934985ca-tmp",
+      "host_logical_cpus": 24,
+      "host_memory_bytes": 33543049216,
+      "host_swap_bytes": 4294963200
+    },
+    "timing": {
+      "wall": "monotonic clock around the exact command",
+      "setup": "each pinned nextest SETUP PASS duration and their sum",
+      "post_setup": "monotonic span after the final setup PASS line until process exit",
+      "aggregate": "sum of exec_time from unique successful nextest test events",
+      "host_pressure": "100ms /proc/meminfo, /proc/pressure, and load observations plus child rusage"
+    },
+    "raw": "dev/benchmarks/nextest-concurrency-934985ca/raw",
+    "validator": "dev/benchmarks/nextest-concurrency-934985ca/validate.py"
+  },
+  "identity_control": {
+    "discovered_total": 4521,
+    "runnable": 4511,
+    "ignored": 10,
+    "duplicates": 0,
+    "normalized_sha256": "73b7296fbe1dab17d5cea6ae79f5f627458bf9f33fa4dcdee91180c9ab3f3807",
+    "doctest_total": 63,
+    "doctest_duplicates": 0,
+    "doctest_normalized_sha256": "6f19c13855d86dd3516bd7f018b4cb6486a20208b1ff6053dc877ab71b41d2d5"
+  },
+  "runs": [
+    {
+      "label": "warmup-24",
+      "role": "warmup_and_successful_24_worker_control",
+      "workers": 24,
+      "exit_code": 0,
+      "wall_ms": 152073,
+      "setup_ms": 34630,
+      "post_setup_ms": 117049,
+      "setup": {
+        "stale-binary-fixture": 484,
+        "default-repository-fixture": 2639,
+        "dogfood-repository-fixture": 2795,
+        "recorded-failure-corpus": 28712
+      },
+      "passed": 4511,
+      "ignored": 10,
+      "failed": 0,
+      "not_run": 0,
+      "duplicate_started": 0,
+      "duplicate_results": 0,
+      "aggregate_test_work_seconds": 2699.977810775,
+      "maximum_test_seconds": 33.494224682,
+      "maximum_test": "jit::jit$storage::repository_state_store::tests::test_conformance_failure_edges_converge_on_both_backends",
+      "minimum_memory_available_bytes": 15313756160,
+      "minimum_swap_free_bytes": 823296,
+      "maximum_load_1m": 22.912109375,
+      "child_maximum_resident_set_kb": 148992
+    },
+    {
+      "label": "w24-1",
+      "role": "measured_baseline",
+      "workers": 24,
+      "exit_code": 100,
+      "wall_ms": 124749,
+      "setup_ms": 10679,
+      "post_setup_ms": 113648,
+      "setup": {
+        "stale-binary-fixture": 472,
+        "default-repository-fixture": 2598,
+        "dogfood-repository-fixture": 2720,
+        "recorded-failure-corpus": 4889
+      },
+      "passed": 4179,
+      "ignored": 7,
+      "failed": 1,
+      "not_run": 331,
+      "duplicate_started": 0,
+      "duplicate_results": 0,
+      "failure": "jit::fast_docs_templates$planning_preset_tests::test_project_defined_preset_save_list_show_apply_in_process timed out after 5s acquiring the shared TMPDIR .jit-bootstrap.lock",
+      "aggregate_successful_test_work_seconds": 2545.699209001,
+      "maximum_successful_test_seconds": 32.418057775,
+      "minimum_memory_available_bytes": 19806773248,
+      "minimum_swap_free_bytes": 823296,
+      "maximum_load_1m": 22.935546875,
+      "child_maximum_resident_set_kb": 87716
+    },
+    {
+      "label": "w36-1",
+      "role": "measured_candidate",
+      "workers": 36,
+      "exit_code": 0,
+      "wall_ms": 97130,
+      "setup_ms": 10615,
+      "post_setup_ms": 86113,
+      "setup": {
+        "stale-binary-fixture": 475,
+        "default-repository-fixture": 2574,
+        "dogfood-repository-fixture": 2707,
+        "recorded-failure-corpus": 4859
+      },
+      "passed": 4511,
+      "ignored": 10,
+      "failed": 0,
+      "not_run": 0,
+      "duplicate_started": 0,
+      "duplicate_results": 0,
+      "aggregate_test_work_seconds": 2799.952286727,
+      "maximum_test_seconds": 34.934618425,
+      "maximum_test": "jit::jit$storage::repository_state_store::tests::test_conformance_failure_edges_converge_on_both_backends",
+      "minimum_memory_available_bytes": 19448332288,
+      "minimum_swap_free_bytes": 823296,
+      "maximum_load_1m": 29.62939453125,
+      "child_maximum_resident_set_kb": 148912
+    },
+    {
+      "label": "w48-1",
+      "role": "measured_candidate",
+      "workers": 48,
+      "exit_code": 100,
+      "wall_ms": 84610,
+      "setup_ms": 10648,
+      "post_setup_ms": 73584,
+      "setup": {
+        "stale-binary-fixture": 476,
+        "default-repository-fixture": 2606,
+        "dogfood-repository-fixture": 2703,
+        "recorded-failure-corpus": 4863
+      },
+      "passed": 4442,
+      "ignored": 10,
+      "failed": 1,
+      "not_run": 68,
+      "duplicate_started": 0,
+      "duplicate_results": 0,
+      "failure": "jit::fast_docs_templates$planning_preset_tests::test_project_defined_preset_save_list_show_apply_in_process timed out after 5s acquiring the shared TMPDIR .jit-bootstrap.lock",
+      "aggregate_successful_test_work_seconds": 2982.902575371,
+      "maximum_successful_test_seconds": 36.405054525,
+      "minimum_memory_available_bytes": 19439013888,
+      "minimum_swap_free_bytes": 823296,
+      "maximum_load_1m": 35.7119140625,
+      "child_maximum_resident_set_kb": 149988
+    }
+  ],
+  "doctest_control": {
+    "wall_ms": 5408,
+    "passed": 63,
+    "failed": 0,
+    "ignored": 0,
+    "discovered": 63,
+    "minimum_memory_available_bytes": 15527088128,
+    "minimum_swap_free_bytes": 0,
+    "maximum_load_1m": 15.95751953125,
+    "child_maximum_resident_set_kb": 605516
+  },
+  "historical_comparison": {
+    "authority": "dev/benchmarks/test-profile-123efe74/summary.json",
+    "historical_revision": "7119bdc1f82401d3c97dcbdc6c7ba72e59400d83",
+    "historical_24_worker_median_wall_ms": 37331,
+    "historical_24_worker_median_aggregate_seconds": 628.921916319,
+    "current_revision": "c1d072df3ad3aafd60055bb25b4c1f1b70b49197",
+    "evidence_only_differences": [
+      "the source revisions differ",
+      "the current nextest configuration runs a fourth recorded-failure-corpus setup that the historical raw run did not contain",
+      "between revisions, five cli_issue test source files changed by 733 insertions and 68 deletions",
+      "the current successful control records 2699.977810775 aggregate seconds and a 33.494224682-second maximum test"
+    ],
+    "causal_claim": "none; the historical and current runs are not matched and the artifact does not infer a cause from their difference"
+  },
+  "thresholds": {
+    "required_consecutive_passing_candidate_runs": 3,
+    "maximum_each_full_run_ms": 23500,
+    "maximum_test_seconds": 20,
+    "no_timeout_resource_or_order_failure": true,
+    "weakened": false
+  },
+  "decision": {
+    "value": "no_change",
+    "accepted_workers": null,
+    "candidate_36": "reject: 97130ms and a 34.934618425-second test exceed hard bounds",
+    "candidate_48": "reject: resource/order lock-timeout failure, incomplete identity execution, and hard-bound misses",
+    "candidate_64": "not run: 48 workers already demonstrated unsafe contention, so 64 was neither useful nor safe",
+    "reason": "No candidate produced even one qualifying full run, so none could enter the required three-consecutive-run acceptance phase.",
+    "nextest_configuration_changed": false,
+    "groups_retries_timeouts_or_profiles_changed": false
+  }
+}
