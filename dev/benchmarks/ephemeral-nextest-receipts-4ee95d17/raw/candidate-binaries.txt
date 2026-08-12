@@ -1,0 +1,10 @@
+marker=nextest receipt environment name is invalid
+first_sample_capture_epoch=1786524281
+artifact=/home/vkaskivuo/Projects/just-in-time/target/debug/jit
+sha256=8fab78f54a6152fda14a3f919fd7ce9e27004540a4750fdac02d69a7522ea2ab
+mtime_epoch=1786524182
+marker_present=true
+artifact=/home/vkaskivuo/Projects/just-in-time/target/debug/deps/cli_issue-780d39e9156860b8
+sha256=f0221d6a2bdb2b7c1461361facf4547ff44700c852013f0ce732f5be25e0f689
+mtime_epoch=1786524215
+marker_present=true

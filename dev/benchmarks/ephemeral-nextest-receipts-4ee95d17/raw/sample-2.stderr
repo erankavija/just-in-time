@@ -1,0 +1,20 @@
+info: experimental features enabled: setup-scripts
+warning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s
+────────────
+ Nextest run ID 70de1a09-d87e-4aa0-a47e-64ce4a9531ef with nextest profile: default
+    Starting 4 tests across 15 binaries (4521 tests skipped)
+       SETUP [      1/4] stale-binary-fixture: /tmp/agent-4ee95d17/scripts/setup-stale-binary-fixture.sh
+  SETUP PASS [   0.481s] stale-binary-fixture: /tmp/agent-4ee95d17/scripts/setup-stale-binary-fixture.sh
+       SETUP [      2/4] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default
+  SETUP PASS [   2.563s] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default
+       SETUP [      3/4] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood
+  SETUP PASS [   2.682s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood
+       SETUP [      4/4] recorded-failure-corpus: /tmp/agent-4ee95d17/scripts/setup-recorded-failure-corpus.sh
+  SETUP PASS [   4.807s] recorded-failure-corpus: /tmp/agent-4ee95d17/scripts/setup-recorded-failure-corpus.sh
+        PASS [   0.033s] (1/4) jit::cli_issue failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope
+        PASS [   0.341s] (2/4) jit::scratch_build stale_binary_child_process_tests::test_checker_child_stale_binary_fails_gate_run_visibly
+        PASS [   0.897s] (3/4) jit commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair
+        PASS [   1.928s] (4/4) jit commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged
+────────────
+     Summary [  12.472s] 4 tests run: 4 passed, 4521 skipped

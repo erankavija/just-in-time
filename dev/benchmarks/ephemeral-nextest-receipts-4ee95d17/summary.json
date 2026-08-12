@@ -1,0 +1,112 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "--workspace",
+    "-E",
+    "test(commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair) | test(commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged) | test(failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope) | test(stale_binary_child_process_tests::test_checker_child_stale_binary_fails_gate_run_visibly)"
+  ],
+  "candidate_binary_marker": "nextest receipt environment name is invalid",
+  "candidate_paths": [
+    "crates/jit/src/storage/mod.rs",
+    "crates/jit/src/storage/test_support.rs",
+    "crates/jit/src/test_utils.rs",
+    "crates/jit/tests/cli_issue/failure_probe_fixture.rs"
+  ],
+  "contract": "ephemeral-nextest-receipt-publication",
+  "decision": "no_change",
+  "decision_reason": "quantitative_threshold_failed",
+  "excluded": [
+    {
+      "exit_code": 101,
+      "label": "isolated-target-attempt",
+      "reason": "disk_quota_exceeded_before_setup",
+      "target": "/tmp/agent-4ee95d17/target"
+    }
+  ],
+  "reference_ms": 10615,
+  "raw_sha256": {
+    "raw/candidate-binaries.txt": "c2d6663f5752002ca462e28fd072578655322f1580974e9c3b17d8eb2aefac80",
+    "raw/excluded-isolated-target.stderr": "0d9d14733daf4775f6ab3ce32d082ce2877bd5edf5f94cb14db9d71bb582a9d2",
+    "raw/sample-1.stderr": "b20cbf656e710d8c572d6a888d6a6a516147ed33268a2c29008e8856ff5247cb",
+    "raw/sample-1.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "raw/sample-2.stderr": "cf8bdbc60ca9740304d400cdce653c8bbde53d4e46bae1b3be23f543a05a008d",
+    "raw/sample-2.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "raw/sample-3.stderr": "c1720e8c48d32bc71d3eccb806ee552fb98537ba5ac0c4c057e218542d50cdb6",
+    "raw/sample-3.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "raw/warmup.stderr": "1243398790b63ca6791ef33fdff1715eb78bfcadf821196e9fa3d4926257ba2f",
+    "raw/warmup.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "samples": [
+    {
+      "label": "sample-1",
+      "recipes": {
+        "default-repository-fixture": 2593,
+        "dogfood-repository-fixture": 2687,
+        "recorded-failure-corpus": 4798,
+        "stale-binary-fixture": 478
+      },
+      "saving_ms": 59,
+      "stderr": "raw/sample-1.stderr",
+      "stdout": "raw/sample-1.stdout",
+      "total_ms": 10556
+    },
+    {
+      "label": "sample-2",
+      "recipes": {
+        "default-repository-fixture": 2563,
+        "dogfood-repository-fixture": 2682,
+        "recorded-failure-corpus": 4807,
+        "stale-binary-fixture": 481
+      },
+      "saving_ms": 82,
+      "stderr": "raw/sample-2.stderr",
+      "stdout": "raw/sample-2.stdout",
+      "total_ms": 10533
+    },
+    {
+      "label": "sample-3",
+      "recipes": {
+        "default-repository-fixture": 2566,
+        "dogfood-repository-fixture": 2680,
+        "recorded-failure-corpus": 4791,
+        "stale-binary-fixture": 470
+      },
+      "saving_ms": 108,
+      "stderr": "raw/sample-3.stderr",
+      "stdout": "raw/sample-3.stdout",
+      "total_ms": 10507
+    }
+  ],
+  "selected_consumers": [
+    "commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair",
+    "commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged",
+    "failure_envelope_contract_tests::test_recorded_failure_arms_emit_the_canonical_error_envelope",
+    "stale_binary_child_process_tests::test_checker_child_stale_binary_fails_gate_run_visibly"
+  ],
+  "source": {
+    "benchmark.py_sha256": "a3891106d0dd5a3b9fae88b16ec75696cfcf23a30d19b222a3a070b75d042b6a",
+    "candidate_diff_sha256": "880fbaa521b20c3dec7bf8b67cce993a6b52dd5c14894c4872a93a010c062a5f",
+    "nextest_configuration_sha256": "8a96223a3e9253cdefb54a655511e4b13fd28f01faf42440f875257db80afe6c",
+    "rejected-candidate.patch.gz_sha256": "75e4197200a7c5036f730569e8f7b174c58d0133ba29c63675dc952760e14e07",
+    "revision": "4c5aafa886c60950397fb42815dc9967d7fa98a0"
+  },
+  "thresholds": {
+    "maximum_setup_ms": 5500,
+    "minimum_saving_ms": 5115
+  },
+  "warmup": {
+    "label": "warmup",
+    "recipes": {
+      "default-repository-fixture": 2583,
+      "dogfood-repository-fixture": 2678,
+      "recorded-failure-corpus": 4796,
+      "stale-binary-fixture": 478
+    },
+    "saving_ms": 80,
+    "stderr": "raw/warmup.stderr",
+    "stdout": "raw/warmup.stdout",
+    "total_ms": 10535
+  }
+}

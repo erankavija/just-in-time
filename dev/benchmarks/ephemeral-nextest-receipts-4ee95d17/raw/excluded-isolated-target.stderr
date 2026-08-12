@@ -1,0 +1,4 @@
+info: experimental features enabled: setup-scripts
+error: failed to build archive at `/tmp/agent-4ee95d17/target/debug/deps/libidna-66ed07249bbbede8.rlib`: Disk quota exceeded (os error 122)
+error: could not compile `idna` (lib) due to 1 previous error
+error: command `cargo test --no-run --message-format json-render-diagnostics --workspace` exited with code 101
