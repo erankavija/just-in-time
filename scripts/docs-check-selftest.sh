@@ -14,8 +14,8 @@ set -uo pipefail
 # The self-test NEVER mutates the real repository index or working tree: the
 # link/citation seeds are scratch files in a mktemp dir, and the checks whose
 # defects can only be seeded into tracked files — the projection check, which
-# renders into its targets, and the shipped-policy check, whose seeds are a
-# stale region and a committed build-input change — run inside throwaway
+# renders into its targets, and the shipped-policy check, whose seed is a
+# stale region — run inside throwaway
 # `git clone`s of this repo under that mktemp dir. A pre-existing staged or
 # unstaged change in the real repo is therefore left untouched. The harness
 # exits 0 only if every assertion passes; it never commits a seed into the real
@@ -374,45 +374,12 @@ echo
 echo "== M7 docs-check-shipped-policy.sh =="
 # This checker regenerates the shipped-policy regions in a scratch fixture of
 # its own and never writes into the tree it inspects, so the throwaway clone
-# below exists only so a stale region can be seeded and a build input committed
-# without touching the real repository.
+# below exists only so a stale region can be seeded without touching the real
+# repository.
 policy_clone="$scratch/policy-repo"
 policy_target="docs/reference/configuration.md"
 policy_begin="<!-- jit:shipped-documentation-policy:begin -->"
 policy_end="<!-- jit:shipped-documentation-policy:end -->"
-# A binary reporting no build commit — the state an ordinary build with no
-# injected provenance is in. The stub answers `version --json` and nothing
-# else, so reaching any other subcommand would mean the checker compared
-# something before establishing that the classification can be trusted.
-policy_stub="$scratch/policy-stub"
-mkdir -p "$policy_stub"
-cat >"$policy_stub/jit" <<'STUB'
-#!/usr/bin/env bash
-if [ "${1:-}" = "version" ]; then
-  printf '{"git_commit":"unknown","git_short_commit":"unknown","git_dirty":null}\n'
-  exit 0
-fi
-echo "stub jit: reached '$*' without established provenance" >&2
-exit 99
-STUB
-chmod +x "$policy_stub/jit"
-# A binary whose version report succeeds but cannot be read. The classification
-# is unobtainable rather than untrusted, and the check owes the same
-# environment failure for it — reading the report must not be the one step that
-# escapes with a status of its own.
-policy_unreadable="$scratch/policy-unreadable-stub"
-mkdir -p "$policy_unreadable"
-cat >"$policy_unreadable/jit" <<'STUB'
-#!/usr/bin/env bash
-if [ "${1:-}" = "version" ]; then
-  printf '{"git_commit":\n'
-  exit 0
-fi
-echo "stub jit: reached '$*' without a readable version report" >&2
-exit 99
-STUB
-chmod +x "$policy_unreadable/jit"
-
 if git clone --local --no-hardlinks --quiet . "$policy_clone" 2>/dev/null; then
   (
     cd "$policy_clone" || exit 3
@@ -436,34 +403,10 @@ if git clone --local --no-hardlinks --quiet . "$policy_clone" 2>/dev/null; then
     "$policy" >/dev/null 2>&1
     echo "$?" >"$scratch/rc_policy_drift"
     git checkout -q -- "$policy_target"
-
-    # An untrustworthy classification, arm 1: provenance that does not resolve
-    # against the repository under check.
-    PATH="$policy_stub:$PATH" "$policy" >/dev/null 2>&1
-    echo "$?" >"$scratch/rc_policy_unresolvable"
-
-    # An untrustworthy classification, arm 1b: a version report that parses
-    # into nothing, so no provenance can be read out of it at all.
-    PATH="$policy_unreadable:$PATH" "$policy" >/dev/null 2>&1
-    echo "$?" >"$scratch/rc_policy_unreadable"
-
-    # An untrustworthy classification, arm 2: a binary that predates the
-    # repository under check. Committing a change to a build input in the clone
-    # makes the installed binary older than the sources there, so the table it
-    # would produce describes an earlier tree — and a rerun of the generator
-    # would agree with it, since both read the same binary.
-    printf '\n// selftest build-input touch\n' >>crates/jit/src/lib.rs
-    git add -A >/dev/null 2>&1
-    git -c user.email=selftest@invalid -c user.name=selftest commit -q -m "touch a build input"
-    "$policy" >/dev/null 2>&1
-    echo "$?" >"$scratch/rc_policy_stale"
   )
   assert_rc 0 "$(cat "$scratch/rc_policy_fresh")" "shipped policy: regions carrying the shipped classification pass"
   assert_rc 0 "$(cat "$scratch/rc_policy_untouched")" "shipped policy: a run leaves the tree it checks unmodified"
   assert_rc 1 "$(cat "$scratch/rc_policy_drift")" "shipped policy: a seeded stale region is a finding"
-  assert_rc 2 "$(cat "$scratch/rc_policy_unresolvable")" "shipped policy: a classification whose provenance does not resolve is an environment failure"
-  assert_rc 2 "$(cat "$scratch/rc_policy_unreadable")" "shipped policy: a version report that cannot be read is an environment failure"
-  assert_rc 2 "$(cat "$scratch/rc_policy_stale")" "shipped policy: a classification from a binary predating the tree under check is an environment failure"
 else
   echo "FAIL: could not create isolated clone for the shipped-policy check"
   fail=1

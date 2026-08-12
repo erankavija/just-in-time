@@ -210,9 +210,7 @@ new_isolated_target_dir() {
 # web/dist/index.html is missing (the web UI hasn't been built) — this
 # doesn't fail `-D warnings` (build-script cargo:warning= messages are not
 # lint warnings), but it does make the clippy log non-empty, which is not a
-# genuinely zero-warning result. Idempotent; mirrors the same stub fixture
-# helper in
-# crates/jit/tests/provenance_contract/repository_inventory.rs. Measurement-
+# genuinely zero-warning result. Idempotent. Measurement-
 # environment preparation only — it does not change what gets compiled or how
 # (REQ-01 unaffected), and is called before every clippy invocation below so
 # a stub removed between samples (by an unrelated process) is re-created.

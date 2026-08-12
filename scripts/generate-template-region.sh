@@ -17,14 +17,6 @@ set -euo pipefail
 # repository's registry consumes it, so the package is the authority and the
 # registry block is generated from it (`@/issue/e204e63d/decision/D-1`).
 #
-# WHY THIS NEEDS NO PROVENANCE CHECK. Its sibling
-# generate-shipped-policy-regions.sh establishes that the jit binary on PATH was
-# built from this repository before it writes, because the classification it
-# renders can only be read out of an already-installed binary. Nothing here is
-# read from an installed binary: the renderer assembles the package from this
-# checkout as part of running, so the declarations rendered are the ones the
-# working tree declares.
-#
 # Usage:
 #   generate-template-region.sh    (takes no arguments — the target is named above)
 #
