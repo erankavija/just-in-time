@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2e8621d9c442ff8d27c2668273cedf748f7a087c",
+  "completed_at": "2026-08-12T10:56:39.434229180Z",
+  "duration_ms": 155123,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Runtime-artifact cache-root derivation, receipt validation, regression coverage, and retained fail-closed contracts satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7094dfa5-954a-448f-a46c-96f7847e11b8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8839276-e9ee-40fa-b1b0-3c686f5dca8a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T10:54:04.310430049Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `22546594c`, `2e8621d9c` (`crates/jit/src/test_utils.rs`; merge-side progress update inspected as pre-existing)\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/7094dfa5/requirement/REQ-01`–`REQ-04` (issue Markdown); `@/gate/cargo-ci` (`.jit/gates.toml`); relevant invariants (`.jit/invariants.toml`)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T10:53:53Z); code-review pending/no prior run\nTruncation recovery: narrowed reads of `test_utils.rs` lines 382–470, 531–710, and 1535–1835; abandoned unrelated broad-search output outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Runtime-artifact cache-root derivation, receipt validation, regression coverage, and retained fail-closed contracts satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

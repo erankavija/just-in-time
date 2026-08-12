@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T10:53:53.920660276Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-12T10:56:39.776652348Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7094dfa5-954a-448f-a46c-96f7847e11b8",
   "labels": [
     "epic:test-suite-performance",
@@ -23,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bind profile fixture cache roots to runtime artifacts",
-  "updated_at": "2026-08-12T10:20:04.427544703Z"
+  "updated_at": "2026-08-12T10:56:39.776652348Z"
 }

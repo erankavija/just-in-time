@@ -13895,3 +13895,5 @@
 {"fields":["dependencies"],"id":"52e5dcf3-7bc4-4f7d-8602-d5f6865e138f","issue_id":"7a2fc6f6-854d-4764-8585-3757c6d9c7ac","timestamp":"2026-08-12T10:19:58.725080392Z","type":"issue_updated","updated_by":"dependency-add"}
 {"from":"ready","id":"33700449-39f0-437f-a1a6-21bcf4ffa7c8","issue_id":"7094dfa5-954a-448f-a46c-96f7847e11b8","timestamp":"2026-08-12T10:20:04.427544703Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:terra-profile-cache-root","id":"b32e763e-c556-4b49-a682-eb8e1e153294","issue_id":"7094dfa5-954a-448f-a46c-96f7847e11b8","timestamp":"2026-08-12T10:20:04.427544703Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"a9909798-9f05-44aa-b276-53f3e30ad1e4","issue_id":"7094dfa5-954a-448f-a46c-96f7847e11b8","timestamp":"2026-08-12T10:53:53.920660276Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"7b739a2a-ee45-42b0-b21d-e4254f44bbb7","issue_id":"7094dfa5-954a-448f-a46c-96f7847e11b8","timestamp":"2026-08-12T10:56:39.776652348Z","type":"gate_passed","updated_by":"auto:executor"}
