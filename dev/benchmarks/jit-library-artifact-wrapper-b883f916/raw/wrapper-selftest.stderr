@@ -1,0 +1,2 @@
+Terminated                 FAKE_ACTION=term "$fake_rustc" -vV > /dev/null 2>&1
+Terminated                 ( cd "$root" || exit 99; CARGO_PKG_NAME= FAKE_ACTION=term "$wrapper" "$fake_rustc" -vV ) > /dev/null 2>&1

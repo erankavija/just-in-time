@@ -1,0 +1,1 @@
+{"sample":1,"setup_clippy":{"wall_seconds":37.497,"max_rss_kb":1742368,"exit_code":0},"setup_test_no_run":{"wall_seconds":60.463,"max_rss_kb":3069840,"exit_code":0},"rebuild_test_no_run":{"wall_seconds":38.731,"max_rss_kb":3062576,"exit_code":0},"target_dir_bytes":3321317349,"probe_restored_verified":true,"success":true}
