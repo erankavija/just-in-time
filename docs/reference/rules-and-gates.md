@@ -35,7 +35,7 @@ names, gate keys, and checkers your project declares.
 ## Gates
 
 - **@/gate/breakdown-review** — AI Breakdown Review: AI-powered adversarial review of a breakdown against the design doc and content standards
-- **@/gate/cargo-ci** — Cargo CI (fmt + clippy + tests + build policy): Full Rust CI pipeline: formatting check, zero-warning clippy, the workspace test suite, the build-footprint budget checker (integration-target and active-executable budgets, profile, and dependency-feature policy; scripts/rust-build-budget.sh), and the incremental-state check must all pass (@/invariant/bounded-rust-build-footprint).
+- **@/gate/cargo-ci** — Cargo CI (fmt + clippy + tests + build policy): Full Rust CI pipeline: formatting check, zero-warning clippy, the workspace test suite compiled in its own step and then measured by the named suite clock, the build-footprint budget checker (integration-target, active-executable, and measured suite-duration budgets, profile, and dependency-feature policy; scripts/rust-build-budget.sh), and the incremental-state check must all pass (@/invariant/bounded-rust-build-footprint).
 - **@/gate/cargo-ci-features** — Cargo CI (feature-gated parsers): Compiles and tests the optional html/xml content-parser features: feature-enabled clippy (zero warnings) and the cross-format parity test suite. Required on issues that touch feature-gated code so the default-only cargo-ci gate does not leave them unexercised.
 - **@/gate/clippy** — Clippy Lints Pass: Zero clippy warnings allowed
 - **@/gate/code-review** — AI Code Review: Issue-scoped, read-only AI code review using `jit:<short-id>` commit attribution, latest gate evidence, blocking issue-impact versus advisory pre-existing findings, and mandatory truncation recovery
