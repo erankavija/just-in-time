@@ -1911,7 +1911,7 @@ fn test_archive_container_preview_and_execution_preserve_citations_beside_unread
 /// REQ-03 (`jit:ef118aea`): a declared scan root may contain more directories
 /// than the ordinary validation closure lists; execution still captures and
 /// revalidates that complete configured universe rather than imposing a
-/// smaller repository-size cap than its path budget.
+/// smaller repository-size cap than its listing budget.
 #[test]
 fn test_archive_container_execution_reports_citations_with_more_than_256_scan_directories() {
     let run = archived_citation_with_scan_directories(261);

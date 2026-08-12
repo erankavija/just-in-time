@@ -2040,6 +2040,71 @@ mod tests {
         }
     }
 
+    /// The bytes a capture actually read are held to the byte budget, so a file
+    /// larger than the declaration admits refuses the whole image rather than
+    /// reaching a producer.
+    #[test]
+    fn test_close_refuses_captured_bytes_over_the_byte_budget() {
+        let path = VirtualPath::data("index.json").unwrap();
+        let bytes = b"captured payload".to_vec();
+        let close = |max_bytes: u64| {
+            let spec = CaptureSpec::phase_one(
+                [path.clone()],
+                CaptureBudget {
+                    max_listings: 0,
+                    max_bytes,
+                    max_depth: 1,
+                },
+            )?;
+            RepositoryImage::close(
+                layout(),
+                spec,
+                BTreeMap::from([(
+                    path.clone(),
+                    RepositoryEntry::File {
+                        identity: EntryIdentity::for_bytes("index", &bytes)?,
+                        bytes: bytes.clone(),
+                        mode: FileMode::Regular,
+                    },
+                )]),
+                BTreeMap::new(),
+                BTreeMap::new(),
+                BTreeMap::new(),
+            )
+        };
+        let read = bytes.len() as u64;
+
+        assert!(close(read).is_ok());
+        assert!(matches!(
+            close(read - 1),
+            Err(CaptureError::ByteBudgetExceeded { actual, maximum })
+                if actual == read && maximum == read - 1
+        ));
+    }
+
+    /// Requesting a listing is what a caller is bounded on, and the refusal
+    /// arrives at declaration time rather than after the reads it would drive.
+    #[test]
+    fn test_capture_spec_refuses_more_listings_than_the_budget_admits() {
+        let budget = CaptureBudget {
+            max_listings: 1,
+            max_bytes: 1024,
+            max_depth: 4,
+        };
+        let mut spec = CaptureSpec::phase_one([], budget).unwrap();
+        spec.discover_listing(VirtualPath::data("issues").unwrap())
+            .unwrap();
+
+        assert!(matches!(
+            spec.discover_listing(VirtualPath::data("templates").unwrap()),
+            Err(CaptureError::ListingBudgetExceeded {
+                actual: 2,
+                maximum: 1
+            })
+        ));
+        assert_eq!(spec.listings().len(), 1);
+    }
+
     /// A listing's children are bounded by what their names cost, not by how
     /// many of them there are: a directory whose children outnumber every path
     /// the declaration named closes when their names fit the byte budget, and is

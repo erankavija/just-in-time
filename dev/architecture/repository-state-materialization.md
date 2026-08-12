@@ -77,11 +77,27 @@ flowchart TD
 
 A `RepositoryImage` (`repository_state/image.rs`) is the single closed input to
 all planning. It is built by `RepositoryImage::close` from a `CaptureSpec`
-(`CaptureSpec::phase_one`) bounded by a `CaptureBudget` (`max_paths`,
-`max_listings`, `max_bytes`, `max_depth`), so capture cannot walk an unbounded
-tree. The image holds, per canonical path, a `RepositoryEntry` — `File` (with
-bytes, `FileMode`, and an `EntryIdentity`), `Directory`, or `Absent` — plus
-`ListingFingerprint`s and pinned/linked-worktree evidence.
+(`CaptureSpec::phase_one`) bounded by a `CaptureBudget` (`max_listings`,
+`max_bytes`, `max_depth`), so capture cannot walk an unbounded tree. The image
+holds, per canonical path, a `RepositoryEntry` — `File` (with bytes, `FileMode`,
+and an `EntryIdentity`), `Directory`, or `Absent` — plus `ListingFingerprint`s
+and pinned/linked-worktree evidence.
+
+Those three bound the one place a capture grows beyond what a caller declared:
+expanding a complete listing names children nobody asked for, and `max_listings`
+bounds how many listings may be requested while `max_bytes` charges every listed
+child's name alongside the bytes read. `max_depth` bounds the shape of each
+path, and so the ancestor closure a caller reaches by declaring one path.
+
+There is no budget on how many exact paths a caller may declare. A declared path
+is not growth — it is one thing the caller decided to read — and its count is
+bounded by whatever the caller derives the declaration from. A budget here would
+restate that bound as a number `CaptureBudget` cannot derive; publishing a
+profile package tree did exactly that, assuming a path depth the package model
+does not constrain, and so refused packages the model accepts. Each caller's
+budget therefore documents what bounds its own declaration
+(`commands/profile.rs::package_tree_capture_budget` is the worked example, since
+its declaration is the one that arrives from outside the repository).
 
 An `EntryIdentity` pairs a boundary-acquired no-follow object identity with the
 SHA-256 and byte size of the exact captured bytes. Identity is what lets a later

@@ -7372,4 +7372,76 @@ target = "docs/guide.md"
         ProfilePackage::from_directory(&destination)
             .expect("the republished tree reads back as a package");
     }
+
+    /// Every dimension of the publication budget clears what the package model
+    /// can demand of it.
+    ///
+    /// The model bounds a package's file count and total size and says nothing
+    /// about how deep or how long its paths are, so what a publication can be
+    /// asked for is stated against those constants. The manifest names every
+    /// file the package holds and no source twice, so the package's declared
+    /// path lengths sum below its byte budget: it can need no more directories
+    /// than that, and no path of it can hold more components than that.
+    #[test]
+    fn test_package_tree_capture_budget_clears_what_the_package_model_can_demand() {
+        let destination = VirtualPath::worktree("packages/deep").unwrap();
+        let budget = package_tree_capture_budget(&destination);
+        let model_bytes = crate::profile::MAX_PROFILE_PACKAGE_BYTES;
+
+        assert!(
+            budget.max_listings > model_bytes,
+            "a package can need a listing per directory its declared paths can name"
+        );
+        assert!(
+            budget.max_depth >= destination.relative().depth() + model_bytes,
+            "a package can declare a path with a component per byte its paths can hold"
+        );
+        assert!(
+            budget.max_bytes >= model_bytes as u64,
+            "a publication reads the whole tree the package carries"
+        );
+    }
+
+    /// A package the model admits whose cost is driven by its directories rather
+    /// than by its files declares a capture the publication budget accepts.
+    ///
+    /// This is the shape that used to be refused: a bound reading the model's
+    /// file count and assuming a path depth to go with it refuses an archive
+    /// `pack` wrote, leaving an operator holding a file nothing takes.
+    #[test]
+    fn test_package_tree_capture_spec_admits_a_file_count_of_unshared_directory_chains() {
+        /// Directory levels each file sits below, sharing none with another.
+        const DEPTH: usize = 64;
+
+        let destination = VirtualPath::worktree("packages/deep").unwrap();
+        let files = crate::profile::MAX_PROFILE_PACKAGE_FILES;
+        let tree = PackageTreeCapture::new(
+            destination.clone(),
+            (0..files)
+                .map(|index| {
+                    Ok(CapturedTreeFile {
+                        relative: RootRelativePath::parse(
+                            (0..DEPTH)
+                                .map(|level| format!("d{level}-{index}/"))
+                                .chain(std::iter::once(format!("source-{index}")))
+                                .collect::<String>(),
+                        )?,
+                        bytes: Vec::new(),
+                        mode: FileMode::Regular,
+                    })
+                })
+                .collect::<Result<Vec<_>, RepositoryLayoutError>>()
+                .expect("every declared path is a safe relative path"),
+        )
+        .expect("the destination is worktree content");
+
+        let spec = tree
+            .capture_spec(package_tree_capture_budget(&destination))
+            .expect("the publication budget admits a package the model admits");
+
+        assert!(
+            spec.paths().count() > files * DEPTH,
+            "the package under test must declare a closure driven by its directories"
+        );
+    }
 }
