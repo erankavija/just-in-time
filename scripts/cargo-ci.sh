@@ -169,6 +169,13 @@ trap 'rm -rf "$WORK"' EXIT
 failed=0
 summary=""
 
+# Gate evidence is stored as text, so keep all reported wall-clock values in
+# one unambiguous, machine-friendly unit. GNU date's %3N expansion is always a
+# three-digit millisecond field on the Linux hosts that run this gate.
+epoch_milliseconds() {
+  date +%s%3N
+}
+
 summarize_pass() {
   local name="$1"
   case "$name" in
@@ -261,19 +268,26 @@ summarize_fail() {
 
 run_step() {
   local name="$1"
+  local started_ms ended_ms elapsed_ms
   shift
+
+  started_ms=$(epoch_milliseconds)
   if "$@" >"$WORK/$name.out" 2>&1; then
+    ended_ms=$(epoch_milliseconds)
+    elapsed_ms=$((ended_ms - started_ms))
     local passed_summary
     if passed_summary=$(summarize_pass "$name"); then
-      summary+="  ✓ $name: $passed_summary"$'\n'
+      summary+="  ✓ $name: $passed_summary (${elapsed_ms} ms)"$'\n'
     else
-      summary+="  ✗ $name: REPORTER FAILED"$'\n'
+      summary+="  ✗ $name: REPORTER FAILED (${elapsed_ms} ms)"$'\n'
       summarize_fail "$name"
       failed=1
     fi
   else
     local rc=$?
-    summary+="  ✗ $name: FAILED (exit $rc)"$'\n'
+    ended_ms=$(epoch_milliseconds)
+    elapsed_ms=$((ended_ms - started_ms))
+    summary+="  ✗ $name: FAILED (exit $rc) (${elapsed_ms} ms)"$'\n'
     summarize_fail "$name"
     failed=1
   fi
@@ -359,8 +373,16 @@ fi
 
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
 run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
+
+# The named suite clock is deliberately narrower than the gate duration. It
+# starts immediately before the pinned workspace suite and ends after the
+# separately reported doctest substep, leaving lock acquisition, preflight,
+# formatting, linting, and the intentionally cold provenance suite outside it.
+suite_clock_started_ms=$(epoch_milliseconds)
 run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
 run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
+suite_clock_ms=$(( $(epoch_milliseconds) - suite_clock_started_ms ))
+summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
 
 # Build-provenance contract suites (jit:5d862134). These are #[ignore]d for
 # the default nextest run — each spawns cold scratch `cargo` builds into throwaway target

@@ -87,6 +87,36 @@ readonly STEP_FAILED="  ✗ "
 step_passed() { grep -qF "$STEP_PASSED$2:" "$1"; }
 step_failed() { grep -qF "$STEP_FAILED$2:" "$1"; }
 
+# Step timing is evidence, not a performance assertion: accept any non-negative
+# integer-millisecond value, while requiring every stable step summary to carry
+# one. Real elapsed values vary with host load, so the contract deliberately
+# avoids fixed-duration expectations.
+all_step_summaries_have_integer_milliseconds() {
+  local summaries
+  summaries=$(grep -E '^  [✓✗] [a-z-]+: ' "$1" | awk '$2 != "suite-clock:"')
+  [ -n "$summaries" ] &&
+    ! grep -Ev '^  [✓✗] [a-z-]+: .+ \([0-9]+ ms\)$' <<<"$summaries"
+}
+
+suite_clock_is_reported() {
+  grep -Eq '^  ✓ suite-clock: [0-9]+ ms$' "$1"
+}
+
+# The scope is a source-order contract rather than an elapsed-time assertion:
+# the timer must bracket the two independently reported suite substeps, and
+# must close before the ignored provenance step starts. This remains
+# deterministic on loaded hosts and proves the clock excludes provenance.
+suite_clock_has_exact_substep_scope() {
+  awk '
+    /suite_clock_started_ms=\$\(epoch_milliseconds\)/ { start = NR }
+    /run_step test .*cargo nextest run --workspace/ { nextest = NR }
+    /run_step doctest .*cargo test --doc --workspace/ { doctest = NR }
+    /suite_clock_ms=\$\(\(.*suite_clock_started_ms/ { stop = NR }
+    /run_step provenance / { provenance = NR }
+    END { exit !(start < nextest && nextest < doctest && doctest < stop && stop < provenance) }
+  ' "$gate"
+}
+
 # Real reporter evidence, not just the stable step prefix. The healthy fixture
 # has exactly four nextest-run tests. The stale-expect fixture has exactly three
 # tests, one of which fails at runtime. These predicates ensure cargo-ci's
@@ -413,14 +443,22 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
     pass)
       check "$name: the gate reports its build-and-test step passing" \
         step_passed "$out" test
+      check "$name: every stable step summary records integer milliseconds" \
+        all_step_summaries_have_integer_milliseconds "$out"
       check "$name: the nextest success reporter preserves all four tests" \
         nextest_success_reported "$out"
       check "$name: the gate reports its separate doctest step passing" \
         step_passed "$out" doctest
+      check "$name: the gate reports the named suite clock" \
+        suite_clock_is_reported "$out"
+      check "$name: the suite clock brackets only nextest and doctests" \
+        suite_clock_has_exact_substep_scope
       ;;
     fail)
       check "$name: the gate reports its build-and-test step failing" \
         step_failed "$out" test
+      check "$name: failed step summaries retain integer milliseconds" \
+        all_step_summaries_have_integer_milliseconds "$out"
       check "$name: the gate exits nonzero" test "$rc" -ne 0
       ;;
   esac
