@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7276d4e7600a1bf74777a331d3b6137dbf254797",
+  "completed_at": "2026-08-12T18:50:42.863583888Z",
+  "duration_ms": 247005,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/scratch_build/build_profile_policy_tests.rs",
+        "id": "F1",
+        "line": 203,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/6d10e5d4/requirement/REQ-04"
+        ],
+        "severity": "medium",
+        "summary": "The sole passing cargo-ci run predates the newly added profiler self-test guard, leaving REQ-04 unverified on the current tree."
+      }
+    ],
+    "summary": "REQ-04 lacks post-change evidence that the profiler self-test guard passed on the current tree.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6d10e5d4-a386-4447-a669-a0f84ee26fad",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d9fcf517-65a8-4f57-8026-2a58e408f70b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T18:46:35.857941299Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 35967 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff74c-3c6b-7440-9235-d99df52420c1\n--------\nuser\n--- 35954 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 16 commits tagged `jit:6d10e5d4`, from `808262c23` through `7276d4e7`\nPolicy sources: AGENTS.md; dev/TESTING.md\nResolved items: @/issue/6d10e5d4/requirement/REQ-01–REQ-04 (issue markdown); @/invariant/bounded-rust-build-footprint and @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-08-12T17:41:08Z; code-review failed, exit 1, 2026-08-12T18:35:33Z (prior structured finding)\nTruncation recovery: narrowed generated-profile patches to metadata and semantic identity checks; inspected current benchmark samples, fixture implementation, guard test, and individual non-generated patches\n\n1. [blocking][issue-impact] REQ-04 remains unverified on the current tree. The new profiler self-test guard at `crates/jit/tests/scratch_build/build_profile_policy_tests.rs:203` was committed after the sole passing `cargo-ci` result, whose recorded commit is `e2da055a` (`.jit/gate-runs/b1ad201b-4ced-4e43-b993-09f694fb1fa8/result.json:5`). Therefore the recorded pass did not execute the guard or establish the required profiler self-test evidence for the current revision.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-04 lacks post-change evidence that the profiler self-test guard passed on the current tree.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The sole passing cargo-ci run predates the newly added profiler self-test guard, leaving REQ-04 unverified on the current tree.\",\"file\":\"crates/jit/tests/scratch_build/build_profile_policy_tests.rs\",\"line\":203,\"references\":[\"@/issue/6d10e5d4/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
