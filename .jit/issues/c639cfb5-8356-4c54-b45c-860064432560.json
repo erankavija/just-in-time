@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:jit-execution-lead",
+  "assignee": "agent:lead-c639cfb5",
   "claimed_at": "2026-08-09T01:36:36.825829189Z",
   "context": {},
   "created_at": "2026-07-14T18:53:07.181314286Z",
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-10T15:46:48.466771064Z"
+  "updated_at": "2026-08-12T22:26:24.098935704Z"
 }
