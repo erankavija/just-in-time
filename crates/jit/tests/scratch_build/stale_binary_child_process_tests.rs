@@ -33,15 +33,18 @@ use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 use tempfile::TempDir;
 
 use jit::storage::FileLocker;
 
 const STALE_CHILD_CACHE: &str = "jit-stale-child-test-cache";
-const FIXTURE_MARKER_VERSION: u32 = 4;
+const FIXTURE_MARKER_VERSION: u32 = 5;
 const FIXTURE_LOCK_TIMEOUT: Duration = Duration::from_secs(120);
 const PINNED_NEXTEST_VERSION: &str = "0.9.133";
+const SETUP_MODE: &str = "JIT_STALE_FIXTURE_SETUP";
+const SETUP_RECEIPT: &str = "JIT_STALE_FIXTURE_RECEIPT";
+const SETUP_RECEIPT_SHA256: &str = "JIT_STALE_FIXTURE_RECEIPT_SHA256";
 const REUSE_OBSERVATION_DIR: &str = "JIT_STALE_FIXTURE_REUSE_OBSERVATION_DIR";
 const NEXTEST_SEMANTIC_TESTS: [&str; 6] = [
     "stale_binary_child_process_tests::test_checker_child_stale_binary_fails_gate_run_visibly",
@@ -68,6 +71,14 @@ struct VerifiedArtifactMarker {
 enum FixtureUse {
     Built,
     Reused,
+    PreparedReuse,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum ScratchShape {
+    BuildInputChange,
+    MetadataOnly,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -77,6 +88,27 @@ struct ScopedFixtureObservation {
     source_sha256: String,
     built_from: String,
     cargo_build_invocations: u32,
+    scratch_shape: Option<ScratchShape>,
+    scratch_root: Option<PathBuf>,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct PreparedFixtureReceipt {
+    version: u32,
+    nextest_run_id: String,
+    artifact: PathBuf,
+    marker: VerifiedArtifactMarker,
+    source_fingerprint: FileFingerprint,
+    artifact_fingerprint: FileFingerprint,
+    build_input_baseline: PathBuf,
+    metadata_baseline: PathBuf,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct FileFingerprint {
+    length: u64,
+    modified_seconds: u64,
+    modified_nanos: u32,
 }
 
 fn jit_binary() -> &'static str {
@@ -118,6 +150,9 @@ pub(super) fn ancestor_commit(workspace_root: &Path) -> Option<String> {
 /// verifies, and publishes both artifact and marker while still holding the
 /// lock. Returns `None` only when the nested Cargo command cannot run or fails.
 pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) -> Option<PathBuf> {
+    if std::env::var_os("NEXTEST").is_some() && std::env::var_os(SETUP_MODE).is_none() {
+        return Some(consume_prepared_stale_child(workspace_root, ancestor));
+    }
     let target_dir = workspace_root.join("target").join(STALE_CHILD_CACHE);
     build_stale_child_binary_with_runner(
         workspace_root,
@@ -126,6 +161,330 @@ pub(super) fn build_stale_child_binary(workspace_root: &Path, ancestor: &str) ->
         run_nested_cargo,
         binary_reports_provenance,
     )
+}
+
+fn consume_prepared_stale_child(workspace_root: &Path, ancestor: &str) -> PathBuf {
+    let receipt = read_prepared_receipt()
+        .unwrap_or_else(|error| panic!("nextest stale-binary fixture setup is invalid: {error}"));
+    let run_id = std::env::var("NEXTEST_RUN_ID")
+        .expect("pinned nextest should identify the setup/test invocation");
+    assert_eq!(
+        receipt.nextest_run_id, run_id,
+        "stale-binary fixture receipt must belong to this nextest invocation"
+    );
+    assert_eq!(receipt.marker.version, FIXTURE_MARKER_VERSION);
+    assert_eq!(receipt.marker.built_from, ancestor);
+    assert_eq!(receipt.marker.cargo_build_invocations, 1);
+    assert_eq!(
+        regular_file_fingerprint(Path::new(jit_binary()))
+            .expect("the outer jit binary should remain an ordinary file"),
+        receipt.source_fingerprint,
+        "the source binary verified by setup must remain unchanged"
+    );
+    assert!(
+        receipt
+            .artifact
+            .starts_with(workspace_root.join("target").join(STALE_CHILD_CACHE)),
+        "prepared artifact must remain inside the shared stale-child cache: {}",
+        receipt.artifact.display()
+    );
+    assert_eq!(
+        regular_file_fingerprint(&receipt.artifact)
+            .expect("the prepared stale child should remain an ordinary file"),
+        receipt.artifact_fingerprint,
+        "the stale child verified by setup must remain unchanged"
+    );
+    let marker_path = receipt
+        .artifact
+        .parent()
+        .expect("prepared artifact should have a cache directory")
+        .join("verified-artifact.json");
+    assert_eq!(
+        read_marker(&marker_path).as_ref(),
+        Some(&receipt.marker),
+        "the setup-verified marker must remain unchanged"
+    );
+
+    record_scoped_fixture_observation(&receipt.marker, FixtureUse::PreparedReuse);
+    receipt.artifact
+}
+
+fn read_prepared_receipt() -> Result<PreparedFixtureReceipt, String> {
+    let path = std::env::var_os(SETUP_RECEIPT)
+        .map(PathBuf::from)
+        .ok_or_else(|| format!("{SETUP_RECEIPT} is not set"))?;
+    regular_file_fingerprint(&path).map_err(|error| {
+        format!(
+            "receipt {} is not an ordinary file: {error}",
+            path.display()
+        )
+    })?;
+    let bytes =
+        fs::read(&path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    let expected_sha256 = std::env::var(SETUP_RECEIPT_SHA256)
+        .map_err(|_| format!("{SETUP_RECEIPT_SHA256} is not set"))?;
+    if sha256_bytes(&bytes) != expected_sha256 {
+        return Err(format!(
+            "receipt digest does not match setup output: {}",
+            path.display()
+        ));
+    }
+    let receipt: PreparedFixtureReceipt = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("cannot parse {}: {error}", path.display()))?;
+    (receipt.version == FIXTURE_MARKER_VERSION)
+        .then_some(receipt)
+        .ok_or_else(|| format!("unsupported receipt version in {}", path.display()))
+}
+
+fn prepare_nextest_fixture() {
+    assert_eq!(std::env::var("NEXTEST").as_deref(), Ok("1"));
+    assert_eq!(
+        std::env::var("NEXTEST_VERSION").as_deref(),
+        Ok(PINNED_NEXTEST_VERSION),
+        "the setup helper must run under the pinned nextest reporter contract"
+    );
+    let run_id = std::env::var("NEXTEST_RUN_ID")
+        .expect("nextest setup should expose one invocation identity");
+    let nextest_env = PathBuf::from(
+        std::env::var_os("NEXTEST_ENV")
+            .expect("nextest setup should expose its test-environment output file"),
+    );
+    let workspace_root = workspace_root();
+    let ancestor = ancestor_commit(&workspace_root)
+        .expect("workspace should have enough history for the stale-binary fixture");
+    let artifact = build_stale_child_binary(&workspace_root, &ancestor)
+        .expect("nextest setup should prepare one verified stale child");
+    let artifact_dir = artifact
+        .parent()
+        .expect("prepared artifact should have a provenance-keyed directory");
+    let marker = read_marker(&artifact_dir.join("verified-artifact.json"))
+        .expect("prepared artifact should retain its verified marker");
+    assert_eq!(marker.cargo_build_invocations, 1);
+    assert_eq!(
+        sha256_file(Path::new(jit_binary())).expect("setup source binary should hash"),
+        marker.source_sha256,
+        "the setup cache key must describe the current outer jit binary"
+    );
+    assert_eq!(
+        sha256_file(&artifact).expect("setup artifact should hash"),
+        marker.artifact_sha256,
+        "the setup receipt must describe the published artifact bytes"
+    );
+    assert!(binary_reports_provenance(
+        &artifact,
+        &ancestor,
+        &marker.short_commit
+    ));
+
+    let target_dir = workspace_root.join("target").join(STALE_CHILD_CACHE);
+    let _lock = FileLocker::new(FIXTURE_LOCK_TIMEOUT)
+        .lock_exclusive(&target_dir.join("fixture.lock"))
+        .expect("stale-child setup lock should be acquirable");
+    let build_input_baseline = prepare_scratch_baseline(
+        &workspace_root,
+        &target_dir,
+        &ancestor,
+        ScratchShape::BuildInputChange,
+    );
+    let metadata_baseline = prepare_scratch_baseline(
+        &workspace_root,
+        &target_dir,
+        &ancestor,
+        ScratchShape::MetadataOnly,
+    );
+
+    let observation_dir = match std::env::var_os(REUSE_OBSERVATION_DIR) {
+        Some(path) => {
+            let path = PathBuf::from(path);
+            assert_eq!(
+                fs::read_dir(&path)
+                    .expect("injected observation directory should be readable")
+                    .count(),
+                0,
+                "injected observation directory must start empty"
+            );
+            path
+        }
+        None => {
+            let parent = target_dir.join("observations");
+            fs::create_dir_all(&parent)
+                .expect("stale fixture observation parent should be creatable");
+            let path = parent.join(&run_id);
+            fs::create_dir(&path)
+                .expect("nextest run observation directory should publish without replacement");
+            path
+        }
+    };
+
+    let receipts = target_dir.join("receipts");
+    fs::create_dir_all(&receipts).expect("stale fixture receipt directory should be creatable");
+    let receipt_path = receipts.join(format!("{run_id}.json"));
+    let receipt = PreparedFixtureReceipt {
+        version: FIXTURE_MARKER_VERSION,
+        nextest_run_id: run_id,
+        source_fingerprint: regular_file_fingerprint(Path::new(jit_binary()))
+            .expect("setup source binary should remain an ordinary file"),
+        artifact_fingerprint: regular_file_fingerprint(&artifact)
+            .expect("setup artifact should remain an ordinary file"),
+        artifact,
+        marker,
+        build_input_baseline,
+        metadata_baseline,
+    };
+    let receipt_bytes =
+        serde_json::to_vec_pretty(&receipt).expect("fixture receipt should serialize");
+    let receipt_sha256 = sha256_bytes(&receipt_bytes);
+    let staging = receipts.join(format!(
+        ".{}.json.tmp.{}",
+        receipt.nextest_run_id,
+        std::process::id()
+    ));
+    fs::write(&staging, &receipt_bytes).expect("fixture receipt staging should be writable");
+    assert_eq!(
+        serde_json::from_reader::<_, PreparedFixtureReceipt>(
+            File::open(&staging).expect("fixture receipt staging should open")
+        )
+        .expect("fixture receipt staging should remain valid JSON"),
+        receipt
+    );
+    publish_staged_file_noreplace(&staging, &receipt_path)
+        .expect("fixture receipt should publish atomically without replacement");
+
+    let setup_observation = observation_dir.join("setup-receipt.json");
+    let setup_staging =
+        observation_dir.join(format!(".setup-receipt.json.tmp.{}", std::process::id()));
+    fs::write(&setup_staging, &receipt_bytes)
+        .expect("setup observation staging should be writable");
+    publish_staged_file_noreplace(&setup_staging, &setup_observation)
+        .expect("setup observation should publish without replacement");
+
+    append_nextest_env(&nextest_env, SETUP_RECEIPT, &receipt_path);
+    append_nextest_env_value(&nextest_env, SETUP_RECEIPT_SHA256, &receipt_sha256);
+    append_nextest_env(
+        &nextest_env,
+        "JIT_STALE_FIXTURE_BUILT_FROM",
+        Path::new(&receipt.marker.built_from),
+    );
+    append_nextest_env(&nextest_env, REUSE_OBSERVATION_DIR, &observation_dir);
+}
+
+fn append_nextest_env(path: &Path, key: &str, value: &Path) {
+    append_nextest_env_value(path, key, &value.to_string_lossy());
+}
+
+fn append_nextest_env_value(path: &Path, key: &str, value: &str) {
+    use std::io::Write;
+
+    assert!(
+        !value.contains('\n') && !value.contains('\r'),
+        "nextest environment values must fit on one line"
+    );
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .expect("nextest environment output should be appendable");
+    writeln!(file, "{key}={value}").expect("nextest environment output should be writable");
+}
+
+fn scratch_shape_change(shape: ScratchShape) -> (&'static str, &'static [u8]) {
+    match shape {
+        ScratchShape::BuildInputChange => (
+            "crates/jit/src/main.rs",
+            b"\n// build-input change for stale-binary coverage\n",
+        ),
+        ScratchShape::MetadataOnly => (
+            "docs/stale-binary-metadata.md",
+            b"metadata-only change for stale-binary coverage\n",
+        ),
+    }
+}
+
+fn prepare_scratch_baseline(
+    workspace_root: &Path,
+    target_dir: &Path,
+    ancestor: &str,
+    shape: ScratchShape,
+) -> PathBuf {
+    let repository = TempDir::new_in(target_dir)
+        .expect("scratch baseline repository staging should be creatable");
+    let run = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(repository.path())
+            .status()
+            .is_ok_and(|status| status.success())
+    };
+    let (changed_path, change) = scratch_shape_change(shape);
+    let cloned = Command::new("git")
+        .args(["clone", "--shared", "--no-checkout", "-q"])
+        .arg(workspace_root)
+        .arg(repository.path())
+        .status()
+        .expect("shared scratch baseline clone should launch");
+    assert!(
+        cloned.success(),
+        "shared scratch baseline clone should succeed"
+    );
+    assert!(run(&["sparse-checkout", "set", "--no-cone", changed_path]));
+    assert!(run(&["checkout", "-q", "-b", "fixture", ancestor]));
+    let path = repository.path().join(changed_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("scratch shape parent should be creatable");
+    }
+    fs::write(&path, change).expect("scratch shape change should be writable");
+    assert!(run(&["add", changed_path]));
+    assert!(run(&[
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-q",
+        "-m",
+        "advance past the build commit",
+    ]));
+    assert!(verify_scratch_repository(
+        repository.path(),
+        ancestor,
+        shape
+    ));
+    repository.keep()
+}
+
+fn verify_scratch_repository(repository: &Path, ancestor: &str, shape: ScratchShape) -> bool {
+    if !fs::symlink_metadata(repository).is_ok_and(|metadata| metadata.file_type().is_dir())
+        || !fs::symlink_metadata(repository.join(".git"))
+            .is_ok_and(|metadata| metadata.file_type().is_dir())
+    {
+        return false;
+    }
+    let parent = Command::new("git")
+        .args(["rev-parse", "HEAD^"])
+        .current_dir(repository)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
+    let changed = Command::new("git")
+        .args(["diff", "--name-only", "HEAD^", "HEAD"])
+        .current_dir(repository)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_string());
+    let clean = Command::new("git")
+        .args(["status", "--porcelain"])
+        .current_dir(repository)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .is_some_and(|output| output.stdout.is_empty());
+    let (changed_path, change) = scratch_shape_change(shape);
+    parent.as_deref() == Some(ancestor)
+        && changed.as_deref() == Some(changed_path)
+        && fs::read(repository.join(changed_path)).ok().as_deref() == Some(change)
+        && clean
 }
 
 fn build_stale_child_binary_with_runner<RunCargo, VerifyBinary>(
@@ -337,6 +696,29 @@ fn sha256_file(path: &Path) -> std::io::Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+fn sha256_bytes(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn regular_file_fingerprint(path: &Path) -> std::io::Result<FileFingerprint> {
+    let metadata = fs::symlink_metadata(path)?;
+    if !metadata.file_type().is_file() {
+        return Err(std::io::Error::other(format!(
+            "{} is not an ordinary file",
+            path.display()
+        )));
+    }
+    let modified = metadata
+        .modified()?
+        .duration_since(UNIX_EPOCH)
+        .map_err(std::io::Error::other)?;
+    Ok(FileFingerprint {
+        length: metadata.len(),
+        modified_seconds: modified.as_secs(),
+        modified_nanos: modified.subsec_nanos(),
+    })
+}
+
 fn write_marker(path: &Path, marker: &VerifiedArtifactMarker) {
     let staging = path.with_extension(format!("json.tmp.{}", std::process::id()));
     let bytes = serde_json::to_vec_pretty(marker).expect("fixture marker should serialize");
@@ -363,25 +745,27 @@ fn publish_staged_file_noreplace(staging: &Path, destination: &Path) -> std::io:
 }
 
 fn record_scoped_fixture_observation(marker: &VerifiedArtifactMarker, outcome: FixtureUse) {
+    if std::env::var_os(SETUP_MODE).is_some() {
+        return;
+    }
     let Some(directory) = std::env::var_os(REUSE_OBSERVATION_DIR).map(PathBuf::from) else {
         return;
     };
-    let arguments = std::env::args().collect::<Vec<_>>();
-    let (index, test) = NEXTEST_SEMANTIC_TESTS
+    let test = current_semantic_test();
+    let index = NEXTEST_SEMANTIC_TESTS
         .iter()
-        .enumerate()
-        .find(|(_, test)| arguments.iter().any(|argument| argument == **test))
-        .unwrap_or_else(|| {
-            panic!("nextest fixture caller has no semantic-test identity in argv: {arguments:?}")
-        });
+        .position(|candidate| *candidate == test)
+        .expect("the current semantic test should have a stable fixture index");
     let staging = directory.join(format!(".fixture-{index}.json.tmp"));
     let destination = directory.join(format!("fixture-{index}.json"));
     let observation = ScopedFixtureObservation {
-        test: (*test).to_string(),
+        test: test.to_string(),
         outcome,
         source_sha256: marker.source_sha256.clone(),
         built_from: marker.built_from.clone(),
         cargo_build_invocations: marker.cargo_build_invocations,
+        scratch_shape: None,
+        scratch_root: None,
     };
     let content = serde_json::to_vec_pretty(&observation)
         .expect("scoped fixture observation should serialize");
@@ -396,6 +780,113 @@ fn record_scoped_fixture_observation(marker: &VerifiedArtifactMarker, outcome: F
     );
     publish_staged_file_noreplace(&staging, &destination)
         .expect("each nextest semantic test should publish one unique fixture observation");
+}
+
+fn current_semantic_test() -> &'static str {
+    let arguments = std::env::args().collect::<Vec<_>>();
+    NEXTEST_SEMANTIC_TESTS
+        .iter()
+        .copied()
+        .find(|test| arguments.iter().any(|argument| argument == test))
+        .unwrap_or_else(|| {
+            panic!("nextest fixture caller has no semantic-test identity in argv: {arguments:?}")
+        })
+}
+
+fn record_scoped_scratch_observation(shape: ScratchShape, root: &Path) {
+    let Some(directory) = std::env::var_os(REUSE_OBSERVATION_DIR).map(PathBuf::from) else {
+        return;
+    };
+    let test = current_semantic_test();
+    let index = NEXTEST_SEMANTIC_TESTS
+        .iter()
+        .position(|candidate| *candidate == test)
+        .expect("the current semantic test should have a stable fixture index");
+    let destination = directory.join(format!("fixture-{index}.json"));
+    let mut observation: ScopedFixtureObservation = serde_json::from_reader(
+        File::open(&destination).expect("artifact observation should precede scratch setup"),
+    )
+    .expect("artifact observation should remain valid JSON");
+    assert!(
+        observation.scratch_root.is_none(),
+        "each semantic test should consume exactly one prepared scratch repository"
+    );
+    observation.scratch_shape = Some(shape);
+    observation.scratch_root = Some(root.to_path_buf());
+    let staging = directory.join(format!(".fixture-{index}.scratch.json.tmp"));
+    fs::write(
+        &staging,
+        serde_json::to_vec_pretty(&observation).expect("scratch observation should serialize"),
+    )
+    .expect("scratch observation staging file should be writable");
+    assert_eq!(
+        serde_json::from_reader::<_, ScopedFixtureObservation>(
+            File::open(&staging).expect("scratch observation staging should open")
+        )
+        .expect("scratch observation staging should remain valid JSON"),
+        observation
+    );
+    fs::rename(staging, destination)
+        .expect("per-test scratch observation replacement should be atomic");
+}
+
+fn assert_nextest_configuration_prepares_stale_fixture_with_supported_setup_script() {
+    let workspace_root = workspace_root();
+    let config: toml::Value = fs::read_to_string(workspace_root.join(".config/nextest.toml"))
+        .expect("nextest configuration should be readable")
+        .parse()
+        .expect("nextest configuration should remain valid TOML");
+
+    let experimental = config["experimental"]
+        .as_array()
+        .expect("nextest experimental features should be declared")
+        .iter()
+        .filter_map(toml::Value::as_str)
+        .collect::<BTreeSet<_>>();
+    assert!(
+        experimental.contains("setup-scripts"),
+        "the pinned runner requires an explicit setup-scripts opt-in"
+    );
+
+    let setup = &config["scripts"]["setup"]["stale-binary-fixture"];
+    let command = &setup["command"];
+    assert_eq!(command["relative-to"].as_str(), Some("workspace-root"));
+    let command_line = command["command-line"]
+        .as_str()
+        .expect("stale fixture setup should name one workspace-relative helper");
+    let helper = workspace_root.join(command_line);
+    assert!(
+        helper.is_file(),
+        "configured stale fixture setup helper should exist: {}",
+        helper.display()
+    );
+    let self_test = Command::new(&helper)
+        .arg("--self-test")
+        .current_dir(&workspace_root)
+        .output()
+        .expect("stale fixture setup helper self-test should launch");
+    assert!(
+        self_test.status.success()
+            && String::from_utf8_lossy(&self_test.stdout).contains("self-test: PASS"),
+        "stale fixture setup helper self-test should pass: stdout={} stderr={}",
+        String::from_utf8_lossy(&self_test.stdout),
+        String::from_utf8_lossy(&self_test.stderr)
+    );
+
+    let rules = config["profile"]["default"]["scripts"]
+        .as_array()
+        .expect("the default profile should attach setup scripts to test filtersets");
+    assert!(
+        rules.iter().any(|rule| {
+            rule["setup"].as_str() == Some("stale-binary-fixture")
+                && NEXTEST_SEMANTIC_TESTS.iter().all(|test| {
+                    rule["filter"]
+                        .as_str()
+                        .is_some_and(|filter| filter.contains(test))
+                })
+        }),
+        "one supported setup rule must cover all six semantic tests"
+    );
 }
 
 #[test]
@@ -517,6 +1008,11 @@ fn test_stale_binary_fixture_failed_cargo_attempt_leaves_cache_retryable() {
 /// the outer suite itself is nextest and cannot recursively spawn another run.
 #[test]
 fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
+    assert_nextest_configuration_prepares_stale_fixture_with_supported_setup_script();
+    if std::env::var(SETUP_MODE).as_deref() == Ok("1") {
+        prepare_nextest_fixture();
+        return;
+    }
     if std::env::var_os("NEXTEST").is_some() {
         return;
     }
@@ -550,7 +1046,7 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
             "--test",
             "scratch_build",
             "--test-threads",
-            "2",
+            "6",
             "-E",
             filter,
         ])
@@ -569,18 +1065,33 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
         report.contains("6 tests run: 6 passed"),
         "pinned nextest must independently report all six semantic tests:\n{report}"
     );
+    let setup_receipt_path = reuse_observations.path().join("setup-receipt.json");
+    let setup_receipt: PreparedFixtureReceipt = serde_json::from_reader(
+        File::open(&setup_receipt_path).expect("setup build observation should open"),
+    )
+    .expect("setup build observation should remain valid JSON");
+    assert_eq!(
+        setup_receipt.marker.cargo_build_invocations, 1,
+        "setup must prove exactly one successful nested Cargo build"
+    );
+
     let mut observations = fs::read_dir(reuse_observations.path())
         .expect("nextest fixture observation directory should remain readable")
-        .map(|entry| {
+        .filter_map(|entry| {
             let path = entry
                 .expect("fixture observation entry should be readable")
                 .path();
-            serde_json::from_reader::<_, ScopedFixtureObservation>(
-                File::open(&path).expect("fixture observation should open"),
-            )
-            .unwrap_or_else(|error| {
-                panic!("invalid fixture observation {}: {error}", path.display())
-            })
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with("fixture-"))
+                .then(|| {
+                    serde_json::from_reader::<_, ScopedFixtureObservation>(
+                        File::open(&path).expect("fixture observation should open"),
+                    )
+                    .unwrap_or_else(|error| {
+                        panic!("invalid fixture observation {}: {error}", path.display())
+                    })
+                })
         })
         .collect::<Vec<_>>();
     observations.sort_by(|left, right| left.test.cmp(&right.test));
@@ -603,6 +1114,14 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
         6,
         "each selected nextest semantic test must publish exactly one fixture observation"
     );
+    assert_eq!(
+        observations
+            .iter()
+            .filter(|observation| observation.outcome == FixtureUse::PreparedReuse)
+            .count(),
+        6,
+        "all semantic identities must truthfully report prepared reuse: {observations:#?}"
+    );
     assert!(
         observations
             .iter()
@@ -618,13 +1137,23 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
         1,
         "all six nextest tests must use one provenance-keyed artifact: {observations:#?}"
     );
-    assert!(
+    assert_eq!(
         observations
             .iter()
-            .filter(|observation| observation.outcome == FixtureUse::Built)
-            .count()
-            <= 1,
-        "at most one nextest test may invoke nested Cargo: {observations:#?}"
+            .filter_map(|observation| observation.scratch_shape)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        2,
+        "the setup must supply exactly the build-input and metadata-only scratch shapes: {observations:#?}"
+    );
+    assert_eq!(
+        observations
+            .iter()
+            .filter_map(|observation| observation.scratch_root.as_ref())
+            .collect::<BTreeSet<_>>()
+            .len(),
+        6,
+        "every semantic identity must receive a unique mutable scratch root: {observations:#?}"
     );
 }
 
@@ -633,7 +1162,14 @@ fn test_stale_binary_fixture_runs_six_semantic_tests_under_pinned_nextest() {
 /// with its full history), but no longer at `HEAD`. Entirely inside the
 /// disposable scratch repo — no ref in the real workspace is read, moved, or
 /// written. Returns `None` (skip) if any local git step fails.
-fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+pub(super) fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+    if std::env::var_os("NEXTEST").is_some() && std::env::var_os(SETUP_MODE).is_none() {
+        return Some(clone_prepared_scratch(
+            workspace_root,
+            ancestor,
+            ScratchShape::BuildInputChange,
+        ));
+    }
     scratch_repo_advanced_with_change(
         workspace_root,
         ancestor,
@@ -642,13 +1178,98 @@ fn scratch_repo_stale_for(workspace_root: &Path, ancestor: &str) -> Option<TempD
     )
 }
 
-fn scratch_repo_metadata_only_for(workspace_root: &Path, ancestor: &str) -> Option<TempDir> {
+pub(super) fn scratch_repo_metadata_only_for(
+    workspace_root: &Path,
+    ancestor: &str,
+) -> Option<TempDir> {
+    if std::env::var_os("NEXTEST").is_some() && std::env::var_os(SETUP_MODE).is_none() {
+        return Some(clone_prepared_scratch(
+            workspace_root,
+            ancestor,
+            ScratchShape::MetadataOnly,
+        ));
+    }
     scratch_repo_advanced_with_change(
         workspace_root,
         ancestor,
         "docs/stale-binary-metadata.md",
         b"metadata-only change for stale-binary coverage\n",
     )
+}
+
+fn clone_prepared_scratch(workspace_root: &Path, ancestor: &str, shape: ScratchShape) -> TempDir {
+    let receipt = read_prepared_receipt()
+        .unwrap_or_else(|error| panic!("nextest stale-binary scratch setup is invalid: {error}"));
+    assert_eq!(receipt.marker.built_from, ancestor);
+    let baseline = match shape {
+        ScratchShape::BuildInputChange => &receipt.build_input_baseline,
+        ScratchShape::MetadataOnly => &receipt.metadata_baseline,
+    };
+    assert!(
+        baseline.starts_with(workspace_root.join("target").join(STALE_CHILD_CACHE)),
+        "prepared scratch baseline must remain inside the stale-child cache: {}",
+        baseline.display()
+    );
+    assert!(
+        verify_scratch_repository(baseline, ancestor, shape),
+        "prepared scratch baseline must remain verified after setup"
+    );
+    let scratch = TempDir::new().expect("prepared scratch clone needs a unique directory");
+    let status = Command::new("git")
+        .args(["clone", "--shared", "--no-checkout", "-q"])
+        .arg(baseline)
+        .arg(scratch.path())
+        .status()
+        .expect("prepared scratch baseline clone should launch");
+    assert!(status.success(), "prepared scratch baseline should clone");
+    let (changed_path, change) = scratch_shape_change(shape);
+    let sparse = Command::new("git")
+        .args(["sparse-checkout", "set", "--no-cone", changed_path])
+        .current_dir(scratch.path())
+        .status()
+        .expect("prepared scratch sparse checkout should launch");
+    assert!(sparse.success());
+    let checkout = Command::new("git")
+        .args(["checkout", "-q", "fixture"])
+        .current_dir(scratch.path())
+        .status()
+        .expect("prepared scratch checkout should launch");
+    assert!(checkout.success());
+    let parent = Command::new("git")
+        .args(["rev-parse", "HEAD^"])
+        .current_dir(scratch.path())
+        .output()
+        .expect("prepared scratch clone ancestry should be readable");
+    assert!(parent.status.success());
+    assert_eq!(String::from_utf8_lossy(&parent.stdout).trim(), ancestor);
+    assert_eq!(
+        fs::read(scratch.path().join(changed_path))
+            .expect("prepared scratch clone should preserve its shape"),
+        change
+    );
+    scrub_stale_repository_data(scratch.path());
+    record_scoped_scratch_observation(shape, scratch.path());
+    scratch
+}
+
+fn scrub_stale_repository_data(root: &Path) {
+    [".jit", ".claude"].iter().for_each(|name| {
+        let path = root.join(name);
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.file_type().is_dir() => fs::remove_dir_all(&path)
+                .unwrap_or_else(|error| panic!("cannot remove {}: {error}", path.display())),
+            Ok(_) => fs::remove_file(&path)
+                .unwrap_or_else(|error| panic!("cannot remove {}: {error}", path.display())),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => panic!("cannot inspect {}: {error}", path.display()),
+        }
+        assert!(
+            fs::symlink_metadata(&path)
+                .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound),
+            "stale repository data must be absent: {}",
+            path.display()
+        );
+    });
 }
 
 fn scratch_repo_advanced_with_change(
