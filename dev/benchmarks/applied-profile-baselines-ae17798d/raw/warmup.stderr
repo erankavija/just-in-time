@@ -1,0 +1,22 @@
+info: experimental features enabled: setup-scripts
+warning: jit-server@1.0.0: web/dist/index.html not found — the jit-server binary will not include usable web assets. Run 'cd web && npm run build' first, then rebuild.
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+────────────
+ Nextest run ID 775ed4a7-6a37-4566-98e2-3b17116e8b32 with nextest profile: default
+    Starting 10 tests across 2 binaries (2578 tests and 13 binaries skipped)
+       SETUP [      1/2] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default
+  SETUP PASS [   3.413s] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default
+       SETUP [      2/2] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood
+  SETUP PASS [   5.510s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood
+        PASS [   0.303s] jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes
+        PASS [   0.341s] jit commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs
+        PASS [   0.461s] jit commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets
+        PASS [   0.573s] jit commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states
+        PASS [   0.941s] jit commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair
+        PASS [   1.974s] jit commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands
+        PASS [   2.023s] jit commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged
+        PASS [   3.001s] jit commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory
+        PASS [   3.151s] jit commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files
+        PASS [   3.884s] jit commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically
+────────────
+     Summary [  12.814s] 10 tests run: 10 passed, 2578 skipped

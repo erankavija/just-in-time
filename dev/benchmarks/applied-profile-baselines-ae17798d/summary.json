@@ -1,0 +1,254 @@
+{
+  "command": [
+    "cargo",
+    "nextest",
+    "run",
+    "--workspace",
+    "--test-threads",
+    "24",
+    "--message-format",
+    "libtest-json-plus",
+    "--message-format-version",
+    "0.1",
+    "--show-progress",
+    "none",
+    "--status-level",
+    "pass",
+    "--final-status-level",
+    "none",
+    "-E",
+    "binary(jit) & test(/^(commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair|commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands|commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged|commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically|commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files|commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs|commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory|commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes|commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets|commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states)$/)"
+  ],
+  "contract": "applied-profile-library-baseline-req-04",
+  "decision": "accepted",
+  "environment": {
+    "CARGO_CI_NO_SCCACHE": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/vkaskivuo/Projects/just-in-time/target",
+    "NEXTEST_EXPERIMENTAL_LIBTEST_JSON": "1",
+    "RUSTC_WRAPPER": ""
+  },
+  "inventory_command": [
+    "cargo",
+    "nextest",
+    "list",
+    "--workspace",
+    "--message-format",
+    "json",
+    "-E",
+    "binary(jit) & test(/^(commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair|commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands|commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged|commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically|commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files|commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs|commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory|commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes|commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets|commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states)$/)"
+  ],
+  "raw_sha256": {
+    "raw/inventory.stderr": "6ca85b520182c4736ac07b2a8d7810792d062a7b52948298fc37c3004f0d7df4",
+    "raw/inventory.stdout": "3879f49e463050752b2edcbae4535f72e083656a5edebe7b340b3d46e842550f",
+    "raw/metadata.json": "69aeb18941be8de698c58e061f53f2036243b1f13955481e9f83b8bfffeba229",
+    "raw/sample-1.stderr": "7497f833d49d1fba8cc9f7eaf0e9c90cf3e7e197af898346873d8f053071252d",
+    "raw/sample-1.stdout": "ebf9bce7201c20d49b746a6ca8d5ae83d5b9f011aa819216ddd58e5c6863653b",
+    "raw/sample-2.stderr": "2d7bcff67ef1fb38c70609a732559da20d82cb9a7849fe79c725798af5b4317f",
+    "raw/sample-2.stdout": "bef3543391de8fb39bb7142e688356b14f98b5dafcdf5ccb74ca970e3420b875",
+    "raw/sample-3.stderr": "ea7a284174ff71d2e78a062ec837768118bdd42225c7f0ff8c82956f60f9dc71",
+    "raw/sample-3.stdout": "dff97eee8c8f5d6a349e98218fabb74ea10ab2a530a64ea4b3fab9d119b553db",
+    "raw/warmup.stderr": "9b0ea6bcfe9ad2c57d53fe43c7ec5b8fddb59ef91cdcc65903e6449b2ebfe518",
+    "raw/warmup.stdout": "ea0a1ef71a790d992a3dce7026c0a99fb7bf041b1c3cc280aef7fc9d9a9c72d4"
+  },
+  "reference_ms": 64894,
+  "reference_tests_ms": {
+    "jit::jit$commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged": 7286,
+    "jit::jit$commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair": 2967,
+    "jit::jit$commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically": 10207,
+    "jit::jit$commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands": 4721,
+    "jit::jit$commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets": 6299,
+    "jit::jit$commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states": 4471,
+    "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes": 5918,
+    "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs": 3941,
+    "jit::jit$commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files": 8503,
+    "jit::jit$commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory": 10581
+  },
+  "samples": [
+    {
+      "exit_code": 0,
+      "label": "sample-1",
+      "reduction_from_reference_ms": 42899,
+      "setup_inclusive_span_ms": 21995,
+      "setup_sum_ms": 5372,
+      "setups_ms": {
+        "default-repository-fixture": 2608,
+        "dogfood-repository-fixture": 2764
+      },
+      "stderr": "raw/sample-1.stderr",
+      "stdout": "raw/sample-1.stdout",
+      "test_sum_ms": 16623,
+      "tests_ms": {
+        "jit::jit$commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged": 2025,
+        "jit::jit$commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair": 946,
+        "jit::jit$commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically": 3858,
+        "jit::jit$commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands": 1965,
+        "jit::jit$commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets": 462,
+        "jit::jit$commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states": 569,
+        "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes": 303,
+        "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs": 341,
+        "jit::jit$commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files": 3146,
+        "jit::jit$commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory": 3008
+      },
+      "wall_ms": 9602
+    },
+    {
+      "exit_code": 0,
+      "label": "sample-2",
+      "reduction_from_reference_ms": 42862,
+      "setup_inclusive_span_ms": 22032,
+      "setup_sum_ms": 5354,
+      "setups_ms": {
+        "default-repository-fixture": 2643,
+        "dogfood-repository-fixture": 2711
+      },
+      "stderr": "raw/sample-2.stderr",
+      "stdout": "raw/sample-2.stdout",
+      "test_sum_ms": 16678,
+      "tests_ms": {
+        "jit::jit$commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged": 2031,
+        "jit::jit$commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair": 933,
+        "jit::jit$commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically": 3884,
+        "jit::jit$commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands": 1974,
+        "jit::jit$commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets": 464,
+        "jit::jit$commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states": 568,
+        "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes": 305,
+        "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs": 343,
+        "jit::jit$commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files": 3160,
+        "jit::jit$commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory": 3016
+      },
+      "wall_ms": 9610
+    },
+    {
+      "exit_code": 0,
+      "label": "sample-3",
+      "reduction_from_reference_ms": 42862,
+      "setup_inclusive_span_ms": 22032,
+      "setup_sum_ms": 5339,
+      "setups_ms": {
+        "default-repository-fixture": 2593,
+        "dogfood-repository-fixture": 2746
+      },
+      "stderr": "raw/sample-3.stderr",
+      "stdout": "raw/sample-3.stdout",
+      "test_sum_ms": 16693,
+      "tests_ms": {
+        "jit::jit$commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged": 2026,
+        "jit::jit$commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair": 946,
+        "jit::jit$commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically": 3890,
+        "jit::jit$commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands": 1971,
+        "jit::jit$commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets": 463,
+        "jit::jit$commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states": 574,
+        "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes": 302,
+        "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs": 341,
+        "jit::jit$commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files": 3164,
+        "jit::jit$commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory": 3016
+      },
+      "wall_ms": 9631
+    }
+  ],
+  "schema_version": 1,
+  "selected_identities": [
+    "jit::jit$commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair",
+    "jit::jit$commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands",
+    "jit::jit$commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged",
+    "jit::jit$commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically",
+    "jit::jit$commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files",
+    "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs",
+    "jit::jit$commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory",
+    "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes",
+    "jit::jit$commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets",
+    "jit::jit$commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states"
+  ],
+  "serialization": {
+    "lock": "/tmp/cargo-ci.lock",
+    "wait_ms": 0
+  },
+  "setup_routes": {
+    "default-repository-fixture": [
+      "jit::jit$commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair",
+      "jit::jit$commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands"
+    ],
+    "dogfood-repository-fixture": [
+      "jit::jit$commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged",
+      "jit::jit$commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically",
+      "jit::jit$commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files",
+      "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs",
+      "jit::jit$commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory",
+      "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes",
+      "jit::jit$commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets",
+      "jit::jit$commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states"
+    ]
+  },
+  "source": {
+    "benchmark.py_sha256": "3dbe65be9004ff430831fa3ad2147cc69262dc6772dd8e102e9f679af9e10851",
+    "candidate_paths_sha256": {
+      ".config/nextest.toml": "8a96223a3e9253cdefb54a655511e4b13fd28f01faf42440f875257db80afe6c",
+      "crates/jit/src/commands/init.rs": "0c3df4e7e9235628314611ca5ee02a1df30c1cb375308b26e9e68cf577175f37",
+      "crates/jit/src/commands/profile.rs": "c0fce774aa306006b7100111b746f97c29f49b9b33b935147e812540d6eac40a",
+      "crates/jit/src/commands/validate.rs": "fe47602b766488e659fc1d478938c0ce4fbecea707ff1719d13a9edba487c9e0",
+      "crates/jit/src/storage/test_support.rs": "47fc5999083294143a279105e98f37b968dae452b11b3acfbb9425e75bf33975",
+      "crates/jit/src/test_utils.rs": "282797c7705126e8fe2e7344bb37ac8769fb3ea38fb3a783c69b955076dd73c9"
+    },
+    "candidate_revision": "db82ac6cc5344d8d8343e76f058e71f8c55812c4",
+    "candidate_tree": "b933b49a5a2b1686cff7922d07e520bbb8338c37",
+    "implementation_commit": "61234ddf0962536303e0447e0a8e530d2473a9c6",
+    "implementation_patch_sha256": "af3d71964131e97473e7e04e68d117257656a35539bddcd7bd3cf6f074b464ef",
+    "reference": {
+      "artifact": "dev/benchmarks/suite-profile.json",
+      "artifact_commit": "58928c35d67c9f56678b577a297ad71c7584f61b",
+      "artifact_sha256": "67069363c05340c8739d324e92e9b215daaf529448e2f3ec7243a9d58cdae20f",
+      "method": {
+        "cache_state": "warm",
+        "integer_millisecond_conversion": "ceil(exec_time_seconds * 1000)",
+        "message_format": "libtest-json-plus",
+        "message_format_version": "0.1",
+        "nextest_version": "0.9.133",
+        "profiling_method": "nextest-libtest-json-plus-v0.1",
+        "runner_selection": [
+          "cargo",
+          "nextest",
+          "run",
+          "--workspace"
+        ],
+        "timing_source": "nextest test event exec_time in seconds",
+        "warmup_runs": 1
+      },
+      "profiled_dirty": false,
+      "profiled_revision": "6c536622212d2790ad624f3a154e80b82f7fbbe8"
+    },
+    "validate.py_sha256": "30aa180f46619ae08307488cc11053983426ed6c61fd30cdd8c264751cb54a93"
+  },
+  "thresholds": {
+    "maximum_command_wall_ms": 25000,
+    "maximum_setup_inclusive_span_ms": 25000,
+    "minimum_reduction_ms": 25000
+  },
+  "warmup": {
+    "exit_code": 0,
+    "label": "warmup",
+    "reduction_from_reference_ms": 39316,
+    "setup_inclusive_span_ms": 25578,
+    "setup_sum_ms": 8923,
+    "setups_ms": {
+      "default-repository-fixture": 3413,
+      "dogfood-repository-fixture": 5510
+    },
+    "stderr": "raw/warmup.stderr",
+    "stdout": "raw/warmup.stdout",
+    "test_sum_ms": 16655,
+    "tests_ms": {
+      "jit::jit$commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged": 2023,
+      "jit::jit$commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair": 941,
+      "jit::jit$commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically": 3884,
+      "jit::jit$commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands": 1975,
+      "jit::jit$commands::validate::tests::test_capture_repair_plan_with_recorded_profile_captures_and_repairs_its_targets": 462,
+      "jit::jit$commands::validate::tests::test_validate_diagnoses_non_profile_drift_identically_across_record_states": 574,
+      "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_memory_writes": 303,
+      "jit::jit$commands::validate::tests::test_validate_fix_rejects_ambiguous_region_without_writing_other_repairs": 341,
+      "jit::jit$commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files": 3151,
+      "jit::jit$commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory": 3001
+    },
+    "wall_ms": 13185
+  }
+}

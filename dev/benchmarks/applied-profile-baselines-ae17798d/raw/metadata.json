@@ -1,0 +1,23 @@
+{
+  "environment": {
+    "CARGO_CI_NO_SCCACHE": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_TARGET_DIR": "/home/vkaskivuo/Projects/just-in-time/target",
+    "NEXTEST_EXPERIMENTAL_LIBTEST_JSON": "1",
+    "RUSTC_WRAPPER": ""
+  },
+  "host": {
+    "hostname": "fraktaali",
+    "logical_cpus": 24,
+    "platform": "Linux-7.1.6-arch1-1-x86_64-with-glibc2.44"
+  },
+  "implementation_commit": "61234ddf0962536303e0447e0a8e530d2473a9c6",
+  "serialization": "/tmp/cargo-ci.lock",
+  "source_revision": "db82ac6cc5344d8d8343e76f058e71f8c55812c4",
+  "source_tree": "b933b49a5a2b1686cff7922d07e520bbb8338c37",
+  "tools": {
+    "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
+    "nextest": "cargo-nextest 0.9.133 (65e806bd5 2026-04-14)\nrelease: 0.9.133\ncommit-hash: 65e806bd589d12c4341d3696a02a9788bd437c3c\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.0\nLLVM version: 22.1.6"
+  }
+}
