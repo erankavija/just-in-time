@@ -9,10 +9,8 @@
 //! - **event_catalog**: The event-log tag vocabulary, each tag's association scope,
 //!   and their projection into `jit --schema` and the committed events reference
 //! - **gate_findings**: Pure parser extracting structured findings from checker stdout
-//! - **build_provenance**: Pure comparison of a running binary's build commit/dirty
-//!   flag against a repository's current HEAD (the stale-binary gate check)
 //! - **repository_inputs**: Declared root-and-exclusion input sets and the content
-//!   digest taken over one, shared by build provenance and gate input declarations
+//!   digest taken over one, used by gate input declarations
 //! - **queries**: Pure query operations on issue collections
 //! - **type_taxonomy**: The taxonomy of type labels and their levels, and validation against it
 //! - **graph**: Dependency graph algorithms (cycle detection, topological sort, transitive reduction)
@@ -29,7 +27,6 @@ pub mod artifact_discovery;
 pub mod artifact_execution;
 pub mod artifact_inventory;
 pub mod artifact_plan;
-pub mod build_provenance;
 pub mod event_catalog;
 pub mod event_log;
 pub mod gate_findings;

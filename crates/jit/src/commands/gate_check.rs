@@ -672,68 +672,6 @@ fn gate_findings_from_report(
     (findings, failed)
 }
 
-/// Compare the running binary's own build provenance
-/// ([`build_info::version_info`](crate::build_info::version_info)) against
-/// `repo_root`'s current `HEAD` and changed build-input paths, retaining
-/// whether each path changed in committed history or the working tree, and
-/// returning why it is stale, or `None` when the comparison does not apply
-/// (REQ-03).
-///
-/// I/O boundary for [`domain::build_provenance`](crate::domain::build_provenance):
-/// resolves `repo_root`'s `HEAD` and whether the build commit is a known
-/// commit there via [`GitRevisionResolver`](crate::storage::GitRevisionResolver)'s
-/// `git rev-parse --verify <rev>^{commit}` semantics (the REQ-03 identity
-/// predicate — a plain string inequality is not enough, see the module docs),
-/// then enumerates committed and working-tree changes and hands the resulting
-/// categorized build-input changes to
-/// [`assess_binary_provenance`](crate::domain::build_provenance::assess_binary_provenance)
-/// for the actual decision. The second resolution (whether the build commit
-/// is known) is skipped entirely when `HEAD` itself does not resolve, so a
-/// non-git or git-unavailable `repo_root` costs a single git invocation.
-///
-/// Given an explicit `repo_root` rather than deriving one, so it is directly
-/// testable against synthetic repositories; [`CommandExecutor::stale_binary_reason`]
-/// is the production entry point that supplies `repo_root` from storage.
-fn stale_binary_reason_for_repo(
-    repo_root: &std::path::Path,
-) -> Option<crate::domain::build_provenance::StaleBinaryReason> {
-    use crate::domain::build_provenance::{assess_binary_provenance, BinaryProvenance};
-    use crate::storage::GitRevisionResolver;
-
-    let info = crate::build_info::version_info();
-    let resolver = GitRevisionResolver::new(repo_root);
-    let repo_head = resolver.resolve_commit("HEAD").ok()?;
-    let known_in_repo = resolver.resolve_commit(info.git_commit).is_ok();
-    if !known_in_repo {
-        return None;
-    }
-
-    // A dirty build is unconditionally stale once identity is established, so
-    // it does not need a diff query. For clean builds, an inability to inspect
-    // either committed or working-tree changes keeps the guard silent rather
-    // than guessing that an installed binary is safe or stale.
-    let build_input_changes = if info.git_dirty == Some(true) {
-        crate::domain::build_provenance::BuildInputChanges::default()
-    } else {
-        let committed = resolver
-            .changed_paths_between(info.git_commit, repo_head.as_str())
-            .ok()?;
-        let working_tree = resolver.changed_worktree_paths().ok()?;
-        crate::domain::build_provenance::binary_build_input_changes(committed, working_tree)
-    };
-
-    match assess_binary_provenance(
-        Some(info.git_commit),
-        info.git_dirty,
-        Some(repo_head.as_str()),
-        known_in_repo,
-        &build_input_changes,
-    ) {
-        BinaryProvenance::Stale(reason) => Some(reason),
-        BinaryProvenance::Fresh | BinaryProvenance::NotApplicable => None,
-    }
-}
-
 impl<S: IssueStore> CommandExecutor<S> {
     /// Repository root used as the checker working directory and as the `git`
     /// context for stamping [`GateRunResult::commit`](crate::domain::GateRunResult).
@@ -752,11 +690,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Distinct from [`checker_repo_root`](Self::checker_repo_root), which
     /// falls back to the current working directory so the checker process
-    /// always has SOME directory to run in. The stale-binary check (REQ-03)
-    /// must never take that fallback: doing so would compare the running
-    /// binary against whatever repository the test/host process happens to be
-    /// executing inside, instead of staying silent for storage that names no
-    /// real repository.
+    /// always has SOME directory to run in. A caller that must describe a real
+    /// repository — digesting a gate's declared inputs, for instance — takes
+    /// this instead, so storage naming no real repository yields `None` rather
+    /// than whatever repository the host process happens to be executing
+    /// inside.
     pub(crate) fn real_repo_root(&self) -> Option<std::path::PathBuf> {
         if !self.storage.is_file_backed() {
             return None;
@@ -764,28 +702,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.require_layout()
             .ok()
             .map(|layout| layout.worktree_root().to_path_buf())
-    }
-
-    /// Compare the running binary's own build provenance against the
-    /// repository this executor is rooted at ([`real_repo_root`](Self::real_repo_root)),
-    /// returning why it is stale, or `None` when it is fresh, the comparison
-    /// does not apply (REQ-03), or storage names no real on-disk repository
-    /// (e.g. `InMemoryStorage`).
-    ///
-    /// The single production entry point for the stale-binary check
-    /// (jit:7446af34): used by [`check_gate`](Self::check_gate) for `exec`
-    /// checkers (REQ-01, guards the evaluator's own binary before it spawns a
-    /// checker process)
-    /// and by the binary crate's startup dispatch (REQ-02, guards a `jit`
-    /// process spawned BY a checker — e.g. a checker script that itself
-    /// shells out to `jit` — which resolves its own binary from `PATH`
-    /// independently of the evaluator and so needs the identical check
-    /// applied to ITSELF).
-    pub fn stale_binary_reason(
-        &self,
-    ) -> Option<crate::domain::build_provenance::StaleBinaryReason> {
-        let real_root = self.real_repo_root()?;
-        stale_binary_reason_for_repo(&real_root)
     }
 
     fn bind_gate_target(
@@ -1441,16 +1357,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", input.gate_key))?;
         let repo_root = self.checker_repo_root()?;
-        if matches!(checker, crate::declarations::GateChecker::Exec { .. }) {
-            if let Some(reason) = self.stale_binary_reason() {
-                return Err(crate::errors::StaleBinaryError::new(
-                    &input.issue.id,
-                    input.gate_key,
-                    &reason,
-                )
-                .into());
-            }
-        }
         let working_dir = match checker {
             crate::declarations::GateChecker::Exec {
                 working_dir: Some(subdir),
@@ -5008,241 +4914,6 @@ source-of-truth = "markdown-first"
             "Expected 'oops' in output, got stdout={:?} stderr={:?}",
             last.stdout,
             last.stderr
-        );
-    }
-
-    // --- Stale-binary check wiring (jit:7446af34) --------------------------
-    //
-    // `setup()` above uses `InMemoryStorage`, whose root is the placeholder
-    // `"."`; `real_repo_root()` is always `None` there, so the stale-binary
-    // check never runs — proven by every `InMemoryStorage`-backed test in
-    // this file still passing unchanged. These tests instead use a real
-    // `JsonFileStorage` rooted at a real (temporary) directory, so
-    // `real_repo_root()` resolves and the check actually reaches git.
-
-    /// A `JsonFileStorage`-backed executor with one automated gate `"g"`,
-    /// rooted at `repo_root` (which the caller controls: git-initialized or
-    /// not). Mirrors `setup()` above but with a real on-disk root.
-    fn setup_at(repo_root: &std::path::Path) -> CommandExecutor<crate::storage::JsonFileStorage> {
-        std::env::set_var("JIT_TEST_MODE", "1");
-        let jit_root = repo_root.join(".jit");
-        let storage = crate::storage::JsonFileStorage::new(&jit_root);
-        let taxonomy = crate::test_taxonomy::test_taxonomy();
-        std::fs::create_dir_all(&jit_root).unwrap();
-        std::fs::write(
-            jit_root.join("config.toml"),
-            format!(
-                "[worktree]\nenforce_leases = \"off\"\n\n{}",
-                taxonomy.config_fragment()
-            ),
-        )
-        .unwrap();
-
-        let layout = crate::storage::discover_repository_layout(repo_root, &jit_root).unwrap();
-        let executor = CommandExecutor::new(storage).with_layout(layout);
-        executor
-            .initialize_fresh_repository(repo_root, None)
-            .unwrap();
-        executor
-            .define_gate(
-                "g".to_string(),
-                "g".to_string(),
-                String::new(),
-                GateStage::Postcheck,
-                GateMode::Auto,
-                Some(GateChecker::Exec {
-                    command: "echo ran".to_string(),
-                    timeout_seconds: 10,
-                    working_dir: None,
-                    env: HashMap::new(),
-                    pass_context: false,
-                    prompt: None,
-                    prompt_file: None,
-                }),
-                100,
-                None,
-            )
-            .unwrap();
-        executor
-    }
-
-    /// Create an issue requiring gate `"g"` on `executor`.
-    fn add_gated_issue(executor: &CommandExecutor<crate::storage::JsonFileStorage>) -> String {
-        let (issue_id, _) = executor
-            .create_issue(
-                "Test".to_string(),
-                "Test".to_string(),
-                crate::domain::Priority::Normal,
-                Vec::new(),
-                Vec::new(),
-                None,
-                None,
-                false,
-            )
-            .unwrap();
-        executor.add_gate(&issue_id, "g".to_string()).unwrap();
-        issue_id
-    }
-
-    /// REQ-03: outside a git repository entirely, the check stays silent and
-    /// the checker runs normally.
-    #[test]
-    fn test_check_gate_stays_silent_outside_git_repository() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let executor = setup_at(temp.path());
-        let issue_id = add_gated_issue(&executor);
-
-        let result = executor.check_gate(&issue_id, "g").unwrap();
-        assert_eq!(result.status, GateRunStatus::Passed);
-    }
-
-    /// REQ-03: an ordinary, unrelated git repository — one that shares no
-    /// history with the running binary's build commit, exactly the "installed
-    /// release validating a different repository" case — stays silent and the
-    /// checker runs normally.
-    #[test]
-    fn test_check_gate_stays_silent_for_unrelated_git_repository() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let init = std::process::Command::new("git")
-            .args(["init", "-q"])
-            .current_dir(temp.path())
-            .status()
-            .unwrap();
-        assert!(init.success());
-        let commit = std::process::Command::new("git")
-            .args([
-                "-c",
-                "user.name=Test",
-                "-c",
-                "user.email=test@example.com",
-                "commit",
-                "--allow-empty",
-                "-q",
-                "-m",
-                "unrelated init",
-            ])
-            .current_dir(temp.path())
-            .status()
-            .unwrap();
-        assert!(commit.success());
-
-        let executor = setup_at(temp.path());
-        let issue_id = add_gated_issue(&executor);
-
-        let result = executor.check_gate(&issue_id, "g").unwrap();
-        assert_eq!(result.status, GateRunStatus::Passed);
-    }
-
-    /// Build a scratch git repository whose `HEAD` is one commit PAST the
-    /// running test binary's own build commit — fetched from the real jit
-    /// workspace this test binary was built from, so the REQ-03 identity
-    /// predicate (the build commit is a known commit here) holds for real,
-    /// entirely inside the disposable scratch repo (no ref in the real
-    /// workspace is read, moved, or written).
-    ///
-    /// Returns `None` (the caller should skip) when the binary was built
-    /// without git (`version_info().git_commit == "unknown"`, e.g. a tarball
-    /// build) or any of the local git steps fails for environment reasons.
-    fn scratch_repo_stale_against_own_build() -> Option<(tempfile::TempDir, String)> {
-        let info = crate::build_info::version_info();
-        if info.git_commit == "unknown" {
-            eprintln!("SKIP: this binary was built without git; no build commit to compare");
-            return None;
-        }
-        let workspace_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)?
-            .to_str()?
-            .to_string();
-
-        let temp = tempfile::TempDir::new().ok()?;
-        let run = |args: &[&str]| {
-            std::process::Command::new("git")
-                .args(args)
-                .current_dir(temp.path())
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false)
-        };
-
-        if !run(&["init", "-q"]) {
-            eprintln!("SKIP: git init failed in scratch repo");
-            return None;
-        }
-        if !run(&["fetch", "-q", &workspace_root, info.git_commit]) {
-            eprintln!("SKIP: git fetch of the running binary's build commit failed");
-            return None;
-        }
-        if !run(&["checkout", "-q", "FETCH_HEAD"]) {
-            eprintln!("SKIP: checkout of the fetched build commit failed");
-            return None;
-        }
-        let source_path = temp.path().join("crates/jit/src/main.rs");
-        let mut source = std::fs::read(&source_path).ok()?;
-        source.extend_from_slice(b"\n// build-input change for stale-binary coverage\n");
-        std::fs::write(&source_path, source).ok()?;
-        if !run(&["add", "crates/jit/src/main.rs"]) {
-            eprintln!("SKIP: staging the build-input change failed");
-            return None;
-        }
-        if !run(&[
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.com",
-            "commit",
-            "-q",
-            "-m",
-            "advance past the build commit with a source change",
-        ]) {
-            eprintln!("SKIP: advancing HEAD past the build commit failed");
-            return None;
-        }
-        Some((temp, info.git_commit.to_string()))
-    }
-
-    /// REQ-01/02: the running binary's build commit is a known commit in the
-    /// repository under validation, but is no longer at `HEAD` — `check_gate`
-    /// refuses BEFORE spawning the checker, and no verdict is ever produced or
-    /// persisted.
-    #[test]
-    fn test_check_gate_refuses_stale_binary_and_persists_no_run() {
-        let Some((temp, built_from)) = scratch_repo_stale_against_own_build() else {
-            return;
-        };
-
-        let executor = setup_at(temp.path());
-        let issue_id = add_gated_issue(&executor);
-
-        let err = executor.check_gate(&issue_id, "g").expect_err(
-            "a binary whose build commit is a known, but no longer current, commit \
-             in the repository under review must refuse to run the checker",
-        );
-        assert!(
-            err.downcast_ref::<crate::errors::StaleBinaryError>()
-                .is_some(),
-            "expected StaleBinaryError, got: {err:?}"
-        );
-        assert!(
-            err.to_string().contains(&built_from),
-            "error message should name the build commit: {err}"
-        );
-
-        // No verdict was ever produced or persisted (REQ-02).
-        assert!(
-            executor
-                .get_last_gate_run(&issue_id, "g")
-                .unwrap()
-                .is_none(),
-            "no gate run should have been recorded for a refused, stale-binary check"
-        );
-        let issue = executor.storage.load_issue(&issue_id).unwrap();
-        assert!(
-            !issue
-                .gates_status
-                .get("g")
-                .is_some_and(|s| s.status == crate::domain::GateStatus::Passed),
-            "the gate must not have been marked passed by a refused, stale-binary check"
         );
     }
 }

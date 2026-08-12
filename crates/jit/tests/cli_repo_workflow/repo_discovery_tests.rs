@@ -21,7 +21,6 @@ fn jit_cmd(dir: &Path) -> Command {
     let mut cmd = Command::new(jit_binary());
     cmd.current_dir(dir)
         .env_remove("JIT_DATA_DIR")
-        .env_remove("JIT_GATE_RUN")
         .env_remove("JIT_ISSUE_ID")
         .env_remove("JIT_GATE_KEY");
     cmd
@@ -78,25 +77,6 @@ fn test_status_discovers_repo_from_inside_dot_jit() {
     assert!(
         out.status.success(),
         "status from inside .jit/issues failed: stderr={}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-#[test]
-fn test_status_gate_child_discovers_repo_from_inside_dot_jit() {
-    let temp = TempDir::new().unwrap();
-    let init_out = jit_init(temp.path());
-    assert!(init_out.status.success(), "init failed: {:?}", init_out);
-
-    let inside_dot_jit = temp.path().join(".jit/issues");
-    let out = jit_cmd(&inside_dot_jit)
-        .env("JIT_GATE_RUN", "1")
-        .args(["status", "--json"])
-        .output()
-        .expect("jit status failed to spawn");
-    assert!(
-        out.status.success(),
-        "gate child status from inside .jit/issues failed: stderr={}",
         String::from_utf8_lossy(&out.stderr)
     );
 }

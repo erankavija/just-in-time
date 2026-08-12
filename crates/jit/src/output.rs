@@ -695,9 +695,6 @@ pub enum ErrorCode {
     RepositoryNotFound,
     /// The repository format is newer than this binary supports.
     RepositoryFormatTooNew,
-    /// A gate checker was refused because the running binary's build inputs do
-    /// not match the repository under review.
-    StaleBinary,
     /// Issue deletion was refused because operator confirmation was absent.
     DeletionNotConfirmed,
     /// No resolution route found the requested profile.
@@ -758,7 +755,7 @@ impl ErrorCode {
     ///
     /// A conformance test compares this list with the variants schemars derives
     /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 45] = [
+    pub const ALL: [ErrorCode; 44] = [
         ErrorCode::IssueNotFound,
         ErrorCode::GateNotFound,
         ErrorCode::CycleDetected,
@@ -777,7 +774,6 @@ impl ErrorCode {
         ErrorCode::InvalidIdPrefix,
         ErrorCode::RepositoryNotFound,
         ErrorCode::RepositoryFormatTooNew,
-        ErrorCode::StaleBinary,
         ErrorCode::DeletionNotConfirmed,
         ErrorCode::ProfileNotFound,
         ErrorCode::ProfileConflict,
@@ -827,7 +823,6 @@ impl ErrorCode {
             ErrorCode::InvalidIdPrefix => "INVALID_ID_PREFIX",
             ErrorCode::RepositoryNotFound => "REPOSITORY_NOT_FOUND",
             ErrorCode::RepositoryFormatTooNew => "REPOSITORY_FORMAT_TOO_NEW",
-            ErrorCode::StaleBinary => "STALE_BINARY",
             ErrorCode::DeletionNotConfirmed => "DELETION_NOT_CONFIRMED",
             ErrorCode::ProfileNotFound => "PROFILE_NOT_FOUND",
             ErrorCode::ProfileConflict => "PROFILE_CONFLICT",
@@ -888,8 +883,7 @@ impl ErrorCode {
             ErrorCode::AlreadyExists | ErrorCode::GateError => ExitCode::AlreadyExists,
             ErrorCode::IoError
             | ErrorCode::ClaimRequiresGit
-            | ErrorCode::RepositoryFormatTooNew
-            | ErrorCode::StaleBinary => ExitCode::ExternalError,
+            | ErrorCode::RepositoryFormatTooNew => ExitCode::ExternalError,
             ErrorCode::PermissionDenied => ExitCode::PermissionDenied,
             ErrorCode::ParseError
             | ErrorCode::ItemNotFound
@@ -937,10 +931,6 @@ impl ErrorCode {
             ErrorCode::RepositoryNotFound => "No JIT repository exists at the resolved path.",
             ErrorCode::RepositoryFormatTooNew => {
                 "The repository format is newer than this binary supports."
-            }
-            ErrorCode::StaleBinary => {
-                "Committed build inputs changed, working-tree build inputs are uncommitted, or \
-                 build provenance records an uncommitted build input."
             }
             ErrorCode::DeletionNotConfirmed => {
                 "Issue deletion lacks the required operator confirmation."
@@ -1076,7 +1066,6 @@ impl std::str::FromStr for ErrorCode {
             "INVALID_ID_PREFIX" => Ok(ErrorCode::InvalidIdPrefix),
             "REPOSITORY_NOT_FOUND" => Ok(ErrorCode::RepositoryNotFound),
             "REPOSITORY_FORMAT_TOO_NEW" => Ok(ErrorCode::RepositoryFormatTooNew),
-            "STALE_BINARY" => Ok(ErrorCode::StaleBinary),
             "DELETION_NOT_CONFIRMED" => Ok(ErrorCode::DeletionNotConfirmed),
             "PROFILE_NOT_FOUND" => Ok(ErrorCode::ProfileNotFound),
             "PROFILE_CONFLICT" => Ok(ErrorCode::ProfileConflict),
@@ -3436,11 +3425,6 @@ mod tests {
             (
                 ErrorCode::RepositoryFormatTooNew,
                 "REPOSITORY_FORMAT_TOO_NEW",
-                ExitCode::ExternalError,
-            ),
-            (
-                ErrorCode::StaleBinary,
-                "STALE_BINARY",
                 ExitCode::ExternalError,
             ),
             (

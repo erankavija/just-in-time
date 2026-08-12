@@ -27,6 +27,7 @@ mod serve_cli_tests;
 mod steering_scenarios;
 mod template_binding_cli_tests;
 mod test_cli_consistency;
+mod version_cli_tests;
 mod workflow_tests;
 mod worktree_cli_tests;
 mod worktree_identity_tests;

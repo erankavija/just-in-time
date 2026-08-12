@@ -143,15 +143,6 @@ ensure_pinned_nextest() {
 
 ensure_pinned_nextest
 
-# Disk-backed TMPDIR: a few tests (provenance_contract suite) compile the whole crate
-# into a fresh temp target dir; on a small tmpfs /tmp that hits "Disk quota
-# exceeded". Use a disk-backed cache dir. It must live OUTSIDE any git repo:
-# tests such as test_get_current_branch_errors_when_git_fails create a temp dir
-# here and expect no enclosing `.git` (so $PWD/target — inside this repo — is
-# wrong). Overridable via CARGO_CI_TMPDIR.
-export TMPDIR="${CARGO_CI_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp}"
-mkdir -p "$TMPDIR"
-
 # Disable incremental compilation for every step below (jit:57d0eb79). The
 # workspace manifest's [profile.dev]/[profile.test] leave incremental on for
 # ordinary interactive builds, where it earns back its disk cost across many
@@ -195,7 +186,7 @@ summarize_pass() {
       fi
       echo "$p passed, ${f:-0} failed, ${s:-0} skipped"
       ;;
-    doctest | provenance)
+    doctest)
       # cargo test runs many binaries, each printing its own
       # "test result: ok. N passed; M failed; K ignored; ...". Sum them.
       local p f i
@@ -205,17 +196,7 @@ summarize_pass() {
             | awk '{s+=$1} END {print s+0}')
       i=$(grep -oP '\K\d+(?= ignored)' "$WORK/$name.out" \
             | awk '{s+=$1} END {print s+0}')
-      # REQ-04 (jit:83efbcb4): the provenance step's own $WORK/provenance.out
-      # is deleted by the EXIT trap once this script finishes, so surface its
-      # seeded-fixture file/byte count line (printed via --nocapture) into the
-      # persisted gate summary here rather than leaving it observable only in
-      # a temp file that is already gone by the time anyone reads this output.
-      local fixture=""
-      if [ "$name" = "provenance" ]; then
-        fixture=$(grep -o 'provenance-fixture: files=[0-9]* bytes=[0-9]*' "$WORK/$name.out" | tail -1)
-        [ -n "$fixture" ] && fixture=" ($fixture)"
-      fi
-      echo "${p:-0} passed, ${f:-0} failed, ${i:-0} ignored${fixture}"
+      echo "${p:-0} passed, ${f:-0} failed, ${i:-0} ignored"
       ;;
     budget)
       # REQ-06 (jit:3f73423b): fold the checker's one-line build-footprint
@@ -243,7 +224,7 @@ summarize_fail() {
       grep -E '^[[:space:]]*Summary .* tests run:' "$WORK/$name.out" | tail -1 || true
       tail -80 "$WORK/$name.out"
       ;;
-    doctest | provenance)
+    doctest)
       echo "--- $name failures ---"
       # Failed test names and the captured panic/assert output blocks.
       grep -E '^test .* FAILED$' "$WORK/$name.out" || true
@@ -326,9 +307,9 @@ gate_target_dir() {
 # REQ-04 (jit:57d0eb79): CARGO_INCREMENTAL=0 above is the mechanism; this is
 # the deterministic check that it held. Runs after the compilation steps so
 # it observes what they actually left on disk. Suites that spawn scratch
-# builds into their own throwaway target dirs (scratch_build,
-# provenance_contract) are out of scope by construction: this only walks the
-# directory `gate_target_dir` resolves, never a suite's private scratch dir.
+# builds into their own throwaway target dirs (scratch_build) are out of scope
+# by construction: this only walks the directory `gate_target_dir` resolves,
+# never a suite's private scratch dir.
 check_no_incremental_state() {
   local target_dir
   target_dir=$(gate_target_dir) || return 1
@@ -377,29 +358,12 @@ run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D
 # The named suite clock is deliberately narrower than the gate duration. It
 # starts immediately before the pinned workspace suite and ends after the
 # separately reported doctest substep, leaving lock acquisition, preflight,
-# formatting, linting, and the intentionally cold provenance suite outside it.
+# formatting, and linting outside it.
 suite_clock_started_ms=$(epoch_milliseconds)
 run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
 run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
 suite_clock_ms=$(( $(epoch_milliseconds) - suite_clock_started_ms ))
 summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
-
-# Build-provenance contract suites (jit:5d862134). These are #[ignore]d for
-# the default nextest run — each spawns cold scratch `cargo` builds into throwaway target
-# dirs to exercise the build script under real git states, costing ~3-4 min that
-# ordinary dev runs should not pay — so the `test` step above skips them. The gate
-# paying that cost is exactly the point: REQ-06's hard metadata-only-invalidation
-# and injected-provenance contracts are unexercised unless a required CI step runs
-# them, so this step does. No lock interaction: these tests spawn plain `cargo`
-# only, so they do not re-acquire the CARGO_CI_BUILD_LOCK this run already holds.
-# (The `test` step's merged-tree gate self-test does re-enter this script, and
-# passes CARGO_CI_NO_LOCK=1 for the same reason.)
-# --nocapture (jit:83efbcb4 REQ-04): the metadata-stability test prints the
-# seeded-fixture file/byte count line before its cold build; this flag is what
-# lets that line reach $WORK/provenance.out for summarize_pass to fold into
-# the persisted gate summary below, on a passing run and not just a failure.
-run_step provenance "${NICE_PREFIX[@]}" cargo test -p jit \
-  --test provenance_contract -- --ignored --nocapture
 
 # Build-footprint budget enforcement (jit:3f73423b). Runs AFTER the test step so
 # its `cargo metadata` and `cargo test --workspace --no-run --message-format=json`

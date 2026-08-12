@@ -1,13 +1,11 @@
 //! Declared repository input sets, and the content digest taken over one.
 //!
 //! A declaration names roots and the categories beneath them it does not
-//! claim: "these paths, minus these patterns". Two consumers state their
-//! inputs this way and both read them through the types here — the production
-//! binary's build inputs ([`build_provenance`](crate::domain::build_provenance))
-//! and a quality gate's checker inputs
-//! ([`GateDefinition::inputs`](crate::declarations::GateDefinition)) — so the
-//! covering rule, the pattern dialect, and the digest have one implementation
-//! between them (`@/invariant/convention-convergence`).
+//! claim: "these paths, minus these patterns". A quality gate's checker inputs
+//! ([`GateDefinition::inputs`](crate::declarations::GateDefinition)) are stated
+//! this way and read through the types here, so the covering rule, the pattern
+//! dialect, and the digest have one implementation
+//! (`@/invariant/convention-convergence`).
 //!
 //! Both constrained values are validated where a declaration is parsed, not
 //! where a consumer first matches: an unparseable root or an uncompilable

@@ -347,7 +347,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Show CLI version and local build provenance
+    /// Show CLI version and build metadata
     Version {
         /// Output as JSON
         #[arg(long)]
@@ -3392,7 +3392,7 @@ impl ProjectCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
             // `render` writes documentation targets, so it must run under the
-            // stale-binary recovery dispatch like the other write commands.
+            // recovery dispatch like the other write commands.
             Self::Render { .. } => true,
         }
     }
