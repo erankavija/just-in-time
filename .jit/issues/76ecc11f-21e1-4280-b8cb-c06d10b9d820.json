@@ -22,8 +22,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-12T23:53:01.568176611Z",
+      "status": "passed",
+      "updated_at": "2026-08-12T23:58:05.718296079Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,7 +36,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "gated",
   "title": "Attribute inherent test costs",
-  "updated_at": "2026-08-12T23:53:01.568176611Z"
+  "updated_at": "2026-08-12T23:59:45.617065701Z"
 }

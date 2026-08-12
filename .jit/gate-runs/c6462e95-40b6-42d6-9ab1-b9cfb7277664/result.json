@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1313e3b0eb792e5e1417cf96ae302db9c5b50058",
+  "completed_at": "2026-08-12T23:58:05.375698611Z",
+  "duration_ms": 206262,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable documentation accurately traces inherent and excluded test costs to the required evidence and addresses prior findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "76ecc11f-21e1-4280-b8cb-c06d10b9d820",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c6462e95-40b6-42d6-9ab1-b9cfb7277664",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T23:54:39.113418719Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e218f2cc7, 2d5e0f9e8, e2f7b6700, d0ed0e578, 2ef01b309, 1313e3b0e\nPolicy sources: AGENTS.md\nResolved items: @/issue/76ecc11f/requirement/REQ-01 through REQ-04 and @/issue/4b7c06d0/requirement/REQ-05 (.jit issue records); @/invariant/single-source-prose, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T23:43:36Z); prior code-review failed (exit 1, findings addressed); doc-review pending\nTruncation recovery: focused individual commit patches, current documentation/source ranges, artifact-key reads, and an exact 66-row profile-table comparison; no mismatches\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable documentation accurately traces inherent and excluded test costs to the required evidence and addresses prior findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
