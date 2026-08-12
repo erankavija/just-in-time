@@ -19,7 +19,7 @@ const WITHDRAWN_FIELDS: [&str; 4] = [
 ];
 
 #[test]
-fn test_global_version_flag_reports_package_version_without_build_provenance() {
+fn test_global_version_flag_reports_only_package_version_and_profile() {
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .arg("--version")
         .output()

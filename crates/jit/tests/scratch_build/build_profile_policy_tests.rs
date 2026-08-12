@@ -102,12 +102,12 @@ fn test_cargo_ci_disables_incremental_compilation_before_the_first_step() {
         export_pos < preflight_pos && preflight_pos < first_step_pos,
         "CARGO_INCREMENTAL=0 must be exported before the first gate step so it \
          covers every Rust compilation the gate performs (fmt, clippy, test, \
-         provenance)"
+         doctest)"
     );
     assert!(
         script[preflight_pos..first_step_pos].contains("if [ \"$failed\" -ne 0 ]"),
         "a failed incremental-state preflight must exit before the expensive \
-         fmt, clippy, test, provenance, and budget steps"
+         fmt, clippy, test, doctest, and budget steps"
     );
 }
 
