@@ -13,9 +13,21 @@
 //! step fails the run when a non-empty `incremental` directory remains under
 //! the target directory the run actually used, rather than relying on a
 //! one-off manual isolated-run observation.
+//!
+//! jit:6d10e5d4 added two more policies this file covers. First, the
+//! dependency-package override `[profile.dev.package."*"].opt-level = 1`:
+//! third-party dependency code is compiled once and then executed by every
+//! test process, so leaving it unoptimized is repeated cost, and level 1 was
+//! the measured selection over level 2
+//! (dev/benchmarks/dependency-profile-6d10e5d4/). Second, that issue's REQ-04
+//! requires the profiler that measures these very policies to pass its own
+//! `--self-test` mode; this file re-invokes
+//! `scripts/profile-test-suite.sh --self-test` so that evidence is
+//! re-established on every suite run rather than attested once.
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -165,4 +177,44 @@ fn test_cargo_build_scripts_share_the_host_lock_and_enable_available_sccache() {
             "{script} must serialize against the same cross-repository host build lock as cargo-ci.sh"
         );
     }
+}
+
+#[test]
+fn test_dev_profile_package_override_sets_dependency_opt_level_to_one() {
+    let manifest = workspace_manifest();
+    let dev = profile_table(&manifest, "dev");
+    let opt_level = dev
+        .get("package")
+        .and_then(|package| package.get("*"))
+        .and_then(|wildcard| wildcard.get("opt-level"))
+        .and_then(toml::Value::as_integer);
+
+    assert_eq!(
+        opt_level,
+        Some(1),
+        "[profile.dev.package.\"*\"].opt-level must stay 1: dependencies are \
+         compiled once and then executed by every test process, so their \
+         unoptimized code is repeated cost, and level 1 was the measured \
+         selection over level 2 (dev/benchmarks/dependency-profile-6d10e5d4/)"
+    );
+}
+
+#[test]
+fn test_profile_test_suite_script_passes_its_own_self_test() {
+    let workspace = workspace_root();
+    let script = workspace.join("scripts/profile-test-suite.sh");
+    let self_test = Command::new(&script)
+        .arg("--self-test")
+        .current_dir(&workspace)
+        .output()
+        .expect("run scripts/profile-test-suite.sh --self-test");
+
+    assert!(
+        self_test.status.success()
+            && String::from_utf8_lossy(&self_test.stdout)
+                .contains("profile-test-suite: self-test passed"),
+        "profiler self-test must pass: stdout={} stderr={}",
+        String::from_utf8_lossy(&self_test.stdout),
+        String::from_utf8_lossy(&self_test.stderr)
+    );
 }
