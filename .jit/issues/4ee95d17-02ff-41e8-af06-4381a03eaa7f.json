@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-12T08:04:40.575529711Z",
+  "dependencies": [
+    "527bd363-70fd-4a0e-9708-9ed7d08002e3"
+  ],
+  "description": "Remove crash-durability barriers only from ephemeral, run-bound nextest fixture receipts while preserving atomic publication, visibility, provenance validation, and persistent-cache durability.\n\n## Background\n\nFour warm setup barriers account for approximately 10.1 of the measured 10.6 setup seconds: the default and dogfood profile receipts each synchronize one staged receipt, while the recorded-failure setup synchronizes its staged receipt and `NEXTEST_ENV` handoff. These files are valid only for one `NEXTEST_RUN_ID`; a process or host crash ends that invocation and a later run rejects them. Crash durability therefore adds no recoverability, unlike the immutable cache entries and production transaction barriers, which remain durable.\n\n## Success Criteria\n\n- [hard] REQ-01: Publishes profile and recorded-failure nextest receipts through one shared test-support convention that remains atomic/no-replace where publication is exclusive, closes writes before consumption, and does not call file or directory durability synchronization for ephemeral run-bound receipt or environment-handoff files.\n- [hard] REQ-02: Retains exact run-ID, SHA-256, provenance-key, cache-root, ordinary-file, immutable-entry, tree or corpus validation, and fail-closed occupied/corrupt/wrong-run behavior; persistent fixture and corpus cache entries retain their existing durability barriers.\n- [hard] REQ-03: Focused contract tests cover valid visibility plus corrupt, irregular, occupied, wrong-SHA, wrong-run, and no-replace cases without repairing or deleting an occupied destination, and direct `cargo test` fallback remains valid.\n- [hard] REQ-04: Three warm exact setup measurements each run the same four existing recipes and report total setup time at most 5,500 milliseconds, saving at least 5,115 milliseconds from the matched 10,615-millisecond reference without changing recipe filters or moving setup outside the nextest clock.\n- [hard] REQ-05: Preserves the exact runnable and ignored identity sets, passes the selected setup consumers, complete nextest suite, doctests, fixture self-tests, formatting, and zero-warning linting without changing production storage or transaction durability.\n\n## Notes\n\nKeep the four focused nextest recipes independent so a selected test does not prepare unrelated fixtures. Consolidate the receipt publication contract, not recipe selection or provenance. Reject the change if the repeated setup saving is below the bound or any persistent/cache durability boundary changes.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T08:04:40.575529711Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4ee95d17-02ff-41e8-af06-4381a03eaa7f",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Avoid durability sync for ephemeral nextest receipts",
+  "updated_at": "2026-08-12T08:04:54.081518646Z"
+}

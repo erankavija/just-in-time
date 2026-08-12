@@ -6,7 +6,7 @@
     "123efe74-865a-401c-9932-8184aafe7feb",
     "1fc8fec3-8bd9-42eb-a31b-441964b05ccd",
     "4731256d-69ac-4993-b815-5d7d0fb0c153",
-    "527bd363-70fd-4a0e-9708-9ed7d08002e3",
+    "4ee95d17-02ff-41e8-af06-4381a03eaa7f",
     "934985ca-8650-4a98-9c09-df9ec8fd9863",
     "ae17798d-c0c6-4ad0-b119-2dd2fab8e95d",
     "bfd215fa-5d5c-40d4-85e9-bd082a991464",
@@ -33,5 +33,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Reduce profiled warm suite work below the enforcement bound",
-  "updated_at": "2026-08-12T08:02:13.808923831Z"
+  "updated_at": "2026-08-12T08:04:59.710751026Z"
 }
