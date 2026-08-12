@@ -18,8 +18,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-12T09:54:09.163275489Z",
+      "status": "passed",
+      "updated_at": "2026-08-12T10:05:32.134007538Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Tune nextest worker concurrency",
-  "updated_at": "2026-08-12T09:54:09.163275489Z"
+  "updated_at": "2026-08-12T10:05:32.134007538Z"
 }

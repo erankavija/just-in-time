@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54dfcc6484a8072d678ad9d0ab05783d9c53314a",
+  "completed_at": "2026-08-12T10:05:31.790457360Z",
+  "duration_ms": 192497,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are evidenced, and the prior identity-substitution validation gap is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "934985ca-8650-4a98-9c09-df9ec8fd9863",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "842bb761-b1a1-40b4-8b6e-abe0a4e687b9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T10:02:19.293185366Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c1d072df, 0df4d88f, 379e7682, 93459cce (jit:934985ca)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml; .jit/invariants.toml; .jit/reference/content-standards.md\nResolved items: @/issue/934985ca/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/gate/cargo-ci (.jit/gates.toml, registry-first); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (2026-08-12T09:05:36Z; exit code unavailable); code-review failed (prior F1, now addressed)\nTruncation recovery: re-read bounded source, validator, and summary evidence; verified raw-artifact checksums; ran the validator and same-count-substitution self-test; inspected per-run metrics and failure excerpts\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are evidenced, and the prior identity-substitution validation gap is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

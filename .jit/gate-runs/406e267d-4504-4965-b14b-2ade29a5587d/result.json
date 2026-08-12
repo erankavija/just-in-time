@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "54dfcc6484a8072d678ad9d0ab05783d9c53314a",
+  "completed_at": "2026-08-12T10:12:18.221965621Z",
+  "duration_ms": 398613,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/test_utils.rs",
+        "id": "F1",
+        "line": 359,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4ee95d17/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "Current receipt setup retains durability synchronization instead of the required shared ephemeral publication convention."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/benchmarks/ephemeral-nextest-receipts-4ee95d17/summary.json",
+        "id": "F2",
+        "line": 18,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4ee95d17/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "All three recorded warm measurements exceed the setup-time maximum and miss the required saving; the evidence records no_change."
+      }
+    ],
+    "summary": "The issue's receipt optimization was rejected and is not present in the shipping tree; its required setup-time bound also failed.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4ee95d17-02ff-41e8-af06-4381a03eaa7f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "406e267d-4504-4965-b14b-2ade29a5587d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T10:05:39.608224597Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2142 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff56f-4c9e-7000-b71d-6624f31efc13\n--------\nuser\n--- 2129 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 95f5e4a, 4c5aafa (issue metadata); 67713111 (rejected benchmark evidence)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4ee95d17/requirement/REQ-01 and REQ-04 (issue description; markdown-first); @/invariant/atomic-writes (.jit/invariants.toml; registry-first); @/gate/cargo-ci (.jit/gates.toml; registry-first)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-08-12T09:05:36Z); code-review pending\nTruncation recovery: none\n\n1. **[blocking][issue-impact] F1:** The requested ephemeral receipt publication change is not shipped. The only candidate is preserved as a rejected patch; current profile receipt setup still calls `sync_all()` at `crates/jit/src/test_utils.rs:359`, and recorded-failure setup still syncs both receipt and environment handoff at `crates/jit/tests/cli_issue/failure_probe_fixture.rs:449` and `:454`. This does not meet REQ-01.\n\n2. **[blocking][issue-impact] F2:** The committed three-sample measurement explicitly rejects the candidate: totals are 10,556/10,533/10,507 ms with only 59/82/108 ms savings, rather than the required ≤5,500 ms and ≥5,115 ms. `summary.json` records `decision: \"no_change\"` for the quantitative threshold failure.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue's receipt optimization was rejected and is not present in the shipping tree; its required setup-time bound also failed.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Current receipt setup retains durability synchronization instead of the required shared ephemeral publication convention.\",\"file\":\"crates/jit/src/test_utils.rs\",\"line\":359,\"references\":[\"@/issue/4ee95d17/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"All three recorded warm measurements exceed the setup-time maximum and miss the required saving; the evidence records no_change.\",\"file\":\"dev/benchmarks/ephemeral-nextest-receipts-4ee95d17/summary.json\",\"line\":18,\"references\":[\"@/issue/4ee95d17/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
