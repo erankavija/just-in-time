@@ -507,14 +507,14 @@ Suppress non-essential output (success messages, headers, warnings). Preserves d
 - Errors (always shown to stderr)
 
 ### `--version`
-Print the CLI package version plus local build provenance:
+Print the CLI package version and build profile:
 
 ```bash
 jit --version
-# jit <package-version> (commit 44ee4610, dirty=false, profile release)
+# jit <package-version> (profile release)
 ```
 
-Use `jit version` when you need the full provenance record.
+Use `jit version` when you also need the target triple.
 
 ## Repository Commands
 
@@ -916,13 +916,13 @@ JSON reports the added package's `id`, `version`, `package_hash`, `archive`,
 `destination`, `file_count`, and `byte_size`. The identity fields are recomputed
 from the extracted content rather than copied from the archive.
 
-## Version and Provenance
+## Version
 
 ### `jit version`
 
-Show the running `jit` binary's local build metadata. This command does not
-require a `.jit/` repository and does not contact GitHub or compare against the
-current checkout.
+Show the running `jit` binary's identity and build metadata. This command does
+not require a `.jit/` repository and does not contact GitHub or compare against
+the current checkout.
 
 ```bash
 jit version
@@ -931,26 +931,16 @@ jit version
 Human-readable output includes:
 
 - `Version` — crate package version
-- `Commit` — short and full Git commit hash injected at build time, or `unknown`
-- `Dirty` — whether a declared build input was uncommitted when the binary was built, as injected at build time, or `unknown`
 - `Profile` — Cargo build profile such as `debug` or `release`
-- `Built` — build timestamp as Unix epoch seconds injected at build time, or `unknown`
 - `Target` — Cargo target triple
 
-The commit, dirty flag, and timestamp are populated only from the provenance
-the build injects (`JIT_BUILD_GIT_HASH`, `JIT_BUILD_GIT_SHORT_HASH`,
-`JIT_BUILD_GIT_DIRTY`, `SOURCE_DATE_EPOCH`); `scripts/install-jit.sh` supplies
-them from the current commit. Its dirty flag reports whether a path that feeds
-the binary was uncommitted, not whether the working tree carried any change at
-all: an uncommitted note or documentation edit changes no build, so it leaves
-an installed binary current. An ordinary `cargo build`/`cargo test` reads no
-ambient Git state or wall clock, so it reports `unknown` for these fields. This
-keeps unchanged rebuilds reproducible and insensitive to Git-metadata-only
-changes.
+Every field comes from Cargo itself. The build reads no Git state and no wall
+clock, so two builds of identical sources report identical metadata and an
+unchanged rebuild is never invalidated by a Git-metadata-only change.
 
 ### `jit version --json`
 
-Return the same provenance as machine-readable JSON:
+Return the same metadata as machine-readable JSON:
 
 ```bash
 jit version --json
@@ -960,20 +950,10 @@ jit version --json
 {
   "package": "jit",
   "version": "<package-version>",
-  "git_commit": "44ee4610bf33e7f35f4c87056c46a6cff3d13f5a",
-  "git_short_commit": "44ee4610",
-  "git_dirty": false,
   "build_profile": "release",
-  "build_timestamp": "1777327815",
   "target": "x86_64-unknown-linux-gnu"
 }
 ```
-
-`git_dirty` is `true` or `false` when a dirty flag was injected at build time,
-and `null` when none was (an ordinary build injecting no provenance). `true`
-means a path the binary is built from was uncommitted; the stale-binary guard
-treats such a build as stale for its whole life, since no commit describes its
-sources.
 
 ## Issue Commands
 
@@ -2041,65 +2021,17 @@ ran but could not produce a verdict (timeout, command-not-found, or crash) exits
 or a manual gate evaluated without `--by`) and lookup errors (issue not found)
 are classified before the run path and are never reported as a runner error.
 
-**Stale-binary refusal for `exec` checkers (jit:7446af34):** a `jit` binary that
-predates the repository it is validating must not produce — or let an `exec`
-checker's own child process produce — a trusted gate verdict. Native in-process
-checkers do not use this subprocess guard. The refusal condition is ALL of:
-
-1. the repository under validation can resolve the running binary's build
-   commit in its own history (the repository the binary was built from, or a
-   clone or fork that shares that history), AND
-2. at least one of these conditions holds:
-   - a committed build-input path changed between the build commit and the
-     repository's current `HEAD`; the refusal names both commits;
-   - an uncommitted build-input path is present in the working tree; the
-     refusal names the responsible paths; or
-   - build provenance records an uncommitted build input at build time; the
-     refusal names the build commit.
-
-When the repository cannot resolve the running binary's build commit, the
-identity prerequisite is absent and the check stays silent.
-
-This is checked in two places, which surface differently on `jit gate
-evaluate`/`evaluate-all`:
-
-- **The evaluator itself is stale:** refused BEFORE the checker ever spawns.
-  `jit gate evaluate` exits `10` directly, no gate run is recorded at all, and
-  under `--json` the error `code` is `STALE_BINARY`. This is PRE-verdict, so
-  it carries no `verdict` field — unlike the post-verdict runner-crash case
-  above (which also exits `10` but DOES carry `verdict: "error"`). Text and
-  `--json` modes agree on exit `10`.
-- **A checker's own child `jit` is stale** — e.g. a checker script that itself
-  shells out to `jit` (like `scripts/jit-validate.sh`'s `exec jit validate
-  "$@"`), which resolves `jit` from `PATH` independently of the evaluator: the
-  child refuses and exits `10`, but the EVALUATOR sees an ordinary checker
-  failure — `jit gate evaluate` exits `4` (`GATE_FAILED`, verdict `fail`), a
-  gate run IS recorded, and the refusal is visible in that run's
-  `stdout`/`stderr` (`jit gate status <id> <gate> --stderr`, or
-  `error.details.checker_result.stderr` under `--json`) rather than as a
-  distinct top-level error code — see the verdict-field section below.
-
-Rebuild and reinstall with `scripts/install-jit.sh` (it injects build
-provenance around `cargo install --path crates/jit`, so the reinstalled binary
-reports its commit and the guard can judge it) to clear either case.
-
 **`--json` verdict field:**
 
 `jit gate evaluate --json` carries a `verdict` field describing the run-path outcome:
 
 - `pass` — top-level field on the success response.
 - `fail` — under `error.details` when the checker evaluated to failure (code `4`).
-  This is also what a stale checker-child refusal looks like from the
-  evaluator's side for an `exec` checker (see above): its subprocess exited
-  nonzero, so the outer command still gets a normal `fail` verdict — the
-  checker's own `checker_result.stderr` is what shows it was a
-  stale-binary refusal.
 - `error` — under `error.details` when checker evaluation failed unexpectedly
   (for example, an `exec` runner failed; code `10`).
 
-Pre-verdict conditions carry no `verdict` field at all: argument/lookup errors
-(codes `2` and `3`), and an `exec` evaluator's own stale-binary refusal above —
-the one case where exit `10` does not carry a checker verdict.
+Pre-verdict conditions carry no `verdict` field at all: argument and lookup
+errors (codes `2` and `3`).
 
 ```bash
 # Success response
@@ -2115,11 +2047,6 @@ jit gate evaluate abc123 tests --json
 
 # Checker ran, failed          (exit 4):  error.details.verdict == "fail"
 # Checker ran, runner crashed  (exit 10): error.details.verdict == "error"
-# Evaluator itself stale, checker never spawned (exit 10):
-#   error.code == "STALE_BINARY", no verdict field
-# Checker's own child jit stale (exit 4, same as "Checker ran, failed"):
-#   error.details.verdict == "fail"; refusal visible in
-#   error.details.checker_result.stderr, not in error.code
 ```
 
 ### `jit gate evaluate-all`
@@ -2158,9 +2085,7 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
   per gate (`key`, `status`, `verdict`, `already_passed`, `warnings`). On the first
   failure it emits the same JSON-error shape as `jit gate evaluate` (with
   `error.details.key` naming the offending gate, and `error.details.verdict`
-  `fail` or `error` — or no `verdict` field at all when the EVALUATOR itself
-  is refused as stale, exit `10`; see the [stale-binary
-  refusal](#jit-gate-evaluate) section for the two ways this can surface).
+  `fail` or `error`).
 
 ```bash
 # All gates pass (one already passed at HEAD, one freshly run)
@@ -2178,10 +2103,8 @@ jit gate evaluate-all abc123 --json
 
 # Fail-fast: first failing gate sets the exit code; later gates do not run.
 jit gate evaluate-all abc123
-# exit 4:  a checker's verdict was fail, OR a checker's own child jit
-#          refused as stale (the refusal is in that gate's checker_result)
-# exit 10: a checker's runner crashed, OR the evaluator itself refused as
-#          stale (no gate ran at all for that entry)
+# exit 4:  a checker's verdict was fail
+# exit 10: a checker's runner crashed
 ```
 
 ### `jit gate evaluate-many`

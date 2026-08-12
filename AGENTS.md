@@ -16,7 +16,7 @@ Run checks for the workspace you changed:
 - **MCP server:** `cd mcp-server && npm test`.
 - **Web UI:** `cd web && npm test && npm run lint && npm run build`.
 
-See `dev/TESTING.md` for focused Rust test commands. Configured gates in `.jit/gates.toml` are authoritative for completion. When installing the dogfood binary, use `./scripts/install-jit.sh` so build provenance remains available to the stale-binary guard.
+See `dev/TESTING.md` for focused Rust test commands. Configured gates in `.jit/gates.toml` are authoritative for completion. Install the dogfood binary with `./scripts/install-jit.sh`.
 
 ## Workspace Structure
 

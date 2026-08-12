@@ -69,7 +69,7 @@
     "jit_hooks_install": "One-time git hook installation during repository setup.",
     "jit_recover": "Repair routine for a damaged repository; a human decides when to run it.",
     "jit_migrate_lifecycle-timestamps": "One-shot backfill run once per repository upgrade.",
-    "jit_version": "Build provenance; the host, not the agent, decides CLI compatibility.",
+    "jit_version": "Build metadata; the host, not the agent, decides CLI compatibility.",
     "jit_snapshot_export": "Archival export for maintainers.",
     "jit_profile_pack": "Writes a package archive to hand to someone outside this repository; distribution is a maintainer step, not work an agent drives here.",
     "jit_profile_add": "Places a package obtained out of band into the worktree; which archive to trust is a human decision made before any agent connects.",
