@@ -24,25 +24,15 @@ incremental = true
 debug = "line-tables-only"
 incremental = true
 
-# SHA-256 is the identity function of every content-addressed fixture, cache
-# entry and provenance record the test suite publishes, and its inputs include
-# whole build artifacts: one fixture consumer hashes a ~137 MB executable. An
-# unoptimized build of the compression function runs that at roughly 55 MB/s,
-# which cost 2.5 s per consumer and dominated fixture preparation; an optimized
-# one costs under 0.1 s. Only the hash implementation and the block plumbing it
-# runs through are named, so the rest of the dependency graph keeps the debug
-# profile's build times (jit:6d10e5d4).
-[profile.dev.package.sha2]
-opt-level = 3
-
-[profile.dev.package.digest]
-opt-level = 3
-
-[profile.dev.package.block-buffer]
-opt-level = 3
-
-[profile.dev.package.cpufeatures]
-opt-level = 3
+# Dependencies are compiled once and then run by every test process, so their
+# unoptimized code is pure repeated cost: the suite's own CPU profile is spread
+# across SHA-256 over whole build artifacts, TOML parsing, and JSON
+# serialization, none of which is workspace code. Optimizing the dependency
+# graph alone leaves workspace crates at the debug profile's compile times and
+# its `debug-assertions`/`overflow-checks`, which package overrides do not
+# change (jit:6d10e5d4).
+[profile.dev.package."*"]
+opt-level = 2
 
 [workspace.dependencies]
 clap = { version = "4.5", features = ["derive"] }
