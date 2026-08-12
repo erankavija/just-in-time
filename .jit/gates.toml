@@ -24,7 +24,7 @@ REVIEWER_AGENT = 'codex exec -m gpt-5.6-sol -c model_reasoning_effort="high"'
 version = 1
 key = "cargo-ci"
 title = "Cargo CI (fmt + clippy + tests + build policy)"
-description = "Full Rust CI pipeline: formatting check, zero-warning clippy, the workspace test suite, the build-provenance contract suites, the build-footprint budget checker (integration-target and active-executable budgets, profile, and dependency-feature policy; scripts/rust-build-budget.sh), and the incremental-state check must all pass (@/invariant/bounded-rust-build-footprint)."
+description = "Full Rust CI pipeline: formatting check, zero-warning clippy, the workspace test suite, the build-footprint budget checker (integration-target and active-executable budgets, profile, and dependency-feature policy; scripts/rust-build-budget.sh), and the incremental-state check must all pass (@/invariant/bounded-rust-build-footprint)."
 stage = "postcheck"
 mode = "auto"
 priority = 100
@@ -40,9 +40,8 @@ pass_context = false
 
 # Inputs: the whole tracked repository surface. The Rust suites this gate runs
 # read the repository itself — the profile package's live-source conformance
-# walks the worktree, the build-provenance fixture seeds from every repository
-# input, and the documentation projections compare against docs/ — so the
-# footprint is the tree, not the workspace alone.
+# walks the worktree and the documentation projections compare against docs/ —
+# so the footprint is the tree, not the workspace alone.
 #
 # Every exclusion below is material no step of this gate opens. Generated trees
 # (agent worktrees, node_modules, the web bundle, the tracker's scratch dir) are
