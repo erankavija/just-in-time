@@ -112,6 +112,17 @@ ensure_real_cargo() {
 
 ensure_real_cargo
 
+# Disable incremental compilation for every Cargo invocation this wrapper makes
+# (jit:57d0eb79). The workspace manifest's [profile.dev]/[profile.test] leave
+# incremental on for ordinary interactive builds, where it earns back its disk
+# cost across many rebuilds of the same tree. A gate run compiles once and
+# exits, so it has no later rebuild to amortize that cost against; left on,
+# incremental state accumulated without bound across gate runs (baseline
+# measurement: dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md,
+# Baseline table). The `incremental-state` step below turns "should be disabled"
+# into a checked fact rather than an assumption.
+export CARGO_INCREMENTAL=0
+
 # Reuse the host-wide compiler cache when it is installed. Keep explicit
 # wrappers authoritative (for instrumentation or debugging), and provide a
 # deterministic opt-out for cache-sensitive diagnosis. Enabling a wrapper
@@ -152,22 +163,18 @@ ensure_pinned_nextest
 export TMPDIR="${CARGO_CI_TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/jit-cargo-ci-tmp}"
 mkdir -p "$TMPDIR"
 
-# Disable incremental compilation for every step below (jit:57d0eb79). The
-# workspace manifest's [profile.dev]/[profile.test] leave incremental on for
-# ordinary interactive builds, where it earns back its disk cost across many
-# rebuilds of the same tree. A gate run compiles once and exits, so it has no
-# later rebuild to amortize that cost against; left on, incremental state
-# accumulated without bound across gate runs (baseline measurement:
-# dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, Baseline table). The
-# `incremental-state` step below turns "should be disabled" into a checked
-# fact rather than an assumption.
-export CARGO_INCREMENTAL=0
-
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
 failed=0
 summary=""
+
+# Gate evidence is stored as text, so keep all reported wall-clock values in
+# one unambiguous, machine-friendly unit. GNU date's %3N expansion is always a
+# three-digit millisecond field on the Linux hosts that run this gate.
+epoch_milliseconds() {
+  date +%s%3N
+}
 
 summarize_pass() {
   local name="$1"
@@ -261,19 +268,26 @@ summarize_fail() {
 
 run_step() {
   local name="$1"
+  local started_ms ended_ms elapsed_ms
   shift
+
+  started_ms=$(epoch_milliseconds)
   if "$@" >"$WORK/$name.out" 2>&1; then
+    ended_ms=$(epoch_milliseconds)
+    elapsed_ms=$((ended_ms - started_ms))
     local passed_summary
     if passed_summary=$(summarize_pass "$name"); then
-      summary+="  ✓ $name: $passed_summary"$'\n'
+      summary+="  ✓ $name: $passed_summary (${elapsed_ms} ms)"$'\n'
     else
-      summary+="  ✗ $name: REPORTER FAILED"$'\n'
+      summary+="  ✗ $name: REPORTER FAILED (${elapsed_ms} ms)"$'\n'
       summarize_fail "$name"
       failed=1
     fi
   else
     local rc=$?
-    summary+="  ✗ $name: FAILED (exit $rc)"$'\n'
+    ended_ms=$(epoch_milliseconds)
+    elapsed_ms=$((ended_ms - started_ms))
+    summary+="  ✗ $name: FAILED (exit $rc) (${elapsed_ms} ms)"$'\n'
     summarize_fail "$name"
     failed=1
   fi
@@ -359,8 +373,16 @@ fi
 
 run_step fmt    "${NICE_PREFIX[@]}" cargo fmt --all -- --check
 run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D warnings
+
+# The named suite clock is deliberately narrower than the gate duration. It
+# starts immediately before the pinned workspace suite and ends after the
+# separately reported doctest substep, leaving lock acquisition, preflight,
+# formatting, linting, and the intentionally cold provenance suite outside it.
+suite_clock_started_ms=$(epoch_milliseconds)
 run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
 run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
+suite_clock_ms=$(( $(epoch_milliseconds) - suite_clock_started_ms ))
+summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
 
 # Build-provenance contract suites (jit:5d862134). These are #[ignore]d for
 # the default nextest run — each spawns cold scratch `cargo` builds into throwaway target
