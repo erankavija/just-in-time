@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "692bd09017d5b9261fc670797a3b4928d8e57a0f",
+  "completed_at": "2026-08-12T10:01:53.833349452Z",
+  "duration_ms": 129032,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The authorized early rejection is fully evidenced, and the candidate doctest identity finding has been resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "efaec52f-da76-438a-a55b-d4cefd5e6217",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "be7b4c7d-4fa0-4e92-978e-e3416e7b4edd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T09:59:44.801232046Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a81639d9, e66dc7e2, 3fc672c5, 692bd090 (`jit:efaec52f`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/efaec52f/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit unavailable); prior code-review failed (exit 1), with its F1 addressed by commit 692bd090\nTruncation recovery: reread individual current evidence files and verifier; ran the read-only evidence and checksum verifiers\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The authorized early rejection is fully evidenced, and the candidate doctest identity finding has been resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
