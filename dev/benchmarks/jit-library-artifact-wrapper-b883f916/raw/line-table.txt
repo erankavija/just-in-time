@@ -1,0 +1,35 @@
+# readelf -S (debug sections)
+  [13] .debug_gdb_s[...] PROGBITS         0000000000568ec8  00568ec8
+  [33] .debug_abbrev     PROGBITS         0000000000000000  0212e7ce
+  [34] .debug_info       PROGBITS         0000000000000000  02149863
+  [35] .debug_aranges    PROGBITS         0000000000000000  02fefed0
+  [36] .debug_ranges     PROGBITS         0000000000000000  0320d9d0
+  [37] .debug_str        PROGBITS         0000000000000000  03876da0
+  [38] .debug_line       PROGBITS         0000000000000000  04fcfba6
+  [39] .debug_macro      PROGBITS         0000000000000000  0602bc4e
+# decoded panic-site entries
+main.rs                                 2214            0x95879c               x
+main.rs                                 2214            0x9587e3               x
+main.rs                                 2214            0x9587f3        
+main.rs                                 2214            0x958821        
+# decoded library-source entries (representative)
+lib.rs                                   944                   0               x
+lib.rs                                   951                0x16               x
+lib.rs                                   951                0x2e        
+lib.rs                                   954                0x38               x
+lib.rs                                   952                0x50               x
+lib.rs                                   957                0x66               x
+lib.rs                                   954                0x94               x
+lib.rs                                   954                0xa7        
+lib.rs                                   954                0xd0        
+lib.rs                                   951               0x135               x
+lib.rs                                   951               0x157        
+lib.rs                                   956               0x174               x
+lib.rs                                   956               0x196        
+lib.rs                                   956               0x1d9        
+lib.rs                                   944               0x1e3               x
+lib.rs                                   952               0x1f1               x
+lib.rs                                   953               0x202               x
+lib.rs                                   952               0x238               x
+lib.rs                                   952               0x2be               x
+lib.rs                                   952               0x2d6        

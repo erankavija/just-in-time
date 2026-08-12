@@ -1,0 +1,162 @@
+{
+  "acceptance_only_runtime": {
+    "cargo_ci_runs": 0,
+    "doctest_samples": 0,
+    "nextest_samples": 0,
+    "status": "not_run_after_hard_rebuild_rejection"
+  },
+  "build_screen": {
+    "baseline_clean_test_build_seconds": 42.327,
+    "baseline_representative_rebuild_seconds": 38.731,
+    "candidate_clean_exit_code": 0,
+    "candidate_clean_regression_percent": 24.712359,
+    "candidate_clean_test_build_seconds": 52.787,
+    "candidate_rebuild_exit_code": 0,
+    "candidate_representative_rebuild_regression_percent": 26.128941,
+    "candidate_representative_rebuild_seconds": 48.851,
+    "clean_build_ceiling_seconds": 52.90875,
+    "passed": false,
+    "probe_restored_verified": true,
+    "representative_rebuild_ceiling_seconds": 48.41375
+  },
+  "compiler_audit": {
+    "all_noneligible_passthrough": true,
+    "authority": "one fresh cargo test --workspace --no-run command",
+    "conflicting_opt_level_count": 0,
+    "note": "The screen harness emitted 70 records across clean/inventory/rebuild phases. This separate fresh single-command audit is authoritative for the exact-one eligibility assertion.",
+    "optimized_count": 1,
+    "ordinary_cli_main_passthrough": true,
+    "passthrough_count": 24,
+    "path": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/compiler-audit.json",
+    "record_count": 25,
+    "rejected_count": 0
+  },
+  "contract": "ordinary-jit-library-artifact-wrapper-screen",
+  "decision": {
+    "candidate_accepted": false,
+    "integration_retained": false,
+    "reason": "The candidate representative library rebuild took 48.851s, exceeding the matched 48.414s ceiling (26.129% regression versus the 25% maximum). REQ-03 therefore requires rejection before runtime sampling.",
+    "thresholds_weakened": false,
+    "value": "no_change"
+  },
+  "decision_matrix": [
+    {
+      "criterion": "wrapper classification and shell safety",
+      "status": "pass"
+    },
+    {
+      "criterion": "fresh real compiler invocation audit",
+      "status": "pass"
+    },
+    {
+      "criterion": "exact runnable, ignored, and doctest identities",
+      "status": "pass"
+    },
+    {
+      "criterion": "line-table backtrace preservation",
+      "status": "pass"
+    },
+    {
+      "criterion": "active executable and target size",
+      "status": "pass"
+    },
+    {
+      "criterion": "clean test-build regression <= 25 percent",
+      "status": "pass"
+    },
+    {
+      "criterion": "representative rebuild regression <= 25 percent",
+      "status": "fail"
+    },
+    {
+      "criterion": "one-sample nextest and doctest screen",
+      "status": "not_authorized"
+    },
+    {
+      "criterion": "three matched runtime/build/doctest samples",
+      "status": "not_authorized"
+    },
+    {
+      "criterion": "authoritative cargo-ci",
+      "status": "not_run_for_rejected_candidate"
+    }
+  ],
+  "environment": {
+    "build_lock": "/tmp/cargo-ci.lock",
+    "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
+    "cargo_build_jobs": 24,
+    "cargo_incremental": 0,
+    "cpu_count": 24,
+    "host_after_screen": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/raw/host-after-screen.txt",
+    "kernel": "7.1.6-arch1-1",
+    "nextest": "cargo-nextest 0.9.133 (65e806bd5 2026-04-14)\nrelease: 0.9.133\ncommit-hash: 65e806bd589d12c4341d3696a02a9788bd437c3c\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu",
+    "os": "Linux-7.1.6-arch1-1-x86_64-with-glibc2.44",
+    "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.0\nLLVM version: 22.1.6",
+    "sccache": false,
+    "target_filesystem": "ext4",
+    "tmpdir": "/home/vkaskivuo/Projects/just-in-time/target/b883f916-tmp"
+  },
+  "identity": {
+    "doctest_count": 63,
+    "doctest_ignored": 0,
+    "exact_sets_equal": true,
+    "normalized_sha256": "b9ea44e2d2d739f98256eeda2c2239de413b180136232cad5113dc78e154ec19",
+    "regular_ignored": 10,
+    "regular_runnable": 4518
+  },
+  "issue": "b883f916-e53a-4c77-b104-10fb4defb456",
+  "line_table_and_backtrace": {
+    "backtrace_exit_code": 101,
+    "backtrace_source_location": "./crates/jit/src/main.rs:2214",
+    "binary_bytes": 120395976,
+    "binary_sha256": "e04273aff4093e9ca798772537aefbc66bb750b711cfc01e2fe14e4b705f368f",
+    "debug_line_section_present": true,
+    "decoded_library_line_present": true,
+    "decoded_main_panic_line_present": true,
+    "raw_backtrace": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/raw/backtrace.stderr",
+    "raw_line_table": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/raw/line-table.txt"
+  },
+  "method": {
+    "baseline_samples": {
+      "clean": 1,
+      "representative_rebuild": 1
+    },
+    "candidate_samples": {
+      "clean": 1,
+      "representative_rebuild": 1
+    },
+    "fresh_target_per_arm_and_sample": true,
+    "harness": "scripts/benchmark-rust-build.sh with the rejected candidate patch applied",
+    "matched_source_revision": true,
+    "phase": "mandatory one-sample early screen",
+    "screen_stop": "The clean build passed by 0.122 seconds; the representative rebuild exceeded its hard ceiling, so no runtime sample was authorized.",
+    "three_sample_protocol": "not authorized after hard one-sample rebuild rejection"
+  },
+  "raw_evidence": {
+    "authoritative_compiler_audit_stderr": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/raw/compiler-audit-build.stderr",
+    "authoritative_compiler_audit_stdout": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/raw/compiler-audit-build.stdout",
+    "baseline": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/screen/opt0-build",
+    "candidate": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/screen/candidate-build"
+  },
+  "schema_version": 1,
+  "size_screen": {
+    "active_test_executable_limit_bytes": 2147483648,
+    "candidate_active_test_executable_bytes": 1525623360,
+    "candidate_target_dir_bytes": 3209648979,
+    "passed": true,
+    "target_dir_limit_bytes": 10737418240
+  },
+  "source": {
+    "candidate_patch": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/rejected-candidate.patch",
+    "candidate_patch_sha256": "1596a035608fb84242b3e1c784449027dc30867f057f57896705b00a74c7d598",
+    "required_revision": "d7382ef4c66daa6f117f08422100d10969200965",
+    "revision": "d7382ef4c66daa6f117f08422100d10969200965",
+    "staged_wrapper_path": "/home/vkaskivuo/Projects/just-in-time/target/b883f916-stage/891990fa6e76342823b0e28b9ee1f6d84256efe1a4b58deda8388d791589fc48/jit-rustc-workspace-wrapper",
+    "wrapper_sha256": "891990fa6e76342823b0e28b9ee1f6d84256efe1a4b58deda8388d791589fc48"
+  },
+  "wrapper_contract_selftest": {
+    "exit_code": 0,
+    "stderr": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/raw/wrapper-selftest.stderr",
+    "stdout": "dev/benchmarks/jit-library-artifact-wrapper-b883f916/raw/wrapper-selftest.stdout"
+  }
+}
