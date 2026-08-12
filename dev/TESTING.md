@@ -258,15 +258,21 @@ the enforced `@/inv/bounded-rust-build-footprint` project invariant.
 
 ### Budgets
 
-`cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces two budgets on every
-gate run, both derived from `cargo metadata` and `cargo test --workspace --no-run
+`cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces three budgets on every
+gate run. Two are derived from `cargo metadata` and `cargo test --workspace --no-run
 --message-format=json` rather than a `target/` directory scan (stale per-hash artifacts
 there cannot describe the current build): at most 12 integration-test targets and at most
-2 GiB of unique active test-executable bytes. Both constants are declared once, in the
-script's own header comment (`MAX_INTEGRATION_TARGETS`, `MAX_EXECUTABLE_BYTES`); read them
-there rather than assuming either has changed.
+2 GiB of unique active test-executable bytes. The third is derived from the measured
+nextest-plus-doctest suite duration, which `scripts/cargo-ci.sh` passes in as
+`--test-suite-ms`: the suite must finish under `MAX_TEST_SUITE_SECONDS`. All three
+constants are declared once, in the script's own header comment
+(`MAX_INTEGRATION_TARGETS`, `MAX_EXECUTABLE_BYTES`, `MAX_TEST_SUITE_SECONDS`); read them
+there rather than assuming any has changed. See
+[dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
+for the measured margin this budget leaves on an idle and a contended host. "5. Inherent
+Test Costs" below attributes what the measured suite duration is spent on.
 
-A third budget — at most 10 GiB for the complete fresh validation target directory — is the
+A fourth budget — at most 10 GiB for the complete fresh validation target directory — is the
 acceptance threshold the benchmark protocol below validates against once per build-topology
 change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
 defeat the point of the interactive incremental-build policy described next. See
@@ -354,6 +360,233 @@ test target or dependency feature:
 - **Duplicate TLS backend / TLS backend drift** — `ureq` enables `native-tls` alongside
   `rustls`, or no longer enables `rustls`. Keep exactly the `rustls` feature (plus `gzip`).
 
+## 5. Inherent Test Costs
+
+`dev/benchmarks/suite-profile.json` (contract `suite-timing-evidence`) records a warm
+per-test duration, `warm_duration_ms`, for every test nextest ran in the default
+`cargo nextest run --workspace` invocation — 4,481 tests at revision `cb8d42c3`, cache
+state warm, one warmup run ahead of the measured run, `ceil(exec_time_seconds * 1000)`.
+Nothing in that profile is close to either enforced ceiling: the slowest single test,
+5,324 ms, sits well under the per-test bound in
+[`.config/nextest.toml`](../.config/nextest.toml), and the whole default run sits
+comfortably under `MAX_TEST_SUITE_SECONDS` — see
+[dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
+for the exact measured margin. The tables below attribute cost, not risk: for every test whose
+measured cost is a direct consequence of the property it proves — a real subprocess, a
+real transaction round trip through the storage journal, real filesystem publication,
+genuine concurrency, or a property-based search over many generated cases — this names it,
+its warm cost, and the mechanism. A cost this attribution does not find a mechanism for
+belongs to a reducibility issue, not to this table.
+
+### Real subprocess timing and signal semantics
+
+Each of these spawns a real child process or binds a real socket and proves a bounded-time
+property that cannot resolve faster than the real timeout, signal, or process teardown it
+exercises: `test_execute_command_timeout` spawns `sleep 10` under a shorter enforced
+timeout; `test_timeout_kills_process_group_and_does_not_deadlock` spawns a background
+grandchild that would otherwise hold a pipe open for 60s; `test_start_server_bounds_a_child_that_neither_serves_nor_exits`
+bounds a real child to a 2s startup window; `test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero`
+and `test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop` drive a
+real `jit-server` process through a stalled connection and its shutdown deadline;
+`test_command_exit_codes_broken_pipe_emits_141` writes a 2 MiB description so a real child
+`jit` process is still writing to stdout when the parent closes its read end after the
+first byte, forcing a real `SIGPIPE` — twice, once plain and once `--json`;
+`test_unrelated_process_still_respects_bootstrap_lock` holds a real file lock in-process
+while a competing real `jit` subprocess is denied it; `test_is_serving_on_port_reports_a_bound_socket_nobody_serves_as_not_serving`
+must wait out a real connect-without-accept before it can conclude no one answered.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `graceful_shutdown_tests::test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero` | 5,324 |
+| `commands::serve::tests::test_start_server_bounds_a_child_that_neither_serves_nor_exits` | 2,012 |
+| `command_exit_code_projection_tests::test_command_exit_codes_broken_pipe_emits_141` | 1,219 |
+| `graceful_shutdown_tests::test_open_registered_stalled_connection_waits_for_the_stopped_accept_loop` | 1,121 |
+| `nested_checker_recovery_test::test_unrelated_process_still_respects_bootstrap_lock` | 1,057 |
+| `gate_execution::tests::test_execute_command_timeout` | 1,018 |
+| `gate_execution::tests::test_timeout_kills_process_group_and_does_not_deadlock` | 1,014 |
+| `commands::serve::tests::test_is_serving_on_port_reports_a_bound_socket_nobody_serves_as_not_serving` | 519 |
+
+### Property-based tests over real production code paths
+
+proptest's default is 256 generated cases per property. `crates/jit/src/storage/claim_coordinator_proptests.rs`
+runs its concurrency and rebuild properties against a real, fsync'd file store with real
+threads per case; its own comment records that the default case count pushed these tests
+to minutes, and caps I/O-bearing properties at 64 cases. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
+and `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` run each case through a
+fresh in-memory `TestHarness`/`CommandExecutor` pipeline rather than a synthetic
+data structure, and cap at 48 cases for the same reason. Both caps trade case count for
+staying inside the per-test budget without dropping to example-based coverage; see those
+files' own configuration comments for the exact rationale.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `storage::claim_coordinator::proptests::prop_concurrent_different_issues_succeed` | 3,008 |
+| `storage::claim_coordinator::proptests::prop_concurrent_claims_exclusive` | 2,931 |
+| `template_apply_tests::prop_apply_yields_transitively_reduced_graph` | 2,430 |
+| `template_apply_tests::prop_force_refresh_is_idempotent_on_node_and_edge_set` | 2,420 |
+| `template_apply_tests::prop_apply_always_yields_acyclic_dag` | 2,262 |
+| `readiness_coherence_tests::prop_stored_readiness_agrees_with_the_blocked_predicate_after_dependency_edits` | 1,732 |
+| `storage::claim_coordinator::proptests::prop_sequence_numbers_monotonic` | 1,247 |
+| `storage::claim_coordinator::proptests::prop_lease_count_invariant` | 571 |
+| `storage::claim_coordinator::proptests::prop_no_data_loss_in_rebuild` | 524 |
+
+### CLI subprocess publishing durable state
+
+Each of these spawns the compiled `jit` binary, once or several times in the same test
+(a dry run, an apply, then a second apply to prove the no-op; a plain-text and a `--json`
+report of the same drift), to pack, apply, validate, or repair a profile package on disk.
+`dev/benchmarks/test-suite-performance-4b7c06d0.json` (contract `transaction-benchmark-evidence`)
+measures exactly that publication cost at the packaging fixture's model limits — 511
+assets, 1,023 distinct source directories: a `profile add` against an existing data root
+carries a median 249 ms and 1,046 directory fsync calls, and a `profiled init` publication
+carries a median 419 ms. `test_profile_pack_and_add_carry_a_package_at_the_model_limits`
+exercises that fixture directly through the CLI; the rest of this table pays the same
+durable-publication machinery at smaller scale, often several times per test.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `profile_cli_tests::test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op` | 4,095 |
+| `profile_acceptance_tests::test_profile_fresh_init_and_existing_apply_are_equivalent_without_git` | 2,894 |
+| `profile_cli_tests::test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op` | 2,828 |
+| `derived_state_repair_tests::test_cli_validate_fix_repairs_each_owned_class_and_preserves_authored_bytes` | 2,635 |
+| `profile_acceptance_tests::test_offline_public_cli_profile_reaches_implementation_ready_breakdown` | 2,129 |
+| `profile_cli_tests::test_profile_pack_and_add_carry_a_package_at_the_model_limits` | 2,058 |
+| `derived_state_repair_tests::test_cli_validate_fix_repairs_mode_only_profile_drift` | 2,002 |
+| `profile_cli_tests::test_validate_plain_and_json_report_installed_profile_drift` | 1,575 |
+| `derived_state_repair_tests::test_cli_validate_fix_preserves_permission_error_classification` | 1,370 |
+| `profile_cli_tests::test_profiled_init_publishes_valid_repo_and_applied_inventory` | 1,328 |
+| `profile_acceptance_tests::test_profile_application_contributes_workflow_invariants_to_scaffolded_registry` | 1,245 |
+| `profile_cli_tests::test_existing_partial_profiled_init_atomically_completes_neutral_scaffold` | 1,224 |
+| `repo_discovery_tests::test_explicit_non_ancestor_data_root_keeps_worktree_assets_at_cwd` | 980 |
+| `repo_discovery_tests::test_nested_profile_init_keeps_data_and_assets_in_child` | 944 |
+| `repo_discovery_tests::test_relative_data_root_override_keeps_worktree_assets_at_discovered_root` | 939 |
+| `label_hierarchy_e2e_test::test_label_hierarchy_complete_workflow` | 824 |
+| `workflow_tests::test_workflow_complex_epic` | 710 |
+| `cross_substrate_generality_tests::test_all_four_kinds_through_one_generic_path` | 621 |
+| `derived_state_repair_tests::test_cli_validate_fix_profile_provenance_failures_are_zero_write` | 543 |
+| `failure_probe_fixture::test_failure_probe_fixture_reports_nonzero_status_for_each_setup_class` | 532 |
+
+### Command-module tests publishing a full profile package's owned surface
+
+These stay below the CLI subprocess boundary — unit tests over `commands::`, `storage::`,
+and `profile::` modules that, per "1. Unit Tests" above, work against a real
+`TempDir`-backed store because that is what those modules exist to do. Each applies,
+composes, or repairs a real, complete profile package's owned surface (schemas, registries,
+rules, generated docs) rather than a one-file fixture, so the cost scales with the
+package's real owned-materialization count. `test_pack_package_archive_stays_within_its_bounds_for_a_package_at_the_model_limits`
+packs the same `write_package_tree_at_model_limits` fixture the transaction benchmark's
+`profile_pack`/`profile_add` measurements above use, directly through the library rather
+than the CLI. `test_validate_fix_repairs_owned_materializations_in_memory` is the one
+exception to the real-filesystem description above — it seeds an equivalently complete
+in-memory repository fixture instead — but the property proven, and the cost, is the same:
+repair correctness across every owned class of a real profile package.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `commands::validate::tests::test_validate_fix_repairs_every_owned_materialization_and_preserves_unowned_files` | 1,967 |
+| `commands::validate::tests::test_validate_fix_repairs_owned_materializations_in_memory` | 1,923 |
+| `commands::profile::tests::test_apply_profile_selection_recovers_an_obsolete_default_schema_atomically` | 1,856 |
+| `commands::profile::tests::test_apply_profile_package_jit_dogfood_composes_what_applying_both_packages_composes` | 1,830 |
+| `derived_state_repair_tests::test_harness_validate_fix_repairs_each_owned_class_and_preserves_authored_bytes` | 1,568 |
+| `profile::repository_package::tests::test_profile_applies_to_neutral_repo_and_ordinary_renderers_consume_config` | 1,460 |
+| `derived_state_repair_tests::test_harness_validate_fix_repairs_mode_only_profile_drift` | 1,444 |
+| `commands::init::tests::test_fresh_profile_init_records_every_package_of_the_selected_closure` | 1,222 |
+| `commands::init::tests::test_fresh_profile_init_publishes_complete_valid_repo_without_git` | 1,199 |
+| `commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged` | 996 |
+| `commands::profile::tests::test_apply_workflow_profile_to_bare_repository_contributes_hierarchy_rules` | 909 |
+| `commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands` | 892 |
+| `profile::package_archive::tests::test_pack_package_archive_stays_within_its_bounds_for_a_package_at_the_model_limits` | 529 |
+
+### Genuine concurrency: real threads, timers, and watchers
+
+`test_concurrent_fresh_profile_init_publishes_one_coherent_repository` races real threads
+through real initialization; `test_concurrent_writer_observes_failed_apply_preimage_then_publishes`
+does the same across a real write barrier. `test_rebuild_index_filters_expired_leases`
+acquires a lease with a real 1s TTL and sleeps 1.1s past it, because expiry is a real clock
+property, not a mocked one. `test_start_watching_ignores_events_jsonl` starts a real
+filesystem watcher and sleeps past its own real debounce window; it is compiled once into
+the `jit-server` crate's library test target and once into its binary target, so it runs —
+and is measured — twice.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `commands::init::tests::test_concurrent_fresh_profile_init_publishes_one_coherent_repository` | 1,213 |
+| `storage::claim_coordinator::tests::test_rebuild_index_filters_expired_leases` | 1,111 |
+| `template_apply_atomicity_tests::test_concurrent_writer_observes_failed_apply_preimage_then_publishes` | 610 |
+| `watcher::tests::test_start_watching_ignores_events_jsonl` (library target) | 513 |
+| `watcher::tests::test_start_watching_ignores_events_jsonl` (binary target) | 512 |
+
+### Data-driven tests bundling many real scenarios
+
+`test_all_steering_scenarios` drives every scenario fixture under
+`crates/jit/tests/fixtures/steering/` from one test function by design — its own doc
+comment records the choice, made so adding a scenario needs a fixture, not a Rust change —
+and each scenario runs multiple real `jit` subprocess invocations.
+`test_cargo_ci_selftest_fails_seeded_broken_merges` is already explained in full under
+"3. Integration Tests" above: it runs the real `scripts/cargo-ci.sh` against four seeded
+merge fixtures, two of which also run a real `cargo build --workspace`.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `steering_scenarios::test_all_steering_scenarios` | 2,519 |
+| `merged_tree_gate_verification_tests::test_cargo_ci_selftest_fails_seeded_broken_merges` | 2,491 |
+
+### Deliberate at-scale tests
+
+`test_harness_scales_with_many_issues` is the harness suite's own worked example of
+behavior-at-scale coverage (see "2. Harness Tests" above): 100 real issue creations through
+the full command pipeline. `test_resolve_ambiguous` creates real issues the same way until
+two land on the same 4-character id prefix — the property under test, ambiguous-prefix
+rejection, cannot be observed without a real collision.
+`test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` writes 257 real
+gate-run directories to disk, plus a real named pipe via `mkfifo` alongside a stray file and
+symlink, to prove the precheck's history capture holds at a real page-scale size rather than
+a handful of examples, and ignores clutter mixed into the same directory that is not itself
+a run.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `harness_demo::test_harness_scales_with_many_issues` | 2,154 |
+| `short_hash_tests::test_resolve_ambiguous` | 1,969 |
+| `commands::gate_check::tests::test_lifecycle_precheck_captures_large_history_and_ignores_root_clutter` | 517 |
+
+### Repeated real gate execution
+
+`commands::gate_check::tests` runs gates defined with `GateChecker::Exec`, so every gate
+check in these tests spawns a real shell command. Proving history compaction,
+re-execution-on-change, and priority ordering takes several such checks per test — seven in
+the slowest of the group, which repeats a failing gate to exercise history compaction.
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `commands::gate_check::tests::test_run_history_is_compacted_to_one_latest_run` | 1,848 |
+| `commands::gate_check::tests::test_check_gate_reexecutes_for_new_same_issue_run_but_not_unrelated_run` | 550 |
+| `commands::gate_check::tests::test_check_gate_run_history_keeps_only_latest_legacy_run` | 547 |
+| `commands::gate_check::tests::test_check_all_gates_respects_priority_order` | 541 |
+| `commands::gate_check::tests::test_check_all_gates_stable_sort_same_priority` | 537 |
+| `commands::gate_check::tests::test_check_gate_executes_again_after_declared_inputs_change` | 515 |
+
+### Excluded from the default run
+
+Seven tests are marked `#[ignore]` and never run in the default `cargo nextest run
+--workspace`, so `suite-profile.json` does not cover them; `cargo nextest run --workspace
+--run-ignored ignored-only` at `cb8d42c3` measures them directly:
+
+| Test | Warm (ms) |
+| --- | ---: |
+| `lock_tests::test_timeout_on_lock_contention` | 308 |
+| `lock_tests::test_exclusive_lock_blocks_shared_locks` | 209 |
+| `lock_tests::test_lock_released_on_drop` | 7 |
+| `lock_tests::test_try_lock_non_blocking` | 7 |
+| `lock_tests::test_exclusive_lock_prevents_concurrent_writes` | 7 |
+| `lock_tests::test_shared_locks_allow_concurrent_reads` | 7 |
+| `worktree_cli_tests::test_validate_branch_drift_detects_drifted_branch` | 6 |
+
+Combined they run in 317 ms wall clock. That cost is not inherent, and the exclusion is not
+a performance decision: the six `lock_tests` are TDD placeholders whose real bodies are
+commented out, passing only because a placeholder body increments a shared counter for
+thread 0; the seventh has an empty body and asserts nothing (jit:abe2c2bd).
+
 ## Test Environment
 
 Two environment behaviors matter when writing tests:
@@ -414,7 +647,9 @@ cargo test --doc --workspace
 ```
 
 The committed nextest policy is documented in
-[`.config/nextest.toml`](../.config/nextest.toml).
+[`.config/nextest.toml`](../.config/nextest.toml), which also pins a per-test ceiling: a
+slow-timeout of 10s, terminated after a second 10s grace period, so any single test that
+runs past 20s fails the run rather than hanging it.
 
 Lint and format alongside tests. Both must be clean before a commit:
 
