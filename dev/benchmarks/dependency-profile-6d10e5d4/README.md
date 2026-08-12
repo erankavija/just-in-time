@@ -30,17 +30,34 @@ arms differ only in the presence and value of the manifest key under test.
 Medians over each arm's own samples; the ceiling is 25% over the opt-level 0
 median of the same metric.
 
+The two arms the decision rests on, `opt0_baseline` and `opt1_candidate`, were
+re-run together as a matched pair with the harness's default 3 clean + 3
+rebuild samples each, at revisions `3514acf4` and `7f577e31` respectively (one
+commit apart, touching only an unrelated progress-tracking file, no code and
+no manifest change; see `summary.json` `.method.fixed_revision`).
+`opt2_rejected_arm` retains its original 3 clean, 2 rebuild samples from a
+since-merged branch revision (`14513e48d` / `4ce93b361`); it was rejected and
+is carried here for context only, not as part of the accepted comparison.
+
 | Metric | opt-level 0 | opt-level 1 | opt-level 2 | Ceiling |
 | --- | ---: | ---: | ---: | ---: |
-| Clean `clippy --all-targets` | 40.605 s | 45.607 s (+12.3%) | 50.178 s (+23.6%) | 50.756 s |
-| Clean `test --no-run` | 52.344 s | 56.877 s (+8.7%) | 59.086 s (+12.9%) | 65.430 s |
-| Representative rebuild | 19.083 s | 19.666 s (+3.1%) | 20.337 s (+6.6%) | 23.854 s |
+| Clean `clippy --all-targets` | 40.367 s | 45.872 s (+13.6%) | 50.178 s (+24.3%) | 50.459 s |
+| Clean `test --no-run` | 51.729 s | 57.239 s (+10.6%) | 59.086 s (+14.2%) | 64.661 s |
+| Representative rebuild | 18.517 s | 19.332 s (+4.4%) | 20.337 s (+9.8%) | 23.146 s |
 | Largest recorded target directory | 6.740 GB | 6.816 GB | 6.929 GB | 10.737 GB |
 
 Both arms clear both mandatory ceilings. The representative rebuild is the
 metric the epic's traps single out, and it is the one the dependency graph
 barely touches: the probe recompiles workspace crates and relinks, and no
 dependency rlib is rebuilt.
+
+The representative-rebuild samples are the noisiest of the three timed
+metrics at this sample size: opt-level 0 recorded 17.230 s / 18.517 s /
+20.640 s and opt-level 1 recorded 18.387 s / 19.332 s / 22.183 s. Even so, the
+decision does not depend on averaging away that noise: opt-level 1's *worst*
+individual rebuild sample (22.183 s) is still below the 23.146 s ceiling
+computed from opt-level 0's median, so the metric clears the mandatory ceiling
+at either arm's own extreme, not only at the median.
 
 ## Suite runtime
 

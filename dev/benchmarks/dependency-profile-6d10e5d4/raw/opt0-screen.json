@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-12T18:02:35Z",
+  "generated_at": "2026-08-12T18:25:00Z",
   "environment": {
-    "git_revision": "7f577e31388fe35aeaae088b49201ff3729a8aa2",
+    "git_revision": "3514acf422e1a9f51101a14b2e224afb7ca70003",
     "os": "Arch Linux",
     "kernel": "Linux 7.1.6-arch1-1",
     "cpu_count": 24,
@@ -22,19 +22,19 @@
     {
       "sample": 1,
       "clippy": {
-        "wall_seconds": 45.872,
-        "max_rss_kb": 1706720,
+        "wall_seconds": 40.827,
+        "max_rss_kb": 1711028,
         "exit_code": 0
       },
       "test_no_run": {
-        "wall_seconds": 57.239,
-        "max_rss_kb": 2566720,
+        "wall_seconds": 51.729,
+        "max_rss_kb": 2556064,
         "exit_code": 0
       },
-      "target_dir_bytes": 5644181258,
+      "target_dir_bytes": 5584782821,
       "inventory": {
-        "target_dir_bytes": 5644181258,
-        "unique_active_test_executable_bytes": 1654970720,
+        "target_dir_bytes": 5584782821,
+        "unique_active_test_executable_bytes": 1597954344,
         "integration_test_target_count": 11,
         "test_case_count": 4588,
         "doctest_case_count": 63,
@@ -45,19 +45,19 @@
     {
       "sample": 2,
       "clippy": {
-        "wall_seconds": 46.1,
-        "max_rss_kb": 1706556,
+        "wall_seconds": 40.342,
+        "max_rss_kb": 1710248,
         "exit_code": 0
       },
       "test_no_run": {
-        "wall_seconds": 57.297,
-        "max_rss_kb": 2568732,
+        "wall_seconds": 51.532,
+        "max_rss_kb": 2551708,
         "exit_code": 0
       },
-      "target_dir_bytes": 5644181200,
+      "target_dir_bytes": 5584782668,
       "inventory": {
-        "target_dir_bytes": 5644181200,
-        "unique_active_test_executable_bytes": 1654970720,
+        "target_dir_bytes": 5584782668,
+        "unique_active_test_executable_bytes": 1597954344,
         "integration_test_target_count": 11
       },
       "success": true
@@ -65,19 +65,19 @@
     {
       "sample": 3,
       "clippy": {
-        "wall_seconds": 45.828,
-        "max_rss_kb": 1705868,
+        "wall_seconds": 40.367,
+        "max_rss_kb": 1709472,
         "exit_code": 0
       },
       "test_no_run": {
-        "wall_seconds": 57.059,
-        "max_rss_kb": 2579820,
+        "wall_seconds": 51.766,
+        "max_rss_kb": 2561136,
         "exit_code": 0
       },
-      "target_dir_bytes": 5644181420,
+      "target_dir_bytes": 5584782767,
       "inventory": {
-        "target_dir_bytes": 5644181420,
-        "unique_active_test_executable_bytes": 1654970720,
+        "target_dir_bytes": 5584782767,
+        "unique_active_test_executable_bytes": 1597954344,
         "integration_test_target_count": 11
       },
       "success": true
@@ -87,71 +87,71 @@
     {
       "sample": 1,
       "setup_clippy": {
-        "wall_seconds": 46.127,
-        "max_rss_kb": 1706416,
+        "wall_seconds": 40.614,
+        "max_rss_kb": 1711000,
         "exit_code": 0
       },
       "setup_test_no_run": {
-        "wall_seconds": 56.933,
-        "max_rss_kb": 2575204,
+        "wall_seconds": 51.907,
+        "max_rss_kb": 2564252,
         "exit_code": 0
       },
       "rebuild_test_no_run": {
-        "wall_seconds": 22.183,
-        "max_rss_kb": 1705792,
+        "wall_seconds": 17.23,
+        "max_rss_kb": 1713716,
         "exit_code": 0
       },
-      "target_dir_bytes": 6815900803,
+      "target_dir_bytes": 6740042879,
       "probe_restored_verified": true,
       "success": true
     },
     {
       "sample": 2,
       "setup_clippy": {
-        "wall_seconds": 45.831,
-        "max_rss_kb": 1704616,
+        "wall_seconds": 40.729,
+        "max_rss_kb": 1709076,
         "exit_code": 0
       },
       "setup_test_no_run": {
-        "wall_seconds": 56.865,
-        "max_rss_kb": 2573564,
+        "wall_seconds": 52.628,
+        "max_rss_kb": 2555148,
         "exit_code": 0
       },
       "rebuild_test_no_run": {
-        "wall_seconds": 18.387,
-        "max_rss_kb": 1706340,
+        "wall_seconds": 20.64,
+        "max_rss_kb": 1712612,
         "exit_code": 0
       },
-      "target_dir_bytes": 6815900704,
+      "target_dir_bytes": 6740042936,
       "probe_restored_verified": true,
       "success": true
     },
     {
       "sample": 3,
       "setup_clippy": {
-        "wall_seconds": 45.705,
-        "max_rss_kb": 1706464,
+        "wall_seconds": 40.473,
+        "max_rss_kb": 1709872,
         "exit_code": 0
       },
       "setup_test_no_run": {
-        "wall_seconds": 57.012,
-        "max_rss_kb": 2565808,
+        "wall_seconds": 52.124,
+        "max_rss_kb": 2554280,
         "exit_code": 0
       },
       "rebuild_test_no_run": {
-        "wall_seconds": 19.332,
-        "max_rss_kb": 1707072,
+        "wall_seconds": 18.517,
+        "max_rss_kb": 1713836,
         "exit_code": 0
       },
-      "target_dir_bytes": 6815900757,
+      "target_dir_bytes": 6740042855,
       "probe_restored_verified": true,
       "success": true
     }
   ],
   "medians": {
-    "clean_clippy_wall_seconds": 45.872,
-    "clean_test_no_run_wall_seconds": 57.239,
-    "clean_total_wall_seconds": 103.11099999999999,
-    "rebuild_wall_seconds": 19.332
+    "clean_clippy_wall_seconds": 40.367,
+    "clean_test_no_run_wall_seconds": 51.729,
+    "clean_total_wall_seconds": 92.133,
+    "rebuild_wall_seconds": 18.517
   }
 }

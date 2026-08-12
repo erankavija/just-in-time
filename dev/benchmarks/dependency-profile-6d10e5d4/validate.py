@@ -17,7 +17,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 RAW_ARMS = {
-    "opt0_baseline": ["opt0-screen-a.json", "opt0-screen-b.json"],
+    "opt0_baseline": ["opt0-screen.json"],
     "opt1_candidate": ["opt1-screen.json"],
     "opt2_rejected_arm": ["opt2-screen-a.json", "opt2-screen-b.json"],
 }

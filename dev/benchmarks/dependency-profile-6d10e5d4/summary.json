@@ -16,7 +16,7 @@
   },
   "method": {
     "harness": "scripts/benchmark-rust-build.sh",
-    "samples_per_arm": "3 clean, 2 rebuild for the two compared arms; 2 clean, 1 rebuild for the intermediate opt-level 2 arm",
+    "samples_per_arm": "3 clean, 3 rebuild for each of the two decision-grounding arms (opt0_baseline, opt1_candidate), freshly re-run together as a matched pair; opt2_rejected_arm retains its original 3 clean, 2 rebuild samples from a since-merged branch revision, carried for context only and excluded from the accepted comparison",
     "isolation": "one freshly created CARGO_TARGET_DIR per sample, removed after its measurements",
     "serialization": "the host-wide CARGO_CI_BUILD_LOCK shared with scripts/cargo-ci.sh",
     "clean_sample": "cargo clippy --workspace --all-targets -- -D warnings, then cargo test --workspace --no-run, timed separately",
@@ -24,9 +24,21 @@
     "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
     "arms_differ_only_by": "the presence and value of the manifest key under test",
     "raw_evidence": {
-      "opt0": ["raw/opt0-screen-a.json", "raw/opt0-screen-b.json"],
-      "opt1": ["raw/opt1-screen.json"],
-      "opt2": ["raw/opt2-screen-a.json", "raw/opt2-screen-b.json"]
+      "opt0": [
+        "raw/opt0-screen.json"
+      ],
+      "opt1": [
+        "raw/opt1-screen.json"
+      ],
+      "opt2": [
+        "raw/opt2-screen-a.json",
+        "raw/opt2-screen-b.json"
+      ]
+    },
+    "fixed_revision": {
+      "opt0_baseline": "3514acf422e1a9f51101a14b2e224afb7ca70003",
+      "opt1_candidate": "7f577e31388fe35aeaae088b49201ff3729a8aa2",
+      "note": "The two decision-grounding arms were re-run one commit apart: opt1_candidate at 7f577e31 (still HEAD when that arm started), opt0_baseline at 3514acf4 (HEAD after an intervening commit). `git diff --stat 7f577e313 3514acf422` touches only dev/active/4b7c06d0-test-suite-performance/progress.json, no code and no manifest change, so the two arms remain a matched pair. opt2_rejected_arm was measured earlier at 14513e48d and 4ce93b361 on a since-merged branch; see raw/opt2-screen-*.json."
     }
   },
   "ceilings": {
@@ -41,25 +53,83 @@
   },
   "build_screen": {
     "opt0_baseline": {
-      "clean_clippy_seconds": [40.572, 40.605, 40.646],
-      "clean_test_no_run_seconds": [52.78, 51.608, 52.344],
-      "representative_rebuild_seconds": [20.931, 17.234],
-      "clean_target_directory_bytes": [5584978120, 5584978149, 5584978057],
-      "rebuild_target_directory_bytes": [6740238926, 6740238798]
+      "clean_clippy_seconds": [
+        40.827,
+        40.342,
+        40.367
+      ],
+      "clean_test_no_run_seconds": [
+        51.729,
+        51.532,
+        51.766
+      ],
+      "representative_rebuild_seconds": [
+        17.23,
+        20.64,
+        18.517
+      ],
+      "clean_target_directory_bytes": [
+        5584782821,
+        5584782668,
+        5584782767
+      ],
+      "rebuild_target_directory_bytes": [
+        6740042879,
+        6740042936,
+        6740042855
+      ]
     },
     "opt1_candidate": {
-      "clean_clippy_seconds": [45.587, 45.627],
-      "clean_test_no_run_seconds": [56.88, 56.873],
-      "representative_rebuild_seconds": [19.666],
-      "clean_target_directory_bytes": [5644381291, 5644381232],
-      "rebuild_target_directory_bytes": [6816101144]
+      "clean_clippy_seconds": [
+        45.872,
+        46.1,
+        45.828
+      ],
+      "clean_test_no_run_seconds": [
+        57.239,
+        57.297,
+        57.059
+      ],
+      "representative_rebuild_seconds": [
+        22.183,
+        18.387,
+        19.332
+      ],
+      "clean_target_directory_bytes": [
+        5644181258,
+        5644181200,
+        5644181420
+      ],
+      "rebuild_target_directory_bytes": [
+        6815900803,
+        6815900704,
+        6815900757
+      ]
     },
     "opt2_rejected_arm": {
-      "clean_clippy_seconds": [49.831, 50.195, 50.178],
-      "clean_test_no_run_seconds": [59.591, 59.086, 58.691],
-      "representative_rebuild_seconds": [22.049, 18.624],
-      "clean_target_directory_bytes": [5751110458, 5751110428, 5751110448],
-      "rebuild_target_directory_bytes": [6929077831, 6929077899]
+      "clean_clippy_seconds": [
+        49.831,
+        50.195,
+        50.178
+      ],
+      "clean_test_no_run_seconds": [
+        59.591,
+        59.086,
+        58.691
+      ],
+      "representative_rebuild_seconds": [
+        22.049,
+        18.624
+      ],
+      "clean_target_directory_bytes": [
+        5751110458,
+        5751110428,
+        5751110448
+      ],
+      "rebuild_target_directory_bytes": [
+        6929077831,
+        6929077899
+      ]
     }
   },
   "suite_runtime": {
@@ -70,18 +140,50 @@
       "suite_clock_ms_exclusive": 29000
     },
     "pre_change": [
-      {"nextest_ms": 40740, "doctest_ms": 5339, "suite_clock_ms": 46079}
+      {
+        "nextest_ms": 40740,
+        "doctest_ms": 5339,
+        "suite_clock_ms": 46079
+      }
     ],
     "opt1_candidate": [
-      {"nextest_ms": 18078, "doctest_ms": 4621, "suite_clock_ms": 22699},
-      {"nextest_ms": 18088, "doctest_ms": 4643, "suite_clock_ms": 22731},
-      {"nextest_ms": 18156, "doctest_ms": 4633, "suite_clock_ms": 22789},
-      {"nextest_ms": 18160, "doctest_ms": 4656, "suite_clock_ms": 22816}
+      {
+        "nextest_ms": 18078,
+        "doctest_ms": 4621,
+        "suite_clock_ms": 22699
+      },
+      {
+        "nextest_ms": 18088,
+        "doctest_ms": 4643,
+        "suite_clock_ms": 22731
+      },
+      {
+        "nextest_ms": 18156,
+        "doctest_ms": 4633,
+        "suite_clock_ms": 22789
+      },
+      {
+        "nextest_ms": 18160,
+        "doctest_ms": 4656,
+        "suite_clock_ms": 22816
+      }
     ],
     "opt2_rejected_arm": [
-      {"nextest_ms": 18517, "doctest_ms": 4540, "suite_clock_ms": 23057},
-      {"nextest_ms": 18529, "doctest_ms": 4508, "suite_clock_ms": 23037},
-      {"nextest_ms": 18594, "doctest_ms": 4483, "suite_clock_ms": 23077}
+      {
+        "nextest_ms": 18517,
+        "doctest_ms": 4540,
+        "suite_clock_ms": 23057
+      },
+      {
+        "nextest_ms": 18529,
+        "doctest_ms": 4508,
+        "suite_clock_ms": 23037
+      },
+      {
+        "nextest_ms": 18594,
+        "doctest_ms": 4483,
+        "suite_clock_ms": 23077
+      }
     ]
   },
   "decision": {
