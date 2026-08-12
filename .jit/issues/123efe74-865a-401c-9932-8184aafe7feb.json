@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:sol-test-profile-opt",
+  "claimed_at": "2026-08-12T06:06:11.427648569Z",
+  "context": {},
+  "created_at": "2026-08-12T06:05:46.100297502Z",
+  "dependencies": [],
+  "description": "Measure and apply an optimized Rust test profile only when it closes the remaining warm-suite runtime gap without creating unacceptable build or artifact costs.\n\n## Background\n\nAfter verified fixture reuse, the complete already-built workspace still carries hundreds of aggregate CPU-seconds across 4,510 runnable test identities. Assertion-preserving baseline substitution cannot remove enough of that work because many expensive tests intentionally exercise their initial operation. A bounded optimization level for `[profile.test]` can accelerate the same code paths without removing operations, identities, or assertions, but its compile-time and artifact-size tradeoffs require matched evidence before adoption.\n\n## Success Criteria\n\n- [hard] REQ-01: Compares a fixed opt-level-0 baseline with `[profile.test] opt-level = 1` in separate clean target directories under identical Rust, Cargo, nextest 0.9.133, incremental-disabled, no-sccache, and 24-thread conditions.\n- [hard] REQ-02: Preserves the exact runnable and ignored test identity sets with no missing or duplicate identities, and all workspace tests and doctests pass in every accepted candidate sample.\n- [hard] REQ-03: Accepts the candidate only when three already-built warm samples have median aggregate test work at least 200 seconds lower than the matched baseline, median nextest wall at most 23,500 milliseconds with no sample above 30,000 milliseconds, and median doctest wall at most 5,500 milliseconds.\n- [hard] REQ-04: Keeps active test-executable bytes below the existing two-gibibyte budget and limits both clean test-build and representative comment-touch rebuild median regressions to at most 25 percent.\n- [hard] REQ-05: If accepted, commits only the measured profile change plus durable benchmark evidence and passes the profiler self-test, cargo-ci self-test, formatting, warning-free linting, and the build-budget checker; if rejected, records complete raw evidence and a no-change decision without weakening any runtime threshold.\n\n## Notes\n\nUse separate target directories for the matched arms because Cargo profile fingerprints differ. Preserve raw per-sample reporter evidence, setup durations, executable manifests, and build timings rather than reporting medians alone.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T06:05:46.100297502Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "123efe74-865a-401c-9932-8184aafe7feb",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Optimize the Rust test profile from matched evidence",
+  "updated_at": "2026-08-12T06:06:11.427648569Z"
+}

@@ -21,7 +21,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Share the recorded failure probe corpus",
-  "updated_at": "2026-08-12T05:33:18.284135078Z"
+  "updated_at": "2026-08-12T06:06:05.844221781Z"
 }

@@ -13812,3 +13812,9 @@
 {"from":"ready","id":"5b2b9c73-95ad-4fbb-b40b-2515174d8840","issue_id":"ae17798d-c0c6-4ad0-b119-2dd2fab8e95d","timestamp":"2026-08-12T05:33:16.137148334Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sol-applied-lib-fixtures","id":"099fa14e-473d-4d7d-845a-916fb1d76b12","issue_id":"ae17798d-c0c6-4ad0-b119-2dd2fab8e95d","timestamp":"2026-08-12T05:33:16.137148334Z","type":"issue_claimed"}
 {"assignee":"agent:sol-failure-corpus","id":"bb4d2f70-f683-4f3f-ae5e-1ea1b4f822a4","issue_id":"deb33646-edb9-4ee9-aea4-c808495f24c8","timestamp":"2026-08-12T05:33:18.284135078Z","type":"issue_claimed"}
+{"id":"5b7e22ca-53d2-4ce3-8492-c77b6938ee47","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","priority":"high","timestamp":"2026-08-12T06:05:46.100297502Z","title":"Optimize the Rust test profile from matched evidence","type":"issue_created"}
+{"fields":["dependencies"],"id":"0f500ee6-1bcb-4256-9ef8-07fdf54e76c6","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T06:06:00.266707205Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"58404e53-ac16-4e54-8524-21cb43422b19","issue_id":"deb33646-edb9-4ee9-aea4-c808495f24c8","timestamp":"2026-08-12T06:06:05.844221781Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:sol-failure-corpus","id":"9a289675-117b-4e4d-9233-9bb6590c4165","issue_id":"deb33646-edb9-4ee9-aea4-c808495f24c8","timestamp":"2026-08-12T06:06:05.844221781Z","type":"issue_claimed"}
+{"from":"ready","id":"6c43591c-29be-495c-8b91-73ef56e32bc3","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","timestamp":"2026-08-12T06:06:11.427648569Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:sol-test-profile-opt","id":"7e0b965b-314d-4e56-8f10-333e2afc9b3b","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","timestamp":"2026-08-12T06:06:11.427648569Z","type":"issue_claimed"}
