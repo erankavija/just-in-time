@@ -29,10 +29,11 @@
     "milestone:v1.0",
     "component:testing",
     "satisfies:REQ-01",
-    "type:task"
+    "type:task",
+    "resolution:candidate-below-hard-performance-bound"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "rejected",
   "title": "Reuse applied profile baselines for CLI prerequisites",
-  "updated_at": "2026-08-12T09:28:29.909552555Z"
+  "updated_at": "2026-08-12T09:29:24.278699850Z"
 }
