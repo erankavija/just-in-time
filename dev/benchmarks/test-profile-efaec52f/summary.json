@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "issue": "efaec52f-da76-438a-a55b-d4cefd5e6217",
+  "generated_at": "2026-08-12T07:30:05Z",
+  "source": {
+    "candidate_revision": "11f096377949c404766a42153ee19e203b54da46",
+    "baseline_revision": "11f096377949c404766a42153ee19e203b54da46",
+    "candidate_manifest": "[profile.test.package.jit] opt-level = 1",
+    "candidate_manifest_sha256": "23cbd35d4f90cbb1d20bd5247f4a432e771c7d550b1f0cdab97be48d77cc8e26",
+    "restored_manifest_sha256": "9136f9113a879cd11eebe6a087e3b7ce1620a1e046b812a64f27a6a62255ae43",
+    "rejected_candidate_path": "dev/benchmarks/test-profile-efaec52f/rejected-candidate.patch"
+  },
+  "method": {
+    "harness": "scripts/benchmark-rust-build.sh",
+    "phase": "authorized_early_rebuild_screen",
+    "samples": {
+      "baseline_clean": 1,
+      "baseline_rebuild": 1,
+      "candidate_clean": 1,
+      "candidate_rebuild": 1,
+      "candidate_runtime": 0,
+      "candidate_doctest": 0
+    },
+    "target_isolation": "fresh per-sample baseline directories below /home/vkaskivuo/.cache/jit-efaec52f-opt0-build-screen and candidate directories below /home/vkaskivuo/.cache/jit-efaec52f-build-screen, removed by the harness after each sample",
+    "serialization": "exclusive /tmp/cargo-ci.lock using the cargo-ci flock convention",
+    "environment": {
+      "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+      "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
+      "nextest": "0.9.133",
+      "cpu_threads": 24,
+      "CARGO_BUILD_JOBS": 24,
+      "CARGO_INCREMENTAL": 0,
+      "RUSTC_WRAPPER": "",
+      "CARGO_CI_NO_SCCACHE": 1
+    },
+    "matched_baseline": {
+      "raw_build": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/baseline.json",
+      "raw_build_sha256": "fb79ef546afa2ca6df6c6f614e06af82db1ae8ed39dd76f73fe22b3fa6060818",
+      "source_revision": "11f096377949c404766a42153ee19e203b54da46",
+      "opt_level": 0,
+      "rebuild_seconds": 35.406,
+      "clean_test_build_seconds": 41.681,
+      "matched_inputs": "Same source revision, Rust/Cargo versions, harness, build lock, 24-job setting, incremental-disabled and no-sccache environment as the candidate; only the candidate Cargo profile override differs."
+    },
+    "early_stop_rule": "Reject after one scoped comment-touch rebuild when wall time exceeds 125 percent of the fresh same-revision opt-level-0 rebuild. Acceptance, and only acceptance, would require three matched build, warm nextest, and doctest samples.",
+    "raw_baseline_build": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/baseline.json",
+    "raw_candidate_build": "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/baseline.json"
+  },
+  "build_screen": {
+    "baseline_rebuild_seconds": 35.406,
+    "rebuild_ceiling_seconds": 44.2575,
+    "candidate_rebuild_seconds": 64.487,
+    "candidate_rebuild_regression_percent": 82.135796,
+    "candidate_over_ceiling_percent": 45.708637,
+    "rebuild_exit_code": 0,
+    "probe_restored_verified": true,
+    "passed": false,
+    "candidate_clean_test_build_seconds_diagnostic": 73.898,
+    "baseline_clean_test_build_seconds": 41.681,
+    "candidate_clean_regression_percent_diagnostic": 77.294211,
+    "clean_build_ceiling_seconds": 52.10125,
+    "candidate_clean_over_ceiling_percent_diagnostic": 41.835369
+  },
+  "compiler_scope": {
+    "baseline_raw_compiler_artifacts": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/raw/clean-1/cargo-test-list.json",
+    "baseline_raw_sha256": "ac02990e2b148aa7cdcaceb4bb9a167d21a748e14249616425566dbfc546c47f",
+    "baseline": {
+      "compiler_artifact_messages": 367,
+      "jit_artifact_messages": 16,
+      "jit_opt_levels": ["0"],
+      "jit_server_artifact_messages": 6,
+      "jit_server_opt_levels": ["0"],
+      "non_workspace_dependency_artifact_messages": 345,
+      "non_workspace_dependency_opt_levels": ["0"]
+    },
+    "raw_compiler_artifacts": "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/raw/clean-1/cargo-test-list.json",
+    "raw_sha256": "850844087410573aff037a0e8b3f8d3f275e46f9ee08ee11e52409a171b3e4ba",
+    "compiler_artifact_messages": 367,
+    "jit": {
+      "artifact_messages": 16,
+      "test_profile_artifact_messages": 12,
+      "opt_levels": ["1"],
+      "non_opt_level_1_messages": 0
+    },
+    "jit_server": {
+      "artifact_messages": 6,
+      "test_profile_artifact_messages": 3,
+      "opt_levels": ["0"],
+      "non_opt_level_0_messages": 0
+    },
+    "non_workspace_dependencies": {
+      "artifact_messages": 345,
+      "opt_levels": ["0"],
+      "non_opt_level_0_messages": 0
+    },
+    "derivation": "Filter reason == compiler-artifact, classify package_id by /crates/jit#, /crates/server#, or non-path dependency, then group profile.opt_level. All messages, including non-harness package artifacts compiled in the test profile, are covered."
+  },
+  "identities": {
+    "baseline_inventory": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/pre-change-test-inventory.json",
+    "baseline_inventory_sha256": "008b56b1054146c1e2a323c4b0a2ceb126986792bb629086227daac4908dee5a",
+    "candidate_regular_inventory": "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/pre-change-test-inventory.json",
+    "candidate_regular_inventory_sha256": "71917ffa0dd30e2af7dc14eb2346f548d806794c4a00eb75455eee2001fcc438",
+    "candidate_regular_total": 4521,
+    "candidate_runnable": 4511,
+    "candidate_ignored": 10,
+    "candidate_regular_normalized_identity_sha256": "072b95d13a6ba9c2b9955ac7ea4004d1ad5eeebbb69e7e4f6660c60a886a64e4",
+    "baseline_regular_normalized_identity_sha256": "072b95d13a6ba9c2b9955ac7ea4004d1ad5eeebbb69e7e4f6660c60a886a64e4",
+    "missing_regular_identities": 0,
+    "duplicate_regular_identities": 0,
+    "doctest": {
+      "count": 63,
+      "ignored": 0,
+      "normalized_identity_sha256": "1891865b69e6594c3ae3ed24045b2214edfbe9f4a140fa237b7f49e8b4ee18b6",
+      "authority": "dev/benchmarks/test-profile-efaec52f/opt0-build-screen/pre-change-test-inventory.json",
+      "authority_sha256": "008b56b1054146c1e2a323c4b0a2ceb126986792bb629086227daac4908dee5a",
+      "reuse_basis": "The fresh baseline and candidate use the exact same source revision; the only input difference is the candidate optimization profile, which cannot change test discovery.",
+      "candidate_list_attempt_status": "operational_error_excluded",
+      "candidate_list_attempt_error": "The external TMPDIR directory was not created before the harness list step. Raw logs retain the failed rustdoc invocation. This is not counted as a passing doctest run and no runtime acceptance claim is made after early rejection.",
+      "raw_attempts": [
+        "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/raw/clean-1/cargo-doctest-list.log",
+        "dev/benchmarks/test-profile-efaec52f/scoped-build-screen/raw/clean-1/cargo-doctest-list-ignored.log"
+      ]
+    }
+  },
+  "bytes": {
+    "baseline_unique_active_test_executable_bytes": 1594067072,
+    "candidate_unique_active_test_executable_bytes": 1541403408,
+    "hard_limit_bytes": 2147483648,
+    "below_hard_limit": true,
+    "candidate_target_directory_bytes": 3244222112
+  },
+  "thresholds": {
+    "median_aggregate_reduction_seconds_minimum": 200,
+    "median_nextest_wall_milliseconds_maximum": 23500,
+    "every_nextest_wall_milliseconds_maximum": 30000,
+    "median_doctest_wall_milliseconds_maximum": 5500,
+    "active_test_executable_bytes_maximum": 2147483648,
+    "clean_test_build_regression_percent_maximum": 25,
+    "comment_touch_rebuild_regression_percent_maximum": 25,
+    "early_rebuild_ceiling_seconds": 44.2575,
+    "weakened": false
+  },
+  "decision_matrix": {
+    "early_rebuild_screen": "fail",
+    "compiler_scope": "pass",
+    "regular_identity_set": "pass",
+    "doctest_identity_set": "reused_unchanged_authority_after_early_reject",
+    "active_executable_bytes": "pass",
+    "three_sample_build_medians": "not_run_after_authorized_early_reject",
+    "warm_runtime": "not_run_after_authorized_early_reject",
+    "doctest_runtime": "not_run_after_authorized_early_reject"
+  },
+  "decision": {
+    "value": "no_change",
+    "candidate_accepted": false,
+    "reason": "The package-scoped candidate's first representative rebuild took 64.487 seconds, exceeding the fresh same-revision opt-level-0 arm's 44.2575-second early-rejection ceiling. The issue explicitly authorizes stopping after this failure, so acceptance-only runtime and three-sample arms were not run.",
+    "thresholds_weakened": false,
+    "production_profile_change_retained": false,
+    "cargo_toml_restored_byte_exact": true
+  }
+}
