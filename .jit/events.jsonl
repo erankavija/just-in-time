@@ -13845,3 +13845,5 @@
 {"from":"in_progress","id":"3b639df2-7fd3-4d91-9c84-c14b024f88fb","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:30:06.998013744Z","to":"done","type":"issue_state_changed"}
 {"id":"cb3e2f90-b06d-4c25-a456-0475aa73c3b2","issue_id":"527bd363-70fd-4a0e-9708-9ed7d08002e3","timestamp":"2026-08-12T08:30:06.998013744Z","type":"issue_completed"}
 {"from":"backlog","id":"0995d08a-1d7d-4145-9573-848eac75a1f1","issue_id":"4ee95d17-02ff-41e8-af06-4381a03eaa7f","timestamp":"2026-08-12T08:30:12.534124748Z","to":"ready","type":"issue_state_changed"}
+{"from":"ready","id":"21255113-f65b-4072-86af-ff2fca95eabf","issue_id":"4ee95d17-02ff-41e8-af06-4381a03eaa7f","timestamp":"2026-08-12T08:30:34.254300572Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:sol-ephemeral-receipts","id":"aecd5696-c754-40f9-a7ca-6a09ff4d771a","issue_id":"4ee95d17-02ff-41e8-af06-4381a03eaa7f","timestamp":"2026-08-12T08:30:34.254300572Z","type":"issue_claimed"}

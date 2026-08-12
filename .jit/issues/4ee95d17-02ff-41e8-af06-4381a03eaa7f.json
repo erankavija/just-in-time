@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:sol-ephemeral-receipts",
+  "claimed_at": "2026-08-12T08:30:34.254300572Z",
   "context": {},
   "created_at": "2026-08-12T08:04:40.575529711Z",
   "dependencies": [
@@ -22,7 +23,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Avoid durability sync for ephemeral nextest receipts",
-  "updated_at": "2026-08-12T08:30:12.534124748Z"
+  "updated_at": "2026-08-12T08:30:34.254300572Z"
 }
