@@ -1,0 +1,27 @@
+{
+  "assignee": "agent:sol-cli-profile-fixture",
+  "claimed_at": "2026-08-12T06:53:34.393626177Z",
+  "context": {},
+  "created_at": "2026-08-12T06:53:15.131539676Z",
+  "dependencies": [],
+  "description": "Reuse the existing verified applied-profile repository fixtures for CLI and warning tests whose initial profile application is only setup, reducing critical-path work without changing the operation or assertion under test.\n\n## Background\n\nSeven profiled identities spend 47,286 aggregate warm milliseconds repeating default or dogfood profile installation before testing later repair, validation, dry-run, event, taxonomy, or warning behavior. The default and dogfood immutable baselines already exist, are provenance-keyed, and are cloned into isolated mutable repositories. Fresh, partial, conflicting, compositional, pack/add, and initial-application tests remain excluded because their starting shape or first application is material.\n\n## Success Criteria\n\n- [hard] REQ-01: Exactly three CLI profile workflow identities and four fast-rules warning identities replace only their prerequisite profile installation with isolated clones of the existing verified default or dogfood baseline.\n- [hard] REQ-02: Preserves every stable test identity and all real CLI operations, mutations, event assertions, profile-record assertions, validation assertions, graph-rule evaluation, taxonomy, and warning assertions after setup.\n- [hard] REQ-03: Uses the existing run-bound SHA-verified receipts and direct-Cargo fallback without adding a fixture recipe, and exact nextest filters activate setup only for the seven named consumers.\n- [hard] REQ-04: Fresh, absent-root, partial-init, conflict, concurrent publication, initial-application, composition, pack/add, and package-provenance tests remain on their authored setup paths.\n- [hard] REQ-05: Setup-inclusive selected-family timing demonstrates at least 30,000 aggregate milliseconds saved from the recorded 47,286-millisecond baseline, with no selected-family wall regression; focused tests, fixture integrity, formatting, and warning-free linting pass.\n\n## Notes\n\nThe intended footprint is `.config/nextest.toml`, `crates/jit/tests/cli_repo_workflow/main.rs`, `crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs`, and `crates/jit/tests/fast_rules/cli_warnings_integration_tests.rs`. No production code or new cache format is expected.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-12T06:53:15.131539676Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "bfd215fa-5d5c-40d4-85e9-bd082a991464",
+  "labels": [
+    "epic:test-suite-performance",
+    "milestone:v1.0",
+    "component:testing",
+    "satisfies:REQ-01",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Reuse applied profile baselines for CLI prerequisites",
+  "updated_at": "2026-08-12T06:53:53.539879865Z"
+}

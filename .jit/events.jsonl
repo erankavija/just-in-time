@@ -13818,3 +13818,7 @@
 {"assignee":"agent:sol-failure-corpus","id":"9a289675-117b-4e4d-9233-9bb6590c4165","issue_id":"deb33646-edb9-4ee9-aea4-c808495f24c8","timestamp":"2026-08-12T06:06:05.844221781Z","type":"issue_claimed"}
 {"from":"ready","id":"6c43591c-29be-495c-8b91-73ef56e32bc3","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","timestamp":"2026-08-12T06:06:11.427648569Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:sol-test-profile-opt","id":"7e0b965b-314d-4e56-8f10-333e2afc9b3b","issue_id":"123efe74-865a-401c-9932-8184aafe7feb","timestamp":"2026-08-12T06:06:11.427648569Z","type":"issue_claimed"}
+{"id":"7e34a9ca-6051-4c84-99ef-5023a1b31ebf","issue_id":"bfd215fa-5d5c-40d4-85e9-bd082a991464","priority":"high","timestamp":"2026-08-12T06:53:15.131539676Z","title":"Reuse applied profile baselines for CLI prerequisites","type":"issue_created"}
+{"fields":["dependencies"],"id":"9fb0d7c7-dc90-451f-b06b-ca744ae0d53a","issue_id":"6d10e5d4-a386-4447-a669-a0f84ee26fad","timestamp":"2026-08-12T06:53:30.834802519Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:sol-cli-profile-fixture","id":"be418c65-5980-461f-9028-8194f1d23db2","issue_id":"bfd215fa-5d5c-40d4-85e9-bd082a991464","timestamp":"2026-08-12T06:53:34.393626177Z","type":"issue_claimed"}
+{"from":"ready","id":"7ce961bd-2bd0-4d19-a641-9673b5a0cb44","issue_id":"bfd215fa-5d5c-40d4-85e9-bd082a991464","timestamp":"2026-08-12T06:53:53.539879865Z","to":"in_progress","type":"issue_state_changed"}
