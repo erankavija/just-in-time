@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-b5bb4b9c",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "21396b6bc8e3b1162fe830db8562ed06bc1a7560",
+  "completed_at": "2026-08-13T18:44:28.663791810Z",
+  "duration_ms": 151420,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The retired profile event contract is removed and aggregate lifecycle behavior remains covered.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b5bb4b9c-1992-463d-a534-6b93698e63ac",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "99e2e75b-876f-4c27-aa93-35c6e0ba9371",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T18:41:57.242794378Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 21396b6bc; 61771c6ac (workflow records only)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover (.jit/invariants.toml); @/issue/c639cfb5/requirement/REQ-12 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review passed (exit 0)\nTruncation recovery: narrowed requirement, gate, parser, and profile-acceptance reads after broad search output truncated\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The retired profile event contract is removed and aggregate lifecycle behavior remains covered.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

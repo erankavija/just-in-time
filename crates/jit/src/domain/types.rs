@@ -1457,29 +1457,6 @@ pub enum Event {
         /// Number of issues whose lifecycle timestamps were backfilled
         issues_updated: usize,
     },
-    /// A profile package was transactionally applied.
-    ///
-    /// Repository-scoped: package targets, the canonical provenance record, and
-    /// this event become durable in one recoverable transaction.
-    ProfileApplied {
-        /// Event ID.
-        id: String,
-        /// When the transaction was constructed.
-        timestamp: DateTime<Utc>,
-        /// Stable profile identifier.
-        profile_id: String,
-        /// Applied semantic version.
-        version: String,
-        /// Package discovery origin.
-        origin: ProfileOrigin,
-        /// Hash of the complete canonical package.
-        package_hash: String,
-        /// Package contribution hashes keyed by repository target.
-        target_hashes: std::collections::BTreeMap<String, String>,
-        /// Whether the transaction isolated a pre-existing non-newline,
-        /// malformed event tail immediately before this record.
-        isolated_torn_tail: bool,
-    },
     /// A complete profile lifecycle mutation reached its durable commit point.
     ///
     /// One record summarizes the requested operation and every profile in the
@@ -1528,7 +1505,6 @@ impl Event {
             | Event::GateDefinitionCreated { id, timestamp, .. }
             | Event::GateDefinitionRemoved { id, timestamp, .. }
             | Event::LifecycleTimestampsBackfilled { id, timestamp, .. }
-            | Event::ProfileApplied { id, timestamp, .. }
             | Event::ProfileLifecycle { id, timestamp, .. } => {
                 *id = new_id;
                 *timestamp = new_timestamp;
@@ -1843,7 +1819,6 @@ impl Event {
             Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
             Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
             Event::LifecycleTimestampsBackfilled { .. } => "", // No associated issue (repo-scoped)
-            Event::ProfileApplied { .. } => "",        // No associated issue (repo-scoped)
             Event::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
         }
     }

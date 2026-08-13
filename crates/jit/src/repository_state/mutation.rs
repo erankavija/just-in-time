@@ -1106,12 +1106,9 @@ fn compose_event_action(
     // it is a profile lifecycle `{ isolated_torn_tail: true }` certifier. Detect this
     // before sampling time or allocating identifiers.
     let torn_tail = prefix_has_torn_tail(&prefix);
-    let has_marker = pending_events.iter().any(|pending| {
-        matches!(
-            pending.event,
-            Event::ProfileApplied { .. } | Event::ProfileLifecycle { .. }
-        )
-    });
+    let has_marker = pending_events
+        .iter()
+        .any(|pending| matches!(pending.event, Event::ProfileLifecycle { .. }));
     if torn_tail && !has_marker {
         // Appending non-certifying events after an uncertified torn tail would
         // produce a log the reader rejects; refuse instead of corrupting it.
@@ -1125,14 +1122,11 @@ fn compose_event_action(
     for pending in &mut pending_events {
         let id = context.allocate();
         pending.event.assign_identity(id, now);
-        match &mut pending.event {
-            Event::ProfileApplied {
-                isolated_torn_tail, ..
-            }
-            | Event::ProfileLifecycle {
-                isolated_torn_tail, ..
-            } => *isolated_torn_tail = torn_tail,
-            _ => {}
+        if let Event::ProfileLifecycle {
+            isolated_torn_tail, ..
+        } = &mut pending.event
+        {
+            *isolated_torn_tail = torn_tail;
         }
     }
     // Over a torn tail, the certifying marker must be composed as the line
@@ -1141,12 +1135,7 @@ fn compose_event_action(
     if torn_tail {
         let marker = pending_events
             .iter()
-            .position(|pending| {
-                matches!(
-                    pending.event,
-                    Event::ProfileApplied { .. } | Event::ProfileLifecycle { .. }
-                )
-            })
+            .position(|pending| matches!(pending.event, Event::ProfileLifecycle { .. }))
             .expect("a markerless torn tail was already rejected");
         let certifier = pending_events.remove(marker);
         pending_events.insert(0, certifier);
@@ -2061,19 +2050,18 @@ mod tests {
         );
     }
 
-    fn profile_applied_marker() -> Event {
-        use crate::domain::ProfileOrigin;
-        Event::ProfileApplied {
+    fn profile_lifecycle_marker() -> Event {
+        Event::ProfileLifecycle {
             id: String::new(),
             timestamp: sentinel_time(),
-            profile_id: "example".into(),
-            version: "1.0".into(),
-            origin: ProfileOrigin::Directory(
-                crate::repository_state::RootRelativePath::parse("packages/example")
-                    .expect("a canonical package location"),
-            ),
-            package_hash: "hash".into(),
-            target_hashes: BTreeMap::new(),
+            operation: crate::domain::ProfileLifecycleOperation::Apply,
+            profiles: vec![crate::domain::ProfileLifecycleProfile {
+                id: "example"
+                    .try_into()
+                    .expect("the profile marker has a canonical identifier"),
+                status: crate::domain::ProfileLifecycleStatus::Installed,
+                variables: Vec::new(),
+            }],
             isolated_torn_tail: false,
         }
     }
@@ -2109,8 +2097,8 @@ mod tests {
 
     #[test]
     fn test_finalize_certifier_over_torn_tail_round_trips_through_reader() {
-        // A batch containing the historical ProfileApplied marker composes it immediately after
-        // the torn partial line, so the reader accepts the whole log.
+        // A batch containing the aggregate ProfileLifecycle marker composes it
+        // immediately after the torn partial line, so the reader accepts the whole log.
         let image = torn_tail_image();
         let delta = finalize(
             &layout(),
@@ -2118,7 +2106,7 @@ mod tests {
             &ctx(),
             &[MutationIntent::RecordEvent {
                 phase: 0,
-                event: Box::new(profile_applied_marker()),
+                event: Box::new(profile_lifecycle_marker()),
             }],
         )
         .unwrap();
@@ -2139,7 +2127,7 @@ mod tests {
                 && serde_json::from_str::<Event>(lines[1]).is_ok_and(|event| {
                     matches!(
                         event,
-                        Event::ProfileApplied {
+                        Event::ProfileLifecycle {
                             isolated_torn_tail: true,
                             ..
                         }
@@ -2151,7 +2139,7 @@ mod tests {
         let events = crate::domain::parse_known_events(text).unwrap();
         assert!(events.iter().any(|event| matches!(
             event,
-            Event::ProfileApplied {
+            Event::ProfileLifecycle {
                 isolated_torn_tail: true,
                 ..
             }
