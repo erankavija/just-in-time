@@ -247,19 +247,22 @@
           "short_id": "b3d92595",
           "title": "Document the completed profile lifecycle for adopters",
           "classification": "documentation",
-          "status": "pending"
+          "status": "in_progress",
+          "note": "Dispatched at the balanced tier for a canonical-reference and cross-page source-of-truth audit; includes the f6a17e0d path-depth wording advisory."
         },
         {
           "short_id": "6574f951",
           "title": "Prove publication survives interruption",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress",
+          "note": "Dispatched at the strongest tier because stage-by-stage injected failure, recovery, and complete-state equivalence cross storage transaction semantics."
         },
         {
           "short_id": "3dcce8a8",
           "title": "Prove no superseded lifecycle path survives",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress",
+          "note": "Dispatched at the balanced tier as bounded structural contract coverage over canonical readers, retired paths, and secret/sensitive vocabulary."
         }
       ]
     },
