@@ -448,20 +448,6 @@ fn tree_target_changes(outcomes: &[TreeFileOutcome]) -> Vec<ProfileTargetChange>
         .collect()
 }
 
-/// Hold an external rehearsal to the same no-replace precondition as the real
-/// archive publication, without creating a staging file or destination.
-fn ensure_external_target_available(target: &Path, requested: &Path) -> Result<()> {
-    match fs::symlink_metadata(target) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Ok(_) => Err(crate::errors::AlreadyExistsError::new(format!(
-            "Output path already exists: {}",
-            requested.display()
-        ))
-        .into()),
-        Err(error) => Err(error.into()),
-    }
-}
-
 /// Read-only command options for the package's non-secret input channels.
 ///
 /// The command boundary turns these filesystem and process inputs into the
@@ -1122,7 +1108,7 @@ impl CommandExecutor<JsonFileStorage> {
             }
             RepositoryExportDestination::External(path) => {
                 if !publish {
-                    ensure_external_target_available(path.as_path(), output)?;
+                    crate::storage::external_publish::preflight_external_file_noreplace(&path)?;
                     return Ok(Vec::new());
                 }
                 // Staging is not publication: the archive lands in a temporary

@@ -2170,6 +2170,8 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
     );
 
     let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let external = TempDir::new().unwrap();
+    let external_archive = external.path().join("synthetic.tar");
     let pack = jit(
         repo.path(),
         &[
@@ -2178,7 +2180,7 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
             "--source",
             package,
             "--output",
-            "synthetic.tar",
+            external_archive.to_str().unwrap(),
             "--dry-run",
             "--json",
         ],
@@ -2188,7 +2190,7 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
     let packed = only_profile(&pack);
     assert_eq!(packed["status"], "would_apply");
     assert_eq!(packed["targets"][0]["action"], "create");
-    assert!(!repo.path().join("synthetic.tar").exists());
+    assert!(!external_archive.exists());
     let pack_human = jit(
         repo.path(),
         &[
@@ -2197,7 +2199,7 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
             "--source",
             package,
             "--output",
-            "synthetic.tar",
+            external_archive.to_str().unwrap(),
             "--dry-run",
         ],
     );
@@ -2666,6 +2668,70 @@ fn test_profile_pack_refuses_an_occupied_output_path_without_replacing_it() {
             "a refused pack replaced what the output path held"
         );
     }
+}
+
+#[test]
+fn test_profile_pack_external_dry_run_refuses_a_missing_parent_without_writing() {
+    let repo = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let missing_parent = outside.path().join("missing");
+    let output = missing_parent.join("synthetic.tar");
+
+    let packed = jit(
+        repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            package,
+            "--output",
+            output.to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ],
+    );
+
+    assert!(!packed.status.success(), "{packed:?}");
+    assert!(
+        !missing_parent.exists(),
+        "external rehearsal must not create its missing parent"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_profile_pack_external_dry_run_refuses_a_symlinked_parent_without_writing() {
+    let repo = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let actual_parent = outside.path().join("actual");
+    let linked_parent = outside.path().join("linked");
+    fs::create_dir(&actual_parent).unwrap();
+    std::os::unix::fs::symlink(&actual_parent, &linked_parent).unwrap();
+    let output = linked_parent.join("synthetic.tar");
+
+    let packed = jit(
+        repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            package,
+            "--output",
+            output.to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ],
+    );
+
+    assert!(!packed.status.success(), "{packed:?}");
+    assert!(
+        !actual_parent.join("synthetic.tar").exists(),
+        "external rehearsal must not follow a symlinked parent or publish through it"
+    );
 }
 
 /// A package at the limits the model permits survives the exchange whole.
