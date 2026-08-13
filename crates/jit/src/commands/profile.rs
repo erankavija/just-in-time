@@ -644,16 +644,12 @@ impl CommandExecutor<JsonFileStorage> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            // The reading is bounded by what the profiles this repository
-            // records can demand: the capture learns their count from the same
-            // listing it enumerates and scales the budget by it, so no figure
-            // here says how many profiles a repository may carry.
-            let Some((image, covered)) = capture_applied_records_covering(
-                session,
-                &profiles_dir,
-                claimed.iter().flat_map(|(_, paths)| paths.iter().cloned()),
-                claim_capture_budget,
-            )?
+            let claimed_paths = claimed
+                .iter()
+                .flat_map(|(_, paths)| paths.iter().cloned())
+                .collect::<Vec<_>>();
+            let Some((image, covered)) =
+                capture_applied_records_covering(session, &profiles_dir, claimed_paths)?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -2145,11 +2141,11 @@ impl CommandExecutor<JsonFileStorage> {
         let record_path = applied_record_path(id)?;
         let layout = self.require_layout()?;
         with_mutation_session(self.storage(), &layout, "profile record read", |session| {
-            // One record is the whole reading, so it is bounded by the form
-            // every record read shares at the count it asks for.
+            // One record is the whole named-path reading, so it shares the
+            // inventory reader's shape-only budget.
             let Some(image) = capture_or_retry(session.capture(CaptureSpec::phase_one(
                 [record_path.clone()],
-                record_capture_budget(1),
+                record_capture_budget(),
             )?))?
             else {
                 return Ok(SessionStep::Retry);
@@ -2319,30 +2315,6 @@ fn profile_graph_error(error: ProfileGraphError) -> anyhow::Error {
     }
 }
 
-/// The bytes the content of `profiles` recorded profiles can demand of one
-/// reading.
-///
-/// The per-profile factor is what the package model admits, and it covers both
-/// carriers of a recorded profile. A record names one claim per contribution,
-/// asset, and managed region its package published, each carrying an identity
-/// and a fingerprint: the identities are the paths and declaration names the
-/// manifest already spelled, whose lengths sum below the manifest's own size,
-/// and the fingerprints are a fixed 64 characters apiece for no more claims than
-/// a model-maximal package has files and declarations. The content those claims
-/// name is package content by the same model. One package byte budget per
-/// recorded profile therefore bounds a reading of the records, and of the
-/// content they claim, without either resting on a figure this file states.
-///
-/// The count is the repository's own declared state — the profiles its record
-/// listing names — so nothing here says how many profiles a repository may
-/// have. A repository recording none still reads its listing, which is why the
-/// multiplier floors at one.
-fn recorded_profile_bytes(profiles: usize) -> u64 {
-    // Saturating: a bound that wrapped would be smaller than the records
-    // demand, which is the failure these budgets exist to prevent.
-    (profiles.max(1) as u64).saturating_mul(crate::profile::MAX_PROFILE_PACKAGE_BYTES as u64)
-}
-
 /// Root-relative depth of the paths an applied-record reading touches.
 ///
 /// Every record is published and read at the one path [`applied_record_path`]
@@ -2360,11 +2332,9 @@ fn applied_record_depth() -> usize {
 /// This capture declares no path, so it reads no payload: the only bytes it can
 /// charge are the names its one listing holds. Those names are the record
 /// inventory the whole reading is about, and a bound that refused them would
-/// refuse to learn the count every later bound is derived from — the same
-/// refusal, one step earlier, that scaling those bounds exists to prevent. So
-/// the growth available here is bounded by what it is: one listing, at the depth
-/// records are published at. No payload multiple appears, because no payload is
-/// read.
+/// refuse the inventory itself. The growth available here is therefore bounded
+/// by what it is: one listing, at the depth records are published at. No payload
+/// multiple appears, because no payload is read.
 fn record_listing_capture_budget() -> CaptureBudget {
     CaptureBudget {
         max_listings: 1,
@@ -2373,17 +2343,20 @@ fn record_listing_capture_budget() -> CaptureBudget {
     }
 }
 
-/// Bounds for reading `records` applied-profile records.
+/// Bounds for reading named applied-profile records.
 ///
-/// One record per applied profile, each a JSON document directly under
-/// `.jit/profiles/`, plus the listing that names them. The single-record read
-/// and the whole-inventory read share this one form at their own counts
-/// (`@/inv/convention-convergence`), so neither can be bounded by something the
-/// other is not.
-fn record_capture_budget(records: usize) -> CaptureBudget {
+/// One record per applied profile is read at the exact path its one listing
+/// names, or at the exact canonical path an id constructs for the single-record
+/// reader. Like [`record_listing_capture_budget`], this performs no discovery:
+/// arbitrary record bytes cannot add a path or listing to the capture. Records
+/// carry adopter-supplied resolved variables, so the package model cannot bound
+/// their payload size; named-path bytes are therefore unbounded. Shape remains
+/// bounded to one listing and the depth [`applied_record_path`] constructs, and
+/// [`CaptureSpec`] confines the read to the declared paths.
+fn record_capture_budget() -> CaptureBudget {
     CaptureBudget {
         max_listings: 1,
-        max_bytes: recorded_profile_bytes(records),
+        max_bytes: u64::MAX,
         max_depth: applied_record_depth(),
     }
 }
@@ -2483,11 +2456,11 @@ pub(super) fn capture_applied_records(
     session: &mut (dyn RepositoryMutationSession + '_),
     profiles_dir: &VirtualPath,
 ) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
-    capture_applied_records_covering(session, profiles_dir, [], record_capture_budget)
+    capture_applied_records_covering(session, profiles_dir, [])
 }
 
-/// Read this repository's applied-profile records together with `also`, under
-/// the budget `budget` derives from the record count.
+/// Read this repository's applied-profile records together with the exact
+/// paths in `also`.
 ///
 /// The agreement check reads a record and then the repository content that
 /// record claims, and both readings must describe one repository state. Widening
@@ -2495,19 +2468,21 @@ pub(super) fn capture_applied_records(
 /// listing is re-read in the same capture, so a record set that moved is
 /// reported as movement rather than answered over two states.
 ///
-/// The reading is two captures because no bound over record payloads can be
-/// stated before the records are counted. The first declares no path at all, so
-/// it reads no payload and charges only the names its listing holds; the count
-/// it learns is what `budget` scales the second by. A record set that moved
-/// between them is caught where it always was — the second capture re-reads the
-/// listing, and a record inventory that disagrees with the one the count came
-/// from restarts the attempt rather than being answered over two states.
+/// The reading is two captures because the listing supplies the record ids the
+/// second capture names. The first declares no path at all, so it reads no
+/// payload and charges only the names its listing holds. The second performs no
+/// discovery either: its records come from those ids and every additional path
+/// comes from `also`, so its named-path payload bytes are unbounded while its
+/// one listing and construction-derived maximum depth bind shape. A record set
+/// that moved between them is caught where it always was — the second capture
+/// re-reads the listing, and a record inventory that disagrees with the first
+/// restarts the attempt rather than being answered over two states.
 fn capture_applied_records_covering(
     session: &mut (dyn RepositoryMutationSession + '_),
     profiles_dir: &VirtualPath,
     also: impl IntoIterator<Item = VirtualPath>,
-    budget: fn(usize) -> CaptureBudget,
 ) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
+    let also = also.into_iter().collect::<Vec<_>>();
     let mut listing = CaptureSpec::phase_one([], record_listing_capture_budget())?;
     listing.discover_listing(profiles_dir.clone())?;
     let Some(listed) = capture_or_retry(session.capture(listing))? else {
@@ -2515,7 +2490,7 @@ fn capture_applied_records_covering(
     };
     let recorded = recorded_profile_ids(&listed, profiles_dir)?;
 
-    let mut spec = CaptureSpec::phase_one([], budget(recorded.len()))?;
+    let mut spec = CaptureSpec::phase_one([], claim_capture_budget(&also))?;
     spec.discover_listing(profiles_dir.clone())?;
     spec.discover_paths(
         recorded
@@ -2533,42 +2508,25 @@ fn capture_applied_records_covering(
     Ok(Some((image, recorded)))
 }
 
-/// Bounds for the profile-agreement capture over a repository whose
-/// `.jit/profiles/` listing names `recorded_profiles` records.
+/// Bounds for applied records plus the exact claimed target paths in `also`.
 ///
-/// The records plus every target they claim. Every bound is derived from a
-/// source a reader can check — the package model for what one profile can
-/// demand, and the repository's own record registry for how many demand it —
-/// for the reason [`package_tree_capture_budget`] states: the model bounds a
-/// package's file count and total size and says nothing about how deep or how
-/// long its paths are, and it bounds no repository's profile count at all, so a
-/// bound assuming either refuses a repository whose profiles legitimately claim
-/// what the model admits — applications that succeeded, followed by a check that
-/// will not read what they published.
-///
-/// * **Listings.** One, the `.jit/profiles/` listing that names the records. A
-///   claimed target is a path a record already names rather than growth a
-///   capture discovers, so nothing here enumerates a directory. The listing
-///   carries names rather than payloads, so it is the one part of the reading
-///   that is bounded before the record count is known.
-/// * **Depth.** A claimed target's path is one a manifest declared, and the
-///   manifest names every path the package publishes without naming one twice,
-///   so the declared path lengths sum below the manifest's own size — itself
-///   within a package byte budget. A path's component count is strictly below
-///   its byte length, so no claimed target sits a package byte budget's worth of
-///   components below its root.
-/// * **Bytes.** What the recorded profiles' own content can demand, which
-///   [`recorded_profile_bytes`] derives from the package model and the count the
-///   record listing states. This reading covers the claimed content as well as
-///   the records, and both are bounded by the same per-profile factor for the
-///   reason stated there.
-///
-/// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
-fn claim_capture_budget(recorded_profiles: usize) -> CaptureBudget {
+/// This is the same no-discovery case as [`record_listing_capture_budget`] and
+/// [`record_capture_budget`]. The one record listing supplies every record id;
+/// parsed records supply every claimed target; arbitrary payload bytes supply
+/// neither paths nor listings. Claimed content may be template-expanded beyond
+/// its package sources, so the package model cannot bound it and named-path
+/// bytes are unbounded. Shape remains bounded to one listing and the greatest
+/// depth of the exact paths the capture will declare. [`CaptureSpec`] confines
+/// the read to those records and claims; an undeclared repository path is never
+/// admitted merely because the byte ceiling is unbounded.
+fn claim_capture_budget(also: &[VirtualPath]) -> CaptureBudget {
+    let record_budget = record_capture_budget();
     CaptureBudget {
-        max_listings: 1,
-        max_bytes: recorded_profile_bytes(recorded_profiles),
-        max_depth: crate::profile::MAX_PROFILE_PACKAGE_BYTES,
+        max_depth: also
+            .iter()
+            .map(|path| path.relative().depth())
+            .fold(record_budget.max_depth, usize::max),
+        ..record_budget
     }
 }
 
@@ -8682,112 +8640,148 @@ target = "docs/guide.md"
         );
     }
 
-    /// Every dimension of the profile-agreement budget clears what the package
-    /// model can demand of it, for as many profiles as the repository records.
-    ///
-    /// A claimed target is package content: its path is one a manifest declared
-    /// and its bytes are what that package published. The model bounds neither
-    /// how deep a declared path may sit nor how many profiles a repository may
-    /// record, so a bound assuming either refuses a repository whose profiles
-    /// claim what the model admits — applications that succeeded, followed by a
-    /// check that will not read what they published. The counts below are far
-    /// apart deliberately, including one well past any figure a reader might be
-    /// tempted to write down: what is asserted is the relationship, so no count
-    /// is a boundary the bound is allowed to have.
+    /// Agreement reads only the claimed targets named by applied records, so
+    /// their adopter-authored bytes are not a discovery dimension to bound.
     #[test]
-    fn test_claim_capture_budget_admits_a_model_maximal_payload_per_recorded_profile() {
-        let model_bytes = crate::profile::MAX_PROFILE_PACKAGE_BYTES;
+    fn test_claim_capture_budget_does_not_limit_named_target_payloads() {
+        let target = VirtualPath::worktree("deeply/nested/claimed/target.txt").unwrap();
+        let budget = claim_capture_budget(std::slice::from_ref(&target));
+        assert_eq!(
+            budget.max_bytes,
+            record_listing_capture_budget().max_bytes,
+            "named target payloads have the listing capture's unbounded ceiling"
+        );
+        assert_eq!(budget.max_listings, 1);
+        assert_eq!(budget.max_depth, target.relative().depth());
+    }
 
-        for recorded in RECORDED_COUNTS {
-            let budget = claim_capture_budget(recorded);
-            assert!(
-                budget.max_bytes >= recorded.max(1) as u64 * model_bytes as u64,
-                "{recorded} recorded profile(s) can claim {recorded} whole packages' \
-                 worth of content, which this budget refuses to read"
-            );
-            assert!(
-                budget.max_depth >= model_bytes,
-                "a package can claim a target with a component per byte its paths can hold"
-            );
-        }
-
-        // The bound follows the repository's record count rather than resting on
-        // a ceiling some number of profiles reaches.
-        assert!(
-            claim_capture_budget(100).max_bytes > claim_capture_budget(32).max_bytes,
-            "the budget stopped growing with the profiles the repository records"
+    /// Applied records are exact paths named by their one listing, so adopter-
+    /// supplied resolved values do not become a discovery dimension to bound.
+    #[test]
+    fn test_record_capture_budget_does_not_limit_named_record_payloads() {
+        let budget = record_capture_budget();
+        assert_eq!(
+            budget.max_bytes,
+            record_listing_capture_budget().max_bytes,
+            "named record payloads have the listing capture's unbounded ceiling"
+        );
+        assert_eq!(budget.max_listings, 1);
+        assert_eq!(
+            budget.max_depth,
+            applied_record_path("workflow")
+                .expect("a canonical record path")
+                .relative()
+                .depth(),
+            "a record sits at the path the engine publishes it at"
         );
     }
 
-    /// Record counts the budget relationships are held at.
-    ///
-    /// Far apart deliberately, and the largest is past any figure a reader might
-    /// be tempted to write down: what is asserted is the relationship, so no
-    /// count is a boundary a bound is allowed to have.
-    const RECORDED_COUNTS: [usize; 8] = [0, 1, 2, 31, 32, 33, 100, 4096];
-
-    /// The reading of a repository's records is bounded by what those records
-    /// can hold, for as many of them as the repository has.
-    ///
-    /// A record's claims scale with what one package publishes, which the model
-    /// bounds; how many records a repository holds, the model does not bound at
-    /// all. A flat byte bound over that count refuses to read what applications
-    /// legitimately wrote, which is the same refusal the claim budget exists to
-    /// prevent, one step earlier in the same check.
+    /// A resolved variable is adopter input carried by the applied record, not
+    /// package content. A valid record may therefore be larger than its package
+    /// while remaining readable through every record-backed command.
     #[test]
-    fn test_record_capture_budget_admits_a_model_maximal_record_per_recorded_profile() {
-        let model_bytes = crate::profile::MAX_PROFILE_PACKAGE_BYTES;
+    fn test_profile_agreement_reads_a_record_larger_than_the_package_model_budget() {
+        const ID: &str = "large-record";
 
-        for records in RECORDED_COUNTS {
-            let budget = record_capture_budget(records);
-            assert!(
-                budget.max_bytes >= records.max(1) as u64 * model_bytes as u64,
-                "{records} record(s) can hold {records} model-maximal packages' worth \
-                 of claims, which this budget refuses to read"
-            );
-            assert!(
-                budget.max_depth
-                    >= applied_record_path("workflow")
-                        .expect("a canonical record path")
-                        .relative()
-                        .depth(),
-                "a record sits at the path the engine publishes it at"
-            );
-        }
-
-        assert!(
-            record_capture_budget(100).max_bytes > record_capture_budget(32).max_bytes,
-            "the budget stopped growing with the records the repository holds"
+        let (temp, _storage, executor, _fixture) = fixture();
+        let package = authored_manifest_package(
+            &temp,
+            "packages/large-record",
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{ID}\"\nversion = \"1.0.0\"\n\
+                 compatible-jit = \"*\"\n\n[[variable]]\nname = \"ADOPTER_VALUE\"\n\
+                 default = \"authored\"\n"
+            ),
+            &[],
         );
-        // The single-record read is the same bound at the count it asks for,
-        // rather than a second form beside it.
-        assert_eq!(
-            record_capture_budget(1).max_bytes,
-            recorded_profile_bytes(1),
-            "the single-record read is bounded by something the inventory read is not"
+        let adopter_value = "v".repeat(crate::profile::MAX_PROFILE_PACKAGE_BYTES + 1);
+
+        apply_package(
+            &executor,
+            &package,
+            &supplied_values(&[("ADOPTER_VALUE", adopter_value.as_str())]),
+        );
+        assert!(
+            fs::metadata(temp.path().join(format!(".jit/profiles/{ID}.json")))
+                .expect("the applied record exists")
+                .len()
+                > crate::profile::MAX_PROFILE_PACKAGE_BYTES as u64,
+            "the regression record must exceed any package-derived byte ceiling"
+        );
+
+        let resolved = executor
+            .resolve_profile_package(&ProfileSelector::id(ID).expect("a canonical profile id"))
+            .expect("the direct named-record reader accepts adopter-sized payloads");
+        assert_eq!(resolved.model().id.as_str(), ID);
+        let agreement = executor
+            .validate_recorded_profiles()
+            .expect("a named applied record remains readable regardless of its payload size");
+        assert!(
+            agreement.profiles[0].divergences.is_empty(),
+            "{agreement:?}"
+        );
+    }
+
+    /// Template expansion can make a claimed repository target larger than
+    /// both the package sources and the applied record that names it.
+    #[test]
+    fn test_profile_agreement_reads_a_claimed_target_larger_than_the_package_model_budget() {
+        const ID: &str = "large-target";
+        const TARGET: &str = "docs/expanded.txt";
+
+        let (temp, _storage, executor, _fixture) = fixture();
+        let package = authored_manifest_package(
+            &temp,
+            "packages/large-target",
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{ID}\"\nversion = \"1.0.0\"\n\
+                 compatible-jit = \"*\"\n\n[[variable]]\nname = \"EXPANSION\"\n\
+                 default = \"authored\"\n\n[[asset]]\nsource = \"assets/template.txt\"\n\
+                 target = \"{TARGET}\"\ntemplate = true\n"
+            ),
+            &[(
+                "assets/template.txt",
+                "{{jit:var:EXPANSION}}{{jit:var:EXPANSION}}{{jit:var:EXPANSION}}",
+            )],
+        );
+        let expansion = "x".repeat(crate::profile::MAX_PROFILE_PACKAGE_BYTES / 2);
+
+        apply_package(
+            &executor,
+            &package,
+            &supplied_values(&[("EXPANSION", expansion.as_str())]),
+        );
+        assert!(
+            fs::metadata(temp.path().join(TARGET))
+                .expect("the expanded target exists")
+                .len()
+                > crate::profile::MAX_PROFILE_PACKAGE_BYTES as u64,
+            "the regression target must exceed any package-derived byte ceiling"
+        );
+
+        let agreement = executor
+            .validate_recorded_profiles()
+            .expect("a named claimed target remains readable regardless of its payload size");
+        assert!(
+            agreement.profiles[0].divergences.is_empty(),
+            "{agreement:?}"
         );
     }
 
     /// The capture that learns how many records there are reads no payload, so
     /// nothing it charges is a payload it could be refused for.
     ///
-    /// The count every later bound scales by comes from this listing. A byte
-    /// bound stated over it would be a bound on the very inventory it exists to
-    /// discover, so what bounds it is its shape: one listing, at the depth
-    /// records are published at.
+    /// A byte bound stated over the listing would be a bound on the very
+    /// inventory it exists to discover, so what bounds it is its shape: one
+    /// listing, at the depth records are published at.
     #[test]
     fn test_record_listing_capture_budget_bounds_the_listing_rather_than_a_payload() {
         let budget = record_listing_capture_budget();
 
         assert_eq!(budget.max_listings, 1);
-        assert_eq!(budget.max_depth, record_capture_budget(1).max_depth);
-        for records in RECORDED_COUNTS {
-            assert!(
-                budget.max_bytes > recorded_profile_bytes(records),
-                "the listing that learns the record count is refused at {records} records, \
-                 which is a payload multiple bounding the inventory it discovers"
-            );
-        }
+        assert_eq!(budget.max_bytes, u64::MAX);
+        assert_eq!(budget.max_depth, record_capture_budget().max_depth);
+        assert_eq!(budget.max_bytes, record_capture_budget().max_bytes);
     }
 
     /// The reading the agreement check actually asks for — the record listing,
@@ -8816,8 +8810,14 @@ target = "docs/guide.md"
             .expect("a safe relative path")
         };
 
-        let mut spec = CaptureSpec::phase_one([], claim_capture_budget(RECORDED))
-            .expect("the agreement capture begins with the records it discovers");
+        let deepest_claim = VirtualPath::from_root(RepositoryRootClass::Worktree, deep(0))
+            .expect("a worktree target");
+        let undeclared = VirtualPath::worktree("not/claimed.txt").unwrap();
+        let mut spec = CaptureSpec::phase_one(
+            [],
+            claim_capture_budget(std::slice::from_ref(&deepest_claim)),
+        )
+        .expect("the agreement capture begins with the records it discovers");
         spec.discover_listing(VirtualPath::PROFILES)
             .expect("the records are read through the listing that names them");
         spec.discover_paths((0..RECORDED).flat_map(|profile| {
@@ -8829,6 +8829,14 @@ target = "docs/guide.md"
             ]
         }))
         .expect("the agreement budget admits the claims a recorded repository can hold");
+        assert!(
+            spec.contains_path(&deepest_claim),
+            "the declared claimed target is in the capture"
+        );
+        assert!(
+            !spec.contains_path(&undeclared),
+            "an unbounded named-path payload budget must not widen path membership"
+        );
     }
 
     /// A package the model admits whose cost is driven by its directories rather
