@@ -355,6 +355,20 @@
       "owner_decision": "Cover all classes, but the owner challenged reading region bodies back since that content is generated. Region clobber ruled intended: regions are profile-owned territory the package re-renders.",
       "lead_resolution": "The owner's principle generalizes: refresh applies where the REPOSITORY authors the content. Live-source assets (already works) and semantic contributions (5a3ecba0) qualify. Regions and install-only assets are package-authored - a region body is generated from the region source, and install-only content is adopter state the authoring repository holds in a different form, guarded by test_live_assets_exclude_install_only_adopter_state. Neither has a repository-side value to read back.",
       "lead_correction": "The lead's own option text claimed that if the region clobber is intended then profile validate should stop reporting it, 'since nothing acts on that report'. That was wrong: jit profile apply re-renders the region and validate goes green, so the report is actionable and needs no change."
+    },
+    {
+      "date": "2026-08-13",
+      "question": "Should the three enforced budget constants (MAX_INTEGRATION_TARGETS=12, MAX_EXECUTABLE_BYTES=2 GiB, MAX_TEST_SUITE_SECONDS=30) be re-derived, and by whom? They cite the obsolete 73482aa1 study at multiple sites.",
+      "options_presented": "A: fold into 0708d692 before merge; B: separate issue under epic:v1-release (lead's recommendation); C: repoint citations only",
+      "owner_decision": "A \u2014 fold into 0708d692 before it merges.",
+      "lead_resolution": "Added REQ-06 to 0708d692 (owner-approved scope change): fresh measurement, stated headroom rule, derivation in one canonical current document (dev/benchmarks/rust-build-budgets/README.md), all current-justification sites repointed. Binding determination to the worker: constants may equal or tighten, never loosen without escalation. Dispatched a dedicated worker session 13."
+    },
+    {
+      "date": "2026-08-13",
+      "question": "Is the 3,168 ms cold margin on the suite budget (26,832 ms cold vs 30,000 ms, ~4.3 s first-run fixture construction inside the clock) acceptable for v1.0?",
+      "options_presented": "A: accept and record (lead's recommendation); B: move fixture construction outside the clock as follow-up",
+      "owner_decision": "A \u2014 accept and record.",
+      "lead_resolution": "Recorded in 0708d692's description and in the REQ-06 canonical budget document. Revisit only if a cold failure recurs."
     }
   ],
   "rework_counts": {
@@ -1408,6 +1422,12 @@
       "change": "Added REQ-07 requiring the profile-agreement capture's bounds to be derived rather than asserted.",
       "approved_by": "owner, 2026-08-13",
       "reason": "CLAIM_CAPTURE_BUDGET's max_depth: 32 is the same defect class the owner ruled on for cf42d08b, in code this epic added, in a file 5a3ecba0 already changes. Folded in rather than dispatched separately."
+    },
+    {
+      "date": "2026-08-13",
+      "issue": "0708d692",
+      "change": "Added hard REQ-06: budget constants justified by a fresh measurement with a stated headroom rule in one canonical current document; current-justification citations of the obsolete 73482aa1 study repointed.",
+      "approved_by": "owner (AskUserQuestion, session 13)"
     }
   ],
   "container_reconciliations": [
