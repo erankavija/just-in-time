@@ -261,34 +261,42 @@ the enforced `@/inv/bounded-rust-build-footprint` project invariant.
 `cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces three budgets on every
 gate run. Two are derived from `cargo metadata` and `cargo test --workspace --no-run
 --message-format=json` rather than a `target/` directory scan (stale per-hash artifacts
-there cannot describe the current build): at most 12 integration-test targets and at most
-2 GiB of unique active test-executable bytes. The third is derived from the measured
+there cannot describe the current build): a bounded count of integration-test targets and
+a bounded total of unique active test-executable bytes. The third is derived from the measured
 nextest-plus-doctest suite duration, which `scripts/cargo-ci.sh` passes in as
 `--test-suite-ms`: the suite must finish under `MAX_TEST_SUITE_SECONDS`. All three
 constants are declared once, in the script's own header comment
 (`MAX_INTEGRATION_TARGETS`, `MAX_EXECUTABLE_BYTES`, `MAX_TEST_SUITE_SECONDS`); read them
-there rather than assuming any has changed. See
+there rather than assuming any has changed. All three are derived from a measurement of
+this tree and a stated headroom rule in
+[dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md); see
 [dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
 for the measured margin this budget leaves on an idle and a contended host. "5. Inherent
 Test Costs" below attributes what the measured suite duration is spent on.
 
-The first gate run in a worktree that has just absorbed a large merge does not measure the
-change. The `suite-build` step keeps compilation outside the clock, but the `test` step
-still pays first-touch I/O on artifacts written seconds earlier, and that is worth many
-seconds: one measured run read `suite-build` 36,966 ms and `suite-clock` 37,761 ms cold,
-against 353 ms and 22,218 ms for the same tree once warm. A suite-duration failure is
-therefore provisional until the run is repeated on a warm target and a quiet host — check
-`uptime` first, and pass `--force`, since `jit gate evaluate` reuses a recorded verdict
-over unchanged declared inputs and `target/` is not one of them.
+The measurement is taken over a target the `suite-build` step has already built and read
+into the page cache, so a fresh target directory and a warm one reach the same verdict and
+a duration failure is about the tree (jit:0708d692). Getting there took removing a hidden
+compilation from inside the clock: a nextest setup script selected its Cargo packages
+differently from the gate's build, which resolved a second feature-unification variant of
+the dependency graph and compiled it mid-suite. Anything the suite runs from inside the
+clock must therefore reuse the workspace build's resolution, which
+`scratch_build/build_profile_policy_tests.rs` asserts over the setup scripts
+`.config/nextest.toml` declares. What remains state-dependent is the suite's own per-target
+fixture construction, worth about 4 s on its first run in a target directory; see
+[dev/benchmarks/cold-warm-verdict-0708d692/README.md](benchmarks/cold-warm-verdict-0708d692/README.md)
+for the cold and warm figures behind all of this. Note that re-measuring needs `--force`,
+since `jit gate evaluate` reuses a recorded verdict over unchanged declared inputs and
+`target/` is not one of them.
 
 A fourth budget — at most 10 GiB for the complete fresh validation target directory — is the
 acceptance threshold the benchmark protocol below validates against once per build-topology
 change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
 defeat the point of the interactive incremental-build policy described next. See
-[dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md](archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md)
-("Benchmark protocol") for the full acceptance criteria and
 [dev/benchmarks/rust-build-efficiency/report.md](benchmarks/rust-build-efficiency/report.md)
-for the measured comparison.
+("Comparison and acceptance thresholds") for the acceptance criteria and the measured
+comparison they were applied to; "Benchmarking a build-topology change" below describes the
+harness that produces both.
 
 ### Build profile and dependency-feature policy
 
@@ -310,8 +318,17 @@ for the measured comparison.
   ordinary interactive development, where the cost amortizes across many rebuilds of the same
   tree. `scripts/cargo-ci.sh` overrides this with `CARGO_INCREMENTAL=0` for every gate step,
   since a gate run compiles once and exits with no later rebuild to amortize against; a
-  dedicated `incremental-state` gate step fails the run if a non-empty `incremental` directory
-  remains under the target directory afterward.
+  dedicated `incremental-state` gate step then fails the run when that ban was not in force,
+  asserting `CARGO_INCREMENTAL=0` in its own environment — the condition every compilation
+  the run performed inherited. Incremental state that appears under the target directory,
+  whether before the run or during it, is reported against the baseline the
+  `incremental-baseline` step records and does not decide the verdict: the directory is
+  shared with everything else that compiles the checkout, an editor's rust-analyzer writes it
+  continuously and repopulates it within seconds of it being cleared, and no filesystem
+  comparison can attribute a write to a writer. So there is nothing to clear before a gate
+  run. The residual that leaves is a child process the gate spawns which overrides the ban
+  against the same target directory; `scripts/cargo-ci.sh` states it where the assertion
+  lives.
 - **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
   `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
   run that must bypass the cache. Opting an existing target directory into a wrapper changes

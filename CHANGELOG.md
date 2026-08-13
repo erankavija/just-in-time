@@ -88,6 +88,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **The build gate decides on the tree rather than on build-cache state.** Two
+  of its steps read the machine instead of the change. `incremental-preflight`
+  refused to run at all while `target/*/incremental` was non-empty — which any
+  editor's rust-analyzer makes true continuously, in every checkout it has open
+  — so a gate reported a policy breach for a directory no gate run produced, and
+  the standing remedy was to clear that directory inside a lock before every
+  run. What replaces it judges the ban instead of the directory:
+  `incremental-state` asserts `CARGO_INCREMENTAL=0` in its own environment, the
+  condition every compilation the run performed inherited, and fails when it
+  does not hold. Entries that appear under the target directory — before the run
+  or while it works — are reported against the baseline `incremental-baseline`
+  records and decide nothing, because no filesystem comparison can attribute a
+  write to a writer. The gate-run ban on incremental compilation is unchanged
+  and still enforced in three places, now including that runtime assertion. Separately, the same commit's suite clocked 57,019 ms on a fresh
+  target directory and 22,541 ms on a warm one, failing and passing the
+  30,000 ms suite budget with 4512 tests passing either way; the documented
+  remedy was folklore, to re-run and read the second number. Most of that gap
+  was compilation the gate believed it had already taken out of the clock: a
+  cargo-nextest setup script selected `-p jit` where the gate's build selects
+  the workspace, and Cargo unifies features over the packages an invocation
+  selects, so the suite resolved a second variant of its whole dependency graph
+  and compiled 60 crates mid-run — 24,677 ms inside the measured span, on every
+  fresh target. Setup scripts now reuse the workspace build's resolution, a
+  policy test holds them to it, and the `suite-build` step additionally reads
+  the executables it linked into the page cache. The same commit now measures
+  27,723 ms cold against 22,571 ms warm and passes both, with the residual
+  attributed to the suite's own first-run fixture construction
+  (`dev/benchmarks/cold-warm-verdict-0708d692/`). Both steps' failures now name
+  what they observed and what they compared it against.
+
 - **A concurrency property decides on coordination rather than on how busy the
   host was.** The claim coordinator's concurrent-acquisition tests spawned a
   thread per issue and asserted every one was granted, but a thread reached the
@@ -644,18 +674,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Debug info and incremental compilation are bounded by policy instead of
   Cargo's undocumented defaults.** Full debug sections dominated a
   representative test executable's size, and incremental state accumulated
-  without bound across gate runs (baseline measured in
-  `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md`). The workspace manifest's
-  `[profile.dev]` and `[profile.test]` now set `debug = "line-tables-only"`,
-  keeping line-number backtraces without the full debugger payload, and both
+  without bound across gate runs (the measurements behind both policies are
+  placed under "Provenance" in `dev/benchmarks/rust-build-budgets/README.md`).
+  The workspace manifest's `[profile.dev]` and `[profile.test]` now set
+  `debug = "line-tables-only"`, keeping line-number backtraces without the
+  full debugger payload, and both
   state `incremental = true` explicitly so ordinary interactive builds and
   test runs keep Cargo's incremental cache on purpose rather than by
   accident. `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every
   step and now runs a dedicated
-  `incremental-state` step afterward that fails the gate if any non-empty
-  `incremental` directory remains under the target directory the run used:
-  a gate run compiles once and exits, so incremental state has no later
-  rebuild to amortize its cost against.
+  `incremental-state` step afterward that fails the gate when that ban was not
+  in force for the compilation it performed: a gate run compiles once and exits,
+  so incremental state has no later rebuild to amortize its cost against.
 
 - **Documentation projections are declared generically and rendered by one
   command.** A single `[projection.<name>]` config registry (fields `kind`,
@@ -730,13 +760,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   sizes from `cargo test --workspace --no-run --message-format=json` (fails
   above 2 GiB), and it asserts the debug-profile, gate-incremental, and
   dependency-feature (no remote JSON Schema resolution, one TLS backend)
-  policies against the committed manifests and gate script. The budgets and
-  their evidence are defined once in the checker and
-  `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md`. `scripts/cargo-ci.sh` runs it
-  as a `budget` step after its test step, reusing warm Cargo artifacts (no
-  second cold build), and folds a concise footprint summary into the persisted
-  gate summary; over-budget or policy-drift runs fail with a diagnostic naming
-  the observed value, the limit, and the corrective area. Each failure mode has
+  policies against the committed manifests and gate script. The budgets are
+  declared once in the checker and derived from a measurement of the tree they
+  are enforced against in `dev/benchmarks/rust-build-budgets/README.md`.
+  `scripts/cargo-ci.sh` runs it as a `budget` step after its test step, reusing
+  warm Cargo artifacts (no second cold build), and folds a concise footprint
+  summary into the persisted gate summary; over-budget or policy-drift runs
+  fail with a diagnostic naming the observed value, the limit, and the
+  corrective area. Each failure mode has
   an injectable-input regression fixture in
   `crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` that runs
   without compilation.

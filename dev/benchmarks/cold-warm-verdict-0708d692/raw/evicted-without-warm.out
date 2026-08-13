@@ -1,0 +1,12 @@
+=== run L (page cache for the executables EVICTED, gate WITHOUT flush+warm) start 2026-08-13T13:45:22+03:00
+  ✓ incremental-baseline: 0 entries already present under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/target, none of them this run's (33 ms)
+  ✓ fmt: ok (1539 ms)
+  ✓ clippy: ok (195 ms)
+  ✓ suite-build: built in 606 ms, flushed in 1 ms, warmed 17 executables (1918021104 bytes) in 28 ms (639 ms)
+  ✓ test: 4513 passed, 0 failed, 7 skipped (18854 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4533 ms)
+  ✓ suite-clock: 23405 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1595965032/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=23405ms (80 ms)
+  ✓ incremental-state: no incremental state created by this run (0 pre-existing entries ignored) (32 ms)
+
+=== exit=0 end 2026-08-13T13:45:48+03:00

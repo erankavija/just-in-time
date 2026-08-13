@@ -1,0 +1,12 @@
+=== warm sample 3, commit a3c2f597a, start 2026-08-13T14:33:37+03:00
+  ✓ incremental-baseline: 0 entries already present under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/target, none of them this run's (34 ms)
+  ✓ fmt: ok (1545 ms)
+  ✓ clippy: ok (193 ms)
+  ✓ suite-build: built in 508 ms, warmed 17 executables (1918057680 bytes) in 66 ms (577 ms)
+  ✓ test: 4514 passed, 0 failed, 7 skipped (18030 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4534 ms)
+  ✓ suite-clock: 22581 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1596001608/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=22581ms (79 ms)
+  ✓ incremental-state: no incremental state created by this run (0 pre-existing entries ignored) (35 ms)
+
+=== exit=0 end 2026-08-13T14:34:02+03:00

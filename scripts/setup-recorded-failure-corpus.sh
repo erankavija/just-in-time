@@ -16,12 +16,22 @@ run_setup() {
   [ -n "${NEXTEST_ENV:-}" ] || fail_environment "NEXTEST_ENV is not set"
   [ -n "${NEXTEST_WORKSPACE_ROOT:-}" ] || fail_environment "NEXTEST_WORKSPACE_ROOT is not set"
 
+  # Package selection is `--workspace` to match the build the caller already
+  # paid for, not because this setup needs the server crate (jit:0708d692).
+  # Cargo unifies features over the packages one invocation selects, so
+  # `-p jit` resolves a second variant of the whole dependency graph and
+  # compiles it: measured on a target freshly built by `cargo test --workspace
+  # --no-run`, `-p jit --test cli_issue` compiled 60 crates in 24,677 ms while
+  # `--workspace --test cli_issue` was fresh in 131 ms. cargo-nextest runs this
+  # script inside the suite run, so that duplicate build landed inside the
+  # measured suite clock on every fresh target — the clock the `budget` step
+  # judges — and its artifacts inside the enforced build footprint.
   (
     cd "$NEXTEST_WORKSPACE_ROOT"
     unset JIT_RECORDED_FAILURE_CORPUS_RECEIPT
     unset JIT_RECORDED_FAILURE_CORPUS_RECEIPT_SHA256
     CARGO_INCREMENTAL=0 JIT_RECORDED_FAILURE_CORPUS_SETUP=1 \
-      "${CARGO:-cargo}" test -p jit --test cli_issue "$SETUP_TEST" -- --exact --nocapture
+      "${CARGO:-cargo}" test --workspace --test cli_issue "$SETUP_TEST" -- --exact --nocapture
   )
 
   grep -q '^JIT_RECORDED_FAILURE_CORPUS_RECEIPT=' "$NEXTEST_ENV" ||
@@ -50,7 +60,7 @@ EOF
   NEXTEST=1 NEXTEST_VERSION="$PINNED_NEXTEST_VERSION" \
     NEXTEST_WORKSPACE_ROOT="$PWD" NEXTEST_ENV="$env_file" \
     CARGO="$fake_cargo" SETUP_SELFTEST_LOG="$log" run_setup
-  grep -qF "test -p jit --test cli_issue $SETUP_TEST -- --exact --nocapture" "$log"
+  grep -qF "test --workspace --test cli_issue $SETUP_TEST -- --exact --nocapture" "$log"
 
   set +e
   (

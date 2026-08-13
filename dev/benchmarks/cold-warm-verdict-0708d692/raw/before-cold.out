@@ -1,0 +1,15 @@
+=== run A (baseline, unmodified gate, COLD tree: no target/ dir) start 2026-08-13T13:00:57+03:00
+--- budget output ---
+rust-build-budget: FAILED
+  - test suite duration: observed 57019 ms, threshold 30000 ms (must be below threshold).
+  ✓ incremental-preflight: ok (17 ms)
+  ✓ fmt: ok (1523 ms)
+  ✓ clippy: ok (36793 ms)
+  ✓ suite-build: ok (45195 ms)
+  ✓ test: 4512 passed, 0 failed, 7 skipped (52446 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4555 ms)
+  ✓ suite-clock: 57019 ms
+  ✗ budget: FAILED (exit 1) (229 ms)
+  ✓ incremental-state: ok (30 ms)
+
+=== exit=1 end 2026-08-13T13:03:18+03:00
