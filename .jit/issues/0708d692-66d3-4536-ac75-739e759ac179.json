@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-13T09:52:45.634526852Z",
   "context": {},
   "created_at": "2026-08-13T09:51:35.291061297Z",
   "dependencies": [],
@@ -30,7 +31,7 @@
     "component:testing"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "The build gate decides on build-cache state instead of the tree",
-  "updated_at": "2026-08-13T09:51:48.403330238Z"
+  "updated_at": "2026-08-13T09:52:45.634526852Z"
 }

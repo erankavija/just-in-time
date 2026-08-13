@@ -14050,3 +14050,5 @@
 {"gate_key":"code-review","id":"dfcc72a5-0d06-46c5-a60b-0dc676670d86","issue_id":"0708d692-66d3-4536-ac75-739e759ac179","timestamp":"2026-08-13T09:51:48.403330238Z","type":"gate_added"}
 {"fields":["dependencies"],"id":"892890c0-bc9a-4c57-81dc-3c362d7606b2","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-08-13T09:51:52.039246499Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["description"],"id":"f7aa7d0c-9136-4c99-ae38-80c9a116d8d5","issue_id":"5a3ecba0-9e2a-401c-9994-85066ddaba8f","timestamp":"2026-08-13T09:52:15.306610336Z","type":"issue_updated","updated_by":"issue-update"}
+{"from":"ready","id":"93711bbe-2132-4772-aead-5fbafbabf56f","issue_id":"0708d692-66d3-4536-ac75-739e759ac179","timestamp":"2026-08-13T09:52:45.634526852Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"eb035afa-f5d8-4dc1-ab09-da1f42dcfade","issue_id":"0708d692-66d3-4536-ac75-739e759ac179","timestamp":"2026-08-13T09:52:45.634526852Z","type":"issue_claimed"}
